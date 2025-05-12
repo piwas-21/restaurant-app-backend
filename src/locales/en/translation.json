@@ -19,7 +19,7 @@
   "decrease_quantity_of_item": "Decrease quantity of {{itemName}}",
   "view_cart_checkout_button": "View Cart & Checkout",
   "view_cart_floating_button": "View Cart ({{count}} items) - CHF {{totalPrice}}",
-  "item_added_to_cart_toast": "\"{{itemName}}\" added to your cart!",
+  "item_added_to_cart_toast": "'{{itemName}}' added to your cart!",
 
   "cart_title": "Your Cart",
   "back_to_menu": "Back to Menu",
@@ -94,7 +94,8 @@
   "login_here_link": "Login here",
   "passwords_do_not_match": "Passwords do not match.",
   "registration_attempt_placeholder": "Registration functionality is a placeholder. Check console.",
-  "special_of_the_day_title": "Today's Special",  "special_of_the_day_description": "Check out today's special dish at RUMI Restaurant, Geneva.",
+  "special_of_the_day_title": "Today's Special",  
+  "special_of_the_day_description": "Check out today's special dish at RUMI Restaurant, Geneva.",
   "order_special_now_button": "Order Now",
   "view_full_menu_button": "View Full Menu",
   "no_special_today_message": "No special dish available today. Please check our full menu!",
@@ -190,6 +191,13 @@
   "feedback_form_submitting_button": "Submitting...",
   "feedback_form_submit_success_message": "Thank you for your feedback!",
   "average_rating_label": "Average Rating: {{rating}}/5 ({{count}} reviews)",
-  "no_reviews_yet": "No reviews yet. Be the first!"
-}
+  "no_reviews_yet": "No reviews yet. Be the first!",
+  "images_count_label": "images",
+  "previous_image_button_label": "Previous Image",
+  "next_image_button_label": "Next Image",
+  "customer_phone_label": "Phone Number:",
+  "customer_phone_placeholder": "Enter your phone number",
+  "switch_to_dark_mode": "Switch to Dark Mode",
+  "switch_to_light_mode": "Switch to Light Mode"
 
+}

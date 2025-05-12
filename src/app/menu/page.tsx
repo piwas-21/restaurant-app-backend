@@ -36,7 +36,7 @@ const menuData = {
           name_key: "sarma_name",
           description_key: "sarma_description",
           price: "1.90",
-          image_urls: ["/images/placeholder-sarma.jpeg", "/images/placeholder-sarma.jpg"], 
+          image_urls: ["/images/placeholder-sarma.jpeg", "/images/placeholder-falafel.jpeg"], 
           allergy_labels: ["Vegan", "Gluten-Free"],
         },
         {
@@ -66,7 +66,7 @@ const menuData = {
           name_key: "iskender_kebab_special_name",
           description_key: "iskender_kebab_special_description",
           price: "28.50",
-          image_urls: ["/images/placeholder-iskender.png", "/images/placeholder-iskender.jpg"],
+          image_urls: ["/images/placeholder-falafel.jpeg", "/images/placeholder-adana.jpeg"],
           allergy_labels: ["Halal", "Contains Dairy"],
         },
       ],
@@ -83,6 +83,11 @@ export default function MenuPage() {
   
   const [enlargedImageItem, setEnlargedImageItem] = useState<MenuItem | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isMounted, setIsMounted] = useState(false); // State to track client-side mount
+
+  useEffect(() => {
+    setIsMounted(true); // Set to true after component mounts on the client
+  }, []);
 
   interface MenuItem {
     id: string;
@@ -141,6 +146,7 @@ export default function MenuPage() {
     }
   }, [enlargedImageItem]);
   
+  // Keyboard navigation for enlarged image modal
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!enlargedImageItem) return;
@@ -160,6 +166,11 @@ export default function MenuPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [enlargedImageItem, showNextImage, showPrevImage, handleCloseEnlargedImage]);
+
+  if (!isMounted) {
+    // Render nothing or a fallback loader on the server and initial client render
+    return null; 
+  }
 
   return (
     <main className={styles.menuContainer} aria-labelledby="menu-page-heading">

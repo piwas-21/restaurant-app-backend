@@ -13,6 +13,11 @@
   --error-color: #f44336;
   --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   --font-family-serif: Georgia, Cambria, "Times New Roman", Times, serif;
+  /* Added variables for nav styling */
+  --nav-link-color: var(--text-color);
+  --nav-link-hover-bg: rgba(0, 0, 0, 0.1);
+  --nav-link-active-color: var(--primary-color);
+  --nav-link-active-bg: rgba(0, 0, 0, 0.05);
 }
 
 html[data-theme="dark"] {
@@ -28,6 +33,11 @@ html[data-theme="dark"] {
   --link-hover-color: #f08080;
   --success-color: #81C784;
   --error-color: #E57373;
+  /* Added variables for nav styling in dark mode */
+  --nav-link-color: var(--text-color);
+  --nav-link-hover-bg: rgba(255, 255, 255, 0.1);
+  --nav-link-active-color: var(--primary-color);
+  --nav-link-active-bg: rgba(255, 255, 255, 0.05);
 }
 
 html,
@@ -54,8 +64,31 @@ a {
 
 a:hover {
   color: var(--link-hover-color);
-  text-decoration: underline;
+  /* text-decoration: underline; /* Consider removing global underline if nav uses background */
 }
+
+/* Navigation Link Styles */
+.nav-link {
+  color: var(--nav-link-color);
+  text-decoration: none;
+  padding: 0.5rem 0.8rem; /* Add some padding */
+  border-radius: 4px; /* Optional: rounded corners */
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  font-weight: 500; /* Slightly bolder */
+}
+
+.nav-link:hover {
+  background-color: var(--nav-link-hover-bg);
+  color: var(--nav-link-color); /* Maintain color or change if needed */
+  text-decoration: none; /* Remove underline on hover if using background */
+}
+
+.nav-link.active {
+  background-color: var(--nav-link-active-bg);
+  color: var(--nav-link-active-color);
+  font-weight: 700; /* Make active link bolder */
+}
+
 
 /* Screen-reader only class */
 .sr-only {
@@ -90,4 +123,3 @@ input:focus, textarea:focus, select:focus {
   outline: 2px solid var(--primary-color);
   border-color: var(--primary-color);
 }
-

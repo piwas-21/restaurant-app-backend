@@ -1,46 +1,89 @@
 /* styles/LanguageSwitcher.module.css */
 
 .languageSwitcherContainer {
-  display: flex;
-  gap: 0.5rem; /* Space between buttons */
-  padding: 0.5rem 0; /* Padding around the switcher */
-  align-items: center;
-  justify-content: center; /* Center buttons if they are in a row */
+  position: relative; /* Needed for absolute positioning of the dropdown */
+  display: inline-block; /* Align with other nav items */
 }
 
-.langButton {
-  padding: 0.4rem 0.8rem;
-  border: 1px solid #ccc;
-  background-color: #f8f9fa;
-  color: #333;
+.dropdownButton {
+  background: none;
+  border: none;
+  padding: 0.5rem; 
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
-.langButton:hover {
-  background-color: #e9ecef;
-  border-color: #bbb;
+.dropdownButton:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover */
+  /* Dark mode adjustment if needed */
+  /* html[data-theme='dark'] & { background-color: rgba(255, 255, 255, 0.1); } */
 }
 
-.langButton:disabled,
-.langButton.activeLang {
-  background-color: #007bff; /* Primary color for active/disabled */
-  color: white;
-  border-color: #007bff;
-  cursor: default;
+.flagIcon {
+  display: block; /* Remove extra space below image */
+  width: 24px; /* Consistent width */
+  height: auto; /* Maintain aspect ratio */
+  border: 1px solid var(--border-color); /* Optional: border around flag */
 }
 
-/* Specific styling for mobile welcome screen if needed */
-.welcomeMobile .languageSwitcherContainer {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+.caret {
+  font-size: 0.6rem; /* Small caret */
+  color: var(--text-secondary);
 }
 
-.welcomeMobile .langButton {
-  padding: 0.6rem 1rem;
+.dropdownMenu {
+  position: absolute;
+  top: 100%; /* Position below the button */
+  right: 0; /* Align to the right */
+  background-color: var(--card-background); 
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  list-style: none;
+  padding: 0.5rem 0;
+  margin: 0.25rem 0 0 0; /* Small margin top */
+  min-width: 100px; /* Adjust as needed */
+  z-index: 10; /* Ensure it appears above other elements */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dropdownItem {
+  background: none;
+  border: none;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   font-size: 0.9rem;
+  color: var(--text-primary);
 }
 
+.dropdownItem:hover {
+  background-color: var(--secondary-color);
+}
+
+.dropdownItem:disabled,
+.dropdownItem.activeLang {
+  background-color: var(--primary-color-light); /* Use a lighter active color or adjust */
+  color: var(--primary-color);
+  cursor: default;
+  font-weight: bold;
+}
+
+.dropdownItem:disabled .flagIcon,
+.dropdownItem.activeLang .flagIcon {
+   /* Optional: style active/disabled flag differently, e.g., border */
+   outline: 2px solid var(--primary-color);
+   outline-offset: 1px;
+}
+
+/* Hide the old button styles */
+.langButton {
+  display: none;
+}

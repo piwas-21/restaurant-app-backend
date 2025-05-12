@@ -2,24 +2,34 @@
 "use client";
 
 import React, { useState } from 'react';
-import styles from '@/app/styles/FeedbackForm.module.css'; // Create this CSS module
+import styles from '@/app/styles/FeedbackForm.module.css';
 import { useTranslation } from 'react-i18next';
 
 interface FeedbackFormProps {
-  dishId: string; // Or some identifier for what is being rated
+  dishId: string;
   onSubmitSuccess: () => void;
 }
 
 const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) => {
   const { t } = useTranslation();
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState(0); // Actual selected rating
+  const [hoverRating, setHoverRating] = useState(0); // Rating based on hover
   const [comment, setComment] = useState('');
-  const [name, setName] = useState(''); // Optional: ask for user's name
+  const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleRatingChange = (newRating: number) => {
+  const handleRatingClick = (newRating: number) => {
     setRating(newRating);
+    setError(null); // Clear error when rating is selected
+  };
+
+  const handleStarMouseEnter = (starValue: number) => {
+    setHoverRating(starValue);
+  };
+
+  const handleStarMouseLeave = () => {
+    setHoverRating(0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,14 +43,12 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) 
       return;
     }
 
-    // Placeholder for API call
     console.log('Submitting feedback:', { dishId, rating, comment, name });
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
-    // On successful submission (simulated)
     setIsSubmitting(false);
-    setRating(0);
+    setRating(0); // Reset rating to 0 after successful submission
+    setHoverRating(0); // Reset hover rating
     setComment('');
     setName('');
     onSubmitSuccess();
@@ -53,19 +61,23 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) 
       
       <div className={styles.formGroup} role="group" aria-labelledby="rating-label">
         <label id="rating-label" className={styles.ratingLabel}>{t('feedback_form_rating_label')}:</label>
-        <div className={styles.starRating}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              className={star <= rating ? styles.starFilled : styles.starEmpty}
-              onClick={() => handleRatingChange(star)}
-              aria-label={t('feedback_form_star_rating_aria_label', { count: star })}
-              aria-pressed={star === rating}
-            >
-              ★
-            </button>
-          ))}
+        <div className={styles.starRating} onMouseLeave={handleStarMouseLeave}>
+          {[1, 2, 3, 4, 5].map((starValue) => {
+            const isFilled = starValue <= (hoverRating || rating);
+            return (
+              <button
+                key={starValue}
+                type="button"
+                className={isFilled ? styles.starFilled : styles.starEmpty} // Keep for potential styling (e.g., color)
+                onClick={() => handleRatingClick(starValue)}
+                onMouseEnter={() => handleStarMouseEnter(starValue)}
+                aria-label={t('feedback_form_star_rating_aria_label', { count: starValue })}
+                aria-pressed={starValue === rating}
+              >
+                {isFilled ? '★' : '☆'} 
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -103,4 +115,3 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) 
 };
 
 export default FeedbackForm;
-

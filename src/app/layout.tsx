@@ -9,16 +9,18 @@ import i18n from "../i18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher"; 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image"; // Import Next.js Image component
+import Image from "next/image";
 import { ThemeProvider, useTheme } from "@/components/ThemeContext"; 
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { SnackbarProvider } from "notistack"; // Import notistack
+import { SnackbarProvider } from "notistack";
+import { usePathname } from "next/navigation"; // Import usePathname
 
 const inter = Inter({ subsets: ["latin"] });
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const [isClient, setIsClient] = useState(false);
   const { theme } = useTheme(); 
+  const pathname = usePathname(); // Get the current pathname
 
   useEffect(() => {
     setIsClient(true);
@@ -56,10 +58,12 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                     <Image src="/rumi_logo.png" alt="RUMI Restaurant Logo" width={180} height={90} style={{ marginRight: "10px" }} />
                   </Link>
                   <nav style={{display: "flex", gap: "1rem", alignItems: "center"}}>
-                    <Link href="/" style={{color: "var(--text-color)"}}>Home</Link>
-                    <Link href="/menu" style={{color: "var(--text-color)"}}>Menu</Link>
-                    <Link href="/reservations" style={{color: "var(--text-color)"}}>Reservations</Link>
-                    <Link href="/cart" style={{color: "var(--text-color)"}}>Cart</Link> 
+                    {/* Assign className to nav links for styling */}
+                    <Link href="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`}>Home</Link>
+                    <Link href="/menu" className={`nav-link ${pathname === '/menu' ? 'active' : ''}`}>Menu</Link>
+                    <Link href="/reservations" className={`nav-link ${pathname === '/reservations' ? 'active' : ''}`}>Reservations</Link>
+                    <Link href="/cart" className={`nav-link ${pathname === '/cart' ? 'active' : ''}`}>Cart</Link> 
+                    {/* LanguageSwitcher and ThemeSwitcher might need similar treatment if they are links */}
                     {isClient && <LanguageSwitcher />}
                     {isClient && <ThemeSwitcher />}
                   </nav>
@@ -87,4 +91,3 @@ export default function RootLayoutOuter({ children }: { children: React.ReactNod
         </ThemeProvider>
     );
 }
-

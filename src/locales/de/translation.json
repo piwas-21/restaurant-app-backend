@@ -19,7 +19,7 @@
   "decrease_quantity_of_item": "Menge von {{itemName}} verringern",
   "view_cart_checkout_button": "Warenkorb & Kasse",
   "view_cart_floating_button": "Warenkorb ({{count}} Artikel) - CHF {{totalPrice}}",
-  "item_added_to_cart_toast": "\"{{itemName}}\" wurde Ihrem Warenkorb hinzugefügt!",
+  "item_added_to_cart_toast": "'{{itemName}}' wurde Ihrem Warenkorb hinzugefügt!",
 
   "cart_title": "Ihr Warenkorb",
   "back_to_menu": "Zurück zur Speisekarte",
@@ -192,6 +192,13 @@
   "feedback_form_submitting_button": "Wird gesendet...",
   "feedback_form_submit_success_message": "Vielen Dank für Ihr Feedback!",
   "average_rating_label": "Durchschnittliche Bewertung: {{rating}}/5 ({{count}} Bewertungen)",
-  "no_reviews_yet": "Noch keine Bewertungen. Seien Sie der Erste!"
+  "no_reviews_yet": "Noch keine Bewertungen. Seien Sie der Erste!",
+  "images_count_label": "Bilder",
+  "previous_image_button_label": "Vorheriges Bild",
+  "next_image_button_label": "Nächstes Bild",
+  "switch_to_dark_mode": "In den Dunkelmodus wechseln",
+  "switch_to_light_mode": "In den Hellmodus wechseln",
+  "customer_phone_label": "Telefonnummer:",
+  "customer_phone_placeholder": "Geben Sie Ihre Telefonnummer ein"
 }
 

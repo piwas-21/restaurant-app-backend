@@ -49,6 +49,7 @@
 
 .ctaButtonPrimary:hover {
   background-color: var(--link-hover-color);
+  color: var(--button-text-color);
 }
 
 .ctaButtonSecondary {

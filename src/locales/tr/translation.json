@@ -19,7 +19,7 @@
   "decrease_quantity_of_item": "{{itemName}} miktarını azalt",
   "view_cart_checkout_button": "Sepet ve Ödeme",
   "view_cart_floating_button": "Sepet ({{count}} ürün) - CHF {{totalPrice}}",
-  "item_added_to_cart_toast": "\"{{itemName}}\" sepetinize eklendi!",
+  "item_added_to_cart_toast": "'{{itemName}}' sepetinize eklendi!",
 
   "cart_title": "Sepetiniz",
   "back_to_menu": "Menüye Dön",
@@ -192,6 +192,13 @@
   "feedback_form_submitting_button": "Gönderiliyor...",
   "feedback_form_submit_success_message": "Geri bildiriminiz için teşekkür ederiz!",
   "average_rating_label": "Ortalama Puan: {{rating}}/5 ({{count}} yorum)",
-  "no_reviews_yet": "Henüz yorum yok. İlk siz olun!"
+  "no_reviews_yet": "Henüz yorum yok. İlk siz olun!",
+  "images_count_label": "resim",
+  "previous_image_button_label": "Önceki Resim",
+  "next_image_button_label": "Sonraki Resim",
+  "switch_to_dark_mode": "Karanlık Moda Geç",
+  "switch_to_light_mode": "Aydınlık Moda Geç",
+  "customer_phone_label": "Telefon Numarası:",
+  "customer_phone_placeholder": "Telefon numaranızı girin"
 }
 
