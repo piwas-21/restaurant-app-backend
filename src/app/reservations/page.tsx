@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import styles from "../styles/Reservations.module.css"; // Use desktop styles
 import { useTranslation } from "react-i18next";
 

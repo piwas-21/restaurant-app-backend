@@ -10,11 +10,13 @@ export default function Cart() {
   const { state, dispatch } = useCart();
 
   const handleRemoveItem = (itemId: string, itemName: string) => {
+    console.log(`Removing item: ${itemName}`);
     dispatch({ type: 'REMOVE_ITEM', payload: { id: itemId } });
     // Announce removal for screen readers if possible, or ensure focus management guides user
   };
 
   const handleUpdateQuantity = (itemId: string, quantity: number, itemName: string) => {
+    console.log(`Updating quantity for item: ${itemName} to ${quantity}`);
     dispatch({ type: 'UPDATE_QUANTITY', payload: { id: itemId, quantity } });
   };
 
@@ -35,7 +37,7 @@ export default function Cart() {
     <div className={styles.cartContainer} role="region" aria-labelledby="cart-heading">
       <h2 id="cart-heading">Your Cart</h2>
       <ul className={styles.cartItemsList} aria-label="Items in your cart">
-        {state.items.map((item, index) => (
+        {state.items.map((item) => (
           <li key={item.id} className={styles.cartItem} role="listitem">
             <div className={styles.itemInfo}>
               <span>{item.name} (CHF {item.price.toFixed(2)})</span>

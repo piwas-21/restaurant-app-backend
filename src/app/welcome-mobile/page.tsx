@@ -11,7 +11,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher"; // Import Language
 const logoPath = "/rumi_logo.png";
 
 export default function WelcomeMobilePage() {
-  const { t, i18n } = useTranslation(); // Initialize useTranslation
+  const { t } = useTranslation(); // Initialize useTranslation
 
   return (
     <main className={styles.welcomeContainer}>

@@ -11,6 +11,7 @@ interface AverageRatingProps {
 }
 
 const AverageRating: React.FC<AverageRatingProps> = ({ dishId, initialRatingData }) => {
+  console.log("AverageRating component rendered for dishId:", dishId);
   const { t } = useTranslation();
   // In a real app, you might fetch this data or receive it as props after calculation
   const ratingData = initialRatingData;

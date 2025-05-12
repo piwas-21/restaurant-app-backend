@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { useTranslation } from 'react-i18next'; // Import useTranslation
 
 export default function CheckoutPage() {
-  const { state, dispatch } = useCart();
+  const { state } = useCart();
   const { t } = useTranslation(); // Initialize useTranslation
   const [orderType, setOrderType] = useState<'pickup' | 'dine-in'>('pickup');
   const [tableNumber, setTableNumber] = useState('');

@@ -1,7 +1,7 @@
 // src/app/admin/menu-management/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import styles from "../../styles/AdminPage.module.css";
 
@@ -23,8 +23,8 @@ interface MenuItem {
 
 export default function MenuManagementPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [isLoading] = useState(false);
+  const [error] = useState('');
 
   // TODO: useEffect to fetch menu items from API on component mount
 

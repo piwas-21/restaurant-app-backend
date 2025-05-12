@@ -1,7 +1,6 @@
 // src/app/layout.tsx
 "use client"; 
 
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/cart/CartContext";
@@ -13,22 +12,9 @@ import Link from "next/link";
 import Image from "next/image"; // Import Next.js Image component
 import { ThemeProvider, useTheme } from "@/components/ThemeContext"; 
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { SnackbarProvider, useSnackbar } from "notistack"; // Import notistack
+import { SnackbarProvider } from "notistack"; // Import notistack
 
 const inter = Inter({ subsets: ["latin"] });
-
-// Test component for notistack
-function NotistackTestButton() {
-  const { enqueueSnackbar } = useSnackbar();
-  return (
-    <button 
-      onClick={() => enqueueSnackbar("Notistack Test Notification!", { variant: "success" })}
-      style={{position: "fixed", top: "50px", right: "10px", zIndex: 9999, padding: "10px", backgroundColor: "blue", color: "white"}}
-    >
-      Test Notistack
-    </button>
-  );
-}
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const [isClient, setIsClient] = useState(false);
@@ -64,8 +50,6 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         <I18nextProvider i18n={i18n}>
           <CartProvider>
             <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: "top", horizontal: "center"}}>
-              {/* Test button can remain for now, or be moved to a specific page for testing */}
-              {isClient && <NotistackTestButton />}
               <header style={{ padding: "0.5rem 1rem", backgroundColor: "var(--secondary-color)", color: "var(--text-color)", textAlign: "center", borderBottom: "1px solid var(--border-color)" }}>
                 <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Link href="/" style={{ textDecoration: "none", color: "var(--primary-color)", display: "flex", alignItems: "center" }}>

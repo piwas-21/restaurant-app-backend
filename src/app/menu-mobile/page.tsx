@@ -1,4 +1,3 @@
-// src/app/menu-mobile/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -8,9 +7,34 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
+// Define proper interfaces for our data structure
+interface MenuItem {
+  id: string;
+  name_key: string;
+  description_key: string;
+  price: string;
+  image_url: string;
+  allergy_labels_keys: string[];
+}
+
+interface MenuCategory {
+  id: string;
+  name_key: string;
+  items: MenuItem[];
+}
+
+interface MenuData {
+  categories: MenuCategory[];
+}
+
+interface FilterOption {
+  id: string;
+  name_key: string;
+}
+
 // Placeholder data - in a real app, this would come from an API
 // Added more diverse allergy_labels_keys for testing filters
-const initialMenuData = {
+const initialMenuData: MenuData = {
   categories: [
     {
       id: "starters",
@@ -89,7 +113,7 @@ const initialMenuData = {
   ],
 };
 
-const availableFilters = [
+const availableFilters: FilterOption[] = [
   { id: "filter_vegan", name_key: "filter_vegan" },
   { id: "filter_vegetarian", name_key: "filter_vegetarian" },
   { id: "filter_gluten_free", name_key: "filter_gluten_free" },
@@ -99,16 +123,17 @@ const availableFilters = [
 ];
 
 export default function MenuMobilePage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { dispatch, state: cartState } = useCart();
   const [activeCategory, setActiveCategory] = useState<string | null>(initialMenuData.categories[0]?.id || null);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  const getItemName = (item: any) => t(item.name_key);
-  const getItemDescription = (item: any) => t(item.description_key);
+  // Fixed type issues with these functions
+  const getItemName = (item: MenuItem): string => t(item.name_key);
+  const getItemDescription = (item: MenuItem): string => t(item.description_key);
 
-  const handleAddItemToCart = (item: any) => {
+  const handleAddItemToCart = (item: MenuItem): void => {
     dispatch({
       type: "ADD_ITEM",
       payload: {
@@ -120,7 +145,7 @@ export default function MenuMobilePage() {
     });
   };
 
-  const getItemQuantityInCart = (itemId: string) => {
+  const getItemQuantityInCart = (itemId: string): number => {
     const itemInCart = cartState.items.find(cartItem => cartItem.id === itemId);
     return itemInCart ? itemInCart.quantity : 0;
   };
@@ -128,7 +153,7 @@ export default function MenuMobilePage() {
   const totalCartItems = cartState.items.reduce((sum, item) => sum + item.quantity, 0);
   const totalCartPrice = cartState.items.reduce((total, item) => total + item.price * item.quantity, 0).toFixed(2);
 
-  const handleFilterChange = (filterId: string) => {
+  const handleFilterChange = (filterId: string): void => {
     setSelectedFilters(prevFilters =>
       prevFilters.includes(filterId)
         ? prevFilters.filter(f => f !== filterId)
@@ -136,11 +161,11 @@ export default function MenuMobilePage() {
     );
   };
 
-  const resetFilters = () => {
+  const resetFilters = (): void => {
     setSelectedFilters([]);
   };
 
-  const filteredMenuData = useMemo(() => {
+  const filteredMenuData = useMemo((): MenuData => {
     if (selectedFilters.length === 0) {
       return initialMenuData;
     }
@@ -284,4 +309,3 @@ export default function MenuMobilePage() {
     </main>
   );
 }
-

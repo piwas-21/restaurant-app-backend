@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState } from "react"; // Added useState
-import type { Metadata } from "next";
 import styles from "../styles/MenuPage.module.css";
 import { useCart } from "@/components/cart/CartContext";
 import Link from "next/link";
@@ -84,12 +83,28 @@ const menuData = {
 
 export default function MenuPage() {
   const { dispatch } = useCart();
-  const { t, i18n } = useTranslation(); // Get i18n instance for current language
+  const { t } = useTranslation(); // Get i18n instance for current language
   const { enqueueSnackbar } = useSnackbar(); // Get enqueueSnackbar from notistack
   const [showFeedbackForm, setShowFeedbackForm] = useState<string | null>(null); // dishId or null
   const [ratings, setRatings] = useState(mockAverageRatings); // Local state for ratings to trigger re-render
 
-  const handleAddItemToCart = (item: any) => {
+  interface MenuItem {
+    id: string;
+    name_key: string;
+    description_key: string;
+    price: string;
+    image_url: string;
+    allergy_labels: string[];
+  }
+
+  interface AddItemPayload {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }
+
+  const handleAddItemToCart = (item: MenuItem): void => {
     dispatch({ 
       type: "ADD_ITEM", 
       payload: { 
@@ -97,13 +112,14 @@ export default function MenuPage() {
         name: t(item.name_key), // Use translated name
         price: parseFloat(item.price), 
         quantity: 1 
-      }
+      } as AddItemPayload
     });
     // toast.success(t("item_added_to_cart_toast", { itemName: t(item.name_key) })); // Old react-hot-toast
     enqueueSnackbar(t("item_added_to_cart_toast", { itemName: t(item.name_key) }), { variant: "success" }); // New notistack notification
   };
 
   const handleFeedbackSuccess = async (dishId: string) => {
+    console.log("Feedback submitted successfully for dishId:", dishId);
     setShowFeedbackForm(null); // Close form
     // Simulate fetching updated ratings - in a real app, this might re-fetch or rely on optimistic updates
     // For this mock, we directly update the local state from the mock store

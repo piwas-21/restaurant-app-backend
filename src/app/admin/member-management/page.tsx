@@ -1,7 +1,7 @@
 // src/app/admin/member-management/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import styles from "../../styles/AdminPage.module.css";
 
@@ -22,8 +22,8 @@ interface Member {
 
 export default function MemberManagementPage() {
   const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [isLoading] = useState(false);
+  const [error] = useState("");
 
   // TODO: useEffect to fetch members from API
 

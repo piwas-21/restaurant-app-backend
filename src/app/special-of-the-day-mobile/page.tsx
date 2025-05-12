@@ -26,9 +26,6 @@ const specialDishData = {
   availability_key: "special_availability_today_only", // Example key, ensure it"s in translations
 };
 
-// A scenario where there is no special dish
-const noSpecialDish = null; // or set specialDishData to null to test this
-
 export default function SpecialOfTheDayMobilePage() {
   const { t } = useTranslation(); // Initialize useTranslation
 
