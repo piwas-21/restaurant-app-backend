@@ -1,7 +1,7 @@
 // src/app/menu/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react"; 
 import styles from "../styles/MenuPage.module.css";
 import { useCart } from "@/components/cart/CartContext";
 import Link from "next/link";
@@ -25,7 +25,6 @@ const submitFeedbackToStore = async (dishId: string, rating: number, comment?: s
   return { success: true };
 };
 
-// IMPORTANT: Update your menuData to use image_urls: string[] instead of image_url: string
 const menuData = {
   categories: [
     {
@@ -37,7 +36,7 @@ const menuData = {
           name_key: "sarma_name",
           description_key: "sarma_description",
           price: "1.90",
-          image_urls: ["/images/placeholder-sarma.jpeg", "/images/placeholder-falafel.jpeg"], // Example for multiple images
+          image_urls: ["/images/placeholder-sarma.jpeg", "/images/placeholder-sarma.jpg"], 
           allergy_labels: ["Vegan", "Gluten-Free"],
         },
         {
@@ -45,7 +44,7 @@ const menuData = {
           name_key: "falafel_name",
           description_key: "falafel_description",
           price: "1.50",
-          image_urls: ["/images/placeholder-falafel.jpeg"], // Example for single image
+          image_urls: ["/images/placeholder-falafel.jpeg"], 
           allergy_labels: ["Vegan", "Gluten-Free"],
         },
       ],
@@ -59,7 +58,7 @@ const menuData = {
           name_key: "adana_kebab_name",
           description_key: "adana_kebab_description",
           price: "23.90",
-          image_urls: ["/images/placeholder-adana.jpeg", "/images/placeholder-falafel.jpeg"],
+          image_urls: ["/images/placeholder-adana.jpeg"],
           allergy_labels: ["Halal"],
         },
          {
@@ -67,7 +66,7 @@ const menuData = {
           name_key: "iskender_kebab_special_name",
           description_key: "iskender_kebab_special_description",
           price: "28.50",
-          image_urls: ["/images/placeholder-falafel.jpeg", "/images/placeholder-adana.jpeg"],
+          image_urls: ["/images/placeholder-iskender.png", "/images/placeholder-iskender.jpg"],
           allergy_labels: ["Halal", "Contains Dairy"],
         },
       ],
@@ -90,7 +89,7 @@ export default function MenuPage() {
     name_key: string;
     description_key: string;
     price: string;
-    image_urls: string[];
+    image_urls: string[]; 
     allergy_labels: string[];
   }
 
@@ -101,7 +100,7 @@ export default function MenuPage() {
     quantity: number;
   }
 
-  const handleAddItemToCart = (item: MenuItem): void => {
+  const handleAddItemToCart = useCallback((item: MenuItem): void => {
     dispatch({
       type: "ADD_ITEM",
       payload: {
@@ -112,36 +111,36 @@ export default function MenuPage() {
       } as AddItemPayload
     });
     enqueueSnackbar(t("item_added_to_cart_toast", { itemName: t(item.name_key) }), { variant: "success" });
-  };
+  }, [dispatch, enqueueSnackbar, t]);
 
-  const handleFeedbackSuccess = async (dishId: string) => {
+  const handleFeedbackSuccess = useCallback(async (dishId: string) => {
+    console.log("Feedback submitted successfully for dish ID:", dishId);
     setShowFeedbackForm(null);
     setRatings({ ...mockAverageRatings });
-  };
+  }, []); 
 
-  const handleImageClick = (item: MenuItem, index: number = 0) => {
+  const handleImageClick = useCallback((item: MenuItem, index: number = 0) => {
     setEnlargedImageItem(item);
     setCurrentImageIndex(index);
-  };
+  }, []);
 
-  const handleCloseEnlargedImage = () => {
+  const handleCloseEnlargedImage = useCallback(() => {
     setEnlargedImageItem(null);
     setCurrentImageIndex(0);
-  };
+  }, []);
 
-  const showNextImage = () => {
+  const showNextImage = useCallback(() => {
     if (enlargedImageItem && enlargedImageItem.image_urls) {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % enlargedImageItem.image_urls.length);
     }
-  };
+  }, [enlargedImageItem]);
 
-  const showPrevImage = () => {
+  const showPrevImage = useCallback(() => {
     if (enlargedImageItem && enlargedImageItem.image_urls) {
       setCurrentImageIndex((prevIndex) => (prevIndex - 1 + enlargedImageItem.image_urls.length) % enlargedImageItem.image_urls.length);
     }
-  };
+  }, [enlargedImageItem]);
   
-  // Keyboard navigation for enlarged image modal
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!enlargedImageItem) return;
