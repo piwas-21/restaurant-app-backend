@@ -1,0 +1,137 @@
+
+[
+  {
+    "id": "durum-adana",
+    "content": {
+      "en": {
+        "name": "Adana Durum",
+        "description": "Onion, Green Salad, Carrot, Spicy Sauce"
+      },
+      "tr": {
+        "name": "Adana Dürüm",
+        "description": "Soğan, Yeşil Salata, Havuç, Acı Sos" 
+      },
+      "de": {
+        "name": "Adana Dürüm",
+        "description": "Zwiebel, Grüner Salat, Karotte, Würzige Soße"
+      }
+    },
+    "price": 14.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/310991a9-b493-4d3c-9a74-60a04d636676.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "durum",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/310991a9-b493-4d3c-9a74-60a04d636676.webp", "alt": "Adana Durum" }]
+  },
+  {
+    "id": "durum-lamb-shish",
+    "content": {
+      "en": {
+        "name": "Lamb Shish Durum",
+        "description": "Onion, Green Salad, Carrot, Spicy Sauce, Tomato"
+      },
+      "tr": {
+        "name": "Kuzu Şiş Dürüm",
+        "description": "Soğan, Yeşil Salata, Havuç, Acı Sos, Domates"
+      },
+      "de": {
+        "name": "Lamm Schisch Dürüm",
+        "description": "Zwiebel, Grüner Salat, Karotte, Würzige Soße, Tomate"
+      }
+    },
+    "price": 14.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5ae72f90-a3d3-4bab-9465-a901f39dc43c.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "durum",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5ae72f90-a3d3-4bab-9465-a901f39dc43c.webp", "alt": "Lamb Shish Durum" }]
+  },
+  {
+    "id": "durum-chicken-shish",
+    "content": {
+      "en": {
+        "name": "Chicken Shish Durum",
+        "description": "Onion, Green Salad, Carrot, Spicy Sauce, Tomato"
+      },
+      "tr": {
+        "name": "Tavuk Şiş Dürüm",
+        "description": "Soğan, Yeşil Salata, Havuç, Acı Sos, Domates"
+      },
+      "de": {
+        "name": "Hähnchen Schisch Dürüm",
+        "description": "Zwiebel, Grüner Salat, Karotte, Würzige Soße, Tomate"
+      }
+    },
+    "price": 13.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/7f28afe8-eb09-4a5e-b27b-5f8be042ff15.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "durum",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/7f28afe8-eb09-4a5e-b27b-5f8be042ff15.webp", "alt": "Chicken Shish Durum" }]
+  },
+  {
+    "id": "durum-kofte-sandwich",
+    "content": {
+      "en": {
+        "name": "Kofte Sandwich",
+        "description": "Wrap Bread, Bread, Onion, Green Salad, Carrot, Spicy Sauce, Tomato"
+      },
+      "tr": {
+        "name": "Köfte Sandviç",
+        "description": "Dürüm Ekmeği, Ekmek, Soğan, Yeşil Salata, Havuç, Acı Sos, Domates"
+      },
+      "de": {
+        "name": "Köfte Sandwich",
+        "description": "Wrap Brot, Brot, Zwiebel, Grüner Salat, Karotte, Würzige Soße, Tomate"
+      }
+    },
+    "price": 13.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/a7e7952d-4713-4c1c-aa56-8822e60ec439.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "durum",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/a7e7952d-4713-4c1c-aa56-8822e60ec439.webp", "alt": "Kofte Sandwich" }]
+  },
+  {
+    "id": "durum-your-durum",
+    "content": {
+      "en": {
+        "name": "Your Durum",
+        "description": "Build your own durum wrap."
+      },
+      "tr": {
+        "name": "Senin Dürümün",
+        "description": "Kendi dürümünü oluştur."
+      },
+      "de": {
+        "name": "Dein Dürüm",
+        "description": "Stelle deinen eigenen Dürüm-Wrap zusammen."
+      }
+    },
+    "price": 10.00,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/1ffaeac5-20b9-4e71-9be0-5295c913f199.webp",
+    "dietaryTags": [],
+    "categoryKey": "durum",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/1ffaeac5-20b9-4e71-9be0-5295c913f199.webp", "alt": "Your Durum" }]
+  },
+  {
+    "id": "durum-french-fries",
+    "content": {
+      "en": {
+        "name": "French Fries Portion",
+        "description": "A serving of crispy french fries."
+      },
+      "tr": {
+        "name": "Patates Kızartması Porsiyon",
+        "description": "Bir porsiyon çıtır patates kızartması."
+      },
+      "de": {
+        "name": "Pommes Frites Portion",
+        "description": "Eine Portion knusprige Pommes Frites."
+      }
+    },
+    "price": 6.00,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/0b07647b-28b0-437d-a201-2e7d48a8e5a1.jpg",
+    "dietaryTags": ["vegetarian", "halal", "vegan", "gluten-free"],
+    "categoryKey": "durum",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/0b07647b-28b0-437d-a201-2e7d48a8e5a1.jpg", "alt": "French Fries Portion" }]
+  }
+]
+
+    

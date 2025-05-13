@@ -8,7 +8,7 @@ import styles from "../styles/WelcomeMobile.module.css";
 import { useTranslation } from "react-i18next"; // Import useTranslation
 import LanguageSwitcher from "@/components/LanguageSwitcher"; // Import LanguageSwitcher
 
-const logoPath = "/rumi_logo.png";
+const logoPath = "/rumi_logo_transparent.png";
 
 export default function WelcomeMobilePage() {
   const { t } = useTranslation(); // Initialize useTranslation

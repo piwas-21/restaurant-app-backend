@@ -1,0 +1,61 @@
+
+[
+  {
+    "id": "hotDrink-mint-tea",
+    "name": "Mint Tea",
+    "price": "CHF 6.00",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/bd54452c-ed92-4bb9-837e-e26c96e39ff4.webp",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-turkish-tea",
+    "name": "Turkish Tea",
+    "price": "CHF 6.00",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/36d1b57c-492e-4fd4-86aa-b740cb69a582.webp",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-coffee-1",
+    "name": "Coffee",
+    "price": "CHF 4.00",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/b45b8bc9-92a8-43e4-b06b-994a2241f625.webp",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-coffee-2",
+    "name": "Coffee",
+    "price": "CHF 3.50",
+    "image": "https://picsum.photos/400/300?random=hot-drink-coffee-2",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-cappuccino",
+    "name": "Cappuccino",
+    "price": "CHF 5.00",
+    "image": "https://picsum.photos/400/300?random=hot-drink-cappuccino",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-latte-macchiato",
+    "name": "Latte Macchiato",
+    "price": "CHF 6.00",
+    "image": "https://picsum.photos/400/300?random=hot-drink-latte",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-espresso",
+    "name": "Espresso",
+    "price": "CHF 4.00",
+    "image": "https://picsum.photos/400/300?random=hot-drink-espresso",
+    "description": ""
+  },
+  {
+    "id": "hotDrink-milk",
+    "name": "Milk",
+    "price": "CHF 0.00",
+    "image": "https://picsum.photos/400/300?random=hot-drink-milk",
+    "description": "Price varies"
+  }
+]
+
+    

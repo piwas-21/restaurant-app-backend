@@ -43,7 +43,7 @@ export default function HomePage() {
           <div className={styles.glassOverlay}></div>
           <nav className={styles.heroNav}>
             <Link href="/" className={styles.heroLogoLink}>
-              <Image src="/rumi_logo.png" alt="RUMI Restaurant Logo" width={180} height={90} />
+              {/* <Image src="/rumi_logo_transparent.png" alt="RUMI Restaurant Logo" width={180} height={90} /> */}
             </Link>
             {/* Placeholder for nav links to match structure if needed */}
             <div className={styles.heroNavLinks}>
@@ -73,7 +73,7 @@ export default function HomePage() {
         
         <nav className={styles.heroNav}>
           <Link href="/" className={styles.heroLogoLink}>
-            <Image src="/rumi_logo.png" alt="RUMI Restaurant Logo" width={180} height={90} />
+            {/* <Image src="/rumi_logo_transparent.png" alt="RUMI Restaurant Logo" width={180} height={90} /> */}
           </Link>
           <div className={styles.heroNavLinks}>
             <Link href="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`}>{t('nav_home', 'Home')}</Link>

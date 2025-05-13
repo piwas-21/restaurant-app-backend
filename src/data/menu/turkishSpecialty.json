@@ -1,0 +1,138 @@
+
+[
+  {
+    "id": "turkishSpecialty-lamb-guvec",
+    "content": {
+      "en": {
+        "name": "Lamb Guvec",
+        "description": "Tender lamb cubes slow-cooked with seasonal vegetables in a traditional clay pot, infused with garlic. Served with crusty bread, rice, and salad."
+      },
+      "tr": {
+        "name": "Kuzu Güveç",
+        "description": "Yumuşak kuzu küpleri, geleneksel bir toprak kapta mevsim sebzeleriyle yavaş pişirilir, sarımsakla tatlandırılır. Çıtır ekmek, pilav ve salata ile servis edilir."
+      },
+      "de": {
+        "name": "Lamm Güvec",
+        "description": "Zarte Lammwürfel langsam mit saisonalem Gemüse in einem traditionellen Tontopf gegart, mit Knoblauch verfeinert. Serviert mit knusprigem Brot, Reis und Salat."
+      }
+    },
+    "price": 28.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5b6d759c-7d34-4771-b2cb-a60b431176fc.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "turkishSpecialty",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5b6d759c-7d34-4771-b2cb-a60b431176fc.webp",
+        "alt": "Lamb Guvec"
+      }
+    ]
+  },
+  {
+    "id": "turkishSpecialty-chicken-mushroom-guvec",
+    "content": {
+      "en": {
+        "name": "Chicken Mushroom Guvec",
+        "description": "Tender chicken and mushroom slow-cooked with seasonal vegetables and cheese in a traditional clay pot, infused with garlic. Served with crusty bread, rice, and salad."
+      },
+      "tr": {
+        "name": "Tavuklu Mantarlı Güveç",
+        "description": "Yumuşak tavuk ve mantar, geleneksel bir toprak kapta mevsim sebzeleri ve peynirle yavaş pişirilir, sarımsakla tatlandırılır. Çıtır ekmek, pilav ve salata ile servis edilir."
+      },
+      "de": {
+        "name": "Hähnchen-Pilz-Güvec",
+        "description": "Zartes Hähnchen und Pilze langsam mit saisonalem Gemüse und Käse in einem traditionellen Tontopf gegart, mit Knoblauch verfeinert. Serviert mit knusprigem Brot, Reis und Salat."
+      }
+    },
+    "price": 28.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5eb2584f-2e0e-4c4a-a2ad-66d5f917720e.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "turkishSpecialty",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5eb2584f-2e0e-4c4a-a2ad-66d5f917720e.webp",
+        "alt": "Chicken Mushroom Guvec"
+      }
+    ]
+  },
+  {
+    "id": "turkishSpecialty-chicken-guvec",
+    "content": {
+      "en": {
+        "name": "Chicken Guvec",
+        "description": "Tender chicken slow-cooked with seasonal vegetables in a traditional clay pot, infused with garlic. Served with crusty bread, rice, and salad."
+      },
+      "tr": {
+        "name": "Tavuk Güveç",
+        "description": "Yumuşak tavuk, geleneksel bir toprak kapta mevsim sebzeleriyle yavaş pişirilir, sarımsakla tatlandırılır. Çıtır ekmek, pilav ve salata ile servis edilir."
+      },
+      "de": {
+        "name": "Hähnchen Güvec",
+        "description": "Zartes Hähnchen langsam mit saisonalem Gemüse in einem traditionellen Tontopf gegart, mit Knoblauch verfeinert. Serviert mit knusprigem Brot, Reis und Salat."
+      }
+    },
+    "price": 26.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/7e7a7c3a-df33-46c3-98a3-9f6d3f62e386.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "turkishSpecialty",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/7e7a7c3a-df33-46c3-98a3-9f6d3f62e386.webp",
+        "alt": "Chicken Guvec"
+      }
+    ]
+  },
+  {
+    "id": "turkishSpecialty-kofte-kiremit",
+    "content": {
+      "en": {
+        "name": "Kofte Kiremit",
+        "description": "Kofte slow-cooked with seasonal vegetables and cheese in a traditional clay pot, infused with garlic. Served with crusty bread, rice, and salad."
+      },
+      "tr": {
+        "name": "Köfte Kiremit",
+        "description": "Köfte, geleneksel bir toprak kapta mevsim sebzeleri ve peynirle yavaş pişirilir, sarımsakla tatlandırılır. Çıtır ekmek, pilav ve salata ile servis edilir."
+      },
+      "de": {
+        "name": "Köfte Kiremit",
+        "description": "Köfte langsam mit saisonalem Gemüse und Käse in einem traditionellen Tontopf gegart, mit Knoblauch verfeinert. Serviert mit knusprigem Brot, Reis und Salat."
+      }
+    },
+    "price": 26.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/fd8edd95-5cdc-447f-b7c2-086bc99ce3c7.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "turkishSpecialty",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/fd8edd95-5cdc-447f-b7c2-086bc99ce3c7.webp",
+        "alt": "Kofte Kiremit"
+      }
+    ]
+  },
+  {
+    "id": "turkishSpecialty-lamb-sac-tava",
+    "content": {
+      "en": {
+        "name": "Lamb Sac Tava",
+        "description": "Tender lamb cubes seared over high heat in a traditional sac pan with peppers, tomatoes, and spices. Juicy, lightly charred, and aromatic, served sizzling with salad and flatbread."
+      },
+      "tr": {
+        "name": "Kuzu Sac Tava",
+        "description": "Yumuşak kuzu küpleri, geleneksel bir sac tavada yüksek ateşte biber, domates ve baharatlarla kızartılır. Sulu, hafifçe kömürleşmiş ve aromatik, salata ve pide ile sıcak servis edilir."
+      },
+      "de": {
+        "name": "Lamm Sac Tava",
+        "description": "Zarte Lammwürfel bei hoher Hitze in einer traditionellen Sac-Pfanne mit Paprika, Tomaten und Gewürzen angebraten. Saftig, leicht angekohlt und aromatisch, brutzelnd mit Salat und Fladenbrot serviert."
+      }
+    },
+    "price": 28.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/0d3dbdab-f6d2-4018-90c2-9f2dfdc3e423.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "turkishSpecialty",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/0d3dbdab-f6d2-4018-90c2-9f2dfdc3e423.webp",
+        "alt": "Lamb Sac Tava"
+      }
+    ]
+  }
+]

@@ -1,0 +1,139 @@
+
+[
+  {
+    "id": "grill-kofte-grill",
+    "content": {
+      "en": {
+        "name": "Kofte Grill",
+        "description": "Grilled koftes served with salad and french fries or rice with sauces and a bread."
+      },
+      "tr": {
+        "name": "Köfte Izgara",
+        "description": "Izgara köfteler, salata ve patates kızartması veya pilav ile soslar ve bir ekmek eşliğinde servis edilir."
+      },
+      "de": {
+        "name": "Köfte Grill",
+        "description": "Gegrillte Köftes, serviert mit Salat und Pommes frites oder Reis, dazu Saucen und Brot."
+      }
+    },
+    "price": 23.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/e2f39427-8d33-4807-bee0-7ae3b3d3cbfb.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "grill",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/e2f39427-8d33-4807-bee0-7ae3b3d3cbfb.webp",
+        "alt": "Kofte Grill"
+      }
+    ]
+  },
+  {
+    "id": "grill-adana-grill",
+    "content": {
+      "en": {
+        "name": "Adana Grill",
+        "description": "Grilled Adana served with salad and french fries or rice with sauces and a bread."
+      },
+      "tr": {
+        "name": "Adana Izgara",
+        "description": "Izgara Adana, salata ve patates kızartması veya pilav ile soslar ve bir ekmek eşliğinde servis edilir."
+      },
+      "de": {
+        "name": "Adana Grill",
+        "description": "Gegrilltes Adana, serviert mit Salat und Pommes frites oder Reis, dazu Saucen und Brot."
+      }
+    },
+    "price": 23.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/375a855f-1b96-4532-add1-7453bda071b6.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "grill",
+    "isSpecial": true,
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/375a855f-1b96-4532-add1-7453bda071b6.webp",
+        "alt": "Adana Grill"
+      }
+    ]
+  },
+  {
+    "id": "grill-chicken-shish-grill",
+    "content": {
+      "en": {
+        "name": "Chicken Shish Grill",
+        "description": "Grilled chicken skewer served with salad and french fries or rice with sauces and a bread."
+      },
+      "tr": {
+        "name": "Tavuk Şiş Izgara",
+        "description": "Izgara tavuk şiş, salata ve patates kızartması veya pilav ile soslar ve bir ekmek eşliğinde servis edilir."
+      },
+      "de": {
+        "name": "Hähnchen Schisch Grill",
+        "description": "Gegrillter Hähnchenspieß, serviert mit Salat und Pommes frites oder Reis, dazu Saucen und Brot."
+      }
+    },
+    "price": 23.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/b49efdd9-5b0f-4b64-89d3-13f265e3993f.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "grill",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/b49efdd9-5b0f-4b64-89d3-13f265e3993f.webp",
+        "alt": "Chicken Shish Grill"
+      }
+    ]
+  },
+  {
+    "id": "grill-lamb-shish-grill",
+    "content": {
+      "en": {
+        "name": "Lamb Shish Grill",
+        "description": "Grilled lamb skewer served with salad and french fries or rice with sauces and a bread."
+      },
+      "tr": {
+        "name": "Kuzu Şiş Izgara",
+        "description": "Izgara kuzu şiş, salata ve patates kızartması veya pilav ile soslar ve bir ekmek eşliğinde servis edilir."
+      },
+      "de": {
+        "name": "Lamm Schisch Grill",
+        "description": "Gegrillter Lammspieß, serviert mit Salat und Pommes frites oder Reis, dazu Saucen und Brot."
+      }
+    },
+    "price": 26.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5e9b15a8-9806-4222-b5e6-8b104bfe88cc.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "grill",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/5e9b15a8-9806-4222-b5e6-8b104bfe88cc.webp",
+        "alt": "Lamb Shish Grill"
+      }
+    ]
+  },
+  {
+    "id": "grill-mix-grill",
+    "content": {
+      "en": {
+        "name": "Mix Grill",
+        "description": "Grilled koftes, Adana, lamb, and chicken skewer served with salad and french fries or rice with sauces and a bread."
+      },
+      "tr": {
+        "name": "Karışık Izgara",
+        "description": "Izgara köfteler, Adana, kuzu ve tavuk şiş, salata ve patates kızartması veya pilav ile soslar ve bir ekmek eşliğinde servis edilir."
+      },
+      "de": {
+        "name": "Mix Grill",
+        "description": "Gegrillte Köftes, Adana, Lamm- und Hähnchenspieß, serviert mit Salat und Pommes frites oder Reis, dazu Saucen und Brot."
+      }
+    },
+    "price": 32.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/cad4dd66-b3e5-4bb7-b59f-53d2bed089e8.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "grill",
+    "images": [
+      {
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/cad4dd66-b3e5-4bb7-b59f-53d2bed089e8.webp",
+        "alt": "Mix Grill"
+      }
+    ]
+  }
+]

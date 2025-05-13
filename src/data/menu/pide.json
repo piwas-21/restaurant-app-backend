@@ -1,0 +1,115 @@
+
+[
+  {
+    "id": "pide-etli-ekmek",
+    "content": {
+      "en": {
+        "name": "Etli Ekmek",
+        "description": "A signature Konya flatbread stretched thin and topped with minced beef, onions, tomatoes, and peppers, baked crisp in an oven. Served in long, shareable strips."
+      },
+      "tr": {
+        "name": "Etli Ekmek",
+        "description": "Konya'nın imzası olan, ince açılmış, üzerine kıyma, soğan, domates ve biber eklenerek fırında çıtır çıtır pişirilmiş pide. Uzun, paylaşılabilir şeritler halinde servis edilir."
+      },
+      "de": {
+        "name": "Etli Ekmek",
+        "description": "Ein charakteristisches Fladenbrot aus Konya, dünn ausgerollt und mit Hackfleisch, Zwiebeln, Tomaten und Paprika belegt, im Ofen knusprig gebacken. Wird in langen, teilbaren Streifen serviert."
+      }
+    },
+    "price": 19.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/76656410-6780-4978-9f4c-c0e0030bc791.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "pide",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/76656410-6780-4978-9f4c-c0e0030bc791.webp", "alt": "Etli Ekmek" }]
+  },
+  {
+    "id": "pide-minced-meat",
+    "content": {
+      "en": {
+        "name": "Minced Meat Pide",
+        "description": "Turkish flatbread with ground beef, onions, and tomatoes, seasoned with spices. A savory food staple, blending tender meat and aromatic spices in a golden crust."
+      },
+      "tr": {
+        "name": "Kıymalı Pide",
+        "description": "Kıyma, soğan ve domates ile hazırlanmış, baharatlarla tatlandırılmış Türk pidesi. Altın rengi kabuk içinde yumuşak et ve aromatik baharatları birleştiren lezzetli bir temel yiyecek."
+      },
+      "de": {
+        "name": "Hackfleisch Pide",
+        "description": "Türkisches Fladenbrot mit Hackfleisch, Zwiebeln und Tomaten, gewürzt mit Gewürzen. Ein herzhaftes Grundnahrungsmittel, das zartes Fleisch und aromatische Gewürze in einer goldenen Kruste vereint."
+      }
+    },
+    "price": 19.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/15eb4fe1-0954-4fbd-ad3d-c8211be249c2.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "pide",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/15eb4fe1-0954-4fbd-ad3d-c8211be249c2.webp", "alt": "Minced Meat Pide" }]
+  },
+  {
+    "id": "pide-lamb",
+    "content": {
+      "en": {
+        "name": "Lamb Pide",
+        "description": "Turkish flatbread with lamb cubes, onions, and tomatoes, seasoned with spices. A savory food staple, blending tender meat and aromatic spices in a golden crust."
+      },
+      "tr": {
+        "name": "Kuzu Etli Pide",
+        "description": "Kuzu küpleri, soğan ve domates ile hazırlanmış, baharatlarla tatlandırılmış Türk pidesi. Altın rengi kabuk içinde yumuşak et ve aromatik baharatları birleştiren lezzetli bir temel yiyecek."
+      },
+      "de": {
+        "name": "Lamm Pide",
+        "description": "Türkisches Fladenbrot mit Lammwürfeln, Zwiebeln und Tomaten, gewürzt mit Gewürzen. Ein herzhaftes Grundnahrungsmittel, das zartes Fleisch und aromatische Gewürze in einer goldenen Kruste vereint."
+      }
+    },
+    "price": 21.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/ddfb6c17-9739-4977-bc83-24c490277f46.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "pide",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/ddfb6c17-9739-4977-bc83-24c490277f46.webp", "alt": "Lamb Pide" }]
+  },
+  {
+    "id": "pide-cheese",
+    "content": {
+      "en": {
+        "name": "Cheese Pide",
+        "description": "Turkish flatbread, vegetarian option with cheese. A savory food staple, cheese in a golden crust."
+      },
+      "tr": {
+        "name": "Peynirli Pide",
+        "description": "Türk pidesi, peynirli vejetaryen seçenek. Altın rengi kabuk içinde peynir bulunan lezzetli bir temel yiyecek."
+      },
+      "de": {
+        "name": "Käse Pide",
+        "description": "Türkisches Fladenbrot, vegetarische Option mit Käse. Ein herzhaftes Grundnahrungsmittel, Käse in einer goldenen Kruste."
+      }
+    },
+    "price": 17.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/a52d9dc3-5648-4ae9-9a72-c1d1403bc9a3.webp",
+    "dietaryTags": ["vegetarian", "halal"],
+    "categoryKey": "pide",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/a52d9dc3-5648-4ae9-9a72-c1d1403bc9a3.webp", "alt": "Cheese Pide" }]
+  },
+  {
+    "id": "pide-vegetarian",
+    "content": {
+      "en": {
+        "name": "Vegetarian Pide",
+        "description": "Turkish flatbread, vegetarian option with cheese and seasonal greens. A savory food staple, blending cheese and seasonal greens in a golden crust."
+      },
+      "tr": {
+        "name": "Vejetaryen Pide",
+        "description": "Türk pidesi, peynirli ve mevsim yeşillikli vejetaryen seçenek. Altın rengi kabuk içinde peynir ve mevsim yeşilliklerini birleştiren lezzetli bir temel yiyecek."
+      },
+      "de": {
+        "name": "Vegetarische Pide",
+        "description": "Türkisches Fladenbrot, vegetarische Option mit Käse und saisonalem Gemüse. Ein herzhaftes Grundnahrungsmittel, das Käse und saisonales Gemüse in einer goldenen Kruste vereint."
+      }
+    },
+    "price": 19.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/068631d5-ae5e-4344-906a-d9b7e8ede89c.webp",
+    "dietaryTags": ["vegetarian", "halal"],
+    "categoryKey": "pide",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/068631d5-ae5e-4344-906a-d9b7e8ede89c.webp", "alt": "Vegetarian Pide" }]
+  }
+]
+
+    

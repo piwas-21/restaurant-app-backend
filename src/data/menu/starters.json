@@ -1,0 +1,115 @@
+
+[
+  {
+    "id": "starter-sarma-vegan",
+    "content": {
+      "en": {
+        "name": "Sarma Piece (Vegan)",
+        "description": "Delicate grape leaves hand-rolled around a savory filling of aromatic rice, fresh Mediterranean herbs, and spices."
+      },
+      "tr": {
+        "name": "Sarma Parçası (Vegan)",
+        "description": "Aromatik pirinç, taze Akdeniz otları ve baharatlardan oluşan lezzetli bir iç harcın etrafına elle sarılmış narin üzüm yaprakları."
+      },
+      "de": {
+        "name": "Sarma Stück (Vegan)",
+        "description": "Zarte Weinblätter, von Hand gerollt, gefüllt mit aromatischem Reis, frischen mediterranen Kräutern und Gewürzen."
+      }
+    },
+    "price": 1.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/c2e00a15-c42a-43ca-9eea-de0e63ef5208.webp",
+    "dietaryTags": ["halal", "vegan", "vegetarian"],
+    "categoryKey": "starter",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/c2e00a15-c42a-43ca-9eea-de0e63ef5208.webp", "alt": "Sarma Piece (Vegan)" }]
+  },
+  {
+    "id": "starter-falafel-vegan",
+    "content": {
+      "en": {
+        "name": "Falafel Piece (Vegan)",
+        "description": "Crispy deep-fried patties of spiced ground chickpeas, blended with fresh coriander."
+      },
+      "tr": {
+        "name": "Falafel Parçası (Vegan)",
+        "description": "Taze kişniş ile karıştırılmış, baharatlı öğütülmüş nohuttan yapılmış çıtır çıtır kızarmış köfteler."
+      },
+      "de": {
+        "name": "Falafel Stück (Vegan)",
+        "description": "Knusprige, frittierte Bratlinge aus gewürzten gemahlenen Kichererbsen, vermischt mit frischem Koriander."
+      }
+    },
+    "price": 1.50,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/d4d0ff86-fa51-4a29-b6c4-7e1aa56a7ef2.webp",
+    "dietaryTags": ["halal", "vegan", "vegetarian"],
+    "categoryKey": "starter",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/d4d0ff86-fa51-4a29-b6c4-7e1aa56a7ef2.webp", "alt": "Falafel Piece (Vegan)" }]
+  },
+  {
+    "id": "starter-tabbouleh-vegan",
+    "content": {
+      "en": {
+        "name": "Tabbouleh (Vegan)",
+        "description": "A vibrant Levantine salad of finely chopped parsley, mint, tomatoes, and onions tossed with cracked bulgur, lemon juice, and olive oil."
+      },
+      "tr": {
+        "name": "Tabule (Vegan)",
+        "description": "İnce kıyılmış maydanoz, nane, domates ve soğanın kırık bulgur, limon suyu ve zeytinyağı ile karıştırıldığı canlı bir Levant salatası."
+      },
+      "de": {
+        "name": "Taboulé (Vegan)",
+        "description": "Ein lebendiger levantinischer Salat aus fein gehackter Petersilie, Minze, Tomaten und Zwiebeln, vermischt mit gebrochenem Bulgur, Zitronensaft und Olivenöl."
+      }
+    },
+    "price": 8.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/e773ec95-e6fb-487d-bd4d-05e1457ad795.webp",
+    "dietaryTags": ["halal", "vegan", "vegetarian"],
+    "categoryKey": "starter",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/e773ec95-e6fb-487d-bd4d-05e1457ad795.webp", "alt": "Tabbouleh (Vegan)" }]
+  },
+  {
+    "id": "starter-hummus-vegan",
+    "content": {
+      "en": {
+        "name": "Hummus (Vegan)",
+        "description": "Creamy blend of mashed chickpeas, tahini, and lemon, whipped into a smooth dip."
+      },
+      "tr": {
+        "name": "Humus (Vegan)",
+        "description": "Ezilmiş nohut, tahin ve limonun kremsi karışımı, pürüzsüz bir dip sos haline getirilmiştir."
+      },
+      "de": {
+        "name": "Hummus (Vegan)",
+        "description": "Cremige Mischung aus pürierten Kichererbsen, Tahini und Zitrone, aufgeschlagen zu einem glatten Dip."
+      }
+    },
+    "price": 8.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/67ea0b23-d74e-4dfb-a213-f21092539cc0.webp",
+    "dietaryTags": ["halal", "vegan", "vegetarian"],
+    "categoryKey": "starter",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/67ea0b23-d74e-4dfb-a213-f21092539cc0.webp", "alt": "Hummus (Vegan)" }]
+  },
+  {
+    "id": "starter-mutabal-vegan",
+    "content": {
+      "en": {
+        "name": "Mutabal (Vegan)",
+        "description": "Creamy Middle Eastern dip of smoky charred eggplant blended with tahini, parsley, and olive oil, enriched with yogurt for tanginess."
+      },
+      "tr": {
+        "name": "Mütebbel (Vegan)",
+        "description": "Tahin, maydanoz ve zeytinyağı ile karıştırılmış, yoğurtla zenginleştirilmiş isli közlenmiş patlıcanın kremsi Orta Doğu dip sosu."
+      },
+      "de": {
+        "name": "Mutabal (Vegan)",
+        "description": "Cremiger Dip aus dem Nahen Osten aus rauchig gegrillter Aubergine, gemischt mit Tahini, Petersilie und Olivenöl, angereichert mit Joghurt für eine säuerliche Note."
+      }
+    },
+    "price": 8.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/ec7d25ba-891e-432b-9304-2f96d0a5e8c2.webp",
+    "dietaryTags": ["halal", "vegan", "vegetarian"],
+    "categoryKey": "starter",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/ec7d25ba-891e-432b-9304-2f96d0a5e8c2.webp", "alt": "Mutabal (Vegan)" }]
+  }
+]
+
+    

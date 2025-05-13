@@ -1,0 +1,137 @@
+
+[
+  {
+    "id": "pizza-margherita",
+    "content": {
+      "en": {
+        "name": "Margherita Pizza",
+        "description": "Classic Italian delicacy!"
+      },
+      "tr": {
+        "name": "Margherita Pizza",
+        "description": "Klasik İtalyan lezzeti!"
+      },
+      "de": {
+        "name": "Margherita Pizza",
+        "description": "Klassische italienische Delikatesse!"
+      }
+    },
+    "price": 13.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/9137e52e-725f-4a42-8f2d-308083e810c4.webp",
+    "dietaryTags": ["vegetarian", "halal"],
+    "categoryKey": "pizza",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/9137e52e-725f-4a42-8f2d-308083e810c4.webp", "alt": "Margherita Pizza" }]
+  },
+  {
+    "id": "pizza-tuna",
+    "content": {
+      "en": {
+        "name": "Tuna Pizza",
+        "description": "Classic Italian delicacy! Tuna, Olive, Onion, Pepper"
+      },
+      "tr": {
+        "name": "Ton Balıklı Pizza",
+        "description": "Klasik İtalyan lezzeti! Ton Balığı, Zeytin, Soğan, Biber"
+      },
+      "de": {
+        "name": "Thunfisch Pizza",
+        "description": "Klassische italienische Delikatesse! Thunfisch, Olive, Zwiebel, Paprika"
+      }
+    },
+    "price": 15.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/f65c5065-5b61-4bce-ae87-6acd9b3946a5.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "pizza",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/f65c5065-5b61-4bce-ae87-6acd9b3946a5.webp", "alt": "Tuna Pizza" }]
+  },
+  {
+    "id": "pizza-paysanne",
+    "content": {
+      "en": {
+        "name": "Paysanne Pizza",
+        "description": "Classic Italian delicacy! Chicken, Olive, Mushroom"
+      },
+      "tr": {
+        "name": "Köylü Pizza",
+        "description": "Klasik İtalyan lezzeti! Tavuk, Zeytin, Mantar"
+      },
+      "de": {
+        "name": "Bauernpizza",
+        "description": "Klassische italienische Delikatesse! Hähnchen, Olive, Pilz"
+      }
+    },
+    "price": 16.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/f05aa4d2-4416-4401-8544-2332f4696fcd.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "pizza",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/f05aa4d2-4416-4401-8544-2332f4696fcd.webp", "alt": "Paysanne Pizza" }]
+  },
+  {
+    "id": "pizza-sicilian",
+    "content": {
+      "en": {
+        "name": "Sicilian Pizza",
+        "description": "Classic Italian delicacy! Tuna, Olive, Mushroom"
+      },
+      "tr": {
+        "name": "Sicilya Pizza",
+        "description": "Klasik İtalyan lezzeti! Ton Balığı, Zeytin, Mantar"
+      },
+      "de": {
+        "name": "Sizilianische Pizza",
+        "description": "Klassische italienische Delikatesse! Thunfisch, Olive, Pilz"
+      }
+    },
+    "price": 15.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/ce844b6e-9ebb-43a0-906f-d697120a042d.webp",
+    "dietaryTags": ["halal"],
+    "categoryKey": "pizza",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/ce844b6e-9ebb-43a0-906f-d697120a042d.webp", "alt": "Sicilian Pizza" }]
+  },
+  {
+    "id": "pizza-pepperoni",
+    "content": {
+      "en": {
+        "name": "Pepperoni Pizza",
+        "description": "Classic Italian delicacy! Pepperoni"
+      },
+      "tr": {
+        "name": "Pepperoni Pizza",
+        "description": "Klasik İtalyan lezzeti! Pepperoni"
+      },
+      "de": {
+        "name": "Pepperoni Pizza",
+        "description": "Klassische italienische Delikatesse! Pepperoni"
+      }
+    },
+    "price": 15.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/709e3a23-f337-472b-bfcc-ea707b1458e9.webp",
+    "dietaryTags": [],
+    "categoryKey": "pizza",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/709e3a23-f337-472b-bfcc-ea707b1458e9.webp", "alt": "Pepperoni Pizza" }]
+  },
+  {
+    "id": "pizza-vegetarian",
+    "content": {
+      "en": {
+        "name": "Vegetarian Pizza",
+        "description": "Classic Italian delicacy! Mushroom, Pepper, Onion, Seasonal Green"
+      },
+      "tr": {
+        "name": "Vejetaryen Pizza",
+        "description": "Klasik İtalyan lezzeti! Mantar, Biber, Soğan, Mevsim Yeşillikleri"
+      },
+      "de": {
+        "name": "Vegetarische Pizza",
+        "description": "Klassische italienische Delikatesse! Pilz, Paprika, Zwiebel, Saisongrünes Gemüse"
+      }
+    },
+    "price": 15.90,
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/120ac7ae-caab-4035-9f20-7dbce0ffbb77.webp",
+    "dietaryTags": ["vegetarian", "halal"],
+    "categoryKey": "pizza",
+    "images": [{ "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/120ac7ae-caab-4035-9f20-7dbce0ffbb77.webp", "alt": "Vegetarian Pizza" }]
+  }
+]
+
+    
