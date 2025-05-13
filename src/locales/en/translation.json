@@ -11,6 +11,10 @@
   "copyright_rumi": "© {{year}} RUMI Restaurant. All rights reserved.",
 
   "menu_title": "Our Menu",
+  "loading_items": "Loading items...",
+  "error_loading_menu_items": "Failed to load menu items for {{categoryName}}. Please try again.",
+  "error_loading_all_menu_items": "Error loading all items. Please try again.",
+  "all_categories_nav": "All",
   "back_to_welcome": "Back to Welcome Screen",
   "view_cart_items": "View Cart, {{count}} items",
   "add_to_order": "Add to Order",
@@ -157,6 +161,14 @@
   "menu_page_description": "Explore the delicious and authentic Turkish menu at RUMI Restaurant in Geneva. From savory kebabs to delightful mezes and traditional desserts. Halal options available.",
   "menu_categories_label": "Menu Categories",
   "dietary_information_label": "Dietary Information",
+  "category_navigation_label": "Categories",
+  "category_not_found_in_menu_data": "Menu items for {{categoryName}} are not available at the moment.",
+  "no_items_in_category": "No items available in {{categoryName}}.",
+
+  "vegan": "Vegan",
+  "vegetarian": "Vegetarian",
+  "halal": "Halal",
+  "gluten-free": "Gluten-Free",
 
   "admin_dashboard_title": "Admin Dashboard",
   "admin_menu_management_title": "Menu Management",
@@ -203,5 +215,7 @@
   "nav_home": "Home",
   "nav_menu": "Menu",
   "nav_reservations": "Reservations",
-  "nav_cart": "Cart"
+  "nav_cart": "Cart",
+
+  "close_image_modal_button": "Close"
 }

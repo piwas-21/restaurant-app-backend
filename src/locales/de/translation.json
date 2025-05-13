@@ -11,6 +11,10 @@
   "copyright_rumi": "© {{year}} RUMI Restaurant. Alle Rechte vorbehalten.",
 
   "menu_title": "Unsere Speisekarte",
+  "loading_items": "Artikel werden geladen...",
+  "error_loading_menu_items": "Fehler beim Laden der Menüpunkte für {{categoryName}}. Bitte versuchen Sie es erneut.",
+  "error_loading_all_menu_items": "Fehler beim Laden aller Artikel. Bitte versuchen Sie es erneut.",
+  "all_categories_nav": "Alle",
   "back_to_welcome": "Zurück zum Willkommensbildschirm",
   "view_cart_items": "Warenkorb ansehen, {{count}} Artikel",
   "add_to_order": "Zur Bestellung hinzufügen",
@@ -158,6 +162,14 @@
   "menu_page_description": "Entdecken Sie die köstliche und authentische türkische Speisekarte im RUMI Restaurant in Genf. Von herzhaften Kebabs bis zu köstlichen Mezes und traditionellen Desserts. Halal-Optionen verfügbar.",
   "menu_categories_label": "Menü-Kategorien",
   "dietary_information_label": "Ernährungsinformationen",
+  "category_navigation_label": "Kategorien",
+  "category_not_found_in_menu_data": "Menüpunkte für {{categoryName}} sind im Moment nicht verfügbar.",
+  "no_items_in_category": "Keine Artikel in {{categoryName}} verfügbar.",
+
+  "vegan": "Vegan",
+  "vegetarian": "Vegetarisch",
+  "halal": "Halal",
+  "gluten-free": "Glutenfrei",
 
   "admin_dashboard_title": "Admin-Dashboard",
   "admin_menu_management_title": "Menüverwaltung",
@@ -204,6 +216,8 @@
   "nav_home": "Home",
   "nav_menu": "Menu",
   "nav_reservations": "Reservations",
-  "nav_cart": "Cart"
+  "nav_cart": "Cart",
+
+  "close_image_modal_button": "Schließen"
 }
 

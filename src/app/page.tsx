@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from "react";
 import styles from "./styles/HomePage.module.css";
 import Link from "next/link";
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 import { usePathname } from "next/navigation";
 import LanguageSwitcher from "@/components/LanguageSwitcher"; 

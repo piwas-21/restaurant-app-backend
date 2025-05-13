@@ -11,6 +11,10 @@
   "copyright_rumi": "© {{year}} RUMI Restaurant. Tüm hakları saklıdır.",
 
   "menu_title": "Menümüz",
+  "loading_items": "Ürünler yükleniyor...",
+  "error_loading_menu_items": "{{categoryName}} için menü öğeleri yüklenirken hata oluştu. Lütfen tekrar deneyin.",
+  "error_loading_all_menu_items": "Tüm ürünler yüklenirken hata oluştu. Lütfen tekrar deneyin.",
+  "all_categories_nav": "Tümü",
   "back_to_welcome": "Karşılama Ekranına Dön",
   "view_cart_items": "Sepeti Görüntüle, {{count}} ürün",
   "add_to_order": "Siparişe Ekle",
@@ -158,6 +162,14 @@
   "menu_page_description": "Cenevre'deki RUMI Restaurant'ın lezzetli ve otantik Türk menüsünü keşfedin. Lezzetli kebaplardan enfes mezelere ve geleneksel tatlılara kadar. Helal seçenekler mevcuttur.",
   "menu_categories_label": "Menü Kategorileri",
   "dietary_information_label": "Beslenme Bilgileri",
+  "category_navigation_label": "Kategoriler",
+  "category_not_found_in_menu_data": "{{categoryName}} için menü öğeleri şu anda mevcut değil.",
+  "no_items_in_category": "{{categoryName}} içinde ürün bulunmamaktadır.",
+
+  "vegan": "Vegan",
+  "vegetarian": "Vejetaryen",
+  "halal": "Helal",
+  "gluten-free": "Glutensiz",
 
   "admin_dashboard_title": "Yönetici Paneli",
   "admin_menu_management_title": "Menü Yönetimi",
@@ -204,6 +216,8 @@
   "nav_home": "Home",
   "nav_menu": "Menu",
   "nav_reservations": "Reservations",
-  "nav_cart": "Cart"
+  "nav_cart": "Cart",
+
+  "close_image_modal_button": "Kapat"
 }
 

@@ -2,49 +2,49 @@
 [
   {
     "name": "Coca Bottle",
-    "price": "CHF 4.00",
+    "price": 4.00,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/607f390f-a85f-46db-849c-7e8dc7742234.webp",
     "id": "cold-drink-coca"
   },
   {
     "name": "Mineral Water",
-    "price": "CHF 4.00",
+    "price": 4.00,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/26b9e6e5-fd0d-4f7e-bf2d-cfd36c904182.jpg",
     "id": "cold-drink-water"
   },
   {
     "name": "Rivella",
-    "price": "CHF 4.00",
+    "price": 4.00,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/4a1f9172-6899-4cac-8b9f-37530bdd6a8a.jpg",
     "id": "cold-drink-rivella"
   },
   {
     "name": "Fanta",
-    "price": "CHF 3.00",
+    "price": 3.00,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/8c6ab517-f272-4024-a388-db8798023bab.webp",
     "id": "cold-drink-fanta"
   },
   {
     "name": "Sprite",
-    "price": "CHF 3.00",
+    "price": 3.00,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/2bd490e2-c18d-4284-b770-d05324af12b3.webp",
     "id": "cold-drink-sprite"
   },
   {
     "name": "Iced Tea",
-    "price": "CHF 3.00",
+    "price": 3.00,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/3ed9445a-283c-4f01-b106-a9141062a022.jpg",
     "id": "cold-drink-iced-tea"
   },
   {
     "name": "Ayran",
-    "price": "CHF 3.50",
+    "price": 3.50,
     "description": "",
     "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/037e3252-7ae2-4355-9edc-f6319e440bf1.jpg",
     "id": "cold-drink-ayran"

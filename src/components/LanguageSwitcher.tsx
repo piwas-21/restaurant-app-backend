@@ -12,21 +12,24 @@ const languages = [
   { code: "en", name: "English", flag: "/flags/en.svg" },
   { code: "de", name: "Deutsch", flag: "/flags/de.svg" },
   { code: "tr", name: "Türkçe", flag: "/flags/tr.svg" },
-];
+] as const; // Add 'as const' for stricter typing
+
+// Export the type for language codes
+export type LanguageCode = typeof languages[number]['code'];
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const changeLanguage = (lng: string) => {
+  const changeLanguage = (lng: LanguageCode) => { // Use LanguageCode type here
     i18n.changeLanguage(lng);
     setDropdownOpen(false); // Close dropdown after selection
   };
 
   const toggleDropdown = () => {
-    setDropdownOpen(!dropdownOpen);
-  };
+      setDropdownOpen(!dropdownOpen);
+    };
 
   // Close dropdown if clicked outside
   useEffect(() => {
@@ -43,35 +46,22 @@ export default function LanguageSwitcher() {
     };
   }, [dropdownRef]);
 
-  const currentLanguage = languages.find(l => l.code === i18n.resolvedLanguage) || languages[0];
+  const currentLanguageDetails = languages.find(l => l.code === i18n.resolvedLanguage) || languages[0];
 
   return (
-    <div className={styles.languageSwitcherContainer} ref={dropdownRef}>
-      <button 
-        className={styles.dropdownButton}
-        onClick={toggleDropdown}
-        aria-haspopup="true"
-        aria-expanded={dropdownOpen}
-        aria-label={`Change language, current language is ${currentLanguage.name}`}
-      >
-        {/* Display current language flag */}
-        <Image src={currentLanguage.flag} alt={currentLanguage.name} width={24} height={18} className={styles.flagIcon} />
-        {/* Optional: Add a dropdown icon/caret */}
-        <span className={styles.caret}>▼</span>
+    <div className={styles.languageSwitcher} ref={dropdownRef}>
+      <button onClick={toggleDropdown} className={styles.dropdownToggle}>
+        <Image src={currentLanguageDetails.flag} alt={currentLanguageDetails.name} width={24} height={18} />
+        <span className={styles.languageName}>{currentLanguageDetails.code.toUpperCase()}</span>
+        <span className={styles.arrow}>{dropdownOpen ? "▲" : "▼"}</span>
       </button>
-      
       {dropdownOpen && (
-        <ul className={styles.dropdownMenu} role="menu">
-          {languages.map((lang) => (
-            <li key={lang.code} role="menuitem">
-              <button
-                onClick={() => changeLanguage(lang.code)}
-                disabled={i18n.resolvedLanguage === lang.code} // Keep disabled state
-                className={`${styles.dropdownItem} ${i18n.resolvedLanguage === lang.code ? styles.activeLang : ""}`}
-              >
-                <Image src={lang.flag} alt={lang.name} width={24} height={18} className={styles.flagIcon} />
-                {/* Optional: Display name next to flag if desired */}
-                {/* <span className={styles.langName}>{lang.name}</span> */} 
+        <ul className={styles.dropdownMenu}>
+          {languages.map((language) => (
+            <li key={language.code}>
+              <button onClick={() => changeLanguage(language.code)} className={styles.dropdownItem}>
+                <Image src={language.flag} alt={language.name} width={20} height={15} />
+                <span>{language.name}</span>
               </button>
             </li>
           ))}

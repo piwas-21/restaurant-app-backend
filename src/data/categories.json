@@ -1,7 +1,7 @@
 
 {
   "en": {
-    "starter": "Starters",
+    "starters": "Starters",
     "durum": "Dürüm Wraps",
     "pide": "Pide (Turkish Pizza)",
     "pizza": "Pizza",
@@ -10,14 +10,10 @@
     "orientalSpecialty": "Oriental Specialties",
     "dessert": "Desserts",
     "hotDrink": "Hot Drinks",
-    "coldDrink": "Cold Drinks",
-    "appetizers": "Appetizers",
-    "soups": "Soups",
-    "mainCourses": "Main Courses",
-    "drinks": "Drinks"
+    "coldDrink": "Cold Drinks"
   },
   "tr": {
-    "starter": "Başlangıçlar",
+    "starters": "Başlangıçlar",
     "durum": "Dürüm",
     "pide": "Pide",
     "pizza": "Pizza",
@@ -26,14 +22,10 @@
     "orientalSpecialty": "Doğu Mutfağı Özel",
     "dessert": "Tatlılar",
     "hotDrink": "Sıcak İçecekler",
-    "coldDrink": "Soğuk İçecekler",
-    "appetizers": "Mezeler",
-    "soups": "Çorbalar",
-    "mainCourses": "Ana Yemekler",
-    "drinks": "İçecekler"
+    "coldDrink": "Soğuk İçecekler"
   },
   "de": {
-    "starter": "Vorspeisen",
+    "starters": "Vorspeisen",
     "durum": "Dürüm Wraps",
     "pide": "Pide (Türkische Pizza)",
     "pizza": "Pizza",
@@ -42,10 +34,6 @@
     "orientalSpecialty": "Orientalische Spezialitäten",
     "dessert": "Nachspeisen",
     "hotDrink": "Heiße Getränke",
-    "coldDrink": "Kalte Getränke",
-    "appetizers": "Vorspeisen",
-    "soups": "Suppen",
-    "mainCourses": "Hauptgerichte",
-    "drinks": "Getränke"
+    "coldDrink": "Kalte Getränke"
   }
 }
