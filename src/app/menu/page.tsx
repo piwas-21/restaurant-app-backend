@@ -55,8 +55,8 @@ interface CategoryTranslations {
 }
 
 // Ensure 'specialOfTheDay' is a valid key type
-const tempCategoriesDataForKeys = categoriesData.en as Record<string, string>; 
-type MenuCategoryKey = keyof typeof tempCategoriesDataForKeys | "specialOfTheDay";
+type TempCategoriesData = typeof categoriesData.en;
+type MenuCategoryKey = keyof TempCategoriesData | "specialOfTheDay";
 
 const ALL_ITEMS_KEY = "all" as const;
 const SPECIAL_OF_THE_DAY_KEY = "specialOfTheDay" as const;
