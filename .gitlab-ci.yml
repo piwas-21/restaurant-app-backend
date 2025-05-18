@@ -22,21 +22,21 @@ create_cache:
             - .yarn
         policy: pull-push
         
-# yarn_test:
-#     image: node:18-bullseye
-#     stage: test
-#     script:
-#         - yarn install
-#         - yarn test
-#     cache: 
-#         key: 
-#             files:
-#                 - yarn.lock
-#         paths:
-#             - node_modules/
-#             - yarn.lock
-#             - .yarn
-#         policy: pull
+yarn_test:
+    image: node:18-bullseye
+    stage: test
+    script:
+        - yarn install
+        - yarn test
+    cache: 
+        key: 
+            files:
+                - yarn.lock
+        paths:
+            - node_modules/
+            - yarn.lock
+            - .yarn
+        policy: pull
 
 # Static Application Tests (SAST)
 

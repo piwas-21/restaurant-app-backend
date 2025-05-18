@@ -3,7 +3,21 @@ module.exports = {
   testEnvironment: 'jest-environment-jsdom',
   setupFilesAfterEnv: ['@testing-library/jest-dom'],
   transform: {
-    '^.+\.(js|jsx|ts|tsx)$': ['babel-jest', {configFile: './babel.config.js'}],
+    '^.+\.(js|jsx|ts|tsx)$': [
+      'babel-jest',
+      {
+        presets: [
+          [
+            'next/babel',
+            {
+              'preset-react': {
+                runtime: 'automatic',
+              },
+            },
+          ],
+        ],
+      },
+    ],
   },
   moduleNameMapper: {
     '\.(css|less|scss|sass)$': 'identity-obj-proxy',
@@ -16,14 +30,14 @@ module.exports = {
     '/node_modules/',
     '^.+\.module\.(css|sass|scss)$',
   ],
-  collectCoverage: false, // Set to false by default
+  collectCoverage: false,
   collectCoverageFrom: [
     'src/components/**/*.tsx',
     'src/app/**/*.tsx',
     '!src/**/*.test.tsx',
     '!src/**/*.spec.tsx',
-    '!**/node_modules/**', // Ensure node_modules are excluded from collection
-    '!**/.next/**'       // Ensure .next directory is excluded
+    '!**/node_modules/**',
+    '!**/.next/**',
   ],
   coverageReporters: ['json', 'lcov', 'text', 'clover'],
   coverageThreshold: {
