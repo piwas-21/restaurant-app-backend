@@ -1,6 +1,92 @@
+# variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE
+#     IMAGE_TAG: $CI_PIPELINE_IID
+
 stages:
-- test
-sast:
-  stage: test
-include:
-- template: Security/SAST.gitlab-ci.yml
+    - cache
+    # - test
+    # - build
+
+create_cache:
+    stage: cache
+    image: node:18-bullseye
+    script:
+        - yarn install
+    cache: 
+        key: 
+            files:
+                - yarn.lock
+        paths:
+            - node_modules/
+            - yarn.lock
+            - .yarn
+        policy: pull-push
+        
+# yarn_test:
+#     image: node:18-bullseye
+#     stage: test
+#     script:
+#         - yarn install
+#         - yarn test
+#     cache: 
+#         key: 
+#             files:
+#                 - yarn.lock
+#         paths:
+#             - node_modules/
+#             - yarn.lock
+#             - .yarn
+#         policy: pull
+
+# gitleaks:
+#   stage: test
+#   image:
+#     name: zricethezav/gitleaks
+#     entrypoint: [""]
+#   script:
+#     - gitleaks detect --verbose --source . -f json -r gitleaks.json
+
+
+# njsscan:
+#   stage: test
+#   image: python
+#   before_script:
+#     - pip3 install --upgrade njsscan
+#   script:
+#     - njsscan --exit-warning . --sarif -o njsscan.sarif
+
+# semgrep:
+#   stage: test
+#   image: returntocorp/semgrep
+#   variables:
+#     SEMGREP_RULES: p/javascript
+#   script:
+#     - semgrep ci --json --output semgrep.json
+
+# retire:
+#   stage: test
+#   image: node:18-bullseye
+#   cache:
+#     key:
+#       files:
+#         - yarn.lock
+#     paths:
+#       - node_modules/
+#       - yarn.lock
+#       - .yarn
+#     policy: pull
+#   before_script:
+#     - npm install -g retire 
+#   script:
+#     - retire --path . --outputformat json --outputpath retire.json
+
+# build_image:
+#     stage: build
+#     image: docker:24
+#     services:
+#     - docker:24-dind
+#     before_script:
+#         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#     script:
+#         - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+#         - docker push $IMAGE_NAME:$IMAGE_TAG
