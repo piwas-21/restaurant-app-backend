@@ -38,6 +38,8 @@ create_cache:
 #             - .yarn
 #         policy: pull
 
+# Static Application Tests (SAST)
+
 gitleaks:
   stage: test
   image:
@@ -63,6 +65,9 @@ semgrep:
   script:
     - semgrep ci
 
+# Software Composition Analysis (SCA) Test
+# This SCA test with retire.js is used for checking vulnerabilities in 3rd party dependencies
+
 retire:
   stage: test
   image: node:18-bullseye
@@ -79,6 +84,8 @@ retire:
     - npm install -g retire 
   script:
     - retire --path .
+
+# Docker Image building 
 
 build_image:
     stage: build
