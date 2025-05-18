@@ -39,3 +39,20 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ## TODO:
 - investigate arabic lang design
 - table selection on reservation (tbd)
+- Additionals:
+- kitche-staff: true
+```
+"additionals": [
+      {
+        "id": "extra-spicy-sauce",
+        "content": {
+          "en": { "name": "Extra Spicy Sauce" },
+          "tr": { "name": "Ekstra Acı Sos" },
+          "de": { "name": "Extra Scharfe Soße" }
+        },
+        "price": 1.00
+      }
+    ],
+```
+
+- Checkout page dark mode not applied
