@@ -38,9 +38,6 @@ create_cache:
 yarn_test:
     image: node:18-bullseye
     stage: test
-    script:
-        - yarn install
-        - yarn test
     cache: 
         key: 
             files:
@@ -50,6 +47,11 @@ yarn_test:
             - yarn.lock
             - .yarn
         policy: pull
+    before_script:
+        - yarn install
+    script:    
+        - yarn test
+    
 
 # Static Application Tests (SAST)
 
