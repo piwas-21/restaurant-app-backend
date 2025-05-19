@@ -3,7 +3,7 @@ variables:
     IMAGE_TAG: $CI_PIPELINE_IID
 
 stages:
-    # - cache
+    - cache
     - test
     - build
 
@@ -21,6 +21,21 @@ stages:
 #             - yarn.lock
 #             - .yarn
 #         policy: pull-push
+
+clear_cache:
+  stage: cache
+  script:
+    - rm -rf node_modules/ .yarn yarn.lock
+    - mkdir node_modules .yarn
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+      - .yarn
+      - yarn.lock
+    policy: push
         
 yarn_test:
     image: node:18-bullseye
@@ -28,15 +43,15 @@ yarn_test:
     script:
         - yarn install
         - yarn test
-    # cache: 
-    #     key: 
-    #         files:
-    #             - yarn.lock
-    #     paths:
-    #         - node_modules/
-    #         - yarn.lock
-    #         - .yarn
-    #     policy: pull
+    cache: 
+        key: 
+            files:
+                - yarn.lock
+        paths:
+            - node_modules/
+            - yarn.lock
+            - .yarn
+        policy: pull
 
 # Static Application Tests (SAST)
 
