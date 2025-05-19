@@ -65,15 +65,11 @@ semgrep:
 retire:
   stage: test
   image: node:18-bullseye
-  cache:
-    key:
-      files:
-        - yarn.lock
-    paths:
-      - node_modules/
-      - yarn.lock
-      - .yarn
-    policy: pull
+  cache: 
+      key: "$CI_COMMIT_REF_SLUG"
+      paths:
+          - node_modules/
+      policy: pull
   before_script:
     - npm install -g retire 
   script:
