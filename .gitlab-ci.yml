@@ -4,7 +4,7 @@ variables:
 
 stages:
     - cache
-    # - test
+    - test
     - build
 
 create_cache:
@@ -40,50 +40,50 @@ create_cache:
 
 # Static Application Tests (SAST)
 
-# gitleaks:
-#   stage: test
-#   image:
-#     name: zricethezav/gitleaks
-#     entrypoint: [""]
-#   script:
-#     - gitleaks detect --verbose --source .
+gitleaks:
+  stage: test
+  image:
+    name: zricethezav/gitleaks
+    entrypoint: [""]
+  script:
+    - gitleaks detect --verbose --source .
 
 
-# njsscan:
-#   stage: test
-#   image: python
-#   before_script:
-#     - pip3 install --upgrade njsscan
-#   script:
-#     - njsscan --exit-warning .
+njsscan:
+  stage: test
+  image: python
+  before_script:
+    - pip3 install --upgrade njsscan
+  script:
+    - njsscan --exit-warning .
 
-# semgrep:
-#   stage: test
-#   image: returntocorp/semgrep
-#   variables:
-#     SEMGREP_RULES: p/javascript
-#   script:
-#     - semgrep ci
+semgrep:
+  stage: test
+  image: returntocorp/semgrep
+  variables:
+    SEMGREP_RULES: p/javascript
+  script:
+    - semgrep ci
 
-# Software Composition Analysis (SCA) Test
-# This SCA test with retire.js is used for checking vulnerabilities in 3rd party dependencies
+Software Composition Analysis (SCA) Test
+This SCA test with retire.js is used for checking vulnerabilities in 3rd party dependencies
 
-# retire:
-#   stage: test
-#   image: node:18-bullseye
-#   cache:
-#     key:
-#       files:
-#         - yarn.lock
-#     paths:
-#       - node_modules/
-#       - yarn.lock
-#       - .yarn
-#     policy: pull
-#   before_script:
-#     - npm install -g retire 
-#   script:
-#     - retire --path .
+retire:
+  stage: test
+  image: node:18-bullseye
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+      - yarn.lock
+      - .yarn
+    policy: pull
+  before_script:
+    - npm install -g retire 
+  script:
+    - retire --path .
 
 # Docker Image building 
 
