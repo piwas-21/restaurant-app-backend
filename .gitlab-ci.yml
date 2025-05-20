@@ -18,7 +18,7 @@ create_cache:
             - node_modules/
         policy: push
         
-yarn_test:
+npm_test:
     image: node:18-bullseye
     stage: test
     cache: 
