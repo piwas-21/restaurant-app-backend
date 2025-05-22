@@ -1,0 +1,103 @@
+/* src/app/styles/CookieConsentBanner.module.css */
+.bannerContainer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--background-color, #fff);
+  color: var(--text-color, #333);
+  padding: 1rem 1.5rem;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  z-index: 2000;
+  border-top: 1px solid var(--border-color, #eee);
+  font-family: var(--font-family-sans);
+}
+
+.bannerContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.bannerText {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.bannerActions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.bannerButton {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.acceptButton {
+  background-color: var(--primary-color, #007bff);
+  color: var(--button-text-color, #fff);
+}
+
+.acceptButton:hover {
+  background-color: var(--primary-color-dark, #0056b3);
+}
+
+.declineButton {
+  background-color: var(--secondary-color, #f0f0f0);
+  color: var(--text-color, #333);
+  border: 1px solid var(--border-color, #ccc);
+}
+
+.declineButton:hover {
+  background-color: #e0e0e0;
+}
+
+/* Dark mode adjustments */
+html[data-theme='dark'] .bannerContainer {
+  background-color: var(--background-color-dark, #222);
+  color: var(--text-color-dark, #eee);
+  border-top: 1px solid var(--border-color-dark, #444);
+}
+
+html[data-theme='dark'] .acceptButton {
+  background-color: var(--primary-color, #007bff);
+  color: var(--button-text-color, #fff);
+}
+
+html[data-theme='dark'] .acceptButton:hover {
+  background-color: var(--primary-color-light, #3394ff);
+}
+
+html[data-theme='dark'] .declineButton {
+  background-color: var(--secondary-color-dark, #555);
+  color: var(--text-color-dark, #eee);
+  border: 1px solid var(--border-color-dark, #777);
+}
+
+html[data-theme='dark'] .declineButton:hover {
+  background-color: #666;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (min-width: 600px) {
+  .bannerContent {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+  .bannerActions {
+    min-width: fit-content;
+  }
+}

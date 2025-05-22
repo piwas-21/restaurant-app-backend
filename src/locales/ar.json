@@ -151,9 +151,9 @@
   "home_location_title": "موقعنا",
   "home_menu_cta": "استعرض قائمتنا",
   "home_reservations_cta": "قم بالحجز",
-  "rumi_address_street": "شارع دي بيرن 13",
-  "rumi_address_city_country": "1201 جنيف، سويسرا",
-  "rumi_phone_number": "+41 22 123 45 67",
+  "rumi_address_street": "شارع دو غراند-بري 45 (Rue du Grand-Pré 45)",
+  "rumi_address_city_country": "1202 جنيف، سويسرا",
+  "rumi_phone_number": "+41 22 786 33 33",
   "phone_label": "الهاتف",
   "google_maps_iframe_title": "موقع مطعم RUMI على خرائط Google",
   "google_maps_iframe_aria_label": "إطار خرائط Google يعرض موقع المطعم",
@@ -335,6 +335,17 @@
   "close_image_modal_button": "إغلاق",
   "open_menu": "افتح القائمة",
   "close_menu": "أغلق القائمة",
-  "each": "لكل"
+  "each": "لكل",
+
+  "cookie_consent_banner_text": "نستخدم التخزين المحلي لتحسين تجربتك، بما في ذلك تذكر تفضيل اللغة. بالنقر على 'قبول'، فإنك توافق على ذلك. يمكنك إدارة تفضيلاتك في أي وقت.",
+  "cookie_consent_accept": "قبول",
+  "cookie_consent_decline": "رفض",
+  "cookie_settings_title": "إعدادات ملفات تعريف الارتباط",
+  "cookie_settings_intro": "قم بإدارة تفضيلات ملفات تعريف الارتباط الخاصة بك. يمكنك تمكين أو تعطيل فئات معينة من ملفات تعريف الارتباط أدناه.",
+  "cookie_settings_preferences_title": "التفضيلات",
+  "cookie_settings_preferences_desc": "تتذكر ملفات تعريف الارتباط هذه اختياراتك، مثل اللغة أو السمة، لتخصيص تجربتك.",
+  "cookie_settings_save": "حفظ التفضيلات",
+  "cookie_settings_close_aria": "إغلاق الإعدادات",
+  "cookie_settings_footer_link": "إدارة تفضيلات ملفات تعريف الارتباط"
   }
   

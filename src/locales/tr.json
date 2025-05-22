@@ -151,9 +151,9 @@
   "home_location_title": "Bize Ulaşın",
   "home_menu_cta": "Menümüzü Keşfedin",
   "home_reservations_cta": "Masa Ayırtın",
-  "rumi_address_street": "Rue de Berne 13",
-  "rumi_address_city_country": "1201 Cenevre, İsviçre",
-  "rumi_phone_number": "+41 22 123 45 67",
+  "rumi_address_street": "Rue du Grand-Pré 45",
+  "rumi_address_city_country": "1202 Cenevre, İsviçre",
+  "rumi_phone_number": "+41 22 786 33 33",
   "phone_label": "Telefon",
   "google_maps_iframe_title": "Google Haritalar'da RUMI Restaurant Konumu",
   "google_maps_iframe_aria_label": "Restoran konumunu gösteren Google Haritalar iframe'i",
@@ -336,6 +336,17 @@
   "close_image_modal_button": "Kapat",
   "open_menu": "Menüyü aç",
   "close_menu": "Menüyü kapat",
-  "each": "her biri"
+  "each": "her biri",
+
+  "cookie_consent_banner_text": "Deneyiminizi geliştirmek için yerel depolama kullanıyoruz; bu, dil tercihinizi hatırlamayı da içerir. 'Kabul Et' seçeneğine tıklayarak bunu kabul etmiş olursunuz. Tercihlerinizi istediğiniz zaman yönetebilirsiniz.",
+  "cookie_consent_accept": "Kabul Et",
+  "cookie_consent_decline": "Reddet",
+  "cookie_settings_title": "Çerez Ayarları",
+  "cookie_settings_intro": "Çerez tercihlerinizi yönetin. Aşağıdan belirli çerez kategorilerini etkinleştirebilir veya devre dışı bırakabilirsiniz.",
+  "cookie_settings_preferences_title": "Tercihler",
+  "cookie_settings_preferences_desc": "Bu çerezler, dil veya tema gibi tercihlerinizi hatırlayarak deneyiminizi kişiselleştirir.",
+  "cookie_settings_save": "Tercihleri Kaydet",
+  "cookie_settings_close_aria": "Ayarları kapat",
+  "cookie_settings_footer_link": "Çerez Tercihlerini Yönet"
 }
 

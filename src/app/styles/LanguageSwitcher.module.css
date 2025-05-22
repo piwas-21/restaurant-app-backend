@@ -1,29 +1,29 @@
-/* styles/LanguageSwitcher.module.css */
+/* src/app/styles/LanguageSwitcher.module.css */
 
 .languageSwitcher {
-  position: relative; /* Establishes a positioning context for the dropdown menu */
-  display: inline-block; /* Allows it to sit alongside other nav items */
+  position: relative;
+  display: inline-block;
   font-family: var(--font-family-sans);
 }
 
 .dropdownToggle {
-  background-color: transparent; /* Or var(--secondary-color) for a slight background */
+  background-color: transparent;
   color: var(--text-color);
-  border: 1px solid var(--border-color); /* Subtle border */
+  border: 1px solid var(--border-color);
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.5rem; /* Space between flag, name, and arrow */
-  border-radius: 6px; /* Slightly more rounded */
+  gap: 0.5rem;
+  border-radius: 6px;
   transition: background-color 0.2s ease, border-color 0.2s ease;
-  min-width: 80px; /* Ensure a minimum width */
+  min-width: 80px;
   justify-content: space-between;
 }
 
 .dropdownToggle:hover {
-  background-color: var(--secondary-color); /* Light background on hover */
-  border-color: #bbb; /* Darken border on hover */
+  background-color: var(--secondary-color);
+  border-color: #bbb;
 }
 
 .dropdownToggle:disabled {
@@ -31,9 +31,9 @@
   opacity: 0.7;
 }
 
-.dropdownToggle img { /* Targeting the Image component's rendered img tag */
-  display: block; /* Removes extra space below image */
-  border-radius: 2px; /* Slightly rounded flag corners */
+.dropdownToggle img {
+  display: block;
+  border-radius: 2px;
 }
 
 .languageName {
@@ -47,24 +47,21 @@
   transition: transform 0.2s ease;
 }
 
-/* Styles for the dropdown menu itself */
 .dropdownMenu {
   position: absolute;
-  top: 100%; /* Position directly below the button */
+  top: 100%;
   left: 0;
-  right: 0; /* Or specify a width */
+  right: 0;
   background-color: var(--background-color);
   border: 1px solid var(--border-color);
-  border-top: none; /* Avoid double border with button */
-  border-radius: 0 0 6px 6px; /* Rounded bottom corners */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Softer, more modern shadow */
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   padding: 0.5rem 0;
-  margin: 0; /* Reset default ul margin */
-  list-style: none; /* Remove default list styling */
-  z-index: 1000; /* Crucial: Ensure it's above other content */
-  max-height: 200px; /* Example: if you have many languages */
-  overflow-y: auto; /* Scroll if too many languages */
-  min-width: 150px; /* Ensure it's wide enough for names */
+  margin: 0;
+  list-style: none;
+  z-index: 1000;
+  min-width: 150px; 
 }
 
 .dropdownItem {
@@ -73,8 +70,8 @@
   color: var(--text-color);
   display: flex;
   align-items: center;
-  gap: 0.75rem; /* More space for flag and name */
-  padding: 0.6rem 1rem; /* More padding */
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
   width: 100%;
   text-align: left;
   cursor: pointer;
@@ -83,34 +80,30 @@
 }
 
 .dropdownItem:hover {
-  background-color: var(--secondary-color); /* Or var(--accent-color) with var(--button-text-color) for text */
+  background-color: var(--secondary-color);
 }
 
-.dropdownItem img { /* Targeting the Image component's rendered img tag in items */
+.dropdownItem img {
   display: block;
   border-radius: 2px;
 }
 
-/* Dark mode considerations (using variables from globals.css) */
-html[data-theme='dark'] .languageSwitcher {
-  /* No specific change needed if using CSS variables correctly */
-}
-
+/* Dark mode considerations */
 html[data-theme='dark'] .dropdownToggle {
-  background-color: transparent; /* Or var(--secondary-color) for a slight background */
+  background-color: transparent;
   color: var(--text-color);
   border: 1px solid var(--border-color);
 }
 
 html[data-theme='dark'] .dropdownToggle:hover {
-  background-color: var(--secondary-color); /* Adjust hover for dark theme if needed */
+  background-color: var(--secondary-color);
   border-color: #555;
 }
 
 html[data-theme='dark'] .dropdownMenu {
-  background-color: var(--background-color); /* Should pick up dark theme var */
+  background-color: var(--background-color);
   border-color: var(--border-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* Darker shadow for dark theme */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 html[data-theme='dark'] .dropdownItem {
@@ -118,31 +111,5 @@ html[data-theme='dark'] .dropdownItem {
 }
 
 html[data-theme='dark'] .dropdownItem:hover {
-  background-color: var(--secondary-color); /* Adjust hover for dark theme */
-}
-
-/* Custom Scrollbar Styles for WebKit browsers (Chrome, Safari, Edge) */
-.dropdownMenu::-webkit-scrollbar {
-  width: 8px; /* Width of the scrollbar */
-}
-
-.dropdownMenu::-webkit-scrollbar-track {
-  background: var(--background-color); /* Or a slightly darker shade like var(--secondary-color) */
-  border-radius: 10px;
-}
-
-.dropdownMenu::-webkit-scrollbar-thumb {
-  background-color: var(--border-color); /* Color of the scroll thumb */
-  border-radius: 10px; /* Roundness of the scroll thumb */
-  border: 2px solid var(--background-color); /* Creates padding around thumb */
-}
-
-.dropdownMenu::-webkit-scrollbar-thumb:hover {
-  background-color: var(--primary-color); /* Darker color on hover */
-}
-
-/* For Firefox */
-.dropdownMenu {
-  scrollbar-width: thin; /* "auto" or "thin" */
-  scrollbar-color: var(--border-color) var(--background-color); /* thumb and track color */
+  background-color: var(--secondary-color);
 }

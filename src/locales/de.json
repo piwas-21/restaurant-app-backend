@@ -151,9 +151,9 @@
   "home_location_title": "So finden Sie uns",
   "home_menu_cta": "Unsere Speisekarte entdecken",
   "home_reservations_cta": "Einen Tisch reservieren",
-  "rumi_address_street": "Rue de Berne 13",
-  "rumi_address_city_country": "1201 Genf, Schweiz",
-  "rumi_phone_number": "+41 22 123 45 67",
+  "rumi_address_street": "Rue du Grand-Pré 45",
+  "rumi_address_city_country": "1202 Genf, Schweiz",
+  "rumi_phone_number": "+41 22 786 33 33",
   "phone_label": "Telefon",
   "google_maps_iframe_title": "RUMI Restaurant Standort auf Google Maps",
   "google_maps_iframe_aria_label": "Google Maps iframe mit dem Standort des Restaurants",
@@ -335,6 +335,17 @@
   "close_image_modal_button": "Schließen",
   "open_menu": "Menü öffnen",
   "close_menu": "Menü schließen",
-  "each": "jeweils"
+  "each": "jeweils",
+
+  "cookie_consent_banner_text": "Wir verwenden lokalen Speicher, um Ihre Erfahrung zu verbessern, einschließlich der Speicherung Ihrer Sprachpräferenz. Durch Klicken auf 'Akzeptieren' stimmen Sie dem zu. Sie können Ihre Einstellungen jederzeit verwalten.",
+  "cookie_consent_accept": "Akzeptieren",
+  "cookie_consent_decline": "Ablehnen",
+  "cookie_settings_title": "Cookie-Einstellungen",
+  "cookie_settings_intro": "Verwalten Sie Ihre Cookie-Einstellungen. Sie können bestimmte Cookie-Kategorien unten aktivieren oder deaktivieren.",
+  "cookie_settings_preferences_title": "Präferenzen",
+  "cookie_settings_preferences_desc": "Diese Cookies speichern Ihre Auswahlmöglichkeiten, wie Sprache oder Thema, um Ihre Erfahrung zu personalisieren.",
+  "cookie_settings_save": "Einstellungen speichern",
+  "cookie_settings_close_aria": "Einstellungen schließen",
+  "cookie_settings_footer_link": "Cookie-Einstellungen verwalten"
 }
 

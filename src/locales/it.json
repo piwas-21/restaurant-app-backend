@@ -150,9 +150,9 @@
     "home_location_title": "Dove Siamo",
     "home_menu_cta": "Esplora il Nostro Menù",
     "home_reservations_cta": "Prenota un Tavolo",
-    "rumi_address_street": "Rue de Berne 13",
-    "rumi_address_city_country": "1201 Ginevra, Svizzera",
-    "rumi_phone_number": "+41 22 123 45 67",
+    "rumi_address_street": "Rue du Grand-Pré 45",
+    "rumi_address_city_country": "1202 Ginevra, Svizzera",
+    "rumi_phone_number": "+41 22 786 33 33",
     "phone_label": "Telefono",
     "google_maps_iframe_title": "Posizione del Ristorante RUMI su Google Maps",
     "google_maps_iframe_aria_label": "Iframe Google Maps con la posizione del ristorante",
@@ -334,6 +334,17 @@
     "close_image_modal_button": "Chiudi",
     "open_menu": "Apri il menu",
     "close_menu": "Chiudi il menu",
-    "each": "ciascuno"
+    "each": "ciascuno",
+
+    "cookie_consent_banner_text": "Utilizziamo l'archiviazione locale per migliorare la tua esperienza, incluso ricordare la tua preferenza linguistica. Facendo clic su 'Accetta', accetti questo. Puoi gestire le tue preferenze in qualsiasi momento.",
+    "cookie_consent_accept": "Accetta",
+    "cookie_consent_decline": "Rifiuta",
+    "cookie_settings_title": "Impostazioni dei cookie",
+    "cookie_settings_intro": "Gestisci le tue preferenze sui cookie. Puoi abilitare o disabilitare categorie specifiche di cookie qui sotto.",
+    "cookie_settings_preferences_title": "Preferenze",
+    "cookie_settings_preferences_desc": "Questi cookie ricordano le tue scelte, come la lingua o il tema, per personalizzare la tua esperienza.",
+    "cookie_settings_save": "Salva preferenze",
+    "cookie_settings_close_aria": "Chiudi impostazioni",
+    "cookie_settings_footer_link": "Gestisci preferenze cookie"
   }
   

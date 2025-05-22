@@ -1,0 +1,194 @@
+/* src/app/styles/CookieSettingsModal.module.css */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 1rem;
+  font-family: var(--font-family-sans);
+}
+
+.modalContent {
+  background-color: var(--background-color, #fff);
+  color: var(--text-color, #333);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color, #eee);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  font-weight: 300;
+  color: var(--text-color, #555);
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+}
+
+.modalBody {
+  margin-bottom: 1.5rem;
+}
+
+.modalBody p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.preferenceItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color-light, #f0f0f0);
+}
+
+.preferenceItem:last-child {
+  border-bottom: none;
+}
+
+.preferenceDetails strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+.preferenceDetails p {
+  font-size: 0.85rem;
+  color: var(--text-color-light, #666);
+  margin-bottom: 0;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #eee);
+}
+
+.modalButton {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.saveButton {
+  background-color: var(--primary-color, #007bff);
+  color: var(--button-text-color, #fff);
+}
+.saveButton:hover {
+  background-color: var(--primary-color-dark, #0056b3);
+}
+
+/* Toggle Switch Styles */
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  min-width: 50px;
+}
+
+.toggleSwitch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border-color, #ccc);
+  transition: .4s;
+  border-radius: 28px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color, #2196F3);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--primary-color, #2196F3);
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+/* Dark Mode Adjustments */
+html[data-theme='dark'] .modalContent {
+  background-color: var(--background-color-dark, #2d2d2d);
+  color: var(--text-color-dark, #eee);
+}
+
+html[data-theme='dark'] .modalHeader, 
+html[data-theme='dark'] .modalFooter {
+  border-color: var(--border-color-dark, #444);
+}
+
+html[data-theme='dark'] .preferenceItem {
+  border-bottom-color: var(--border-color-dark-light, #3a3a3a);
+}
+
+html[data-theme='dark'] .closeButton {
+  color: var(--text-color-dark, #bbb);
+}
+
+html[data-theme='dark'] .preferenceDetails p {
+  color: var(--text-color-dark-light, #aaa);
+}
+
+html[data-theme='dark'] .slider {
+  background-color: var(--border-color-dark, #555);
+}
+
+html[data-theme='dark'] input:checked + .slider {
+  background-color: var(--primary-color-light, #3da9fc);
+}
