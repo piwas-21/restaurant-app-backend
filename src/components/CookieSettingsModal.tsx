@@ -27,10 +27,6 @@ export default function CookieSettingsModal() {
     closeSettingsModal();
   };
 
-  const handleTogglePreferences = () => {
-    setCurrentPreferences(prev => prev === null ? true : !prev);
-  };
-
   return (
     <div className={styles.modalOverlay} onClick={closeSettingsModal}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
