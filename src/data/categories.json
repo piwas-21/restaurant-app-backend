@@ -76,5 +76,18 @@
     "dessert": "حلويات",
     "hotDrink": "مشروبات ساخنة",
     "coldDrink": "مشروبات باردة"
+  },
+  "es": {
+    "specialOfTheDay": "Especial del Día",
+    "starters": "Entrantes",
+    "durum": "Wraps Dürüm",
+    "pide": "Pide (Pizza Turca)",
+    "pizza": "Pizza",
+    "grill": "Parrilla",
+    "turkishSpecialty": "Especialidades Turcas",
+    "orientalSpecialty": "Especialidades Orientales",
+    "dessert": "Postres",
+    "hotDrink": "Bebidas Calientes",
+    "coldDrink": "Bebidas Frías"
   }
 }

@@ -10,6 +10,7 @@ import translationTR from "./locales/tr.json";
 import translationIT from "./locales/it.json";
 import translationAR from "./locales/ar.json";
 import translationFR from "./locales/fr.json";
+import translationES from "./locales/es.json";
 
 const resources = {
   en: { translation: translationEN },
@@ -18,6 +19,7 @@ const resources = {
   it: { translation: translationIT },
   ar: { translation: translationAR },
   fr: { translation: translationFR },
+  es: { translation: translationES },
 };
 
 i18n

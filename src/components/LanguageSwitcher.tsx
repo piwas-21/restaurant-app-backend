@@ -14,6 +14,7 @@ const languages = [
   { code: "de", name: "Deutsch", flag: "/flags/de.svg" },
   { code: "ar", name: "العربية", flag: "/flags/ar.svg" },
   { code: "tr", name: "Türkçe", flag: "/flags/tr.svg" },
+  { code: "es", name: "Español", flag: "/flags/es.svg" },
 ] as const;
 
 export type LanguageCode = typeof languages[number]['code'];
