@@ -5,7 +5,22 @@ const nextConfig = {
   },
   // Other configurations can go here
   images: {
-    domains: ['lh3.google.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'restaurant-admin-api.orderhub.ch',
+        pathname: '/web-images/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.google.com',
+        pathname: '/u/0/d/**',
+      }
+    ],
+    deviceSizes: [640, 828, 1200],
+    imageSizes: [64, 96, 128],
+    formats: ['image/webp'],
+    unoptimized: true
   },
 };
 

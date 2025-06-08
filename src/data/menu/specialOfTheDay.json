@@ -28,13 +28,13 @@
       }
     },
     "price": 25.50,
-    "image": "/images/placeholder-sarma.jpeg",
+    "image": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz",
     "dietaryTags": ["halal"],
     "categoryKey": "specialOfTheDay",
     "isSpecial": true,
     "images": [
-      { "url": "/images/placeholder-sarma.jpeg", "alt": "Today's Special - sarma" },
-      { "url": "/images/placeholder-falafel.jpeg", "alt": "Today's Special - falafal" }
+      { "url": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz", "alt": "Today's Special - sarma" },
+      { "url": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz", "alt": "Today's Special - falafal" }
     ]
   }
 ]
