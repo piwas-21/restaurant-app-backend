@@ -16,13 +16,11 @@
       }
     },
     "price": 19.9,
-    "image": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/76656410-6780-4978-9f4c-c0e0030bc791.webp",
     "dietaryTags": ["halal"],
     "categoryKey": "pide",
     "images": [
-      { "url": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz", "alt": "Etli Ekmek" },
-      { "url": "1DWb7yCzZ7JBFWlPC2VK09jJ2EQdE6zQW", "alt": "Etli Ekmek" },
-      { "url": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz", "alt": "Etli Ekmek" }
+      { "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/76656410-6780-4978-9f4c-c0e0030bc791.webp", "alt": "Etli Ekmek" }
     ]
   },
   {

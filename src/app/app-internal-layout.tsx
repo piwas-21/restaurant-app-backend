@@ -9,18 +9,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTheme } from "@/components/ThemeContext";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import navStyles from "./styles/Header.module.css";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
 import CookieSettingsModal from "@/components/CookieSettingsModal";
 import FooterCookieLink from "@/components/FooterCookieLink";
+import UserMenu from "@/components/UserMenu";
+import { useAuth } from "@/components/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export default function AppInternalLayout({ children }: { children: React.ReactNode }) {
   const [isClient, setIsClient] = useState(false);
   const { theme } = useTheme();
+  const { user, isLoading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const isHomePage = pathname === '/';
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,14 +47,47 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
     return () => {
       i18n.off("languageChanged", handleLanguageChanged);
     };
-  }, [i18n]); 
+  }, [i18n]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const userRole = user?.role.toLowerCase();
+    const protectedRoutes: { [key:string]: string[] } = {
+      '/admin': ['admin'],
+      '/cashier': ['admin', 'cashier'],
+      '/kitchen-staff': ['admin', 'kitchen-staff'],
+      '/server': ['admin', 'server'],
+      '/account': ['customer']
+    };
+
+    const currentRoute = Object.keys(protectedRoutes).find(route => pathname.startsWith(route));
+
+    if (currentRoute) {
+      if (!user || !protectedRoutes[currentRoute].includes(userRole as string)) {
+        router.replace('/auth/login');
+        return;
+      }
+    }
+
+    const staffRedirects: { [key: string]: string } = {
+      'cashier': '/cashier',
+      'kitchen-staff': '/kitchen-staff',
+      'server': '/server',
+    };
+
+    const requiredPath = userRole ? staffRedirects[userRole] : undefined;
+
+    if (requiredPath && pathname !== requiredPath) {
+      router.replace(requiredPath);
+    }
+  }, [user, isLoading, pathname, router]);
 
   useEffect(() => {
     if (isClient) {
       document.documentElement.setAttribute("data-theme", theme);
       if (!document.body.classList.contains(inter.className)) {
         document.body.className = `${document.body.className} ${inter.className}`.trim();
-      } else if (document.body.className && !inter.className) { // Handles case where inter.className might be empty
       }
     }
   }, [theme, isClient]);
@@ -84,24 +121,53 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
     right: 0,
   };
 
-  let headerSpecificStyles: CSSProperties;
-  if (isHomePage) {
-    headerSpecificStyles = {
-      ...commonHeaderProperties,
-      backgroundColor: "transparent",
-      borderBottom: "none",
-      position: "absolute",
-      top: 0,
-    };
-  } else {
-    headerSpecificStyles = {
-      ...commonHeaderProperties,
-      backgroundColor: "var(--secondary-color)",
-      borderBottom: "1px solid var(--border-color)",
-      position: "sticky",
-      top: 0,
-    };
-  }
+  const headerSpecificStyles: CSSProperties = isHomePage ? {
+    ...commonHeaderProperties,
+    backgroundColor: "transparent",
+    borderBottom: "none",
+    position: "absolute",
+    top: 0,
+  } : {
+    ...commonHeaderProperties,
+    backgroundColor: "var(--secondary-color)",
+    borderBottom: "1px solid var(--border-color)",
+    position: "sticky",
+    top: 0,
+  };
+
+  const renderNavLinks = () => {
+    if (isLoading) return null;
+
+    const role = user?.role.toLowerCase();
+
+    if (role === 'admin') {
+      return (
+        <>
+          <Link href="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_home', 'Home')}</Link>
+          <Link href="/menu" className={`nav-link ${pathname === '/menu' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_menu', 'Menu')}</Link>
+          <Link href="/reservations" className={`nav-link ${pathname === '/reservations' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_reservations', 'Reservations')}</Link>
+          <Link href="/cart" className={`nav-link ${pathname === '/cart' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_cart', 'Cart')}</Link>
+          <Link href="/admin/dashboard" className={`nav-link ${pathname.startsWith('/admin') ? 'active' : ''}`} onClick={closeMobileMenu}>{t('admin_dashboard_title')}</Link>
+          <Link href="/cashier" className={`nav-link ${pathname === '/cashier' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_cashier')}</Link>
+          <Link href="/kitchen-staff" className={`nav-link ${pathname === '/kitchen-staff' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_kitchen')}</Link>
+          <Link href="/server" className={`nav-link ${pathname === '/server' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_server')}</Link>
+        </>
+      );
+    }
+
+    if (role === 'cashier' || role === 'kitchen-staff' || role === 'server') {
+      return null;
+    }
+
+    return (
+      <>
+        <Link href="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_home', 'Home')}</Link>
+        <Link href="/menu" className={`nav-link ${pathname === '/menu' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_menu', 'Menu')}</Link>
+        <Link href="/reservations" className={`nav-link ${pathname === '/reservations' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_reservations', 'Reservations')}</Link>
+        <Link href="/cart" className={`nav-link ${pathname === '/cart' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_cart', 'Cart')}</Link>
+      </>
+    );
+  };
 
   return (
     <>
@@ -129,16 +195,15 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
             }
           </button>
           <nav className={`${navStyles.navLinksContainer} ${mobileMenuOpen ? navStyles.mobileMenuOpen : ''}`}>
-            <Link href="/" className={`nav-link ${pathname === '/' ? 'active' : ''}`} onClick={closeMobileMenu}>{isClient ? t('nav_home', 'Home') : 'Home'}</Link>
-            <Link href="/menu" className={`nav-link ${pathname === '/menu' ? 'active' : ''}`} onClick={closeMobileMenu}>{isClient ? t('nav_menu', 'Menu') : 'Menu'}</Link>
-            <Link href="/reservations" className={`nav-link ${pathname === '/reservations' ? 'active' : ''}`} onClick={closeMobileMenu}>{isClient ? t('nav_reservations', 'Reservations') : 'Reservations'}</Link>
-            <Link href="/cart" className={`nav-link ${pathname === '/cart' ? 'active' : ''}`} onClick={closeMobileMenu}>{isClient ? t('nav_cart', 'Cart') : 'Cart'}</Link>
-            <Link href="/auth/login" className={`nav-link ${pathname === '/auth/login' ? 'active' : ''}`} onClick={closeMobileMenu}>{isClient ? t('nav_login', 'Login') : 'Login'}</Link>
-            {isClient && (
-              <div className={navStyles.switcherGroup}>
-                <LanguageSwitcher />
-                <ThemeSwitcher />
-              </div>
+            {renderNavLinks()}
+            {isClient && !isLoading && (
+              <>
+                {user ? <UserMenu /> : <Link href="/auth/login" className={`nav-link ${pathname === '/auth/login' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_login', 'Login')}</Link>}
+                <div className={navStyles.switcherGroup}>
+                  <LanguageSwitcher />
+                  <ThemeSwitcher />
+                </div>
+              </>
             )}
           </nav>
         </div>

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useCart } from '@/components/cart/CartContext';
-import styles from '../styles/CartPage.module.css'; // Create this CSS module
+import styles from '../styles/CartPage.module.css';
 import { useTranslation } from 'react-i18next';
 
 export default function CartPage() {
@@ -68,4 +68,3 @@ export default function CartPage() {
     </main>
   );
 }
-

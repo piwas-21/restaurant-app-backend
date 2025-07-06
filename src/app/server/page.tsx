@@ -9,16 +9,16 @@ export type ServerOrderItemStatus = "PENDING" | "IN_KITCHEN" | "READY" | "SERVED
 export type ServerOrderStatus = "ACTIVE" | "ALL_ITEMS_SERVED" | "PAID" | "CANCELLED";
 
 export interface ServerOrderItem {
-  id: string;         // Unique ID for this item instance in the order
-  menuItemId: string; // ID of the item from the main menu data
-  name: string;       // Name of the dish
+  id: string;
+  menuItemId: string;
+  name: string;
   quantity: number;
   status: ServerOrderItemStatus;
   notes?: string;
 }
 
 export interface ServerOrder {
-  id: string; // Order ID
+  id: string;
   tableNumber: string;
   items: ServerOrderItem[];
   orderStatus: ServerOrderStatus;
@@ -26,12 +26,11 @@ export interface ServerOrder {
   orderNotes?: string;
 }
 
-// Mock Data for Server View
 const initialServerOrders: ServerOrder[] = [
-  {
+    {
     id: "SERV001",
     tableNumber: "3A",
-    timestamp: new Date(Date.now() - 3600000 * 0.25), // 15 mins ago
+    timestamp: new Date(Date.now() - 3600000 * 0.25),
     orderNotes: "Birthday celebration, bring dessert with candle.",
     items: [
       { id: "sitem001a", menuItemId: "adana01", name: "Adana Kebab", quantity: 1, status: "READY", notes: "Well done" },
@@ -43,7 +42,7 @@ const initialServerOrders: ServerOrder[] = [
   {
     id: "SERV002",
     tableNumber: "5B",
-    timestamp: new Date(Date.now() - 3600000 * 0.15), // 9 mins ago
+    timestamp: new Date(Date.now() - 3600000 * 0.15),
     items: [
       { id: "sitem002a", menuItemId: "pide01", name: "Pide with Cheese", quantity: 1, status: "IN_KITCHEN" },
       { id: "sitem002b", menuItemId: "cola01", name: "Coca-Cola", quantity: 2, status: "READY" },
@@ -53,40 +52,36 @@ const initialServerOrders: ServerOrder[] = [
   {
     id: "SERV003",
     tableNumber: "1C",
-    timestamp: new Date(Date.now() - 3600000 * 0.05), // 3 mins ago
+    timestamp: new Date(Date.now() - 3600000 * 0.05),
     items: [
       { id: "sitem003a", menuItemId: "mixedgrill01", name: "Mixed Grill Platter", quantity: 1, status: "SERVED_TO_TABLE" },
       { id: "sitem003b", menuItemId: "water01", name: "Sparkling Water", quantity: 1, status: "SERVED_TO_TABLE" },
     ],
-    orderStatus: "ALL_ITEMS_SERVED", // Example of an already completed order
+    orderStatus: "ALL_ITEMS_SERVED",
   },
 ];
 
 export default function ServerPage() {
   const { t } = useTranslation();
-  const [orders, setOrders] = useState<ServerOrder[]>(initialServerOrders.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime())); // Oldest first for serving priority
+  const [orders, setOrders] = useState<ServerOrder[]>(initialServerOrders.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()));
 
   const handleMarkItemServed = (orderId: string, itemId: string) => {
     setOrders(prevOrders =>
       prevOrders.map(order => {
         if (order.id === orderId) {
           const updatedItems = order.items.map(item =>
-            // Use the proper enum/type instead of a string literal
             item.id === itemId ? { ...item, status: "SERVED_TO_TABLE" as ServerOrderItemStatus } : item
           );
-          // Also use the proper enum/type value here
           const allItemsServed = updatedItems.every(item => item.status === "SERVED_TO_TABLE");
           return {
             ...order,
             items: updatedItems,
-            // Make sure this also uses the correct type if orderStatus is an enum
             orderStatus: allItemsServed ? "ALL_ITEMS_SERVED" : "ACTIVE",
           };
         }
         return order;
       })
     );
-    // In a real app, send this update to a backend/WebSocket
   };
 
   const getItemStatusStyle = (status: ServerOrderItemStatus) => {
@@ -102,7 +97,6 @@ export default function ServerPage() {
     return "";
   }
 
-  // Filter out orders that are fully served, unless we want a section for recent/all orders
   const activeTableOrders = orders.filter(order => order.orderStatus === "ACTIVE");
 
   return (
@@ -153,16 +147,10 @@ export default function ServerPage() {
                   </li>
                 ))}
               </ul>
-              {/* Optional: Button to mark whole order as delivered if needed, 
-                  or it could be an automatic status change once all items are served. 
-                  For now, relying on individual item status updating the overall orderStatus. */}
             </div>
           ))}
         </div>
       )}
-      <Link href="/" className={styles.homeLink}>
-        {t('back_to_welcome', 'Back to Welcome Screen')}
-      </Link>
     </main>
   );
 }

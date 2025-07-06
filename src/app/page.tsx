@@ -25,7 +25,7 @@ export default function HomePage() {
   }, [isClient, t, i18n.language]);
 
   const googleMapsEmbedUrl = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2761.009531572909!2d6.139046315578307!3d46.21753897911699!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x478c6508101d6e5f%3A0x34a0d1c0b2f5c303!2sRue%20du%20Grand-Pr%C3%A9%2045%2C%201202%20Gen%C3%A8ve%2C%20Switzerland!5e0";
-  const backgroundImageUrl = 'https://lh3.google.com/u/0/d/1ZnD-FSyYYeRA9nreAAuFtD-0IMgwTI9_';
+  const backgroundImageUrl = '/images/rumi-background.png';
 
   return (
     <div className={styles.homeContainer}>

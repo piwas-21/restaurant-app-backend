@@ -28,12 +28,12 @@
       }
     },
     "price": 9.9,
-    "image": "17gKGJey_A2GQO6M4SfNmcgk7Pe4OCrdZ",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/8701a905-04b8-44c8-815b-d8b7f0c1bba2.webp",
     "dietaryTags": ["vegetarian", "halal"],
     "categoryKey": "dessert",
     "images": [
       {
-        "url": "17gKGJey_A2GQO6M4SfNmcgk7Pe4OCrdZ",
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/8701a905-04b8-44c8-815b-d8b7f0c1bba2.webp",
         "alt": "Baklava Portion (4 Pieces)"
       }
     ]

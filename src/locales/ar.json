@@ -105,7 +105,7 @@
   "login_here_link": "سجل الدخول هنا",
   "passwords_do_not_match": "كلمات المرور غير متطابقة.",
   "registration_attempt_placeholder": "وظيفة التسجيل هي مجرد عنصر تمثيلي. تحقق من وحدة التحكم.",
-  
+
   "special_of_the_day_title": "طبق اليوم المميز",
   "special_of_the_day_description": "اكتشف طبق اليوم المميز في مطعم RUMI في جنيف.",
   "order_special_now_button": "اطلب الآن",
@@ -113,7 +113,7 @@
   "no_special_today_message": "لا يوجد طبق مميز اليوم. يرجى مراجعة قائمتنا الكاملة!",
   "allergens_label": "المواد المسببة للحساسية:",
   "special_availability_today_only": "اليوم فقط!",
-  
+
   "reservations_title": "احجز طاولتك",
   "reservations_description": "قم بالحجز في مطعم RUMI في جنيف. حجز سهل عبر الإنترنت لراحتك.",
   "reservations_form_intro": "احجز طاولتك في RUMI لتجربة طعام تركية لا تُنسى.",
@@ -345,6 +345,10 @@
   "nav_reservations": "الحجوزات",
   "nav_cart": "العربة",
   "nav_login": "تسجيل الدخول",
+  "nav_admin": "المسؤول",
+  "nav_cashier": "أمين الصندوق",
+  "nav_kitchen": "المطبخ",
+  "nav_server": "النادل",
 
   "close_image_modal_button": "إغلاق",
   "open_menu": "افتح القائمة",
@@ -360,6 +364,15 @@
   "cookie_settings_preferences_desc": "تتذكر ملفات تعريف الارتباط هذه اختياراتك، مثل اللغة أو السمة، لتخصيص تجربتك.",
   "cookie_settings_save": "حفظ التفضيلات",
   "cookie_settings_close_aria": "إغلاق الإعدادات",
-  "cookie_settings_footer_link": "إدارة تفضيلات ملفات تعريف الارتباط"
-  }
+  "cookie_settings_footer_link": "إدارة تفضيلات ملفات تعريف الارتباط",
+
+  "user_menu.aria_label": "قائمة المستخدم",
+  "user_menu.avatar_alt": "صورة المستخدم",
+  "user_menu.logout": "تسجيل الخروج",
+  "roles.admin": "مدير",
+  "roles.customer": "عميل",
+  "roles.cashier": "أمين صندوق",
+  "roles.kitchen-staff": "طاقم المطبخ",
+  "roles.server": "نادل"
+}
   

@@ -1,4 +1,3 @@
-// src/app/admin/menu-management/page.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -15,8 +14,7 @@ const initialMenuItems = [
 interface MenuItem {
   id: string;
   name_en: string;
-  // Add name_tr, name_de, description fields, image_url, allergen_info etc. from schema
-  category: string; // This should ideally be a category_id linking to a Categories table
+  category: string;
   price: number;
   availability: boolean;
 }
@@ -26,21 +24,17 @@ export default function MenuManagementPage() {
   const [isLoading] = useState(false);
   const [error] = useState('');
 
-  // TODO: useEffect to fetch menu items from API on component mount
-
   const handleToggleAvailability = (itemId: string) => {
     setMenuItems(prevItems =>
       prevItems.map(item =>
         item.id === itemId ? { ...item, availability: !item.availability } : item
       )
     );
-    // TODO: API call to update availability
   };
 
   const handleDeleteItem = (itemId: string) => {
     if (confirm('Are you sure you want to delete this item?')) {
       setMenuItems(prevItems => prevItems.filter(item => item.id !== itemId));
-      // TODO: API call to delete item
     }
   };
 
@@ -51,7 +45,7 @@ export default function MenuManagementPage() {
         <Link href="/admin/dashboard" className={styles.adminButton} style={{ backgroundColor: "#6c757d", color: "white", textDecoration: "none" }}>Back to Dashboard</Link>
       </header>
       <section className={styles.adminContent}>
-        <button className={`${styles.adminButton} ${styles.add}`}>Add New Menu Item</button> {/* TODO: Link to add/edit page */}
+        <button className={`${styles.adminButton} ${styles.add}`}>Add New Menu Item</button>
         {isLoading && <p>Loading menu items...</p>}
         {error && <p className="errorMessage">Error: {error}</p>}
         {!isLoading && !error && (
@@ -74,7 +68,7 @@ export default function MenuManagementPage() {
                     <td>{item.price.toFixed(2)}</td>
                     <td>{item.availability ? 'Yes' : 'No'}</td>
                     <td>
-                      <button className={`${styles.adminButton} ${styles.edit}`}>Edit</button> {/* TODO: Link to add/edit page with item ID */}
+                      <button className={`${styles.adminButton} ${styles.edit}`}>Edit</button>
                       <button
                         onClick={() => handleToggleAvailability(item.id)}
                         className={styles.adminButton}
@@ -94,4 +88,3 @@ export default function MenuManagementPage() {
     </main>
   );
 }
-

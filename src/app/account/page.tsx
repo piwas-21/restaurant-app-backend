@@ -296,10 +296,6 @@ export default function AccountPage() {
         fidelityPoints={fidelityPoints}
         pointsForNextReward={pointsForNextReward} 
       />
-
-      <Link href="/" style={{ marginTop: '2rem', display: 'block', textAlign: 'center' }} className={styles.homeLink}>
-        {t('back_to_welcome', 'Back to Welcome Screen')}
-      </Link>
     </main>
   );
 }

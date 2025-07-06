@@ -1,9 +1,10 @@
-// src/app/admin/member-management/page.tsx
 "use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
 import styles from "../../styles/AdminPage.module.css";
+import { registerStaff, staffRegistrationSchema } from "../../../lib/auth/utils";
+import { z } from "zod";
 
 // Mock data - replace with API calls
 const initialMembers = [
@@ -17,18 +18,25 @@ interface Member {
   lastName: string;
   email: string;
   loyalty_points: number;
-  // Add other fields like registration date, etc.
 }
 
 export default function MemberManagementPage() {
   const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [isLoading] = useState(false);
-  const [error] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const [registrationSuccess, setRegistrationSuccess] = useState<string | null>(null);
 
-  // TODO: useEffect to fetch members from API
+  // Form state
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState("cashier");
 
   const handleEditMember = (memberId: string) => {
-    // For now, just log. In a real app, this would open an edit form/modal.
     console.log("Edit member:", memberId);
     alert(`Editing member ${memberId} - functionality to be implemented.`);
   };
@@ -36,18 +44,102 @@ export default function MemberManagementPage() {
   const handleDeleteMember = (memberId: string) => {
     if (confirm("Are you sure you want to delete this member?")) {
       setMembers(prevMembers => prevMembers.filter(m => m.id !== memberId));
-      // TODO: API call to delete member
     }
   };
+
+  const handleRegistrationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegistrationError(null);
+    setRegistrationSuccess(null);
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const token = user.accessToken;
+
+    if (!token) {
+      setRegistrationError("Unauthorized. Please log in again.");
+      return;
+    }
+
+    try {
+      const formData = { firstName, lastName, email, password, confirmPassword, role };
+      staffRegistrationSchema.parse(formData);
+
+      const response = await registerStaff(formData, token);
+
+      if (response.success) {
+        setRegistrationSuccess(response.message);
+        setFirstName("");
+        setLastName("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setRole("cashier");
+        setShowRegistrationForm(false);
+      } else {
+        setRegistrationError(response.message || "Failed to register staff.");
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        setRegistrationError(error.errors.map(e => e.message).join(", "));
+      } else {
+        setRegistrationError("An unknown error occurred.");
+      }
+    }
+  };
+
 
   return (
     <main className={styles.adminContainer}>
       <header className={styles.adminHeader}>
         <h1>Manage Members</h1>
+        <div>
+        <button onClick={() => setShowRegistrationForm(!showRegistrationForm)} className={styles.adminButton}>
+            {showRegistrationForm ? "Cancel" : "Register New Staff"}
+          </button>
         <Link href="/admin/dashboard" className={styles.adminButton} style={{ backgroundColor: "#6c757d", color: "white", textDecoration: "none" }}>Back to Dashboard</Link>
+        </div>
       </header>
+
+      {showRegistrationForm && (
+        <section className={styles.adminContent}>
+          <h2>Register New Staff</h2>
+          <form onSubmit={handleRegistrationSubmit}>
+            {registrationError && <p className="errorMessage">{registrationError}</p>}
+            {registrationSuccess && <p className="successMessage">{registrationSuccess}</p>}
+            <div className={styles.formGroup}>
+              <label htmlFor="firstName">First Name</label>
+              <input type="text" id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} required />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="lastName">Last Name</label>
+              <input type="text" id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} required />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="email">Email</label>
+              <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} required />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="password">Password</label>
+              <input type="password" id="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="confirmPassword">Confirm Password</label>
+              <input type="password" id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="role">Role</label>
+              <select id="role" value={role} onChange={e => setRole(e.target.value)}>
+                <option value="cashier">Cashier</option>
+                <option value="kitchen-staff">Kitchen Staff</option>
+                <option value="server">Server</option>
+              </select>
+            </div>
+            <button type="submit" className={styles.adminButton}>Register</button>
+          </form>
+        </section>
+      )}
+
       <section className={styles.adminContent}>
-        {/* Add New Member button could be here if manual addition is a feature */}
         {isLoading && <p>Loading members...</p>}
         {error && <p className="errorMessage">Error: {error}</p>}
         {!isLoading && !error && (
@@ -81,4 +173,3 @@ export default function MemberManagementPage() {
     </main>
   );
 }
-

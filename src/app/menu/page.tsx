@@ -108,7 +108,6 @@ export default function MenuPage() {
       try {
         const imageUrl = new URL(url);
         if (imageUrl.hostname === "restaurant-admin-api.orderhub.ch") {
-          // Add quality parameters to the API URL
           imageUrl.searchParams.set("q", "100");
           imageUrl.searchParams.set("w", "1200");
           return imageUrl.toString();
@@ -138,7 +137,7 @@ export default function MenuPage() {
     if (!selectedView && loadedCategoryKeys.length > 0) {
       setSelectedView(SPECIAL_OF_THE_DAY_KEY);
     }
-  }, []); // Reverted: selectedView removed from deps
+  }, []);
 
   useEffect(() => {
     if (!selectedView) {
@@ -161,8 +160,7 @@ export default function MenuPage() {
                 SPECIAL_OF_THE_DAY_KEY
               ]
             ) {
-              // console.log("Skipping specialOfTheDay in 'All' as it might be loaded separately or is dynamic");
-              // continue;
+              continue;
             }
             try {
               const categoryModule = await import(

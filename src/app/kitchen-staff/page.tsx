@@ -4,28 +4,28 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import styles from '../styles/KitchenStaffPage.module.css';
-import categoriesData from '../../data/categories.json'; // To get category names for filtering
+import categoriesData from '../../data/categories.json';
 import type { LanguageCode } from '@/components/LanguageSwitcher';
 
 export type KitchenOrderItemStatus = "Pending" | "Preparing" | "Ready";
 
 export interface KitchenOrderItem {
-  id: string;         // Unique ID for this item instance in the order
-  menuItemId: string; // ID of the item from the main menu data
-  name: string;       // Name of the dish
+  id: string;
+  menuItemId: string;
+  name: string;
   quantity: number;
   status: KitchenOrderItemStatus;
-  categoryKey: keyof typeof categoriesData.en; // For filtering by dish type
-  notes?: string; // Specific notes for this item, e.g., "extra spicy"
+  categoryKey: keyof typeof categoriesData.en;
+  notes?: string;
 }
 
 export interface KitchenOrder {
-  id: string; // Order ID
+  id: string;
   orderType: 'Pickup' | 'Dine-in';
   tableNumber?: string;
   items: KitchenOrderItem[];
   timestamp: Date;
-  orderNotes?: string; // General notes for the whole order
+  orderNotes?: string;
 }
 
 interface CategoryData {
@@ -34,15 +34,14 @@ interface CategoryData {
   };
 }
 
-const categories: CategoryData = categoriesData
+const categories: CategoryData = categoriesData;
 
-// Mock Data for Kitchen View
 const initialKitchenOrders: KitchenOrder[] = [
-  {
+    {
     id: "KORD001",
     orderType: "Dine-in",
     tableNumber: "3A",
-    timestamp: new Date(Date.now() - 3600000 * 0.2), // 12 mins ago
+    timestamp: new Date(Date.now() - 3600000 * 0.2),
     orderNotes: "Customer is in a hurry.",
     items: [
       { id: "kitem001a", menuItemId: "adana01", name: "Adana Kebab", quantity: 1, status: "Pending", categoryKey: "grill", notes: "Well done" },
@@ -52,7 +51,7 @@ const initialKitchenOrders: KitchenOrder[] = [
   {
     id: "KORD002",
     orderType: "Pickup",
-    timestamp: new Date(Date.now() - 3600000 * 0.1), // 6 mins ago
+    timestamp: new Date(Date.now() - 3600000 * 0.1),
     items: [
       { id: "kitem002a", menuItemId: "pide01", name: "Pide with Cheese", quantity: 1, status: "Pending", categoryKey: "pide" },
       { id: "kitem002b", menuItemId: "pide02", name: "Pide with Minced Lamb", quantity: 1, status: "Preparing", categoryKey: "pide" },
@@ -63,7 +62,7 @@ const initialKitchenOrders: KitchenOrder[] = [
     id: "KORD003",
     orderType: "Dine-in",
     tableNumber: "7",
-    timestamp: new Date(Date.now() - 3600000 * 0.05), // 3 mins ago
+    timestamp: new Date(Date.now() - 3600000 * 0.05),
     items: [
       { id: "kitem003a", menuItemId: "grill005", name: "Mixed Grill Platter", quantity: 1, status: "Pending", categoryKey: "grill" },
     ],
@@ -72,7 +71,7 @@ const initialKitchenOrders: KitchenOrder[] = [
     id: "KORD004",
     orderType: "Dine-in",
     tableNumber: "9",
-    timestamp: new Date(Date.now() - 3600000 * 0.02), // 1 min ago
+    timestamp: new Date(Date.now() - 3600000 * 0.02),
     items: [
       { id: "kitem004a", menuItemId: "pizza01", name: "Margherita Pizza", quantity: 1, status: "Ready", categoryKey: "pizza" },
       { id: "kitem004b", menuItemId: "coldDrink02", name: "Cola", quantity: 2, status: "Ready", categoryKey: "coldDrink" },
@@ -88,7 +87,7 @@ interface CategoryForFilter {
 
 export default function KitchenStaffPage() {
   const { t, i18n } = useTranslation();
-  const [orders, setOrders] = useState<KitchenOrder[]>(initialKitchenOrders.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime())); // Oldest first
+  const [orders, setOrders] = useState<KitchenOrder[]>(initialKitchenOrders.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()));
   const [dishTypeFilter, setDishTypeFilter] = useState<string>("all");
   const [availableCategories, setAvailableCategories] = useState<CategoryForFilter[]>([]);
 
@@ -118,22 +117,19 @@ export default function KitchenStaffPage() {
     );
   };
 
-  // Filter orders: only show orders that have at least one item not yet 'Ready'
-  // OR if the dishTypeFilter is active, show orders that have items of that type not yet ready.
   const activeOrders = orders.filter(order => {
     const hasNonReadyItems = order.items.some(item => item.status !== "Ready");
-    if (!hasNonReadyItems) return false; // If all items are ready, don't show the order card
+    if (!hasNonReadyItems) return false;
 
-    if (dishTypeFilter === "all") return true; // If filter is 'all', show if any item is not ready
+    if (dishTypeFilter === "all") return true;
     
-    // If a dish type is filtered, show if any item of that type is not ready
     return order.items.some(item => item.categoryKey === dishTypeFilter && item.status !== "Ready");
   });
 
   const getStatusTextStyle = (status: KitchenOrderItemStatus) => {
     if (status === "Preparing") return styles.itemStatusTextPreparing;
     if (status === "Ready") return styles.itemStatusTextReady;
-    return styles.itemStatusTextPending; // This might not be used if Pending always has a button
+    return styles.itemStatusTextPending;
   };
 
   return (
@@ -178,8 +174,7 @@ export default function KitchenStaffPage() {
               )}
               <ul className={styles.itemList}>
                 {order.items
-                  .filter(item => dishTypeFilter === "all" || item.categoryKey === dishTypeFilter) // Filter items by category if filter is active
-                  // .filter(item => item.status !== "Ready") // REMOVED: We want to show ready items to display their status
+                  .filter(item => dishTypeFilter === "all" || item.categoryKey === dishTypeFilter)
                   .map(item => (
                   <li key={item.id} className={styles.itemEntry}>
                     <div className={styles.itemName}>
@@ -190,7 +185,7 @@ export default function KitchenStaffPage() {
                     <div className={styles.itemActions}>
                       {item.status === "Pending" && (
                         <button 
-                            className={styles.statusButton} // Basic button style for "Start Preparing"
+                            className={styles.statusButton}
                             onClick={() => handleUpdateItemStatus(order.id, item.id, "Preparing")}
                         >
                             {t('mark_as_preparing_button', 'Start Preparing')}
@@ -198,7 +193,7 @@ export default function KitchenStaffPage() {
                       )}
                       {item.status === "Preparing" && (
                         <button 
-                            className={`${styles.statusButton} ${styles.statusPreparing}`} // Specific style for "Mark as Ready"
+                            className={`${styles.statusButton} ${styles.statusPreparing}`}
                             onClick={() => handleUpdateItemStatus(order.id, item.id, "Ready")}
                         >
                             {t('mark_as_ready_button', 'Mark as Ready')}
@@ -217,9 +212,6 @@ export default function KitchenStaffPage() {
           ))}
         </div>
       )}
-      <Link href="/" className={styles.homeLink}>
-        {t('back_to_welcome', 'Back to Welcome Screen')}
-      </Link>
     </main>
   );
 }

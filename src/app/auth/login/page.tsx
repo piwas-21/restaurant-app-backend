@@ -3,18 +3,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import styles from "../../styles/AuthPage.module.css";
-import { useRouter } from 'next/navigation'; // Import useRouter
-
-// Mock roles for simulation - in a real app, this would come from your auth system
-const ROLES = ["customer", "admin", "cashier", "kitchen-staff", "server"];
-let roleIndex = 0; // Simple way to cycle roles for testing
+import { useRouter } from 'next/navigation';
+import { login as loginUser } from '../../../lib/auth/utils';
+import { useAuth } from '@/components/AuthContext';
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
+  const { login } = useAuth();
 
   useEffect(() => {
     emailInputRef.current?.focus();
@@ -29,35 +28,38 @@ export default function LoginPage() {
       return;
     }
 
-    // Simulate login and role assignment
-    console.log("Login attempt:", { email });
-    // In a real app, you would authenticate and get the user's role from the backend.
-    const mockUserRole = ROLES[roleIndex % ROLES.length];
-    roleIndex++; // Cycle to the next role for the next login attempt for testing
+    try {
+      const response = await loginUser({ email, password });
 
-    alert(`Simulating login. Assigned role: ${mockUserRole}. Redirecting...`);
-
-    // Redirect based on role
-    switch (mockUserRole) {
-      case "admin":
-        router.push("/admin/dashboard");
-        break;
-      case "customer":
-        router.push("/account"); // User account page
-        break;
-      case "cashier":
-        router.push("/cashier");
-        break;
-      case "kitchen-staff":
-        router.push("/kitchen-staff");
-        break;
-      case "server":
-        router.push("/server");
-        break;
-      default:
-        setError("Unknown user role or redirect path not configured.");
-        router.push("/"); // Fallback to homepage
-        break;
+      if (response.success) {
+        login(response.data);
+        const userRole = response.data.role.toLowerCase();
+        
+        switch (userRole) {
+          case "admin":
+            router.push("/admin/dashboard");
+            break;
+          case "customer":
+            router.push("/account");
+            break;
+          case "cashier":
+            router.push("/cashier");
+            break;
+          case "kitchen-staff":
+            router.push("/kitchen-staff");
+            break;
+          case "server":
+            router.push("/server");
+            break;
+          default:
+            router.push("/");
+            break;
+        }
+      } else {
+        setError(response.message || "An unknown error occurred.");
+      }
+    } catch (err) {
+      setError("Failed to connect to the server.");
     }
   };
 
@@ -77,11 +79,9 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               aria-required="true"
-              aria-describedby={error && email === "" ? "email-error" : undefined}
               ref={emailInputRef}
               autoComplete="email"
             />
-            {error && email === "" && <span id="email-error" className="sr-only">Email is required.</span>}
           </div>
           <div className={styles.formGroup}>
             <label htmlFor="password">Password</label>
@@ -92,11 +92,9 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              aria-required="true"              
-              aria-describedby={error && password === "" ? "password-error" : undefined}
+              aria-required="true"
               autoComplete="current-password"
             />
-            {error && password === "" && <span id="password-error" className="sr-only">Password is required.</span>}
           </div>
           <button type="submit" className={styles.submitButton}>Login</button>
         </form>

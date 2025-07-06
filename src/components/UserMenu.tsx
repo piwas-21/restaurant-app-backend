@@ -1,0 +1,71 @@
+"use client";
+
+import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import Image from 'next/image';
+import styles from '../app/styles/UserMenu.module.css';
+import { useAuth } from './AuthContext';
+import Link from 'next/link';
+
+export default function UserMenu() {
+  const { t } = useTranslation();
+  const { user, logout } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
+  };
+
+  const handleLogout = () => {
+    logout();
+    setDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className={styles.userMenu} ref={dropdownRef}>
+      <button
+        onClick={toggleDropdown}
+        className={styles.dropdownToggle}
+        aria-haspopup="true"
+        aria-expanded={dropdownOpen}
+        aria-label={t('user_menu.aria_label')}
+      >
+        <Image src="/images/avatar.svg" alt={t('user_menu.avatar_alt')} width={40} height={40} className={styles.avatar} />
+      </button>
+
+      {dropdownOpen && (
+        <div className={styles.dropdownMenu}>
+          <div className={styles.userInfo}>
+            <p className={styles.userName}>{user.firstName} {user.lastName}</p>
+            <p className={styles.userRole}>{t(`roles.${user.role.toLowerCase()}`)}</p>
+          </div>
+          {user.role.toLowerCase() === 'customer' && (
+            <Link href="/account" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+              {t('user_menu.my_account')}
+            </Link>
+          )}
+          <button onClick={handleLogout} className={styles.logoutButton}>
+            {t('user_menu.logout')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

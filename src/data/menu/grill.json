@@ -44,14 +44,12 @@
       }
     },
     "price": 23.90,
-    "image": "1t2wrLT5ArO92G4EeotQxn8Qaf3bI3pYb",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/375a855f-1b96-4532-add1-7453bda071b6.webp",
     "dietaryTags": ["halal"],
     "categoryKey": "grill",
     "isSpecial": true,
     "images": [
-      { "url": "1t2wrLT5ArO92G4EeotQxn8Qaf3bI3pYb", "alt": "Adana Grill" },
-      { "url": "11fy_-nMtT1P5LbasowudFG35vNVgogL4", "alt": "Adana Grill" },
-      { "url": "1b9fQ385ZE-wZknxWl5RouBgyOtEQyXBO", "alt": "Adana Grill" }
+      { "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/375a855f-1b96-4532-add1-7453bda071b6.webp", "alt": "Adana Grill" }
     ]
   },
   {
@@ -71,17 +69,14 @@
       }
     },
     "price": 23.90,
-    "image": "15WahXWtlFxb9AcN_ZlkP_InyyoKozSx9",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/b49efdd9-5b0f-4b64-89d3-13f265e3993f.webp",
     "dietaryTags": ["halal"],
     "categoryKey": "grill",
     "images": [
       {
-        "url": "15WahXWtlFxb9AcN_ZlkP_InyyoKozSx9",
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/b49efdd9-5b0f-4b64-89d3-13f265e3993f.webp",
         "alt": "Chicken Shish Grill"
-      },
-      { "url": "15ATFgspMuGGcffkm985KO2WTJpaUOOCQ", "alt": "Chicken Shish Grill" },
-      { "url": "1Tchuo9RJ2E60OwqfaQruJ4Ma1rGvpw85", "alt": "Chicken Shish Grill" },
-      { "url": "1dPUqc7uHIoPSbur14MQoBhfB7bOuJ5_g", "alt": "Chicken Shish Grill" }
+      }
     ]
   },
   {
@@ -128,17 +123,15 @@
       }
     },
     "price": 32.90,
-    "image": "1s1XnW8C87Afe_ll_niD-3THLtiucifCU",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/cad4dd66-b3e5-4bb7-b59f-53d2bed089e8.webp",
     "dietaryTags": ["halal"],
     "categoryKey": "grill",
     "images": [
       {
-        "url": "1s1XnW8C87Afe_ll_niD-3THLtiucifCU",
+        "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/cad4dd66-b3e5-4bb7-b59f-53d2bed089e8.webp",
         "alt": "Mix Grill"
       },
-      { "url": "1p_nGdKU82M2ZotnbkXChWLmu0Mguvuub", "alt": "Mix Grill" },
-      { "url": "1haJuSuEvjEJRzNSRuUbkWg70gVc2-61h", "alt": "Mix Grill" },
-      { "url": "17C-lmyYNhxL8gEnDzmOTMOkBR4isiGba", "alt": "Mix Grill" }
+      { "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/cad4dd66-b3e5-4bb7-b59f-53d2bed089e8.webp", "alt": "Mix Grill" }
     ]
   }
 ]

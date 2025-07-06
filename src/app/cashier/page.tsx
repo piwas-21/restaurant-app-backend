@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
-import styles from '../styles/CashierPage.module.css'; // Import CSS module
+import styles from '../styles/CashierPage.module.css';
 
 // Define types for Order and OrderItem
 interface OrderItem {
@@ -190,9 +190,6 @@ export default function CashierPage() {
           </tbody>
         </table>
       )}
-      <Link href="/" className={styles.homeLink}>
-        {t('back_to_welcome', 'Back to Welcome Screen')}
-      </Link>
     </main>
   );
 }

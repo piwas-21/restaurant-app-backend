@@ -346,6 +346,10 @@
   "nav_reservations": "Rezervasyonlar",
   "nav_cart": "Sepet",
   "nav_login": "Giriş Yap",
+  "nav_admin": "Yönetici",
+  "nav_cashier": "Kasiyer",
+  "nav_kitchen": "Mutfak",
+  "nav_server": "Garson",
 
   "close_image_modal_button": "Kapat",
   "open_menu": "Menüyü aç",
@@ -361,6 +365,15 @@
   "cookie_settings_preferences_desc": "Bu çerezler, dil veya tema gibi tercihlerinizi hatırlayarak deneyiminizi kişiselleştirir.",
   "cookie_settings_save": "Tercihleri Kaydet",
   "cookie_settings_close_aria": "Ayarları kapat",
-  "cookie_settings_footer_link": "Çerez Tercihlerini Yönet"
+  "cookie_settings_footer_link": "Çerez Tercihlerini Yönet",
+
+  "user_menu.aria_label": "Kullanıcı menüsü",
+  "user_menu.avatar_alt": "Kullanıcı avatarı",
+  "user_menu.logout": "Çıkış yap",
+  "roles.admin": "Yönetici",
+  "roles.customer": "Müşteri",
+  "roles.cashier": "Kasiyer",
+  "roles.kitchen-staff": "Mutfak Personeli",
+  "roles.server": "Garson"
 }
 

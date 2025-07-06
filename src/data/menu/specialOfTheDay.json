@@ -28,13 +28,12 @@
       }
     },
     "price": 25.50,
-    "image": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz",
+    "image": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/21b35f18-40c7-40a5-a1fc-ec5fc637efff.webp",
     "dietaryTags": ["halal"],
     "categoryKey": "specialOfTheDay",
     "isSpecial": true,
     "images": [
-      { "url": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz", "alt": "Today's Special - sarma" },
-      { "url": "1hhq-NiggboavmcJQQjE0upG8sLwkVVAz", "alt": "Today's Special - falafal" }
+      { "url": "https://restaurant-admin-api.orderhub.ch/web-images/67d4c8d1c062921ef88f9767/product/21b35f18-40c7-40a5-a1fc-ec5fc637efff.webp", "alt": "Today's Special - sarma" }
     ]
   }
 ]

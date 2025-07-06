@@ -1,9 +1,11 @@
-// src/app/auth/register/page.tsx
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import styles from "../../styles/AuthPage.module.css";
+import { useRouter } from 'next/navigation';
+import { z } from 'zod';
+import { registerCustomer, customerRegistrationSchema } from '../../../lib/auth/utils';
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState('');
@@ -12,7 +14,9 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const firstNameInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     firstNameInputRef.current?.focus();
@@ -21,19 +25,29 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      setError('All fields are required.');
-      return;
+    setSuccess('');
+
+    try {
+      const formData = { firstName, lastName, email, password, confirmPassword };
+      customerRegistrationSchema.parse(formData);
+
+      const response = await registerCustomer(formData);
+
+      if (response.success) {
+        setSuccess(response.message);
+        setTimeout(() => {
+          router.push('/auth/login');
+        }, 2000);
+      } else {
+        setError(response.message || "Failed to register.");
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        setError(error.errors.map(e => e.message).join(", "));
+      } else {
+        setError("An unknown error occurred.");
+      }
     }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      // Consider setting focus to the password field or confirm password field
-      return;
-    }
-    // TODO: Implement actual registration logic (e.g., API call)
-    console.log('Registration attempt:', { firstName, lastName, email });
-    alert('Registration functionality to be implemented. Check console.');
-    // On success, redirect or update auth state (e.g., to login page)
   };
 
   return (
@@ -42,6 +56,7 @@ export default function RegisterPage() {
         <h1 id="register-heading">Register</h1>
         <form onSubmit={handleSubmit} noValidate>
           {error && <p className={styles.errorMessage} role="alert">{error}</p>}
+          {success && <p className="successMessage" role="alert">{success}</p>}
           <div className={styles.formGroup}>
             <label htmlFor="firstName">First Name</label>
             <input
@@ -51,7 +66,6 @@ export default function RegisterPage() {
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               required
-              aria-required="true"
               ref={firstNameInputRef}
               autoComplete="given-name"
             />
@@ -65,7 +79,6 @@ export default function RegisterPage() {
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
-              aria-required="true"
               autoComplete="family-name"
             />
           </div>
@@ -78,7 +91,6 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              aria-required="true"
               autoComplete="email"
             />
           </div>
@@ -91,11 +103,8 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              aria-required="true"
-              aria-describedby="password-requirements" // Add if there are specific requirements
               autoComplete="new-password"
             />
-            {/* <p id="password-requirements" className="sr-only">Password must be at least 8 characters long.</p> */}
           </div>
           <div className={styles.formGroup}>
             <label htmlFor="confirmPassword">Confirm Password</label>
@@ -106,7 +115,6 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              aria-required="true"
               autoComplete="new-password"
             />
           </div>
@@ -119,4 +127,3 @@ export default function RegisterPage() {
     </main>
   );
 }
-

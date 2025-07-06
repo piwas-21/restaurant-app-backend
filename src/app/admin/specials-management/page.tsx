@@ -1,4 +1,3 @@
-// src/app/admin/specials-management/page.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -14,9 +13,8 @@ const initialSpecials = [
 interface DailySpecial {
   id: string;
   name_en: string;
-  // Add name_tr, name_de, description fields, image_url etc. from schema
   price: number;
-  date_active: string; // Should be a Date object in a real app
+  date_active: string;
 }
 
 export default function SpecialsManagementPage() {
@@ -24,12 +22,9 @@ export default function SpecialsManagementPage() {
   const [isLoading] = useState(false);
   const [error] = useState('');
 
-  // TODO: useEffect to fetch specials from API
-
   const handleDeleteSpecial = (specialId: string) => {
     if (confirm('Are you sure you want to delete this special?')) {
       setSpecials(prevSpecials => prevSpecials.filter(s => s.id !== specialId));
-      // TODO: API call to delete special
     }
   };
 
@@ -40,7 +35,7 @@ export default function SpecialsManagementPage() {
         <Link href="/admin/dashboard" className={styles.adminButton} style={{ backgroundColor: "#6c757d", color: "white", textDecoration: "none" }}>Back to Dashboard</Link>
       </header>
       <section className={styles.adminContent}>
-        <button className={`${styles.adminButton} ${styles.add}`}>Add New Special</button> {/* TODO: Link to add/edit page */}
+        <button className={`${styles.adminButton} ${styles.add}`}>Add New Special</button>
         {isLoading && <p>Loading specials...</p>}
         {error && <p className="errorMessage">Error: {error}</p>}
         {!isLoading && !error && (
@@ -61,7 +56,7 @@ export default function SpecialsManagementPage() {
                     <td>{special.price.toFixed(2)}</td>
                     <td>{special.date_active}</td>
                     <td>
-                      <button className={`${styles.adminButton} ${styles.edit}`}>Edit</button> {/* TODO: Link to add/edit page with special ID */}
+                      <button className={`${styles.adminButton} ${styles.edit}`}>Edit</button>
                       <button onClick={() => handleDeleteSpecial(special.id)} className={`${styles.adminButton} ${styles.delete}`}>Delete</button>
                     </td>
                   </tr>
@@ -74,4 +69,3 @@ export default function SpecialsManagementPage() {
     </main>
   );
 }
-

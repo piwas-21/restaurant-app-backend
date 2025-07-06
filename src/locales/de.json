@@ -345,6 +345,10 @@
   "nav_reservations": "Reservierungen",
   "nav_cart": "Warenkorb",
   "nav_login": "Anmelden",
+  "nav_admin": "Administrator",
+  "nav_cashier": "Kassierer",
+  "nav_kitchen": "Küche",
+  "nav_server": "Kellner",
 
   "close_image_modal_button": "Schließen",
   "open_menu": "Menü öffnen",
@@ -360,6 +364,15 @@
   "cookie_settings_preferences_desc": "Diese Cookies speichern Ihre Auswahlmöglichkeiten, wie Sprache oder Thema, um Ihre Erfahrung zu personalisieren.",
   "cookie_settings_save": "Einstellungen speichern",
   "cookie_settings_close_aria": "Einstellungen schließen",
-  "cookie_settings_footer_link": "Cookie-Einstellungen verwalten"
+  "cookie_settings_footer_link": "Cookie-Einstellungen verwalten",
+
+  "user_menu.aria_label": "Benutzermenü",
+  "user_menu.avatar_alt": "Benutzeravatar",
+  "user_menu.logout": "Abmelden",
+  "roles.admin": "Administrator",
+  "roles.customer": "Kunde",
+  "roles.cashier": "Kassierer",
+  "roles.kitchen-staff": "Küchenpersonal",
+  "roles.server": "Kellner"
 }
 

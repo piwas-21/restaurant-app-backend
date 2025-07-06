@@ -15,7 +15,6 @@
   "error_loading_menu_items": "Failed to load menu items for {{categoryName}}. Please try again.",
   "error_loading_all_menu_items": "Error loading all items. Please try again.",
   "all_categories_nav": "All",
-  "back_to_welcome": "Back to Welcome Screen",
   "view_cart_items": "View Cart, {{count}} items",
   "add_to_order": "Add to Order",
   "add_item_to_order": "Add {{itemName}} to order",
@@ -190,7 +189,7 @@
   "admin_manage_daily_specials": "Manage Daily Specials",
   "admin_manage_members": "Manage Members",
 
-  "cashier_interface_title": "Cashier Interface",
+  "cashier_interface_title": "Cashier",
   "orders_list_title": "Current Orders",
   "order_id_header": "Order ID",
   "customer_name_header": "Customer",
@@ -210,7 +209,7 @@
   "no_orders_message": "No current orders to display.",
   "table_number_label_short": "Table",
 
-  "server_interface_title": "Server Interface",
+  "server_interface_title": "Server",
   "active_table_orders_title": "Active Table Orders",
   "table_number_label": "Table",
   "order_status_label": "Order Status",
@@ -228,7 +227,7 @@
   "order_timestamp_label": "Ordered At",
   "order_notes_label": "Notes",
 
-  "kitchen_staff_dashboard_title": "Kitchen Dashboard",
+  "kitchen_staff_dashboard_title": "Kitchen",
   "orders_to_prepare_title": "Orders to Prepare",
   "order_id_label": "Order ID",
   "order_type_label": "Type",
@@ -338,6 +337,9 @@
   "nav_reservations": "Reservations",
   "nav_cart": "Cart",
   "nav_login": "Login",
+  "nav_cashier": "Cashier",
+  "nav_kitchen": "Kitchen",
+  "nav_server": "Server",
 
   "close_image_modal_button": "Close",
   "open_menu": "Open menu",
@@ -353,5 +355,15 @@
   "cookie_settings_preferences_desc": "These cookies remember your choices, like language or theme, to personalize your experience.",
   "cookie_settings_save": "Save Preferences",
   "cookie_settings_close_aria": "Close settings",
-  "cookie_settings_footer_link": "Manage Cookie Preferences"
+  "cookie_settings_footer_link": "Manage Cookie Preferences",
+
+  "user_menu.aria_label": "User menu",
+  "user_menu.avatar_alt": "User avatar",
+  "user_menu.logout": "Logout",
+  "user_menu.my_account": "My Account",
+  "roles.admin": "Administrator",
+  "roles.customer": "Customer",
+  "roles.cashier": "Cashier",
+  "roles.kitchen-staff": "Kitchen Staff",
+  "roles.server": "Server"
 }

@@ -1,4 +1,3 @@
-// src/app/reservations/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -13,7 +12,7 @@ export default function ReservationsPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedTable, setSelectedTable] = useState(""); // New state for table selection
+  const [selectedTable, setSelectedTable] = useState("");
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -32,7 +31,7 @@ export default function ReservationsPage() {
       guests,
       name,
       phone,
-      selectedTable, // Include selected table in the request
+      selectedTable,
       notes,
     });
     alert(t("reservation_request_sent"));
@@ -105,7 +104,6 @@ export default function ReservationsPage() {
           </select>
         </div>
 
-        {/* Table Selection Section Start */}
         <div className={styles.formGroup}>
           <label htmlFor="reservationTable">{t("table_selection_label")}</label>
           <select
@@ -122,7 +120,6 @@ export default function ReservationsPage() {
             <option value="private">{t("table_option_private")}</option>
           </select>
         </div>
-        {/* Table Selection Section End */}
 
         <div className={styles.formGroup}>
           <label htmlFor="reservationName">{t("full_name_label")}</label>

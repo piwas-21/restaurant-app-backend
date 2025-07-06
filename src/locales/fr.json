@@ -342,6 +342,10 @@
     "nav_reservations": "Réservations",
     "nav_cart": "Panier",
     "nav_login": "Connexion",
+    "nav_admin": "Administrateur",
+    "nav_cashier": "Caissier",
+    "nav_kitchen": "Cuisine",
+    "nav_server": "Serveur",
 
     "close_image_modal_button": "Fermer",
     "open_menu": "Ouvrir le menu",
@@ -357,6 +361,15 @@
     "cookie_settings_preferences_desc": "Ces cookies se souviennent de vos choix, comme la langue ou le thème, afin de personnaliser votre expérience.",
     "cookie_settings_save": "Enregistrer les préférences",
     "cookie_settings_close_aria": "Fermer les paramètres",
-    "cookie_settings_footer_link": "Gérer les préférences de cookies"
+    "cookie_settings_footer_link": "Gérer les préférences de cookies",
+
+    "user_menu.aria_label": "Menu utilisateur",
+    "user_menu.avatar_alt": "Avatar de l'utilisateur",
+    "user_menu.logout": "Se déconnecter",
+    "roles.admin": "Administrateur",
+    "roles.customer": "Client",
+    "roles.cashier": "Caissier",
+    "roles.kitchen-staff": "Personnel de cuisine",
+    "roles.server": "Serveur"
   }
   
