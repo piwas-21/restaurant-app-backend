@@ -1,16 +1,14 @@
 "use client";
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import styles from '../styles/CashierPage.module.css';
 
-// Define types for Order and OrderItem
 interface OrderItem {
   id: string;
   name: string;
   quantity: number;
-  price: number; // Price per unit
+  price: number;
 }
 
 export type PaymentStatus = "Paid Online" | "To Be Paid at Cashier" | "Paid at Cashier";
@@ -23,7 +21,7 @@ export interface Order {
   totalPrice: number;
   paymentStatus: PaymentStatus;
   orderType: OrderType;
-  tableNumber?: string; // Optional, for Dine-in
+  tableNumber?: string;
   timestamp: Date;
 }
 

@@ -22,8 +22,8 @@ interface Member {
 
 export default function MemberManagementPage() {
   const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [isLoading] = useState(false);
+  const [error] = useState("");
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [registrationSuccess, setRegistrationSuccess] = useState<string | null>(null);

@@ -58,7 +58,7 @@ export default function LoginPage() {
       } else {
         setError(response.message || "An unknown error occurred.");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to connect to the server.");
     }
   };

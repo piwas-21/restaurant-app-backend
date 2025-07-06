@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import styles from '../styles/KitchenStaffPage.module.css';
 import categoriesData from '../../data/categories.json';
