@@ -1,9 +1,10 @@
 version: '3.8'
 services:
   restaurantsystem-api:
-    build:
-      context: .
-      dockerfile: RestaurantSystem.Api/Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: RestaurantSystem.Api/Dockerfile
+    image: ${CI_REGISTRY_IMAGE}:${CI_PIPELINE_IID}
     container_name: restaurant-api-dev
     ports:
       - "5221:8080"
