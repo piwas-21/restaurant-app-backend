@@ -104,7 +104,6 @@ deploy_job:
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts
-    - cp .env .env
     - echo "" >> .env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> .env
     - scp docker-compose-pro.yml .env $SERVER_USER@$SERVER_IP:/home/$SERVER_USER/
