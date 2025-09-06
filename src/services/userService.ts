@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
 
-const USER_API_URL = `/User`;
+const USER_API_URL = `/api/User`;
 
 export const fetchUsers = async (
   role: string,

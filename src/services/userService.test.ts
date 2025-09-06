@@ -31,7 +31,7 @@ describe('userService', () => {
       const result = await userService.fetchUsers(role, isDeleted, search, page, pageSize);
 
       expect(apiClient.get).toHaveBeenCalledWith(
-        `/User/users?Role=Customer&IsDeleted=false&Search=&Page=1&PageSize=10`
+        `/api/User/users?Role=Customer&IsDeleted=false&Search=&Page=1&PageSize=10`
       );
       expect(result).toEqual(mockResponse);
     });
@@ -59,7 +59,7 @@ describe('userService', () => {
       const result = await userService.registerStaff(staffData);
 
       expect(apiClient.post).toHaveBeenCalledWith(
-        '/User/register/staff',
+        '/api/User/register/staff',
         staffData
       );
       expect(result).toEqual(mockResponse);
@@ -89,7 +89,7 @@ describe('userService', () => {
       const result = await userService.deleteStaff(userId);
 
       expect(apiClient.delete).toHaveBeenCalledWith(
-        '/User/delete/user',
+        '/api/User/delete/user',
         { userId }
       );
       expect(result).toEqual(mockResponse);

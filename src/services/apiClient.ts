@@ -12,7 +12,6 @@ async function request(url: string, options: RequestInit = {}) {
 
   options.headers = headers;
 
-  // Prepend the base URL to the request URL
   const fullUrl = `${API_BASE_URL}${url}`;
 
   let response = await fetch(fullUrl, options);
@@ -43,6 +42,14 @@ export const apiClient = {
     };
     return request(url, postOptions);
   },
+  postFormData: (url: string, formData: FormData, options?: RequestInit) => {
+    const postOptions = {
+      ...options,
+      method: 'POST',
+      body: formData,
+    };
+    return request(url, postOptions);
+  },
   put: (url: string, body: any, options?: RequestInit) => {
     const putOptions = {
       ...options,
@@ -55,16 +62,26 @@ export const apiClient = {
     };
     return request(url, putOptions);
   },
-  delete: (url: string, body: any, options?: RequestInit) => {
-    const deleteOptions = {
+  putFormData: (url: string, formData: FormData, options?: RequestInit) => {
+    const putOptions = {
+      ...options,
+      method: 'PUT',
+      body: formData,
+    };
+    return request(url, putOptions);
+  },
+  delete: (url: string, body?: any, options?: RequestInit) => {
+    const deleteOptions: RequestInit = {
       ...options,
       method: 'DELETE',
-      headers: {
+    };
+    if (body) {
+      deleteOptions.headers = {
         'Content-Type': 'application/json',
         ...options?.headers,
-      },
-      body: JSON.stringify(body),
-    };
+      };
+      deleteOptions.body = JSON.stringify(body);
+    }
     return request(url, deleteOptions);
   }
 };

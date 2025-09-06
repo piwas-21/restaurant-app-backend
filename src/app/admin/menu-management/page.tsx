@@ -1,93 +1,133 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import Link from 'next/link';
-import styles from "../../styles/AdminPage.module.css";
+import { useSearchParams, useRouter } from 'next/navigation';
+import styles from '@/app/styles/AdminPage.module.css';
+import { getProductsByCategoryId } from '@/services/menuService';
+import CreateProductModal from '@/components/admin/CreateProductModal';
 
-// Mock data - replace with API calls
-const initialMenuItems = [
-  { id: '1', name_en: 'Sarma Piece (Vegan)', category: 'Starters', price: 1.90, availability: true },
-  { id: '2', name_en: 'Adana Kebab', category: 'Main Courses', price: 23.90, availability: true },
-  { id: '3', name_en: 'Baklava', category: 'Desserts', price: 9.90, availability: false },
-];
-
-interface MenuItem {
+interface Product {
   id: string;
-  name_en: string;
-  category: string;
-  price: number;
-  availability: boolean;
+  name: string;
+  basePrice: number;
+  isActive: boolean;
+  isAvailable: boolean;
 }
 
-export default function MenuManagementPage() {
+const MenuManagementContent = () => {
   const { t } = useTranslation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const categoryId = searchParams.get('categoryId');
+  const categoryName = searchParams.get('categoryName');
 
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(initialMenuItems);
-  const [isLoading] = useState(false);
-  const [error] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleToggleAvailability = (itemId: string) => {
-    setMenuItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, availability: !item.availability } : item
-      )
-    );
-  };
-
-  const handleDeleteItem = (itemId: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      setMenuItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  const fetchProducts = async () => {
+    if (categoryId) {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await getProductsByCategoryId(categoryId);
+        if (response.success) {
+          setProducts(response.data.items);
+        } else {
+          setError(response.message || 'Failed to fetch products');
+        }
+      } catch (err) {
+        setError('An unexpected error occurred.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
+  
+  useEffect(() => {
+    fetchProducts();
+  }, [categoryId]);
+
+  const handleProductCreated = () => {
+    fetchProducts(); // Refetch products after a new one is created
+  };
+  
+  const pageTitle = categoryName
+    ? `${t('menu_items_for')} "${categoryName}"`
+    : t('admin_menu_management_title');
 
   return (
-    <main className={styles.adminContainer}>
-      <header className={styles.adminHeader}>
-        <h1>Menu Management</h1>
-        <Link href="/admin/dashboard" className={styles.adminButton} style={{ backgroundColor: "#6c757d", color: "white", textDecoration: "none" }}>Back to Dashboard</Link>
-      </header>
-      <section className={styles.adminContent}>
-        <button className={`${styles.adminButton} ${styles.add}`}>Add New Menu Item</button>
-        {isLoading && <p>Loading menu items...</p>}
-        {error && <p className="errorMessage">{t('error')}: {error}</p>}
-        {!isLoading && !error && (
+    <div className={styles.adminContainer}>
+      <div className={styles.adminHeader}>
+        <h1>{pageTitle}</h1>
+        <div>
+          {categoryId && (
+            <button className={`${styles.adminButton} ${styles.add}`} onClick={() => setIsModalOpen(true)}>
+              {t('create_new_product')}
+            </button>
+          )}
+          <button className={styles.adminButton} onClick={() => router.push('/admin/category-management')}>
+            {t('back_to_categories')}
+          </button>
+        </div>
+      </div>
+      <div className={styles.adminContent}>
+        {isLoading ? (
+          <p>{t('loading_products')}</p>
+        ) : error ? (
+          <p className={styles.error}>{error}</p>
+        ) : (
           <div className={styles.adminTableContainer}>
             <table className={styles.adminTable}>
               <thead>
                 <tr>
-                  <th>Name (English)</th>
-                  <th>Category</th>
-                  <th>Price (CHF)</th>
-                  <th>Available</th>
-                  <th>Actions</th>
+                  <th>{t('product_name')}</th>
+                  <th>{t('base_price')}</th>
+                  <th>{t('active')}</th>
+                  <th>{t('available')}</th>
+                  <th>{t('actions_header')}</th>
                 </tr>
               </thead>
               <tbody>
-                {menuItems.map(item => (
-                  <tr key={item.id}>
-                    <td>{item.name_en}</td>
-                    <td>{item.category}</td>
-                    <td>{item.price.toFixed(2)}</td>
-                    <td>{item.availability ? t('yes') : t('no')}</td>
-                    <td>
-                      <button className={`${styles.adminButton} ${styles.edit}`}>Edit</button>
-                      <button
-                        onClick={() => handleToggleAvailability(item.id)}
-                        className={styles.adminButton}
-                        style={{ backgroundColor: item.availability ? "#ffc107" : "#28a745", color: item.availability ? "black" : "white" }}
-                      >
-                        {item.availability ? 'Set Unavailable' : 'Set Available'}
-                      </button>
-                      <button onClick={() => handleDeleteItem(item.id)} className={`${styles.adminButton} ${styles.delete}`}>Delete</button>
-                    </td>
+                {products.length > 0 ? (
+                  products.map((product) => (
+                    <tr key={product.id}>
+                      <td>{product.name}</td>
+                      <td>{product.basePrice}</td>
+                      <td>{product.isActive ? t('yes') : t('no')}</td>
+                      <td>{product.isAvailable ? t('yes') : t('no')}</td>
+                      <td>
+                        {/* Edit and Delete buttons for products will go here */}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5}>{t('no_products_found')}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         )}
-      </section>
-    </main>
+      </div>
+      <CreateProductModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onProductCreated={handleProductCreated}
+        categoryId={categoryId}
+      />
+    </div>
   );
-}
+};
+
+// Wrap the component in Suspense as useSearchParams requires it
+const MenuManagementPage = () => (
+  <Suspense fallback={<div>Loading...</div>}>
+    <MenuManagementContent />
+  </Suspense>
+);
+
+export default MenuManagementPage;

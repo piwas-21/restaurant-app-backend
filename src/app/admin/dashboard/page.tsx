@@ -15,6 +15,7 @@ export default function AdminDashboardPage() {
           <li><Link href="/admin/menu-management">Manage Menu</Link></li>
           <li><Link href="/admin/specials-management">Manage Daily Specials</Link></li>
           <li><Link href="/admin/member-management">Manage Members</Link></li>
+          <li><Link href="/admin/category-management">Manage Categories</Link></li>
         </ul>
       </nav>
       <section className={styles.adminContent}>

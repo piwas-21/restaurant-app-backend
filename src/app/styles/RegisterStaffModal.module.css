@@ -4,12 +4,13 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    overflow-y: auto; /* Allow scrolling for the overlay if content is too tall */
+    padding: 1rem;
+    overflow-y: auto;
   }
   
   .modalContent {
@@ -17,50 +18,150 @@
     color: var(--text-color);
     padding: 2rem;
     border-radius: 8px;
-    width: 90%; /* Make modal content responsive */
-    max-width: 400px; /* Set a max-width for larger screens */
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    max-height: 90vh; /* Set a max height for scrolling */
-    overflow-y: auto; /* Enable vertical scrolling if content overflows */
+    width: 90%;
+    max-width: 900px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modalHeader {
+    border-bottom: 1px solid var(--border-color, #eee);
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .modalHeader h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+  
+  .formGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+  
+  .formColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .fullWidth {
+    grid-column: 1 / -1;
   }
   
   .formGroup {
     margin-bottom: 1rem;
   }
   
+  .formGroup h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.2rem;
+    border-bottom: 1px solid var(--border-color-light);
+    padding-bottom: 0.5rem;
+  }
+  
   .formGroup label {
     display: block;
     margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  /* --- Selectable Chip Styling --- */
+  .chipGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .chip input[type="checkbox"] {
+    opacity: 0;
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+
+  .chip label {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    font-weight: normal;
+    white-space: nowrap;
+    margin-bottom: 0;
+  }
+  
+  .chip label:hover {
+    background-color: var(--background-color-hover, #f0f0f0);
+  }
+
+  .chip input[type="checkbox"]:checked + label {
+    background-color: #28a745; /* Green color for selected */
+    color: white;
+    border-color: #28a745;
+  }
+  
+  /* Dynamic Section Styling */
+  .variationItem, .contentItem {
+    border: 1px solid var(--border-color, #eee);
+    padding: 1rem;
+    padding-top: 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+  
+  .contentItem .cancelButton, .variationItem .cancelButton {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .addSectionButton {
+    margin-top: 0.5rem;
+    margin-bottom: 1rem;
   }
   
   .formGroup input,
-  .formGroup select {
+  .formGroup select,
+  .formGroup textarea {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ccc;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color, #ccc);
     border-radius: 4px;
     background-color: var(--input-background-color);
     color: var(--text-color);
+    font-size: 1rem;
   }
   
   .errorMessage {
-    color: red;
+    color: var(--error-color, red);
     font-size: 0.875rem;
+    margin-top: 0.25rem;
   }
   
   .buttonGroup {
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
-    margin-top: 1.5rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color, #eee);
   }
   
   .submitButton,
   .cancelButton {
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 1rem;
   }
   
   .submitButton {
