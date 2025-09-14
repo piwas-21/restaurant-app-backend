@@ -8,6 +8,7 @@ import styles from '@/app/styles/AdminPage.module.css';
 import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
 import { useTranslation } from 'react-i18next';
 import { createProduct, CreateProductData } from '@/services/menuService';
+import { uploadBulkProductImages } from '@/services/productService';
 import { getCategories } from '@/services/categoryService';
 
 // Enums and Constants
@@ -66,8 +67,9 @@ interface CreateProductModalProps {
 
 const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose, onProductCreated, categoryId }) => {
   const { t } = useTranslation();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'creating' | 'uploading'>('idle');
   const [categories, setCategories] = useState<Category[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   const {
     register, handleSubmit, control, formState: { errors },
@@ -94,8 +96,12 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose
         if (response.success) setCategories(response.data.items);
       };
       fetchAllCategories();
+    } else {
+      reset();
+      setImageFiles([]);
+      setSubmissionStatus('idle');
     }
-  }, [isOpen]);
+  }, [isOpen, reset]);
   
   useEffect(() => {
     const primaryId = watch('primaryCategoryId');
@@ -105,7 +111,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose
   }, [selectedCategoryIds, watch, setValue]);
 
   const onSubmit = async (data: CreateProductFormValues) => {
-    setIsSubmitting(true);
+    setSubmissionStatus('creating');
     const formattedContent = data.content?.reduce((acc, curr) => {
       acc[curr.language] = { name: curr.name, description: curr.description || '' };
       return acc;
@@ -120,19 +126,34 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose
     };
 
     try {
-      const response = await createProduct(productData);
-      if (response.success) {
+      const productResponse = await createProduct(productData);
+      if (productResponse.success && productResponse.data.id) {
         onProductCreated();
-        onClose();
-        reset();
+
+        if (imageFiles.length > 0) {
+          setSubmissionStatus('uploading');
+          const imageResponse = await uploadBulkProductImages(productResponse.data.id, imageFiles);
+          if (!imageResponse.success) {
+            // Handle image upload failure, maybe notify user but product is already created
+            console.error("Image upload failed:", imageResponse.message);
+          }
+        }
+        
+        onClose(); // Close modal after success
       } else {
-        setError('root', { message: response.message || 'Failed to create product' });
+        setError('root', { message: productResponse.message || 'Failed to create product' });
       }
     } catch (error) {
       setError('root', { message: 'An unexpected error occurred.' });
     } finally {
-      setIsSubmitting(false);
+      setSubmissionStatus('idle');
     }
+  };
+
+  const getSubmitButtonText = () => {
+    if (submissionStatus === 'creating') return t('creating...');
+    if (submissionStatus === 'uploading') return t('uploading...');
+    return t('create_product');
   };
 
   if (!isOpen) return null;
@@ -219,6 +240,12 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose
               </div>
 
               <div className={modalStyles.formGroup}>
+                <label>{t('product_images')} ({t('optional')})</label>
+                <input type="file" multiple onChange={(e) => setImageFiles(Array.from(e.target.files || []))} />
+                {imageFiles.length > 0 && <p>{t('files_selected', { count: imageFiles.length })}</p>}
+              </div>
+
+              <div className={modalStyles.formGroup}>
                 <h3>{t('allergens')} ({t('optional')})</h3>
                 <Controller
                   name="allergens"
@@ -287,8 +314,10 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose
           </div>
           
           <div className={modalStyles.buttonGroup}>
-            <button type="submit" className={modalStyles.submitButton} disabled={isSubmitting}>{isSubmitting ? t('creating...') : t('create_product')}</button>
-            <button type="button" onClick={onClose} className={modalStyles.cancelButton} disabled={isSubmitting}>{t('cancel')}</button>
+            <button type="submit" className={modalStyles.submitButton} disabled={submissionStatus !== 'idle'}>
+              {getSubmitButtonText()}
+            </button>
+            <button type="button" onClick={onClose} className={modalStyles.cancelButton} disabled={submissionStatus !== 'idle'}>{t('cancel')}</button>
           </div>
         </form>
       </div>

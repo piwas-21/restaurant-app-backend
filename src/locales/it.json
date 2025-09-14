@@ -426,7 +426,7 @@
   "view_products": "Visualizza prodotti",
   "menu_items_for": "Voci di menu per",
   "back_to_categories": "Torna alle categorie",
-  
+
   "loading_products": "Caricamento prodotti...",
   "product_name": "Nome prodotto",
   "product_price": "Prezzo",
@@ -478,6 +478,35 @@
   "add_ingredient_translation": "Aggiungi traduzione degli ingredienti",
   "ingredients_placeholder": "Separati da virgole, es.: lenticchia, acqua, sale",
 
-  "add_language_translation": "Aggiungi traduzione della lingua"
+  "add_language_translation": "Aggiungi traduzione della lingua",
+
+  "all_categories": "Tutte le categorie",
+  "select_category_to_create_product": "Seleziona prima una categoria per creare un nuovo prodotto.",
+  "product_image": "Immagine del prodotto",
+  "upload_product_image": "Carica immagine del prodotto",
+  "product_created_successfully_upload_image": "Prodotto creato con successo. Ora puoi caricare un’immagine.",
+  "alt_text": "Testo alternativo",
+  "uploading...": "Caricamento...",
+  "upload_image": "Carica immagine",
+  "close": "Chiudi",
+  "loading_product_details": "Caricamento dettagli del prodotto...",
+  "product_not_found": "Prodotto non trovato.",
+  "product_information": "Informazioni sul prodotto",
+  "status": "Stato",
+  "inactive": "Inattivo",
+  "unavailable": "Non disponibile",
+  "prep_time": "Tempo di preparazione",
+  "minutes": "minuti",
+  "details": "Dettagli",
+  "primary": "Principale",
+  "final_price": "Prezzo finale",
+  "product_images": "Immagini del prodotto",
+  "files_selected": "{{count}} file selezionato/i",
+  "edit_product": "Modifica prodotto",
+  "update_product": "Aggiorna prodotto",
+  "updating...": "Aggiornamento...",
+  "suggested_side_items": "Contorni suggeriti",
+  "item_name": "Nome dell’articolo",
+  "price": "Prezzo",
+  "required": "Obbligatorio"
 }
-  

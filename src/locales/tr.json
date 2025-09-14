@@ -427,7 +427,7 @@
   "view_products": "Ürünleri Görüntüle",
   "menu_items_for": "Menü Öğeleri -",
   "back_to_categories": "Kategorilere Geri Dön",
-  
+
   "loading_products": "Ürünler yükleniyor...",
   "product_name": "Ürün Adı",
   "product_price": "Fiyat",
@@ -479,6 +479,36 @@
   "add_ingredient_translation": "İçindekiler Çevirisi Ekle",
   "ingredients_placeholder": "Virgülle ayırın, örn: mercimek, su, tuz",
 
-  "add_language_translation": "Dil Çevirisi Ekle"
+  "add_language_translation": "Dil Çevirisi Ekle",
+
+  "all_categories": "Tüm Kategoriler",
+  "select_category_to_create_product": "Yeni bir ürün oluşturmak için lütfen önce bir kategori seçin.",
+  "product_image": "Ürün Görseli",
+  "upload_product_image": "Ürün Görseli Yükle",
+  "product_created_successfully_upload_image": "Ürün başarıyla oluşturuldu. Şimdi bir görsel yükleyebilirsiniz.",
+  "alt_text": "Alt Metin",
+  "uploading...": "Yükleniyor...",
+  "upload_image": "Görsel Yükle",
+  "close": "Kapat",
+  "loading_product_details": "Ürün detayları yükleniyor...",
+  "product_not_found": "Ürün bulunamadı.",
+  "product_information": "Ürün Bilgileri",
+  "status": "Durum",
+  "inactive": "Pasif",
+  "unavailable": "Mevcut Değil",
+  "prep_time": "Hazırlama Süresi",
+  "minutes": "dakika",
+  "details": "Detaylar",
+  "primary": "Ana",
+  "final_price": "Nihai Fiyat",
+  "product_images": "Ürün Görselleri",
+  "files_selected": "{{count}} dosya seçildi",
+  "edit_product": "Ürünü Düzenle",
+  "update_product": "Ürünü Güncelle",
+  "updating...": "Güncelleniyor...",
+  "suggested_side_items": "Önerilen Yan Ürünler",
+  "item_name": "Ürün Adı",
+  "price": "Fiyat",
+  "required": "Zorunlu"
 }
 

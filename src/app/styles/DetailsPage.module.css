@@ -1,0 +1,139 @@
+/* styles/DetailsPage.module.css */
+
+.detailsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.mainContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.infoSection {
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--card-background);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+
+.infoSection h2,
+.infoSection h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--primary-color-light);
+  padding-bottom: 0.5rem;
+  font-size: 1.4rem;
+}
+
+.infoSection p,
+.infoSection li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.infoSection ul {
+  list-style-position: inside;
+  padding-left: 0;
+}
+
+.imageGalleryContainer {
+  width: 100%;
+}
+
+.primaryImageContainer {
+  width: 100%;
+  margin-bottom: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.primaryImage {
+  width: 100%;
+  height: auto;
+  max-height: 450px;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbnailContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.75rem;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 2px solid var(--border-color);
+  transition: border-color 0.2s;
+}
+
+.thumbnail:hover, .thumbnail.active {
+  border-color: var(--primary-color);
+}
+
+/* Variations table specific styling */
+.variationsTable {
+  margin-top: 1rem;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden; /* Ensures border-radius is respected by children */
+}
+
+.variationsTable th, .variationsTable td {
+  padding: 0.8rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.variationsTable th {
+  background-color: var(--secondary-color-light);
+}
+
+.variationsTable tr:last-child td {
+  border-bottom: none;
+}
+
+[data-theme="dark"] .variationsTable th {
+  background-color: var(--secondary-color, #2c2c2c);
+  color: var(--text-color, #e0e0e0);
+}
+
+
+@media (min-width: 992px) {
+  .detailsContainer {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .imageGalleryContainer {
+    width: 400px;
+    position: sticky;
+    top: 2rem;
+  }
+
+  .mainContent {
+    flex: 1;
+  }
+
+  .infoGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

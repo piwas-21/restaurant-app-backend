@@ -15,6 +15,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'lh3.google.com',
         pathname: '/u/0/d/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'rumi-test-backend-bucket.s3.eu-central-1.amazonaws.com',
+        pathname: '/**',
       }
     ],
     deviceSizes: [640, 828, 1200],

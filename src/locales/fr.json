@@ -23,7 +23,7 @@
     "view_cart_checkout_button": "Voir le panier et passer commande",
     "view_cart_floating_button": "Voir le panier ({{count}} articles) - CHF {{totalPrice}}",
     "item_added_to_cart_toast": "'{{itemName}}' ajouté à votre panier !",
-    
+
     "cart_title": "Votre panier",
     "back_to_menu": "Retour au menu",
     "cart_empty_message": "Votre panier est vide.",
@@ -81,7 +81,7 @@
     "checkout_payrexx_placeholder": "La fonctionnalité Payrexx est un espace réservé.",
     "checkout_processing_payment": "Traitement du paiement...",
 
-    
+
     "login_title": "Connexion membre",
     "login_description": "Connectez-vous à votre compte RUMI pour accéder aux avantages et à l'historique des commandes.",
     "email_address_label": "Adresse e-mail",
@@ -133,7 +133,7 @@
     "reservation_confirmation_note": "Votre réservation n’est confirmée qu’après réponse de notre part. Pour plus de 10 personnes, veuillez appeler.",
     "reservation_validation_error": "Veuillez remplir tous les champs obligatoires : date, heure, nombre de personnes, nom et téléphone.",
     "reservation_request_sent": "Demande de réservation envoyée ! (Détails dans la console). Nous vous contacterons.",
-    
+
     "sarma_name": "Sarma (Vegan)",
     "sarma_description": "Feuilles de vigne roulées à la main, garnies de riz et d’herbes. Un classique turc.",
     "falafel_name": "Falafel (Vegan)",
@@ -146,7 +146,7 @@
     "main_courses_category": "Plats principaux",
     "desserts_category": "Desserts",
     "drinks_category": "Boissons",
-    
+
     "home_page_title": "Restaurant RUMI - Cuisine turque authentique à Genève, Suisse",
     "home_page_description": "Savourez les saveurs turques authentiques chez RUMI à Genève. Kebab, meze, desserts. Ambiance chaleureuse. Options halal disponibles.",
     "home_hero_title": "Découvrez les saveurs turques authentiques",
@@ -167,7 +167,7 @@
     "phone_label": "Téléphone",
     "google_maps_iframe_title": "Localisation du restaurant RUMI sur Google Maps",
     "google_maps_iframe_aria_label": "Carte Google Maps montrant la localisation du restaurant",
-    
+
     "menu_page_title": "Menu du restaurant RUMI - Entrées, Plats, Desserts | Genève",
     "menu_page_description": "Découvrez notre menu turc authentique à Genève. Kebab, meze, desserts traditionnels. Options halal disponibles.",
     "menu_categories_label": "Catégories du menu",
@@ -423,7 +423,7 @@
     "view_products": "Voir les produits",
     "menu_items_for": "Éléments du menu pour",
     "back_to_categories": "Retour aux catégories",
-    
+
     "loading_products": "Chargement des produits...",
     "product_name": "Nom du produit",
     "product_price": "Prix",
@@ -475,6 +475,35 @@
   "add_ingredient_translation": "Ajouter une traduction des ingrédients",
   "ingredients_placeholder": "Séparés par des virgules, ex. : lentille, eau, sel",
 
-  "add_language_translation": "Ajouter une traduction de langue"
+  "add_language_translation": "Ajouter une traduction de langue",
+
+  "all_categories": "Toutes les catégories",
+  "select_category_to_create_product": "Veuillez d’abord sélectionner une catégorie pour créer un nouveau produit.",
+  "product_image": "Image du produit",
+  "upload_product_image": "Téléverser l’image du produit",
+  "product_created_successfully_upload_image": "Produit créé avec succès. Vous pouvez maintenant téléverser une image.",
+  "alt_text": "Texte alternatif",
+  "uploading...": "Téléversement...",
+  "upload_image": "Téléverser l’image",
+  "close": "Fermer",
+  "loading_product_details": "Chargement des détails du produit...",
+  "product_not_found": "Produit introuvable.",
+  "product_information": "Informations sur le produit",
+  "status": "Statut",
+  "inactive": "Inactif",
+  "unavailable": "Indisponible",
+  "prep_time": "Temps de préparation",
+  "minutes": "minutes",
+  "details": "Détails",
+  "primary": "Principal",
+  "final_price": "Prix final",
+  "product_images": "Images du produit",
+  "files_selected": "{{count}} fichier(s) sélectionné(s)",
+  "edit_product": "Modifier le produit",
+  "update_product": "Mettre à jour le produit",
+  "updating...": "Mise à jour...",
+  "suggested_side_items": "Articles d’accompagnement suggérés",
+  "item_name": "Nom de l’article",
+  "price": "Prix",
+  "required": "Obligatoire"
   }
-  

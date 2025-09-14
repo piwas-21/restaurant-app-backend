@@ -8,7 +8,9 @@ const PRODUCTS_API_URL = `${API_BASE_URL}/Products`;
 interface Product {
   id: string;
   name: string;
-  price: number;
+  basePrice: number;
+  isActive: boolean;
+  isAvailable: boolean;
   // Add other product properties as needed based on the full API response
 }
 
@@ -66,5 +68,20 @@ export const getProductsByCategoryId = async (
 
 export const createProduct = async (productData: CreateProductData) => {
   const response = await apiClient.post(PRODUCTS_API_URL, productData);
+  return response.json();
+};
+
+export const getAllProducts = async (
+    pageNumber: number = 1,
+    pageSize: number = 10
+  ): Promise<{ success: boolean; message: string; data: PaginatedProducts; errors: any }> => {
+    const response = await apiClient.get(
+      `${PRODUCTS_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`
+    );
+    return response.json();
+  };
+
+export const getProductById = async (productId: string) => {
+  const response = await apiClient.get(`${PRODUCTS_API_URL}/${productId}`);
   return response.json();
 };

@@ -426,7 +426,7 @@
   "view_products": "Produkte ansehen",
   "menu_items_for": "Menüelemente für",
   "back_to_categories": "Zurück zu den Kategorien",
-  
+
   "loading_products": "Produkte werden geladen...",
   "product_name": "Produktname",
   "product_price": "Preis",
@@ -478,6 +478,36 @@
   "add_ingredient_translation": "Zutatenübersetzung hinzufügen",
   "ingredients_placeholder": "Durch Kommas getrennt, z. B.: Linse, Wasser, Salz",
 
-  "add_language_translation": "Sprachübersetzung hinzufügen"
+  "add_language_translation": "Sprachübersetzung hinzufügen",
+
+  "all_categories": "Alle Kategorien",
+  "select_category_to_create_product": "Bitte wählen Sie zuerst eine Kategorie, um ein neues Produkt zu erstellen.",
+  "product_image": "Produktbild",
+  "upload_product_image": "Produktbild hochladen",
+  "product_created_successfully_upload_image": "Produkt erfolgreich erstellt. Sie können nun ein Bild hochladen.",
+  "alt_text": "Alt-Text",
+  "uploading...": "Wird hochgeladen...",
+  "upload_image": "Bild hochladen",
+  "close": "Schließen",
+  "loading_product_details": "Produktdetails werden geladen...",
+  "product_not_found": "Produkt nicht gefunden.",
+  "product_information": "Produktinformationen",
+  "status": "Status",
+  "inactive": "Inaktiv",
+  "unavailable": "Nicht verfügbar",
+  "prep_time": "Vorbereitungszeit",
+  "minutes": "Minuten",
+  "details": "Details",
+  "primary": "Primär",
+  "final_price": "Endpreis",
+  "product_images": "Produktbilder",
+  "files_selected": "{{count}} Datei(en) ausgewählt",
+  "edit_product": "Produkt bearbeiten",
+  "update_product": "Produkt aktualisieren",
+  "updating...": "Aktualisiere...",
+  "suggested_side_items": "Vorgeschlagene Beilagen",
+  "item_name": "Artikelname",
+  "price": "Preis",
+  "required": "Erforderlich"
 }
 

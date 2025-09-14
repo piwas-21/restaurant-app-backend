@@ -426,7 +426,7 @@
   "view_products": "عرض المنتجات",
   "menu_items_for": "عناصر القائمة لـ",
   "back_to_categories": "العودة إلى الفئات",
-  
+
   "loading_products": "جارٍ تحميل المنتجات...",
   "product_name": "اسم المنتج",
   "product_price": "السعر",
@@ -478,6 +478,35 @@
   "add_ingredient_translation": "إضافة ترجمة للمكونات",
   "ingredients_placeholder": "مفصولة بفواصل، مثل: عدس، ماء، ملح",
 
-  "add_language_translation": "إضافة ترجمة للغة"
+  "add_language_translation": "إضافة ترجمة للغة",
+
+  "all_categories": "جميع الفئات",
+  "select_category_to_create_product": "يرجى اختيار فئة أولاً لإنشاء منتج جديد.",
+  "product_image": "صورة المنتج",
+  "upload_product_image": "تحميل صورة المنتج",
+  "product_created_successfully_upload_image": "تم إنشاء المنتج بنجاح. يمكنك الآن تحميل صورة.",
+  "alt_text": "نص بديل",
+  "uploading...": "جارٍ التحميل...",
+  "upload_image": "تحميل صورة",
+  "close": "إغلاق",
+  "loading_product_details": "جارٍ تحميل تفاصيل المنتج...",
+  "product_not_found": "لم يتم العثور على المنتج.",
+  "product_information": "معلومات المنتج",
+  "status": "الحالة",
+  "inactive": "غير نشط",
+  "unavailable": "غير متاح",
+  "prep_time": "وقت التحضير",
+  "minutes": "دقيقة",
+  "details": "تفاصيل",
+  "primary": "أساسي",
+  "final_price": "السعر النهائي",
+  "product_images": "صور المنتج",
+  "files_selected": "{{count}} ملف/ملفات محددة",
+  "edit_product": "تعديل المنتج",
+  "update_product": "تحديث المنتج",
+  "updating...": "جارٍ التحديث...",
+  "suggested_side_items": "عناصر جانبية مقترحة",
+  "item_name": "اسم العنصر",
+  "price": "السعر",
+  "required": "مطلوب"
 }
-  
