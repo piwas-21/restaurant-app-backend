@@ -8,7 +8,7 @@ import CreateCategoryModal from '@/components/admin/CreateCategoryModal';
 import EditCategoryModal from '@/components/admin/EditCategoryModal';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
-import CategoryManagementHeader from '@/components/admin/category-management/CategoryManagementHeader';
+import PageHeader from '@/components/admin/PageHeader';
 import CategoriesTable from '@/components/admin/category-management/CategoriesTable';
 import { Category } from '@/app/admin/menu-management/interfaces';
 
@@ -45,7 +45,7 @@ const CategoryManagementPage = () => {
     if (categoryToDelete) {
       const result = await handleDeleteCategory(categoryToDelete.id);
       setIsConfirmationModalOpen(false);
-      setResultModalMessage(t(result.message));
+      setResultModalMessage(result.message); // Use the message directly
       setIsResultModalSuccess(result.success);
       setIsResultModalOpen(true);
       setCategoryToDelete(null);
@@ -55,7 +55,11 @@ const CategoryManagementPage = () => {
   return (
     <>
       <div className={styles.adminContainer}>
-        <CategoryManagementHeader onOpenCreateModal={() => setIsCreateModalOpen(true)} />
+        <PageHeader title={t('admin_category_management_title')}>
+          <button className={`${styles.adminButton} ${styles.add}`} onClick={() => setIsCreateModalOpen(true)}>
+            {t('create_category')}
+          </button>
+        </PageHeader>
         <div className={styles.adminContent}>
           <CategoriesTable
             categories={categories}

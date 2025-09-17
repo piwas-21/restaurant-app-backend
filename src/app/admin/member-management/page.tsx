@@ -7,7 +7,7 @@ import styles from '@/app/styles/AdminPage.module.css';
 import RegisterStaffModal from '@/components/admin/RegisterStaffModal';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
-import MemberManagementHeader from '@/components/admin/member-management/MemberManagementHeader';
+import PageHeader from '@/components/admin/PageHeader';
 import FilterControls from '@/components/admin/member-management/FilterControls';
 import MembersTable from '@/components/admin/member-management/MembersTable';
 
@@ -65,7 +65,11 @@ const MemberManagementPage = () => {
   return (
     <>
       <div className={styles.adminContainer}>
-        <MemberManagementHeader onRegisterStaff={() => setIsRegisterModalOpen(true)} />
+        <PageHeader title={t('admin_member_management_title')}>
+          <button className={`${styles.adminButton} ${styles.add}`} onClick={() => setIsRegisterModalOpen(true)}>
+            {t('register_staff')}
+          </button>
+        </PageHeader>
         <div className={styles.adminContent}>
           <FilterControls
             activeTab={activeTab}

@@ -1,18 +1,9 @@
 import { apiClient } from './apiClient';
+import { Product } from '@/app/admin/menu-management/interfaces';
 
 const API_BASE_URL = '/api';
 const CATEGORIES_API_URL = `${API_BASE_URL}/Categories`;
 const PRODUCTS_API_URL = `${API_BASE_URL}/Products`;
-
-// Interfaces for Product Retrieval
-interface Product {
-  id: string;
-  name: string;
-  basePrice: number;
-  isActive: boolean;
-  isAvailable: boolean;
-  // Add other product properties as needed based on the full API response
-}
 
 interface PaginatedProducts {
   items: Product[];
@@ -55,14 +46,16 @@ export interface CreateProductData {
   content?: ContentData;
 }
 
-export const getProductsByCategoryId = async (
-  categoryId: string,
+export const getProducts = async (
   pageNumber: number = 1,
-  pageSize: number = 10
+  pageSize: number = 10,
+  categoryId?: string | null
 ): Promise<{ success: boolean; message: string; data: PaginatedProducts; errors: any }> => {
-  const response = await apiClient.get(
-    `${CATEGORIES_API_URL}/${categoryId}/products?pageNumber=${pageNumber}&pageSize=${pageSize}`
-  );
+  let url = `${PRODUCTS_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+  if (categoryId) {
+    url += `&CategoryId=${categoryId}`;
+  }
+  const response = await apiClient.get(url);
   return response.json();
 };
 
@@ -70,16 +63,6 @@ export const createProduct = async (productData: CreateProductData) => {
   const response = await apiClient.post(PRODUCTS_API_URL, productData);
   return response.json();
 };
-
-export const getAllProducts = async (
-    pageNumber: number = 1,
-    pageSize: number = 10
-  ): Promise<{ success: boolean; message: string; data: PaginatedProducts; errors: any }> => {
-    const response = await apiClient.get(
-      `${PRODUCTS_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`
-    );
-    return response.json();
-  };
 
 export const getProductById = async (productId: string) => {
   const response = await apiClient.get(`${PRODUCTS_API_URL}/${productId}`);

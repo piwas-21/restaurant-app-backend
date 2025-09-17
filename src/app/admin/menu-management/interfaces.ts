@@ -1,9 +1,11 @@
 // src/interfaces/Product.ts
 
 export interface ProductImage {
+  id: string;
   url: string;
   altText: string;
   isPrimary: boolean;
+  sortOrder: number;
 }
 
 export interface SideItem {
@@ -15,6 +17,7 @@ export interface SideItem {
 }
 
 export interface Variation {
+  id?: string;
   name: string;
   priceModifier: number;
   finalPrice: number;
@@ -47,9 +50,12 @@ export interface ProductDetails {
 export interface Product {
   id: string;
   name: string;
+  description: string;
   basePrice: number;
   isActive: boolean;
   isAvailable: boolean;
+  imageUrl: string | null;
+  images: ProductImage[];
 }
 
 export interface Category {

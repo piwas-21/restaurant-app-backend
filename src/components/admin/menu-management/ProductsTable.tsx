@@ -11,9 +11,10 @@ interface ProductsTableProps {
   isLoading: boolean;
   error: string | null;
   onEdit: (productId: string) => void;
+  onDelete: (productId: string) => void;
 }
 
-const ProductsTable: React.FC<ProductsTableProps> = ({ products, isLoading, error, onEdit }) => {
+const ProductsTable: React.FC<ProductsTableProps> = ({ products, isLoading, error, onEdit, onDelete }) => {
   const { t } = useTranslation();
 
   if (isLoading) return <p>{t('loading_products')}</p>;
@@ -42,6 +43,9 @@ const ProductsTable: React.FC<ProductsTableProps> = ({ products, isLoading, erro
                 <td className={styles.actionsCell}>
                   <button onClick={() => onEdit(product.id)} className={`${styles.adminButton} ${styles.edit}`}>
                     {t('edit')}
+                  </button>
+                  <button onClick={() => onDelete(product.id)} className={`${styles.adminButton} ${styles.delete}`}>
+                    {t('delete')}
                   </button>
                   <Link href={`/admin/menu-management/${product.id}`} className={`${styles.adminButton} ${styles.details}`}>
                     {t('details')}

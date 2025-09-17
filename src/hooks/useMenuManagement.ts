@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getProductsByCategoryId, getAllProducts } from '@/services/menuService';
+import { getProducts } from '@/services/menuService';
 import { getCategories } from '@/services/categoryService';
 import { Product, Category } from '@/app/admin/menu-management/interfaces';
 
@@ -21,9 +21,7 @@ export const useMenuManagement = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = selectedCategoryId 
-        ? await getProductsByCategoryId(selectedCategoryId) 
-        : await getAllProducts();
+      const response = await getProducts(1, 10, selectedCategoryId);
       
       if (response.success) {
         setProducts(response.data.items);

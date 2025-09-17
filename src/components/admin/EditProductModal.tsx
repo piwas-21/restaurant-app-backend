@@ -7,7 +7,7 @@ import { z } from 'zod';
 import styles from '@/app/styles/AdminPage.module.css';
 import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
 import { useTranslation } from 'react-i18next';
-import { updateProduct } from '@/services/productService';
+import { updateProduct, uploadBulkProductImages } from '@/services/productService';
 import { getCategories } from '@/services/categoryService';
 
 // Constants
@@ -61,6 +61,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   const {
     register, handleSubmit, control, formState: { errors },
@@ -117,6 +118,9 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
     try {
       const response = await updateProduct(product.id, productData);
       if (response.success) {
+        if (imageFiles.length > 0) {
+          await uploadBulkProductImages(product.id, imageFiles);
+        }
         onProductUpdated();
         onClose();
       } else {
@@ -151,6 +155,11 @@ const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onClose, on
                 <select {...register('type')}>
                   {productTypes.map(type => <option key={type} value={type}>{t(`product_type_${type}`)}</option>)}
                 </select>
+              </div>
+              <div className={modalStyles.formGroup}>
+                <label>{t('product_images')} ({t('optional')})</label>
+                <input type="file" multiple onChange={(e) => setImageFiles(Array.from(e.target.files || []))} />
+                {imageFiles.length > 0 && <p>{t('files_selected', { count: imageFiles.length })}</p>}
               </div>
             </div>
           </div>

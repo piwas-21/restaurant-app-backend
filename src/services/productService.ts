@@ -38,3 +38,18 @@ export const updateProduct = async (productId: string, productData: any) => {
   const response = await apiClient.put(`${PRODUCTS_API_URL}/${productId}`, productData);
   return response.json();
 };
+
+export const updateProductImageDetails = async (productId: string, imageId: string, imageData: any) => {
+  const response = await apiClient.put(`${PRODUCTS_API_URL}/${productId}/images/${imageId}`, imageData);
+  return response.json();
+};
+
+export const deleteProductImage = async (productId: string, imageId: string) => {
+  const response = await apiClient.delete(`${PRODUCTS_API_URL}/${productId}/images/${imageId}`);
+  return response.json();
+};
+
+export const deleteProduct = async (productId: string) => {
+  const response = await apiClient.delete(`${PRODUCTS_API_URL}/${productId}`);
+  return response.json();
+};

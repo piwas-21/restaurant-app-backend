@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { loginSchema, staffRegistrationSchema } from '../schemas/auth.schema';
+import { loginSchema } from '../schemas/auth.schema';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const AUTH_API_URL = `${API_BASE_URL}/api/Auth`;
@@ -37,19 +37,10 @@ export async function refreshToken() {
         body: JSON.stringify({ accessToken, refreshToken }),
     });
 
-    if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-            localStorage.setItem('token', data.data.accessToken);
-            localStorage.setItem('refreshToken', data.data.refreshToken);
-        }
-        return data;
+    const data = await response.json();
+    if (data.success) {
+        localStorage.setItem('token', data.data.accessToken);
+        localStorage.setItem('refreshToken', data.data.refreshToken);
     }
-
-    // Handle logout if refresh fails
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    window.location.href = '/auth/login';
-
-    return response.json();
+    return data;
 }

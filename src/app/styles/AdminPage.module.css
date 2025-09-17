@@ -1,11 +1,124 @@
 /* styles/AdminPage.module.css */
 
-.adminContainer {
-  padding: 2rem;
-  background-color: var(--secondary-color-light, #f8f9fa); /* Use CSS var, fallback */
-  color: var(--text-color, #333);
+.adminLayout {
+  display: flex;
   min-height: 100vh;
 }
+
+.sidebar {
+  width: 250px;
+  background-color: var(--primary-color-dark, #343a40);
+  color: var(--button-text-color, white);
+  position: fixed;
+  height: 100%;
+  overflow-y: auto;
+  padding-top: 2rem; /* Align with page content padding */
+}
+
+.sidebar nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar nav ul li a {
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  padding: 0.85rem 1.5rem;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  display: block;
+  border-left: 3px solid transparent;
+  font-size: 1.1rem; /* Larger font size */
+}
+
+.sidebar nav ul li a:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.sidebar nav ul li a.activeLink {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-left-color: var(--accent-color, #ffc107);
+}
+
+.sidebarTitle {
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 0 1.5rem 1rem;
+  color: white;
+}
+
+.sidebarDivider {
+  border: 0;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 0 1.5rem 1rem;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.pageTitle {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.pageActions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+
+.adminMainContent {
+  margin-left: 250px; /* Same as sidebar width */
+  flex-grow: 1;
+  background-color: var(--secondary-color-light, #f4f6f9);
+  display: flex;
+  flex-direction: column;
+}
+
+.adminContainer {
+  padding: 2rem;
+  flex-grow: 1;
+}
+
+[data-theme="dark"] .sidebar {
+  background-color: var(--primary-color-dark, #1f1f1f);
+}
+
+[data-theme="dark"] .sidebar nav ul li a {
+  color: #a0a0a0;
+}
+
+[data-theme="dark"] .sidebar nav ul li a:hover {
+  color: #ffffff;
+  background-color: #222222;
+}
+
+[data-theme="dark"] .sidebar nav ul li a.activeLink {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-left-color: #ffc107;
+}
+
+[data-theme="dark"] .adminMainContent {
+  background-color: #121212;
+}
+
 
 .adminHeader {
   background-color: var(--primary-color-dark, #343a40);
@@ -146,6 +259,12 @@
   color: white;
 }
 
+.adminButton.view {
+  background-color: var(--info-color, #17a2b8);
+  color: white;
+}
+
+
 .adminButton.details {
   background-color: var(--info-color, #17a2b8);
   color: white;
@@ -187,13 +306,20 @@
   border-radius: 6px;
   padding: 5px 5px;
   position: absolute;
-  z-index: 1;
+  z-index: 1001; /* Higher z-index */
   bottom: 125%;
   left: 50%;
   margin-left: -80px;
   opacity: 0;
   transition: opacity 0.3s;
 }
+
+.adminButton:disabled {
+  background-color: #8a8a8a;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 
 .tooltipContainer:hover .tooltipText {
   visibility: visible;

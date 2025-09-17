@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Link from 'next/link';
-import styles from "../../styles/AdminPage.module.css";
+import styles from "@/app/styles/AdminPage.module.css";
+import PageHeader from '@/components/admin/PageHeader';
 
 // Mock data - replace with API calls
 const initialSpecials = [
@@ -32,12 +32,10 @@ export default function SpecialsManagementPage() {
 
   return (
     <main className={styles.adminContainer}>
-      <header className={styles.adminHeader}>
-        <h1>Manage Daily Specials</h1>
-        <Link href="/admin/dashboard" className={styles.adminButton} style={{ backgroundColor: "#6c757d", color: "white", textDecoration: "none" }}>Back to Dashboard</Link>
-      </header>
-      <section className={styles.adminContent}>
+      <PageHeader title={t('admin_specials_management_title')}>
         <button className={`${styles.adminButton} ${styles.add}`}>Add New Special</button>
+      </PageHeader>
+      <section className={styles.adminContent}>
         {isLoading && <p>Loading specials...</p>}
         {error && <p className="errorMessage">{t('error')}: {error}</p>}
         {!isLoading && !error && (

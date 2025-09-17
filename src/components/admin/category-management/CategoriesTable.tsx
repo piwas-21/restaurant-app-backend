@@ -50,7 +50,7 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({ categories, isLoading
                   <button onClick={() => onDelete(category)} className={`${styles.adminButton} ${styles.delete}`}>
                     {t('delete')}
                   </button>
-                  <button onClick={() => handleViewProducts(category)} className={`${styles.adminButton} ${styles.details}`}>
+                  <button onClick={() => handleViewProducts(category)} className={`${styles.adminButton} ${styles.view}`}>
                     {t('view_products')}
                   </button>
                 </td>

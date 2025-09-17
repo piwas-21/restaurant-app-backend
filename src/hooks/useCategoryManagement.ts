@@ -35,12 +35,13 @@ export const useCategoryManagement = () => {
       const response = await deleteCategory(categoryId);
       if (response.success) {
         fetchCategories(); // Refresh the list
-        return { success: true, message: 'Category deleted successfully' };
+        return { success: true, message: 'category_deleted_successfully' };
       } else {
-        return { success: false, message: response.message || 'Failed to delete category' };
+        const errorMessage = response.errors ? response.errors.join(', ') : response.message;
+        return { success: false, message: errorMessage || 'failed_to_delete_category' };
       }
     } catch (err) {
-      return { success: false, message: 'An unexpected error occurred during deletion.' };
+      return { success: false, message: 'delete_category_error' };
     }
   };
 
