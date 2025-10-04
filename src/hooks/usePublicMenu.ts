@@ -45,17 +45,30 @@ export function usePublicMenu() {
         const gallery = Array.isArray(p.images)
           ? p.images.map((img: any) => ({ url: img.url, alt: img.altText || p.name }))
           : [];
+        const hasContent = p.content && typeof p.content === 'object';
+        const normalizedContent = hasContent
+          ? Object.keys(p.content).reduce((acc: any, lang: string) => {
+              const v = p.content[lang] || {};
+              acc[lang] = { name: v.name || p.name, description: v.description || '' };
+              return acc;
+            }, {})
+          : { en: { name: p.name, description: p.description || '' } };
         return {
           id: p.id,
-          content: { en: { name: p.name, description: p.description || "" } },
+          content: normalizedContent,
           price: typeof p.basePrice === "number" ? p.basePrice : parseFloat(p.basePrice || "0"),
           image: primaryImage,
           dietaryTags: [],
           categoryKey: categoryId || undefined,
+          isSpecial: p.isSpecial,
+          isActive: p.isActive,
+          isAvailable: p.isAvailable,
           images: gallery,
+          longDescription: p.description || "",
         };
       });
-      setItems(mapped);
+      const filtered = mapped.filter(i => i.isActive !== false && i.isAvailable !== false);
+      setItems(filtered);
     } catch (e: any) {
       console.error("Failed to fetch products", e);
       setError(e?.message || "Failed to fetch products");
@@ -81,4 +94,3 @@ export function usePublicMenu() {
     refetch: fetchProducts,
   } as const;
 }
-

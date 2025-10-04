@@ -130,12 +130,27 @@
   color: var(--text-color); /* Use CSS variable */
 }
 
+/* Title and text clamping for consistent card heights */
+.itemTitle {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  min-height: 1.8rem; /* roughly one line height */
+}
+
 .itemDescription {
   font-size: 0.95rem;
   color: var(--text-secondary); /* Use CSS variable */
-  margin-bottom: 1.2rem;
-  min-height: 50px;
-  flex-grow: 1;
+  margin-bottom: 0.8rem;
+}
+
+.clamp2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.8rem; /* reserve space for two lines */
 }
 
 .itemPrice {
@@ -150,6 +165,40 @@
   min-height: 20px;
 }
 
+.ingredientsSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1rem 0;
+  min-height: 32px; /* reserve space even when empty */
+}
+
+.ingredientsLabel {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary, #666);
+  opacity: 0.8;
+}
+
+.ingredientsContent {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.ingredientTag {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background-color: var(--background-subtle, #f5f5f5);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #666);
+  opacity: 0.9;
+}
+
 .allergyTag {
   display: inline-block;
   padding: 0.4em 0.8em;
@@ -162,26 +211,26 @@
 
 /* Specific Dietary Tag Styles - these might need dark mode adjustments if not using CSS vars that adapt */
 .allergyTag.vegan {
-  background-color: var(--success-color-xlight, #d4edda); 
-  color: var(--success-color-dark, #155724); 
+  background-color: var(--success-color-xlight, #d4edda);
+  color: var(--success-color-dark, #155724);
   border-color: var(--success-color-light, #c3e6cb);
 }
 
 .allergyTag.vegetarian {
-  background-color: var(--info-color-xlight, #cce5ff); 
-  color: var(--info-color-dark, #004085); 
+  background-color: var(--info-color-xlight, #cce5ff);
+  color: var(--info-color-dark, #004085);
   border-color: var(--info-color-light, #b8daff);
 }
 
 .allergyTag.halal {
-  background-color: var(--secondary-color-light, #e2e3e5); 
-  color: var(--text-secondary, #383d41); 
+  background-color: var(--secondary-color-light, #e2e3e5);
+  color: var(--text-secondary, #383d41);
   border-color: var(--border-color-light, #d6d8db);
 }
 
 .allergyTag.gluten-free {
-  background-color: var(--warning-color-xlight, #fff3cd); 
-  color: var(--warning-color-dark, #856404); 
+  background-color: var(--warning-color-xlight, #fff3cd);
+  color: var(--warning-color-dark, #856404);
   border-color: var(--warning-color-light, #ffeeba);
 }
 
@@ -199,6 +248,57 @@
   transition: background-color 0.3s ease, transform 0.2s;
   margin-top: 0.5rem;
   font-weight: 500;
+}
+
+.viewDetailsButton {
+  background-color: var(--secondary-color, #f1f3f5);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 0.8rem 1.3rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: background-color 0.3s ease, transform 0.2s;
+  margin-left: 0.5rem;
+}
+.viewDetailsButton:hover {
+  background-color: var(--secondary-color-light, #e9ecef);
+  transform: translateY(-1px);
+}
+
+.productDetailsModal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.productDetailsContent {
+  background: var(--card-background);
+  color: var(--text-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow: auto;
+  position: relative;
+}
+.productDetailsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.productDetailsBody p { margin: 0.5rem 0; }
+.productDetailsClose {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
 }
 
 .addToOrderButton {
@@ -343,7 +443,7 @@
     font-size: 1.4rem;
   }
   .enlargedImageModalContainer {
-    width: 95vw; 
+    width: 95vw;
     height: 95vh;
   }
   .navButtonModal {
@@ -353,10 +453,10 @@
     height: 45px;
   }
   .prevButton {
-    left: 5px; 
+    left: 5px;
   }
   .nextButton {
-    right: 5px; 
+    right: 5px;
   }
   .closeButtonModal {
     top: 10px;
@@ -385,7 +485,7 @@
     font-size: 1.6rem;
   }
   .itemsGrid {
-    grid-template-columns: 1fr; 
+    grid-template-columns: 1fr;
   }
   .menuItem h3 {
     font-size: 1.3rem;
@@ -398,9 +498,9 @@
     margin-right: 0;
   }
   .addToOrderButton {
-    margin-bottom: 0.5rem; 
+    margin-bottom: 0.5rem;
   }
-  .itemActions { 
+  .itemActions {
     display: flex;
     flex-direction: column;
   }

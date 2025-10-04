@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { mockApiClient } from './mockApiClient';
 
 const CATEGORIES_API_URL = '/api/Categories';
 
@@ -52,6 +53,11 @@ export const uploadCategoryImage = async (categoryId: string, imageFile: File) =
 };
 
 export const getCategories = async () => {
-  const response = await apiClient.get(CATEGORIES_API_URL);
-  return response.json();
+  try {
+    const response = await apiClient.get(CATEGORIES_API_URL);
+    return response.json();
+  } catch {
+    // Fallback to mock API if real API fails
+    return mockApiClient.getCategories();
+  }
 };

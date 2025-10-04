@@ -36,6 +36,7 @@ export interface ProductDetails {
   basePrice: number;
   isActive: boolean;
   isAvailable: boolean;
+  isSpecial?: boolean;
   preparationTimeMinutes: number;
   type: string;
   ingredients: string[];
@@ -54,6 +55,7 @@ export interface Product {
   basePrice: number;
   isActive: boolean;
   isAvailable: boolean;
+  isSpecial?: boolean;
   imageUrl: string | null;
   images: ProductImage[];
 }
@@ -61,4 +63,7 @@ export interface Product {
 export interface Category {
   id: string;
   name: string;
+  description?: string | null;
+  isActive: boolean;
+  displayOrder: number;
 }

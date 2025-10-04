@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { mockApiClient } from './mockApiClient';
 
 const PRODUCTS_API_URL = '/api/Products';
 
@@ -35,8 +36,13 @@ export const uploadBulkProductImages = async (productId: string, imageFiles: Fil
 };
 
 export const updateProduct = async (productId: string, productData: any) => {
-  const response = await apiClient.put(`${PRODUCTS_API_URL}/${productId}`, productData);
-  return response.json();
+  try {
+    const response = await apiClient.put(`${PRODUCTS_API_URL}/${productId}`, productData);
+    return response.json();
+  } catch {
+    // Fallback to mock API if real API fails
+    return mockApiClient.updateProduct(productId, productData);
+  }
 };
 
 export const updateProductImageDetails = async (productId: string, imageId: string, imageData: any) => {

@@ -8,11 +8,11 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 9999;
     padding: 1rem;
     overflow-y: auto;
   }
-  
+
   .modalContent {
     background: var(--background-color);
     color: var(--text-color);
@@ -24,38 +24,38 @@
     max-height: 90vh;
     overflow-y: auto;
   }
-  
+
   .modalHeader {
     border-bottom: 1px solid var(--border-color, #eee);
     padding-bottom: 1rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .modalHeader h2 {
     margin: 0;
     font-size: 1.5rem;
   }
-  
+
   .formGrid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
   }
-  
+
   .formColumn {
     display: flex;
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .fullWidth {
     grid-column: 1 / -1;
   }
-  
+
   .formGroup {
     margin-bottom: 1rem;
   }
-  
+
   .formGroup h3 {
     margin-top: 0;
     margin-bottom: 0.75rem;
@@ -63,7 +63,7 @@
     border-bottom: 1px solid var(--border-color-light);
     padding-bottom: 0.5rem;
   }
-  
+
   .formGroup label {
     display: block;
     margin-bottom: 0.5rem;
@@ -95,7 +95,7 @@
     white-space: nowrap;
     margin-bottom: 0;
   }
-  
+
   .chip label:hover {
     background-color: var(--background-color-hover, #f0f0f0);
   }
@@ -105,7 +105,7 @@
     color: white;
     border-color: #28a745;
   }
-  
+
   /* Dynamic Section Styling */
   .variationItem, .contentItem {
     border: 1px solid var(--border-color, #eee);
@@ -115,19 +115,19 @@
     margin-bottom: 1rem;
     position: relative;
   }
-  
+
   .contentItem .cancelButton, .variationItem .cancelButton {
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
     padding: 0.25rem 0.5rem;
   }
-  
+
   .addSectionButton {
     margin-top: 0.5rem;
     margin-bottom: 1rem;
   }
-  
+
   .formGroup input,
   .formGroup select,
   .formGroup textarea {
@@ -139,13 +139,17 @@
     color: var(--text-color);
     font-size: 1rem;
   }
-  
+
   .errorMessage {
     color: var(--error-color, red);
     font-size: 0.875rem;
     margin-top: 0.25rem;
   }
-  
+
+  .fieldError {
+    border-color: var(--danger-color, #dc3545) !important;
+  }
+
   .buttonGroup {
     display: flex;
     justify-content: flex-end;
@@ -154,7 +158,7 @@
     padding-top: 1.5rem;
     border-top: 1px solid var(--border-color, #eee);
   }
-  
+
   .submitButton,
   .cancelButton {
     padding: 0.75rem 1.5rem;
@@ -163,13 +167,13 @@
     cursor: pointer;
     font-size: 1rem;
   }
-  
+
   .submitButton {
     background-color: var(--primary-color);
     color: white;
   }
-  
+
   .cancelButton {
     background-color: #ccc;
   }
-  
+

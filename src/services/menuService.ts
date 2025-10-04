@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { mockApiClient } from './mockApiClient';
 import { Product } from '@/app/admin/menu-management/interfaces';
 
 const API_BASE_URL = '/api';
@@ -35,6 +36,7 @@ export interface CreateProductData {
   basePrice: number;
   isActive: boolean;
   isAvailable: boolean;
+  isSpecial?: boolean;
   preparationTimeMinutes?: number;
   type: string;
   ingredients?: string[];
@@ -51,20 +53,35 @@ export const getProducts = async (
   pageSize: number = 10,
   categoryId?: string | null
 ): Promise<{ success: boolean; message: string; data: PaginatedProducts; errors: any }> => {
-  let url = `${PRODUCTS_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
-  if (categoryId) {
-    url += `&CategoryId=${categoryId}`;
+  try {
+    let url = `${PRODUCTS_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    if (categoryId) {
+      url += `&CategoryId=${categoryId}`;
+    }
+    const response = await apiClient.get(url);
+    return response.json();
+  } catch {
+    // Fallback to mock API if real API fails
+    return mockApiClient.getProducts(pageNumber, pageSize, categoryId);
   }
-  const response = await apiClient.get(url);
-  return response.json();
 };
 
 export const createProduct = async (productData: CreateProductData) => {
-  const response = await apiClient.post(PRODUCTS_API_URL, productData);
-  return response.json();
+  try {
+    const response = await apiClient.post(PRODUCTS_API_URL, productData);
+    return response.json();
+  } catch {
+    // Fallback to mock API if real API fails
+    return mockApiClient.createProduct(productData);
+  }
 };
 
 export const getProductById = async (productId: string) => {
-  const response = await apiClient.get(`${PRODUCTS_API_URL}/${productId}`);
-  return response.json();
+  try {
+    const response = await apiClient.get(`${PRODUCTS_API_URL}/${productId}`);
+    return response.json();
+  } catch {
+    // Fallback to mock API if real API fails
+    return mockApiClient.getProductById(productId);
+  }
 };

@@ -8,6 +8,15 @@ const logout = () => {
   window.location.href = '/auth/login';
 };
 
+const isApiUnavailable = (error: any) => {
+  // Check if it's a network error or connection refused
+  return error instanceof TypeError ||
+         error.message?.includes('fetch') ||
+         error.message?.includes('Failed to fetch') ||
+         error.code === 'NETWORK_ERROR' ||
+         error.name === 'NetworkError';
+};
+
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   let token = localStorage.getItem('token');
 
@@ -22,29 +31,37 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
 
   options.headers = headers;
 
-  let response = await fetch(url, options);
+  try {
+    let response = await fetch(url, options);
 
-  if (response.status === 401) {
-    try {
-      const refreshResponse = await refreshToken();
-      if (refreshResponse.success) {
-        token = localStorage.getItem('token');
-        if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
-          options.headers = headers;
-          response = await fetch(url, options); // Retry the request
+    if (response.status === 401) {
+      try {
+        const refreshResponse = await refreshToken();
+        if (refreshResponse.success) {
+          token = localStorage.getItem('token');
+          if (token) {
+            headers.set('Authorization', `Bearer ${token}`);
+            options.headers = headers;
+            response = await fetch(url, options); // Retry the request
+          }
+        } else {
+          logout(); // Logout if refresh fails
+          return Promise.reject(refreshResponse);
         }
-      } else {
-        logout(); // Logout if refresh fails
-        return Promise.reject(refreshResponse);
+      } catch (refreshError) {
+        logout();
+        return Promise.reject(refreshError);
       }
-    } catch (error) {
-      logout();
-      return Promise.reject(error);
     }
-  }
 
-  return response;
+    return response;
+  } catch (error) {
+    // If it's a network error, throw it so the calling service can handle it
+    if (isApiUnavailable(error)) {
+      throw new Error('API_UNAVAILABLE');
+    }
+    throw error;
+  }
 };
 
 const apiClient = {

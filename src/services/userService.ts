@@ -27,6 +27,6 @@ export const registerStaff = async (staffData: any) => {
 };
 
 export const deleteStaff = async (userId: string) => {
-  const response = await apiClient.delete(`${USER_API_URL}/delete/user`, { userId });
+  const response = await apiClient.delete(`${USER_API_URL}/delete/user/${userId}`);
   return response.json();
 };

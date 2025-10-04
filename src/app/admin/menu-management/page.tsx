@@ -89,13 +89,9 @@ const MenuManagementContent = () => {
               <button
                 className={`${styles.adminButton} ${styles.add}`}
                 onClick={() => setIsCreateModalOpen(true)}
-                disabled={!selectedCategoryId}
               >
                 {t('create_new_product')}
               </button>
-              {!selectedCategoryId && (
-                <span className={styles.tooltipText}>{t('select_category_to_create_product')}</span>
-              )}
             </div>
           </div>
         </PageHeader>

@@ -9,10 +9,11 @@ import { useTranslation } from 'react-i18next';
 import EditProductModal from '@/components/admin/EditProductModal';
 import ImageGallery from '@/components/admin/product-details/ImageGallery';
 import ProductInformation from '@/components/admin/product-details/ProductInformation';
-import ProductDetailsGrid from '@/components/admin/product-details/ProductDetailsGrid';
+import DetailsEditor from '@/components/admin/product-details/DetailsEditor';
+import CategoriesEditor from '@/components/admin/product-details/CategoriesEditor';
+import MultilingualContentEditor from '@/components/admin/product-details/MultilingualContentEditor';
 import VariationsTable from '@/components/admin/product-details/VariationsTable';
 import SuggestedSideItemsTable from '@/components/admin/product-details/SuggestedSideItemsTable';
-import MultilingualContent from '@/components/admin/product-details/MultilingualContent';
 import PageHeader from '@/components/admin/PageHeader';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
@@ -59,11 +60,12 @@ const ProductDetailsPage = () => {
         </PageHeader>
         <div className={`${styles.adminContent} ${detailsStyles.detailsContainer}`}>
           <div className={detailsStyles.mainContent}>
-            <ProductInformation product={product} />
-            <ProductDetailsGrid product={product} />
-            <MultilingualContent content={product.content} />
-            <VariationsTable variations={product.variations} />
-            <SuggestedSideItemsTable suggestedSideItems={product.suggestedSideItems} />
+            <ProductInformation product={product} onUpdated={fetchProductData} />
+            <DetailsEditor product={product} onUpdated={fetchProductData} />
+            <CategoriesEditor product={product} onUpdated={fetchProductData} />
+            <MultilingualContentEditor product={product} onUpdated={fetchProductData} />
+            <VariationsTable variations={product.variations} productId={product.id} onUpdated={fetchProductData} product={product} />
+            <SuggestedSideItemsTable suggestedSideItems={product.suggestedSideItems} productId={product.id} onUpdated={fetchProductData} product={product} />
           </div>
           <ImageGallery images={product.images} productName={product.name} onImageUpdate={fetchProductData} />
         </div>

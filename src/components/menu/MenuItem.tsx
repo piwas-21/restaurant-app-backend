@@ -10,6 +10,7 @@ import type { MenuItem as MenuItemType } from "@/types/menu";
 import MenuItemImage from "./MenuItemImage";
 import MenuItemDetails from "./MenuItemDetails";
 import MenuItemActions from "./MenuItemActions";
+import ProductDetailsModal from "./ProductDetailsModal";
 import FeedbackForm from "@/components/feedback/FeedbackForm";
 import styles from "@/app/styles/MenuPage.module.css";
 
@@ -30,6 +31,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
   const { t, i18n } = useTranslation();
   const { enqueueSnackbar } = useSnackbar();
   const [showFeedbackForm, setShowFeedbackForm] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const currentLanguage = (i18n.language.split("-")[0] || "en") as LanguageCode;
 
@@ -55,10 +57,11 @@ const MenuItem: React.FC<MenuItemProps> = ({
 
   const itemName =
     item.content?.[currentLanguage]?.name || item.content?.en?.name || item.id;
-  const itemDescription =
+  const ingredientsText =
     item.content?.[currentLanguage]?.description ||
     item.content?.en?.description ||
     "";
+  const productDescription = item.longDescription || "";
   const mainImageAlt =
     item.content?.[currentLanguage]?.name ||
     item.content?.en?.name ||
@@ -84,7 +87,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
       <MenuItemDetails
         id={item.id}
         title={itemName}
-        description={itemDescription}
+        description={productDescription}
+        ingredients={ingredientsText}
         price={numericPrice}
         dietaryTags={item.dietaryTags}
         t={t}
@@ -95,6 +99,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
         onFeedback={() => setShowFeedbackForm(item.id)}
         addAria={t("add_item_to_order", { itemName })}
         addLabel={t("add_to_order")}
+        onDetails={() => setShowDetails(true)}
+        detailsLabel={t('details')}
         feedbackAria={`${t("feedback_form_heading")} ${itemName}`}
         feedbackLabel={t("feedback_form_heading")}
       />
@@ -104,6 +110,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
           onSubmitSuccess={() => onFeedbackSuccess(item.id)}
         />
       )}
+      <ProductDetailsModal isOpen={showDetails} item={item} onClose={() => setShowDetails(false)} />
     </div>
   );
 };
