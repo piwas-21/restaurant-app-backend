@@ -94,7 +94,8 @@ export default function MenuPage() {
     const altText =
       enlargedImageItem.content?.[currentLanguage]?.name ||
       enlargedImageItem.content?.en?.name ||
-      enlargedImageItem.id;
+      enlargedImageItem.name ||
+      'Menu item image';
     return [{ url: enlargedImageItem.image, alt: altText }];
   }, [enlargedImageItem, currentLanguage]);
 

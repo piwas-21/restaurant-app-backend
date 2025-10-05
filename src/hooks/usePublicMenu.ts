@@ -55,10 +55,17 @@ export function usePublicMenu() {
           : { en: { name: p.name, description: p.description || '' } };
         return {
           id: p.id,
+          name: p.name || 'Unnamed Item', // Base name for fallback
+          description: p.description || '', // Base description for description fallback
+          ingredients: Array.isArray(p.ingredients) ? p.ingredients : [], // Base ingredients for ingredients fallback
           content: normalizedContent,
           price: typeof p.basePrice === "number" ? p.basePrice : parseFloat(p.basePrice || "0"),
           image: primaryImage,
           dietaryTags: [],
+          allergens: Array.isArray(p.allergens) ? p.allergens : [],
+          preparationTimeMinutes: typeof p.preparationTimeMinutes === "number" ? p.preparationTimeMinutes : undefined,
+          variations: Array.isArray(p.variations) ? p.variations : [],
+          suggestedSideItems: Array.isArray(p.suggestedSideItemIds) ? p.suggestedSideItemIds : [],
           categoryKey: categoryId || undefined,
           isSpecial: p.isSpecial,
           isActive: p.isActive,
@@ -70,6 +77,7 @@ export function usePublicMenu() {
       const filtered = mapped.filter(i => i.isActive !== false && i.isAvailable !== false);
       setItems(filtered);
     } catch (e: any) {
+      // eslint-disable-next-line no-console
       console.error("Failed to fetch products", e);
       setError(e?.message || "Failed to fetch products");
       setItems([]);

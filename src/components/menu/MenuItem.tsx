@@ -37,7 +37,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 
   const handleAddItemToCart = useCallback(() => {
     const itemName =
-      item.content?.[currentLanguage]?.name || item.content?.en?.name || item.id;
+      item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
     const numericPrice =
       typeof item.price === "string" ? parseFloat(item.price) : item.price;
 
@@ -56,17 +56,18 @@ const MenuItem: React.FC<MenuItemProps> = ({
   }, [dispatch, enqueueSnackbar, t, currentLanguage, item]);
 
   const itemName =
-    item.content?.[currentLanguage]?.name || item.content?.en?.name || item.id;
+    item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
   const ingredientsText =
     item.content?.[currentLanguage]?.description ||
     item.content?.en?.description ||
+    (Array.isArray(item.ingredients) ? item.ingredients.join(', ') : '') ||
     "";
   const productDescription = item.longDescription || "";
   const mainImageAlt =
     item.content?.[currentLanguage]?.name ||
     item.content?.en?.name ||
-    t("menu_item_image_alt") ||
-    item.id;
+    item.name ||
+    t("menu_item_image_alt");
   const numericPrice =
     typeof item.price === "string" ? parseFloat(item.price) : item.price;
 
@@ -89,6 +90,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
         title={itemName}
         description={productDescription}
         ingredients={ingredientsText}
+        allergens={item.allergens}
         price={numericPrice}
         dietaryTags={item.dietaryTags}
         t={t}
