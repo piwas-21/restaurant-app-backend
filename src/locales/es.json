@@ -524,5 +524,9 @@
   "add_selected": "Agregar Seleccionados",
   "already_added": "Ya Agregado",
   "no_side_items_selected": "No hay acompañamientos seleccionados",
-  "no_side_items_found": "No se encontraron acompañamientos"
+  "no_side_items_found": "No se encontraron acompañamientos",
+
+  "delete_confirmation": "¿Estás seguro de que deseas eliminar este elemento?",
+  "add": "Agregar",
+  "save": "Guardar"
   }

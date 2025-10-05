@@ -523,5 +523,9 @@
   "add_selected": "Add Selected",
   "already_added": "Already Added",
   "no_side_items_selected": "No side items selected",
-  "no_side_items_found": "No side items found"
+  "no_side_items_found": "No side items found",
+
+  "delete_confirmation": "Are you sure to delete this item?",
+  "add": "Add",
+  "save": "Save"
 }

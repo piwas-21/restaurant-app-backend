@@ -532,5 +532,9 @@
   "add_selected": "Seçilenleri Ekle",
   "already_added": "Zaten Eklendi",
   "no_side_items_selected": "Yan ürün seçilmedi",
-  "no_side_items_found": "Yan ürün bulunamadı"
+  "no_side_items_found": "Yan ürün bulunamadı",
+
+  "delete_confirmation": "Bu öğeyi silmek istediğinizden emin misiniz?",
+  "add": "Ekle",
+  "save": "Kaydet"
 }

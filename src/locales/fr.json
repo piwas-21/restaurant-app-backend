@@ -528,5 +528,9 @@
   "add_selected": "Ajouter la Sélection",
   "already_added": "Déjà Ajouté",
   "no_side_items_selected": "Aucun accompagnement sélectionné",
-  "no_side_items_found": "Aucun accompagnement trouvé"
+  "no_side_items_found": "Aucun accompagnement trouvé",
+
+  "delete_confirmation": "Êtes-vous sûr de vouloir supprimer cet élément ?",
+  "add": "Ajouter",
+  "save": "Enregistrer"
 }

@@ -530,5 +530,9 @@
   "search_placeholder": "البحث عن عناصر...",
   "add_selected": "إضافة المحدد",
   "already_added": "مضاف بالفعل",
-  "no_side_items_selected": "لم يتم اختيار أطباق جانبية"
+  "no_side_items_selected": "لم يتم اختيار أطباق جانبية",
+
+  "delete_confirmation": "هل أنت متأكد من حذف هذا العنصر؟",
+  "add": "إضافة",
+  "save": "حفظ"
 }

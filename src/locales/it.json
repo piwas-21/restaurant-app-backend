@@ -531,5 +531,9 @@
   "add_selected": "Aggiungi Selezionati",
   "already_added": "Già Aggiunto",
   "no_side_items_selected": "Nessun contorno selezionato",
-  "no_side_items_found": "Nessun contorno trovato"
+  "no_side_items_found": "Nessun contorno trovato",
+
+  "delete_confirmation": "Sei sicuro di voler eliminare questo elemento?",
+  "add": "Aggiungi",
+  "save": "Salva"
 }
