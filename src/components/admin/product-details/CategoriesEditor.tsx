@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ProductDetails } from '@/app/admin/menu-management/interfaces';
 import detailsStyles from '@/app/styles/DetailsPage.module.css';
+import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
 import styles from '@/app/styles/AdminPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { getCategories } from '@/services/categoryService';
@@ -20,16 +21,31 @@ const CategoriesEditor: React.FC<Props> = ({ product, onUpdated }) => {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selected, setSelected] = useState<string[]>(product.categories.map((c) => categories.find(cat => cat.name === c.categoryName)?.id || '').filter(Boolean));
-  const [primary, setPrimary] = useState<string | ''>(product.categories.find((c) => c.isPrimary) ? categories.find(cat => cat.name === product.categories.find(c => c.isPrimary)?.categoryName)?.id || '' : '');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [primary, setPrimary] = useState<string>('');
 
   useEffect(() => {
     const fetchAll = async () => {
       const resp = await getCategories();
-      if (resp.success) setCategories(resp.data.items);
+      if (resp.success) {
+        setCategories(resp.data.items);
+
+        // Set selected categories after fetching categories
+        const selectedIds = product.categories.map((c) =>
+          resp.data.items.find((cat: Category) => cat.name === c.categoryName)?.id || ''
+        ).filter(Boolean);
+        setSelected(selectedIds);
+
+        // Set primary category after fetching categories
+        const primaryCategory = product.categories.find((c) => c.isPrimary);
+        if (primaryCategory) {
+          const primaryId = resp.data.items.find((cat: Category) => cat.name === primaryCategory.categoryName)?.id || '';
+          setPrimary(primaryId);
+        }
+      }
     };
     fetchAll();
-  }, []);
+  }, [product.categories]);
 
   const toggle = (id: string, checked: boolean) => {
     setSelected(prev => checked ? Array.from(new Set([...(prev||[]), id])) : (prev||[]).filter(x=>x!==id));
@@ -74,10 +90,21 @@ const CategoriesEditor: React.FC<Props> = ({ product, onUpdated }) => {
         </ul>
       ) : (
         <div className={detailsStyles.formGrid}>
-          <div className={detailsStyles.checkboxRow}>
-            {categories.map(c => (
-              <label key={c.id}><input type="checkbox" checked={selected.includes(c.id)} onChange={e=>toggle(c.id, e.target.checked)} /> {c.name}</label>
-            ))}
+          <div className={detailsStyles.formGroup}>
+            <label>{t('categories')}</label>
+            <div className={modalStyles.chipGroup}>
+              {categories.map(c => (
+                <div key={c.id} className={modalStyles.chip}>
+                  <input
+                    type="checkbox"
+                    id={`category-inline-${c.id}`}
+                    checked={selected.includes(c.id)}
+                    onChange={e => toggle(c.id, e.target.checked)}
+                  />
+                  <label htmlFor={`category-inline-${c.id}`}>{c.name}</label>
+                </div>
+              ))}
+            </div>
           </div>
           <div className={detailsStyles.formGroup}>
             <label>{t('primary_category')}</label>

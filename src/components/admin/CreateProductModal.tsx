@@ -15,6 +15,7 @@ import { ProductBasicInfo } from './product/ProductBasicInfo';
 import { ProductDetails } from './product/ProductDetails';
 import { MultilingualContent } from './product/MultilingualContent';
 import { ProductVariations } from './product/ProductVariations';
+import { SuggestedSideItemsPicker } from './product/SuggestedSideItemsPicker';
 import { submitProductForm } from './product/productFormUtils';
 
 const CreateProductModal: React.FC<CreateProductModalProps> = ({
@@ -27,6 +28,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'creating' | 'uploading'>('idle');
   const [categories, setCategories] = useState<Category[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [selectedSideItemIds, setSelectedSideItemIds] = useState<string[]>([]);
 
   const {
     register,
@@ -51,6 +53,8 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
       variations: [],
       content: [],
       allergens: [],
+      preparationTimeMinutes: 0,
+      suggestedSideItemIds: [],
     },
   });
 
@@ -76,6 +80,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
     } else {
       reset();
       setImageFiles([]);
+      setSelectedSideItemIds([]);
       setSubmissionStatus('idle');
     }
   }, [isOpen, reset]);
@@ -155,6 +160,16 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
               variationFields={variationFields}
               appendVariation={appendVariation}
               removeVariation={removeVariation}
+            />
+
+            <SuggestedSideItemsPicker
+              errors={errors}
+              control={control}
+              selectedSideItemIds={selectedSideItemIds}
+              onChange={(newIds) => {
+                setSelectedSideItemIds(newIds);
+                setValue('suggestedSideItemIds', newIds);
+              }}
             />
           </div>
 

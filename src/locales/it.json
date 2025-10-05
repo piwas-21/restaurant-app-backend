@@ -522,5 +522,14 @@
   "no_images_found": "Nessuna immagine trovata per questo prodotto.",
   "upload_images": "Carica immagini",
   "save_uploads": "Salva caricamenti",
-  "files_staged": "{{count}} file pronto/i per il caricamento"
+  "files_staged": "{{count}} file pronto/i per il caricamento",
+
+  "preparation_time_minutes": "Tempo di Preparazione (Minuti)",
+  "add_side_items": "Aggiungi Contorni",
+  "search_side_items": "Cerca Contorni",
+  "search_placeholder": "Cerca articoli...",
+  "add_selected": "Aggiungi Selezionati",
+  "already_added": "Già Aggiunto",
+  "no_side_items_selected": "Nessun contorno selezionato",
+  "no_side_items_found": "Nessun contorno trovato"
 }

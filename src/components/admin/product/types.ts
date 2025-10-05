@@ -1,5 +1,5 @@
 // Product-related types and interfaces
-export const productTypes = ['mainItem', 'sideItem', 'beverage', 'dessert', 'sauce', 'addOn'] as const;
+export const productTypes = ['mainItem', 'beverage', 'dessert', 'sauce', 'addOn'] as const;
 export const allergensList = ['halal', 'vegan', 'vegetarian', 'gluten-free', 'contains_dairy', 'contains_nuts'] as const;
 export const supportedLanguages = ['en', 'tr', 'es', 'ar', 'de', 'fr', 'it'] as const;
 
@@ -55,10 +55,12 @@ export interface ProductFormData {
   primaryCategoryId: string;
   variations: Variation[];
   content: ContentItem[];
+  preparationTimeMinutes: number;
+  suggestedSideItemIds: string[];
 }
 
 // Extended interface for edit operations that includes additional fields
-export interface EditProductFormData extends ProductFormData {
+export interface EditProductFormData extends Omit<ProductFormData, 'preparationTimeMinutes'> {
   id?: string;
   preparationTimeMinutes?: number;
   displayOrder?: number;
@@ -79,6 +81,8 @@ export interface BaseProductFormData {
   primaryCategoryId: string;
   variations: Variation[];
   content: ContentItem[];
+  preparationTimeMinutes: number;
+  suggestedSideItemIds: string[];
 }
 
 // Component prop interfaces that work with both create and edit
@@ -115,4 +119,21 @@ export interface ProductVariationsProps {
   variationFields: any[];
   appendVariation: (variation: Variation) => void;
   removeVariation: (index: number) => void;
+}
+
+// Interface for the new suggested side items component
+export interface SuggestedSideItemsPickerProps {
+  errors: any;
+  control: any;
+  selectedSideItemIds: string[];
+  onChange: (selectedIds: string[]) => void;
+}
+
+// Product search result interface
+export interface ProductSearchResult {
+  id: string;
+  name: string;
+  description?: string;
+  basePrice: number;
+  type: ProductType;
 }

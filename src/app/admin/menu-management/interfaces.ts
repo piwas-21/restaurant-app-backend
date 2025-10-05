@@ -19,9 +19,11 @@ export interface SideItem {
 export interface Variation {
   id?: string;
   name: string;
+  description?: string;
   priceModifier: number;
   finalPrice: number;
   isActive: boolean;
+  displayOrder?: number;
 }
 
 export interface ProductCategory {

@@ -514,5 +514,14 @@
   "no_images_found": "No images found for this product.",
   "upload_images": "Upload Images",
   "save_uploads": "Save Uploads",
-  "files_staged": "{{count}} files staged for upload"
+  "files_staged": "{{count}} files staged for upload",
+
+  "preparation_time_minutes": "Preparation Time (Minutes)",
+  "add_side_items": "Add Side Items",
+  "search_side_items": "Search Side Items",
+  "search_placeholder": "Search for items...",
+  "add_selected": "Add Selected",
+  "already_added": "Already Added",
+  "no_side_items_selected": "No side items selected",
+  "no_side_items_found": "No side items found"
 }

@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProductDetails } from '@/app/admin/menu-management/interfaces';
 import detailsStyles from '@/app/styles/DetailsPage.module.css';
+import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
 import styles from '@/app/styles/AdminPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { updateProduct } from '@/services/productService';
 import { buildProductPayload } from './buildProductPayload';
+import { getCategories } from '@/services/categoryService';
 
+interface Category { id: string; name: string; }
 const allergensList = ["halal", "vegan", "vegetarian", "gluten-free", "contains_dairy", "contains_nuts"];
 
 interface Props {
@@ -20,6 +23,17 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
   const [editing, setEditing] = useState(false);
   const [ingredients, setIngredients] = useState(product.ingredients.join(', '));
   const [allergens, setAllergens] = useState<string[]>(product.allergens || []);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const resp = await getCategories();
+      if (resp.success) {
+        setCategories(resp.data.items);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const toggleAllergen = (a: string, checked: boolean) => {
     setAllergens(prev => checked ? Array.from(new Set([...(prev||[]), a])) : (prev||[]).filter(x=>x!==a));
@@ -27,7 +41,7 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
 
   const save = async () => {
     const updated: ProductDetails = { ...product, ingredients: ingredients ? ingredients.split(',').map(s=>s.trim()).filter(Boolean) : [], allergens } as any;
-    const payload = buildProductPayload(updated);
+    const payload = buildProductPayload(updated, categories);
     await updateProduct(product.id, payload);
     setEditing(false);
     onUpdated && onUpdated();
@@ -59,9 +73,17 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
           </div>
           <div className={detailsStyles.formGroup}>
             <label>{t('allergens')}</label>
-            <div className={detailsStyles.checkboxRow}>
+            <div className={modalStyles.chipGroup}>
               {allergensList.map(a => (
-                <label key={a}><input type="checkbox" checked={allergens.includes(a)} onChange={e=>toggleAllergen(a, e.target.checked)} /> {t(`allergen_${a}`)}</label>
+                <div key={a} className={modalStyles.chip}>
+                  <input
+                    type="checkbox"
+                    id={`allergen-inline-${a}`}
+                    checked={allergens.includes(a)}
+                    onChange={e => toggleAllergen(a, e.target.checked)}
+                  />
+                  <label htmlFor={`allergen-inline-${a}`}>{t(`allergen_${a}`)}</label>
+                </div>
               ))}
             </div>
           </div>

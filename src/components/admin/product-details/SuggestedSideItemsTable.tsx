@@ -11,6 +11,9 @@ import { updateProduct } from '@/services/productService';
 import { getProducts } from '@/services/menuService';
 import { buildProductPayload } from './buildProductPayload';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
+import { getCategories } from '@/services/categoryService';
+
+interface Category { id: string; name: string; }
 
 interface SuggestedSideItemsTableProps {
   suggestedSideItems: SideItem[];
@@ -30,6 +33,17 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
   const [draft, setDraft] = useState<Partial<SideItem> | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const resp = await getCategories();
+      if (resp.success) {
+        setCategories(resp.data.items);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(()=>{ setLocal(suggestedSideItems||[]); },[suggestedSideItems]);
 
@@ -49,7 +63,7 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
     const additions = results.filter(r => selectedIds.includes(r.id)).map(p => ({ id: p.id, name: p.name, description: p.description, price: p.basePrice, isRequired: false } as SideItem));
     const next = [...local, ...additions.filter(a => !local.some(l => l.id === a.id))];
     if (productId && product) {
-      const payload = buildProductPayload({ ...product, suggestedSideItems: next } as any);
+      const payload = buildProductPayload({ ...product, suggestedSideItems: next } as any, categories);
       await updateProduct(productId, payload);
     }
     setLocal(next);
@@ -65,7 +79,7 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
     const next = [...local];
     next[editingIndex] = draft as SideItem;
     if (productId && product) {
-      const payload = buildProductPayload({ ...product, suggestedSideItems: next } as any);
+      const payload = buildProductPayload({ ...product, suggestedSideItems: next } as any, categories);
       await updateProduct(productId, payload);
     }
     setLocal(next);
@@ -79,7 +93,7 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
     setConfirmOpen(false);
     const next = local.filter((_,i)=>i!==idx);
     if (productId && product) {
-      const payload = buildProductPayload({ ...product, suggestedSideItems: next } as any);
+      const payload = buildProductPayload({ ...product, suggestedSideItems: next } as any, categories);
       await updateProduct(productId, payload);
     }
     setLocal(next);
@@ -96,12 +110,17 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
         </div>
         {showPicker && (
           <div className={detailsStyles.formGrid}>
-            <input placeholder={t('search') as string} value={search} onChange={e=>setSearch(e.target.value)} />
-            <div className={detailsStyles.actionRow}>
-              <button className={`${styles.adminButton}`} onClick={runSearch}>{t('search')}</button>
-              <button className={styles.cancelButton} onClick={()=>{ setShowPicker(false); setSelectedIds([]); }}>{t('cancel')}</button>
-              <button className={`${styles.adminButton} ${styles.save}`} onClick={saveSelected} disabled={selectedIds.length===0}>{t('save')}</button>
-            </div>
+            <input
+              placeholder={t('search') as string}
+              value={search}
+              onChange={e=>setSearch(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && search.trim()) {
+                  runSearch();
+                }
+              }}
+            />
+
             <div className={modalStyles.chipGroup}>
               {results.map(p => {
                 const id = `side-item-result-${p.id}`;
@@ -113,6 +132,11 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
                   </div>
                 );
               })}
+            </div>
+            <div className={detailsStyles.actionRow}>
+              <button className={`${styles.adminButton}`} onClick={runSearch}>{t('search')}</button>
+              <button className={styles.cancelButton} onClick={()=>{ setShowPicker(false); setSelectedIds([]); }}>{t('cancel')}</button>
+              <button className={`${styles.adminButton} ${styles.save}`} onClick={saveSelected} disabled={selectedIds.length===0}>{t('save')}</button>
             </div>
           </div>
         )}
@@ -128,12 +152,17 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
       </div>
       {showPicker && (
         <div className={detailsStyles.formGrid}>
-          <input placeholder={t('search') as string} value={search} onChange={e=>setSearch(e.target.value)} />
-          <div className={detailsStyles.actionRow}>
-            <button className={`${styles.adminButton}`} onClick={runSearch}>{t('search')}</button>
-            <button className={styles.cancelButton} onClick={()=>{ setShowPicker(false); setSelectedIds([]); }}>{t('cancel')}</button>
-            <button className={`${styles.adminButton} ${styles.save}`} onClick={saveSelected} disabled={selectedIds.length===0}>{t('save')}</button>
-          </div>
+          <input
+            placeholder={t('search') as string}
+            value={search}
+            onChange={e=>setSearch(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && search.trim()) {
+                runSearch();
+              }
+            }}
+          />
+
           <div className={modalStyles.chipGroup}>
             {results.map(p => {
               const id = `side-item-result-${p.id}`;
@@ -145,6 +174,12 @@ const SuggestedSideItemsTable: React.FC<SuggestedSideItemsTableProps> = ({ sugge
                 </div>
               );
             })}
+          </div>
+
+          <div className={detailsStyles.actionRow}>
+            <button className={`${styles.adminButton}`} onClick={runSearch}>{t('search')}</button>
+            <button className={styles.cancelButton} onClick={()=>{ setShowPicker(false); setSelectedIds([]); }}>{t('cancel')}</button>
+            <button className={`${styles.adminButton} ${styles.save}`} onClick={saveSelected} disabled={selectedIds.length===0}>{t('save')}</button>
           </div>
         </div>
       )}

@@ -523,6 +523,14 @@
   "no_images_found": "Bu ürün için görsel bulunamadı.",
   "upload_images": "Görseller Yükle",
   "save_uploads": "Yüklemeleri Kaydet",
-  "files_staged": "{{count}} dosya yükleme için hazırlandı"
-}
+  "files_staged": "{{count}} dosya yükleme için hazırlandı",
 
+  "preparation_time_minutes": "Hazırlık Süresi (Dakika)",
+  "add_side_items": "Yan Ürün Ekle",
+  "search_side_items": "Yan Ürün Ara",
+  "search_placeholder": "Ürün ara...",
+  "add_selected": "Seçilenleri Ekle",
+  "already_added": "Zaten Eklendi",
+  "no_side_items_selected": "Yan ürün seçilmedi",
+  "no_side_items_found": "Yan ürün bulunamadı"
+}

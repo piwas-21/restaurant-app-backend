@@ -32,6 +32,20 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
           </select>
         </div>
 
+        <div className={modalStyles.formGroup}>
+          <label>{t('preparation_time_minutes')}</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            {...register('preparationTimeMinutes')}
+            placeholder="0"
+          />
+          {errors.preparationTimeMinutes && (
+            <p className={modalStyles.errorMessage}>{errors.preparationTimeMinutes.message}</p>
+          )}
+        </div>
+
         <div className={modalStyles.chipGroup}>
           <div className={modalStyles.chip}>
             <input type="checkbox" id="product-active" {...register('isActive')} />

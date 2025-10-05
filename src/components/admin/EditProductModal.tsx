@@ -14,6 +14,7 @@ import { ProductBasicInfo } from './product/ProductBasicInfo';
 import { ProductDetails } from './product/ProductDetails';
 import { MultilingualContent } from './product/MultilingualContent';
 import { ProductVariations } from './product/ProductVariations';
+import { SuggestedSideItemsPicker } from './product/SuggestedSideItemsPicker';
 import { submitEditProductForm } from './product/productFormUtils';
 
 const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -26,6 +27,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [selectedSideItemIds, setSelectedSideItemIds] = useState<string[]>([]);
 
   const {
     register,
@@ -35,6 +37,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
     setError,
     reset,
     watch,
+    setValue,
   } = useForm<EditFormData>({
     resolver: zodResolver(editProductSchema) as any,
     defaultValues: {
@@ -51,6 +54,8 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
       content: [],
       categoryIds: [],
       primaryCategoryId: '',
+      preparationTimeMinutes: 0,
+      suggestedSideItemIds: [],
     }
   });
 
@@ -106,7 +111,10 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
         content: flattenedContent,
         preparationTimeMinutes: product.preparationTimeMinutes || 0,
         displayOrder: product.displayOrder || 0,
+        suggestedSideItemIds: product.suggestedSideItemIds || [],
       });
+
+      setSelectedSideItemIds(product.suggestedSideItemIds || []);
     }
   }, [product, reset]);
 
@@ -126,8 +134,12 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
 
   const getErrorMessages = () => {
     const msgs: string[] = [];
+    const visited = new WeakSet();
     const walk = (obj: any, path: string[] = []) => {
       if (!obj || typeof obj !== 'object') return;
+      if (visited.has(obj)) return; // Prevent circular references
+      visited.add(obj);
+
       if (obj.type === 'error' && obj.message) {
         msgs.push(`${path.join('.')} — ${obj.message}`);
       }
@@ -143,7 +155,15 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
   };
 
   return (
-    <div className={modalStyles.modalOverlay}>
+    <div
+      className={modalStyles.modalOverlay}
+      onClick={(e) => {
+        // Close modal when clicking on the overlay (outside the modal content)
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className={modalStyles.modalContent}>
         <div className={modalStyles.modalHeader}>
           <h2>{t('edit_product')}</h2>
@@ -188,6 +208,16 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
               variationFields={variationFields}
               appendVariation={appendVariation}
               removeVariation={removeVariation}
+            />
+
+            <SuggestedSideItemsPicker
+              control={control}
+              errors={errors}
+              selectedSideItemIds={selectedSideItemIds}
+              onChange={(newSelection: string[]) => {
+                setSelectedSideItemIds(newSelection);
+                setValue('suggestedSideItemIds', newSelection);
+              }}
             />
           </div>
 

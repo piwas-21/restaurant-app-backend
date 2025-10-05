@@ -36,6 +36,8 @@ const baseProductSchema = z.object({
     const languages = items.map(item => item.language);
     return new Set(languages).size === languages.length;
   }, { message: 'Each language can only be used once' }),
+  preparationTimeMinutes: z.coerce.number().min(0).default(0),
+  suggestedSideItemIds: z.array(z.string()).default([]),
 });
 
 export const createProductSchema = baseProductSchema;

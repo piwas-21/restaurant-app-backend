@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import detailsStyles from '@/app/styles/DetailsPage.module.css';
+import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
 import styles from '@/app/styles/AdminPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { updateProduct } from '@/services/productService';
 import { ProductDetails } from '@/app/admin/menu-management/interfaces';
 import { buildProductPayload } from './buildProductPayload';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
+import { getCategories } from '@/services/categoryService';
 
+interface Category { id: string; name: string; }
 const supportedLanguages = ["en", "tr", "es", "ar", "de", "fr", "it"];
 
 interface Props {
@@ -23,6 +26,32 @@ const MultilingualContentEditor: React.FC<Props> = ({ product, onUpdated }) => {
   const [entries, setEntries] = useState(initial);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteIndex, setPendingDeleteIndex] = useState<number | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [invalidFields, setInvalidFields] = useState<Set<number>>(new Set());
+  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const resp = await getCategories();
+      if (resp.success) {
+        setCategories(resp.data.items);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  const updateEntry = (index: number, field: string, value: string) => {
+    const updated = [...entries];
+    updated[index] = { ...updated[index], [field]: value };
+    setEntries(updated);
+
+    // Clear validation error for this field when it becomes non-empty
+    if (field === 'name' && value.trim() && invalidFields.has(index)) {
+      const newInvalidFields = new Set(invalidFields);
+      newInvalidFields.delete(index);
+      setInvalidFields(newInvalidFields);
+    }
+  };
 
   const add = () => {
     const used = entries.map(e => e.language).filter(Boolean);
@@ -37,9 +66,35 @@ const MultilingualContentEditor: React.FC<Props> = ({ product, onUpdated }) => {
     setConfirmOpen(false);
   };
   const save = async () => {
-    const content = entries.reduce((acc: any, curr: any) => { if (curr.language) acc[curr.language] = { name: curr.name, description: curr.description }; return acc; }, {});
+    // Validate that all entries have non-empty names
+    const invalidIndexes = new Set<number>();
+    entries.forEach((entry, index) => {
+      if (entry.language && !entry.name?.trim()) {
+        invalidIndexes.add(index);
+      }
+    });
+
+    if (invalidIndexes.size > 0) {
+      setInvalidFields(invalidIndexes);
+      // Focus the first invalid field
+      const firstInvalidIndex = Math.min(...Array.from(invalidIndexes));
+      const firstInvalidInput = inputRefs.current[firstInvalidIndex];
+      if (firstInvalidInput) {
+        firstInvalidInput.focus();
+      }
+      return;
+    }
+
+    setInvalidFields(new Set());
+
+    const content = entries.reduce((acc: any, curr: any) => {
+      if (curr.language && curr.name?.trim()) {
+        acc[curr.language] = { name: curr.name.trim(), description: curr.description?.trim() || '' };
+      }
+      return acc;
+    }, {});
     const updated: ProductDetails = { ...product, content } as any;
-    const payload = buildProductPayload(updated);
+    const payload = buildProductPayload(updated, categories);
     await updateProduct(product.id, payload);
     setEditing(false);
     onUpdated && onUpdated();
@@ -92,8 +147,20 @@ const MultilingualContentEditor: React.FC<Props> = ({ product, onUpdated }) => {
                     <option key={l} value={l} disabled={entries.some((x,i)=> x.language === l && i !== idx)}>{t(`lang_${l}`)}</option>
                   ))}
                 </select>
-                <input placeholder={t('name_in_language') as string} value={e.name} onChange={ev=>setEntries(entries.map((x,i)=> i===idx ? { ...x, name: ev.target.value } : x))} />
-                <input placeholder={t('ingredients_in_language') as string} value={e.description} onChange={ev=>setEntries(entries.map((x,i)=> i===idx ? { ...x, description: ev.target.value } : x))} />
+                <div>
+                  <input
+                    ref={el => { inputRefs.current[idx] = el; }}
+                    placeholder={t('name_in_language') as string}
+                    value={e.name}
+                    onChange={ev=>updateEntry(idx, 'name', ev.target.value)}
+                    className={invalidFields.has(idx) ? modalStyles.fieldError : ''}
+                  />
+                </div>
+                <input
+                  placeholder={t('ingredients_in_language') as string}
+                  value={e.description}
+                  onChange={ev=>updateEntry(idx, 'description', ev.target.value)}
+                />
                 <button type="button" className={styles.deleteButton} onClick={()=>askRemove(idx)}>{t('remove')}</button>
               </div>
             </div>

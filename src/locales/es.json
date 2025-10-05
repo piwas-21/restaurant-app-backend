@@ -515,5 +515,14 @@
   "no_images_found": "No se encontraron imágenes para este producto.",
   "upload_images": "Subir imágenes",
   "save_uploads": "Guardar cargas",
-  "files_staged": "{{count}} archivo(s) preparado(s) para cargar"
+  "files_staged": "{{count}} archivo(s) preparado(s) para cargar",
+
+  "preparation_time_minutes": "Tiempo de Preparación (Minutos)",
+  "add_side_items": "Agregar Acompañamientos",
+  "search_side_items": "Buscar Acompañamientos",
+  "search_placeholder": "Buscar artículos...",
+  "add_selected": "Agregar Seleccionados",
+  "already_added": "Ya Agregado",
+  "no_side_items_selected": "No hay acompañamientos seleccionados",
+  "no_side_items_found": "No se encontraron acompañamientos"
   }
