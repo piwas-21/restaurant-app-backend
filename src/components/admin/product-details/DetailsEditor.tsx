@@ -9,9 +9,9 @@ import { useTranslation } from 'react-i18next';
 import { updateProduct } from '@/services/productService';
 import { buildProductPayload } from './buildProductPayload';
 import { getCategories } from '@/services/categoryService';
+import AllergenDisplay, { AVAILABLE_ALLERGENS } from '@/components/common/AllergenDisplay';
 
 interface Category { id: string; name: string; }
-const allergensList = ["halal", "vegan", "vegetarian", "gluten-free", "contains_dairy", "contains_nuts"];
 
 interface Props {
   product: ProductDetails;
@@ -63,7 +63,15 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
       {!editing ? (
         <>
           <p><strong>{t('ingredients')}:</strong> {product.ingredients.join(', ')}</p>
-          <p><strong>{t('allergens')}:</strong> {product.allergens.map(a => t(`allergen_${a}`)).join(', ')}</p>
+          <div style={{ marginBottom: '1rem', justifyItems: 'flex-start', display: 'inline-flex' }}>
+            <p style={{ marginRight: '1rem' }}><strong>{t('allergens')}:</strong></p>
+            <AllergenDisplay
+              allergens={product.allergens}
+              id="product-details-allergens"
+              variant="admin"
+              showLabel={false}
+            />
+          </div>
         </>
       ) : (
         <div className={detailsStyles.formGrid}>
@@ -74,7 +82,7 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
           <div className={detailsStyles.formGroup}>
             <label>{t('allergens')}</label>
             <div className={modalStyles.chipGroup}>
-              {allergensList.map(a => (
+              {AVAILABLE_ALLERGENS.map(a => (
                 <div key={a} className={modalStyles.chip}>
                   <input
                     type="checkbox"

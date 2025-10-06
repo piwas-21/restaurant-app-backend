@@ -455,12 +455,24 @@
   "product_type_dessert": "Dessert",
   "product_type_sauce": "Salsa",
   "product_type_addOn": "Extra",
+
   "allergen_halal": "Halal",
-  "allergen_vegan": "Vegano",
+  "allergen_vegan": "Vegan",
   "allergen_vegetarian": "Vegetariano",
-  "allergen_gluten-free": "Senza glutine",
   "allergen_contains_dairy": "Contiene latticini",
   "allergen_contains_nuts": "Contiene frutta a guscio",
+  "allergen_gluten_free": "Senza glutine",
+  "allergen_dairy_free": "Senza latticini",
+  "allergen_nut_free": "Senza frutta a guscio",
+  "allergen_kosher": "Kosher",
+  "allergen_contains_gluten": "Contiene glutine",
+  "allergen_contains_soy": "Contiene soia",
+  "allergen_contains_eggs": "Contiene uova",
+  "allergen_spicy": "Piccante",
+  "allergen_sugar_free": "Senza zucchero",
+  "allergen_organic": "Biologico",
+  "allergen_low_sodium": "Basso contenuto di sodio",
+
   "multilingual_content": "Contenuto multilingue",
   "lang_en": "Inglese",
   "lang_tr": "Turco",
@@ -559,5 +571,6 @@
   "orientalSpecialty": "Specialità Orientali",
   "dessert": "Dessert",
   "hotDrink": "Bevande Calde",
-  "coldDrink": "Bevande Fredde"
+  "coldDrink": "Bevande Fredde",
+  "preview": "Anteprima"
 }

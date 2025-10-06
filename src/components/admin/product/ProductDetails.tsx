@@ -1,16 +1,17 @@
 import React from 'react';
 import { Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { ProductDetailsProps, productTypes, allergensList } from './types';
+import { ProductDetailsProps, productTypes } from './types';
 import styles from '@/app/styles/AdminPage.module.css';
 import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
+import { AVAILABLE_ALLERGENS } from '@/components/common/AllergenDisplay';
 
 export const ProductDetails: React.FC<ProductDetailsProps> = ({
   register,
   errors,
   control,
   imageFiles,
-  setImageFiles
+  setImageFiles,
 }) => {
   const { t } = useTranslation();
 
@@ -26,21 +27,17 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
         <div className={modalStyles.formGroup}>
           <label>{t('product_type')}</label>
           <select {...register('type')}>
-            {productTypes.map(type => (
-              <option key={type} value={type}>{t(`product_type_${type}`)}</option>
+            {productTypes.map((type) => (
+              <option key={type} value={type}>
+                {t(`product_type_${type}`)}
+              </option>
             ))}
           </select>
         </div>
 
         <div className={modalStyles.formGroup}>
           <label>{t('preparation_time_minutes')}</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            {...register('preparationTimeMinutes')}
-            placeholder="0"
-          />
+          <input type="number" min="0" step="1" {...register('preparationTimeMinutes')} placeholder="0" />
           {errors.preparationTimeMinutes && (
             <p className={modalStyles.errorMessage}>{errors.preparationTimeMinutes.message}</p>
           )}
@@ -63,35 +60,39 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
       </div>
 
       <div className={modalStyles.formGroup}>
-        <label>{t('product_images')} ({t('optional')})</label>
+        <label>
+          {t('product_images')} ({t('optional')})
+        </label>
         <input
           type="file"
           multiple
           accept="image/*"
           onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
         />
-        {imageFiles.length > 0 && (
-          <p>{t('files_selected', { count: imageFiles.length })}</p>
-        )}
+        {imageFiles.length > 0 && <p>{t('files_selected', { count: imageFiles.length })}</p>}
       </div>
 
       <div className={modalStyles.formGroup}>
-        <h3>{t('allergens')} ({t('optional')})</h3>
+        <h3>
+          {t('allergens')} ({t('optional')})
+        </h3>
         <Controller
           name="allergens"
           control={control}
           render={({ field }) => (
             <div className={modalStyles.chipGroup}>
-              {allergensList.map(allergen => (
+              {AVAILABLE_ALLERGENS.map((allergen) => (
                 <div key={allergen} className={modalStyles.chip}>
                   <input
                     type="checkbox"
                     id={`allergen-chip-${allergen}`}
                     value={allergen}
                     checked={field.value?.includes(allergen)}
-                    onChange={e => {
+                    onChange={(e) => {
                       const selected = field.value || [];
-                      field.onChange(e.target.checked ? [...selected, allergen] : selected.filter((a: string) => a !== allergen));
+                      field.onChange(
+                        e.target.checked ? [...selected, allergen] : selected.filter((a: string) => a !== allergen),
+                      );
                     }}
                   />
                   <label htmlFor={`allergen-chip-${allergen}`}>{t(`allergen_${allergen}`)}</label>

@@ -6,43 +6,7 @@ import styles from "@/app/styles/MenuPage.module.css";
 import type { MenuItem as MenuItemType, DetailedProduct } from "@/types/menu";
 import { useTranslation } from "react-i18next";
 import { getProductById } from "@/services/menuService";
-
-// Import the allergen helper function from MenuItemDetails
-function getAllergenInfo(allergen: string) {
-  const allergenLower = allergen.toLowerCase();
-
-  const allergenMap: { [key: string]: { icon: string; className: string } } = {
-    'vegan': { icon: '🌱', className: 'vegan' },
-    'vegetarian': { icon: '🥬', className: 'vegetarian' },
-    'gluten-free': { icon: '🌾', className: 'glutenFree' },
-    'gluten free': { icon: '🌾', className: 'glutenFree' },
-    'dairy-free': { icon: '🥛', className: 'dairyFree' },
-    'dairy free': { icon: '🥛', className: 'dairyFree' },
-    'nut-free': { icon: '🥜', className: 'nutFree' },
-    'nut free': { icon: '🥜', className: 'nutFree' },
-    'halal': { icon: '☪️', className: 'halal' },
-    'kosher': { icon: '✡️', className: 'kosher' },
-    'contains nuts': { icon: '⚠️', className: 'warning' },
-    'contains dairy': { icon: '⚠️', className: 'warning' },
-    'contains gluten': { icon: '⚠️', className: 'warning' },
-    'contains soy': { icon: '⚠️', className: 'warning' },
-    'contains eggs': { icon: '⚠️', className: 'warning' },
-    'spicy': { icon: '🌶️', className: 'spicy' },
-    'sugar-free': { icon: '🍯', className: 'sugarFree' },
-    'organic': { icon: '🌿', className: 'organic' },
-    'low-sodium': { icon: '🧂', className: 'lowSodium' }
-  };
-
-  if (allergenMap[allergenLower]) {
-    return allergenMap[allergenLower];
-  }
-
-  if (allergenLower.includes('contain') || allergenLower.includes('may contain')) {
-    return { icon: '⚠️', className: 'warning' };
-  }
-
-  return { icon: '🏷️', className: 'default' };
-}
+import AllergenDisplay from "@/components/common/AllergenDisplay";
 
 type Props = {
   isOpen: boolean;
@@ -145,26 +109,15 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
             </div>
           )}
 
-          {(detailedProduct?.allergens || item.allergens) && (detailedProduct?.allergens || item.allergens)!.length > 0 && (
-            <div className={styles.productDetailSection}>
-              <h4>{t('allergens', 'Allergens')}:</h4>
-              <div className={styles.allergensContent}>
-                {(detailedProduct?.allergens || item.allergens)!.map((allergen, idx) => {
-                  const { icon, className } = getAllergenInfo(allergen);
-                  return (
-                    <span
-                      key={`${item.id}-allergen-modal-${idx}`}
-                      className={`${styles.allergenTag} ${styles[className]}`}
-                      title={allergen}
-                    >
-                      <span className={styles.allergenIcon}>{icon}</span>
-                      <span className={styles.allergenText}>{allergen}</span>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <div className={styles.productDetailSection} style={{ justifyItems: 'flex-start' }}>
+            <h4>{t('allergens', 'Allergens')}:</h4>
+            <AllergenDisplay
+              allergens={detailedProduct?.allergens || item.allergens}
+              id={`${item.id}-modal`}
+              variant="admin"
+              showLabel={false}
+            />
+          </div>
 
           {(detailedProduct?.preparationTimeMinutes || item.preparationTimeMinutes) && (
             <div className={styles.productDetailSection}>

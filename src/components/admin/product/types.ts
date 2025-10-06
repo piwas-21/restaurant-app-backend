@@ -1,10 +1,8 @@
 // Product-related types and interfaces
 export const productTypes = ['mainItem', 'beverage', 'dessert', 'sauce', 'addOn'] as const;
-export const allergensList = ['halal', 'vegan', 'vegetarian', 'gluten-free', 'contains_dairy', 'contains_nuts'] as const;
 export const supportedLanguages = ['en', 'tr', 'es', 'ar', 'de', 'fr', 'it'] as const;
 
 export type ProductType = typeof productTypes[number];
-export type Allergen = typeof allergensList[number];
 export type SupportedLanguage = typeof supportedLanguages[number];
 
 export interface Category {
