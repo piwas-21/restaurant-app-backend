@@ -100,6 +100,8 @@ trigger_deploy_pipeline:
     project: restaurant-app3282120/rumi-argocd-gitops
     branch: main
     strategy: depend
+    forward:
+      pipeline_variables: true
 
 # Docker Image Scanning
 
