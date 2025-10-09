@@ -1,31 +1,37 @@
+# variables:
+#     IMAGE_NAME: $CI_REGISTRY_IMAGE
+#     IMAGE_TAG: $CI_PIPELINE_IID
+
 variables:
-    IMAGE_NAME: $CI_REGISTRY_IMAGE
-    IMAGE_TAG: $CI_PIPELINE_IID
+  MS_NAME: $CI_REGISTRY_IMAGE
+  MS_VERSION: $CI_PIPELINE_IID
+
 
 stages:
-    - cache
+    # - cache
     - test
     - build
+    - deploy_pipeline
 
-create_cache:
-    stage: cache
-    image: node:18-bullseye
-    script:
-        - npm install
-    cache: 
-        key: "$CI_COMMIT_REF_SLUG"
-        paths:
-            - node_modules/
-        policy: push
+# create_cache:
+#     stage: cache
+#     image: node:18-bullseye
+#     script:
+#         - npm install
+#     cache: 
+#         key: "$CI_COMMIT_REF_SLUG"
+#         paths:
+#             - node_modules/
+#         policy: push
         
 npm_test:
     image: node:18-bullseye
     stage: test
-    cache: 
-        key: "$CI_COMMIT_REF_SLUG"
-        paths:
-            - node_modules/
-        policy: pull
+    # cache: 
+    #     key: "$CI_COMMIT_REF_SLUG"
+    #     paths:
+    #         - node_modules/
+    #     policy: pull
     before_script:
         - npm install
     script:    
@@ -65,11 +71,11 @@ semgrep:
 retire:
   stage: test
   image: node:18-bullseye
-  cache: 
-      key: "$CI_COMMIT_REF_SLUG"
-      paths:
-          - node_modules/
-      policy: pull
+  # cache: 
+  #     key: "$CI_COMMIT_REF_SLUG"
+  #     paths:
+  #         - node_modules/
+  #     policy: pull
   before_script:
     - npm install -g retire 
   script:
@@ -85,8 +91,17 @@ build_image:
     before_script:
         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     script:
-        - docker build -t $IMAGE_NAME:$IMAGE_TAG .
-        - docker push $IMAGE_NAME:$IMAGE_TAG
+        - docker build -t $MS_NAME:$MS_VERSION .
+        - docker push $MS_NAME:$MS_VERSION
+
+trigger_deploy_pipeline:
+  stage: deploy_pipeline
+  trigger:
+    project: restaurant-app3282120/rumi-argocd-gitops
+    branch: main
+    strategy: depend
+    forward:
+      pipeline_variables: true
 
 # Docker Image Scanning
 
@@ -101,6 +116,6 @@ trivy:
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker pull $IMAGE_NAME:$IMAGE_TAG
-    - trivy image --severity HIGH,CRITICAL --exit-code 1 $IMAGE_NAME:$IMAGE_TAG
+    - docker pull $MS_NAME:$MS_VERSION
+    - trivy image --severity HIGH,CRITICAL --exit-code 1 $MS_NAME:$MS_VERSION
   allow_failure: true
