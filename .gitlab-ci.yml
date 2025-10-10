@@ -9,7 +9,7 @@ variables:
 
 stages:
     # - cache
-    # - test
+    - test
     - build
     - deploy_pipeline
 
@@ -49,13 +49,13 @@ stages:
 #     - gitleaks detect --verbose --source .
 
 
-# njsscan:
-#   stage: test
-#   image: python
-#   before_script:
-#     - pip3 install --upgrade njsscan
-#   script:
-#     - njsscan --exit-warning .
+njsscan:
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - pip3 install --upgrade njsscan
+  script:
+    - njsscan --exit-warning .
 
 # semgrep:
 #   stage: test
