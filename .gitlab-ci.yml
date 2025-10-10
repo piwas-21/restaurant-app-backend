@@ -91,8 +91,8 @@ build_image:
     before_script:
         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     script:
-        - docker build -t $MS_NAME:$MS_VERSION .
-        - docker push $MS_NAME:$MS_VERSION
+        - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+        - docker push $IMAGE_NAME:$IMAGE_TAG
 
 trigger_deploy_pipeline:
   stage: deploy_pipeline
