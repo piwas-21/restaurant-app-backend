@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rumi-build-pvc
+  namespace: rumi-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rumi-source
+  namespace: rumi-test
+data:
+  build.sh: |
+    #!/bin/sh
+    set -e
+    echo "Installing dependencies..."
+    apk add --no-cache git nodejs npm docker
+
+    echo "Cloning repository..."
+    cd /workspace
+    git clone https://github.com/mahmutkaya/rumi-restaurant-web.git .
+
+    echo "Building Docker image using buildctl..."
+    # Build the image without pushing to registry
+    docker build -t rumi-restaurant-web:latest .
+
+    echo "Saving image to tar..."
+    docker save rumi-restaurant-web:latest -o /output/rumi-restaurant-web.tar
+
+    echo "Build completed successfully!"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rumi-build-job
+  namespace: rumi-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: builder
+        image: docker:24-dind
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            dockerd-entrypoint.sh &
+            sleep 10
+            cd /workspace
+            git clone https://github.com/mahmutkaya/rumi-restaurant-web.git .
+            docker build -t rumi-restaurant-web:latest .
+            docker save rumi-restaurant-web:latest > /output/rumi-image.tar
+            echo "Build complete!"
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: output
+          mountPath: /output
+        - name: docker-graph-storage
+          mountPath: /var/lib/docker
+        securityContext:
+          privileged: true
+      restartPolicy: Never
+      volumes:
+      - name: workspace
+        emptyDir: {}
+      - name: output
+        persistentVolumeClaim:
+          claimName: rumi-build-pvc
+      - name: docker-graph-storage
+        emptyDir: {}
+  backoffLimit: 2

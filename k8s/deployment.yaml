@@ -20,7 +20,7 @@ spec:
       containers:
       - name: rumi-restaurant-web
         image: rumi-restaurant-web:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         ports:
         - containerPort: 3000
           name: http
