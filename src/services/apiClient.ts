@@ -1,6 +1,13 @@
 import { refreshToken } from './authService';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// Get API base URL from environment variable with fallback
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5221';
+
+// Warn if environment variable is not set (only in development)
+if (!process.env.NEXT_PUBLIC_API_URL && process.env.NODE_ENV === 'development') {
+  // eslint-disable-next-line no-console
+  console.warn('⚠️ NEXT_PUBLIC_API_URL not set, using fallback:', API_BASE_URL);
+}
 
 const logout = () => {
   localStorage.removeItem('token');

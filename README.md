@@ -28,13 +28,22 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 3.  **Create an environment file:**
 
-    Create a file named `.env.local` in the root of the project and add the following line:
+    Copy the example environment file and configure it:
+
+    ```bash
+    cp .env.example .env.local
+    ```
+
+    Update `.env.local` with your local backend URL:
 
     ```
-    NEXT_PUBLIC_API_URL=http://localhost:5221/api
+    NEXT_PUBLIC_API_URL=http://localhost:5221
+    NEXT_PUBLIC_IMAGE_BASE_URL=https://rumi-test-backend-bucket.s3.eu-central-1.amazonaws.com
     ```
 
-    *Note: This URL assumes the backend is running on the default port `5221`. If your backend is running on a different port, update the URL accordingly.*
+    *Note: The backend URL assumes the backend is running on port `5221`. Update if your backend uses a different port.*
+
+    📖 **For detailed environment configuration, see [ENVIRONMENT-SETUP.md](./ENVIRONMENT-SETUP.md)**
 
 4.  **Run the development server:**
 

@@ -1,0 +1,110 @@
+---
+# ConfigMap for Backend
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rumi-backend-config
+  namespace: rumi-test
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  # Add database connection strings and other config as secrets later
+
+---
+# Deployment for Backend API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rumi-restaurant-backend
+  namespace: rumi-test
+  labels:
+    app: rumi-restaurant-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rumi-restaurant-backend
+  template:
+    metadata:
+      labels:
+        app: rumi-restaurant-backend
+    spec:
+      containers:
+      - name: rumi-backend
+        image: muslumgezgin951/restaurant-system-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: rumi-backend-config
+        livenessProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+# Service for Backend
+apiVersion: v1
+kind: Service
+metadata:
+  name: rumi-restaurant-backend
+  namespace: rumi-test
+  labels:
+    app: rumi-restaurant-backend
+spec:
+  selector:
+    app: rumi-restaurant-backend
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  type: ClusterIP
+
+---
+# HPA for Backend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rumi-restaurant-backend
+  namespace: rumi-test
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rumi-restaurant-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
