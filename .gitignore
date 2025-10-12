@@ -2,6 +2,9 @@
 
 .vscode/
 
+# Archived files (old manual kubectl deployments)
+.archived/
+
 # dependencies
 /node_modules
 /.pnp

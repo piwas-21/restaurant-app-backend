@@ -84,3 +84,35 @@ This project uses [Jest](https://jestjs.io/) for unit and component testing.
     ```bash
     npm test -- --watch
     ```
+
+## Deployment
+
+This project uses **GitOps with ArgoCD** for automated deployments to Kubernetes.
+
+### Production Deployment
+
+Simply push your changes to the `main` branch:
+
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main
+```
+
+The GitLab CI/CD pipeline will:
+1. Run tests and security scans
+2. Build the Docker image
+3. Trigger the ArgoCD GitOps pipeline
+4. Automatically deploy to production
+
+📖 **For detailed deployment information, see [GITOPS-DEPLOYMENT.md](./GITOPS-DEPLOYMENT.md)**
+
+### Local Testing
+
+To test the Docker build locally:
+
+```bash
+./build-production.sh
+```
+
+**Note**: This creates a local image only. Production builds are handled by GitLab CI/CD.

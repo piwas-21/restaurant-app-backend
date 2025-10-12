@@ -17,25 +17,25 @@ stages:
 #     image: node:18-bullseye
 #     script:
 #         - npm install
-#     cache: 
+#     cache:
 #         key: "$CI_COMMIT_REF_SLUG"
 #         paths:
 #             - node_modules/
 #         policy: push
-        
+
 npm_test:
     image: node:18-bullseye
     stage: test
-    # cache: 
+    # cache:
     #     key: "$CI_COMMIT_REF_SLUG"
     #     paths:
     #         - node_modules/
     #     policy: pull
     before_script:
         - npm install
-    script:    
+    script:
         - npm test
-    
+
 
 # Static Application Security Tests (SAST)
 
@@ -70,17 +70,17 @@ semgrep:
 retire:
   stage: test
   image: node:18-bullseye
-  # cache: 
+  # cache:
   #     key: "$CI_COMMIT_REF_SLUG"
   #     paths:
   #         - node_modules/
   #     policy: pull
   before_script:
-    - npm install -g retire 
+    - npm install -g retire
   script:
     - retire --path .
 
-# Docker Image building 
+# Docker Image building
 
 build_image:
     stage: build
@@ -95,12 +95,13 @@ build_image:
 
 trigger_deploy_pipeline:
   stage: deploy_pipeline
+  variables:
+    MS_NAME: "rumi-restaurant-web"
+    MS_VERSION: "$CI_PIPELINE_IID"
   trigger:
     project: restaurant-app3282120/rumi-argocd-gitops
     branch: main
     strategy: depend
-    forward:
-      pipeline_variables: true
 
 # Docker Image Scanning
 
