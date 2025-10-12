@@ -1,0 +1,12 @@
+# Trivy Ignore File
+# This file contains CVEs that are false positives or have been verified as not applicable
+
+# CVE-2024-21538: cross-spawn Regular Expression Denial of Service
+# Status: FALSE POSITIVE
+# Reason: Trivy reads package.json metadata from execa@5.1.1 which declares "cross-spawn": "^7.0.3"
+#         However, npm resolution actually installs cross-spawn@7.0.6 (fixed version)
+# Verified: npm list cross-spawn shows all instances at 7.0.6
+# Evidence: package-lock.json "node_modules/cross-spawn" shows version 7.0.6
+# Date: October 13, 2025
+# Tracking: See TRIVY-CVE-2024-21538.md for full analysis
+CVE-2024-21538

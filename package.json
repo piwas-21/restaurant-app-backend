@@ -42,5 +42,8 @@
     "jest-environment-jsdom": "^29.7.0",
     "ts-jest": "^29.3.4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "cross-spawn": "^7.0.6"
   }
 }
