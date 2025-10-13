@@ -95,55 +95,13 @@ build_image:
 
 trigger_deploy_pipeline:
   stage: deploy_pipeline
-  image: alpine/git:latest
   variables:
     MS_NAME: "rumi-restaurant-web"
     MS_VERSION: "$CI_PIPELINE_IID"
-  before_script:
-    - apk add --no-cache curl
-  script:
-    - |
-      echo "========================================="
-      echo "🚀 Triggering GitOps Pipeline"
-      echo "========================================="
-      echo "Service: ${MS_NAME}"
-      echo "Version: ${MS_VERSION}"
-      echo "Pipeline: ${CI_PIPELINE_ID}"
-      echo "========================================="
-      
-      # Method 1: Try native GitLab trigger (may require permissions)
-      echo "Attempting to trigger via GitLab API..."
-      
-      # Build the API URL
-      PROJECT_PATH="restaurant-app3282120/rumi-argocd-gitops"
-      ENCODED_PATH=$(echo -n "$PROJECT_PATH" | sed 's|/|%2F|g')
-      API_URL="https://gitlab.com/api/v4/projects/${ENCODED_PATH}/ref/main/trigger/pipeline"
-      
-      # Try with CI_JOB_TOKEN
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-        -H "Content-Type: application/json" \
-        -H "PRIVATE-TOKEN: ${CI_JOB_TOKEN}" \
-        -d "{\"ref\":\"main\",\"variables\":[{\"key\":\"MS_NAME\",\"value\":\"${MS_NAME}\"},{\"key\":\"MS_VERSION\",\"value\":\"${MS_VERSION}\"}]}" \
-        "https://gitlab.com/api/v4/projects/${ENCODED_PATH}/pipeline")
-      
-      echo "HTTP Response Code: ${HTTP_CODE}"
-      
-      if [ "$HTTP_CODE" = "201" ]; then
-        echo "✅ GitOps pipeline triggered successfully!"
-        exit 0
-      else
-        echo "⚠️  Could not trigger via API (code: ${HTTP_CODE})"
-        echo ""
-        echo "This is expected if cross-project triggers are not configured."
-        echo "Please ask your DevOps team to:"
-        echo "1. Go to rumi-argocd-gitops project settings"
-        echo "2. Enable 'Settings > CI/CD > Pipeline triggers' OR"
-        echo "3. Grant access to frontend project under 'Settings > CI/CD > Token Access'"
-        echo ""
-        echo "For now, deployment will continue via ArgoCD auto-sync."
-        exit 0  # Don't fail the pipeline
-      fi
-  allow_failure: true
+  trigger:
+    project: restaurant-app3282120/rumi-argocd-gitops
+    branch: main
+  # Token access is now configured - this should work!
 
 # Docker Image Scanning
 
