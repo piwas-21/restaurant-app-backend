@@ -1,0 +1,7 @@
+# GitLeaks ignore file
+# Ignore documentation files that previously contained example credentials (now redacted)
+# The credentials in commit 61e3296 have been redacted in commit eb884f9
+# These credentials should be rotated by DevOps as they were exposed in git history
+
+61e32969e16d22f50accd320cab6b14b548a1bb6:INFOMANIAK-DNS-UPDATE-GUIDE.md:aws-access-token:66
+61e32969e16d22f50accd320cab6b14b548a1bb6:INFOMANIAK-DNS-UPDATE-GUIDE.md:generic-api-key:67
