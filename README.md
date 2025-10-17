@@ -43,7 +43,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
     *Note: The backend URL assumes the backend is running on port `5221`. Update if your backend uses a different port.*
 
-    📖 **For detailed environment configuration, see [ENVIRONMENT-SETUP.md](./ENVIRONMENT-SETUP.md)**
+    📖 **For detailed environment configuration, see [ENVIRONMENT-SETUP.md](./docs/ENVIRONMENT-SETUP.md)**
 
 4.  **Run the development server:**
 
@@ -105,7 +105,7 @@ The GitLab CI/CD pipeline will:
 3. Trigger the ArgoCD GitOps pipeline
 4. Automatically deploy to production
 
-📖 **For detailed deployment information, see [GITOPS-DEPLOYMENT.md](./GITOPS-DEPLOYMENT.md)**
+📖 **For detailed deployment information, see [GITOPS-DEPLOYMENT.md](./docs/GITOPS-DEPLOYMENT.md)**
 
 ### Local Testing
 
@@ -116,3 +116,18 @@ To test the Docker build locally:
 ```
 
 **Note**: This creates a local image only. Production builds are handled by GitLab CI/CD.
+
+## Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs) directory:
+
+### Deployment & Infrastructure
+- **[GITOPS-DEPLOYMENT.md](./docs/GITOPS-DEPLOYMENT.md)** - GitOps deployment workflow with ArgoCD
+- **[K8S-DEPLOYMENT.md](./docs/K8S-DEPLOYMENT.md)** - Kubernetes deployment configuration and guides
+- **[ENVIRONMENT-SETUP.md](./docs/ENVIRONMENT-SETUP.md)** - Environment variables and configuration setup
+
+### Security & Compliance
+- **[TRIVY-CVE-2024-21538.md](./docs/TRIVY-CVE-2024-21538.md)** - Trivy CVE analysis and mitigation
+
+### DNS & Infrastructure (Historical)
+- **[INFOMANIAK-DNS-UPDATE-GUIDE.md](./docs/INFOMANIAK-DNS-UPDATE-GUIDE.md)** - DNS configuration guide (Note: This was accidentally added to frontend repo, should be in GitOps repo)
