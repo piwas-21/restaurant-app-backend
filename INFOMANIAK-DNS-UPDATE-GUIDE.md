@@ -62,9 +62,9 @@ If you need to find it yourself:
 
 1. **Configure AWS credentials:**
 ```bash
-# Set base credentials
-export AWS_ACCESS_KEY_ID=AKIAZYA6UPN7SKL4UXOL
-export AWS_SECRET_ACCESS_KEY=RKyn6UdWhpm/mOHKq02j/oYm2njUUlx8KVPOjG/9
+# Set base credentials (obtain from DevOps team)
+export AWS_ACCESS_KEY_ID=<YOUR_AWS_ACCESS_KEY_ID>
+export AWS_SECRET_ACCESS_KEY=<YOUR_AWS_SECRET_ACCESS_KEY>
 export AWS_DEFAULT_REGION=eu-central-1
 
 # Assume the admin role
