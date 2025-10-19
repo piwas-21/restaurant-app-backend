@@ -90,7 +90,10 @@ build_image:
     before_script:
         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     script:
-        - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+        - docker build 
+          --build-arg NEXT_PUBLIC_API_URL=https://rumirestaurant.ch 
+          --build-arg NEXT_PUBLIC_IMAGE_BASE_URL=https://rumi-test-backend-bucket.s3.eu-central-1.amazonaws.com 
+          -t $IMAGE_NAME:$IMAGE_TAG .
         - docker push $IMAGE_NAME:$IMAGE_TAG
 
 trigger_deploy_pipeline:
