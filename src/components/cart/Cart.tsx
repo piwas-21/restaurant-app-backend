@@ -13,20 +13,28 @@ interface CartProps {
 
 export default function Cart({ showProceedButton = true }: CartProps) {
   const { t } = useTranslation();
-  const { state, dispatch } = useCart();
+  const { state, removeItem, updateItem, getTotal } = useCart();
 
-  const handleRemoveItem = (itemId: string, itemName: string) => {
-    console.log(`Removing item: ${itemName}`);
-    dispatch({ type: 'REMOVE_ITEM', payload: { id: itemId } });
+  const handleRemoveItem = async (basketItemId: string | undefined, itemName: string) => {
+    if (!basketItemId) return;
+    try {
+      await removeItem(basketItemId);
+    } catch {
+      // Error already shown via CartContext
+      // eslint-disable-next-line no-console
+      console.error(`Failed to remove item: ${itemName}`);
+    }
   };
 
-  const handleUpdateQuantity = (itemId: string, quantity: number, itemName: string) => {
-    console.log(`Updating quantity for item: ${itemName} to ${quantity}`);
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id: itemId, quantity } });
-  };
-
-  const calculateTotal = () => {
-    return state.items.reduce((total, item) => total + item.price * item.quantity, 0).toFixed(2);
+  const handleUpdateQuantity = async (basketItemId: string | undefined, quantity: number, itemName: string) => {
+    if (!basketItemId || quantity < 1) return;
+    try {
+      await updateItem(basketItemId, quantity);
+    } catch {
+      // Error already shown via CartContext
+      // eslint-disable-next-line no-console
+      console.error(`Failed to update quantity for item: ${itemName}`);
+    }
   };
 
   if (state.items.length === 0) {
@@ -41,27 +49,34 @@ export default function Cart({ showProceedButton = true }: CartProps) {
   return (
     <div className={styles.cartContainer} role="region" aria-labelledby="cart-heading-full">
       <h2 id="cart-heading-full">{t("cart_title", 'Your Cart')}</h2>
+      {state.isLoading && <p>{t('loading', 'Loading...')}</p>}
+      {state.error && <p className={styles.error}>{state.error}</p>}
       <ul className={styles.cartItemsList} aria-label="Items in your cart">
         {state.items.map((item) => (
-          <li key={item.id} className={styles.cartItem} role="listitem">
+          <li key={item.id || item.productId} className={styles.cartItem} role="listitem">
             <div className={styles.itemInfo}>
-              <span>{item.name} (CHF {item.price.toFixed(2)})</span>
+              <span>{item.productName || 'Unknown Item'} (CHF {item.unitPrice.toFixed(2)})</span>
+              {item.specialInstructions && (
+                <p className={styles.instructions}>{item.specialInstructions}</p>
+              )}
             </div>
             <div className={styles.itemControls}>
-              <label htmlFor={`quantity-${item.id}`} className="sr-only">{t('quantity_for', ' Quantity for')} {item.name}</label>
+              <label htmlFor={`quantity-${item.id}`} className="sr-only">{t('quantity_for', ' Quantity for')} {item.productName}</label>
               <input
                 type="number"
                 id={`quantity-${item.id}`}
                 value={item.quantity}
-                onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value, 10), item.name)}
+                onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value, 10), item.productName || 'Unknown')}
                 min="1"
                 className={styles.quantityInput}
-                aria-label={`Quantity for ${item.name}`}
+                aria-label={`Quantity for ${item.productName}`}
+                disabled={state.isSyncing}
               />
-              <button 
-                onClick={() => handleRemoveItem(item.id, item.name)} 
+              <button
+                onClick={() => handleRemoveItem(item.id, item.productName || 'Unknown')}
                 className={styles.removeButton}
-                aria-label={`Remove ${item.name} from cart`}
+                aria-label={`Remove ${item.productName} from cart`}
+                disabled={state.isSyncing}
               >
                 {t('cart_remove_item_button', 'Remove')}
               </button>
@@ -70,7 +85,7 @@ export default function Cart({ showProceedButton = true }: CartProps) {
         ))}
       </ul>
       <div className={styles.cartTotal} role="status" aria-live="polite">
-        <h3>{t('total_price_header', 'Total')}: CHF {calculateTotal()}</h3>
+        <h3>{t('total_price_header', 'Total')}: CHF {getTotal().toFixed(2)}</h3>
       </div>
       {showProceedButton && (
         <Link href="/checkout" className={styles.checkoutButton} role="button">

@@ -27,7 +27,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
   onFeedbackSuccess,
   getFallbackImage,
 }) => {
-  const { dispatch } = useCart();
+  const { addItem } = useCart();
   const { t, i18n } = useTranslation();
   const { enqueueSnackbar } = useSnackbar();
   const [showFeedbackForm, setShowFeedbackForm] = useState<string | null>(null);
@@ -36,25 +36,24 @@ const MenuItem: React.FC<MenuItemProps> = ({
   // Get current language - component will re-render when i18n.language changes
   const currentLanguage = (i18n.language.split("-")[0] || "en") as LanguageCode;
 
-  const handleAddItemToCart = useCallback(() => {
+  const handleAddItemToCart = useCallback(async () => {
     const itemName =
       item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
-    const numericPrice =
-      typeof item.price === "string" ? parseFloat(item.price) : item.price;
 
-    dispatch({
-      type: "ADD_ITEM",
-      payload: {
-        id: item.id,
-        name: itemName,
-        price: numericPrice,
+    try {
+      await addItem({
+        productId: item.id,
         quantity: 1,
-      },
-    });
-    enqueueSnackbar(t("item_added_to_cart_toast", { itemName }), {
-      variant: "success",
-    });
-  }, [dispatch, enqueueSnackbar, t, currentLanguage, item]);
+      });
+      enqueueSnackbar(t("item_added_to_cart_toast", { itemName }), {
+        variant: "success",
+      });
+    } catch {
+      enqueueSnackbar(t("error_adding_to_cart", "Failed to add item to cart"), {
+        variant: "error",
+      });
+    }
+  }, [addItem, enqueueSnackbar, t, currentLanguage, item]);
 
   // Compute localized values - these will update when currentLanguage changes
   const itemName =
