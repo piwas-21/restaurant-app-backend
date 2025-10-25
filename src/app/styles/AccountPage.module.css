@@ -4,8 +4,8 @@
   padding: 2rem;
   font-family: var(--font-family-sans);
   color: var(--text-color);
-  max-width: 900px; /* Limit width for better readability */
-  margin: 0 auto;   /* Center the content */
+  max-width: 1400px; /* Increased for two-column layout */
+  margin: 0 auto;
 }
 
 .pageTitle {
@@ -15,13 +15,33 @@
   color: var(--primary-color);
 }
 
+/* Two-column layout for larger screens */
+.contentGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .contentGrid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.leftColumn,
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
 .section {
   background-color: var(--card-background);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1.5rem 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Consider a CSS var for shadow if it needs to adapt */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .sectionTitle {
@@ -61,7 +81,7 @@
 .formTextarea:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px var(--primary-color-xlight); 
+  box-shadow: 0 0 0 2px var(--primary-color-xlight);
 }
 
 .formTextarea {
@@ -86,17 +106,17 @@
   color: var(--button-text-color);
   border: 1px solid var(--primary-color);
   transition: background-color 0.2s ease, border-color 0.2s ease;
-  display: inline-block; 
+  display: inline-block;
 }
 
 .saveButton:hover,
 .changePasswordButton:hover {
-  background-color: var(--link-hover-color); 
+  background-color: var(--link-hover-color);
   border-color: var(--link-hover-color);
 }
 
 .errorMessage {
-  color: var(--danger-color-dark); 
+  color: var(--danger-color-dark);
   background-color: var(--danger-color-xlight);
   border: 1px solid var(--danger-color-light);
   padding: 0.8rem;
@@ -136,7 +156,7 @@
 }
 
 .strengthMedium {
-  background-color: var(--warning-color); 
+  background-color: var(--warning-color);
 }
 
 .strengthStrong {
@@ -194,7 +214,7 @@
 .orderDetailsExpanded {
   background-color: var(--background-color); /* Use main background, or secondary-color-light if you prefer distinction */
   padding: 1rem;
-  margin: 0.5rem 0 1rem 0; 
+  margin: 0.5rem 0 1rem 0;
   border-radius: 4px;
   border: 1px solid var(--border-color-light);
   color: var(--text-color); /* Ensure text in this section is theme-aware */
@@ -225,6 +245,24 @@
   background-color: var(--secondary-color); /* Header row background */
   color: var(--text-color); /* Ensure header text is also theme-aware */
   font-weight: 500;
+}
+
+/* Delivery Address in Order Details */
+.deliveryAddressSection {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color-light);
+}
+
+.addressDetails {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-color);
+}
+
+.addressDetails p {
+  margin: 0.25rem 0;
 }
 
 /* Fidelity Points */
@@ -260,4 +298,40 @@
 .homeLink:hover {
   color: var(--link-hover-color);
   text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .pageTitle {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section {
+    padding: 1rem 1.25rem;
+  }
+
+  .sectionTitle {
+    font-size: 1.25rem;
+  }
+
+  .contentGrid {
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .addressGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .orderHistoryItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
 }

@@ -77,3 +77,113 @@ export async function registerCustomer(formData: CustomerRegistrationPayload) {
   }
   return data;
 }
+
+/**
+ * Forgot Password - Request password reset
+ */
+export interface ForgotPasswordCommand {
+  email: string;
+}
+
+export async function forgotPassword(formData: ForgotPasswordCommand) {
+  const response = await fetch(`${AUTH_API_URL}/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  });
+
+  return response.json();
+}
+
+/**
+ * Reset Password - Reset password with token
+ */
+export interface ResetPasswordCommand {
+  email: string;
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export async function resetPassword(formData: ResetPasswordCommand) {
+  const response = await fetch(`${AUTH_API_URL}/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  });
+
+  return response.json();
+}
+
+/**
+ * Change Password - Change password for authenticated user
+ */
+export interface ChangePasswordCommand {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export async function changePassword(formData: ChangePasswordCommand) {
+  const token = localStorage.getItem('auth_token');
+
+  const response = await fetch(`${AUTH_API_URL}/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(formData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to change password');
+  }
+
+  return data;
+}
+
+/**
+ * Send Email Verification
+ */
+export interface SendEmailVerificationCommand {
+  email: string;
+}
+
+export async function sendEmailVerification(formData: SendEmailVerificationCommand) {
+  const response = await fetch(`${AUTH_API_URL}/send-email-verification`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  });
+
+  return response.json();
+}
+
+/**
+ * Verify Email - Verify email address with token
+ */
+export interface VerifyEmailCommand {
+  email: string;
+  token: string;
+}
+
+export async function verifyEmail(formData: VerifyEmailCommand) {
+  const response = await fetch(`${AUTH_API_URL}/verify-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  });
+
+  return response.json();
+}

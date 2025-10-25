@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from '../../app/styles/AccountPage.module.css'; 
+import styles from '../../app/styles/AccountPage.module.css';
 import type { OrderHistoryItem, OrderStatus } from '../../app/account/page';
 
 interface OrderHistorySectionProps {
@@ -52,12 +52,12 @@ export default function OrderHistorySection({ orderHistory, getOrderStatusTransl
             <React.Fragment key={order.id}>
               <li className={styles.orderHistoryItem}>
                 <div>
-                  <span className={styles.orderDetailLabel}>{t('order_id_label', 'Order ID')}</span>
-                  <span className={styles.orderDetailValue}>{order.id}</span>
-                </div>
-                <div>
                   <span className={styles.orderDetailLabel}>{t('order_date_label', 'Date')}</span>
                   <span className={styles.orderDetailValue}>{formatDate(order.date)}</span>
+                </div>
+                <div>
+                  <span className={styles.orderDetailLabel}>{t('order_type_label', 'Type')}</span>
+                  <span className={styles.orderDetailValue}>{t(`order_type_${order.orderType.toLowerCase()}`, order.orderType)}</span>
                 </div>
                 <div>
                   <span className={styles.orderDetailLabel}>{t('order_status_label', 'Status')}</span>
@@ -68,8 +68,8 @@ export default function OrderHistorySection({ orderHistory, getOrderStatusTransl
                   <span className={styles.orderDetailValue}>CHF {order.totalAmount.toFixed(2)}</span>
                 </div>
                 <div>
-                  <button 
-                    onClick={() => toggleOrderDetails(order.id)} 
+                  <button
+                    onClick={() => toggleOrderDetails(order.id)}
                     className={styles.viewDetailsButton}
                     aria-expanded={expandedOrderId === order.id}
                     aria-controls={`order-details-${order.id}`}
@@ -104,6 +104,21 @@ export default function OrderHistorySection({ orderHistory, getOrderStatusTransl
                     </table>
                   ) : (
                     <p>{t('no_items_in_this_order', 'No item details available for this order.')}</p>
+                  )}
+
+                  {order.deliveryAddress && (
+                    <div className={styles.deliveryAddressSection}>
+                      <h4 className={styles.orderDetailsTitle}>{t('delivery_address_title', 'Delivery Address')}</h4>
+                      <div className={styles.addressDetails}>
+                        <p>{order.deliveryAddress.addressLine1}</p>
+                        {order.deliveryAddress.addressLine2 && <p>{order.deliveryAddress.addressLine2}</p>}
+                        <p>
+                          {order.deliveryAddress.postalCode} {order.deliveryAddress.city}
+                          {order.deliveryAddress.state && `, ${order.deliveryAddress.state}`}
+                        </p>
+                        <p>{order.deliveryAddress.country}</p>
+                      </div>
+                    </div>
                   )}
                 </li>
               )}

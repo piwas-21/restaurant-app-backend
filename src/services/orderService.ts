@@ -49,6 +49,46 @@ export async function createOrder(command: CreateOrderCommand): Promise<OrderDto
 }
 
 /**
+ * Get orders for the current authenticated user
+ *
+ * @param filters - Optional query filters
+ * @returns Paged list of orders for current user
+ */
+export async function getMyOrders(
+  filters?: Partial<OrderQueryFilters>
+): Promise<PagedResult<OrderDto>> {
+  try {
+    // Build query string from filters
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+    }
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/Orders?${queryString}` : '/api/Orders';
+
+    const response = await apiClient.get<OrderDtoPagedResultApiResponse>(
+      endpoint,
+      { requireAuth: true }
+    );
+
+    if (!response.data) {
+      throw new Error('Failed to fetch orders');
+    }
+
+    return response.data;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching my orders:', error);
+    throw error;
+  }
+}
+
+/**
  * Get orders with optional filters
  *
  * @param filters - Query filters (status, payment status, date range, etc.)
@@ -292,6 +332,7 @@ export async function refundPayment(
 export const orderService = {
   createOrder,
   getOrders,
+  getMyOrders,
   getOrderById,
   updateOrderStatus,
   cancelOrder,

@@ -63,8 +63,22 @@ export interface CreateOrderDeliveryAddressDto {
   additionalInfo?: string;
 }
 
-export interface DeliveryAddressDto extends CreateOrderDeliveryAddressDto {
+export interface DeliveryAddressDto {
   id: string;
+  orderId: string;
+  userAddressId?: string;
+  label: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+  phone?: string;
+  latitude?: number;
+  longitude?: number;
+  deliveryInstructions?: string;
+  fullAddress: string;
 }
 
 /**
