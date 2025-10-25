@@ -1,29 +1,13 @@
 /* Container */
 .container {
-  min-height: calc(100vh - 80px);
-  padding: 2rem 1rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  padding: 2rem;
+  background-color: var(--background-color);
 }
 
 .content {
   max-width: 600px;
   margin: 0 auto;
-  background: white;
-  border-radius: 16px;
-  padding: 2.5rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  animation: slideUp 0.4s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* Header */
@@ -33,22 +17,25 @@
 }
 
 .title {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--text-color);
   margin-bottom: 0.5rem;
+  font-family: var(--font-family-serif);
 }
 
 .subtitle {
-  font-size: 1rem;
-  color: #718096;
+  font-size: 1.1rem;
+  color: var(--text-color);
+  opacity: 0.8;
   margin: 0;
 }
 
 /* Order Type Summary */
 .orderTypeSummary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background-color: var(--card-background);
+  border: 2px solid var(--primary-color);
+  color: var(--text-color);
   padding: 1rem 1.5rem;
   border-radius: 12px;
   margin-bottom: 2rem;
@@ -56,23 +43,24 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .orderTypeSummary .label {
   font-size: 0.875rem;
   font-weight: 600;
-  opacity: 0.9;
+  opacity: 0.7;
 }
 
 .orderTypeSummary .value {
   font-size: 1rem;
   font-weight: 700;
+  color: var(--primary-color);
 }
 
 .orderTypeSummary .detail {
   font-size: 0.875rem;
-  opacity: 0.9;
+  opacity: 0.8;
   margin-left: auto;
 }
 
@@ -94,54 +82,53 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #2d3748;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-color);
 }
 
 .label svg {
-  color: #667eea;
+  color: var(--primary-color);
 }
 
 .required {
-  color: #e53e3e;
+  color: var(--error-color);
   margin-left: 0.25rem;
 }
 
 .input {
   width: 100%;
-  padding: 0.875rem 1rem;
+  padding: 0.75rem 1rem;
   font-size: 1rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   transition: all 0.2s ease;
-  background-color: #f7fafc;
+  background-color: var(--background-color);
+  color: var(--text-color);
   font-family: inherit;
 }
 
 .input:hover {
-  border-color: #cbd5e0;
-  background-color: #fff;
+  border-color: var(--primary-color);
 }
 
 .input:focus {
   outline: none;
-  border-color: #667eea;
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--primary-color);
 }
 
 .input::placeholder {
-  color: #a0aec0;
+  color: var(--text-color);
+  opacity: 0.5;
 }
 
 .inputError {
-  border-color: #fc8181 !important;
-  background-color: #fff5f5 !important;
+  border-color: var(--error-color) !important;
+  background-color: var(--background-color) !important;
 }
 
 .inputError:focus {
-  box-shadow: 0 0 0 3px rgba(245, 101, 101, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1) !important;
 }
 
 /* Error Message */
@@ -150,7 +137,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #e53e3e;
+  color: var(--error-color);
   margin: 0;
   animation: shake 0.3s ease-in-out;
 }
@@ -173,8 +160,9 @@
 
 /* Hint */
 .hint {
-  font-size: 0.8rem;
-  color: #718096;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  opacity: 0.6;
   margin: 0;
   font-style: italic;
 }
@@ -190,7 +178,7 @@
   gap: 0.75rem;
   cursor: pointer;
   font-size: 0.875rem;
-  color: #2d3748;
+  color: var(--text-color);
   user-select: none;
 }
 
@@ -198,14 +186,15 @@
   width: 20px;
   height: 20px;
   cursor: pointer;
-  accent-color: #667eea;
+  accent-color: var(--primary-color);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .checkboxHint {
-  font-size: 0.75rem;
-  color: #a0aec0;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  opacity: 0.6;
   margin: 0.5rem 0 0 2rem;
 }
 
@@ -215,7 +204,7 @@
   gap: 1rem;
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-color);
 }
 
 .backButton {
@@ -223,19 +212,18 @@
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
-  color: #4a5568;
-  background-color: #edf2f7;
-  border: none;
-  border-radius: 8px;
+  color: var(--text-color);
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
 }
 
 .backButton:hover {
-  background-color: #e2e8f0;
+  background-color: var(--border-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .backButton:active {
@@ -247,10 +235,10 @@
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
-  color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: var(--button-text-color);
+  background-color: var(--primary-color);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -261,8 +249,8 @@
 }
 
 .continueButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  background-color: var(--link-hover-color);
+  transform: translateY(-1px);
 }
 
 .continueButton:active {
@@ -284,20 +272,21 @@
 }
 
 .emptyState h1 {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--text-color);
   margin-bottom: 1rem;
 }
 
 .emptyState p {
   font-size: 1rem;
-  color: #718096;
+  color: var(--text-color);
+  opacity: 0.7;
   margin-bottom: 2rem;
 }
 
 .alertIcon {
-  color: #ed8936;
+  color: var(--warning-color);
   margin-bottom: 1rem;
 }
 
@@ -305,18 +294,18 @@
   padding: 0.875rem 2rem;
   font-size: 1rem;
   font-weight: 600;
-  color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: var(--button-text-color);
+  background-color: var(--primary-color);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
 }
 
 .browseButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  background-color: var(--link-hover-color);
+  transform: translateY(-1px);
 }
 
 .browseButton:active {
@@ -326,20 +315,19 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .container {
-    padding: 1rem 0.5rem;
+    padding: 1rem;
   }
 
   .content {
-    padding: 1.5rem;
-    border-radius: 12px;
+    max-width: 100%;
   }
 
   .title {
-    font-size: 1.5rem;
+    font-size: 2rem;
   }
 
   .subtitle {
-    font-size: 0.875rem;
+    font-size: 1rem;
   }
 
   .orderTypeSummary {
@@ -370,16 +358,11 @@
 
 @media (max-width: 480px) {
   .container {
-    padding: 0.5rem 0;
-  }
-
-  .content {
-    padding: 1rem;
-    border-radius: 8px;
+    padding: 0.5rem;
   }
 
   .title {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
   }
 
   .input {
@@ -389,76 +372,5 @@
 
   .checkboxHint {
     margin-left: 0;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .container {
-    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-  }
-
-  .content {
-    background: #2d3748;
-  }
-
-  .title {
-    color: #f7fafc;
-  }
-
-  .subtitle {
-    color: #cbd5e0;
-  }
-
-  .label {
-    color: #e2e8f0;
-  }
-
-  .input {
-    background-color: #1a202c;
-    border-color: #4a5568;
-    color: #f7fafc;
-  }
-
-  .input:hover {
-    border-color: #718096;
-    background-color: #2d3748;
-  }
-
-  .input:focus {
-    background-color: #2d3748;
-  }
-
-  .input::placeholder {
-    color: #718096;
-  }
-
-  .hint {
-    color: #a0aec0;
-  }
-
-  .checkboxLabel {
-    color: #e2e8f0;
-  }
-
-  .actions {
-    border-top-color: #4a5568;
-  }
-
-  .backButton {
-    background-color: #1a202c;
-    color: #e2e8f0;
-  }
-
-  .backButton:hover {
-    background-color: #4a5568;
-  }
-
-  .emptyState h1 {
-    color: #f7fafc;
-  }
-
-  .emptyState p {
-    color: #cbd5e0;
   }
 }
