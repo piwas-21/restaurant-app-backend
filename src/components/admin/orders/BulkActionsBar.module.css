@@ -1,0 +1,134 @@
+/* Bulk Actions */
+.bulkActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  margin-bottom: 16px;
+  background-color: var(--card-background, white);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+}
+
+.bulkInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bulkCount {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary-color, #c00000);
+}
+
+.bulkButtons {
+  display: flex;
+  gap: 12px;
+}
+
+.exportDropdown {
+  position: relative;
+}
+
+.bulkExportButton,
+.bulkClearButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulkExportButton {
+  background-color: var(--primary-color, #c00000);
+  border-color: var(--primary-color, #c00000);
+  color: white;
+}
+
+.bulkExportButton:hover {
+  background-color: var(--primary-color-dark, #a00000);
+}
+
+.exportMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background-color: var(--card-background, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 1000;
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.exportMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-color, #374151);
+  transition: background-color 0.2s;
+}
+
+.exportMenuItem:hover {
+  background-color: var(--secondary-color, #f3f4f6);
+}
+
+@media (prefers-color-scheme: dark) {
+  .exportMenu {
+    background-color: var(--card-background, #1e1e1e);
+    border-color: var(--border-color, #444444);
+  }
+
+  .exportMenuItem {
+    color: var(--text-color, #f0f0f0);
+  }
+
+  .exportMenuItem:hover {
+    background-color: var(--secondary-color, #2c2c2c);
+  }
+}
+
+.bulkClearButton {
+  background-color: var(--background-color, white);
+  border-color: var(--border-color, #d1d5db);
+  color: var(--text-color, #374151);
+}
+
+.bulkClearButton:hover {
+  background-color: var(--secondary-color, #f9fafb);
+  border-color: var(--border-color, #9ca3af);
+}
+
+.bulkStatusButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: var(--primary-color, #c00000);
+  border-color: var(--primary-color, #c00000);
+  color: white;
+}
+
+.bulkStatusButton:hover {
+  background-color: var(--primary-color-dark, #a00000);
+}

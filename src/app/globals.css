@@ -237,3 +237,39 @@ input:focus, textarea:focus, select:focus {
     width: 100% !important;
   }
 }
+
+/* Print Styles - Hide everything except the order details modal */
+@media print {
+  /* Reset page for printing with minimal margins */
+  @page {
+    margin: 0.5cm;
+    size: A4 portrait;
+  }
+
+  /* Reset body */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide all body content by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the order details modal and its children */
+  #order-details-print,
+  #order-details-print * {
+    visibility: visible;
+  }
+
+  /* Position the modal for printing - take full width */
+  #order-details-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

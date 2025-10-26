@@ -1,0 +1,206 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background-color: var(--secondary-color, #f8fafc);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color, #374151);
+}
+
+@media (prefers-color-scheme: dark) {
+  .container {
+    background-color: var(--secondary-color, #2c2c2c);
+    border-color: var(--border-color, #444444);
+  }
+
+  .label {
+    color: var(--text-color, #f0f0f0);
+  }
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.presetButton {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #d1d5db);
+  background-color: var(--background-color, white);
+  color: var(--text-color, #6b7280);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.presetButton:hover {
+  border-color: var(--primary-color, #c00000);
+  color: var(--primary-color, #c00000);
+  background-color: rgba(192, 0, 0, 0.05);
+}
+
+.presetButton.active {
+  border-color: var(--primary-color, #c00000);
+  background-color: var(--primary-color, #c00000);
+  color: white;
+}
+
+.presetButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .presetButton {
+    background-color: var(--card-background, #252525);
+    border-color: var(--border-color, #444444);
+    color: var(--text-color, #f0f0f0);
+    opacity: 0.8;
+  }
+
+  .presetButton:hover {
+    border-color: var(--primary-color, #e06666);
+    color: var(--primary-color, #e06666);
+    background-color: rgba(224, 102, 102, 0.1);
+  }
+
+  .presetButton.active {
+    border-color: var(--primary-color, #e06666);
+    background-color: var(--primary-color, #c00000);
+    color: white;
+    opacity: 1;
+  }
+}
+
+.customPicker {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+@media (prefers-color-scheme: dark) {
+  .customPicker {
+    border-top-color: var(--border-color, #444444);
+  }
+}
+
+.dateInputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.dateInputGroup label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-color, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dateInputGroup label {
+    color: var(--text-color, #f0f0f0);
+    opacity: 0.7;
+  }
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-color, #111827);
+  transition: border-color 0.2s;
+  background-color: var(--background-color, white);
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: var(--primary-color, #c00000);
+}
+
+@media (prefers-color-scheme: dark) {
+  .dateInput {
+    background-color: var(--card-background, #252525);
+    border-color: var(--border-color, #444444);
+    color: var(--text-color, #f0f0f0);
+  }
+
+  .dateInput:focus {
+    border-color: var(--primary-color, #e06666);
+  }
+}
+
+.applyButton {
+  padding: 8px 20px;
+  border: none;
+  background-color: var(--primary-color, #c00000);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.applyButton:hover {
+  background-color: var(--primary-color-dark, #890303);
+}
+
+.applyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .applyButton {
+    background-color: var(--primary-color, #e06666);
+    color: var(--text-color, #1a1a1a);
+  }
+
+  .applyButton:hover {
+    background-color: var(--primary-color, #f08080);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .presets {
+    flex-direction: column;
+  }
+
+  .presetButton {
+    width: 100%;
+  }
+
+  .customPicker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dateInputGroup {
+    width: 100%;
+  }
+
+  .applyButton {
+    width: 100%;
+  }
+}

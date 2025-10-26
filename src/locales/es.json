@@ -726,5 +726,10 @@
   "delivery_fee": "Tarifa de Entrega",
   "discount": "Descuento",
   "tip": "Propina",
-  "items": "Artículos"
+  "items": "Artículos",
+
+  "keyboard_shortcuts": "Atajos de Teclado",
+  "filters_cleared": "Todos los filtros borrados",
+  "clear_all_filters": "Borrar Todos los Filtros",
+  "status_notes_required": "Por favor, proporcione notas para la actualización del estado"
   }

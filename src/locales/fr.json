@@ -730,5 +730,10 @@
   "delivery_fee": "Frais de Livraison",
   "discount": "Remise",
   "tip": "Pourboire",
-  "items": "Articles"
+  "items": "Articles",
+
+  "keyboard_shortcuts": "Raccourcis Clavier",
+  "filters_cleared": "Tous les filtres effacés",
+  "clear_all_filters": "Effacer Tous les Filtres",
+  "status_notes_required": "Veuillez fournir des notes pour la mise à jour du statut"
 }

@@ -733,5 +733,10 @@
   "delivery_fee": "Liefergebühr",
   "discount": "Rabatt",
   "tip": "Trinkgeld",
-  "items": "Artikel"
+  "items": "Artikel",
+
+  "keyboard_shortcuts": "Tastenkombinationen",
+  "filters_cleared": "Alle Filter gelöscht",
+  "clear_all_filters": "Alle Filter Löschen",
+  "status_notes_required": "Bitte geben Sie Notizen für die Statusaktualisierung an"
 }

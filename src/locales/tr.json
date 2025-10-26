@@ -734,5 +734,10 @@
   "delivery_fee": "Teslimat Ücreti",
   "discount": "İndirim",
   "tip": "Bahşiş",
-  "items": "Ürünler"
+  "items": "Ürünler",
+
+  "keyboard_shortcuts": "Klavye Kısayolları",
+  "filters_cleared": "Tüm filtreler temizlendi",
+  "clear_all_filters": "Tüm Filtreleri Temizle",
+  "status_notes_required": "Durum güncellemesi için lütfen notlar girin"
 }

@@ -732,5 +732,10 @@
   "delivery_fee": "رسوم التوصيل",
   "discount": "الخصم",
   "tip": "الإكرامية",
-  "items": "العناصر"
+  "items": "العناصر",
+
+  "keyboard_shortcuts": "اختصارات لوحة المفاتيح",
+  "filters_cleared": "تم مسح جميع الفلاتر",
+  "clear_all_filters": "مسح جميع الفلاتر",
+  "status_notes_required": "يرجى تقديم ملاحظات لتحديث الحالة"
 }

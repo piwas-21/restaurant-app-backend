@@ -1,0 +1,287 @@
+/* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.modalContent {
+  background: var(--card-background, white);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .modalContent {
+    background: var(--card-background, #252525);
+    border-color: var(--border-color, #444444);
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
+}
+
+@media (prefers-color-scheme: dark) {
+  .modalHeader {
+    border-bottom-color: var(--border-color, #444444);
+  }
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-color, #1e293b);
+}
+
+@media (prefers-color-scheme: dark) {
+  .modalHeader h2 {
+    color: var(--text-color, #f0f0f0);
+  }
+}
+
+.closeButton {
+  background: transparent;
+  border: none;
+  color: var(--text-color, #64748b);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background: var(--secondary-color, #f1f5f9);
+  color: var(--text-color, #1e293b);
+}
+
+@media (prefers-color-scheme: dark) {
+  .closeButton {
+    color: var(--text-color, #f0f0f0);
+  }
+
+  .closeButton:hover {
+    background: var(--secondary-color, #2c2c2c);
+    color: var(--text-color, #f0f0f0);
+  }
+}
+
+.modalBody {
+  padding: 1.5rem;
+}
+
+.formGroup {
+  margin-bottom: 1.5rem;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-color, #475569);
+  font-size: 0.875rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .formGroup label {
+    color: var(--text-color, #f0f0f0);
+  }
+}
+
+.select,
+.textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: all 0.2s;
+  background: var(--background-color, white);
+  color: var(--text-color, #1a1a1a);
+}
+
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #c00000);
+  box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .select,
+  .textarea {
+    background: var(--card-background, #252525);
+    color: var(--text-color, #f0f0f0);
+    border-color: var(--border-color, #444444);
+  }
+
+  .select:focus,
+  .textarea:focus {
+    border-color: var(--primary-color, #e06666);
+  }
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Progress Bar */
+.progressBar {
+  margin-top: 1rem;
+}
+
+.progressText {
+  font-size: 14px;
+  color: var(--text-color, #64748b);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progressText {
+    color: var(--text-color, #f0f0f0);
+    opacity: 0.8;
+  }
+}
+
+.progressTrack {
+  width: 100%;
+  height: 8px;
+  background-color: var(--border-color, #e2e8f0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progressTrack {
+    background-color: var(--border-color, #444444);
+  }
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color, #c00000) 0%, var(--primary-color-dark, #a00000) 100%);
+  transition: width 0.3s ease;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 2px solid var(--border-color, #e2e8f0);
+  justify-content: flex-end;
+}
+
+@media (prefers-color-scheme: dark) {
+  .modalFooter {
+    border-top-color: var(--border-color, #444444);
+  }
+}
+
+.cancelButton,
+.confirmButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelButton {
+  background: var(--secondary-color, #f1f5f9);
+  color: var(--text-color, #475569);
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: var(--border-color, #e2e8f0);
+}
+
+@media (prefers-color-scheme: dark) {
+  .cancelButton {
+    background: var(--secondary-color, #2c2c2c);
+    color: var(--text-color, #f0f0f0);
+  }
+
+  .cancelButton:hover:not(:disabled) {
+    background: var(--border-color, #444444);
+  }
+}
+
+.confirmButton {
+  background: var(--primary-color, #c00000);
+  color: white;
+}
+
+.confirmButton:hover:not(:disabled) {
+  background: var(--primary-color-dark, #890303);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(192, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .confirmButton {
+    background: var(--primary-color, #e06666);
+    color: var(--text-color, #1a1a1a);
+  }
+
+  .confirmButton:hover:not(:disabled) {
+    background: var(--primary-color, #f08080);
+  }
+}
+
+.cancelButton:disabled,
+.confirmButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

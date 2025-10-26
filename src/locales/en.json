@@ -725,5 +725,10 @@
   "delivery_fee": "Delivery Fee",
   "discount": "Discount",
   "tip": "Tip",
-  "items": "Items"
+  "items": "Items",
+
+  "keyboard_shortcuts": "Keyboard Shortcuts",
+  "filters_cleared": "All filters cleared",
+  "clear_all_filters": "Clear All Filters",
+  "status_notes_required": "Please provide notes for the status update"
 }

@@ -733,5 +733,10 @@
   "delivery_fee": "Spese di Consegna",
   "discount": "Sconto",
   "tip": "Mancia",
-  "items": "Articoli"
+  "items": "Articoli",
+
+  "keyboard_shortcuts": "Scorciatoie da Tastiera",
+  "filters_cleared": "Tutti i filtri cancellati",
+  "clear_all_filters": "Cancella Tutti i Filtri",
+  "status_notes_required": "Si prega di fornire note per l'aggiornamento dello stato"
 }

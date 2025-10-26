@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 const Sidebar = () => {
@@ -26,6 +26,11 @@ const Sidebar = () => {
       href: '/admin/menu-management',
       label: t('admin_menu_management_title'),
       icon: UtensilsCrossed
+    },
+    {
+      href: '/admin/orders-management',
+      label: t('admin_orders_management', 'Orders Management'),
+      icon: ClipboardList
     },
     {
       href: '/admin/specials-management',
