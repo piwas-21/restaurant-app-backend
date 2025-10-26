@@ -49,7 +49,8 @@ export interface BasketDto {
   subTotal: number;
   tax: number;
   deliveryFee: number;
-  discount: number;
+  discount: number; // Promo code discount
+  customerDiscount: number; // Customer-specific discount
   total: number;
   promoCode?: string;
   totalItems: number;

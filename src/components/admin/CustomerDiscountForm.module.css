@@ -316,3 +316,201 @@
     justify-content: center;
   }
 }
+
+/* User Search Styles */
+.searchContainer {
+  position: relative;
+}
+
+.searchInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--text-color, #1f2937);
+  background-color: var(--background-color, #fff);
+  transition: all 0.2s;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--primary-color, #667eea);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+[data-theme="dark"] .searchInput {
+  background-color: var(--secondary-color, #3a3a3a);
+  color: var(--text-color, #e0e0e0);
+  border-color: var(--border-color, #555);
+}
+
+.searchResults {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.5rem;
+  background: var(--card-background, white);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+[data-theme="dark"] .searchResults {
+  background: var(--secondary-color, #2c2c2c);
+  border-color: var(--border-color, #444);
+}
+
+.searchResultItem {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.searchResultItem:last-child {
+  border-bottom: none;
+}
+
+.searchResultItem:hover {
+  background: var(--secondary-color-light, #f9fafb);
+}
+
+[data-theme="dark"] .searchResultItem {
+  border-bottom-color: var(--border-color, #444);
+}
+
+[data-theme="dark"] .searchResultItem:hover {
+  background: var(--background-color, #333);
+}
+
+.searchResultInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.searchResultName {
+  font-weight: 600;
+  color: var(--text-color, #1f2937);
+  font-size: 0.95rem;
+}
+
+.searchResultEmail {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+[data-theme="dark"] .searchResultName {
+  color: var(--text-color, #e0e0e0);
+}
+
+[data-theme="dark"] .searchResultEmail {
+  color: var(--text-secondary, #999);
+}
+
+.searchNoResults {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.selectedUserCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: var(--secondary-color-light, #f3f4f6);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  gap: 0.75rem;
+}
+
+[data-theme="dark"] .selectedUserCard {
+  background: var(--secondary-color, #3a3a3a);
+  border-color: var(--border-color, #555);
+}
+
+.selectedUserInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  color: var(--primary-color, #667eea);
+}
+
+.selectedUserInfo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.selectedUserName {
+  font-weight: 600;
+  color: var(--text-color, #1f2937);
+  font-size: 0.95rem;
+}
+
+.selectedUserEmail {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+[data-theme="dark"] .selectedUserName {
+  color: var(--text-color, #e0e0e0);
+}
+
+[data-theme="dark"] .selectedUserEmail {
+  color: var(--text-secondary, #999);
+}
+
+.clearUserButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-secondary, #6b7280);
+  transition: all 0.2s;
+}
+
+.clearUserButton:hover {
+  background: var(--background-color, white);
+  color: var(--error-color, #ef4444);
+}
+
+.clearUserButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .clearUserButton:hover {
+  background: var(--background-color, #222);
+  color: var(--error-color, #f87171);
+}

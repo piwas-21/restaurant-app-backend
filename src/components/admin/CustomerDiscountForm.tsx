@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSnackbar } from 'notistack';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader2, Search, UserCheck } from 'lucide-react';
 import { adminFidelityService, CreateCustomerDiscountDto, UpdateCustomerDiscountDto } from '@/services/adminFidelityService';
+import { fetchUsers, UserDto } from '@/services/userService';
 import type { CustomerDiscountRule } from '@/types/fidelity';
 import styles from './CustomerDiscountForm.module.css';
 
@@ -20,6 +21,12 @@ export default function CustomerDiscountForm({
 }: CustomerDiscountFormProps) {
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UserDto[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserDto | null>(null);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [formData, setFormData] = useState({
     userId: '',
     name: '',
@@ -55,8 +62,72 @@ export default function CustomerDiscountForm({
         hasValidFrom: !!discount.validFrom,
         hasValidUntil: !!discount.validUntil,
       });
+      // Set selected user for display in edit mode
+      setSelectedUser({
+        id: discount.userId,
+        email: '',
+        firstName: '',
+        lastName: '',
+        fullName: `User ${discount.userId}`,
+        role: '',
+        isEmailConfirmed: false,
+        createdAt: '',
+        metadata: {},
+        orderLimitAmount: 0,
+        discountPercentage: 0,
+        isDiscountActive: false,
+      });
     }
   }, [discount]);
+
+  // Debounced user search
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    setShowSearchResults(true);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetchUsers('', false, query, 1, 10);
+        if (response.success && response.data?.items) {
+          setSearchResults(response.data.items);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error searching users:', error);
+        setSearchResults([]);
+        enqueueSnackbar('Failed to search users', { variant: 'error' });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 500); // 500ms debounce
+  }, [enqueueSnackbar]);
+
+  const handleUserSelect = useCallback((user: UserDto) => {
+    setSelectedUser(user);
+    setFormData(prev => ({ ...prev, userId: user.id }));
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+  }, []);
+
+  const handleClearUser = useCallback(() => {
+    setSelectedUser(null);
+    setFormData(prev => ({ ...prev, userId: '' }));
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -197,21 +268,77 @@ export default function CustomerDiscountForm({
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
-              <label htmlFor="userId">
-                User ID <span className={styles.required}>*</span>
+              <label htmlFor="userSearch">
+                Customer <span className={styles.required}>*</span>
               </label>
-              <input
-                type="text"
-                id="userId"
-                name="userId"
-                value={formData.userId}
-                onChange={handleChange}
-                disabled={!!discount || loading}
-                className={styles.input}
-                placeholder="Enter customer user ID"
-              />
+
+              {selectedUser ? (
+                <div className={styles.selectedUserCard}>
+                  <div className={styles.selectedUserInfo}>
+                    <UserCheck size={20} />
+                    <div>
+                      <div className={styles.selectedUserName}>{selectedUser.fullName || `${selectedUser.firstName} ${selectedUser.lastName}`}</div>
+                      <div className={styles.selectedUserEmail}>{selectedUser.email || `ID: ${selectedUser.id}`}</div>
+                    </div>
+                  </div>
+                  {!discount && (
+                    <button
+                      type="button"
+                      onClick={handleClearUser}
+                      className={styles.clearUserButton}
+                      disabled={loading}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.searchContainer}>
+                  <div className={styles.searchInputWrapper}>
+                    <Search size={18} className={styles.searchIcon} />
+                    <input
+                      type="text"
+                      id="userSearch"
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      disabled={loading}
+                      className={styles.searchInput}
+                      placeholder="Search by name or email..."
+                      autoComplete="off"
+                    />
+                    {searchLoading && (
+                      <Loader2 size={18} className={`${styles.searchIcon} ${styles.spinner}`} />
+                    )}
+                  </div>
+
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className={styles.searchResults}>
+                      {searchResults.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => handleUserSelect(user)}
+                          className={styles.searchResultItem}
+                        >
+                          <div className={styles.searchResultInfo}>
+                            <div className={styles.searchResultName}>{user.fullName || `${user.firstName} ${user.lastName}`}</div>
+                            <div className={styles.searchResultEmail}>{user.email}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {showSearchResults && searchResults.length === 0 && !searchLoading && (
+                    <div className={styles.searchNoResults}>
+                      No users found matching &ldquo;{searchQuery}&rdquo;
+                    </div>
+                  )}
+                </div>
+              )}
+
               <small className={styles.help}>
-                The unique identifier of the customer
+                {selectedUser ? 'Selected customer for this discount' : 'Search and select a customer'}
               </small>
             </div>
 

@@ -443,8 +443,15 @@ export default function ReviewPage() {
 
                 {(cartState.basket?.discount ?? 0) > 0 && (
                   <div className={`${styles.summaryRow} ${styles.discount}`}>
-                    <span>{t('discount', 'Discount')}</span>
+                    <span>{t('discount', 'Promo Discount')}</span>
                     <span>-{formatPrice(cartState.basket?.discount || 0)}</span>
+                  </div>
+                )}
+
+                {(cartState.basket?.customerDiscount ?? 0) > 0 && (
+                  <div className={`${styles.summaryRow} ${styles.discount}`}>
+                    <span>{t('customer_discount', 'Customer Discount')}</span>
+                    <span>-{formatPrice(cartState.basket?.customerDiscount || 0)}</span>
                   </div>
                 )}
 
