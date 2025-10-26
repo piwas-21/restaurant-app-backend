@@ -20,10 +20,13 @@ module.exports = {
     ],
   },
   moduleNameMapper: {
-    '\.(css|less|scss|sass)$': 'identity-obj-proxy',
-    '\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': '<rootDir>/__mocks__/fileMock.js',
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': '<rootDir>/__mocks__/fileMock.js',
     '^@/components/(.*)$': '<rootDir>/src/components/$1',
     '^@/app/(.*)$': '<rootDir>/src/app/$1',
+    '^@/services/(.*)$': '<rootDir>/src/services/$1',
+    '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
+    '^@/types/(.*)$': '<rootDir>/src/types/$1',
     'next/router': '<rootDir>/__mocks__/nextRouterMock.js',
   },
   transformIgnorePatterns: [

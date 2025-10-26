@@ -7,6 +7,7 @@ import { useCheckout } from '@/contexts/CheckoutContext';
 import { useCart } from '@/components/cart/CartContext';
 import { useSession } from '@/hooks/useSession';
 import { createOrder } from '@/services/orderService';
+import FidelityPointsCheckout from '@/components/checkout/FidelityPointsCheckout';
 import {
   PaymentMethod,
   CreateOrderCommand,
@@ -45,9 +46,19 @@ export default function ReviewPage() {
   // Payment method state
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>(PaymentMethod.Cash);
 
+  // Fidelity points redemption state
+  const [redeemedPoints, setRedeemedPoints] = useState(0);
+  const [pointsDiscount, setPointsDiscount] = useState(0);
+
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  // Handler for points redemption
+  const handlePointsRedemption = (points: number, discountAmount: number) => {
+    setRedeemedPoints(points);
+    setPointsDiscount(discountAmount);
+  };
 
   // Check prerequisites
   useEffect(() => {
@@ -150,10 +161,10 @@ export default function ReviewPage() {
 
       // Build order command
       const orderCommand: CreateOrderCommand = {
-        sessionId,
-        customerName: checkoutState.customerInfo.name,
-        customerEmail: checkoutState.customerInfo.email,
-        customerPhone: checkoutState.customerInfo.phone,
+        sessionId: sessionId || undefined,
+        customerName: checkoutState.customerInfo?.name,
+        customerEmail: checkoutState.customerInfo?.email,
+        customerPhone: checkoutState.customerInfo?.phone,
         type: checkoutState.orderType as OrderTypeEnum,
         tableNumber: checkoutState.orderType === 'DineIn' && checkoutState.tableNumber
           ? parseInt(checkoutState.tableNumber, 10)
@@ -166,8 +177,6 @@ export default function ReviewPage() {
           amount: cartState.basket?.total || 0,
         }],
         promoCode: cartState.basket?.promoCode || undefined,
-        hasUserLimitDiscount: cartState.basket?.hasUserLimitDiscount || false,
-        userLimitAmount: cartState.basket?.userLimitAmount || 0,
       };
 
       // Submit order
@@ -417,6 +426,12 @@ export default function ReviewPage() {
 
           {/* Right Column - Order Summary */}
           <div className={styles.rightColumn}>
+            {/* Fidelity Points Section */}
+            <FidelityPointsCheckout
+              orderSubtotal={cartState.basket?.subTotal || 0}
+              onPointsRedemption={handlePointsRedemption}
+            />
+
             <div className={styles.summaryCard}>
               <h2 className={styles.summaryTitle}>{t('order_summary', 'Order Summary')}</h2>
 
@@ -430,6 +445,13 @@ export default function ReviewPage() {
                   <div className={`${styles.summaryRow} ${styles.discount}`}>
                     <span>{t('discount', 'Discount')}</span>
                     <span>-{formatPrice(cartState.basket?.discount || 0)}</span>
+                  </div>
+                )}
+
+                {pointsDiscount > 0 && (
+                  <div className={`${styles.summaryRow} ${styles.discount}`}>
+                    <span>{t('points_discount', 'Points Discount')} ({redeemedPoints} pts)</span>
+                    <span>-{formatPrice(pointsDiscount)}</span>
                   </div>
                 )}
 
@@ -449,7 +471,7 @@ export default function ReviewPage() {
               <div className={styles.summaryTotal}>
                 <span>{t('total', 'Total')}</span>
                 <span className={styles.totalAmount}>
-                  {formatPrice(cartState.basket?.total || 0)}
+                  {formatPrice((cartState.basket?.total || 0) - pointsDiscount)}
                 </span>
               </div>
 

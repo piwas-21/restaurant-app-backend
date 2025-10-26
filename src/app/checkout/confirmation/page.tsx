@@ -13,7 +13,6 @@ import {
   Phone,
   Mail,
   ShoppingBag,
-  ArrowRight,
   Receipt,
   Loader2,
   AlertCircle,
@@ -27,7 +26,7 @@ function ConfirmationContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const orderId = searchParams.get('orderId');
   const orderNumber = searchParams.get('orderNumber');
 
@@ -220,11 +219,17 @@ function ConfirmationContent() {
                     <MapPin size={18} className={styles.addressIcon} />
                     <div>
                       <p className={styles.addressTitle}>{t('delivery_address', 'Delivery Address')}:</p>
-                      <p>{order.deliveryAddress.street}</p>
+                      <p>{order.deliveryAddress.addressLine1}</p>
+                      {order.deliveryAddress.addressLine2 && (
+                        <p>{order.deliveryAddress.addressLine2}</p>
+                      )}
                       <p>{order.deliveryAddress.postalCode} {order.deliveryAddress.city}</p>
+                      {order.deliveryAddress.state && (
+                        <p>{order.deliveryAddress.state}</p>
+                      )}
                       <p>{order.deliveryAddress.country}</p>
-                      {order.deliveryAddress.additionalInfo && (
-                        <p className={styles.additionalInfo}>{order.deliveryAddress.additionalInfo}</p>
+                      {order.deliveryAddress.deliveryInstructions && (
+                        <p className={styles.additionalInfo}>{order.deliveryAddress.deliveryInstructions}</p>
                       )}
                     </div>
                   </div>
@@ -328,27 +333,27 @@ function ConfirmationContent() {
           <div className={styles.rightColumn}>
             <div className={styles.summaryCard}>
               <h2 className={styles.summaryTitle}>{t('order_summary', 'Order Summary')}</h2>
-              
+
               <div className={styles.summaryRows}>
                 <div className={styles.summaryRow}>
                   <span>{t('subtotal', 'Subtotal')}</span>
                   <span>{formatPrice(order.subTotal)}</span>
                 </div>
-                
+
                 {order.discount > 0 && (
                   <div className={`${styles.summaryRow} ${styles.discount}`}>
                     <span>{t('discount', 'Discount')}</span>
                     <span>-{formatPrice(order.discount)}</span>
                   </div>
                 )}
-                
+
                 {order.deliveryFee > 0 && (
                   <div className={styles.summaryRow}>
                     <span>{t('delivery_fee', 'Delivery Fee')}</span>
                     <span>{formatPrice(order.deliveryFee)}</span>
                   </div>
                 )}
-                
+
                 <div className={styles.summaryRow}>
                   <span>{t('tax', 'Tax')}</span>
                   <span>{formatPrice(order.tax)}</span>
@@ -361,7 +366,7 @@ function ConfirmationContent() {
                   </div>
                 )}
               </div>
-              
+
               <div className={styles.summaryTotal}>
                 <span>{t('total', 'Total')}</span>
                 <span className={styles.totalAmount}>

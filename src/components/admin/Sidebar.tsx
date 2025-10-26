@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 const Sidebar = () => {
@@ -31,6 +31,21 @@ const Sidebar = () => {
       href: '/admin/specials-management',
       label: t('admin_specials_management_title'),
       icon: Sparkles
+    },
+    {
+      href: '/admin/fidelity-analytics',
+      label: 'Fidelity Analytics',
+      icon: TrendingUp
+    },
+    {
+      href: '/admin/point-rules',
+      label: 'Point Rules',
+      icon: Award
+    },
+    {
+      href: '/admin/customer-discounts',
+      label: 'Customer Discounts',
+      icon: Gift
     },
   ];
 

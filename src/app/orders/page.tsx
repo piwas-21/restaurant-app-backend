@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/components/AuthContext';
 import { getOrders } from '@/services/orderService';
 import { addItemToBasket } from '@/services/basketService';
 import { useCart } from '@/components/cart/CartContext';
@@ -32,7 +32,7 @@ import styles from '../styles/OrdersPage.module.css';
 export default function OrdersPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const { addItem } = useCart();
 
@@ -43,28 +43,19 @@ export default function OrdersPage() {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    fetchOrders();
-  }, [isAuthenticated, router, selectedStatus]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
 
       const filters = selectedStatus !== 'All' ? { status: selectedStatus } : {};
       const result = await getOrders(filters);
-      
+
       // Sort by date (newest first)
-      const sortedOrders = result.items.sort((a, b) => 
+      const sortedOrders = result.items.sort((a, b) =>
         new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
       );
-      
+
       setOrders(sortedOrders);
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -77,7 +68,16 @@ export default function OrdersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedStatus, t, enqueueSnackbar]);
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    fetchOrders();
+  }, [user, router, fetchOrders]);
 
   const handleReorder = async (order: OrderDto) => {
     try {
@@ -353,11 +353,17 @@ export default function OrdersPage() {
                           {t('delivery_address', 'Delivery Address')}
                         </h4>
                         <div className={styles.addressBox}>
-                          <p>{order.deliveryAddress.street}</p>
+                          <p>{order.deliveryAddress.addressLine1}</p>
+                          {order.deliveryAddress.addressLine2 && (
+                            <p>{order.deliveryAddress.addressLine2}</p>
+                          )}
                           <p>{order.deliveryAddress.postalCode} {order.deliveryAddress.city}</p>
+                          {order.deliveryAddress.state && (
+                            <p>{order.deliveryAddress.state}</p>
+                          )}
                           <p>{order.deliveryAddress.country}</p>
-                          {order.deliveryAddress.additionalInfo && (
-                            <p className={styles.additionalInfo}>{order.deliveryAddress.additionalInfo}</p>
+                          {order.deliveryAddress.deliveryInstructions && (
+                            <p className={styles.additionalInfo}>{order.deliveryAddress.deliveryInstructions}</p>
                           )}
                         </div>
                       </div>

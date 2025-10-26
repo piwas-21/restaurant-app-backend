@@ -303,14 +303,6 @@ export default function AccountPage() {
     }
   };
 
-  const [fidelityPoints, setFidelityPoints] = useState<number>(0);
-  const pointsForNextReward = 500;
-
-  useEffect(() => {
-    // TODO: Load fidelity points from API when endpoint is available
-    setFidelityPoints(200);
-  }, []);
-
   return (
     <main className={styles.container}>
       <h1 className={styles.pageTitle}>{t('account_page_title', 'My Account')}</h1>
@@ -351,10 +343,7 @@ export default function AccountPage() {
             getOrderStatusTranslationKey={getOrderStatusTranslationKey}
           />
 
-          <FidelityPointsSection
-            fidelityPoints={fidelityPoints}
-            pointsForNextReward={pointsForNextReward}
-          />
+          <FidelityPointsSection />
         </div>
       </div>
     </main>

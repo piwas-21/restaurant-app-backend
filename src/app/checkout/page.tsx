@@ -9,18 +9,18 @@ import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
 export default function CheckoutPage() {
-  const { state } = useCart(); 
+  const { state } = useCart();
   const { t } = useTranslation();
   const [orderType, setOrderType] = useState<'pickup' | 'dine-in'>('pickup');
   const [tableNumber, setTableNumber] = useState('');
   const [tipPercentage, setTipPercentage] = useState(0);
   const [customTip, setCustomTip] = useState('');
-  const [customerName, setCustomerName] = useState(''); 
-  const [customerPhone, setCustomerPhone] = useState(''); 
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const calculateSubtotal = () => {
-    return state.items.reduce((total, item) => total + item.price * item.quantity, 0);
+    return state.items.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
   };
 
   const subtotal = calculateSubtotal();
@@ -34,16 +34,16 @@ export default function CheckoutPage() {
   const total = subtotal + tipAmount;
 
   const handlePayrexxPayment = async () => {
-    if (!customerName || !customerPhone) { 
-        alert(t('checkout_place_order_pickup_validation')); 
+    if (!customerName || !customerPhone) {
+        alert(t('checkout_place_order_pickup_validation'));
         return;
     }
 
     setIsProcessingPayment(true);
     const referenceId = `RUMI-ORDER-${Date.now()}`;
     const paymentData = {
-      amount: total, 
-      currency: 'CHF', 
+      amount: total,
+      currency: 'CHF',
       referenceId: referenceId,
       successRedirectUrl: `${window.location.origin}/payment-success?orderId=${referenceId}`,
       failedRedirectUrl: `${window.location.origin}/payment-failed?orderId=${referenceId}`,
@@ -51,7 +51,7 @@ export default function CheckoutPage() {
       customer: {
         firstName: customerName.split(' ')[0] || 'Rumi',
         lastName: customerName.split(' ').slice(1).join(' ') || 'Customer',
-        email: 'default@example.com', 
+        email: 'default@example.com',
         phone: customerPhone,
       },
     };
@@ -76,7 +76,7 @@ export default function CheckoutPage() {
             referenceId,
             items: state.items,
             orderType,
-            tableNumber, 
+            tableNumber,
             customerName,
             customerPhone,
             subtotal: subtotal.toFixed(2),
@@ -126,16 +126,16 @@ export default function CheckoutPage() {
     <main className={styles.checkoutContainer} aria-labelledby="checkout-main-heading">
       {isProcessingPayment && <div className={styles.overlay}><p>{t('checkout_processing_payment')}...</p></div>}
       <h1 id="checkout-main-heading">{t('checkout_title')}</h1>
-      
+
       <section className={styles.cartSummarySection} aria-labelledby="order-summary-heading">
         <h2 id="order-summary-heading">{t('checkout_order_summary')}</h2>
         <Cart showProceedButton={false} /> {/* Pass prop to hide the button */}
       </section>
 
-      <div> 
+      <div>
         <section className={styles.orderDetailsSection} aria-labelledby="order-details-heading">
           <h2 id="order-details-heading">{t('checkout_order_details')}</h2>
-          
+
           <div className={styles.formGroup}>
             <label htmlFor="customerName">{t('checkout_customer_name_label')}</label>
             <input
@@ -165,12 +165,12 @@ export default function CheckoutPage() {
 
           <div className={styles.formGroup}>
             <label htmlFor="orderType">{t('checkout_order_type_label')}</label>
-            <select 
-              id="orderType" 
-              value={orderType} 
-              onChange={(e) => setOrderType(e.target.value as 'pickup' | 'dine-in')} 
+            <select
+              id="orderType"
+              value={orderType}
+              onChange={(e) => setOrderType(e.target.value as 'pickup' | 'dine-in')}
               className={styles.selectInput}
-              disabled={isProcessingPayment} 
+              disabled={isProcessingPayment}
             >
               <option value="pickup">{t('checkout_order_type_pickup')}</option>
             </select>
@@ -227,9 +227,9 @@ export default function CheckoutPage() {
         <section className={styles.paymentOptionsSection} aria-labelledby="payment-options-heading">
             <h2 id="payment-options-heading" className={styles.srOnly}>{t('checkout_payment_options_label')}</h2>
             <div className={styles.paymentButtonsContainer}>
-                <button 
-                  type="button" 
-                  onClick={handlePayrexxPayment} 
+                <button
+                  type="button"
+                  onClick={handlePayrexxPayment}
                   className={`${styles.paymentButton} ${styles.payrexxButton}`}
                   aria-label={t('checkout_payrexx_aria_label')}
                   disabled={isProcessingPayment || state.items.length === 0}
