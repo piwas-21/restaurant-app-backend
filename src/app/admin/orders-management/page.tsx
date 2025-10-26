@@ -37,7 +37,7 @@ import styles from '../../styles/AdminOrdersPage.module.css';
 export default function AdminOrdersPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
   // Filter preferences with localStorage persistence
@@ -145,8 +145,13 @@ export default function AdminOrdersPage() {
   }, [selectedStatus, selectedPaymentStatus, selectedOrderType, showFocusOnly, sortBy, sortOrder]);
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking user
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
-      router.push('/login');
+      router.push('/');
       return;
     }
 
@@ -161,7 +166,7 @@ export default function AdminOrdersPage() {
 
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, selectedStatus, selectedPaymentStatus, selectedOrderType, showFocusOnly, dateRangeStart, dateRangeEnd]);
+  }, [user, authLoading, selectedStatus, selectedPaymentStatus, selectedOrderType, showFocusOnly, dateRangeStart, dateRangeEnd]);
 
   const fetchOrders = async () => {
     try {

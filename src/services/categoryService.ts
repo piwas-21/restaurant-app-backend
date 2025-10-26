@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient } from '@/utils/apiClient';
 import { mockApiClient } from './mockApiClient';
 
 const CATEGORIES_API_URL = '/api/Categories';
@@ -15,13 +15,11 @@ interface UpdateCategoryData extends CategoryData {
 }
 
 export const createCategory = async (categoryData: CategoryData & { displayOrder: number }) => {
-  const response = await apiClient.post(CATEGORIES_API_URL, categoryData);
-  return response.json();
+  return await apiClient.post(CATEGORIES_API_URL, categoryData);
 };
 
 export const updateCategory = async (categoryId: string, categoryData: UpdateCategoryData) => {
-  const response = await apiClient.put(`${CATEGORIES_API_URL}/${categoryId}`, categoryData);
-  return response.json();
+  return await apiClient.put(`${CATEGORIES_API_URL}/${categoryId}`, categoryData);
 };
 
 export const reorderCategory = async (categoryId: string, displayOrder: number) => {
@@ -33,29 +31,23 @@ export const reorderCategory = async (categoryId: string, displayOrder: number) 
       },
     ],
   };
-  const response = await apiClient.put(`${CATEGORIES_API_URL}/reorder`, payload);
-  return response.json();
+  return await apiClient.put(`${CATEGORIES_API_URL}/reorder`, payload);
 };
 
 export const deleteCategory = async (categoryId: string) => {
-  // The existing apiClient.delete is designed for a body, but passing undefined works for body-less requests.
-  // The API spec DELETE /api/Categories/{id} does not require a body.
-  const response = await apiClient.delete(`${CATEGORIES_API_URL}/${categoryId}`);
-  return response.json();
+  return await apiClient.delete(`${CATEGORIES_API_URL}/${categoryId}`);
 };
 
 export const uploadCategoryImage = async (categoryId: string, imageFile: File) => {
   const formData = new FormData();
   formData.append('Image', imageFile);
 
-  const response = await apiClient.putFormData(`${CATEGORIES_API_URL}/${categoryId}/image`, formData);
-  return response.json();
+  return await apiClient.putFormData(`${CATEGORIES_API_URL}/${categoryId}/image`, formData);
 };
 
 export const getCategories = async () => {
   try {
-    const response = await apiClient.get(CATEGORIES_API_URL);
-    return response.json();
+    return await apiClient.get(CATEGORIES_API_URL);
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.getCategories();

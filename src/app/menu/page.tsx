@@ -310,7 +310,7 @@ export default function MenuPage() {
 
       <div style={{ textAlign: "center", marginTop: "2rem" }}>
         <Link
-          href="/checkout"
+          href="/cart"
           className={`${styles.addToOrderButton} ${styles.viewCartButton}`}
         >
           {t("view_cart_checkout_button")}

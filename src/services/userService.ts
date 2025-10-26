@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient } from '@/utils/apiClient';
 
 const USER_API_URL = `/api/User`;
 
@@ -48,8 +48,7 @@ interface ApiResponse<T> {
  */
 export async function getCurrentUser(): Promise<UserDto> {
   try {
-    const response = await apiClient.get(`${USER_API_URL}/profile`);
-    const json = await response.json() as ApiResponse<UserDto>;
+    const json = await apiClient.get<ApiResponse<UserDto>>(`${USER_API_URL}/profile`);
 
     if (!json.data) {
       throw new Error('Failed to fetch user profile');
@@ -71,8 +70,7 @@ export async function getCurrentUser(): Promise<UserDto> {
  */
 export async function updateProfile(command: UpdateUserProfileCommand): Promise<UserDto> {
   try {
-    const response = await apiClient.put(`${USER_API_URL}/profile`, command);
-    const json = await response.json() as ApiResponse<UserDto>;
+    const json = await apiClient.put<ApiResponse<UserDto>>(`${USER_API_URL}/profile`, command);
 
     if (!json.data) {
       throw new Error('Failed to update profile');
@@ -101,16 +99,13 @@ export const fetchUsers = async (
     PageSize: String(pageSize),
   });
 
-  const response = await apiClient.get(`${USER_API_URL}/users?${params.toString()}`);
-  return response.json();
+  return await apiClient.get(`${USER_API_URL}/users?${params.toString()}`);
 };
 
 export const registerStaff = async (staffData: any) => {
-  const response = await apiClient.post(`${USER_API_URL}/register/staff`, staffData);
-  return response.json();
+  return await apiClient.post(`${USER_API_URL}/register/staff`, staffData);
 };
 
 export const deleteStaff = async (userId: string) => {
-  const response = await apiClient.delete(`${USER_API_URL}/delete/user/${userId}`);
-  return response.json();
+  return await apiClient.delete(`${USER_API_URL}/delete/user/${userId}`);
 };

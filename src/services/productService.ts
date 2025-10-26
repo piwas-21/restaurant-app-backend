@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient } from '@/utils/apiClient';
 import { mockApiClient } from './mockApiClient';
 
 const PRODUCTS_API_URL = '/api/Products';
@@ -16,13 +16,11 @@ export const uploadProductImage = async (
   formData.append('IsPrimary', String(isPrimary));
   formData.append('SortOrder', String(sortOrder));
 
-  const response = await apiClient.postFormData(`${PRODUCTS_API_URL}/${productId}/images`, formData);
-  return response.json();
+  return await apiClient.postFormData(`${PRODUCTS_API_URL}/${productId}/images`, formData);
 };
 
 export const getProductImages = async (productId: string) => {
-  const response = await apiClient.get(`${PRODUCTS_API_URL}/${productId}/images`);
-  return response.json();
+  return await apiClient.get(`${PRODUCTS_API_URL}/${productId}/images`);
 };
 
 export const uploadBulkProductImages = async (productId: string, imageFiles: File[]) => {
@@ -31,14 +29,12 @@ export const uploadBulkProductImages = async (productId: string, imageFiles: Fil
     formData.append('Images', file);
   });
 
-  const response = await apiClient.postFormData(`${PRODUCTS_API_URL}/${productId}/images/bulk`, formData);
-  return response.json();
+  return await apiClient.postFormData(`${PRODUCTS_API_URL}/${productId}/images/bulk`, formData);
 };
 
 export const updateProduct = async (productId: string, productData: any) => {
   try {
-    const response = await apiClient.put(`${PRODUCTS_API_URL}/${productId}`, productData);
-    return response.json();
+    return await apiClient.put(`${PRODUCTS_API_URL}/${productId}`, productData);
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.updateProduct(productId, productData);
@@ -46,38 +42,31 @@ export const updateProduct = async (productId: string, productData: any) => {
 };
 
 export const updateProductImageDetails = async (productId: string, imageId: string, imageData: any) => {
-  const response = await apiClient.put(`${PRODUCTS_API_URL}/${productId}/images/${imageId}`, imageData);
-  return response.json();
+  return await apiClient.put(`${PRODUCTS_API_URL}/${productId}/images/${imageId}`, imageData);
 };
 
 export const deleteProductImage = async (productId: string, imageId: string) => {
-  const response = await apiClient.delete(`${PRODUCTS_API_URL}/${productId}/images/${imageId}`);
-  return response.json();
+  return await apiClient.delete(`${PRODUCTS_API_URL}/${productId}/images/${imageId}`);
 };
 
 export const deleteProduct = async (productId: string) => {
-  const response = await apiClient.delete(`${PRODUCTS_API_URL}/${productId}`);
-  return response.json();
+  return await apiClient.delete(`${PRODUCTS_API_URL}/${productId}`);
 };
 
 // Special Products API Functions
 
 export const getSpecialProducts = async (page: number = 1, pageSize: number = 20) => {
-  const response = await apiClient.get(`${PRODUCTS_API_URL}/specials?page=${page}&pageSize=${pageSize}`);
-  return response.json();
+  return await apiClient.get(`${PRODUCTS_API_URL}/specials?page=${page}&pageSize=${pageSize}`);
 };
 
 export const getFeaturedSpecial = async () => {
-  const response = await apiClient.get(`${PRODUCTS_API_URL}/featured-special`);
-  return response.json();
+  return await apiClient.get(`${PRODUCTS_API_URL}/featured-special`);
 };
 
 export const setFeaturedSpecial = async (productId: string) => {
-  const response = await apiClient.post(`${PRODUCTS_API_URL}/${productId}/set-featured`, {});
-  return response.json();
+  return await apiClient.post(`${PRODUCTS_API_URL}/${productId}/set-featured`, {});
 };
 
 export const unsetFeaturedSpecial = async () => {
-  const response = await apiClient.delete(`${PRODUCTS_API_URL}/featured-special`);
-  return response.json();
+  return await apiClient.delete(`${PRODUCTS_API_URL}/featured-special`);
 };

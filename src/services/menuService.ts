@@ -1,9 +1,8 @@
-import { apiClient } from './apiClient';
+import { apiClient } from '@/utils/apiClient';
 import { mockApiClient } from './mockApiClient';
 import { Product } from '@/app/admin/menu-management/interfaces';
 
 const API_BASE_URL = '/api';
-const CATEGORIES_API_URL = `${API_BASE_URL}/Categories`;
 const PRODUCTS_API_URL = `${API_BASE_URL}/Products`;
 
 interface PaginatedProducts {
@@ -59,8 +58,7 @@ export const getProducts = async (
     if (categoryId) {
       url += `&CategoryId=${categoryId}`;
     }
-    const response = await apiClient.get(url);
-    return response.json();
+    return await apiClient.get(url);
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.getProducts(pageNumber, pageSize, categoryId);
@@ -69,8 +67,7 @@ export const getProducts = async (
 
 export const createProduct = async (productData: CreateProductData) => {
   try {
-    const response = await apiClient.post(PRODUCTS_API_URL, productData);
-    return response.json();
+    return await apiClient.post(PRODUCTS_API_URL, productData);
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.createProduct(productData);
@@ -79,8 +76,7 @@ export const createProduct = async (productData: CreateProductData) => {
 
 export const getProductById = async (productId: string) => {
   try {
-    const response = await apiClient.get(`${PRODUCTS_API_URL}/${productId}`);
-    return response.json();
+    return await apiClient.get(`${PRODUCTS_API_URL}/${productId}`);
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.getProductById(productId);
@@ -89,8 +85,7 @@ export const getProductById = async (productId: string) => {
 
 export const getFeaturedSpecial = async () => {
   try {
-    const response = await apiClient.get(`${PRODUCTS_API_URL}/featured-special`);
-    return response.json();
+    return await apiClient.get(`${PRODUCTS_API_URL}/featured-special`);
   } catch {
     // Return null if no featured special or API fails
     return { success: true, data: null, message: 'No featured special available' };

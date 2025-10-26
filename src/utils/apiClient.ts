@@ -3,7 +3,10 @@
  *
  * Centralized HTTP client with error handling, authentication, and session management.
  * Uses fetch API with proper TypeScript typing and error handling.
+ * Includes automatic token refresh on 401 responses.
  */
+
+import { refreshToken } from '@/services/authService';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5221';
 
@@ -55,9 +58,12 @@ async function request<T>(
   const { requireAuth = false, requireSession = false, ...fetchConfig } = config;
 
   // Build headers
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
+
+  // Only set Content-Type for non-FormData bodies
+  if (!(fetchConfig.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   // Merge existing headers if provided
   if (fetchConfig.headers) {
@@ -66,7 +72,7 @@ async function request<T>(
   }
 
   // Add authentication token if available or required
-  const token = getAuthToken();
+  let token = getAuthToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   } else if (requireAuth) {
@@ -86,10 +92,49 @@ async function request<T>(
 
   try {
     // Make request
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       ...fetchConfig,
       headers,
     });
+
+    // Handle 401 Unauthorized - try to refresh token and retry
+    if (response.status === 401 && token) {
+      try {
+        const refreshResponse = await refreshToken();
+        if (refreshResponse.success) {
+          // Get the new token
+          token = getAuthToken();
+          if (token) {
+            // Update Authorization header with new token
+            headers['Authorization'] = `Bearer ${token}`;
+
+            // Retry the original request with new token
+            response = await fetch(url, {
+              ...fetchConfig,
+              headers,
+            });
+          }
+        } else {
+          // Refresh failed - redirect to login
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+          }
+          throw new ApiError(401, 'Session expired. Please login again.');
+        }
+      } catch {
+        // Refresh failed - redirect to login
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+          window.location.href = '/';
+        }
+        throw new ApiError(401, 'Session expired. Please login again.');
+      }
+    }
 
     // Handle non-JSON responses (like 204 No Content)
     if (response.status === 204) {
@@ -143,10 +188,12 @@ export const apiClient = {
    * POST request
    */
   post: <T>(endpoint: string, body?: unknown, config?: RequestConfig): Promise<T> => {
+    // Support both FormData and JSON
+    const requestBody = body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined);
     return request<T>(endpoint, {
       ...config,
       method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
+      body: requestBody,
     });
   },
 
@@ -154,10 +201,12 @@ export const apiClient = {
    * PUT request
    */
   put: <T>(endpoint: string, body?: unknown, config?: RequestConfig): Promise<T> => {
+    // Support both FormData and JSON
+    const requestBody = body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined);
     return request<T>(endpoint, {
       ...config,
       method: 'PUT',
-      body: body ? JSON.stringify(body) : undefined,
+      body: requestBody,
     });
   },
 
@@ -177,6 +226,28 @@ export const apiClient = {
    */
   delete: <T>(endpoint: string, config?: RequestConfig): Promise<T> => {
     return request<T>(endpoint, { ...config, method: 'DELETE' });
+  },
+
+  /**
+   * POST FormData request (for backward compatibility)
+   */
+  postFormData: <T>(endpoint: string, formData: FormData, config?: RequestConfig): Promise<T> => {
+    return request<T>(endpoint, {
+      ...config,
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  /**
+   * PUT FormData request (for backward compatibility)
+   */
+  putFormData: <T>(endpoint: string, formData: FormData, config?: RequestConfig): Promise<T> => {
+    return request<T>(endpoint, {
+      ...config,
+      method: 'PUT',
+      body: formData,
+    });
   },
 };
 
