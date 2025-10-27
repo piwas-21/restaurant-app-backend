@@ -37,6 +37,15 @@ export interface BasketItemDto {
   unitPrice: number;
   itemTotal: number;
   specialInstructions?: string;
+  // Customization fields for optional ingredients
+  selectedIngredients?: string[]; // IDs of selected optional ingredients
+  excludedIngredients?: string[]; // IDs of ingredients to exclude
+  addedIngredients?: string[]; // IDs of optional ingredients added
+  customizationPrice?: number; // Additional price from customizations
+  // Ingredient names for display purposes
+  selectedIngredientNames?: string[];
+  excludedIngredientNames?: string[];
+  addedIngredientNames?: string[];
 }
 
 /**
@@ -77,6 +86,9 @@ export interface AddToBasketDto {
   menuId?: string;
   quantity: number;
   specialInstructions?: string;
+  selectedIngredients?: string[];
+  excludedIngredients?: string[];
+  selectedSideItems?: Array<{ id: string; quantity: number }>;
 }
 
 /**

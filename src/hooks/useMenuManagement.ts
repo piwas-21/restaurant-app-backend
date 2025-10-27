@@ -22,7 +22,7 @@ export const useMenuManagement = () => {
     setError(null);
     try {
       const response = await getProducts(1, 10, selectedCategoryId);
-      
+
       if (response.success) {
         setProducts(response.data.items);
       } else {

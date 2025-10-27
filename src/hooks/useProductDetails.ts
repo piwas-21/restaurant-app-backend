@@ -12,7 +12,7 @@ export const useProductDetails = (productId: string) => {
 
   const fetchProductData = useCallback(async () => {
     if (!productId) return;
-    
+
     setIsLoading(true);
     setError(null);
     try {

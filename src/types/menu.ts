@@ -11,11 +11,46 @@ export interface MenuItemImage {
   alt: string;
 }
 
+/**
+ * Detailed ingredient with optional/pricing information
+ */
+export interface ProductIngredient {
+  id: string;
+  name: string;
+  isOptional: boolean;
+  price: number;
+  isActive: boolean;
+  displayOrder: number;
+  // Multilingual support
+  content?: Record<string, {
+    name: string;
+    description?: string;
+  }>;
+}
+
+/**
+ * Product customization selected by user
+ */
+export interface ProductCustomization {
+  productId: string;
+  quantity: number;
+  selectedIngredients?: string[]; // IDs of optional ingredients to include
+  excludedIngredients?: string[]; // IDs of default ingredients to exclude
+  addedIngredients?: string[]; // IDs of optional ingredients added
+  selectedSideItems?: Array<{
+    id: string;
+    quantity: number;
+  }>;
+  specialInstructions?: string;
+  totalPrice: number;
+}
+
 export interface MenuItem {
   id: string;
   name: string; // Base name from API for fallback
   description?: string; // Base description from API for description fallback
-  ingredients?: string[]; // Base ingredients from API for ingredients fallback
+  ingredients?: string[]; // Base ingredients from API for ingredients fallback (simple strings)
+  detailedIngredients?: ProductIngredient[]; // Detailed ingredients with optional/pricing info
   content: Partial<Record<string, MenuItemContent>> & {
     en?: MenuItemContent;
   };
@@ -31,7 +66,7 @@ export interface MenuItem {
     displayOrder: number;
     description?: string;
   }>;
-  suggestedSideItems?: string[];
+  suggestedSideItems?: string[]; // IDs of suggested side items
   categoryKey?: string;
   isSpecial?: boolean;
   isActive?: boolean;
@@ -113,7 +148,8 @@ export interface DetailedProduct {
   isSpecial: boolean;
   preparationTimeMinutes?: number;
   type: ProductType;
-  ingredients: string[];
+  ingredients: string[]; // Simple ingredient strings for backward compatibility
+  detailedIngredients?: ProductIngredient[]; // Detailed ingredients with optional/pricing info
   allergens: string[];
   displayOrder: number;
   content: ContentData;

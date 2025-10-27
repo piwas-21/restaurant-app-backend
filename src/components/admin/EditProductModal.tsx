@@ -15,6 +15,7 @@ import { ProductDetails } from './product/ProductDetails';
 import { MultilingualContent } from './product/MultilingualContent';
 import { ProductVariations } from './product/ProductVariations';
 import { SuggestedSideItemsPicker } from './product/SuggestedSideItemsPicker';
+import { ProductIngredientsManager } from './product/ProductIngredientsManager';
 import { submitEditProductForm } from './product/productFormUtils';
 
 const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -28,6 +29,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [selectedSideItemIds, setSelectedSideItemIds] = useState<string[]>([]);
+  const [detailedIngredients, setDetailedIngredients] = useState<any[]>([]);
 
   const {
     register,
@@ -116,6 +118,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
       });
 
       setSelectedSideItemIds(product.suggestedSideItemIds || []);
+      setDetailedIngredients(product.detailedIngredients || []);
     }
   }, [product, reset]);
 
@@ -124,6 +127,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
       data,
       product,
       imageFiles,
+      detailedIngredients, // Pass ingredients to submit handler
       setIsSubmitting,
       setError,
       onProductUpdated,
@@ -219,6 +223,12 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
                 setSelectedSideItemIds(newSelection);
                 setValue('suggestedSideItemIds', newSelection);
               }}
+            />
+
+            <ProductIngredientsManager
+              ingredients={detailedIngredients}
+              onChange={setDetailedIngredients}
+              productBasePrice={watch('basePrice') || 0}
             />
           </div>
 

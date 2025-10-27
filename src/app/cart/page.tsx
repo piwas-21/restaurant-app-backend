@@ -127,12 +127,52 @@ export default function CartPage() {
                   {item.variationName && (
                     <p className={styles.itemVariation}>{item.variationName}</p>
                   )}
-                  <p className={styles.itemPrice}>CHF {item.unitPrice.toFixed(2)} {t('per_item', 'per item')}</p>
 
-                  {/* Special Instructions */}
-                  <div className={styles.instructionsContainer}>
-                    {editingInstructions === itemId ? (
-                      <div className={styles.instructionsEdit}>
+                  {/* Price Breakdown */}
+                  <div className={styles.priceBreakdownItem}>
+                    <p className={styles.itemPrice}>
+                      {t('base_price', 'Base Price')}: CHF {item.unitPrice.toFixed(2)}
+                    </p>
+                    {item.customizationPrice != null && item.customizationPrice > 0 && (
+                      <p className={styles.customizationPrice}>
+                        {t('customization_cost', 'Customizations')}: +CHF {item.customizationPrice.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Customizations */}
+                  {(item.selectedIngredientNames?.length || item.excludedIngredientNames?.length || item.specialInstructions) && (
+                    <div className={styles.customizationsContainer}>
+                      <h4 className={styles.customizationsTitle}>{t('customizations', 'Customizations')}:</h4>
+
+                      {item.selectedIngredientNames && item.selectedIngredientNames.length > 0 && (
+                        <div className={styles.customizationDetail}>
+                          <span className={styles.customizationLabel}>{t('added_ingredients', 'Added')}:</span>
+                          <span className={styles.customizationValue}>{item.selectedIngredientNames.join(', ')}</span>
+                        </div>
+                      )}
+
+                      {item.excludedIngredientNames && item.excludedIngredientNames.length > 0 && (
+                        <div className={styles.customizationDetail}>
+                          <span className={styles.customizationLabel}>{t('removed_ingredients', 'Removed')}:</span>
+                          <span className={styles.customizationValue}>{item.excludedIngredientNames.join(', ')}</span>
+                        </div>
+                      )}
+
+                      {item.specialInstructions && (
+                        <div className={styles.customizationDetail}>
+                          <span className={styles.customizationLabel}>{t('special_requests', 'Special Requests')}:</span>
+                          <span className={styles.customizationValue}>{item.specialInstructions}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Special Instructions Edit Section */}
+                  {!item.selectedIngredientNames?.length && !item.excludedIngredientNames?.length && (
+                    <div className={styles.instructionsContainer}>
+                      {editingInstructions === itemId ? (
+                        <div className={styles.instructionsEdit}>
                         <textarea
                           value={instructionsValue}
                           onChange={(e) => setInstructionsValue(e.target.value)}
@@ -181,7 +221,8 @@ export default function CartPage() {
                         </button>
                       </>
                     )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Item Controls */}

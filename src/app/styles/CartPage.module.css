@@ -372,6 +372,8 @@
   transition: all 0.2s ease;
   white-space: nowrap;
   font-weight: 500;
+  width: 120px;
+  max-width: 120px;
 }
 
 .removeItemButton:hover:not(:disabled) {
@@ -696,3 +698,73 @@
     align-items: stretch;
   }
 }
+
+/* Price Breakdown Item */
+.priceBreakdownItem {
+  margin: 0.75rem 0;
+}
+
+.customizationPrice {
+  font-size: 0.875rem;
+  color: var(--success-color, #28a745);
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+/* Customizations Container */
+.customizationsContainer {
+  margin-top: 1rem;
+  padding: 0.875rem;
+  background-color: var(--secondary-color-light, #f9fafb);
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+[data-theme="dark"] .customizationsContainer {
+  background-color: var(--secondary-color, #3a3a3a);
+  border-color: var(--border-color, #555);
+}
+
+.customizationsTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-color, #1a1a1a);
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+[data-theme="dark"] .customizationsTitle {
+  color: var(--text-color, #e0e0e0);
+}
+
+.customizationDetail {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.customizationDetail:last-child {
+  margin-bottom: 0;
+}
+
+.customizationLabel {
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .customizationLabel {
+  color: var(--text-secondary, #9ca3af);
+}
+
+.customizationValue {
+  color: var(--text-color, #1a1a1a);
+  flex: 1;
+}
+
+[data-theme="dark"] .customizationValue {
+  color: var(--text-color, #e0e0e0);
+}
+

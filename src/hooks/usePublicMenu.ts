@@ -62,6 +62,7 @@ export function usePublicMenu() {
           name: p.name || 'Unnamed Item', // Base name for fallback
           description: p.description || '', // Base description for description fallback
           ingredients: Array.isArray(p.ingredients) ? p.ingredients : [], // Base ingredients for ingredients fallback
+          detailedIngredients: Array.isArray(p.detailedIngredients) ? p.detailedIngredients : [], // Detailed ingredients with optional/pricing
           content: normalizedContent,
           price: typeof p.basePrice === "number" ? p.basePrice : parseFloat(p.basePrice || "0"),
           image: primaryImage,

@@ -19,6 +19,7 @@ interface SubmitEditProductFormParams {
   data: EditFormData;
   product: any;
   imageFiles: File[];
+  detailedIngredients?: any[];
   setIsSubmitting: (status: boolean) => void;
   setError: UseFormSetError<EditFormData>;
   onProductUpdated: () => void;
@@ -95,6 +96,7 @@ export const submitEditProductForm = async ({
   data,
   product,
   imageFiles,
+  detailedIngredients,
   setIsSubmitting,
   setError,
   onProductUpdated,
@@ -158,6 +160,7 @@ export const submitEditProductForm = async ({
       primaryCategoryId,
       variations: cleanedVariations,
       content: formattedContent,
+      detailedIngredients: detailedIngredients || [],
     } as any;
 
     const response = await updateProduct(product.id, productData) as { success: boolean; message?: string };

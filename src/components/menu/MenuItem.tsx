@@ -6,11 +6,12 @@ import { useCart } from "@/components/cart/CartContext";
 import { useTranslation } from "react-i18next";
 import { useSnackbar } from "notistack";
 import type { LanguageCode } from "@/components/LanguageSwitcher";
-import type { MenuItem as MenuItemType } from "@/types/menu";
+import type { MenuItem as MenuItemType, ProductCustomization } from "@/types/menu";
 import MenuItemImage from "./MenuItemImage";
 import MenuItemDetails from "./MenuItemDetails";
 import MenuItemActions from "./MenuItemActions";
 import ProductDetailsModal from "./ProductDetailsModal";
+import CustomizationModal from "./CustomizationModal";
 import FeedbackForm from "@/components/feedback/FeedbackForm";
 import styles from "./MenuItem.module.css";
 
@@ -32,11 +33,24 @@ const MenuItem: React.FC<MenuItemProps> = ({
   const { enqueueSnackbar } = useSnackbar();
   const [showFeedbackForm, setShowFeedbackForm] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showCustomization, setShowCustomization] = useState(false);
 
   // Get current language - component will re-render when i18n.language changes
   const currentLanguage = (i18n.language.split("-")[0] || "en") as LanguageCode;
 
+  // Check if product has customization options
+  const hasCustomizationOptions =
+    (item.detailedIngredients && item.detailedIngredients.some(ing => ing.isOptional)) ||
+    (item.suggestedSideItems && item.suggestedSideItems.length > 0);
+
   const handleAddItemToCart = useCallback(async () => {
+    // If product has customization options, show customization modal
+    if (hasCustomizationOptions) {
+      setShowCustomization(true);
+      return;
+    }
+
+    // Otherwise, add directly to cart
     const itemName =
       item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
 
@@ -45,6 +59,31 @@ const MenuItem: React.FC<MenuItemProps> = ({
         productId: item.id,
         quantity: 1,
       });
+      enqueueSnackbar(t("item_added_to_cart_toast", { itemName }), {
+        variant: "success",
+      });
+    } catch {
+      enqueueSnackbar(t("error_adding_to_cart", "Failed to add item to cart"), {
+        variant: "error",
+      });
+    }
+  }, [addItem, enqueueSnackbar, t, currentLanguage, item, hasCustomizationOptions]);
+
+  const handleCustomizationConfirm = useCallback(async (customization: ProductCustomization) => {
+    const itemName =
+      item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
+
+    try {
+      await addItem({
+        productId: customization.productId,
+        quantity: customization.quantity,
+        specialInstructions: customization.specialInstructions,
+        selectedIngredients: customization.selectedIngredients,
+        excludedIngredients: customization.excludedIngredients,
+        selectedSideItems: customization.selectedSideItems,
+      });
+
+      setShowCustomization(false);
       enqueueSnackbar(t("item_added_to_cart_toast", { itemName }), {
         variant: "success",
       });
@@ -121,6 +160,14 @@ const MenuItem: React.FC<MenuItemProps> = ({
         />
       )}
       <ProductDetailsModal isOpen={showDetails} item={item} onClose={() => setShowDetails(false)} />
+      {showCustomization && (
+        <CustomizationModal
+          product={item}
+          isOpen={showCustomization}
+          onClose={() => setShowCustomization(false)}
+          onAddToCart={handleCustomizationConfirm}
+        />
+      )}
     </div>
   );
 };

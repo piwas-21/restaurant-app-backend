@@ -38,6 +38,9 @@ interface AddItemPayload {
   menuId?: string;
   quantity: number;
   specialInstructions?: string;
+  selectedIngredients?: string[];
+  excludedIngredients?: string[];
+  selectedSideItems?: Array<{ id: string; quantity: number }>;
 }
 
 interface UpdateItemPayload {
