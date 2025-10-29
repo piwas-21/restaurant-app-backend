@@ -122,7 +122,7 @@ const MultilingualContentEditor: React.FC<Props> = ({ product, onUpdated }) => {
               <tr>
                 <th>{t('language')}</th>
                 <th>{t('name')}</th>
-                <th>{t('description')} / {t('ingredients')}</th>
+                <th>{t('description')}</th>
               </tr>
             </thead>
             <tbody>
@@ -157,7 +157,7 @@ const MultilingualContentEditor: React.FC<Props> = ({ product, onUpdated }) => {
                   />
                 </div>
                 <input
-                  placeholder={t('ingredients_in_language') as string}
+                  placeholder={t('description_in_language') as string}
                   value={e.description}
                   onChange={ev=>updateEntry(idx, 'description', ev.target.value)}
                 />

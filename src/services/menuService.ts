@@ -26,7 +26,6 @@ interface ContentData {
   [languageCode: string]: {
     name: string;
     description: string;
-    ingredient: string;
   };
 }
 
@@ -39,13 +38,13 @@ export interface CreateProductData {
   isSpecial?: boolean;
   preparationTimeMinutes?: number;
   type: string;
-  ingredients?: string[];
   allergens?: string[];
   displayOrder?: number;
   categoryIds: string[];
   primaryCategoryId: string;
   variations?: VariationData[];
   content?: ContentData;
+  detailedIngredients?: any[];
 }
 
 export const getProducts = async (

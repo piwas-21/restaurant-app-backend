@@ -66,7 +66,7 @@ export interface MenuItem {
     displayOrder: number;
     description?: string;
   }>;
-  suggestedSideItems?: string[]; // IDs of suggested side items
+  suggestedSideItems?: SuggestedSideItem[]; // Full side item objects
   categoryKey?: string;
   isSpecial?: boolean;
   isActive?: boolean;

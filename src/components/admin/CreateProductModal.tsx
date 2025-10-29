@@ -16,6 +16,7 @@ import { ProductDetails } from './product/ProductDetails';
 import { MultilingualContent } from './product/MultilingualContent';
 import { ProductVariations } from './product/ProductVariations';
 import { SuggestedSideItemsPicker } from './product/SuggestedSideItemsPicker';
+import { ProductIngredientsManager } from './product/ProductIngredientsManager';
 import { submitProductForm } from './product/productFormUtils';
 
 const CreateProductModal: React.FC<CreateProductModalProps> = ({
@@ -29,6 +30,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [selectedSideItemIds, setSelectedSideItemIds] = useState<string[]>([]);
+  const [detailedIngredients, setDetailedIngredients] = useState<any[]>([]);
 
   const {
     register,
@@ -81,6 +83,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
       reset();
       setImageFiles([]);
       setSelectedSideItemIds([]);
+      setDetailedIngredients([]);
       setSubmissionStatus('idle');
     }
   }, [isOpen, reset]);
@@ -97,6 +100,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
       data,
       imageFiles,
       currentLanguage,
+      detailedIngredients,
       setSubmissionStatus,
       setError,
       onProductCreated,
@@ -170,6 +174,12 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 setSelectedSideItemIds(newIds);
                 setValue('suggestedSideItemIds', newIds);
               }}
+            />
+
+            <ProductIngredientsManager
+              ingredients={detailedIngredients}
+              onChange={setDetailedIngredients}
+              productBasePrice={watch('basePrice') || 0}
             />
           </div>
 

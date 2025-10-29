@@ -7,6 +7,7 @@ interface SubmitProductFormParams {
   data: FormData;
   imageFiles: File[];
   currentLanguage: string;
+  detailedIngredients?: any[];
   setSubmissionStatus: (status: 'idle' | 'creating' | 'uploading') => void;
   setError: UseFormSetError<FormData>;
   onProductCreated: () => void;
@@ -30,6 +31,7 @@ export const submitProductForm = async ({
   data,
   imageFiles,
   currentLanguage,
+  detailedIngredients,
   setSubmissionStatus,
   setError,
   onProductCreated,
@@ -40,13 +42,12 @@ export const submitProductForm = async ({
   setSubmissionStatus('creating');
   try {
     // Format content for the API
-    const content: { [key: string]: { name: string; description: string; ingredient: string } } = {};
+    const content: { [key: string]: { name: string; description: string } } = {};
 
     // Automatically add the main product data to content using the current user language
     content[currentLanguage] = {
       name: data.name,
-      description: data.description || '',
-      ingredient: data.ingredients || ''
+      description: data.description || ''
     };
 
     // Add any additional multilingual content
@@ -54,8 +55,7 @@ export const submitProductForm = async ({
       if (item.language && item.language !== currentLanguage) {
         content[item.language] = {
           name: item.name,
-          description: item.description || '',
-          ingredient: item.ingredient || ''
+          description: item.description || ''
         };
       }
     });
@@ -63,9 +63,9 @@ export const submitProductForm = async ({
     // Format the product data
     const productData = {
       ...data,
-      ingredients: data.ingredients ? data.ingredients.split(',').map(s => s.trim()) : [],
       content,
-      variations: data.variations || []
+      variations: data.variations || [],
+      detailedIngredients: detailedIngredients || []
     };
 
     const productResponse = await createProduct(productData) as { success: boolean; data?: { id: string }; message?: string };
@@ -116,15 +116,13 @@ export const submitEditProductForm = async ({
         language: String(e.language).trim(),
         name: String(e.name || '').trim(),
         description: (e.description ?? '').toString(),
-        ingredient: (e.ingredient ?? '').toString(),
       }));
 
     const formattedContent = cleanedContentArray.length > 0
       ? cleanedContentArray.reduce((acc: any, curr: any) => {
           acc[curr.language] = {
             name: curr.name,
-            description: curr.description,
-            ingredient: curr.ingredient
+            description: curr.description
           };
           return acc;
         }, {})
@@ -154,7 +152,6 @@ export const submitEditProductForm = async ({
       description: (data.description ?? '').toString(),
       basePrice: parseNum(data.basePrice, 0),
       preparationTimeMinutes: typeof data.preparationTimeMinutes === 'number' ? data.preparationTimeMinutes : parseInt(String(data.preparationTimeMinutes || '0'), 10) || 0,
-      ingredients: data.ingredients ? data.ingredients.split(',').map(s => s.trim()).filter(Boolean) : [],
       allergens: Array.isArray(data.allergens) ? data.allergens.filter(Boolean) : [],
       categoryIds,
       primaryCategoryId,

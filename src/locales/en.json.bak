@@ -801,6 +801,5 @@
   "language_it": "Italian",
   "language_ar": "Arabic",
   "language_es": "Spanish",
-  "ingredients_managed_in_edit_modal": "To edit ingredients, use the Edit Product button at the top of the page",
-  "use_comma_for_decimals": "Use comma (,) for decimals"
+  "ingredients_managed_in_edit_modal": "To edit ingredients, use the Edit Product button at the top of the page"
 }

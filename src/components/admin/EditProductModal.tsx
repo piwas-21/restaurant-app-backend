@@ -51,7 +51,6 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
       isSpecial: false,
       type: 'mainItem',
       allergens: [],
-      ingredients: '',
       variations: [],
       content: [],
       categoryIds: [],
@@ -93,7 +92,6 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
         language: lang,
         name: data.name,
         description: data.description,
-        ingredient: data.ingredient,
       })) : [];
 
       const safeCategoryIds = (product.categories?.map((c: any) => c.categoryId).filter((x: any) => !!x) || []) as string[];
@@ -106,7 +104,6 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
         isAvailable: product.isAvailable ?? true,
         isSpecial: product.isSpecial ?? false,
         type: product.type || 'mainItem',
-        ingredients: Array.isArray(product.ingredients) ? product.ingredients.join(', ') : (product.ingredients || ''),
         allergens: Array.isArray(product.allergens) ? product.allergens : [],
         categoryIds: safeCategoryIds,
         primaryCategoryId: product.primaryCategoryId || (safeCategoryIds.length > 0 ? safeCategoryIds[0] : ''),

@@ -370,3 +370,13 @@
     gap: 1rem;
   }
 }
+
+.priceHint {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666);
+  font-style: italic;
+}
+
+[data-theme="dark"] .priceHint {
+  color: var(--text-secondary, #aaa);
+}

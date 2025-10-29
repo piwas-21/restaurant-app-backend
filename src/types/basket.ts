@@ -19,6 +19,19 @@ export interface MenuItemSummaryDto {
 }
 
 /**
+ * Side item in basket
+ */
+export interface BasketSideItemDto {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  imageUrl?: string;
+  quantity: number;
+  subTotal: number;
+}
+
+/**
  * Individual item in the basket
  */
 export interface BasketItemDto {
@@ -46,6 +59,8 @@ export interface BasketItemDto {
   selectedIngredientNames?: string[];
   excludedIngredientNames?: string[];
   addedIngredientNames?: string[];
+  // Selected side items with quantities
+  selectedSideItems?: BasketSideItemDto[];
 }
 
 /**

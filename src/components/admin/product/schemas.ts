@@ -15,7 +15,6 @@ export const contentSchema = z.object({
   language: z.string().min(1, 'Language is required'),
   name: z.string().min(1, 'Name is required for this language'),
   description: z.string().optional(),
-  ingredient: z.string().optional(),
 });
 
 // Base product schema shared by both create and edit
@@ -27,7 +26,6 @@ const baseProductSchema = z.object({
   isAvailable: z.boolean().default(true),
   isSpecial: z.boolean().default(false),
   type: z.enum(productTypes),
-  ingredients: z.string().optional(),
   allergens: z.array(z.string()).optional(),
   categoryIds: z.array(z.string()).min(1, 'Select at least one category'),
   primaryCategoryId: z.string().min(1, 'Primary category is required'),

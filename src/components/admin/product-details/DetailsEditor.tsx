@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ProductDetails } from '@/app/admin/menu-management/interfaces';
+import { ProductDetails, ProductIngredient } from '@/app/admin/menu-management/interfaces';
 import detailsStyles from '@/app/styles/DetailsPage.module.css';
 import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
 import styles from '@/app/styles/AdminPage.module.css';
@@ -10,6 +10,7 @@ import { updateProduct } from '@/services/productService';
 import { buildProductPayload } from './buildProductPayload';
 import { getCategories } from '@/services/categoryService';
 import AllergenDisplay, { AVAILABLE_ALLERGENS } from '@/components/common/AllergenDisplay';
+import { ProductIngredientsManager } from '@/components/admin/product/ProductIngredientsManager';
 
 interface Category { id: string; name: string; }
 
@@ -21,17 +22,31 @@ interface Props {
 const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
   const { t, i18n } = useTranslation();
   const [editing, setEditing] = useState(false);
-  const [ingredients, setIngredients] = useState(product.ingredients.join(', '));
+  const [detailedIngredients, setDetailedIngredients] = useState<ProductIngredient[]>(
+    product.detailedIngredients || []
+  );
   const [allergens, setAllergens] = useState<string[]>(product.allergens || []);
   const [categories, setCategories] = useState<Category[]>([]);
 
   const currentLanguage = (i18n.language.split('-')[0] || 'en') as string;
 
-  // Get multilingual ingredients with fallback
+  // Get multilingual ingredients from detailedIngredients with fallback
   const getLocalizedIngredients = () => {
+    // Use new detailedIngredients structure
+    if (product.detailedIngredients && product.detailedIngredients.length > 0) {
+      return product.detailedIngredients
+        .filter((ing) => ing.isActive)
+        .map((ing) => {
+          // Try to get name in current language, fallback to English, then base name
+          return ing.content?.[currentLanguage]?.name || ing.content?.en?.name || ing.name;
+        })
+        .join(', ');
+    }
+
+    // Fallback to legacy structures
     return product.content?.[currentLanguage]?.ingredient ||
            product.content?.en?.ingredient ||
-           product.ingredients.join(', ') ||
+           (Array.isArray(product.ingredients) ? product.ingredients.join(', ') : '') ||
            '';
   };
 
@@ -50,7 +65,7 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
   };
 
   const save = async () => {
-    const updated: ProductDetails = { ...product, ingredients: ingredients ? ingredients.split(',').map(s=>s.trim()).filter(Boolean) : [], allergens } as any;
+    const updated: ProductDetails = { ...product, detailedIngredients, allergens } as any;
     const payload = buildProductPayload(updated, categories);
     await updateProduct(product.id, payload);
     setEditing(false);
@@ -72,8 +87,10 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
       </div>
       {!editing ? (
         <>
-          <p><strong>{t('ingredients')}:</strong> {getLocalizedIngredients()}</p>
-          <div style={{ marginBottom: '1rem', justifyItems: 'flex-start', display: 'inline-flex' }}>
+          <p>
+            <strong>{t('ingredients')}:</strong> {getLocalizedIngredients() || <em>{t('no_ingredients_added')}</em>}
+          </p>
+          <div style={{ marginBottom: '1rem', justifyItems: 'flex-start', display: 'inline-flex', marginTop: '1rem' }}>
             <p style={{ marginRight: '1rem' }}><strong>{t('allergens')}:</strong></p>
             <AllergenDisplay
               allergens={product.allergens}
@@ -85,9 +102,12 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
         </>
       ) : (
         <div className={detailsStyles.formGrid}>
-          <div className={detailsStyles.formGroup}>
-            <label>{t('ingredients')}</label>
-            <input value={ingredients} onChange={e=>setIngredients(e.target.value)} />
+          <div className={detailsStyles.formGroup} style={{ gridColumn: '1 / -1' }}>
+            <ProductIngredientsManager
+              ingredients={detailedIngredients}
+              onChange={setDetailedIngredients}
+              productBasePrice={product.basePrice}
+            />
           </div>
           <div className={detailsStyles.formGroup}>
             <label>{t('allergens')}</label>

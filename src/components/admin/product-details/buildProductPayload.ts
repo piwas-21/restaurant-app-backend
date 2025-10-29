@@ -58,6 +58,7 @@ export function buildProductPayload(product: ProductDetails, categories?: Catego
     preparationTimeMinutes: product.preparationTimeMinutes,
     type: product.type,
     ingredients: product.ingredients || [],
+    detailedIngredients: (product as any).detailedIngredients || [],
     allergens: product.allergens || [],
     categoryIds,
     primaryCategoryId,

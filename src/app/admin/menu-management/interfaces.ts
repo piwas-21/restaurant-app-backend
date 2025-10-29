@@ -31,6 +31,21 @@ export interface ProductCategory {
   isPrimary: boolean;
 }
 
+export interface ProductIngredient {
+  id: string;
+  name: string;
+  isOptional: boolean;
+  price: number;
+  isActive: boolean;
+  displayOrder: number;
+  content?: {
+    [languageCode: string]: {
+      name: string;
+      description: string;
+    };
+  };
+}
+
 export interface ProductDetails {
   id: string;
   name: string;
@@ -41,7 +56,8 @@ export interface ProductDetails {
   isSpecial?: boolean;
   preparationTimeMinutes: number;
   type: string;
-  ingredients: string[];
+  ingredients: string[]; // Legacy field - kept for backward compatibility
+  detailedIngredients?: ProductIngredient[];
   allergens: string[];
   categories: ProductCategory[];
   variations: Variation[];

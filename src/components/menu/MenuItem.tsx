@@ -98,11 +98,22 @@ const MenuItem: React.FC<MenuItemProps> = ({
   const itemName =
     item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
 
-  const ingredientsText =
-    item.content?.[currentLanguage]?.ingredient ||
-    item.content?.en?.ingredient ||
-    (Array.isArray(item.ingredients) ? item.ingredients.join(', ') : '') ||
-    "";
+  // Get ingredients from detailedIngredients with multilingual support
+  const getIngredientsText = () => {
+    if (item.detailedIngredients && item.detailedIngredients.length > 0) {
+      return item.detailedIngredients
+        .filter((ing: any) => ing.isActive)
+        .map((ing: any) => {
+          // Try to get name in current language, fallback to English, then base name
+          return ing.content?.[currentLanguage]?.name || ing.content?.en?.name || ing.name;
+        })
+        .join(', ');
+    }
+    // Fallback to legacy ingredients array
+    return Array.isArray(item.ingredients) ? item.ingredients.join(', ') : '';
+  };
+
+  const ingredientsText = getIngredientsText();
 
   const productDescription =
     item.content?.[currentLanguage]?.description ||

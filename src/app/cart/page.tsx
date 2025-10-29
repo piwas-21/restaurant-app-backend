@@ -141,7 +141,7 @@ export default function CartPage() {
                   </div>
 
                   {/* Customizations */}
-                  {(item.selectedIngredientNames?.length || item.excludedIngredientNames?.length || item.specialInstructions) && (
+                  {(item.selectedIngredientNames?.length || item.excludedIngredientNames?.length || item.selectedSideItems?.length || item.specialInstructions) && (
                     <div className={styles.customizationsContainer}>
                       <h4 className={styles.customizationsTitle}>{t('customizations', 'Customizations')}:</h4>
 
@@ -156,6 +156,20 @@ export default function CartPage() {
                         <div className={styles.customizationDetail}>
                           <span className={styles.customizationLabel}>{t('removed_ingredients', 'Removed')}:</span>
                           <span className={styles.customizationValue}>{item.excludedIngredientNames.join(', ')}</span>
+                        </div>
+                      )}
+
+                      {item.selectedSideItems && item.selectedSideItems.length > 0 && (
+                        <div className={styles.customizationDetail}>
+                          <span className={styles.customizationLabel}>{t('side_items', 'Side Items')}:</span>
+                          <span className={styles.customizationValue}>
+                            {item.selectedSideItems.map((sideItem, idx) => (
+                              <span key={sideItem.id}>
+                                {sideItem.name} x{sideItem.quantity} (CHF {sideItem.subTotal.toFixed(2)})
+                                {idx < item.selectedSideItems!.length - 1 ? ', ' : ''}
+                              </span>
+                            ))}
+                          </span>
                         </div>
                       )}
 

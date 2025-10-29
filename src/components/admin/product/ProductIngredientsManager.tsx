@@ -20,8 +20,10 @@ export function ProductIngredientsManager({
   const { t } = useTranslation();
 
   const handleAddIngredient = () => {
+    // Generate a temporary unique ID for new ingredients (will be replaced by server)
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newIngredient: ProductIngredient = {
-      id: "00000000-0000-0000-0000-000000000000", // Empty GUID for new ingredients
+      id: tempId,
       name: "",
       isOptional: false,
       price: 0,
@@ -162,25 +164,44 @@ export function ProductIngredientsManager({
                     <label>
                       {t("additional_price")}
                       <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={ingredient.price}
-                        onChange={(e) =>
-                          handleIngredientChange(
-                            index,
-                            "price",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
+                        type="text"
+                        value={ingredient.price === 0 ? '' : ingredient.price}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Replace dot with comma for decimal separator
+                          const normalizedValue = value.replace('.', ',');
+
+                          // Allow empty string or valid number with comma
+                          if (value === '' || value === '-') {
+                            handleIngredientChange(index, "price", 0);
+                          } else if (/^-?\d*,?\d*$/.test(normalizedValue)) {
+                            // Valid format: digits, optional comma, optional digits
+                            const numValue = parseFloat(normalizedValue.replace(',', '.'));
+                            if (!isNaN(numValue)) {
+                              handleIngredientChange(index, "price", numValue);
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // On blur, ensure we have a valid number
+                          const value = e.target.value.replace(',', '.');
+                          const numValue = parseFloat(value);
+                          if (isNaN(numValue) || numValue < 0) {
+                            handleIngredientChange(index, "price", 0);
+                          }
+                        }}
+                        placeholder="0,00"
                         className={styles.priceInput}
                       />
                       <span className={styles.currency}>CHF</span>
                     </label>
+                    <span className={styles.priceHint}>
+                      {t("use_comma_for_decimals")}
+                    </span>
                     {ingredient.price > 0 && (
                       <span className={styles.pricePreview}>
                         {t("customer_pays")}:{" "}
-                        CHF {(productBasePrice + ingredient.price).toFixed(2)}
+                        CHF {(productBasePrice + (Number(ingredient.price) || 0)).toFixed(2)}
                       </span>
                     )}
                   </div>

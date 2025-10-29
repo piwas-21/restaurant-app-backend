@@ -70,7 +70,7 @@ export function usePublicMenu() {
           allergens: Array.isArray(p.allergens) ? p.allergens : [],
           preparationTimeMinutes: typeof p.preparationTimeMinutes === "number" ? p.preparationTimeMinutes : undefined,
           variations: Array.isArray(p.variations) ? p.variations : [],
-          suggestedSideItems: Array.isArray(p.suggestedSideItemIds) ? p.suggestedSideItemIds : [],
+          suggestedSideItems: Array.isArray(p.suggestedSideItems) ? p.suggestedSideItems : [],
           categoryKey: categoryId || undefined,
           isSpecial: p.isSpecial,
           isActive: p.isActive,

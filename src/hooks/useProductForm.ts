@@ -104,7 +104,6 @@ export const useProductForm = (onSuccess: () => void): UseProductFormResult => {
         categoryIds: data.categoryIds,
         primaryCategoryId: data.primaryCategoryId,
         description: data.description,
-        ingredients: data.ingredients,
         allergens: data.allergens,
         variations: data.variations,
         content: formattedContent,

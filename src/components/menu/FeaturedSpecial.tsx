@@ -17,17 +17,35 @@ interface FeaturedSpecialProps {
     preparationTimeMinutes?: number;
     allergens?: string[];
     ingredients?: string[];
+    detailedIngredients?: any[];
+    content?: { [key: string]: { name?: string; description?: string } };
   };
   onAddToCart?: () => void;
   onViewDetails?: () => void;
 }
 
 const FeaturedSpecial: React.FC<FeaturedSpecialProps> = ({ special, onAddToCart, onViewDetails }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = i18n.language || 'en';
 
   if (!special) {
     return null;
   }
+
+  // Get ingredients from detailedIngredients with multilingual support
+  const getIngredients = () => {
+    if (special.detailedIngredients && special.detailedIngredients.length > 0) {
+      return special.detailedIngredients
+        .filter((ing: any) => ing.isActive)
+        .map((ing: any) => {
+          return ing.content?.[currentLanguage]?.name || ing.content?.en?.name || ing.name;
+        });
+    }
+    // Fallback to legacy ingredients array
+    return special.ingredients || [];
+  };
+
+  const ingredientsList = getIngredients();
 
   return (
     <section className={styles.featuredSpecialSection} aria-labelledby="featured-special-heading">
@@ -74,10 +92,10 @@ const FeaturedSpecial: React.FC<FeaturedSpecialProps> = ({ special, onAddToCart,
               )}
             </div>
 
-            {special.ingredients && special.ingredients.length > 0 && (
+            {ingredientsList && ingredientsList.length > 0 && (
               <div className={styles.featuredSpecialIngredients}>
                 <strong>{t('ingredients', 'Ingredients')}:</strong>{' '}
-                <span>{special.ingredients.join(', ')}</span>
+                <span>{ingredientsList.join(', ')}</span>
               </div>
             )}
 

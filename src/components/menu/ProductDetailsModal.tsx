@@ -22,11 +22,19 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // State for optional ingredients selection
+  const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set());
+
+  // State for side items selection
+  const [selectedSideItems, setSelectedSideItems] = useState<Map<string, number>>(new Map());
+
   // Fetch detailed product data when modal opens
   useEffect(() => {
     if (!isOpen || !item) {
       setDetailedProduct(null);
       setError(null);
+      setSelectedIngredients(new Set());
+      setSelectedSideItems(new Map());
       return;
     }
 
@@ -37,6 +45,24 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
         const response = await getProductById(item.id) as { success: boolean; data?: any; message?: string };
         if (response.success && response.data) {
           setDetailedProduct(response.data);
+
+          // Initialize selected ingredients (non-optional ingredients are selected by default)
+          const defaultIngredients = new Set<string>();
+          if (response.data.detailedIngredients) {
+            response.data.detailedIngredients
+              .filter((ing: any) => ing.isActive && !ing.isOptional)
+              .forEach((ing: any) => defaultIngredients.add(ing.id));
+          }
+          setSelectedIngredients(defaultIngredients);
+
+          // Initialize selected side items (required side items are selected by default)
+          const defaultSideItems = new Map<string, number>();
+          if (response.data.suggestedSideItems) {
+            response.data.suggestedSideItems
+              .filter((side: any) => side.isRequired)
+              .forEach((side: any) => defaultSideItems.set(side.id, 1));
+          }
+          setSelectedSideItems(defaultSideItems);
         } else {
           throw new Error(response.message || "Failed to fetch product details");
         }
@@ -67,14 +93,92 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
 
   const price = detailedProduct?.basePrice || (typeof item.price === 'number' ? item.price : parseFloat(item.price as any));
 
-  // Fallback to the base ingredients array if content.ingredient is not available
-  const ingredientsText = detailedProduct
-    ? (detailedProduct.content?.[currentLanguage]?.ingredient || detailedProduct.content?.en?.ingredient || "")
-    : (item.content?.[currentLanguage]?.ingredient || item.content?.en?.ingredient || "");
+  // Get ingredients from detailedIngredients with multilingual support
+  const getIngredients = () => {
+    const productToUse = detailedProduct || item;
+    if (productToUse.detailedIngredients && productToUse.detailedIngredients.length > 0) {
+      return productToUse.detailedIngredients
+        .filter((ing: any) => ing.isActive)
+        .map((ing: any) => {
+          // Try to get name in current language, fallback to English, then base name
+          return ing.content?.[currentLanguage]?.name || ing.content?.en?.name || ing.name;
+        });
+    }
+    // Fallback to legacy ingredients array
+    return productToUse.ingredients || [];
+  };
 
-  const ingredients = ingredientsText
-    ? ingredientsText.split(/[\,\n;]+/).map(s => s.trim()).filter(Boolean)
-    : (detailedProduct?.ingredients || item.ingredients || []);
+  const ingredients = getIngredients();
+
+  // Get optional ingredients for selection
+  const getOptionalIngredients = () => {
+    if (!detailedProduct?.detailedIngredients) return [];
+    return detailedProduct.detailedIngredients.filter((ing: any) => ing.isActive && ing.isOptional);
+  };
+
+  const optionalIngredients = getOptionalIngredients();
+
+  // Handler for ingredient toggle
+  const toggleIngredient = (ingredientId: string) => {
+    const newSelected = new Set(selectedIngredients);
+    if (newSelected.has(ingredientId)) {
+      newSelected.delete(ingredientId);
+    } else {
+      newSelected.add(ingredientId);
+    }
+    setSelectedIngredients(newSelected);
+  };
+
+  // Handler for side item toggle
+  const toggleSideItem = (sideItemId: string, checked: boolean) => {
+    const newSelected = new Map(selectedSideItems);
+    if (checked) {
+      newSelected.set(sideItemId, 1);
+    } else {
+      newSelected.delete(sideItemId);
+    }
+    setSelectedSideItems(newSelected);
+  };
+
+  // Handler for side item quantity change
+  const updateSideItemQuantity = (sideItemId: string, quantity: number) => {
+    const newSelected = new Map(selectedSideItems);
+    if (quantity > 0) {
+      newSelected.set(sideItemId, quantity);
+    } else {
+      newSelected.delete(sideItemId);
+    }
+    setSelectedSideItems(newSelected);
+  };
+
+  // Calculate total price
+  const calculateTotalPrice = () => {
+    let total = price;
+
+    // Add optional ingredient prices
+    if (detailedProduct?.detailedIngredients) {
+      detailedProduct.detailedIngredients.forEach((ing: any) => {
+        if (ing.isOptional && selectedIngredients.has(ing.id)) {
+          total += ing.price || 0;
+        }
+      });
+    }
+
+    // Add side item prices
+    if (detailedProduct?.suggestedSideItems) {
+      detailedProduct.suggestedSideItems.forEach((side: any) => {
+        const quantity = selectedSideItems.get(side.id);
+        if (quantity) {
+          total += side.price * quantity;
+        }
+      });
+    }
+
+    return total;
+  };
+
+  const totalPrice = calculateTotalPrice();
+  const hasCustomizations = optionalIngredients.length > 0 || (detailedProduct?.suggestedSideItems && detailedProduct.suggestedSideItems.length > 0);
 
   return createPortal(
     <div className={styles.productDetailsModal} onClick={onClose}>

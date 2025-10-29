@@ -27,11 +27,6 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
       </div>
 
       <div className={modalStyles.formGroup}>
-        <label>{t('ingredients')}</label>
-        <input {...register('ingredients')} placeholder={t('ingredients_placeholder')} />
-      </div>
-
-      <div className={modalStyles.formGroup}>
         <h3>{t('categories')}</h3>
         <Controller
           name="categoryIds"
