@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, LayoutGrid } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 const Sidebar = () => {
@@ -36,6 +36,16 @@ const Sidebar = () => {
       href: '/admin/orders-management',
       label: t('admin_orders_management', 'Orders Management'),
       icon: ClipboardList
+    },
+    {
+      href: '/admin/reservations-management',
+      label: t('admin_reservations_management', 'Reservations Management'),
+      icon: CalendarCheck
+    },
+    {
+      href: '/admin/tables-management',
+      label: t('table_management', 'Table Management'),
+      icon: LayoutGrid
     },
     {
       href: '/admin/point-rules',

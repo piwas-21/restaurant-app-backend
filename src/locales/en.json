@@ -954,5 +954,9 @@
   "please_complete_all_fields": "Please complete all fields",
   "please_fill_customer_details": "Please fill in your details",
   "booking": "Booking...",
-  "book_now": "Book Now"
+  "book_now": "Book Now",
+  "or_custom": "Or custom",
+  "enter_guests": "Enter number",
+  "or_pick_date": "Or pick a date",
+  "or_enter_time": "Or enter time"
 }

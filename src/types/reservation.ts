@@ -69,3 +69,43 @@ export interface ReservationFormData {
   selectedTable?: TableDto;
   specialRequests: string;
 }
+
+export interface CreateTableDto {
+  tableNumber: string;
+  maxGuests: number;
+  isActive?: boolean;
+  isOutdoor?: boolean;
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  height?: number;
+}
+
+export interface UpdateTableDto {
+  tableNumber: string;
+  maxGuests: number;
+  isActive: boolean;
+  isOutdoor: boolean;
+  positionX: number;
+  positionY: number;
+  width: number;
+  height: number;
+}
+
+// API Response Types
+export interface ApiResponse<T> {
+  data?: T;
+  success: boolean;
+  message?: string;
+  errors?: string[];
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
+}

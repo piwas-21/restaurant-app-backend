@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import ReservationCalendar from '@/components/admin/reservations/ReservationCalendar';
 import { exportReservationsToCSV, exportReservationsToPDF } from '@/utils/reservationExportUtils';
+import ConfirmationModal from '@/components/common/ConfirmationModal';
+import ResultModal from '@/components/common/ResultModal';
 import styles from './styles.module.css';
 
 type ViewMode = 'list' | 'calendar';
@@ -48,6 +50,18 @@ export default function AdminReservationsManagementPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedReservation, setSelectedReservation] = useState<ReservationDto | null>(null);
   const [selectedReservationIds, setSelectedReservationIds] = useState<Set<string>>(new Set());
+
+  // Modal states
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
+    isOpen: false,
+    message: '',
+    onConfirm: () => {}
+  });
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; message: string; isSuccess: boolean }>({
+    isOpen: false,
+    message: '',
+    isSuccess: false
+  });
 
   // Auth check
   useEffect(() => {
@@ -116,23 +130,29 @@ export default function AdminReservationsManagementPage() {
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm(t('confirm_cancel_reservation', 'Are you sure you want to cancel this reservation?'))) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_cancel_reservation', 'Are you sure you want to cancel this reservation?'),
+      onConfirm: async () => {
+        setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
 
-    try {
-      await reservationService.cancelReservation(id);
-      enqueueSnackbar(t('reservation_cancelled', 'Reservation cancelled successfully'), {
-        variant: 'success',
-        anchorOrigin: { vertical: 'bottom', horizontal: 'right' },
-      });
-      fetchData();
-    } catch (err: any) {
-      enqueueSnackbar(err.message || t('failed_to_cancel', 'Failed to cancel reservation'), {
-        variant: 'error',
-        anchorOrigin: { vertical: 'bottom', horizontal: 'right' },
-      });
-    }
+        try {
+          await reservationService.cancelReservation(id);
+          setResultModal({
+            isOpen: true,
+            message: t('reservation_cancelled', 'Reservation cancelled successfully'),
+            isSuccess: true
+          });
+          fetchData();
+        } catch (err: any) {
+          setResultModal({
+            isOpen: true,
+            message: err.message || t('failed_to_cancel', 'Failed to cancel reservation'),
+            isSuccess: false
+          });
+        }
+      }
+    });
   };
 
   // Export handlers
@@ -141,11 +161,28 @@ export default function AdminReservationsManagementPage() {
       ? filteredReservations.filter(r => selectedReservationIds.has(r.id))
       : filteredReservations;
 
-    exportReservationsToCSV(dataToExport);
-    enqueueSnackbar(
-      t('exported_successfully', `Exported ${dataToExport.length} reservations to CSV`),
-      { variant: 'success', anchorOrigin: { vertical: 'bottom', horizontal: 'right' } }
-    );
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_export_csv', `Export ${dataToExport.length} reservations to CSV?`),
+      onConfirm: () => {
+        try {
+          exportReservationsToCSV(dataToExport);
+          setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
+          setResultModal({
+            isOpen: true,
+            message: t('exported_successfully', `Successfully exported ${dataToExport.length} reservations to CSV`),
+            isSuccess: true
+          });
+        } catch (err: any) {
+          setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
+          setResultModal({
+            isOpen: true,
+            message: t('export_failed', `Failed to export: ${err.message}`),
+            isSuccess: false
+          });
+        }
+      }
+    });
   };
 
   const handleExportPDF = () => {
@@ -153,11 +190,28 @@ export default function AdminReservationsManagementPage() {
       ? filteredReservations.filter(r => selectedReservationIds.has(r.id))
       : filteredReservations;
 
-    exportReservationsToPDF(dataToExport);
-    enqueueSnackbar(
-      t('exported_successfully', `Exported ${dataToExport.length} reservations to PDF`),
-      { variant: 'success', anchorOrigin: { vertical: 'bottom', horizontal: 'right' } }
-    );
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_export_pdf', `Export ${dataToExport.length} reservations to PDF?`),
+      onConfirm: () => {
+        try {
+          exportReservationsToPDF(dataToExport);
+          setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
+          setResultModal({
+            isOpen: true,
+            message: t('exported_successfully', `Successfully exported ${dataToExport.length} reservations to PDF`),
+            isSuccess: true
+          });
+        } catch (err: any) {
+          setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
+          setResultModal({
+            isOpen: true,
+            message: t('export_failed', `Failed to export: ${err.message}`),
+            isSuccess: false
+          });
+        }
+      }
+    });
   };
 
   // Bulk selection handlers
@@ -182,55 +236,63 @@ export default function AdminReservationsManagementPage() {
   const handleBulkConfirm = async () => {
     if (selectedReservationIds.size === 0) return;
 
-    const confirmAction = confirm(
-      t('confirm_bulk_action', `Confirm ${selectedReservationIds.size} reservations?`)
-    );
-    if (!confirmAction) return;
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_bulk_action', `Confirm ${selectedReservationIds.size} reservations?`),
+      onConfirm: async () => {
+        setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
 
-    let successCount = 0;
-    for (const id of selectedReservationIds) {
-      try {
-        await reservationService.confirmReservation(id);
-        successCount++;
-      } catch (err) {
-        console.error(`Failed to confirm reservation ${id}:`, err);
+        let successCount = 0;
+        for (const id of selectedReservationIds) {
+          try {
+            await reservationService.confirmReservation(id);
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to confirm reservation ${id}:`, err);
+          }
+        }
+
+        setResultModal({
+          isOpen: true,
+          message: t('bulk_confirm_success', `Confirmed ${successCount} of ${selectedReservationIds.size} reservations`),
+          isSuccess: successCount > 0
+        });
+
+        setSelectedReservationIds(new Set());
+        fetchData();
       }
-    }
-
-    enqueueSnackbar(
-      t('bulk_confirm_success', `Confirmed ${successCount} of ${selectedReservationIds.size} reservations`),
-      { variant: 'success', anchorOrigin: { vertical: 'bottom', horizontal: 'right' } }
-    );
-
-    setSelectedReservationIds(new Set());
-    fetchData();
+    });
   };
 
   const handleBulkCancel = async () => {
     if (selectedReservationIds.size === 0) return;
 
-    const confirmAction = confirm(
-      t('confirm_bulk_cancel', `Cancel ${selectedReservationIds.size} reservations?`)
-    );
-    if (!confirmAction) return;
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_bulk_cancel', `Cancel ${selectedReservationIds.size} reservations?`),
+      onConfirm: async () => {
+        setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
 
-    let successCount = 0;
-    for (const id of selectedReservationIds) {
-      try {
-        await reservationService.cancelReservation(id);
-        successCount++;
-      } catch (err) {
-        console.error(`Failed to cancel reservation ${id}:`, err);
+        let successCount = 0;
+        for (const id of selectedReservationIds) {
+          try {
+            await reservationService.cancelReservation(id);
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to cancel reservation ${id}:`, err);
+          }
+        }
+
+        setResultModal({
+          isOpen: true,
+          message: t('bulk_cancel_success', `Cancelled ${successCount} of ${selectedReservationIds.size} reservations`),
+          isSuccess: successCount > 0
+        });
+
+        setSelectedReservationIds(new Set());
+        fetchData();
       }
-    }
-
-    enqueueSnackbar(
-      t('bulk_cancel_success', `Cancelled ${successCount} of ${selectedReservationIds.size} reservations`),
-      { variant: 'success', anchorOrigin: { vertical: 'bottom', horizontal: 'right' } }
-    );
-
-    setSelectedReservationIds(new Set());
-    fetchData();
+    });
   };
 
   // Filter reservations by search query
@@ -544,6 +606,21 @@ export default function AdminReservationsManagementPage() {
           )
         )}
       </div>
+
+      {/* Modals */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} })}
+        onConfirm={confirmModal.onConfirm}
+        message={confirmModal.message}
+      />
+
+      <ResultModal
+        isOpen={resultModal.isOpen}
+        onClose={() => setResultModal({ isOpen: false, message: '', isSuccess: false })}
+        message={resultModal.message}
+        isSuccess={resultModal.isSuccess}
+      />
     </main>
   );
 }

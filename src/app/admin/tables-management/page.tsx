@@ -17,6 +17,8 @@ import {
 import { enqueueSnackbar } from 'notistack';
 import { reservationService } from '@/services/reservationService';
 import { TableDto } from '@/types/reservation';
+import ConfirmationModal from '@/components/common/ConfirmationModal';
+import ResultModal from '@/components/common/ResultModal';
 import styles from './styles.module.css';
 
 export default function TablesManagementPage() {
@@ -30,6 +32,18 @@ export default function TablesManagementPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTable, setSelectedTable] = useState<TableDto | null>(null);
+
+  // Modal states
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
+    isOpen: false,
+    message: '',
+    onConfirm: () => {}
+  });
+  const [resultModal, setResultModal] = useState<{ isOpen: boolean; message: string; isSuccess: boolean }>({
+    isOpen: false,
+    message: '',
+    isSuccess: false
+  });
 
   // Fetch tables
   const fetchTables = async () => {
@@ -77,20 +91,29 @@ export default function TablesManagementPage() {
 
   // Handle delete table
   const handleDeleteTable = async (tableId: string) => {
-    const confirmDelete = confirm(t('confirm_delete_table', 'Are you sure you want to delete this table?'));
-    if (!confirmDelete) return;
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_delete_table', 'Are you sure you want to delete this table?'),
+      onConfirm: async () => {
+        setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
 
-    try {
-      await reservationService.deleteTable(tableId);
-      enqueueSnackbar(t('table_deleted_successfully', 'Table deleted successfully'), {
-        variant: 'success'
-      });
-      fetchTables();
-    } catch (err: any) {
-      enqueueSnackbar(err.message || t('failed_to_delete_table', 'Failed to delete table'), {
-        variant: 'error'
-      });
-    }
+        try {
+          await reservationService.deleteTable(tableId);
+          setResultModal({
+            isOpen: true,
+            message: t('table_deleted_successfully', 'Table deleted successfully'),
+            isSuccess: true
+          });
+          fetchTables();
+        } catch (err: any) {
+          setResultModal({
+            isOpen: true,
+            message: err.message || t('failed_to_delete_table', 'Failed to delete table'),
+            isSuccess: false
+          });
+        }
+      }
+    });
   };
 
   // Handle toggle active status
@@ -330,6 +353,21 @@ export default function TablesManagementPage() {
           }}
         />
       )}
+
+      {/* Confirmation and Result Modals */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} })}
+        onConfirm={confirmModal.onConfirm}
+        message={confirmModal.message}
+      />
+
+      <ResultModal
+        isOpen={resultModal.isOpen}
+        onClose={() => setResultModal({ isOpen: false, message: '', isSuccess: false })}
+        message={resultModal.message}
+        isSuccess={resultModal.isSuccess}
+      />
     </div>
   );
 }

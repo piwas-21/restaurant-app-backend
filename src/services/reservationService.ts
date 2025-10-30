@@ -4,10 +4,13 @@ import {
   TableDto,
   ReservationDto,
   CreateReservationDto,
+  CreateTableDto,
+  UpdateTableDto,
   AvailableTimeSlotsDto,
-  ReservationStatus
+  ReservationStatus,
+  ApiResponse,
+  PagedResult
 } from '@/types/reservation';
-import { ApiResponse, PagedResult } from '@/types/api';
 
 export const reservationService = {
   // Tables
@@ -26,6 +29,29 @@ export const reservationService = {
       throw new Error('Table not found');
     }
     return response.data;
+  },
+
+  async createTable(data: CreateTableDto): Promise<TableDto> {
+    const response = await apiClient.post<ApiResponse<TableDto>>('/api/tables', data);
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to create table');
+    }
+    return response.data;
+  },
+
+  async updateTable(id: string, data: UpdateTableDto): Promise<TableDto> {
+    const response = await apiClient.put<ApiResponse<TableDto>>(`/api/tables/${id}`, data);
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to update table');
+    }
+    return response.data;
+  },
+
+  async deleteTable(id: string): Promise<void> {
+    const response = await apiClient.delete<ApiResponse<boolean>>(`/api/tables/${id}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to delete table');
+    }
   },
 
   // Reservations

@@ -381,20 +381,22 @@
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .exportButton:hover {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
+  background: #f4c430;
+  color: #1a1a1a;
+  border-color: #f4c430;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 196, 48, 0.3);
 }
 
 .bulkActionsBar {

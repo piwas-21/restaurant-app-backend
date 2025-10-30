@@ -83,6 +83,13 @@ export default function VisualTableLayout({
     return chairs;
   };
 
+  // Normalize pixel positions to percentages
+  // Backend stores positions in pixels assuming 800x600 canvas
+  const normalizePosition = (pixelValue: number, maxPixels: number): number => {
+    // Convert pixel value to percentage (0-100)
+    return (pixelValue / maxPixels) * 100;
+  };
+
   // Default layout if no positions are set
   const getDefaultPosition = (index: number, total: number): { x: number; y: number } => {
     const cols = Math.ceil(Math.sqrt(total));
@@ -95,7 +102,7 @@ export default function VisualTableLayout({
     };
   };
 
-  // Apply default positions if tables don't have positions
+  // Apply default positions if tables don't have positions, or normalize pixel positions
   const tablesWithPositions = tables.map((table, index) => {
     if (table.positionX === undefined || table.positionY === undefined) {
       const defaultPos = getDefaultPosition(index, tables.length);
@@ -105,7 +112,16 @@ export default function VisualTableLayout({
         positionY: defaultPos.y
       };
     }
-    return table;
+
+    // Normalize positions: backend uses pixels (max ~800x600), convert to percentages
+    const normalizedX = table.positionX > 100 ? normalizePosition(table.positionX, 800) : table.positionX;
+    const normalizedY = table.positionY > 100 ? normalizePosition(table.positionY, 600) : table.positionY;
+
+    return {
+      ...table,
+      positionX: normalizedX,
+      positionY: normalizedY
+    };
   });
 
   return (
