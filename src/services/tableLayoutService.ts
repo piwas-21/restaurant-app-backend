@@ -1,5 +1,5 @@
 import { apiClient } from '@/utils/apiClient';
-import type { TableDto, UpdateTableDto, ApiResponse } from '@/types/reservation';
+import type { TableDto, UpdateTableDto, CreateTableDto, ApiResponse } from '@/types/reservation';
 
 class TableLayoutService {
   /**
@@ -29,6 +29,27 @@ class TableLayoutService {
     await Promise.all(
       tables.map(({ id, data }) => this.updateTable(id, data))
     );
+  }
+
+  /**
+   * Create a new table
+   */
+  async createTable(data: CreateTableDto): Promise<TableDto> {
+    const response = await apiClient.post<ApiResponse<TableDto>>('/api/tables', data);
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Failed to create table');
+    }
+    return response.data;
+  }
+
+  /**
+   * Delete a table
+   */
+  async deleteTable(id: string): Promise<void> {
+    const response = await apiClient.delete<ApiResponse<void>>(`/api/tables/${id}`);
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to delete table');
+    }
   }
 }
 

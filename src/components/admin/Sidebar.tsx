@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, LayoutGrid, MapPin } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3 } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 const Sidebar = () => {
@@ -43,14 +43,14 @@ const Sidebar = () => {
       icon: CalendarCheck
     },
     {
-      href: '/admin/tables-management',
-      label: t('table_management', 'Table Management'),
-      icon: LayoutGrid
-    },
-    {
       href: '/admin/table-layout-editor',
       label: t('table_layout_editor', 'Table Layout Editor'),
       icon: MapPin
+    },
+    {
+      href: '/admin/table-statistics',
+      label: t('table_statistics', 'Table Statistics'),
+      icon: BarChart3
     },
     {
       href: '/admin/point-rules',

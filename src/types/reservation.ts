@@ -17,6 +17,7 @@ export interface TableDto {
   width: number;
   height: number;
   shape?: string; // circle, square, rectangle
+  notes?: string;
 }
 
 export interface ReservationDto {
@@ -81,6 +82,7 @@ export interface CreateTableDto {
   width?: number;
   height?: number;
   shape?: string;
+  notes?: string;
 }
 
 export interface UpdateTableDto {
@@ -93,6 +95,7 @@ export interface UpdateTableDto {
   width: number;
   height: number;
   shape: string;
+  notes?: string;
 }
 
 // API Response Types

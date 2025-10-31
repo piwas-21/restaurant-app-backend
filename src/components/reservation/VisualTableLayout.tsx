@@ -64,6 +64,9 @@ export default function VisualTableLayout({
 
     const showTooltip = hoveredTable?.id === table.id || status === 'selected';
 
+    // Position tooltip below if table is in the top 30% of the layout
+    const tooltipBelow = topPercent < 30;
+
     return (
       <div
         key={table.id}
@@ -83,7 +86,7 @@ export default function VisualTableLayout({
 
         {/* Tooltip on hover or selection */}
         {showTooltip && (
-          <div className={styles.tableTooltip}>
+          <div className={`${styles.tableTooltip} ${tooltipBelow ? styles.tooltipBelow : ''}`}>
             <div className={styles.tooltipRow}>
               <span className={styles.tooltipIcon}>👥</span>
               <span>{table.maxGuests} seats</span>

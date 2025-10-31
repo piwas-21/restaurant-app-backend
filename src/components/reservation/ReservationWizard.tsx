@@ -49,8 +49,13 @@ export default function ReservationWizard() {
     setError(null);
     try {
       const dateStr = date.toISOString().split('T')[0];
-      const slots = await reservationService.getAvailableTimeSlots(dateStr, guests);
-      setAvailableSlots(slots);
+      const result = await reservationService.getAvailableTimeSlots(dateStr, guests);
+      if (result.error) {
+        setError(result.error);
+        setAvailableSlots(null);
+      } else {
+        setAvailableSlots(result.data);
+      }
     } catch (err) {
       setError('Failed to load available time slots');
       console.error(err);
