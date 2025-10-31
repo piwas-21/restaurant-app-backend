@@ -127,7 +127,8 @@ export default function TablesManagementPage() {
         positionX: table.positionX,
         positionY: table.positionY,
         width: table.width,
-        height: table.height
+        height: table.height,
+        shape: table.shape || 'circle'
       });
       enqueueSnackbar(
         t('table_status_updated', `Table ${table.isActive ? 'deactivated' : 'activated'} successfully`),
@@ -383,7 +384,8 @@ function CreateTableModal({ onClose, onSuccess }: { onClose: () => void; onSucce
     positionX: 0,
     positionY: 0,
     width: 100,
-    height: 100
+    height: 100,
+    shape: 'circle'
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -502,7 +504,8 @@ function EditTableModal({
     positionX: table.positionX,
     positionY: table.positionY,
     width: table.width,
-    height: table.height
+    height: table.height,
+    shape: table.shape || 'circle'
   });
   const [submitting, setSubmitting] = useState(false);
 

@@ -1,25 +1,44 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { TableDto } from '@/types/reservation';
 import styles from './VisualTableLayout.module.css';
 
+// Canvas dimensions used for position conversion (must match backend seeder)
+const CANVAS_WIDTH = 600;
+const CANVAS_HEIGHT = 500;
+
 interface VisualTableLayoutProps {
   tables: TableDto[];
-  selectedTableId?: string;
+  selectedTableIds?: string[];
   onSelectTable: (table: TableDto) => void;
   bookedTableIds?: string[];
 }
 
 export default function VisualTableLayout({
   tables,
-  selectedTableId,
+  selectedTableIds = [],
   onSelectTable,
   bookedTableIds = []
 }: VisualTableLayoutProps) {
+  const [entrancePosition, setEntrancePosition] = useState({ x: 50, y: 10 });
+  const [hoveredTable, setHoveredTable] = useState<TableDto | null>(null);
+
+  useEffect(() => {
+    // Load entrance position from localStorage
+    const saved = localStorage.getItem('entrancePosition');
+    if (saved) {
+      try {
+        const position = JSON.parse(saved);
+        setEntrancePosition(position);
+      } catch (e) {
+        console.error('Failed to load entrance position:', e);
+      }
+    }
+  }, []);
 
   const getTableStatus = (table: TableDto): 'available' | 'booked' | 'selected' => {
-    if (selectedTableId === table.id) return 'selected';
+    if (selectedTableIds.includes(table.id)) return 'selected';
     if (bookedTableIds.includes(table.id)) return 'booked';
     return 'available';
   };
@@ -28,116 +47,84 @@ export default function VisualTableLayout({
     const status = getTableStatus(table);
     const isClickable = status === 'available' || status === 'selected';
 
-    // Determine table shape based on capacity
-    const isRound = table.maxGuests <= 4;
+    // Use shape from backend, fallback to capacity-based logic
+    const shape = table.shape || (table.maxGuests <= 4 ? 'circle' : 'rectangle');
+    const isRound = shape === 'circle';
+    const isSquare = shape === 'square';
     const isLarge = table.maxGuests > 6;
+
+    // Apply shape styles
+    let shapeClass = styles.rectangular; // default
+    if (isRound) shapeClass = styles.round;
+    if (isSquare) shapeClass = styles.square;
+
+    // Convert pixel positions to percentages
+    const leftPercent = ((table.positionX || 0) / CANVAS_WIDTH) * 100;
+    const topPercent = ((table.positionY || 0) / CANVAS_HEIGHT) * 100;
+
+    const showTooltip = hoveredTable?.id === table.id || status === 'selected';
 
     return (
       <div
         key={table.id}
-        className={`${styles.table} ${styles[status]} ${isRound ? styles.round : styles.rectangular} ${isLarge ? styles.large : ''} ${!isClickable ? styles.disabled : ''}`}
+        className={`${styles.table} ${styles[status]} ${shapeClass} ${isLarge ? styles.large : ''} ${!isClickable ? styles.disabled : ''}`}
         onClick={() => isClickable && onSelectTable(table)}
+        onMouseEnter={() => setHoveredTable(table)}
+        onMouseLeave={() => setHoveredTable(null)}
         style={{
-          left: `${table.positionX || 0}%`,
-          top: `${table.positionY || 0}%`,
+          left: `${leftPercent}%`,
+          top: `${topPercent}%`,
         }}
       >
-        {/* Chairs around table */}
-        {renderChairs(table, isRound)}
-
         {/* Table content */}
         <div className={styles.tableContent}>
           <span className={styles.tableLabel}>Table {table.tableNumber}</span>
         </div>
+
+        {/* Tooltip on hover or selection */}
+        {showTooltip && (
+          <div className={styles.tableTooltip}>
+            <div className={styles.tooltipRow}>
+              <span className={styles.tooltipIcon}>👥</span>
+              <span>{table.maxGuests} seats</span>
+            </div>
+            <div className={styles.tooltipRow}>
+              <span className={styles.tooltipIcon}>⬜</span>
+              <span>{shape.charAt(0).toUpperCase() + shape.slice(1)} table</span>
+            </div>
+            <div className={styles.tooltipRow}>
+              <span className={styles.tooltipIcon}>{table.isOutdoor ? '🌳' : '🏠'}</span>
+              <span>{table.isOutdoor ? 'Outdoor' : 'Indoor'}</span>
+            </div>
+            {table.notes && (
+              <div className={styles.tooltipNotes}>
+                <span className={styles.tooltipIcon}>💬</span>
+                <span>{table.notes}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
-
-  const renderChairs = (table: TableDto, isRound: boolean) => {
-    const chairCount = Math.min(table.maxGuests, isRound ? 4 : 8);
-    const chairs = [];
-
-    if (isRound) {
-      // For round tables, place chairs around
-      const positions = ['top', 'right', 'bottom', 'left'];
-      for (let i = 0; i < chairCount; i++) {
-        chairs.push(
-          <div key={i} className={`${styles.chair} ${styles[positions[i]]}`} />
-        );
-      }
-    } else {
-      // For rectangular tables, place chairs on sides
-      const chairsPerSide = Math.ceil(chairCount / 2);
-      for (let i = 0; i < chairsPerSide; i++) {
-        chairs.push(
-          <div key={`top-${i}`} className={`${styles.chair} ${styles.top}`} style={{ left: `${20 + (i * 60/chairsPerSide)}%` }} />
-        );
-      }
-      for (let i = 0; i < Math.floor(chairCount / 2); i++) {
-        chairs.push(
-          <div key={`bottom-${i}`} className={`${styles.chair} ${styles.bottom}`} style={{ left: `${20 + (i * 60/Math.floor(chairCount / 2))}%` }} />
-        );
-      }
-    }
-
-    return chairs;
-  };
-
-  // Normalize pixel positions to percentages
-  // Backend stores positions in pixels assuming 800x600 canvas
-  // We scale down to fit in a smaller percentage range to reduce overlap
-  const normalizePosition = (pixelValue: number, maxPixels: number, scaleFactor: number = 0.7): number => {
-    // Convert pixel value to percentage and scale down to create more spacing
-    const percentage = (pixelValue / maxPixels) * 100;
-    return percentage * scaleFactor;
-  };
-
-  // Default layout if no positions are set
-  const getDefaultPosition = (index: number, total: number): { x: number; y: number } => {
-    const cols = Math.min(4, Math.ceil(Math.sqrt(total))); // Max 4 columns
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-
-    return {
-      x: 5 + (col * 22), // 22% spacing between columns
-      y: 10 + (row * 25)  // 25% spacing between rows
-    };
-  };
-
-  // Apply default positions if tables don't have positions, or normalize pixel positions
-  const tablesWithPositions = tables.map((table, index) => {
-    if (table.positionX === undefined || table.positionY === undefined ||
-        table.positionX === 0 || table.positionY === 0) {
-      const defaultPos = getDefaultPosition(index, tables.length);
-      return {
-        ...table,
-        positionX: defaultPos.x,
-        positionY: defaultPos.y
-      };
-    }
-
-    // Normalize positions: backend uses pixels (max ~800x600), convert to percentages with scaling
-    const normalizedX = table.positionX > 100 ? normalizePosition(table.positionX, 800, 0.75) : table.positionX;
-    const normalizedY = table.positionY > 100 ? normalizePosition(table.positionY, 600, 0.85) : table.positionY;
-
-    return {
-      ...table,
-      positionX: normalizedX,
-      positionY: normalizedY
-    };
-  });
 
   return (
     <div className={styles.container}>
       <div className={styles.floorPlan}>
         {/* Entrance marker */}
-        <div className={styles.entrance}>
+        <div
+          className={styles.entrance}
+          style={{
+            left: `${entrancePosition.x}%`,
+            top: `${entrancePosition.y}%`,
+          }}
+        >
           <div className={styles.entranceDoor} />
           <span className={styles.entranceLabel}>Way in</span>
         </div>
 
         {/* Tables */}
-        {tablesWithPositions.map(renderTableShape)}
+        {tables.map(renderTableShape)}
       </div>
 
       {/* Legend */}

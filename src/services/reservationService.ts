@@ -82,21 +82,42 @@ export const reservationService = {
     };
   },
 
-  async getAvailableTimeSlots(date: string, numberOfGuests: number): Promise<AvailableTimeSlotsDto> {
+  async getAvailableTimeSlots(date: string, numberOfGuests: number): Promise<{
+    data: AvailableTimeSlotsDto | null;
+    error?: string;
+    isCapacityIssue?: boolean;
+  }> {
     const params = new URLSearchParams({
       date: date,
       numberOfGuests: String(numberOfGuests)
     });
 
-    const response = await apiClient.get<ApiResponse<AvailableTimeSlotsDto>>(
-      `/api/reservations/available-slots?${params}`
-    );
+    try {
+      const response = await apiClient.get<ApiResponse<AvailableTimeSlotsDto>>(
+        `/api/reservations/available-slots?${params}`
+      );
 
-    if (!response.data) {
-      throw new Error('Failed to fetch available time slots');
+      if (!response.success || !response.data) {
+        // Check errors array first, then message, then fallback
+        const errorMessage = response.errors && response.errors.length > 0
+          ? response.errors[0]
+          : response.message || 'Failed to fetch available time slots';
+
+        // Check if it's a capacity issue (expected scenario)
+        const isCapacityIssue = errorMessage.toLowerCase().includes('no tables available for');
+
+        return {
+          data: null,
+          error: errorMessage,
+          isCapacityIssue
+        };
+      }
+
+      return { data: response.data };
+    } catch (error: any) {
+      // Network or unexpected errors
+      throw new Error(error.message || 'Failed to fetch available time slots');
     }
-
-    return response.data;
   },
 
   async createReservation(data: CreateReservationDto): Promise<ReservationDto> {

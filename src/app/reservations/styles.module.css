@@ -362,3 +362,170 @@
     gap: 0.5rem;
   }
 }
+
+/* Combine Tables Chip */
+.combineChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border: 2px solid rgba(244, 196, 48, 0.3);
+  background: rgba(244, 196, 48, 0.05);
+  color: var(--text-primary);
+  border-radius: 24px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.combineChip:hover {
+  background: rgba(244, 196, 48, 0.1);
+  border-color: rgba(244, 196, 48, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(244, 196, 48, 0.2);
+}
+
+.combineChipActive {
+  background: linear-gradient(135deg, #f4c430 0%, #d4a62a 100%);
+  border-color: #f4c430;
+  color: #000;
+  box-shadow: 0 2px 12px rgba(244, 196, 48, 0.3);
+}
+
+.combineChipActive:hover {
+  background: linear-gradient(135deg, #ffcc33 0%, #e6b230 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(244, 196, 48, 0.4);
+}
+
+.combineChipIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* Capacity Warning */
+.capacityWarning {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+  border: 2px solid #ffa726;
+  border-left: 5px solid #ff9800;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.15);
+  animation: slideDown 0.4s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.warningIcon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.warningContent {
+  flex: 1;
+}
+
+.warningTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #e65100;
+  margin: 0 0 0.5rem 0;
+}
+
+.warningMessage {
+  font-size: 0.95rem;
+  color: #5d4037;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.5;
+}
+
+.warningAction {
+  font-size: 0.9rem;
+  color: #6d4c41;
+  margin: 0;
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* Dark Mode Support */
+[data-theme="dark"] .capacityWarning {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(255, 152, 0, 0.1) 100%);
+  border-color: rgba(255, 167, 38, 0.5);
+  border-left-color: rgba(255, 152, 0, 0.8);
+}
+
+[data-theme="dark"] .warningTitle {
+  color: #ffb74d;
+}
+
+[data-theme="dark"] .warningMessage,
+[data-theme="dark"] .warningAction {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Dark Mode Support */
+[data-theme="dark"] .dateButton {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .dateButton:hover {
+  background: rgba(244, 196, 48, 0.15);
+  border-color: rgba(244, 196, 48, 0.5);
+}
+
+[data-theme="dark"] .dateButton.selected {
+  background: #f4c430;
+  border-color: #f4c430;
+}
+
+[data-theme="dark"] .guestButton {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .guestButton:hover {
+  background: rgba(244, 196, 48, 0.15);
+  border-color: rgba(244, 196, 48, 0.5);
+}
+
+[data-theme="dark"] .guestButton.selected {
+  background: #f4c430;
+  border-color: #f4c430;
+  color: #000;
+}
+
+[data-theme="dark"] .timeButton {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .timeButton:hover {
+  background: rgba(244, 196, 48, 0.15);
+  border-color: rgba(244, 196, 48, 0.5);
+}
+
+[data-theme="dark"] .timeButton.selected {
+  background: #f4c430;
+  border-color: #f4c430;
+  color: #000;
+}

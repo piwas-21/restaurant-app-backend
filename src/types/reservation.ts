@@ -16,6 +16,7 @@ export interface TableDto {
   positionY: number;
   width: number;
   height: number;
+  shape?: string; // circle, square, rectangle
 }
 
 export interface ReservationDto {
@@ -79,6 +80,7 @@ export interface CreateTableDto {
   positionY?: number;
   width?: number;
   height?: number;
+  shape?: string;
 }
 
 export interface UpdateTableDto {
@@ -90,6 +92,7 @@ export interface UpdateTableDto {
   positionY: number;
   width: number;
   height: number;
+  shape: string;
 }
 
 // API Response Types
