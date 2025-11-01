@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { fidelityPointsService } from '@/services/fidelityPointsService';
 import type { FidelityPointBalance } from '@/types/fidelity';
 import PointsHistoryModal from './PointsHistoryModal';
-import styles from '../../app/styles/AccountPage.module.css';
+import styles from './FidelityPointsSection.module.css';
 
 export default function FidelityPointsSection() {
   const { t } = useTranslation();

@@ -57,9 +57,17 @@ export default function UserMenu() {
             <p className={styles.userRole}>{t(`roles.${user.role.toLowerCase()}`)}</p>
           </div>
           {user.role.toLowerCase() === 'customer' && (
-            <Link href="/account" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
-              {t('user_menu.my_account')}
-            </Link>
+            <>
+              <Link href="/account" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+                {t('user_menu.my_account')}
+              </Link>
+              <Link href="/my-orders" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+                {t('user_menu.my_orders', 'My Orders')}
+              </Link>
+              <Link href="/my-reservations" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+                {t('nav_reservations', 'Reservations')}
+              </Link>
+            </>
           )}
           <button onClick={handleLogout} className={styles.logoutButton}>
             {t('user_menu.logout')}

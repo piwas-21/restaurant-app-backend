@@ -60,6 +60,12 @@
   border-color: #f87171;
 }
 
+.statusNoShow {
+  background-color: #fecaca;
+  color: #7f1d1d;
+  border-color: #f87171;
+}
+
 /* Dark Theme Support */
 @media (prefers-color-scheme: dark) {
   .statusPending {
@@ -105,6 +111,12 @@
   }
 
   .statusCancelled {
+    background-color: rgba(248, 113, 113, 0.2);
+    color: #f87171;
+    border-color: #f87171;
+  }
+
+  .statusNoShow {
     background-color: rgba(248, 113, 113, 0.2);
     color: #f87171;
     border-color: #f87171;

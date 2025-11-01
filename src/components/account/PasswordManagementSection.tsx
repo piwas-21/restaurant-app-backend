@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from '../../app/styles/AccountPage.module.css'; // Assuming styles are shared
+import styles from './PasswordManagementSection.module.css';
 
 interface PasswordManagementSectionProps {
   currentPassword: string;

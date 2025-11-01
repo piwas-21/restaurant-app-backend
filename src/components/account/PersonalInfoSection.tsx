@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from '../../app/styles/AccountPage.module.css';
+import styles from './PersonalInfoSection.module.css';
 // Import the specific error keys type from the main page
 import type { UserProfile, ProfileErrorKeys } from '../../app/account/page';
 

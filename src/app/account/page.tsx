@@ -7,44 +7,15 @@ import styles from '../styles/AccountPage.module.css';
 
 import PersonalInfoSection from '../../components/account/PersonalInfoSection';
 import PasswordManagementSection from '../../components/account/PasswordManagementSection';
-import OrderHistorySection from '../../components/account/OrderHistorySection';
 import FidelityPointsSection from '../../components/account/FidelityPointsSection';
 import AddressManagement from '../../components/account/AddressManagement';
-import { getMyOrders } from '@/services/orderService';
 import { getCurrentUser, updateProfile, type UpdateUserProfileCommand } from '@/services/userService';
 import { changePassword } from '@/services/authService';
-import { OrderDto } from '@/types/order';
 
 export interface UserProfile {
   fullName: string;
   email: string;
   phoneNumber: string;
-}
-
-export type OrderStatus = "Delivered" | "In Progress" | "Cancelled" | "Pending Payment" | "Pending" | "Confirmed" | "Preparing" | "Ready" | "InTransit" | "Completed";
-
-export interface OrderItemDetail {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number; // Price per unit when ordered
-}
-
-export interface OrderHistoryItem {
-  id: string;
-  date: string;
-  status: OrderStatus;
-  totalAmount: number;
-  orderType: string;
-  items: OrderItemDetail[];
-  deliveryAddress?: {
-    addressLine1: string;
-    addressLine2?: string;
-    city: string;
-    state?: string;
-    postalCode: string;
-    country: string;
-  };
 }
 
 export type ProfileErrorKeys =
@@ -248,61 +219,6 @@ export default function AccountPage() {
     return '';
   };
 
-  const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-
-  // Load order history
-  useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const result = await getMyOrders({ pageSize: 50, page: 1 });
-
-        // Transform OrderDto to OrderHistoryItem
-        const transformedOrders: OrderHistoryItem[] = result.items.map((order: OrderDto) => ({
-          id: order.id,
-          date: new Date(order.orderDate).toISOString().split('T')[0],
-          status: order.status as OrderStatus,
-          totalAmount: order.total,
-          orderType: order.type,
-          items: order.items.map(item => ({
-            id: item.id,
-            name: item.productName || item.menuName || 'Unknown Item',
-            quantity: item.quantity,
-            price: item.unitPrice,
-          })),
-          deliveryAddress: order.deliveryAddress ? {
-            addressLine1: order.deliveryAddress.addressLine1,
-            addressLine2: order.deliveryAddress.addressLine2,
-            city: order.deliveryAddress.city,
-            state: order.deliveryAddress.state,
-            postalCode: order.deliveryAddress.postalCode,
-            country: order.deliveryAddress.country,
-          } : undefined,
-        }));
-
-        setOrderHistory(transformedOrders);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load orders:', error);
-        // Fall back to empty array on error
-        setOrderHistory([]);
-      } finally {
-        setOrdersLoading(false);
-      }
-    };
-    loadOrders();
-  }, []);
-
-  const getOrderStatusTranslationKey = (status: OrderStatus): string => {
-    switch (status) {
-      case "Delivered": return 'order_status_delivered';
-      case "In Progress": return 'order_status_in_progress';
-      case "Cancelled": return 'order_status_cancelled';
-      case "Pending Payment": return 'order_status_pending_payment';
-      default: return status;
-    }
-  };
-
   return (
     <main className={styles.container}>
       <h1 className={styles.pageTitle}>{t('account_page_title', 'My Account')}</h1>
@@ -317,8 +233,6 @@ export default function AccountPage() {
             handleProfileChange={handleProfileChange}
             handleProfileSave={handleProfileSave}
           />
-
-          <AddressManagement />
 
           <PasswordManagementSection
             currentPassword={currentPassword}
@@ -336,13 +250,9 @@ export default function AccountPage() {
           />
         </div>
 
-        {/* Right Column: Orders and Fidelity Points */}
+        {/* Right Column: Fidelity Points */}
         <div className={styles.rightColumn}>
-          <OrderHistorySection
-            orderHistory={ordersLoading ? [] : orderHistory}
-            getOrderStatusTranslationKey={getOrderStatusTranslationKey}
-          />
-
+          <AddressManagement />
           <FidelityPointsSection />
         </div>
       </div>

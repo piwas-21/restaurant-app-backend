@@ -1,0 +1,210 @@
+/* FidelityPointsSection.module.css */
+
+.section {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color-light);
+  color: var(--text-color);
+}
+
+.loadingText {
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+  padding: 2rem 0;
+  margin: 0;
+}
+
+.errorText {
+  color: var(--error-color, #dc2626);
+  text-align: center;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+.retryButton {
+  display: block;
+  margin: 1rem auto 0;
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-color, #667eea);
+  color: var(--button-text-color, white);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+}
+
+.retryButton:hover {
+  background-color: var(--primary-hover, #5568d3);
+}
+
+[data-theme="dark"] .retryButton {
+  background-color: var(--primary-color-dark, #5568d3);
+}
+
+[data-theme="dark"] .retryButton:hover {
+  background-color: var(--primary-hover, #4557b8);
+}
+
+.pointsBalanceCard {
+  background: var(--primary-color, #667eea);
+  color: var(--button-text-color, white);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+[data-theme="dark"] .pointsBalanceCard {
+  background: var(--primary-color, #5568d3);
+}
+
+.pointsMainInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.pointsNumber {
+  display: flex;
+  flex-direction: column;
+}
+
+.pointsValue {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.pointsLabel {
+  font-size: 0.875rem;
+  opacity: 0.9;
+}
+
+.pointsValue .currencyValue {
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.pointsValue .valueLabel {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.pointsStats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.statLabel {
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}
+
+.pointsActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.viewHistoryButton,
+.learnMoreButton {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.viewHistoryButton {
+  background-color: var(--primary-color, #5568d3);
+  color: var(--button-text-color, white);
+}
+
+.viewHistoryButton:hover {
+  background-color: var(--link-hover-color);
+  border-color: var(--link-hover-color);
+}
+
+.learnMoreButton {
+  background-color: var(--card-background, white);
+  color: var(--primary-color, #667eea);
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.learnMoreButton:hover {
+  background-color: var(--secondary-color-light, #f8f9fa);
+}
+
+[data-theme="dark"] .learnMoreButton {
+  background-color: var(--secondary-color, #3a3a3a);
+  color: white;
+  border-color: var(--border-color, #555);
+}
+
+[data-theme="dark"] .learnMoreButton:hover {
+  background-color: var(--background-color, #222);
+}
+
+@media (max-width: 640px) {
+  .pointsMainInfo {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .pointsValue {
+    font-size: 2rem;
+  }
+
+  .pointsStats {
+    grid-template-columns: 1fr;
+  }
+
+  .pointsActions {
+    flex-direction: column;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .section {
+    padding: 1rem 1.25rem;
+  }
+
+  .sectionTitle {
+    font-size: 1.25rem;
+  }
+}
