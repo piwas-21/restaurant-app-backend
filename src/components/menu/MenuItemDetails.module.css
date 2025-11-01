@@ -1,0 +1,115 @@
+/* Menu Item Details Styles */
+.itemTitle {
+  font-size: 1.6rem;
+  margin-bottom: 0.7rem;
+  color: var(--text-color);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  min-height: 1.8rem;
+}
+
+.itemDescription {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.8rem;
+}
+
+.clamp2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.8rem;
+}
+
+.itemPrice {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-bottom: 1.2rem;
+}
+
+.allergyTags {
+  margin-bottom: 1rem;
+  min-height: 20px;
+}
+
+.ingredientsSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1rem 0;
+  min-height: 32px;
+}
+
+.ingredientsLabel {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary, #666);
+  opacity: 0.8;
+}
+
+.ingredientsContent {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.ingredientTag {
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  background-color: var(--background-subtle, #f5f5f5);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #666);
+  opacity: 0.9;
+}
+
+/* Legacy allergyTag styles - kept for backward compatibility */
+.allergyTag {
+  display: inline-block;
+  padding: 0.4em 0.8em;
+  border-radius: 15px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0.25rem;
+  border: 1px solid transparent;
+}
+
+.allergyTag.vegan {
+  background-color: var(--success-color-xlight, #d4edda);
+  color: var(--success-color-dark, #155724);
+  border-color: var(--success-color-light, #c3e6cb);
+}
+
+.allergyTag.vegetarian {
+  background-color: var(--info-color-xlight, #cce5ff);
+  color: var(--info-color-dark, #004085);
+  border-color: var(--info-color-light, #b8daff);
+}
+
+.allergyTag.halal {
+  background-color: var(--secondary-color-light, #e2e3e5);
+  color: var(--text-secondary, #383d41);
+  border-color: var(--border-color-light, #d6d8db);
+}
+
+.allergyTag.gluten-free {
+  background-color: var(--warning-color-xlight, #fff3cd);
+  color: var(--warning-color-dark, #856404);
+  border-color: var(--warning-color-light, #ffeeba);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .itemTitle {
+    font-size: 1.3rem;
+  }
+}

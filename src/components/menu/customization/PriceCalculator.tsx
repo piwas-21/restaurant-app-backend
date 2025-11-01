@@ -55,7 +55,7 @@ export default function PriceCalculator({
 
   return (
     <div className={styles.priceCalculator}>
-      {/* Price Breakdown */}
+      {/* Price Breakdown - Compact */}
       <div className={styles.priceBreakdown}>
         <div className={styles.priceRow}>
           <span className={styles.priceLabel}>{t("base_price")}:</span>
@@ -114,36 +114,39 @@ export default function PriceCalculator({
         )}
       </div>
 
-      {/* Quantity Selector */}
-      <div className={styles.quantitySelector}>
-        <span className={styles.quantityLabel}>{t("quantity")}:</span>
-        <div className={styles.quantityControls}>
-          <button
-            onClick={() => onQuantityChange(-1)}
-            disabled={quantity <= 1}
-            className={styles.quantityButton}
-            aria-label={t("decrease_quantity")}
-            type="button"
-          >
-            <Minus size={18} />
-          </button>
-          <span className={styles.quantityValue}>{quantity}</span>
-          <button
-            onClick={() => onQuantityChange(1)}
-            disabled={quantity >= 99}
-            className={styles.quantityButton}
-            aria-label={t("increase_quantity")}
-            type="button"
-          >
-            <Plus size={18} />
-          </button>
+      {/* Bottom Row: Quantity + Total (Inline) */}
+      <div className={styles.footerRow}>
+        {/* Quantity Selector */}
+        <div className={styles.quantitySelector}>
+          <span className={styles.quantityLabel}>{t("quantity")}:</span>
+          <div className={styles.quantityControls}>
+            <button
+              onClick={() => onQuantityChange(-1)}
+              disabled={quantity <= 1}
+              className={styles.quantityButton}
+              aria-label={t("decrease_quantity")}
+              type="button"
+            >
+              <Minus size={18} />
+            </button>
+            <span className={styles.quantityValue}>{quantity}</span>
+            <button
+              onClick={() => onQuantityChange(1)}
+              disabled={quantity >= 99}
+              className={styles.quantityButton}
+              aria-label={t("increase_quantity")}
+              type="button"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Total */}
-      <div className={styles.totalRow}>
-        <span className={styles.totalLabel}>{t("total_price")}:</span>
-        <span className={styles.totalValue}>CHF {total.toFixed(2)}</span>
+        {/* Total */}
+        <div className={styles.totalPrice}>
+          <span className={styles.totalLabel}>{t("total_price")}:</span>
+          <span className={styles.totalValue}>CHF {total.toFixed(2)}</span>
+        </div>
       </div>
     </div>
   );

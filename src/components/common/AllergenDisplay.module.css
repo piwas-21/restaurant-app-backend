@@ -1,0 +1,171 @@
+/* Allergen Display Styles */
+.allergensSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0.5rem 0 1rem 0;
+  min-height: 32px;
+}
+
+.allergensLabel {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  color: var(--warning-color-dark, #856404);
+  font-weight: 600;
+}
+
+.allergensContent {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.allergenTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid;
+  transition: all 0.2s ease;
+}
+
+.allergenTag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.allergenIcon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.allergenText {
+  line-height: 1;
+}
+
+/* Positive allergen types */
+.allergenTag.vegan {
+  background-color: var(--success-color-xlight, #d4f4dd);
+  color: var(--success-color-dark, #1b5e20);
+  border-color: var(--success-color-light, #4caf50);
+}
+
+.allergenTag.vegetarian {
+  background-color: var(--success-color-xlight, #e8f5e8);
+  color: var(--success-color-dark, #2e7d32);
+  border-color: var(--success-color-light, #66bb6a);
+}
+
+.allergenTag.glutenFree {
+  background-color: #fff3e0;
+  color: #e65100;
+  border-color: #ffb74d;
+}
+
+.allergenTag.dairyFree {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border-color: #42a5f5;
+}
+
+.allergenTag.nutFree {
+  background-color: #f3e5f5;
+  color: #4a148c;
+  border-color: #ab47bc;
+}
+
+.allergenTag.halal {
+  background-color: #e8f5e8;
+  color: #1b5e20;
+  border-color: #4caf50;
+}
+
+.allergenTag.kosher {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border-color: #2196f3;
+}
+
+.allergenTag.organic {
+  background-color: #f1f8e9;
+  color: #33691e;
+  border-color: #8bc34a;
+}
+
+.allergenTag.sugarFree {
+  background-color: #fce4ec;
+  color: #880e4f;
+  border-color: #e91e63;
+}
+
+.allergenTag.lowSodium {
+  background-color: #e0f2f1;
+  color: #004d40;
+  border-color: #26a69a;
+}
+
+.allergenTag.warning {
+  background-color: var(--warning-color-xlight, #fff8e1);
+  color: var(--warning-color-dark, #e65100);
+  border-color: var(--warning-color-light, #ffb74d);
+}
+
+.allergenTag.spicy {
+  background-color: #ffebee;
+  color: #c62828;
+  border-color: #ef5350;
+}
+
+.allergenTag.default {
+  background-color: var(--background-subtle, #f5f5f5);
+  color: var(--text-secondary, #666);
+  border-color: var(--border-color, #ddd);
+}
+
+.allergenTag.more {
+  background-color: var(--background-subtle, #f0f0f0);
+  color: var(--text-secondary, #666);
+  border-color: var(--border-color, #ccc);
+  font-weight: 600;
+  cursor: help;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .allergenTag.vegan {
+    background-color: rgba(76, 175, 80, 0.15);
+    color: #81c784;
+    border-color: rgba(76, 175, 80, 0.3);
+  }
+
+  .allergenTag.vegetarian {
+    background-color: rgba(102, 187, 106, 0.15);
+    color: #a5d6a7;
+    border-color: rgba(102, 187, 106, 0.3);
+  }
+
+  .allergenTag.warning {
+    background-color: rgba(255, 183, 77, 0.15);
+    color: #ffcc02;
+    border-color: rgba(255, 183, 77, 0.3);
+  }
+
+  .allergenTag.default {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .allergenTag.more {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+}

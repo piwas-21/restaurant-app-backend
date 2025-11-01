@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import styles from "./MenuItem.module.css";
+import styles from "./MenuItemDetails.module.css";
 import AllergenDisplay from "@/components/common/AllergenDisplay";
 
 type RatingData = { average: number; count: number } | undefined;
@@ -22,8 +22,8 @@ export default function MenuItemDetails({ id, title, description, ingredients, a
   return (
     <>
       <h3 id={`item-name-${id}`} className={styles.itemTitle}>{title}</h3>
-      <p className={`${styles.itemDescription} ${styles.clamp2}`}>{(description || '').trim().length > 0 ? description : ' '}</p>
-      {(() => {
+      {/* <p className={`${styles.itemDescription} ${styles.clamp2}`}>{(description || '').trim().length > 0 ? description : ' '}</p> */}
+      {/* {(() => {
         const text = (ingredients || '').trim();
         const parts = text
           ? text.split(/[\,\n;]+/).map((s) => s.trim()).filter(Boolean)
@@ -63,7 +63,7 @@ export default function MenuItemDetails({ id, title, description, ingredients, a
             )}
           </div>
         );
-      })()}
+      })()} */}
 
       {/* Allergens section - display below ingredients */}
       <AllergenDisplay

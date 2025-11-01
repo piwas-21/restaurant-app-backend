@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import styles from "./MenuItem.module.css";
+import styles from "./MenuItemActions.module.css";
 
 type Props = {
   onAdd: () => void;

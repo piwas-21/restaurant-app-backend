@@ -1,7 +1,8 @@
 /* Featured Special Section Styles */
 .featuredSpecialSection {
-  margin: 2rem 0 3rem 0;
   padding: 0;
+  width: 50%;
+  margin: 2rem auto;
 }
 
 .featuredSpecialContainer {

@@ -3,6 +3,8 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  flex: 1;
+  min-width: 0;
 }
 
 /* Price Breakdown */
@@ -18,7 +20,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
 }
 
 .priceLabel {
@@ -35,7 +37,7 @@
 }
 
 .itemDetails {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--text-secondary, #9ca3af);
   font-style: italic;
   margin-top: 0.125rem;
@@ -49,6 +51,7 @@
   color: var(--text-color, #1a1a1a);
   font-weight: 600;
   white-space: nowrap;
+  font-size: 0.875rem;
 }
 
 [data-theme="dark"] .priceValue {
@@ -59,33 +62,33 @@
 .divider {
   height: 1px;
   background-color: var(--border-color, #e5e7eb);
-  margin: 0.5rem 0;
+  margin: 0.25rem 0;
 }
 
 [data-theme="dark"] .divider {
   background-color: var(--border-color, #555);
 }
 
+/* Footer Row - Quantity + Total Inline */
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 /* Quantity Selector */
 .quantitySelector {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  background-color: var(--secondary-color-light, #f9fafb);
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-}
-
-[data-theme="dark"] .quantitySelector {
-  background-color: var(--secondary-color, #3a3a3a);
-  border-color: var(--border-color, #555);
+  gap: 0.75rem;
 }
 
 .quantityLabel {
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-color, #1a1a1a);
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .quantityLabel {
@@ -95,15 +98,15 @@
 .quantityControls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .quantityButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   background-color: var(--background-color, white);
   color: var(--text-color, #1a1a1a);
   border: 1px solid var(--border-color, #e5e7eb);
@@ -141,10 +144,10 @@
 }
 
 .quantityValue {
-  min-width: 2.5rem;
+  min-width: 2rem;
   text-align: center;
-  font-size: 1.125rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-color, #1a1a1a);
 }
 
@@ -152,48 +155,80 @@
   color: var(--text-color, #e0e0e0);
 }
 
-/* Total Row */
-.totalRow {
+/* Total Price - Inline Badge */
+.totalPrice {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
   background-color: var(--primary-color, #c0392b);
   color: var(--button-text-color, white);
   border-radius: 8px;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .totalPrice {
+  background-color: var(--primary-color-dark, #e06666);
+  color: rgb(199, 191, 191);
+}
+
+.totalLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.totalValue {
   font-size: 1.125rem;
   font-weight: 700;
 }
 
-[data-theme="dark"] .totalRow {
-  background-color: var(--primary-color-dark, #e06666);
-}
-
-.totalLabel {
-  flex: 1;
-}
-
-.totalValue {
-  font-size: 1.25rem;
-  white-space: nowrap;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
+  .priceCalculator {
+    gap: 0.875rem;
+  }
+
+  .priceBreakdown {
+    gap: 0.375rem;
+  }
+
   .priceRow {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    gap: 0.75rem;
+  }
+
+  .priceValue {
+    font-size: 0.8125rem;
   }
 
   .itemDetails {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
+  }
+
+  .divider {
+    margin: 0.375rem 0;
+  }
+
+  .footerRow {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
   .quantitySelector {
-    padding: 0.875rem;
+    flex: 1;
+    min-width: fit-content;
+    gap: 0.5rem;
   }
 
   .quantityLabel {
     font-size: 0.875rem;
+  }
+
+  .quantityControls {
+    gap: 0.375rem;
   }
 
   .quantityButton {
@@ -202,21 +237,54 @@
   }
 
   .quantityValue {
-    font-size: 1rem;
+    font-size: 0.9375rem;
+    min-width: 1.75rem;
   }
 
-  .totalRow {
-    padding: 0.875rem;
-    font-size: 1rem;
+  .totalPrice {
+    flex: 1;
+    min-width: fit-content;
+    justify-content: space-between;
+    padding: 0.625rem 0.875rem;
+  }
+
+  .totalLabel {
+    font-size: 0.8125rem;
   }
 
   .totalValue {
-    font-size: 1.125rem;
+    font-size: 1rem;
   }
 }
 
 @media (max-width: 480px) {
+  .priceCalculator {
+    gap: 0.75rem;
+  }
+
   .priceRow {
+    font-size: 0.75rem;
+  }
+
+  .priceValue {
+    font-size: 0.75rem;
+  }
+
+  .itemDetails {
+    font-size: 0.625rem;
+  }
+
+  .footerRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.625rem;
+  }
+
+  .quantitySelector {
+    justify-content: space-between;
+  }
+
+  .quantityLabel {
     font-size: 0.8125rem;
   }
 
@@ -230,15 +298,20 @@
   }
 
   .quantityValue {
-    font-size: 0.9375rem;
-    min-width: 2rem;
+    font-size: 0.875rem;
+    min-width: 1.5rem;
   }
 
-  .totalRow {
-    font-size: 0.9375rem;
+  .totalPrice {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+  }
+
+  .totalLabel {
+    font-size: 0.75rem;
   }
 
   .totalValue {
-    font-size: 1rem;
+    font-size: 0.9375rem;
   }
 }

@@ -253,7 +253,6 @@ export default function CustomizationModal({
             quantity={quantity}
             onQuantityChange={handleQuantityChange}
           />
-
           <button
             onClick={handleAddToCart}
             className={styles.addToCartButton}
@@ -262,7 +261,7 @@ export default function CustomizationModal({
           >
             {isSubmitting
               ? t("adding_to_cart", "Adding...")
-              : `${t("add_to_order")} ${quantity} ${t("to_cart")} - CHF ${totalPrice().toFixed(2)}`}
+              : t("add_to_order", "Add to Order")}
           </button>
         </div>
       </div>

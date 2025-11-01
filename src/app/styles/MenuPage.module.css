@@ -86,13 +86,19 @@
 }
 
 .viewCartButton {
-  background-color: var(--danger-color) !important;
+  background-color: var(--link-color);
+  color: var(--button-text-color);
   padding: 1rem 2rem !important;
   font-size: 1.1rem !important;
   font-weight: bold !important;
   white-space: nowrap !important;
   display: inline-block !important;
   max-width: 100% !important;
+}
+
+.viewCartButton:hover {
+  background-color: var(--link-hover-color);
+  color: var(--button-text-color);
 }
 
 .errorMessage {

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import styles from '@/components/menu/MenuItem.module.css';
+import styles from './AllergenDisplay.module.css';
 
 // Helper function to get allergen styling and icon
 export function getAllergenInfo(allergen: string) {
@@ -165,7 +165,7 @@ export default function AllergenDisplay({
   // Default 'full' variant - preserves layout spacing
   return (
     <div className={`${styles.allergensSection} ${className}`} aria-label={t('allergens', 'Allergens')}>
-      {showLabel && <div className={styles.allergensLabel}>{t('allergens', 'Allergens')}</div>}
+      {/* {showLabel && <div className={styles.allergensLabel}>{t('allergens', 'Allergens')}</div>} */}
       <div className={styles.allergensContent}>
         {shown.map((allergen, idx) => {
           const { icon, className: allergenClassName } = getAllergenInfo(allergen);
