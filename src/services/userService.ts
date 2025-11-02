@@ -1,50 +1,23 @@
 import { apiClient } from '@/utils/apiClient';
+import type {
+  UserDto,
+  RegisterStaffCommand,
+  UpdateStaffCommand,
+  UpdateCustomerCommand,
+  UpdateUserDiscountsCommand,
+  UserStatistics,
+  PagedResult,
+  ApiResponse,
+  UpdateUserProfileCommand
+} from '@/types/user';
+
+// Re-export types for convenience
+export type { UpdateUserProfileCommand, UserDto };
 
 const USER_API_URL = `/api/User`;
 
 /**
- * User DTO matching backend UserDto
- */
-export interface UserDto {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  phoneNumber?: string;
-  role: string;
-  isEmailConfirmed: boolean;
-  createdAt: string;
-  updatedAt?: string;
-  metadata: Record<string, string>;
-  orderLimitAmount: number;
-  discountPercentage: number;
-  isDiscountActive: boolean;
-}
-
-/**
- * Update User Profile Command
- */
-export interface UpdateUserProfileCommand {
-  firstName: string;
-  lastName: string;
-  phoneNumber?: string;
-}
-
-/**
- * API Response wrapper
- */
-interface ApiResponse<T> {
-  data: T;
-  success: boolean;
-  message?: string;
-  errors?: string[];
-}
-
-/**
  * Get current user profile
- *
- * @returns Current user details
  */
 export async function getCurrentUser(): Promise<UserDto> {
   try {
@@ -64,9 +37,6 @@ export async function getCurrentUser(): Promise<UserDto> {
 
 /**
  * Update current user's profile
- *
- * @param command - Profile update details
- * @returns Updated user profile
  */
 export async function updateProfile(command: UpdateUserProfileCommand): Promise<UserDto> {
   try {
@@ -84,13 +54,16 @@ export async function updateProfile(command: UpdateUserProfileCommand): Promise<
   }
 }
 
+/**
+ * Fetch users with filters (Admin only)
+ */
 export const fetchUsers = async (
   role: string,
   isDeleted: boolean,
   search: string,
   page: number,
   pageSize: number
-) => {
+): Promise<ApiResponse<PagedResult<UserDto>>> => {
   const params = new URLSearchParams({
     Role: role,
     IsDeleted: String(isDeleted),
@@ -99,13 +72,57 @@ export const fetchUsers = async (
     PageSize: String(pageSize),
   });
 
-  return await apiClient.get(`${USER_API_URL}/users?${params.toString()}`);
+  return await apiClient.get<ApiResponse<PagedResult<UserDto>>>(`${USER_API_URL}/users?${params.toString()}`);
 };
 
-export const registerStaff = async (staffData: any) => {
-  return await apiClient.post(`${USER_API_URL}/register/staff`, staffData);
+/**
+ * Register a new staff member (Admin only)
+ */
+export const registerStaff = async (command: RegisterStaffCommand): Promise<ApiResponse<any>> => {
+  return await apiClient.post<ApiResponse<any>>(`${USER_API_URL}/register/staff`, command);
 };
 
-export const deleteStaff = async (userId: string) => {
-  return await apiClient.delete(`${USER_API_URL}/delete/user/${userId}`);
+/**
+ * Update staff member details (Admin only)
+ */
+export const updateStaff = async (command: UpdateStaffCommand): Promise<ApiResponse<any>> => {
+  return await apiClient.post<ApiResponse<any>>(`${USER_API_URL}/update/staff`, command);
 };
+
+/**
+ * Update customer profile (Admin only)
+ */
+export const updateCustomer = async (command: UpdateCustomerCommand): Promise<ApiResponse<UserDto>> => {
+  return await apiClient.put<ApiResponse<UserDto>>(`${USER_API_URL}/profile`, command);
+};
+
+/**
+ * Update user discount settings (Admin only)
+ */
+export const updateUserDiscounts = async (command: UpdateUserDiscountsCommand): Promise<ApiResponse<UserDto>> => {
+  return await apiClient.put<ApiResponse<UserDto>>(`${USER_API_URL}/user-discounts`, command);
+};
+
+/**
+ * Delete/Soft delete a user (Admin only)
+ */
+export const deleteUser = async (userId: string): Promise<ApiResponse<string>> => {
+  return await apiClient.delete<ApiResponse<string>>(`${USER_API_URL}/delete/user`, {
+    body: JSON.stringify({ userId })
+  });
+};
+
+/**
+ * Legacy method - kept for backward compatibility
+ */
+export const deleteStaff = async (userId: string): Promise<ApiResponse<string>> => {
+  return deleteUser(userId);
+};
+
+/**
+ * Get user statistics (Admin only)
+ */
+export const getUserStatistics = async (): Promise<ApiResponse<UserStatistics>> => {
+  return await apiClient.get<ApiResponse<UserStatistics>>(`${USER_API_URL}/statistics`);
+};
+

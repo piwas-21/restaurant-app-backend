@@ -6,6 +6,7 @@ import tableLayoutService from '@/services/tableLayoutService';
 import { reservationService } from '@/services/reservationService';
 import type { TableDto, ReservationDto } from '@/types/reservation';
 import { ReservationStatus } from '@/types/reservation';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 import styles from './styles.module.css';
 
 interface TableReservationStats {
@@ -111,9 +112,10 @@ function TableStatisticsPage() {
   const leastPopularTables = sortedByReservations.filter(t => t.totalReservations > 0).slice(-5).reverse();
 
   return (
-    <div className={styles.container}>
-      {/* Header */}
-      <div className={styles.header}>
+    <AdminAuthGuard>
+      <div className={styles.container}>
+        {/* Header */}
+        <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Table Statistics</h1>
           <p className={styles.subtitle}>Overview of your restaurant table inventory and capacity</p>
@@ -423,7 +425,8 @@ function TableStatisticsPage() {
           })}
         </div>
       </div>
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }
 

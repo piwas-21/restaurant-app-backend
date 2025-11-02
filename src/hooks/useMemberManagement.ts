@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { fetchUsers, deleteStaff } from '@/services/userService';
+import { fetchUsers, deleteStaff, updateStaff } from '@/services/userService';
+import type { UserDto, UpdateStaffCommand } from '@/types/user';
 
 export const useMemberManagement = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -38,6 +39,29 @@ export const useMemberManagement = () => {
     }
   };
 
+  const handleUpdateUser = async (user: UserDto, updates: Partial<UserDto>, newPassword?: string) => {
+    try {
+      // Only staff/admin users can be updated by admin
+      if (user.role === 'Customer') {
+        return { success: false, message: 'Customers can only update their own profile' };
+      }
+
+      const command: UpdateStaffCommand = {
+        userId: user.id,
+        firstName: updates.firstName ?? user.firstName,
+        lastName: updates.lastName ?? user.lastName,
+        email: updates.email ?? user.email,
+        phoneNumber: updates.phoneNumber ?? user.phoneNumber,
+        role: updates.role ?? user.role,
+        password: newPassword,
+      };
+      const data = await updateStaff(command);
+      return { success: data.success, message: data.message };
+    } catch {
+      return { success: false, message: 'An unexpected error occurred.' };
+    }
+  };
+
   return {
     users,
     totalCount,
@@ -45,5 +69,6 @@ export const useMemberManagement = () => {
     error,
     getUsers,
     handleDeleteUser,
+    handleUpdateUser,
   };
 };

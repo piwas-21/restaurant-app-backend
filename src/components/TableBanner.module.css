@@ -1,0 +1,235 @@
+.banner {
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.banner.top {
+  position: sticky;
+  top: 0;
+}
+
+.banner.floating {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 600px;
+  border-radius: 12px;
+  animation: slideDown 0.3s ease-out, float 2s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-5px);
+  }
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-size: 0.875rem;
+  opacity: 0.95;
+  font-weight: 500;
+}
+
+.tableNumber {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.clearButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.clearButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.clearButton:active {
+  transform: scale(0.95);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .banner {
+    background: linear-gradient(135deg, #4c5fd5 0%, #5a3d7c 100%);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .icon,
+  .clearButton {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .icon:hover,
+  .clearButton:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .badge {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+/* Custom Theme Support */
+[data-theme="dark"] .banner {
+  background: linear-gradient(135deg, #4c5fd5 0%, #5a3d7c 100%);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .icon,
+[data-theme="dark"] .clearButton {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Accessibility */
+.clearButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+/* Enhanced hover effects */
+.content:hover .icon {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+.content:hover .tableNumber {
+  transform: scale(1.02);
+  transition: transform 0.2s ease;
+}
+
+/* Loading state for async actions */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  }
+}
+
+.banner.loading {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .content {
+    padding: 0.625rem 0.875rem;
+    gap: 0.5rem;
+  }
+
+  .icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .label {
+    font-size: 0.8125rem;
+  }
+
+  .tableNumber {
+    font-size: 1rem;
+  }
+
+  .badge {
+    font-size: 0.6875rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .clearButton {
+    width: 28px;
+    height: 28px;
+  }
+
+  .banner.floating {
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    transform: none;
+    max-width: none;
+    border-radius: 8px;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+}
+
+/* Print styles - hide banner when printing */
+@media print {
+  .banner {
+    display: none;
+  }
+}

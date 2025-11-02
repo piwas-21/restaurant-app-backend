@@ -7,6 +7,7 @@ import type { PointEarningRule } from '@/types/fidelity';
 import { Plus, Edit, Trash2, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import PointRuleForm from '@/components/admin/PointRuleForm';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 import styles from './point-rules.module.css';
 
 export default function PointRulesPage() {
@@ -77,7 +78,8 @@ export default function PointRulesPage() {
   };
 
   return (
-    <main className={styles.container}>
+    <AdminAuthGuard>
+      <main className={styles.container}>
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>{t('point_earning_rules', 'Point Earning Rules')}</h1>
@@ -189,6 +191,7 @@ export default function PointRulesPage() {
           onCancel={handleFormCancel}
         />
       )}
-    </main>
+      </main>
+    </AdminAuthGuard>
   );
 }

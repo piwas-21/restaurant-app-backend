@@ -13,6 +13,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import ProductsTable from '@/components/admin/menu-management/ProductsTable';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
 const MenuManagementContent = () => {
   const { t } = useTranslation();
@@ -139,9 +140,11 @@ const MenuManagementContent = () => {
 };
 
 const MenuManagementPage = () => (
-  <Suspense fallback={<div>Loading...</div>}>
-    <MenuManagementContent />
-  </Suspense>
+  <AdminAuthGuard>
+    <Suspense fallback={<div>Loading...</div>}>
+      <MenuManagementContent />
+    </Suspense>
+  </AdminAuthGuard>
 );
 
 export default MenuManagementPage;

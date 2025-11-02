@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { UtensilsCrossed } from "lucide-react";
 import { useCart } from "@/components/cart/CartContext";
 import { useSnackbar } from "notistack";
+import TableBanner from "@/components/TableBanner";
 
 import type { LanguageCode } from "@/components/LanguageSwitcher";
 import { usePublicMenu, ALL_ITEMS_KEY } from "@/hooks/usePublicMenu";
@@ -78,6 +79,7 @@ export default function MenuPage() {
       menuItem.image = fallbackImage;
     }
   };
+
   useEffect(() => {
     setIsMounted(true);
 
@@ -226,6 +228,8 @@ export default function MenuPage() {
       <h1 id="menu-page-heading" className={styles.pageTitle}>
         <UtensilsCrossed size={48} strokeWidth={2} aria-label={t("menu_title")} />
       </h1>
+
+      <TableBanner position="top" />
 
       {featuredSpecial && (
         <FeaturedSpecial

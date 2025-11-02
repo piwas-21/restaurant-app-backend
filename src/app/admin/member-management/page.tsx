@@ -10,6 +10,10 @@ import ResultModal from '@/components/common/ResultModal';
 import PageHeader from '@/components/admin/PageHeader';
 import FilterControls from '@/components/admin/member-management/FilterControls';
 import MembersTable from '@/components/admin/member-management/MembersTable';
+import UserStatistics from '@/components/admin/member-management/UserStatistics';
+import EditUserModal from '@/components/admin/member-management/EditUserModal';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
+import type { UserDto } from '@/types/user';
 
 const MemberManagementPage = () => {
   const { t } = useTranslation();
@@ -20,6 +24,7 @@ const MemberManagementPage = () => {
     error,
     getUsers,
     handleDeleteUser,
+    handleUpdateUser,
   } = useMemberManagement();
 
   const [activeTab, setActiveTab] = useState('customers');
@@ -29,19 +34,55 @@ const MemberManagementPage = () => {
   const [pageSize] = useState(10);
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<UserDto | null>(null);
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const [userToDelete, setUserToDelete] = useState<UserDto | null>(null);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [resultModalMessage, setResultModalMessage] = useState('');
   const [isResultModalSuccess, setIsResultModalSuccess] = useState(false);
+  const [statsKey, setStatsKey] = useState(0); // Key to force statistics refresh
 
   useEffect(() => {
     const role = activeTab === 'customers' ? 'Customer' : '';
     getUsers(role, showDeleted, searchTerm, page, pageSize);
   }, [activeTab, searchTerm, showDeleted, page, pageSize, getUsers]);
 
-  const handleEdit = (user: any) => {
-    // Handle edit logic
+  const handleEdit = (user: UserDto) => {
+    setUserToEdit(user);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveUser = async (updatedUser: Partial<UserDto>) => {
+    if (!userToEdit) return;
+
+    try {
+      // Extract password if it exists
+      const { password, ...updates } = updatedUser as Partial<UserDto> & { password?: string };
+
+      // Call the update API
+      const result = await handleUpdateUser(userToEdit, updates, password);
+
+      // Show result
+      setIsEditModalOpen(false);
+      setUserToEdit(null);
+      setResultModalMessage(t(result.message || 'User updated successfully'));
+      setIsResultModalSuccess(result.success);
+      setIsResultModalOpen(true);
+
+      // Refresh the user list
+      const role = activeTab === 'customers' ? 'Customer' : '';
+      await getUsers(role, showDeleted, searchTerm, page, pageSize);
+
+      // Refresh statistics
+      setStatsKey(prev => prev + 1);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error updating user:', error);
+      setResultModalMessage(t('error_updating_user', 'Error updating user'));
+      setIsResultModalSuccess(false);
+      setIsResultModalOpen(true);
+    }
   };
 
   const handleDeleteClick = (user: any) => {
@@ -57,13 +98,22 @@ const MemberManagementPage = () => {
       setIsResultModalSuccess(result.success);
       setIsResultModalOpen(true);
       setUserToDelete(null);
+
+      // Refresh the user list after delete
+      if (result.success) {
+        const role = activeTab === 'customers' ? 'Customer' : '';
+        await getUsers(role, showDeleted, searchTerm, page, pageSize);
+
+        // Refresh statistics
+        setStatsKey(prev => prev + 1);
+      }
     }
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
-    <>
+    <AdminAuthGuard>
       <div className={styles.adminContainer}>
         <PageHeader title={t('admin_member_management_title')}>
           <button className={`${styles.adminButton} ${styles.add}`} onClick={() => setIsRegisterModalOpen(true)}>
@@ -71,6 +121,7 @@ const MemberManagementPage = () => {
           </button>
         </PageHeader>
         <div className={styles.adminContent}>
+          <UserStatistics key={statsKey} />
           <FilterControls
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -84,6 +135,7 @@ const MemberManagementPage = () => {
             users={users}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
+            isLoading={isLoading}
           />
           <div className={styles.pagination}>
             <button onClick={() => setPage(page - 1)} disabled={page === 1}>
@@ -101,10 +153,13 @@ const MemberManagementPage = () => {
           </div>
         </div>
       </div>
-      <RegisterStaffModal 
+      <RegisterStaffModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
-        onStaffRegistered={() => getUsers(activeTab === 'customers' ? 'Customer' : '', showDeleted, searchTerm, page, pageSize)}
+        onStaffRegistered={() => {
+          getUsers(activeTab === 'customers' ? 'Customer' : '', showDeleted, searchTerm, page, pageSize);
+          setStatsKey(prev => prev + 1); // Refresh statistics
+        }}
       />
       <ConfirmationModal
         isOpen={isConfirmationModalOpen}
@@ -118,7 +173,16 @@ const MemberManagementPage = () => {
         message={resultModalMessage}
         isSuccess={isResultModalSuccess}
       />
-    </>
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        user={userToEdit}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setUserToEdit(null);
+        }}
+        onSave={handleSaveUser}
+      />
+    </AdminAuthGuard>
   );
 };
 

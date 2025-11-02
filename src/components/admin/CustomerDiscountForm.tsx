@@ -5,6 +5,7 @@ import { useSnackbar } from 'notistack';
 import { X, Save, Loader2, Search, UserCheck } from 'lucide-react';
 import { adminFidelityService, CreateCustomerDiscountDto, UpdateCustomerDiscountDto } from '@/services/adminFidelityService';
 import { fetchUsers, UserDto } from '@/services/userService';
+import { UserRole } from '@/types/user';
 import type { CustomerDiscountRule } from '@/types/fidelity';
 import styles from './CustomerDiscountForm.module.css';
 
@@ -69,13 +70,14 @@ export default function CustomerDiscountForm({
         firstName: '',
         lastName: '',
         fullName: `User ${discount.userId}`,
-        role: '',
+        role: UserRole.Customer,
         isEmailConfirmed: false,
         createdAt: '',
         metadata: {},
         orderLimitAmount: 0,
         discountPercentage: 0,
         isDiscountActive: false,
+        isDeleted: false,
       });
     }
   }, [discount]);

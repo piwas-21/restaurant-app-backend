@@ -1,0 +1,117 @@
+/* Loading skeleton */
+.skeleton {
+  height: 20px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+/* Phone cell */
+.phoneCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #666;
+}
+
+.phoneCell svg {
+  color: #999;
+}
+
+.noData {
+  color: #999;
+  font-style: italic;
+}
+
+/* Date cell */
+.dateCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #666;
+}
+
+.dateCell svg {
+  color: #999;
+}
+
+/* Role badges */
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.roleBadge.customer {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.roleBadge.staff {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.roleBadge.admin {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+/* Status badges */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.statusBadge.active {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.statusBadge.active svg {
+  color: #2e7d32;
+}
+
+.statusBadge.deleted {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.statusBadge.deleted svg {
+  color: #c62828;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .phoneCell,
+  .dateCell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .roleBadge,
+  .statusBadge {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+  }
+}

@@ -1,0 +1,250 @@
+/**
+ * QR Code & Table Management Theme Variables
+ * Centralized theme configuration for QR code features
+ */
+
+:root {
+  /* Primary Colors */
+  --qr-primary: #667eea;
+  --qr-primary-dark: #5568d3;
+  --qr-primary-light: #818cf8;
+
+  /* Secondary Colors */
+  --qr-secondary: #764ba2;
+  --qr-secondary-dark: #5a3d7c;
+  --qr-secondary-light: #9333ea;
+
+  /* Status Colors */
+  --qr-success: #10b981;
+  --qr-success-dark: #059669;
+  --qr-warning: #f59e0b;
+  --qr-warning-dark: #d97706;
+  --qr-error: #ef4444;
+  --qr-error-dark: #dc2626;
+  --qr-info: #3b82f6;
+  --qr-info-dark: #2563eb;
+
+  /* Neutral Colors - Light Mode */
+  --qr-background: #f8f9fa;
+  --qr-card-bg: #ffffff;
+  --qr-text: #1f2937;
+  --qr-text-muted: #6b7280;
+  --qr-border: rgba(0, 0, 0, 0.1);
+  --qr-hover-bg: rgba(0, 0, 0, 0.05);
+
+  /* Gradients */
+  --qr-gradient-primary: linear-gradient(135deg, var(--qr-primary) 0%, var(--qr-secondary) 100%);
+  --qr-gradient-success: linear-gradient(135deg, var(--qr-success) 0%, var(--qr-success-dark) 100%);
+  --qr-gradient-warning: linear-gradient(135deg, var(--qr-warning) 0%, var(--qr-warning-dark) 100%);
+  --qr-gradient-error: linear-gradient(135deg, var(--qr-error) 0%, var(--qr-error-dark) 100%);
+
+  /* Shadows */
+  --qr-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --qr-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --qr-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --qr-shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+  /* Transitions */
+  --qr-transition-fast: 0.15s ease;
+  --qr-transition-base: 0.2s ease;
+  --qr-transition-slow: 0.3s ease;
+
+  /* Border Radius */
+  --qr-radius-sm: 6px;
+  --qr-radius-md: 8px;
+  --qr-radius-lg: 12px;
+  --qr-radius-xl: 16px;
+
+  /* Spacing */
+  --qr-space-xs: 0.25rem;
+  --qr-space-sm: 0.5rem;
+  --qr-space-md: 1rem;
+  --qr-space-lg: 1.5rem;
+  --qr-space-xl: 2rem;
+
+  /* Z-Index Layers */
+  --qr-z-dropdown: 100;
+  --qr-z-sticky: 200;
+  --qr-z-modal-backdrop: 900;
+  --qr-z-modal: 1000;
+  --qr-z-toast: 1100;
+}
+
+/* Dark Mode Variables */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --qr-background: #111827;
+    --qr-card-bg: #1f2937;
+    --qr-text: #f9fafb;
+    --qr-text-muted: #9ca3af;
+    --qr-border: rgba(255, 255, 255, 0.1);
+    --qr-hover-bg: rgba(255, 255, 255, 0.05);
+
+    /* Adjusted shadows for dark mode */
+    --qr-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --qr-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --qr-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --qr-shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Custom Data Theme Attribute Support */
+[data-theme="dark"] {
+  --qr-background: #111827;
+  --qr-card-bg: #1f2937;
+  --qr-text: #f9fafb;
+  --qr-text-muted: #9ca3af;
+  --qr-border: rgba(255, 255, 255, 0.1);
+  --qr-hover-bg: rgba(255, 255, 255, 0.05);
+
+  --qr-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --qr-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --qr-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --qr-shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] {
+  --qr-background: #f8f9fa;
+  --qr-card-bg: #ffffff;
+  --qr-text: #1f2937;
+  --qr-text-muted: #6b7280;
+  --qr-border: rgba(0, 0, 0, 0.1);
+  --qr-hover-bg: rgba(0, 0, 0, 0.05);
+
+  --qr-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --qr-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --qr-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --qr-shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Animation Keyframes */
+@keyframes qr-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes qr-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes qr-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes qr-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes qr-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes qr-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes qr-shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Utility Classes */
+.qr-gradient-text {
+  background: var(--qr-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.qr-glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.qr-card {
+  background: var(--qr-card-bg);
+  border-radius: var(--qr-radius-lg);
+  border: 1px solid var(--qr-border);
+  box-shadow: var(--qr-shadow-md);
+  transition: all var(--qr-transition-base);
+}
+
+.qr-card:hover {
+  box-shadow: var(--qr-shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Accessibility Utilities */
+.qr-focus-ring:focus-visible {
+  outline: 2px solid var(--qr-primary);
+  outline-offset: 2px;
+}
+
+.qr-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Print Utilities */
+@media print {
+  .qr-no-print {
+    display: none !important;
+  }
+
+  .qr-print-only {
+    display: block !important;
+  }
+}
+
+@media not print {
+  .qr-print-only {
+    display: none !important;
+  }
+}

@@ -9,6 +9,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import FidelityAnalyticsCards from '@/components/admin/FidelityAnalyticsCards';
 import { adminFidelityAnalyticsService } from '@/services/adminFidelityAnalyticsService';
 import type { FidelityAnalytics } from '@/services/adminFidelityAnalyticsService';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
 export default function FidelityAnalyticsPage() {
   const { enqueueSnackbar } = useSnackbar();
@@ -34,7 +35,8 @@ export default function FidelityAnalyticsPage() {
   };
 
   return (
-    <main className={styles.adminContainer}>
+    <AdminAuthGuard>
+      <main className={styles.adminContainer}>
       <PageHeader title="Fidelity Analytics" />
 
       <section className={styles.adminContent}>
@@ -105,6 +107,7 @@ export default function FidelityAnalyticsPage() {
           </div>
         </div>
       </section>
-    </main>
+      </main>
+    </AdminAuthGuard>
   );
 }

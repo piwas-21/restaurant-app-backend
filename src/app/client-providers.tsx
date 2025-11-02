@@ -10,6 +10,7 @@ import React from "react";
 import { AuthProvider } from "@/components/AuthContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { CheckoutProvider } from "@/contexts/CheckoutContext";
+import { TableContextProvider } from "@/contexts/TableContext";
 import { X } from "lucide-react";
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
@@ -19,9 +20,10 @@ export default function ClientProviders({ children }: { children: React.ReactNod
         <ThemeProvider>
           <I18nextProvider i18n={i18n}>
             <CookieConsentProvider>
-              <CartProvider>
-                <CheckoutProvider>
-                  <SnackbarProvider
+              <TableContextProvider>
+                <CartProvider>
+                  <CheckoutProvider>
+                    <SnackbarProvider
                     maxSnack={3}
                     anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                     autoHideDuration={4000}
@@ -48,11 +50,12 @@ export default function ClientProviders({ children }: { children: React.ReactNod
                         <X size={18} strokeWidth={2} />
                       </button>
                     )}
-                  >
-                    {children}
-                  </SnackbarProvider>
-                </CheckoutProvider>
-              </CartProvider>
+                    >
+                      {children}
+                    </SnackbarProvider>
+                  </CheckoutProvider>
+                </CartProvider>
+              </TableContextProvider>
             </CookieConsentProvider>
           </I18nextProvider>
         </ThemeProvider>

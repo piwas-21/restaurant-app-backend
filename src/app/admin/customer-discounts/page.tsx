@@ -14,6 +14,7 @@ import {
 import { adminFidelityService } from '@/services/adminFidelityService';
 import type { CustomerDiscountRule } from '@/types/fidelity';
 import CustomerDiscountForm from '@/components/admin/CustomerDiscountForm';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 import styles from './customer-discounts.module.css';
 
 export default function CustomerDiscountsPage() {
@@ -108,7 +109,8 @@ export default function CustomerDiscountsPage() {
   };
 
   return (
-    <div className={styles.container}>
+    <AdminAuthGuard>
+      <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <h1 className={styles.title}>Customer Discounts</h1>
@@ -265,6 +267,7 @@ export default function CustomerDiscountsPage() {
           onSuccess={handleFormSuccess}
         />
       )}
-    </div>
+      </div>
+    </AdminAuthGuard>
   );
 }

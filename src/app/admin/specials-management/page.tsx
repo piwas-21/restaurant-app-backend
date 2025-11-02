@@ -9,6 +9,7 @@ import FeaturedSpecialCard from '@/components/admin/specials-management/Featured
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
 import { useSpecialsManagement } from '@/hooks/useSpecialsManagement';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
 export default function SpecialsManagementPage() {
   const { t } = useTranslation();
@@ -75,7 +76,7 @@ export default function SpecialsManagementPage() {
   };
 
   return (
-    <>
+    <AdminAuthGuard>
       <main className={styles.adminContainer}>
         <PageHeader title={t('admin_specials_management_title', 'Specials Management')} />
 
@@ -110,6 +111,6 @@ export default function SpecialsManagementPage() {
         message={resultModalMessage}
         isSuccess={isResultModalSuccess}
       />
-    </>
+    </AdminAuthGuard>
   );
 }

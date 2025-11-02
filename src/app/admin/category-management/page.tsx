@@ -11,6 +11,7 @@ import ResultModal from '@/components/common/ResultModal';
 import PageHeader from '@/components/admin/PageHeader';
 import CategoriesTable from '@/components/admin/category-management/CategoriesTable';
 import { Category } from '@/app/admin/menu-management/interfaces';
+import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
 const CategoryManagementPage = () => {
   const { t } = useTranslation();
@@ -53,7 +54,7 @@ const CategoryManagementPage = () => {
   };
 
   return (
-    <>
+    <AdminAuthGuard>
       <div className={styles.adminContainer}>
         <PageHeader title={t('admin_category_management_title')}>
           <button className={`${styles.adminButton} ${styles.add}`} onClick={() => setIsCreateModalOpen(true)}>
@@ -93,7 +94,7 @@ const CategoryManagementPage = () => {
         message={resultModalMessage}
         isSuccess={isResultModalSuccess}
       />
-    </>
+    </AdminAuthGuard>
   );
 };
 

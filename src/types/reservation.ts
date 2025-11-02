@@ -26,6 +26,8 @@ export interface TableDto {
   height: number;
   shape?: string; // circle, square, rectangle
   notes?: string;
+  qrCodeData?: string;
+  qrCodeGeneratedAt?: string;
 }
 
 export interface ReservationDto {

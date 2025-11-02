@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useCheckout } from '@/contexts/CheckoutContext';
 import { useCart } from '@/components/cart/CartContext';
+import { useTableContext } from '@/contexts/TableContext';
 import { OrderType } from '@/types/order';
 import {
   Store,
@@ -21,6 +22,7 @@ export default function OrderTypePage() {
   const router = useRouter();
   const { state: checkoutState, setOrderType, setTableNumber, setDeliveryAddress } = useCheckout();
   const { state: cartState } = useCart();
+  const { tableContext, hasTableContext } = useTableContext();
   const [selectedType, setSelectedType] = useState<OrderType | null>(checkoutState.orderType);
   const [tableNum, setTableNum] = useState(checkoutState.tableNumber || '');
   const [tableError, setTableError] = useState('');
@@ -32,6 +34,17 @@ export default function OrderTypePage() {
   const [country, setCountry] = useState(checkoutState.deliveryAddress?.country || 'Switzerland');
   const [additionalInfo, setAdditionalInfo] = useState(checkoutState.deliveryAddress?.additionalInfo || '');
   const [addressError, setAddressError] = useState('');
+
+  // Check for table context from QR code scan
+  useEffect(() => {
+    if (hasTableContext && tableContext.tableNumber) {
+      // Auto-select dine-in and pre-fill table number
+      setSelectedType(OrderType.DineIn);
+      setTableNum(tableContext.tableNumber);
+      setOrderType(OrderType.DineIn);
+      setTableNumber(tableContext.tableNumber);
+    }
+  }, [hasTableContext, tableContext, setOrderType, setTableNumber]);
 
   // Check if cart is empty
   if (cartState.items.length === 0) {
@@ -194,8 +207,14 @@ export default function OrderTypePage() {
                 className={`${styles.input} ${tableError ? styles.inputError : ''}`}
                 min="1"
                 max="100"
+                readOnly={hasTableContext}
               />
               {tableError && <p className={styles.error}>{tableError}</p>}
+              {hasTableContext && (
+                <p className={styles.infoText}>
+                  {t('table_from_qr', 'Table number set from QR code scan')}
+                </p>
+              )}
             </div>
           </div>
         )}
