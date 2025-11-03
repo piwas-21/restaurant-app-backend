@@ -66,24 +66,23 @@ export default function VisualTableLayout({
     // Position tooltip below if table is in the top 30% of the layout
     const tooltipBelow = topPercent < 30;
 
-    return (
-      <div
-        key={table.id}
-        className={`${styles.table} ${styles[status]} ${shapeClass} ${isLarge ? styles.large : ''}`}
-        onClick={() => onSelectTable(table)}
-        onMouseEnter={() => setHoveredTable(table)}
-        onMouseLeave={() => setHoveredTable(null)}
-        style={{
-          left: `${leftPercent}%`,
-          top: `${topPercent}%`,
-        }}
-      >
-        {/* Table content */}
-        <div className={styles.tableContent}>
-          <span className={styles.tableLabel}>Table {table.tableNumber}</span>
-        </div>
-
-        {/* Tooltip on hover or selection */}
+  return (
+    <div
+      key={table.id}
+      className={`${styles.table} ${styles[status]} ${shapeClass} ${isLarge ? styles.large : ''}`}
+      onClick={() => onSelectTable(table)}
+      onMouseEnter={() => setHoveredTable(table)}
+      onMouseLeave={() => setHoveredTable(null)}
+      style={{
+        left: `${leftPercent}%`,
+        top: `${topPercent}%`,
+      }}
+    >
+      {/* Table content */}
+      <div className={styles.tableContent}>
+        <span className={styles.tableNumber}>Table {table.tableNumber}</span>
+        <span className={styles.guestCount}>👥 {table.maxGuests}</span>
+      </div>        {/* Tooltip on hover or selection */}
         {showTooltip && (
           <div className={`${styles.tableTooltip} ${tooltipBelow ? styles.tooltipBelow : ''}`}>
             <div className={styles.tooltipRow}>
@@ -121,8 +120,7 @@ export default function VisualTableLayout({
             top: `${entrancePosition.y}%`,
           }}
         >
-          <div className={styles.entranceDoor} />
-          <span className={styles.entranceLabel}>Way in</span>
+          <div className={styles.entranceDoor}>Entrance</div>
         </div>
 
         {/* Tables */}

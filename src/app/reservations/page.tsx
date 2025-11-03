@@ -81,26 +81,48 @@ export default function ReservationsPage() {
 
       // Check if there's a capacity issue (expected scenario, not an error)
       if (result.isCapacityIssue && result.error) {
-        // Show all available tables with a warning
+        // Show all tables as available with a warning
         setCapacityWarning(result.error);
         setBookedTableIds([]);
       } else if (result.error) {
-        // Other API errors
+        // Other API errors - mark all tables as booked
         setBookedTableIds(allTables.map(t => t.id));
       } else if (result.data) {
-        // Success - find the time slot that matches
-        const slot = result.data.timeSlots.find(s => s.startTime.startsWith(selectedTime));
-
         // Store all time slots for showing available times
         setAvailableTimeSlots(result.data.timeSlots || []);
 
+        // Find the time slot that matches the selected time
+        const slot = result.data.timeSlots.find(s => s.startTime.startsWith(selectedTime));
+
         if (slot) {
-          // Calculate booked tables
+          // Calculate booked tables for the selected time slot
           const availableIds = new Set(slot.availableTables.map(t => t.id));
           const booked = allTables.filter(t => !availableIds.has(t.id)).map(t => t.id);
           setBookedTableIds(booked);
+
+          // Check if any available tables meet the capacity requirement
+          const suitableTables = slot.availableTables.filter(t => t.maxGuests >= numberOfGuests);
+          if (suitableTables.length === 0 && slot.availableTables.length > 0) {
+            // Tables are available but none meet capacity - show warning
+            setCapacityWarning(`Available tables may not accommodate ${numberOfGuests} guests individually. Consider selecting multiple tables.`);
+          }
         } else {
-          setBookedTableIds(allTables.map(t => t.id));
+          // Selected time slot not found - check if tables exist at other times
+          // This prevents falsely showing all tables as booked when they're just at different times
+          const allAvailableTableIds = new Set<string>();
+          result.data.timeSlots.forEach(timeSlot => {
+            timeSlot.availableTables.forEach(t => allAvailableTableIds.add(t.id));
+          });
+
+          if (allAvailableTableIds.size > 0) {
+            // Some tables are available at other times - only mark truly booked ones
+            const booked = allTables.filter(t => !allAvailableTableIds.has(t.id)).map(t => t.id);
+            setBookedTableIds(booked);
+            setCapacityWarning('Some tables may be booked at this time. Check availability at other times or consider combining tables.');
+          } else {
+            // No tables available at any time
+            setBookedTableIds(allTables.map(t => t.id));
+          }
         }
       }
     } catch {
@@ -109,9 +131,7 @@ export default function ReservationsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTableSelect = (table: TableDto) => {
+  };  const handleTableSelect = (table: TableDto) => {
     const isBooked = bookedTableIds.includes(table.id);
     const isSelected = selectedTableIds.includes(table.id);
 

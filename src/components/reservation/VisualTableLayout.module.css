@@ -9,12 +9,12 @@
   width: 100%;
   min-height: 600px;
   aspect-ratio: 6 / 5;
-  background: linear-gradient(135deg, #fdfbf7 0%, #f5f1e8 50%, #fdfbf7 100%);
-  border: 3px solid #d4a62a;
-  border-radius: 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
   padding: 2rem;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(212, 166, 42, 0.15), inset 0 2px 12px rgba(244, 196, 48, 0.1);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* Entrance */
@@ -25,29 +25,23 @@
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  z-index: 1;
+  z-index: 10;
 }
 
 .entranceDoor {
-  width: 80px;
-  height: 40px;
-  border: 3px solid #d4a62a;
-  border-bottom: none;
-  border-radius: 40px 40px 0 0;
-  background: linear-gradient(180deg, #ffffff 0%, #fdfbf7 100%);
-  box-shadow: 0 -2px 8px rgba(212, 166, 42, 0.25), inset 0 1px 3px rgba(244, 196, 48, 0.1);
+  background: var(--success-color);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transition: box-shadow 0.2s, transform 0.1s;
 }
 
 .entranceLabel {
-  font-size: 0.85rem;
-  color: #6b5d3f;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  display: none; /* Hide the separate label since we'll put text inside the door */
 }
 
 /* Tables */
@@ -91,11 +85,14 @@
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  transition: all 0.3s ease;
-  border: 2px solid #ddd;
+  transition: all 0.2s;
+  border: 3px solid #4CAF50;
+  background: var(--background-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .table.round .tableContent {
@@ -104,51 +101,40 @@
 
 /* Table states */
 .table.available .tableContent {
-  background: linear-gradient(135deg, #ffffff 0%, #f8f6f0 100%);
-  border-color: #c9b896;
-  box-shadow: 0 3px 10px rgba(107, 93, 63, 0.12), inset 0 1px 3px rgba(255, 255, 255, 0.8);
+  border-color: #4CAF50;
 }
 
 .table.available:hover .tableContent {
-  background: linear-gradient(135deg, #fffef8 0%, #f5f1e8 100%);
-  border-color: #b89968;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   transform: scale(1.05);
-  box-shadow: 0 4px 16px rgba(184, 153, 104, 0.25), inset 0 1px 3px rgba(255, 255, 255, 0.9);
+  z-index: 5;
 }
 
 .table.booked .tableContent {
-  background: linear-gradient(135deg, #e8e5df 0%, #c9c4b8 100%);
-  border-color: #8e8576;
-  box-shadow: 0 2px 8px rgba(107, 93, 63, 0.15), inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: #f5f5f5;
+  border-color: #999;
+  opacity: 0.6;
 }
 
 .table.selected .tableContent {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
-  border-color: #f4c430;
-  box-shadow: 0 0 0 4px rgba(244, 196, 48, 0.25), 0 4px 16px rgba(244, 196, 48, 0.3);
+  border-color: #2196F3;
+  border-width: 4px;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2), 0 4px 12px rgba(0, 0, 0, 0.2);
   transform: scale(1.08);
+  z-index: 6;
 }
 
 .tableLabel {
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  color: #4a3f2a;
+  color: #333;
   text-align: center;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  margin-bottom: 0.25rem;
 }
 
-.table.booked .tableLabel {
-  color: #6b5d3f;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-[data-theme="dark"] .table.booked .tableLabel {
-  color: #999;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+.guestCount {
+  font-size: 0.75rem;
+  color: #666;
 }
 
 /* Table Tooltip */
@@ -256,35 +242,32 @@
   align-items: center;
   gap: 0.75rem;
   font-size: 0.95rem;
-  color: #4a3f2a;
+  color: #333;
   font-weight: 600;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 
 .legendBox {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  border: 2px solid #adb5bd;
+  border: 3px solid;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .legendBox.available {
-  background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
-  border-color: #adb5bd;
+  background: white;
+  border-color: #4CAF50;
 }
 
 .legendBox.booked {
-  background: linear-gradient(135deg, #dee2e6 0%, #adb5bd 100%);
-  border-color: #6c757d;
+  background: #f5f5f5;
+  border-color: #999;
 }
 
 .legendBox.selected {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
-  border-color: #f4c430;
-  box-shadow: 0 2px 8px rgba(244, 196, 48, 0.3);
+  background: white;
+  border-color: #2196F3;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Responsive */
@@ -319,6 +302,10 @@
     font-size: 0.7rem;
   }
 
+  .guestCount {
+    font-size: 0.65rem;
+  }
+
   .tableTooltip {
     font-size: 0.75rem;
     min-width: 130px;
@@ -340,12 +327,8 @@
   }
 
   .entranceDoor {
-    width: 50px;
-    height: 25px;
-  }
-
-  .entranceLabel {
-    font-size: 0.7rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
   }
 
   .legend {
@@ -404,6 +387,10 @@
 
   .tableLabel {
     font-size: 0.65rem;
+  }
+
+  .guestCount {
+    font-size: 0.6rem;
   }
 
   .tableTooltip {
@@ -477,52 +464,51 @@
 
 /* Dark mode support */
 [data-theme="dark"] .floorPlan {
-  background: #1a1a1a;
-  border-color: #f4c430;
+  background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+  border-color: #444;
 }
 
-[data-theme="dark"] .entranceDoor {
-  background: #2a2a2a;
-  border-color: #f4c430;
-}
-
-[data-theme="dark"] .entranceLabel {
-  color: #aaa;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* [data-theme="dark"] .entranceDoor {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+} */
 
 [data-theme="dark"] .table.available .tableContent {
   background: #2a2a2a;
-  border-color: #444;
+  border-color: #4CAF50;
 }
 
 [data-theme="dark"] .table.available:hover .tableContent {
   background: #333;
-  border-color: #666;
 }
 
 [data-theme="dark"] .table.booked .tableContent {
-  background: #444;
+  background: #1e1e1e;
   border-color: #666;
+}
+
+[data-theme="dark"] .table.selected .tableContent {
+  border-color: #2196F3;
 }
 
 [data-theme="dark"] .tableLabel {
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-weight: 700;
+}
+
+[data-theme="dark"] .guestCount {
+  color: #aaa;
 }
 
 [data-theme="dark"] .tableTooltip {
   background: rgba(30, 30, 30, 0.98);
-  border-color: #f4c430;
+  border-color: #2196F3;
 }
 
 [data-theme="dark"] .tableTooltip::after {
-  border-top-color: #f4c430;
+  border-top-color: #2196F3;
+}
+
+[data-theme="dark"] .tableTooltip.tooltipBelow::after {
+  border-bottom-color: #2196F3;
 }
 
 [data-theme="dark"] .tooltipRow {
@@ -540,10 +526,16 @@
 
 [data-theme="dark"] .legendBox.available {
   background: #2a2a2a;
-  border-color: #444;
+  border-color: #4CAF50;
 }
 
 [data-theme="dark"] .legendBox.booked {
-  background: #444;
+  background: #1e1e1e;
   border-color: #666;
+}
+
+[data-theme="dark"] .legendBox.selected {
+  border-color: #2196F3;
+  background: #1e1e1e;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
 }

@@ -289,6 +289,15 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       dispatch({ type: 'SYNC_BASKET', payload: { basket: updatedBasket } });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+
+      // If item was already removed (not found), refresh the cart
+      // This handles the case where the item was removed in another tab
+      if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('basket item not found')) {
+        await syncBasket();
+        return; // Don't throw error or rollback
+      }
+
+      // For other errors, rollback and show error
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
       // eslint-disable-next-line no-console
@@ -319,6 +328,16 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       dispatch({ type: 'SYNC_BASKET', payload: { basket: updatedBasket } });
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+
+      // If item was already removed (not found), keep the optimistic update
+      // This handles the case where the item was removed in another tab
+      if (errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('basket item not found')) {
+        // Refresh the cart to get the latest state from the server
+        await syncBasket();
+        return; // Don't throw error or rollback
+      }
+
+      // For other errors, rollback and show error
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
       // eslint-disable-next-line no-console

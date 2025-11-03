@@ -71,7 +71,9 @@ const Sidebar = () => {
 
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.sidebarTitle}>{t('admin_dashboard_title')}</div>
+      <div className={styles.sidebarTitle} suppressHydrationWarning>
+        {t('admin_dashboard_title')}
+      </div>
       <hr className={styles.sidebarDivider} />
       <nav>
         <ul>
@@ -84,7 +86,7 @@ const Sidebar = () => {
                   className={pathname.startsWith(item.href) ? styles.activeLink : ''}
                 >
                   <Icon size={20} strokeWidth={2} />
-                  <span>{item.label}</span>
+                  <span suppressHydrationWarning>{item.label}</span>
                 </Link>
               </li>
             );
