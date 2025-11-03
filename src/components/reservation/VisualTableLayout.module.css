@@ -90,7 +90,7 @@
   justify-content: center;
   border-radius: 12px;
   transition: all 0.2s;
-  border: 3px solid #4CAF50;
+  border: 3px solid var(--success-color);
   background: var(--background-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -101,7 +101,7 @@
 
 /* Table states */
 .table.available .tableContent {
-  border-color: #4CAF50;
+  border-color: var(--success-color);
 }
 
 .table.available:hover .tableContent {
@@ -117,7 +117,7 @@
 }
 
 .table.selected .tableContent {
-  border-color: #2196F3;
+  border-color: var(--info-color);
   border-width: 4px;
   box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2), 0 4px 12px rgba(0, 0, 0, 0.2);
   transform: scale(1.08);
@@ -468,13 +468,8 @@
   border-color: #444;
 }
 
-/* [data-theme="dark"] .entranceDoor {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-} */
-
 [data-theme="dark"] .table.available .tableContent {
   background: #2a2a2a;
-  border-color: #4CAF50;
 }
 
 [data-theme="dark"] .table.available:hover .tableContent {
@@ -484,10 +479,6 @@
 [data-theme="dark"] .table.booked .tableContent {
   background: #1e1e1e;
   border-color: #666;
-}
-
-[data-theme="dark"] .table.selected .tableContent {
-  border-color: #2196F3;
 }
 
 [data-theme="dark"] .tableLabel {
@@ -535,7 +526,7 @@
 }
 
 [data-theme="dark"] .legendBox.selected {
-  border-color: #2196F3;
+  border-color: var(--info-color);
   background: #1e1e1e;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
 }

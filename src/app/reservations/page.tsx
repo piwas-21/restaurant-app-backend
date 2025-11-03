@@ -79,51 +79,44 @@ export default function ReservationsPage() {
     try {
       const result = await reservationService.getAvailableTimeSlots(selectedDate, numberOfGuests);
 
-      // Check if there's a capacity issue (expected scenario, not an error)
-      if (result.isCapacityIssue && result.error) {
-        // Show all tables as available with a warning
-        setCapacityWarning(result.error);
-        setBookedTableIds([]);
-      } else if (result.error) {
-        // Other API errors - mark all tables as booked
+      // Handle API errors
+      if (result.error) {
         setBookedTableIds(allTables.map(t => t.id));
-      } else if (result.data) {
-        // Store all time slots for showing available times
-        setAvailableTimeSlots(result.data.timeSlots || []);
+        setLoading(false);
+        return;
+      }
 
-        // Find the time slot that matches the selected time
-        const slot = result.data.timeSlots.find(s => s.startTime.startsWith(selectedTime));
+      if (!result.data) {
+        setBookedTableIds(allTables.map(t => t.id));
+        setLoading(false);
+        return;
+      }
 
-        if (slot) {
-          // Calculate booked tables for the selected time slot
-          const availableIds = new Set(slot.availableTables.map(t => t.id));
-          const booked = allTables.filter(t => !availableIds.has(t.id)).map(t => t.id);
-          setBookedTableIds(booked);
+      // Store all time slots for showing available times
+      setAvailableTimeSlots(result.data.timeSlots || []);
 
-          // Check if any available tables meet the capacity requirement
-          const suitableTables = slot.availableTables.filter(t => t.maxGuests >= numberOfGuests);
-          if (suitableTables.length === 0 && slot.availableTables.length > 0) {
-            // Tables are available but none meet capacity - show warning
-            setCapacityWarning(`Available tables may not accommodate ${numberOfGuests} guests individually. Consider selecting multiple tables.`);
-          }
-        } else {
-          // Selected time slot not found - check if tables exist at other times
-          // This prevents falsely showing all tables as booked when they're just at different times
-          const allAvailableTableIds = new Set<string>();
-          result.data.timeSlots.forEach(timeSlot => {
-            timeSlot.availableTables.forEach(t => allAvailableTableIds.add(t.id));
-          });
+      // Find the time slot that matches the selected time
+      const slot = result.data.timeSlots.find(s => s.startTime.startsWith(selectedTime));
 
-          if (allAvailableTableIds.size > 0) {
-            // Some tables are available at other times - only mark truly booked ones
-            const booked = allTables.filter(t => !allAvailableTableIds.has(t.id)).map(t => t.id);
-            setBookedTableIds(booked);
-            setCapacityWarning('Some tables may be booked at this time. Check availability at other times or consider combining tables.');
-          } else {
-            // No tables available at any time
-            setBookedTableIds(allTables.map(t => t.id));
-          }
+      if (slot) {
+        // We found the selected time slot - check availability
+        const availableIds = new Set(slot.availableTables.map(t => t.id));
+        const booked = allTables.filter(t => !availableIds.has(t.id)).map(t => t.id);
+        setBookedTableIds(booked);
+
+        // Check capacity: are there any tables that can accommodate the party size?
+        const tablesWithCapacity = slot.availableTables.filter(t => t.maxGuests >= numberOfGuests);
+
+        if (tablesWithCapacity.length === 0 && slot.availableTables.length > 0) {
+          // Tables are available but none have sufficient capacity
+          const maxCapacity = Math.max(...slot.availableTables.map(t => t.maxGuests));
+          setCapacityWarning(
+            `No single table can accommodate ${numberOfGuests} guests. The largest available table seats ${maxCapacity}. Please select multiple tables and request to combine them.`
+          );
         }
+      } else {
+        // Selected time slot not found - all tables are booked at this time
+        setBookedTableIds(allTables.map(t => t.id));
       }
     } catch {
       // Unexpected network errors
