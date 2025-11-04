@@ -14,6 +14,12 @@ interface PriceCalculatorProps {
   selectedSideItems: Array<{ id: string; quantity: number }>;
   quantity: number;
   onQuantityChange: (delta: number) => void;
+  selectedVariationId?: string | null;
+  variations?: Array<{
+    id?: string;
+    name: string;
+    priceModifier: number;
+  }>;
 }
 
 export default function PriceCalculator({
@@ -24,8 +30,20 @@ export default function PriceCalculator({
   selectedSideItems,
   quantity,
   onQuantityChange,
+  selectedVariationId,
+  variations,
 }: PriceCalculatorProps) {
   const { t } = useTranslation();
+
+    // Calculate base price with variation modifier (additive)
+  let adjustedBasePrice = basePrice;
+  if (selectedVariationId && variations && variations.length > 0) {
+    const selectedVariation = variations.find(v => v.id === selectedVariationId);
+    if (selectedVariation) {
+      // priceModifier is always additive: basePrice + modifier
+      adjustedBasePrice = basePrice + selectedVariation.priceModifier;
+    }
+  }
 
   // Calculate ingredient customization cost
   const ingredientsCost = selectedIngredients.reduce((total, ingredientId) => {
@@ -39,8 +57,8 @@ export default function PriceCalculator({
     return total + (sideItem?.price || 0) * selectedItem.quantity;
   }, 0);
 
-  // Calculate subtotal (before quantity)
-  const subtotal = basePrice + ingredientsCost + sideItemsCost;
+  // Calculate subtotal (before quantity) using adjusted base price
+  const subtotal = adjustedBasePrice + ingredientsCost + sideItemsCost;
 
   // Calculate total (with quantity)
   const total = subtotal * quantity;
@@ -59,7 +77,7 @@ export default function PriceCalculator({
       <div className={styles.priceBreakdown}>
         <div className={styles.priceRow}>
           <span className={styles.priceLabel}>{t("base_price")}:</span>
-          <span className={styles.priceValue}>CHF {basePrice.toFixed(2)}</span>
+          <span className={styles.priceValue}>CHF {adjustedBasePrice.toFixed(2)}</span>
         </div>
 
         {/* Show customization details if any */}

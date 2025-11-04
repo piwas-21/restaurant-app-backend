@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Trash2, GripVertical } from "lucide-react";
 import type { ProductIngredient } from "@/types/menu";
@@ -18,6 +18,23 @@ export function ProductIngredientsManager({
   productBasePrice,
 }: ProductIngredientsManagerProps) {
   const { t } = useTranslation();
+  // Local state to preserve string value during typing
+  const [priceInputs, setPriceInputs] = useState<Record<number, string>>({});
+
+  // Initialize price inputs when ingredients change (e.g., loading existing product)
+  useEffect(() => {
+    const newInputs: Record<number, string> = {};
+    ingredients.forEach((ing, idx) => {
+      if (priceInputs[idx] === undefined) {
+        newInputs[idx] = ing.price === 0 ? '' : String(ing.price).replace('.', ',');
+      }
+    });
+    if (Object.keys(newInputs).length > 0) {
+      setPriceInputs(prev => ({ ...prev, ...newInputs }));
+    }
+    // Only run when ingredients array length changes (new ingredients added/removed)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingredients.length]);
 
   const handleAddIngredient = () => {
     // Generate a temporary unique ID for new ingredients (will be replaced by server)
@@ -165,17 +182,25 @@ export function ProductIngredientsManager({
                       {t("additional_price")}
                       <input
                         type="text"
-                        value={ingredient.price === 0 ? '' : ingredient.price}
+                        value={priceInputs[index] ?? (ingredient.price === 0 ? '' : String(ingredient.price).replace('.', ','))}
                         onChange={(e) => {
                           const value = e.target.value;
+
+                          // Update local input state immediately to preserve typing
+                          setPriceInputs(prev => ({ ...prev, [index]: value }));
+
+                          // Allow empty string
+                          if (value === '') {
+                            handleIngredientChange(index, "price", 0);
+                            return;
+                          }
+
                           // Replace dot with comma for decimal separator
                           const normalizedValue = value.replace('.', ',');
 
-                          // Allow empty string or valid number with comma
-                          if (value === '' || value === '-') {
-                            handleIngredientChange(index, "price", 0);
-                          } else if (/^-?\d*,?\d*$/.test(normalizedValue)) {
-                            // Valid format: digits, optional comma, optional digits
+                          // Validate format: digits, optional comma, optional digits
+                          if (/^-?\d*,?\d*$/.test(normalizedValue)) {
+                            // Parse to number
                             const numValue = parseFloat(normalizedValue.replace(',', '.'));
                             if (!isNaN(numValue)) {
                               handleIngredientChange(index, "price", numValue);
@@ -183,11 +208,15 @@ export function ProductIngredientsManager({
                           }
                         }}
                         onBlur={(e) => {
-                          // On blur, ensure we have a valid number
+                          // On blur, ensure we have a valid number and clean up display
                           const value = e.target.value.replace(',', '.');
                           const numValue = parseFloat(value);
                           if (isNaN(numValue) || numValue < 0) {
                             handleIngredientChange(index, "price", 0);
+                            setPriceInputs(prev => ({ ...prev, [index]: '' }));
+                          } else {
+                            handleIngredientChange(index, "price", numValue);
+                            setPriceInputs(prev => ({ ...prev, [index]: String(numValue).replace('.', ',') }));
                           }
                         }}
                         placeholder="0,00"
@@ -201,7 +230,7 @@ export function ProductIngredientsManager({
                     {ingredient.price > 0 && (
                       <span className={styles.pricePreview}>
                         {t("customer_pays")}:{" "}
-                        CHF {(productBasePrice + (Number(ingredient.price) || 0)).toFixed(2)}
+                        CHF {(Number(productBasePrice || 0) + (Number(ingredient.price) || 0)).toFixed(2)}
                       </span>
                     )}
                   </div>

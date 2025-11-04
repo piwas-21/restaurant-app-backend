@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useCart } from '@/components/cart/CartContext';
 import styles from '../styles/CartPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Plus, Minus, ShoppingCart, Tag, Loader2 } from 'lucide-react';
+import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
+import { adminTaxConfigurationService } from '@/services/adminTaxConfigurationService';
+import type { TaxConfiguration } from '@/services/adminTaxConfigurationService';
 
 export default function CartPage() {
   const { state, removeItem, updateItem, applyPromoCode, removePromoCode, getTotal, getItemCount } = useCart();
@@ -15,6 +18,23 @@ export default function CartPage() {
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [editingInstructions, setEditingInstructions] = useState<string | null>(null);
   const [instructionsValue, setInstructionsValue] = useState('');
+  const [taxConfig, setTaxConfig] = useState<TaxConfiguration | null>(null);
+
+  // Check if customer has active discount
+  const customerHasDiscount = hasActiveDiscount(state.basket?.customerDiscount || 0);
+
+  // Fetch active tax configuration
+  useEffect(() => {
+    const fetchTaxConfig = async () => {
+      try {
+        const config = await adminTaxConfigurationService.getActiveTaxConfiguration();
+        setTaxConfig(config);
+      } catch {
+        // Silently fail if tax config can't be fetched
+      }
+    };
+    fetchTaxConfig();
+  }, []);
 
   const handleRemoveItem = async (basketItemId: string | undefined) => {
     if (!basketItemId) return;
@@ -121,11 +141,10 @@ export default function CartPage() {
                 {/* Item Details */}
                 <div className={styles.itemDetails}>
                   <h2 className={styles.itemName}>{item.productName || 'Unknown Item'}</h2>
-                  {item.productDescription && (
-                    <p className={styles.itemDescription}>{item.productDescription}</p>
-                  )}
                   {item.variationName && (
-                    <p className={styles.itemVariation}>{item.variationName}</p>
+                    <p className={styles.itemVariation}>
+                      <strong>{t('variation', 'Size/Variation')}:</strong> {item.variationName}
+                    </p>
                   )}
 
                   {/* Price Breakdown */}
@@ -353,14 +372,25 @@ export default function CartPage() {
               </div>
             )}
 
-            <div className={styles.priceRow}>
-              <span>{t('tax', 'Tax')}:</span>
-              <span>CHF {state.basket?.tax.toFixed(2) || '0.00'}</span>
-            </div>
+            {state.basket && state.basket.customerDiscount > 0 && (
+              <div className={styles.priceRow}>
+                <span>{t('customer_discount', 'Customer Discount')}:</span>
+                <span className={styles.discountAmount}>-CHF {state.basket.customerDiscount.toFixed(2)}</span>
+              </div>
+            )}
+
+            {state.basket && state.basket.tax > 0 && (
+              <div className={styles.priceRow}>
+                <span>{taxConfig?.name || t('tax', 'Tax')}:</span>
+                <span>CHF {state.basket.tax.toFixed(2)}</span>
+              </div>
+            )}
 
             <div className={styles.totalRow}>
               <span>{t('total', 'Total')}:</span>
-              <span className={styles.totalAmount}>CHF {getTotal().toFixed(2)}</span>
+              <span className={styles.totalAmount}>
+                CHF {formatPriceWithRounding(getTotal(), customerHasDiscount)}
+              </span>
             </div>
           </div>
 

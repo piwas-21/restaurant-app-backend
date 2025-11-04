@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3 } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3, DollarSign } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 const Sidebar = () => {
@@ -62,7 +62,12 @@ const Sidebar = () => {
       label: 'Customer Discounts',
       icon: Gift
     },
-        {
+    {
+      href: '/admin/tax-configuration',
+      label: 'Tax Configuration',
+      icon: DollarSign
+    },
+    {
       href: '/admin/fidelity-analytics',
       label: 'Fidelity Analytics',
       icon: TrendingUp

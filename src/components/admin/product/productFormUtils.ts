@@ -60,12 +60,22 @@ export const submitProductForm = async ({
       }
     });
 
+    // Clean detailedIngredients - remove temporary IDs for new ingredients
+    const cleanedIngredients = (detailedIngredients || []).map((ing: any) => {
+      const cleaned = { ...ing };
+      // If ID starts with "temp-", it's a new ingredient - remove the ID
+      if (typeof cleaned.id === 'string' && cleaned.id.startsWith('temp-')) {
+        delete cleaned.id;
+      }
+      return cleaned;
+    });
+
     // Format the product data
     const productData = {
       ...data,
       content,
       variations: data.variations || [],
-      detailedIngredients: detailedIngredients || []
+      detailedIngredients: cleanedIngredients
     };
 
     const productResponse = await createProduct(productData) as { success: boolean; data?: { id: string }; message?: string };
@@ -145,6 +155,16 @@ export const submitEditProductForm = async ({
         displayOrder: Number.isInteger(v.displayOrder as any) ? (v.displayOrder as any) : 0,
       }));
 
+    // Clean detailedIngredients - remove temporary IDs for new ingredients
+    const cleanedIngredients = (detailedIngredients || []).map((ing: any) => {
+      const cleaned = { ...ing };
+      // If ID starts with "temp-", it's a new ingredient - remove the ID
+      if (typeof cleaned.id === 'string' && cleaned.id.startsWith('temp-')) {
+        delete cleaned.id;
+      }
+      return cleaned;
+    });
+
     const productData = {
       ...data,
       id: product.id,
@@ -157,7 +177,7 @@ export const submitEditProductForm = async ({
       primaryCategoryId,
       variations: cleanedVariations,
       content: formattedContent,
-      detailedIngredients: detailedIngredients || [],
+      detailedIngredients: cleanedIngredients,
     } as any;
 
     const response = await updateProduct(product.id, productData) as { success: boolean; message?: string };

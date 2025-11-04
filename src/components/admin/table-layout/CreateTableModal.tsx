@@ -141,32 +141,28 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
           <div className={styles.formGroup}>
             <label>Location</label>
             <div className={styles.chipGroup}>
-              <div className={styles.chip}>
-                <input
-                  type="checkbox"
-                  id="isOutdoor"
-                  checked={formData.isOutdoor}
-                  onChange={(e) => setFormData(prev => ({ ...prev, isOutdoor: e.target.checked }))}
-                  disabled={creating}
-                />
-                <label htmlFor="isOutdoor">Outdoor</label>
-              </div>
+              <button
+                type="button"
+                className={`${styles.chip} ${formData.isOutdoor ? styles.chipActive : ''}`}
+                onClick={() => setFormData(prev => ({ ...prev, isOutdoor: !prev.isOutdoor }))}
+                disabled={creating}
+              >
+                <span className={styles.chipLabel}>Outdoor</span>
+              </button>
             </div>
           </div>
 
           <div className={styles.formGroup}>
             <label>Status</label>
             <div className={styles.chipGroup}>
-              <div className={styles.chip}>
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
-                  disabled={creating}
-                />
-                <label htmlFor="isActive">Active</label>
-              </div>
+              <button
+                type="button"
+                className={`${styles.chip} ${formData.isActive ? styles.chipActive : ''}`}
+                onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}
+                disabled={creating}
+              >
+                <span className={styles.chipLabel}>Active</span>
+              </button>
             </div>
           </div>
 

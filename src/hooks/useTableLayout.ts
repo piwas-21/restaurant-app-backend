@@ -16,6 +16,8 @@ export function useTableLayout() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteModalData, setDeleteModalData] = useState<{ tableNumber?: string; tableCount?: number }>({});
 
   const showMessage = useCallback((type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -60,17 +62,24 @@ export function useTableLayout() {
   const handleDeleteTable = useCallback(async () => {
     if (!selectedTable) return;
 
-    if (!confirm(`Are you sure you want to delete Table ${selectedTable.tableNumber}?`)) {
-      return;
-    }
+    setDeleteModalData({ tableNumber: selectedTable.tableNumber });
+    setShowDeleteModal(true);
+  }, [selectedTable]);
+
+  const confirmDeleteTable = useCallback(async () => {
+    if (!selectedTable) return;
 
     try {
+      setSaving(true);
       await tableLayoutService.deleteTable(selectedTable.id);
       setTables(prev => prev.filter(t => t.id !== selectedTable.id));
       setSelectedTable(null);
+      setShowDeleteModal(false);
       showMessage('success', `Table ${selectedTable.tableNumber} deleted successfully!`);
     } catch (error: any) {
       showMessage('error', error.message || 'Failed to delete table');
+    } finally {
+      setSaving(false);
     }
   }, [selectedTable, showMessage]);
 
@@ -208,9 +217,12 @@ export function useTableLayout() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete ${selectedTableIds.size} table(s)?`)) {
-      return;
-    }
+    setDeleteModalData({ tableCount: selectedTableIds.size });
+    setShowDeleteModal(true);
+  }, [selectedTableIds.size, showMessage]);
+
+  const confirmBulkDeleteTables = useCallback(async () => {
+    if (selectedTableIds.size === 0) return;
 
     try {
       setSaving(true);
@@ -219,9 +231,11 @@ export function useTableLayout() {
         return tableId;
       });
 
+      const count = selectedTableIds.size;
       await Promise.all(deletes);
       await loadTables();
-      showMessage('success', `Deleted ${selectedTableIds.size} table(s)`);
+      setShowDeleteModal(false);
+      showMessage('success', `Deleted ${count} table(s)`);
       setSelectedTableIds(new Set());
     } catch (error: any) {
       showMessage('error', error.message || 'Failed to delete tables');
@@ -249,6 +263,9 @@ export function useTableLayout() {
     message,
     selectedTableIds,
     setSelectedTableIds,
+    showDeleteModal,
+    setShowDeleteModal,
+    deleteModalData,
 
     // Actions
     showMessage,
@@ -258,11 +275,13 @@ export function useTableLayout() {
     updateSelectedTable,
     handleCreateTable,
     handleDeleteTable,
+    confirmDeleteTable,
     handleSaveLayout,
     toggleTableSelection,
     bulkActivateTables,
     bulkDeactivateTables,
     bulkDeleteTables,
+    confirmBulkDeleteTables,
 
     // Constants
     CANVAS_WIDTH,

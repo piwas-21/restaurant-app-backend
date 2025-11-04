@@ -7,6 +7,7 @@ import TableFilters from '@/components/admin/table-layout/TableFilters';
 import TableCanvas from '@/components/admin/table-layout/TableCanvas';
 import TablePropertiesSidebar from '@/components/admin/table-layout/TablePropertiesSidebar';
 import { CreateTableModal } from '@/components/admin/table-layout/CreateTableModal';
+import { DeleteTableModal } from '@/components/admin/table-layout/DeleteTableModal';
 import TableQRCodeModal from '@/components/admin/tables/TableQRCodeModal';
 import { useTableLayout } from '@/hooks/useTableLayout';
 import type { TableDto } from '@/types/reservation';
@@ -54,6 +55,9 @@ export default function TableLayoutEditorPage() {
     message,
     selectedTableIds,
     setSelectedTableIds,
+    showDeleteModal,
+    setShowDeleteModal,
+    deleteModalData,
     showMessage,
     loadTables,
     loadEntrancePosition,
@@ -61,11 +65,13 @@ export default function TableLayoutEditorPage() {
     updateSelectedTable,
     handleCreateTable,
     handleDeleteTable,
+    confirmDeleteTable,
     handleSaveLayout,
     toggleTableSelection,
     bulkActivateTables,
     bulkDeactivateTables,
     bulkDeleteTables,
+    confirmBulkDeleteTables,
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
   } = useTableLayout();
@@ -320,6 +326,16 @@ export default function TableLayoutEditorPage() {
           existingTableNumbers={tables.map(t => t.tableNumber)}
           canvasWidth={CANVAS_WIDTH}
           canvasHeight={CANVAS_HEIGHT}
+        />
+
+        {/* Delete Table Modal */}
+        <DeleteTableModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={deleteModalData.tableCount ? confirmBulkDeleteTables : confirmDeleteTable}
+          tableNumber={deleteModalData.tableNumber}
+          tableCount={deleteModalData.tableCount}
+          isDeleting={saving}
         />
       </div>
     </AdminAuthGuard>

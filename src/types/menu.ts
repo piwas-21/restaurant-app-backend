@@ -34,6 +34,7 @@ export interface ProductIngredient {
 export interface ProductCustomization {
   productId: string;
   quantity: number;
+  selectedVariationId?: string | null; // ID or name of selected variation
   selectedIngredients?: string[]; // IDs of optional ingredients to include
   excludedIngredients?: string[]; // IDs of default ingredients to exclude
   addedIngredients?: string[]; // IDs of optional ingredients added

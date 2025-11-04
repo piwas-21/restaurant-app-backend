@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { getOrderById } from '@/services/orderService';
 import { OrderDto } from '@/types/order';
+import { adminTaxConfigurationService } from '@/services/adminTaxConfigurationService';
+import type { TaxConfiguration } from '@/services/adminTaxConfigurationService';
 import {
   CheckCircle,
   Clock,
@@ -33,6 +35,19 @@ function ConfirmationContent() {
   const [order, setOrder] = useState<OrderDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [taxConfig, setTaxConfig] = useState<TaxConfiguration | null>(null);
+
+  useEffect(() => {
+    const fetchTaxConfig = async () => {
+      try {
+        const config = await adminTaxConfigurationService.getActiveTaxConfiguration();
+        setTaxConfig(config);
+      } catch (error) {
+        // Silently fail - fallback to default tax label
+      }
+    };
+    fetchTaxConfig();
+  }, []);
 
   useEffect(() => {
     if (!orderId) {
@@ -354,10 +369,12 @@ function ConfirmationContent() {
                   </div>
                 )}
 
-                <div className={styles.summaryRow}>
-                  <span>{t('tax', 'Tax')}</span>
-                  <span>{formatPrice(order.tax)}</span>
-                </div>
+                {order.tax > 0 && (
+                  <div className={styles.summaryRow}>
+                    <span>{taxConfig?.name || t('tax', 'Tax')}</span>
+                    <span>{formatPrice(order.tax)}</span>
+                  </div>
+                )}
 
                 {order.tip > 0 && (
                   <div className={styles.summaryRow}>

@@ -40,6 +40,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
 
   // Check if product has customization options
   const hasCustomizationOptions =
+    (item.variations && item.variations.length > 0) ||
     (item.detailedIngredients && item.detailedIngredients.some(ing => ing.isOptional)) ||
     (item.suggestedSideItems && item.suggestedSideItems.length > 0);
 
@@ -76,6 +77,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
     try {
       await addItem({
         productId: customization.productId,
+        productVariationId: customization.selectedVariationId || undefined,
         quantity: customization.quantity,
         specialInstructions: customization.specialInstructions,
         selectedIngredients: customization.selectedIngredients,

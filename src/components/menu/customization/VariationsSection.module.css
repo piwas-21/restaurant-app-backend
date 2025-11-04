@@ -1,0 +1,115 @@
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 1rem;
+}
+
+.variationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.variationOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--card-background);
+}
+
+.variationOption:hover {
+  border-color: var(--primary-color);
+  background-color: var(--secondary-color);
+}
+
+.variationOption:has(.variationRadio:checked) {
+  border-color: var(--primary-color);
+  background-color: var(--secondary-color);
+}
+
+.variationRadio {
+  margin-top: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+  accent-color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.variationContent {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.variationInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.variationName {
+  font-weight: 600;
+  color: var(--text-color);
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.variationDescription {
+  font-size: 0.875rem;
+  color: var(--text-color);
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.variationPrice {
+  font-weight: 600;
+  color: var(--primary-color);
+  font-size: 1rem;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+}
+
+.priceModifier {
+  font-size: 0.75rem;
+  color: var(--text-color);
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .variationOption {
+    padding: 0.875rem;
+  }
+
+  .variationContent {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .variationPrice {
+    align-items: flex-start;
+  }
+
+  .sectionTitle {
+    font-size: 1rem;
+  }
+}

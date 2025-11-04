@@ -8,6 +8,9 @@ import { useCart } from '@/components/cart/CartContext';
 import { useSession } from '@/hooks/useSession';
 import { createOrder } from '@/services/orderService';
 import FidelityPointsCheckout from '@/components/checkout/FidelityPointsCheckout';
+import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
+import { adminTaxConfigurationService } from '@/services/adminTaxConfigurationService';
+import type { TaxConfiguration } from '@/services/adminTaxConfigurationService';
 import {
   PaymentMethod,
   CreateOrderCommand,
@@ -48,6 +51,9 @@ export default function ReviewPage() {
 
   // Fidelity points redemption state
   const [redeemedPoints, setRedeemedPoints] = useState(0);
+
+  // Tax configuration state
+  const [taxConfig, setTaxConfig] = useState<TaxConfiguration | null>(null);
   const [pointsDiscount, setPointsDiscount] = useState(0);
 
   // Submission state
@@ -59,6 +65,19 @@ export default function ReviewPage() {
     setRedeemedPoints(points);
     setPointsDiscount(discountAmount);
   };
+
+  // Fetch active tax configuration
+  useEffect(() => {
+    const fetchTaxConfig = async () => {
+      try {
+        const config = await adminTaxConfigurationService.getActiveTaxConfiguration();
+        setTaxConfig(config);
+      } catch (error) {
+        console.error('Failed to fetch tax configuration:', error);
+      }
+    };
+    fetchTaxConfig();
+  }, []);
 
   // Check prerequisites
   useEffect(() => {
@@ -87,6 +106,17 @@ export default function ReviewPage() {
       style: 'currency',
       currency: 'CHF',
     }).format(price);
+  };
+
+  // Check if customer has active discount
+  const customerHasDiscount = hasActiveDiscount(
+    (cartState.basket?.customerDiscount || 0) + (cartState.basket?.discount || 0)
+  );
+
+  // Format total with special rounding for discounted customers
+  const formatTotal = (total: number) => {
+    const formattedValue = formatPriceWithRounding(total, customerHasDiscount);
+    return `CHF ${formattedValue}`;
   };
 
   const paymentMethods = [
@@ -469,16 +499,18 @@ export default function ReviewPage() {
                   </div>
                 )}
 
-                <div className={styles.summaryRow}>
-                  <span>{t('tax', 'Tax')}</span>
-                  <span>{formatPrice(cartState.basket?.tax || 0)}</span>
-                </div>
+                {(cartState.basket?.tax ?? 0) > 0 && (
+                  <div className={styles.summaryRow}>
+                    <span>{taxConfig?.name || t('tax', 'Tax')}</span>
+                    <span>{formatPrice(cartState.basket?.tax || 0)}</span>
+                  </div>
+                )}
               </div>
 
               <div className={styles.summaryTotal}>
                 <span>{t('total', 'Total')}</span>
                 <span className={styles.totalAmount}>
-                  {formatPrice((cartState.basket?.total || 0) - pointsDiscount)}
+                  {formatTotal((cartState.basket?.total || 0) - pointsDiscount)}
                 </span>
               </div>
 

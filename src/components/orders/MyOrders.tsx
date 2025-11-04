@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getMyOrders } from '@/services/orderService';
 import { OrderDto } from '@/types/order';
+import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
 import styles from './MyOrders.module.css';
 
 export type OrderStatus = "Delivered" | "In Progress" | "Cancelled" | "Pending Payment" | "Pending" | "Confirmed" | "Preparing" | "Ready" | "InTransit" | "Completed";

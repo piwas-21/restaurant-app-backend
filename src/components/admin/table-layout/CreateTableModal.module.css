@@ -22,7 +22,8 @@
 }
 
 .modalContent {
-  background: white;
+  background: var(--background-color, white);
+  color: var(--text-color, #1a1a1a);
   padding: 2rem;
   border-radius: 12px;
   max-width: 500px;
@@ -31,6 +32,12 @@
   overflow-y: auto;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.3s ease-out;
+}
+
+[data-theme="dark"] .modalContent {
+  background: var(--secondary-color, #2c2c2c);
+  color: var(--text-color, #e0e0e0);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 @keyframes slideUp {
@@ -46,12 +53,16 @@
 
 .modalContent h2 {
   margin: 0 0 1.5rem 0;
-  color: var(--text-color);
+  color: var(--text-color, #1a1a1a);
   font-size: 1.5rem;
 }
 
+[data-theme="dark"] .modalContent h2 {
+  color: var(--text-color, #e0e0e0);
+}
+
 .error {
-  background: var(--error-color);
+  background: var(--error-color, #dc3545);
   color: white;
   padding: 0.75rem 1rem;
   border-radius: 6px;
@@ -66,9 +77,13 @@
 .formGroup label {
   display: block;
   margin-bottom: 0.5rem;
-  color: var(--text-color);
+  color: var(--text-color, #1a1a1a);
   font-weight: 500;
   font-size: 0.875rem;
+}
+
+[data-theme="dark"] .formGroup label {
+  color: var(--text-color, #e0e0e0);
 }
 
 .formGroup input[type="text"],
@@ -77,10 +92,21 @@
 .formGroup textarea {
   width: 100%;
   padding: 0.625rem 0.75rem;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color, #e0e0e0);
+  background: var(--background-color, white);
+  color: var(--text-color, #1a1a1a);
   border-radius: 6px;
   font-size: 0.875rem;
   transition: border-color 0.2s ease;
+}
+
+[data-theme="dark"] .formGroup input[type="text"],
+[data-theme="dark"] .formGroup input[type="number"],
+[data-theme="dark"] .formGroup select,
+[data-theme="dark"] .formGroup textarea {
+  border: 1px solid var(--border-color, #444);
+  background: var(--input-background, #1a1a1a);
+  color: var(--text-color, #e0e0e0);
 }
 
 .formGroup input[type="text"]:focus,
@@ -95,8 +121,16 @@
 .formGroup input[type="number"]:disabled,
 .formGroup select:disabled,
 .formGroup textarea:disabled {
-  background: #f5f5f5;
+  background: var(--disabled-background, #f5f5f5);
   cursor: not-allowed;
+  opacity: 0.6;
+}
+
+[data-theme="dark"] .formGroup input[type="text"]:disabled,
+[data-theme="dark"] .formGroup input[type="number"]:disabled,
+[data-theme="dark"] .formGroup select:disabled,
+[data-theme="dark"] .formGroup textarea:disabled {
+  background: var(--disabled-background, #0a0a0a);
 }
 
 .formGroup textarea {
@@ -106,9 +140,13 @@
 
 .charCounter {
   display: block;
-  color: var(--text-muted);
+  color: var(--text-muted, #6b7280);
   font-size: 0.875rem;
   margin-top: 0.25rem;
+}
+
+[data-theme="dark"] .charCounter {
+  color: var(--text-muted, #9ca3af);
 }
 
 .chipGroup {
@@ -118,31 +156,56 @@
 }
 
 .chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.chip input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-.chip input[type="checkbox"]:disabled {
-  cursor: not-allowed;
-}
-
-.chip label {
-  cursor: pointer;
-  margin: 0;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border: 2px solid var(--border-color, #e0e0e0);
+  background: var(--background-color, white);
+  color: var(--text-color, #1a1a1a);
+  border-radius: 20px;
   font-size: 0.875rem;
-  color: var(--text-color);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
   user-select: none;
 }
 
-.chip input[type="checkbox"]:disabled + label {
+[data-theme="dark"] .chip {
+  border: 2px solid var(--border-color, #444);
+  background: var(--input-background, #1a1a1a);
+  color: var(--text-color, #e0e0e0);
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--primary-color, #c0392b);
+  background: var(--primary-color-light, rgba(192, 57, 43, 0.1));
+}
+
+[data-theme="dark"] .chip:hover:not(:disabled) {
+  border-color: var(--primary-color, #e06666);
+  background: rgba(224, 102, 102, 0.15);
+}
+
+.chip.chipActive {
+  border-color: var(--primary-color, #c0392b);
+  background: var(--primary-color, #c0392b);
+  color: white;
+}
+
+[data-theme="dark"] .chip.chipActive {
+  border-color: var(--primary-color, #e06666);
+  background: var(--primary-color, #e06666);
+  color: white;
+}
+
+.chip:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
+}
+
+.chipLabel {
+  font-weight: 500;
 }
 
 .buttonGroup {
@@ -151,7 +214,11 @@
   justify-content: flex-end;
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+[data-theme="dark"] .buttonGroup {
+  border-top: 1px solid var(--border-color, #444);
 }
 
 .cancelButton,
@@ -166,12 +233,20 @@
 }
 
 .cancelButton {
-  background: #f5f5f5;
-  color: var(--text-color);
+  background: var(--secondary-color, #6c757d);
+  color: white;
+}
+
+[data-theme="dark"] .cancelButton {
+  background: var(--secondary-color, #4a5568);
 }
 
 .cancelButton:hover:not(:disabled) {
-  background: #e0e0e0;
+  background: var(--secondary-color-dark, #5a6268);
+}
+
+[data-theme="dark"] .cancelButton:hover:not(:disabled) {
+  background: var(--secondary-color-dark, #3a4556);
 }
 
 .cancelButton:disabled {
@@ -180,14 +255,22 @@
 }
 
 .submitButton {
-  background: var(--primary-color);
+  background: var(--primary-color, #c0392b);
   color: white;
 }
 
+[data-theme="dark"] .submitButton {
+  background: var(--primary-color, #e06666);
+}
+
 .submitButton:hover:not(:disabled) {
-  background: var(--primary-dark);
+  background: var(--primary-dark, #a52a1e);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="dark"] .submitButton:hover:not(:disabled) {
+  background: var(--primary-color-dark, #c94d4d);
 }
 
 .submitButton:disabled {

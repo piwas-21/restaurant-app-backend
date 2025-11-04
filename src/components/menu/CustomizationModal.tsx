@@ -9,6 +9,7 @@ import type { MenuItem, DetailedProduct, ProductCustomization } from "@/types/me
 import OptionalIngredientsSection from "./customization/OptionalIngredientsSection";
 import SuggestedSideItemsSection from "./customization/SuggestedSideItemsSection";
 import SpecialRequestSection from "./customization/SpecialRequestSection";
+import VariationsSection from "./customization/VariationsSection";
 import PriceCalculator from "./customization/PriceCalculator";
 import styles from "./CustomizationModal.module.css";
 
@@ -30,6 +31,7 @@ export default function CustomizationModal({
 
   // State for customizations
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariationId, setSelectedVariationId] = useState<string | null>(null);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [excludedIngredients, setExcludedIngredients] = useState<string[]>([]);
   const [selectedSideItems, setSelectedSideItems] = useState<
@@ -47,6 +49,17 @@ export default function CustomizationModal({
         : (product as MenuItem).price || 0;
 
     let total = basePrice;
+
+    // Apply variation price modifier (always additive)
+    if (selectedVariationId && product.variations) {
+      const variation = product.variations.find(
+        (v) => ((v as any).id || v.name) === selectedVariationId
+      );
+      if (variation) {
+        // priceModifier is always additive: basePrice + modifier
+        total = basePrice + variation.priceModifier;
+      }
+    }
 
     // Add optional ingredients price
     if (product.detailedIngredients) {
@@ -71,12 +84,13 @@ export default function CustomizationModal({
     });
 
     return total * quantity;
-  }, [product, selectedIngredients, selectedSideItems, quantity]);
+  }, [product, selectedVariationId, selectedIngredients, selectedSideItems, quantity]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setQuantity(1);
+      setSelectedVariationId(null);
       setSelectedIngredients([]);
       setExcludedIngredients([]);
       setSelectedSideItems([]);
@@ -120,6 +134,7 @@ export default function CustomizationModal({
       const customization: ProductCustomization = {
         productId: product.id,
         quantity,
+        selectedVariationId,
         selectedIngredients,
         excludedIngredients,
         addedIngredients: selectedIngredients.filter((id) => {
@@ -167,6 +182,7 @@ export default function CustomizationModal({
 
   // Check if product has any customization options
   const hasOptionalIngredients = product.detailedIngredients?.some((i) => i.isOptional);
+  const hasVariations = product.variations && product.variations.length > 0;
   const hasSuggestedSides =
     "suggestedSideItems" in product &&
     Array.isArray(product.suggestedSideItems) &&
@@ -207,6 +223,16 @@ export default function CustomizationModal({
 
         {/* Body */}
         <div className={styles.modalBody}>
+          {/* Variations Section */}
+          {hasVariations && (
+            <VariationsSection
+              variations={product.variations || []}
+              selectedVariationId={selectedVariationId}
+              onVariationChange={setSelectedVariationId}
+              basePrice={basePrice}
+            />
+          )}
+
           {/* Optional Ingredients Section */}
           {hasOptionalIngredients && (
             <OptionalIngredientsSection
@@ -252,6 +278,8 @@ export default function CustomizationModal({
             selectedSideItems={selectedSideItems}
             quantity={quantity}
             onQuantityChange={handleQuantityChange}
+            selectedVariationId={selectedVariationId}
+            variations={product.variations || []}
           />
           <button
             onClick={handleAddToCart}
