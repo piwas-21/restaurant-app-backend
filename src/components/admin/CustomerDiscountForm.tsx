@@ -397,7 +397,7 @@ export default function CustomerDiscountForm({
                 placeholder={formData.discountType === 'Percentage' ? '10' : '5.00'}
               />
               <small className={styles.help}>
-                {formData.discountType === 'Percentage' ? 'Enter percentage (0-100)' : 'Enter dollar amount'}
+                {formData.discountType === 'Percentage' ? 'Enter percentage (0-100)' : 'Enter CHF amount'}
               </small>
             </div>
           </div>

@@ -224,9 +224,9 @@ export const adminFidelityService = {
    * Format currency value
    */
   formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('de-CH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'CHF',
     }).format(value);
   },
 

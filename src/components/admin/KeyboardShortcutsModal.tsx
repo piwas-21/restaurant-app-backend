@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Keyboard } from 'lucide-react';
 import { KeyboardShortcut, formatShortcut } from '@/hooks/useKeyboardShortcuts';
 import styles from './KeyboardShortcutsModal.module.css';
@@ -9,18 +10,20 @@ interface KeyboardShortcutsModalProps {
 }
 
 export default function KeyboardShortcutsModal({ shortcuts, onClose }: KeyboardShortcutsModalProps) {
+  const { t } = useTranslation();
+
   return (
     <div className={styles.modal} onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div className={styles.titleRow}>
             <Keyboard size={24} />
-            <h2>Keyboard Shortcuts</h2>
+            <h2>{t('keyboard_shortcuts', 'Keyboard Shortcuts')}</h2>
           </div>
           <button
             className={styles.closeButton}
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('close', 'Close')}
           >
             <X size={24} />
           </button>
@@ -28,7 +31,7 @@ export default function KeyboardShortcutsModal({ shortcuts, onClose }: KeyboardS
 
         <div className={styles.modalBody}>
           <p className={styles.description}>
-            Use these keyboard shortcuts to navigate quickly:
+            {t('keyboard_shortcuts_desc', 'Use these keyboard shortcuts to navigate quickly:')}
           </p>
 
           <div className={styles.shortcutsList}>
@@ -43,7 +46,7 @@ export default function KeyboardShortcutsModal({ shortcuts, onClose }: KeyboardS
 
         <div className={styles.modalFooter}>
           <button onClick={onClose} className={styles.closeButtonPrimary}>
-            Got it!
+            {t('got_it', 'Got it!')}
           </button>
         </div>
       </div>

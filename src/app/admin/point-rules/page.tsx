@@ -138,8 +138,8 @@ export default function PointRulesPage() {
                 <tr key={rule.id}>
                   <td className={styles.nameCell}>{rule.name}</td>
                   <td>
-                    ${rule.minOrderAmount.toFixed(2)} -{' '}
-                    {rule.maxOrderAmount ? `$${rule.maxOrderAmount.toFixed(2)}` : '∞'}
+                    CHF {rule.minOrderAmount.toFixed(2)} -{' '}
+                    {rule.maxOrderAmount ? `CHF ${rule.maxOrderAmount.toFixed(2)}` : '∞'}
                   </td>
                   <td className={styles.pointsCell}>
                     <span className={styles.pointsBadge}>{rule.pointsAwarded} pts</span>

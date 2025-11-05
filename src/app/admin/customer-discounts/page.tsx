@@ -208,7 +208,7 @@ export default function CustomerDiscountsPage() {
                       : adminFidelityService.formatCurrency(discount.discountValue)}
                   </td>
                   <td className={styles.rangeCell}>
-                    {discount.minOrderAmount ? adminFidelityService.formatCurrency(discount.minOrderAmount) : '$0'}
+                    {discount.minOrderAmount ? adminFidelityService.formatCurrency(discount.minOrderAmount) : 'CHF 0'}
                     {' → '}
                     {discount.maxOrderAmount ? adminFidelityService.formatCurrency(discount.maxOrderAmount) : '∞'}
                   </td>

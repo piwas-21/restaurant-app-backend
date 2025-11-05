@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, PieChart as PieChartIcon, BarChart3, Calendar } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import styles from './AdvancedOrderAnalytics.module.css';
 
 interface AdvancedOrderAnalyticsProps {
@@ -23,6 +24,7 @@ interface AdvancedOrderAnalyticsProps {
 }
 
 export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalyticsProps) {
+  const { t } = useTranslation();
   const [dateRange, setDateRange] = useState<'7days' | '30days' | '90days'>('30days');
 
   // Calculate date range
@@ -118,7 +120,7 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
       <div className={styles.header}>
         <h2 className={styles.title}>
           <BarChart3 size={24} />
-          Advanced Analytics
+          {t('advanced_analytics', 'Advanced Analytics')}
         </h2>
         <div className={styles.dateRangeButtons}>
           <button
@@ -126,21 +128,21 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
             onClick={() => setDateRange('7days')}
           >
             <Calendar size={16} />
-            Last 7 Days
+            {t('last_7_days', 'Last 7 Days')}
           </button>
           <button
             className={dateRange === '30days' ? styles.active : ''}
             onClick={() => setDateRange('30days')}
           >
             <Calendar size={16} />
-            Last 30 Days
+            {t('last_30_days', 'Last 30 Days')}
           </button>
           <button
             className={dateRange === '90days' ? styles.active : ''}
             onClick={() => setDateRange('90days')}
           >
             <Calendar size={16} />
-            Last 90 Days
+            {t('last_90_days', 'Last 90 Days')}
           </button>
         </div>
       </div>
@@ -150,7 +152,7 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
         <div className={styles.chartCard}>
           <div className={styles.chartHeader}>
             <TrendingUp size={20} />
-            <h3>Orders & Revenue Over Time</h3>
+            <h3>{t('orders_revenue_over_time', 'Orders & Revenue Over Time')}</h3>
           </div>
           <div className={styles.chartContainer}>
             <ResponsiveContainer width="100%" height={300}>
@@ -180,8 +182,8 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
                     color: '#f1f5f9',
                   }}
                   formatter={(value: number, name: string) => {
-                    if (name === 'revenue') return [formatCurrency(value), 'Revenue'];
-                    return [value, 'Orders'];
+                    if (name === 'revenue') return [formatCurrency(value), t('revenue', 'Revenue')];
+                    return [value, t('orders', 'Orders')];
                   }}
                 />
                 <Legend />
@@ -212,7 +214,7 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
         <div className={styles.chartCard}>
           <div className={styles.chartHeader}>
             <PieChartIcon size={20} />
-            <h3>Order Types Distribution</h3>
+            <h3>{t('order_types_distribution', 'Order Types Distribution')}</h3>
           </div>
           <div className={styles.chartContainer}>
             <ResponsiveContainer width="100%" height={300}>
@@ -248,7 +250,7 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
         <div className={styles.chartCard}>
           <div className={styles.chartHeader}>
             <BarChart3 size={20} />
-            <h3>Revenue by Order Status</h3>
+            <h3>{t('revenue_by_order_status', 'Revenue by Order Status')}</h3>
           </div>
           <div className={styles.chartContainer}>
             <ResponsiveContainer width="100%" height={300}>
@@ -271,7 +273,7 @@ export default function AdvancedOrderAnalytics({ orders }: AdvancedOrderAnalytic
                     borderRadius: '8px',
                     color: '#f1f5f9',
                   }}
-                  formatter={(value: number) => [formatCurrency(value), 'Revenue']}
+                  formatter={(value: number) => [formatCurrency(value), t('revenue', 'Revenue')]}
                 />
                 <Bar dataKey="revenue" fill="#c00000" radius={[8, 8, 0, 0]} />
               </BarChart>

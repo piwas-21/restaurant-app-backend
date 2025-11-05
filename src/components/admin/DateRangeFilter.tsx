@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Calendar } from 'lucide-react';
 import styles from './DateRangeFilter.module.css';
 
@@ -11,6 +12,7 @@ interface DateRangeFilterProps {
 }
 
 export default function DateRangeFilter({ onDateRangeChange }: DateRangeFilterProps) {
+  const { t } = useTranslation();
   const [selectedPreset, setSelectedPreset] = useState<DateRangePreset | 'all'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -71,51 +73,51 @@ export default function DateRangeFilter({ onDateRangeChange }: DateRangeFilterPr
     <div className={styles.container}>
       <div className={styles.label}>
         <Calendar size={16} />
-        <span>Date Range</span>
+        <span>{t('date_range', 'Date Range')}</span>
       </div>
       <div className={styles.presets}>
         <button
           onClick={() => handlePresetChange('all')}
           className={`${styles.presetButton} ${selectedPreset === 'all' ? styles.active : ''}`}
         >
-          All Time
+          {t('all_time', 'All Time')}
         </button>
         <button
           onClick={() => handlePresetChange('today')}
           className={`${styles.presetButton} ${selectedPreset === 'today' ? styles.active : ''}`}
         >
-          Today
+          {t('today', 'Today')}
         </button>
         <button
           onClick={() => handlePresetChange('yesterday')}
           className={`${styles.presetButton} ${selectedPreset === 'yesterday' ? styles.active : ''}`}
         >
-          Yesterday
+          {t('yesterday', 'Yesterday')}
         </button>
         <button
           onClick={() => handlePresetChange('last7days')}
           className={`${styles.presetButton} ${selectedPreset === 'last7days' ? styles.active : ''}`}
         >
-          Last 7 Days
+          {t('last_7_days', 'Last 7 Days')}
         </button>
         <button
           onClick={() => handlePresetChange('last30days')}
           className={`${styles.presetButton} ${selectedPreset === 'last30days' ? styles.active : ''}`}
         >
-          Last 30 Days
+          {t('last_30_days', 'Last 30 Days')}
         </button>
         <button
           onClick={() => handlePresetChange('custom')}
           className={`${styles.presetButton} ${selectedPreset === 'custom' ? styles.active : ''}`}
         >
-          Custom Range
+          {t('custom_range', 'Custom Range')}
         </button>
       </div>
 
       {showCustomPicker && (
         <div className={styles.customPicker}>
           <div className={styles.dateInputGroup}>
-            <label htmlFor="startDate">From</label>
+            <label htmlFor="startDate">{t('from', 'From')}</label>
             <input
               id="startDate"
               type="date"
@@ -125,7 +127,7 @@ export default function DateRangeFilter({ onDateRangeChange }: DateRangeFilterPr
             />
           </div>
           <div className={styles.dateInputGroup}>
-            <label htmlFor="endDate">To</label>
+            <label htmlFor="endDate">{t('to', 'To')}</label>
             <input
               id="endDate"
               type="date"
@@ -139,7 +141,7 @@ export default function DateRangeFilter({ onDateRangeChange }: DateRangeFilterPr
             className={styles.applyButton}
             disabled={!customStartDate || !customEndDate}
           >
-            Apply
+            {t('apply', 'Apply')}
           </button>
         </div>
       )}

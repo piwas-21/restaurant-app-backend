@@ -7,6 +7,7 @@ import styles from '@/app/styles/AdminPage.module.css';
 import RegisterStaffModal from '@/components/admin/RegisterStaffModal';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
+import Pagination from '@/components/common/Pagination';
 import PageHeader from '@/components/admin/PageHeader';
 import FilterControls from '@/components/admin/member-management/FilterControls';
 import MembersTable from '@/components/admin/member-management/MembersTable';
@@ -43,9 +44,18 @@ const MemberManagementPage = () => {
   const [isResultModalSuccess, setIsResultModalSuccess] = useState(false);
   const [statsKey, setStatsKey] = useState(0); // Key to force statistics refresh
 
+  // Reset showDeleted when switching to staff tab
+  useEffect(() => {
+    if (activeTab === 'staff') {
+      setShowDeleted(false);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     const role = activeTab === 'customers' ? 'Customer' : '';
-    getUsers(role, showDeleted, searchTerm, page, pageSize);
+    // For staff, always pass false for showDeleted since they are hard deleted
+    const showDeletedParam = activeTab === 'customers' ? showDeleted : false;
+    getUsers(role, showDeletedParam, searchTerm, page, pageSize);
   }, [activeTab, searchTerm, showDeleted, page, pageSize, getUsers]);
 
   const handleEdit = (user: UserDto) => {
@@ -72,7 +82,8 @@ const MemberManagementPage = () => {
 
       // Refresh the user list
       const role = activeTab === 'customers' ? 'Customer' : '';
-      await getUsers(role, showDeleted, searchTerm, page, pageSize);
+      const showDeletedParam = activeTab === 'customers' ? showDeleted : false;
+      await getUsers(role, showDeletedParam, searchTerm, page, pageSize);
 
       // Refresh statistics
       setStatsKey(prev => prev + 1);
@@ -90,6 +101,22 @@ const MemberManagementPage = () => {
     setIsConfirmationModalOpen(true);
   };
 
+  const getDeleteConfirmationMessage = () => {
+    if (!userToDelete) return '';
+
+    const userName = `${userToDelete.firstName} ${userToDelete.lastName}`;
+
+    // Staff members are permanently deleted
+    if (activeTab === 'staff') {
+      return t('delete_staff_confirmation_message',
+        `Are you sure you want to permanently delete ${userName}? This action cannot be undone.`);
+    }
+
+    // Customers are soft deleted
+    return t('delete_customer_confirmation_message',
+      `Are you sure you want to delete ${userName}? This customer can be restored later if needed.`);
+  };
+
   const handleConfirmDelete = async () => {
     if (userToDelete) {
       const result = await handleDeleteUser(userToDelete.id);
@@ -102,7 +129,8 @@ const MemberManagementPage = () => {
       // Refresh the user list after delete
       if (result.success) {
         const role = activeTab === 'customers' ? 'Customer' : '';
-        await getUsers(role, showDeleted, searchTerm, page, pageSize);
+        const showDeletedParam = activeTab === 'customers' ? showDeleted : false;
+        await getUsers(role, showDeletedParam, searchTerm, page, pageSize);
 
         // Refresh statistics
         setStatsKey(prev => prev + 1);
@@ -137,27 +165,21 @@ const MemberManagementPage = () => {
             onDelete={handleDeleteClick}
             isLoading={isLoading}
           />
-          <div className={styles.pagination}>
-            <button onClick={() => setPage(page - 1)} disabled={page === 1}>
-              {t('previous')}
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(page + 1)}
-              disabled={page === totalPages}
-            >
-              {t('next')}
-            </button>
-          </div>
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            isLoading={isLoading}
+          />
         </div>
       </div>
       <RegisterStaffModal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onStaffRegistered={() => {
-          getUsers(activeTab === 'customers' ? 'Customer' : '', showDeleted, searchTerm, page, pageSize);
+          const role = activeTab === 'customers' ? 'Customer' : '';
+          const showDeletedParam = activeTab === 'customers' ? showDeleted : false;
+          getUsers(role, showDeletedParam, searchTerm, page, pageSize);
           setStatsKey(prev => prev + 1); // Refresh statistics
         }}
       />
@@ -165,7 +187,7 @@ const MemberManagementPage = () => {
         isOpen={isConfirmationModalOpen}
         onClose={() => setIsConfirmationModalOpen(false)}
         onConfirm={handleConfirmDelete}
-        message={t('delete_user_confirmation_message', { name: userToDelete?.firstName + ' ' + userToDelete?.lastName })}
+        message={getDeleteConfirmationMessage()}
       />
       <ResultModal
         isOpen={isResultModalOpen}

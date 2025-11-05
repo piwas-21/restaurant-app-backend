@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { OrderDto } from '@/types/order';
 import { cancelOrder, refundPayment } from '@/services/orderService';
 import { exportOrderToCSV } from '@/utils/exportUtils';
@@ -37,6 +38,7 @@ interface OrderDetailsModalProps {
 }
 
 export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: OrderDetailsModalProps) {
+  const { t } = useTranslation();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -54,7 +56,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
 
   const handleCancelOrder = async () => {
     if (!cancelReason.trim()) {
-      setError('Please provide a cancellation reason');
+      setError(t('provide_cancellation_reason', 'Please provide a cancellation reason'));
       return;
     }
 
@@ -66,10 +68,10 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
         onOrderUpdated(updatedOrder);
       }
       setShowCancelModal(false);
-      alert('Order cancelled successfully');
+      alert(t('order_cancelled_successfully', 'Order cancelled successfully'));
       onClose();
     } catch (err) {
-      setError('Failed to cancel order. Please try again.');
+      setError(t('failed_to_cancel_order', 'Failed to cancel order. Please try again.'));
     } finally {
       setIsCancelling(false);
     }
@@ -77,13 +79,13 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
 
   const handleRefundPayment = async () => {
     if (!selectedPayment || !refundAmount || !refundReason.trim()) {
-      setError('Please fill in all refund details');
+      setError(t('fill_refund_details', 'Please fill in all refund details'));
       return;
     }
 
     const amount = parseFloat(refundAmount);
     if (isNaN(amount) || amount <= 0) {
-      setError('Please enter a valid refund amount');
+      setError(t('enter_valid_refund_amount', 'Please enter a valid refund amount'));
       return;
     }
 
@@ -95,10 +97,10 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
         reason: refundReason,
       });
       setShowRefundModal(false);
-      alert('Payment refunded successfully');
+      alert(t('payment_refunded_successfully', 'Payment refunded successfully'));
       onClose();
     } catch (err) {
-      setError('Failed to process refund. Please try again.');
+      setError(t('failed_to_process_refund', 'Failed to process refund. Please try again.'));
     } finally {
       setIsRefunding(false);
     }
@@ -137,11 +139,11 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
   const getOrderTypeLabel = () => {
     switch (order.type) {
       case 'DineIn':
-        return 'Dine In';
+        return t('dine_in', 'Dine In');
       case 'Takeaway':
-        return 'Takeaway';
+        return t('takeaway', 'Takeaway');
       case 'Delivery':
-        return 'Delivery';
+        return t('delivery', 'Delivery');
       default:
         return order.type;
     }
@@ -178,7 +180,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <h2 className={styles.title}>Order Details</h2>
+            <h2 className={styles.title}>{t('order_details', 'Order Details')}</h2>
             <div className={styles.orderMeta}>
               <span className={styles.orderNumber}>#{order.orderNumber}</span>
               <span className={getStatusBadgeClasses(order.status)}>
@@ -196,7 +198,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <button
               onClick={handlePrint}
               className={styles.iconButton}
-              title="Print Receipt"
+              title={t('print_receipt', 'Print Receipt')}
             >
               <Printer size={20} />
             </button>
@@ -204,7 +206,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 className={styles.iconButton}
-                title="Export"
+                title={t('export', 'Export')}
               >
                 <Download size={20} />
                 <ChevronDown size={14} />
@@ -213,11 +215,11 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                 <div className={styles.exportMenu}>
                   <button onClick={handleExport} className={styles.exportMenuItem}>
                     <FileText size={16} />
-                    Export as CSV
+                    {t('export_as_csv', 'Export as CSV')}
                   </button>
                   <button onClick={handleExportPDF} className={styles.exportMenuItem}>
                     <FileText size={16} />
-                    Export as PDF
+                    {t('export_as_pdf', 'Export as PDF')}
                   </button>
                 </div>
               )}
@@ -234,18 +236,18 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
               <Package size={18} />
-              Order Information
+              {t('order_information', 'Order Information')}
             </h3>
             <div className={styles.infoGrid}>
               <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Order Type</span>
+                <span className={styles.infoLabel}>{t('order_type', 'Order Type')}</span>
                 <div className={styles.infoValue}>
                   {getOrderTypeIcon()}
                   {getOrderTypeLabel()}
                 </div>
               </div>
               <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Order Date</span>
+                <span className={styles.infoLabel}>{t('order_date', 'Order Date')}</span>
                 <div className={styles.infoValue}>
                   <Clock size={16} />
                   {formatDate(order.orderDate)}
@@ -253,18 +255,18 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
               </div>
               {order.type === 'DineIn' && order.tableNumber && (
                 <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>Table Number</span>
+                  <span className={styles.infoLabel}>{t('table_number', 'Table Number')}</span>
                   <div className={styles.infoValue}>
                     <UtensilsCrossed size={16} />
-                    Table {order.tableNumber}
+                    {t('table', 'Table')} {order.tableNumber}
                   </div>
                 </div>
               )}
               <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Payment Status</span>
+                <span className={styles.infoLabel}>{t('payment_status', 'Payment Status')}</span>
                 <div className={styles.infoValue}>
                   <CreditCard size={16} />
-                  {order.isFullyPaid ? 'Paid' : 'Pending'}
+                  {order.isFullyPaid ? t('paid', 'Paid') : t('pending', 'Pending')}
                 </div>
               </div>
             </div>
@@ -274,7 +276,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
               <User size={18} />
-              Customer Information
+              {t('customer_information', 'Customer Information')}
             </h3>
             <div className={styles.customerInfo}>
               {order.customerName && (
@@ -303,7 +305,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>
                 <MapPin size={18} />
-                Delivery Address
+                {t('delivery_address', 'Delivery Address')}
               </h3>
               <div className={styles.addressCard}>
                 <p className={styles.addressLine}>{order.deliveryAddress.addressLine1}</p>
@@ -327,7 +329,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
               <Package size={18} />
-              Order Items ({order.items.length})
+              {t('order_items', 'Order Items')} ({order.items.length})
             </h3>
             <div className={styles.itemsList}>
               {order.items.map((item) => (
@@ -355,7 +357,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                       </p>
                     )}
                     <div className={styles.itemQuantity}>
-                      Qty: {item.quantity} × {formatPrice(item.unitPrice)}
+                      {t('qty', 'Qty')}: {item.quantity} × {formatPrice(item.unitPrice)}
                     </div>
                   </div>
                   <div className={styles.itemTotal}>
@@ -370,37 +372,37 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
               <CreditCard size={18} />
-              Order Summary
+              {t('order_summary', 'Order Summary')}
             </h3>
             <div className={styles.summary}>
               <div className={styles.summaryRow}>
-                <span>Subtotal</span>
+                <span>{t('subtotal', 'Subtotal')}</span>
                 <span>{formatPrice(order.subTotal)}</span>
               </div>
 
               {order.discount > 0 && (
                 <div className={`${styles.summaryRow} ${styles.discount}`}>
-                  <span>Promo Discount</span>
+                  <span>{t('promo_discount', 'Promo Discount')}</span>
                   <span>-{formatPrice(order.discount)}</span>
                 </div>
               )}
 
               {order.hasUserLimitDiscount && order.userLimitAmount > 0 && (
                 <div className={`${styles.summaryRow} ${styles.discount}`}>
-                  <span>User Limit Discount</span>
+                  <span>{t('user_limit_discount', 'User Limit Discount')}</span>
                   <span>-{formatPrice(order.userLimitAmount)}</span>
                 </div>
               )}
 
               {order.deliveryFee > 0 && (
                 <div className={styles.summaryRow}>
-                  <span>Delivery Fee</span>
+                  <span>{t('delivery_fee', 'Delivery Fee')}</span>
                   <span>{formatPrice(order.deliveryFee)}</span>
                 </div>
               )}
 
               <div className={styles.summaryRow}>
-                <span>Tax</span>
+                <span>{t('tax', 'Tax')}</span>
                 <span>{formatPrice(order.tax)}</span>
               </div>
 
@@ -416,7 +418,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>
                 <CreditCard size={18} />
-                Payment Details
+                {t('payment_details', 'Payment Details')}
               </h3>
               <div className={styles.paymentsList}>
                 {order.payments.map((payment) => (
@@ -444,7 +446,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>
                 <FileText size={18} />
-                Order Notes
+                {t('notes', 'Notes')}
               </h3>
               <div className={styles.notesCard}>
                 <p>{order.notes}</p>
@@ -457,7 +459,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>
                 <Clock size={18} />
-                Status History
+                {t('action_history', 'Action History')}
               </h3>
               <div className={styles.timeline}>
                 {order.statusHistory.map((history) => (
@@ -491,7 +493,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                 className={styles.cancelOrderButton}
               >
                 <Ban size={18} />
-                Cancel Order
+                {t('cancel_order', 'Cancel Order')}
               </button>
             )}
             {order.payments && order.payments.length > 0 && order.isFullyPaid && (
@@ -500,12 +502,12 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                 className={styles.refundButton}
               >
                 <DollarSign size={18} />
-                Refund Payment
+                {t('refund_payment', 'Refund Payment')}
               </button>
             )}
           </div>
           <button onClick={onClose} className={styles.closeButtonFooter}>
-            Close
+            {t('close', 'Close')}
           </button>
         </div>
 
@@ -515,18 +517,18 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <div className={styles.confirmModalContent}>
               <h3 className={styles.confirmModalTitle}>
                 <Ban size={20} />
-                Cancel Order
+                {t('cancel_order', 'Cancel Order')}
               </h3>
               <p className={styles.confirmModalMessage}>
-                Are you sure you want to cancel this order? This action cannot be undone.
+                {t('cancel_order_warning', 'Are you sure you want to cancel this order? This action cannot be undone.')}
               </p>
               <div className={styles.formGroup}>
-                <label htmlFor="cancelReason">Cancellation Reason *</label>
+                <label htmlFor="cancelReason">{t('cancellation_reason', 'Cancellation Reason')} *</label>
                 <textarea
                   id="cancelReason"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="Enter reason for cancellation..."
+                  placeholder={t('cancellation_reason_placeholder', 'Enter reason for cancellation...')}
                   className={styles.textarea}
                   rows={4}
                 />
@@ -542,7 +544,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                   className={styles.cancelButton}
                   disabled={isCancelling}
                 >
-                  Cancel
+                  {t('cancel', 'Cancel')}
                 </button>
                 <button
                   onClick={handleCancelOrder}
@@ -552,12 +554,12 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                   {isCancelling ? (
                     <>
                       <Loader2 size={18} className={styles.spinner} />
-                      Cancelling...
+                      {t('cancelling', 'Cancelling...')}
                     </>
                   ) : (
                     <>
                       <Ban size={18} />
-                      Confirm Cancellation
+                      {t('cancel_order', 'Cancel Order')}
                     </>
                   )}
                 </button>
@@ -572,20 +574,20 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
             <div className={styles.confirmModalContent}>
               <h3 className={styles.confirmModalTitle}>
                 <DollarSign size={20} />
-                Refund Payment
+                {t('refund_payment', 'Refund Payment')}
               </h3>
               <p className={styles.confirmModalMessage}>
-                Select a payment to refund and enter the refund details.
+                {t('refund_payment_warning', 'This will process a refund for the selected payment.')}
               </p>
               <div className={styles.formGroup}>
-                <label htmlFor="paymentSelect">Select Payment *</label>
+                <label htmlFor="paymentSelect">{t('select_payment', 'Select Payment')} *</label>
                 <select
                   id="paymentSelect"
                   value={selectedPayment || ''}
                   onChange={(e) => setSelectedPayment(e.target.value)}
                   className={styles.select}
                 >
-                  <option value="">-- Select Payment --</option>
+                  <option value="">{t('select_payment_to_refund', '-- Select Payment --')}</option>
                   {order.payments.map((payment) => (
                     <option key={payment.id} value={payment.id}>
                       {payment.paymentMethod} - {formatPrice(payment.amount)}
@@ -594,7 +596,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                 </select>
               </div>
               <div className={styles.formGroup}>
-                <label htmlFor="refundAmount">Refund Amount (CHF) *</label>
+                <label htmlFor="refundAmount">{t('refund_amount', 'Refund Amount')} (CHF) *</label>
                 <input
                   id="refundAmount"
                   type="number"
@@ -607,12 +609,12 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                 />
               </div>
               <div className={styles.formGroup}>
-                <label htmlFor="refundReason">Refund Reason *</label>
+                <label htmlFor="refundReason">{t('refund_reason', 'Refund Reason')} *</label>
                 <textarea
                   id="refundReason"
                   value={refundReason}
                   onChange={(e) => setRefundReason(e.target.value)}
-                  placeholder="Enter reason for refund..."
+                  placeholder={t('refund_reason_placeholder', 'Enter reason for refund...')}
                   className={styles.textarea}
                   rows={4}
                 />
@@ -630,7 +632,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                   className={styles.cancelButton}
                   disabled={isRefunding}
                 >
-                  Cancel
+                  {t('cancel', 'Cancel')}
                 </button>
                 <button
                   onClick={handleRefundPayment}
@@ -640,12 +642,12 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                   {isRefunding ? (
                     <>
                       <Loader2 size={18} className={styles.spinner} />
-                      Processing...
+                      {t('refunding', 'Refunding...')}
                     </>
                   ) : (
                     <>
                       <DollarSign size={18} />
-                      Confirm Refund
+                      {t('refund_payment', 'Refund Payment')}
                     </>
                   )}
                 </button>

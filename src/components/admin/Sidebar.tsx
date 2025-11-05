@@ -54,22 +54,22 @@ const Sidebar = () => {
     },
     {
       href: '/admin/point-rules',
-      label: 'Point Rules',
+      label: t('point_rules', 'Point Rules'),
       icon: Award
     },
     {
       href: '/admin/customer-discounts',
-      label: 'Customer Discounts',
+      label: t('customer_discounts', 'Customer Discounts'),
       icon: Gift
     },
     {
       href: '/admin/tax-configuration',
-      label: 'Tax Configuration',
+      label: t('tax_configuration', 'Tax Configuration'),
       icon: DollarSign
     },
     {
       href: '/admin/fidelity-analytics',
-      label: 'Fidelity Analytics',
+      label: t('fidelity_analytics', 'Fidelity Analytics'),
       icon: TrendingUp
     },
   ];

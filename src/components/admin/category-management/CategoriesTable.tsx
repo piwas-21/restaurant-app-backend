@@ -33,6 +33,7 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({ categories, isLoading
             <th>{t('category_name')}</th>
             <th>{t('is_active')}</th>
             <th>{t('display_order')}</th>
+            <th>{t('product_count')}</th>
             <th>{t('actions_header')}</th>
           </tr>
         </thead>
@@ -43,6 +44,7 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({ categories, isLoading
                 <td>{category.name}</td>
                 <td>{category.isActive ? t('yes') : t('no')}</td>
                 <td>{category.displayOrder}</td>
+                <td>{category.productCount ?? 0}</td>
                 <td className={styles.actionsCell}>
                   <button onClick={() => onEdit(category)} className={`${styles.adminButton} ${styles.edit}`}>
                     {t('edit')}
@@ -58,7 +60,7 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({ categories, isLoading
             ))
           ) : (
             <tr>
-              <td colSpan={4}>{t('no_categories_found')}</td>
+              <td colSpan={5}>{t('no_categories_found')}</td>
             </tr>
           )}
         </tbody>

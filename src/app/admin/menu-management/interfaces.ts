@@ -84,4 +84,5 @@ export interface Category {
   description?: string | null;
   isActive: boolean;
   displayOrder: number;
+  productCount?: number;
 }

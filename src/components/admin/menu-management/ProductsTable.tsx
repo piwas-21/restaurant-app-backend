@@ -37,7 +37,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({ products, isLoading, erro
             products.map((product) => (
               <tr key={product.id}>
                 <td>{product.name}</td>
-                <td>${product.basePrice.toFixed(2)}</td>
+                <td>CHF {product.basePrice.toFixed(2)}</td>
                 <td>{product.isActive ? t('yes') : t('no')}</td>
                 <td>{product.isAvailable ? t('yes') : t('no')}</td>
                 <td className={styles.actionsCell}>

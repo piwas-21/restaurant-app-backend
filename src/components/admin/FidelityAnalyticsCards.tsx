@@ -50,9 +50,9 @@ export default function FidelityAnalyticsCards({ analytics, loading }: FidelityA
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('de-CH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'CHF',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);

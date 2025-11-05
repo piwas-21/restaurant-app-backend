@@ -122,13 +122,13 @@ export default function PointRuleForm({ rule, onSuccess, onCancel }: PointRuleFo
 
           // Check for overlap error
           if (firstError.toLowerCase().includes('overlap')) {
-            // Extract range information: "Rule overlaps with existing rule. Range: $0 - $11"
+            // Extract range information: "Rule overlaps with existing rule. Range: CHF 0 - CHF 11"
             const rangeMatch = firstError.match(/Range:\s*\$?([\d.]+)\s*-\s*\$?([\d.]+|unlimited)/i);
 
             if (rangeMatch) {
               const minAmount = rangeMatch[1];
               const maxAmount = rangeMatch[2];
-              errorMessage = `This rule overlaps with an existing rule covering $${minAmount} - $${maxAmount === 'unlimited' ? 'unlimited' : '$' + maxAmount}. Please adjust your order amount range to avoid conflicts with existing rules.`;
+              errorMessage = `This rule overlaps with an existing rule covering CHF ${minAmount} - ${maxAmount === 'unlimited' ? 'unlimited' : 'CHF ' + maxAmount}. Please adjust your order amount range to avoid conflicts with existing rules.`;
             } else {
               errorMessage = `This rule overlaps with an existing rule. Please adjust the order amount range to avoid conflicts.`;
             }
@@ -199,7 +199,7 @@ export default function PointRuleForm({ rule, onSuccess, onCancel }: PointRuleFo
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label htmlFor="minOrderAmount" className={styles.label}>
-                {t('min_order_amount', 'Min Order Amount')} * ($)
+                {t('min_order_amount', 'Min Order Amount')} * (CHF)
               </label>
               <input
                 type="number"
@@ -216,7 +216,7 @@ export default function PointRuleForm({ rule, onSuccess, onCancel }: PointRuleFo
 
             <div className={styles.formGroup}>
               <label htmlFor="maxOrderAmount" className={styles.label}>
-                {t('max_order_amount', 'Max Order Amount')} ($)
+                {t('max_order_amount', 'Max Order Amount')} (CHF)
               </label>
               <input
                 type="number"

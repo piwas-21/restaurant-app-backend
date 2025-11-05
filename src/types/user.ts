@@ -3,8 +3,10 @@
  */
 export enum UserRole {
   Customer = 'Customer',
-  Staff = 'Staff',
-  Admin = 'Admin'
+  Admin = 'Admin',
+  Cashier = 'Cashier',
+  KitchenStaff = 'KitchenStaff',
+  Server = 'Server'
 }
 
 /**

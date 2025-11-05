@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { OrderDto } from '@/types/order';
 import {
   ShoppingBag,
@@ -15,6 +16,7 @@ interface OrderAnalyticsProps {
 }
 
 export default function OrderAnalytics({ orders }: OrderAnalyticsProps) {
+  const { t } = useTranslation();
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('de-CH', {
       style: 'currency',
@@ -44,32 +46,32 @@ export default function OrderAnalytics({ orders }: OrderAnalyticsProps) {
 
   const cards = [
     {
-      title: 'Total Orders Today',
+      title: t('total_orders_today', 'Total Orders Today'),
       value: totalOrdersToday.toString(),
       icon: ShoppingBag,
       color: 'blue',
-      description: 'Orders placed today',
+      description: t('orders_placed_today', 'Orders placed today'),
     },
     {
-      title: 'Pending Orders',
+      title: t('pending_orders', 'Pending Orders'),
       value: pendingOrders.toString(),
       icon: Clock,
       color: 'yellow',
-      description: 'Awaiting processing',
+      description: t('awaiting_processing', 'Awaiting processing'),
     },
     {
-      title: 'Revenue Today',
+      title: t('revenue_today', 'Revenue Today'),
       value: formatPrice(revenueToday),
       icon: TrendingUp,
       color: 'green',
-      description: 'Total sales today',
+      description: t('total_sales_today', 'Total sales today'),
     },
     {
-      title: 'Average Order Value',
+      title: t('average_order_value', 'Average Order Value'),
       value: formatPrice(averageOrderValue),
       icon: DollarSign,
       color: 'purple',
-      description: 'Per order average',
+      description: t('per_order_average', 'Per order average'),
     },
   ];
 

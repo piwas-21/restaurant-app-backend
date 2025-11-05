@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Download, X, Package, ChevronDown, FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import styles from './BulkActionsBar.module.css';
 
 interface BulkActionsBarProps {
@@ -17,19 +18,20 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
   onUpdateStatus,
   onClearSelection,
 }) => {
+  const { t } = useTranslation();
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   return (
     <div className={styles.bulkActions}>
       <div className={styles.bulkInfo}>
         <span className={styles.bulkCount}>
-          {selectedCount} order{selectedCount > 1 ? 's' : ''} selected
+          {selectedCount} {t('orders_selected', 'order(s) selected')}
         </span>
       </div>
       <div className={styles.bulkButtons}>
         <button onClick={onUpdateStatus} className={styles.bulkStatusButton}>
           <Package size={16} />
-          Update Status
+          {t('update_status_bulk', 'Update Status')}
         </button>
         <div className={styles.exportDropdown}>
           <button
@@ -37,7 +39,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
             className={styles.bulkExportButton}
           >
             <Download size={16} />
-            Export Selected
+            {t('export_selected', 'Export Selected')}
             <ChevronDown size={14} />
           </button>
           {showExportMenu && (
@@ -50,7 +52,7 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
                 className={styles.exportMenuItem}
               >
                 <FileText size={16} />
-                Export as CSV
+                {t('export_as_csv', 'Export as CSV')}
               </button>
               <button
                 onClick={() => {
@@ -60,14 +62,14 @@ export const BulkActionsBar: React.FC<BulkActionsBarProps> = ({
                 className={styles.exportMenuItem}
               >
                 <FileText size={16} />
-                Export as PDF
+                {t('export_as_pdf', 'Export as PDF')}
               </button>
             </div>
           )}
         </div>
         <button onClick={onClearSelection} className={styles.bulkClearButton}>
           <X size={16} />
-          Clear Selection
+          {t('clear_selection', 'Clear Selection')}
         </button>
       </div>
     </div>
