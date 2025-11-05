@@ -38,7 +38,8 @@ export const useMenuManagement = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await getCategories() as { success: boolean; data?: { items: any[] } };
+        // Fetch all categories for dropdown
+        const response = await getCategories(1, 100) as { success: boolean; data?: { items: any[] } };
         if (response.success && response.data?.items && Array.isArray(response.data.items)) {
           setCategories(response.data.items);
         }

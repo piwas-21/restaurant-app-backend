@@ -6,20 +6,10 @@ import { Star, Clock } from 'lucide-react';
 import Image from 'next/image';
 import styles from './FeaturedSpecial.module.css';
 import AllergenDisplay from '@/components/common/AllergenDisplay';
+import type { FeaturedSpecial as FeaturedSpecialType } from '@/types/menu';
 
 interface FeaturedSpecialProps {
-  special: {
-    id: string;
-    name: string;
-    description?: string;
-    basePrice: number;
-    imageUrl?: string;
-    preparationTimeMinutes?: number;
-    allergens?: string[];
-    ingredients?: string[];
-    detailedIngredients?: any[];
-    content?: { [key: string]: { name?: string; description?: string } };
-  };
+  special: FeaturedSpecialType;
   onAddToCart?: () => void;
   onViewDetails?: () => void;
 }

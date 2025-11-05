@@ -18,11 +18,11 @@ export function usePublicMenu() {
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 10;
 
-  // Load categories once
+  // Load categories once - fetch all categories for menu display
   useEffect(() => {
     const init = async () => {
       try {
-        const response = await getCategories() as { success: boolean; data?: { items: any[] } };
+        const response = await getCategories(1, 100) as { success: boolean; data?: { items: any[] } };
         if (response.success && response.data?.items && Array.isArray(response.data.items)) {
           setCategories(response.data.items as ApiCategory[]);
         } else {

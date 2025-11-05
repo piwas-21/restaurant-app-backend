@@ -26,7 +26,8 @@ const CategoriesEditor: React.FC<Props> = ({ product, onUpdated }) => {
 
   useEffect(() => {
     const fetchAll = async () => {
-      const resp = await getCategories() as { success: boolean; data?: { items: any[] } };
+      // Fetch all categories for selection
+      const resp = await getCategories(1, 100) as { success: boolean; data?: { items: any[] } };
       if (resp.success && resp.data?.items) {
         setCategories(resp.data.items);
 

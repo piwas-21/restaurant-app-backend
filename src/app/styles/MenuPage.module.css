@@ -103,17 +103,44 @@
   background-color: var(--card-background);
   padding: 12px 0;
   z-index: 100;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 2rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+.navWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.navScrollContainer {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  max-width: 600px; /* Limit width to show approximately 5 categories */
+  width: 100%;
+}
+
+.navScrollContainer::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.navButtonsContainer {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  min-width: min-content;
+}
+
 .navButton {
   padding: 10px 20px;
-  margin: 8px;
   cursor: pointer;
   border: 1px solid var(--border-color);
   border-radius: 20px;
@@ -121,6 +148,8 @@
   transition: background-color 0.3s, color 0.3s, transform 0.2s;
   font-weight: 500;
   color: var(--text-color);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .navButton:hover {
@@ -134,6 +163,42 @@
   color: var(--button-text-color);
   border-color: var(--primary-color);
   font-weight: bold;
+}
+
+.navArrow {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-color);
+  flex-shrink: 0;
+  z-index: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.navArrow:hover {
+  background-color: var(--primary-color);
+  color: var(--button-text-color);
+  border-color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.navArrow:active {
+  transform: scale(0.95);
+}
+
+.navArrowLeft {
+  margin-right: 12px;
+}
+
+.navArrowRight {
+  margin-left: 12px;
 }
 
 .categoryTitle {
@@ -230,10 +295,30 @@
     margin-bottom: 1.5rem;
   }
 
+  .navWrapper {
+    padding: 0 0.5rem;
+  }
+
+  .navScrollContainer {
+    max-width: calc(100% - 80px);
+  }
+
   .navButton {
     padding: 8px 12px;
-    margin: 4px;
     font-size: 0.9rem;
+  }
+
+  .navArrow {
+    width: 32px;
+    height: 32px;
+  }
+
+  .navArrowLeft {
+    margin-right: 6px;
+  }
+
+  .navArrowRight {
+    margin-left: 6px;
   }
 
   .pageTitle {

@@ -45,9 +45,10 @@ export const uploadCategoryImage = async (categoryId: string, imageFile: File) =
   return await apiClient.putFormData(`${CATEGORIES_API_URL}/${categoryId}/image`, formData);
 };
 
-export const getCategories = async () => {
+export const getCategories = async (pageNumber: number = 1, pageSize: number = 100) => {
   try {
-    return await apiClient.get(CATEGORIES_API_URL);
+    const url = `${CATEGORIES_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    return await apiClient.get(url);
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.getCategories();

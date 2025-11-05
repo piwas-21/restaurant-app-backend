@@ -12,12 +12,13 @@ import TableBanner from "@/components/TableBanner";
 import type { LanguageCode } from "@/components/LanguageSwitcher";
 import { usePublicMenu, ALL_ITEMS_KEY } from "@/hooks/usePublicMenu";
 import CategoryNav from "@/components/menu/CategoryNav";
-import type { MenuItem } from "@/types/menu";
+import type { MenuItem, FeaturedSpecial, FeaturedSpecialResponse, ProductCustomization } from "@/types/menu";
 import ImageModal from "@/components/menu/ImageModal";
 import MenuList from "@/components/menu/MenuList";
 import Pagination from "@/components/common/Pagination";
-import FeaturedSpecial from "@/components/menu/FeaturedSpecial";
+import FeaturedSpecialComponent from "@/components/menu/FeaturedSpecial";
 import ProductDetailsModal from "@/components/menu/ProductDetailsModal";
+import CustomizationModal from "@/components/menu/CustomizationModal";
 import { getFeaturedSpecial } from "@/services/menuService";
 
 // Map API category names to translation keys
@@ -65,8 +66,9 @@ export default function MenuPage() {
   );
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
-  const [featuredSpecial, setFeaturedSpecial] = useState<any | null>(null);
+  const [featuredSpecial, setFeaturedSpecial] = useState<FeaturedSpecial | null>(null);
   const [showFeaturedDetails, setShowFeaturedDetails] = useState(false);
+  const [showFeaturedCustomization, setShowFeaturedCustomization] = useState(false);
 
   const { addItem } = useCart();
   const { enqueueSnackbar } = useSnackbar();
@@ -86,7 +88,7 @@ export default function MenuPage() {
     // Fetch featured special
     const loadFeaturedSpecial = async () => {
       try {
-        const response = await getFeaturedSpecial() as { success: boolean; data?: any };
+        const response = await getFeaturedSpecial() as FeaturedSpecialResponse;
         if (response.success && response.data) {
           setFeaturedSpecial(response.data);
         }
@@ -106,12 +108,52 @@ export default function MenuPage() {
   const handleAddFeaturedToCart = useCallback(() => {
     if (!featuredSpecial) return;
 
+    // Check if product has customization options
+    const hasCustomizationOptions =
+      (featuredSpecial.variations && featuredSpecial.variations.length > 0) ||
+      (featuredSpecial.detailedIngredients && featuredSpecial.detailedIngredients.some(ing => ing.isOptional)) ||
+      (featuredSpecial.suggestedSideItems && featuredSpecial.suggestedSideItems.length > 0);
+
+    // If product has customization options, show customization modal
+    if (hasCustomizationOptions) {
+      setShowFeaturedCustomization(true);
+      return;
+    }
+
+    // Otherwise, add directly to cart
     try {
       addItem({
         productId: featuredSpecial.id,
         quantity: 1,
       });
 
+      enqueueSnackbar(t('item_added_to_cart', 'Item added to cart'), {
+        variant: 'success',
+        autoHideDuration: 2000,
+      });
+    } catch {
+      enqueueSnackbar(t('error_adding_to_cart', 'Error adding item to cart'), {
+        variant: 'error',
+        autoHideDuration: 3000,
+      });
+    }
+  }, [featuredSpecial, addItem, enqueueSnackbar, t]);
+
+  const handleFeaturedCustomizationConfirm = useCallback(async (customization: ProductCustomization) => {
+    if (!featuredSpecial) return;
+
+    try {
+      await addItem({
+        productId: customization.productId,
+        productVariationId: customization.selectedVariationId || undefined,
+        quantity: customization.quantity,
+        specialInstructions: customization.specialInstructions,
+        selectedIngredients: customization.selectedIngredients,
+        excludedIngredients: customization.excludedIngredients,
+        selectedSideItems: customization.selectedSideItems,
+      });
+
+      setShowFeaturedCustomization(false);
       enqueueSnackbar(t('item_added_to_cart', 'Item added to cart'), {
         variant: 'success',
         autoHideDuration: 2000,
@@ -232,7 +274,7 @@ export default function MenuPage() {
       <TableBanner position="top" />
 
       {featuredSpecial && (
-        <FeaturedSpecial
+        <FeaturedSpecialComponent
           special={featuredSpecial}
           onAddToCart={handleAddFeaturedToCart}
           onViewDetails={handleViewFeaturedDetails}
@@ -332,6 +374,35 @@ export default function MenuPage() {
             isSpecial: true,
           }}
           onClose={handleCloseFeaturedDetails}
+        />
+      )}
+
+      {showFeaturedCustomization && featuredSpecial && (
+        <CustomizationModal
+          isOpen={showFeaturedCustomization}
+          product={{
+            id: featuredSpecial.id,
+            name: featuredSpecial.name,
+            description: featuredSpecial.description || '',
+            basePrice: featuredSpecial.basePrice,
+            imageUrl: featuredSpecial.imageUrl || '',
+            preparationTimeMinutes: featuredSpecial.preparationTimeMinutes,
+            allergens: featuredSpecial.allergens || [],
+            ingredients: featuredSpecial.ingredients || [],
+            detailedIngredients: featuredSpecial.detailedIngredients || [],
+            displayOrder: 0,
+            type: 'mainItem',
+            isActive: true,
+            isAvailable: true,
+            isSpecial: true,
+            content: {},
+            images: featuredSpecial.images || (featuredSpecial.imageUrl ? [{ url: featuredSpecial.imageUrl, alt: featuredSpecial.name }] : []),
+            variations: featuredSpecial.variations || [],
+            suggestedSideItems: featuredSpecial.suggestedSideItems || [],
+            categories: [],
+          }}
+          onClose={() => setShowFeaturedCustomization(false)}
+          onAddToCart={handleFeaturedCustomizationConfirm}
         />
       )}
 

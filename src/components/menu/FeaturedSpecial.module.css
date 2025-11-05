@@ -1,7 +1,7 @@
 /* Featured Special Section Styles */
 .featuredSpecialSection {
-  padding: 0;
-  width: 50%;
+  padding: 0 1rem;
+  max-width: 1400px;
   margin: 2rem auto;
 }
 
@@ -235,7 +235,37 @@
 }
 
 /* Responsive styles for featured special */
+@media (max-width: 1200px) {
+  .featuredSpecialContent {
+    grid-template-columns: 350px 1fr;
+  }
+}
+
+@media (max-width: 992px) {
+  .featuredSpecialSection {
+    padding: 0 1rem;
+  }
+
+  .featuredSpecialContent {
+    grid-template-columns: 300px 1fr;
+    gap: 1.5rem;
+  }
+
+  .featuredSpecialTitle {
+    font-size: 1.75rem;
+  }
+
+  .priceValue {
+    font-size: 1.75rem;
+  }
+}
+
 @media (max-width: 768px) {
+  .featuredSpecialSection {
+    padding: 0 1rem;
+    margin: 1.5rem auto;
+  }
+
   .featuredSpecialContainer {
     padding: 1.5rem;
   }
@@ -257,6 +287,10 @@
     font-size: 1.5rem;
   }
 
+  .featuredSpecialMeta {
+    gap: 1.5rem;
+  }
+
   .featuredSpecialIngredients {
     font-size: 0.9rem;
     padding: 0.6rem;
@@ -276,5 +310,63 @@
   .featuredSpecialButton {
     width: 100%;
     padding: 0.875rem 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .featuredSpecialSection {
+    padding: 0 1rem;
+    margin: 1rem auto;
+  }
+
+  .featuredSpecialContainer {
+    padding: 1rem;
+  }
+
+  .featuredSpecialBadge {
+    font-size: 0.95rem;
+    padding: 0.4rem 1.2rem;
+    margin-bottom: 1rem;
+  }
+
+  .featuredSpecialBadge svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .featuredSpecialTitle {
+    font-size: 1.3rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .featuredSpecialDescription {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .featuredSpecialMeta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .priceValue {
+    font-size: 1.5rem;
+  }
+
+  .featuredSpecialIngredients {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+  }
+
+  .featuredSpecialActions {
+    gap: 0.5rem;
+  }
+
+  .featuredSpecialAddButton,
+  .featuredSpecialDetailsButton {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
   }
 }

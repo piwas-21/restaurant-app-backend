@@ -182,3 +182,27 @@ export interface DetailedProductResponse {
   data: DetailedProduct;
   errors?: string[];
 }
+
+export interface FeaturedSpecial {
+  id: string;
+  name: string;
+  description?: string;
+  basePrice: number;
+  imageUrl?: string;
+  featuredDate: string;
+  preparationTimeMinutes: number;
+  ingredients?: string[];
+  allergens?: string[];
+  images?: MenuItemImage[];
+  variations: DetailedProductVariation[];
+  suggestedSideItems: SuggestedSideItem[];
+  detailedIngredients: ProductIngredient[];
+  content?: ContentData;
+}
+
+export interface FeaturedSpecialResponse {
+  success: boolean;
+  message?: string;
+  data: FeaturedSpecial | null;
+  errors?: string[];
+}

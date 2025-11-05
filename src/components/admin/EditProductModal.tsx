@@ -96,6 +96,11 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
 
       const safeCategoryIds = (product.categories?.map((c: any) => c.categoryId).filter((x: any) => !!x) || []) as string[];
 
+      // Extract IDs from suggestedSideItems array
+      const sideItemIds = Array.isArray(product.suggestedSideItems)
+        ? product.suggestedSideItems.map((item: any) => item.id).filter((id: any) => !!id)
+        : [];
+
       reset({
         name: product.name || '',
         description: product.description || '',
@@ -111,10 +116,10 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
         content: flattenedContent,
         preparationTimeMinutes: product.preparationTimeMinutes || 0,
         displayOrder: product.displayOrder || 0,
-        suggestedSideItemIds: product.suggestedSideItemIds || [],
+        suggestedSideItemIds: sideItemIds,
       });
 
-      setSelectedSideItemIds(product.suggestedSideItemIds || []);
+      setSelectedSideItemIds(sideItemIds);
       setDetailedIngredients(product.detailedIngredients || []);
     }
   }, [product, reset]);

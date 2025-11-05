@@ -18,6 +18,35 @@ export const SuggestedSideItemsPicker: React.FC<SuggestedSideItemsPickerProps> =
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<ProductSearchResult[]>([]);
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>([]);
+  const [selectedItemsDetails, setSelectedItemsDetails] = useState<Map<string, { name: string; description?: string }>>(new Map());
+
+  // Fetch details for selected side items on mount or when selectedSideItemIds change
+  React.useEffect(() => {
+    const fetchSelectedItemsDetails = async () => {
+      if (selectedSideItemIds.length === 0) {
+        setSelectedItemsDetails(new Map());
+        return;
+      }
+
+      try {
+        const resp = await getProducts(1, 100, undefined);
+        if (resp.success) {
+          const detailsMap = new Map<string, { name: string; description?: string }>();
+          selectedSideItemIds.forEach((id: string) => {
+            const item = resp.data.items.find((p: any) => p.id === id);
+            if (item) {
+              detailsMap.set(id, { name: item.name, description: item.description });
+            }
+          });
+          setSelectedItemsDetails(detailsMap);
+        }
+      } catch {
+        // Handle error silently
+      }
+    };
+
+    fetchSelectedItemsDetails();
+  }, [selectedSideItemIds]);
 
   const runSearch = async () => {
     if (!search.trim()) return;
@@ -74,9 +103,10 @@ export const SuggestedSideItemsPicker: React.FC<SuggestedSideItemsPickerProps> =
     return (
       <div className={modalStyles.chipGroup}>
         {selectedSideItemIds.map(id => {
-          // Find the item name from results if available, otherwise just show ID
-          const item = results.find(r => r.id === id);
-          const displayName = item?.name || `Item ${id}`;
+          // Get the item name from fetched details, fallback to results, or show ID
+          const itemDetails = selectedItemsDetails.get(id);
+          const resultItem = results.find(r => r.id === id);
+          const displayName = itemDetails?.name || resultItem?.name || `Item ${id.substring(0, 8)}...`;
 
           return (
             <div key={id} className={modalStyles.chip}>

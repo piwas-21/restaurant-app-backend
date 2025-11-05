@@ -10,6 +10,7 @@ import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
 import PageHeader from '@/components/admin/PageHeader';
 import CategoriesTable from '@/components/admin/category-management/CategoriesTable';
+import Pagination from '@/components/common/Pagination';
 import { Category } from '@/app/admin/menu-management/interfaces';
 import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
@@ -19,8 +20,12 @@ const CategoryManagementPage = () => {
     categories,
     isLoading,
     error,
+    currentPage,
+    totalPages,
+    totalCount,
     fetchCategories,
     handleDeleteCategory,
+    handlePageChange,
   } = useCategoryManagement();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -69,17 +74,27 @@ const CategoryManagementPage = () => {
             onEdit={handleEditClick}
             onDelete={handleDeleteClick}
           />
+          {!isLoading && !error && totalCount > 0 && (
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+              />
+            </div>
+          )}
         </div>
       </div>
       <CreateCategoryModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onCategoryCreated={fetchCategories}
+        onCategoryCreated={() => fetchCategories(currentPage)}
       />
       <EditCategoryModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        onCategoryUpdated={fetchCategories}
+        onCategoryUpdated={() => fetchCategories(currentPage)}
         category={selectedCategory}
       />
       <ConfirmationModal
