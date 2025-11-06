@@ -1081,6 +1081,7 @@
   "qr_download_success": "QR-Code erfolgreich heruntergeladen",
   "qr_print_success": "Druckdialog wird geöffnet...",
   "qr_generation_failed": "QR-Code konnte nicht generiert werden",
-  "qr_code_ready": "QR-Code ist bereit"
+  "qr_code_ready": "QR-Code ist bereit",
+  "showing_items": "{{start}}-{{end}} von {{total}} Elementen werden angezeigt"
 }
 

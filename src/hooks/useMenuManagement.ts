@@ -16,15 +16,22 @@ export const useMenuManagement = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(initialCategoryId);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 20;
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (page: number = 1) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await getProducts(1, 10, selectedCategoryId);
+      const response = await getProducts(page, pageSize, selectedCategoryId);
 
       if (response.success) {
         setProducts(response.data.items);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalCount(response.data.totalCount || 0);
+        setCurrentPage(page);
       } else {
         setError(response.message || 'Failed to fetch products');
       }
@@ -33,7 +40,7 @@ export const useMenuManagement = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategoryId]);
+  }, [selectedCategoryId, pageSize]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -51,13 +58,20 @@ export const useMenuManagement = () => {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
+    setCurrentPage(1);
+    fetchProducts(1);
   }, [fetchProducts]);
 
   const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const categoryId = event.target.value;
     setSelectedCategoryId(categoryId === 'all' ? null : categoryId);
+    setCurrentPage(1);
     router.push('/admin/menu-management');
+  };
+
+  const handlePageChange = (page: number) => {
+    fetchProducts(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return {
@@ -66,7 +80,12 @@ export const useMenuManagement = () => {
     selectedCategoryId,
     isLoading,
     error,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageSize,
     handleCategoryChange,
-    fetchProducts,
+    handlePageChange,
+    fetchProducts: () => fetchProducts(currentPage),
   };
 };

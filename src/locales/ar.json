@@ -1075,6 +1075,7 @@
   "qr_download_success": "تم تنزيل رمز الاستجابة السريعة بنجاح",
   "qr_print_success": "جاري فتح نافذة الطباعة...",
   "qr_generation_failed": "فشل إنشاء رمز الاستجابة السريعة",
-  "qr_code_ready": "رمز الاستجابة السريعة جاهز"
+  "qr_code_ready": "رمز الاستجابة السريعة جاهز",
+  "showing_items": "عرض {{start}}-{{end}} من {{total}} عنصر"
 }
 

@@ -17,6 +17,7 @@ import { ReservationsList } from '@/components/admin/reservations/ReservationsLi
 import { exportReservationsToCSV, exportReservationsToPDF } from '@/utils/reservationExportUtils';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
+import Pagination from '@/components/common/Pagination';
 import styles from './styles.module.css';
 
 type ViewMode = 'list' | 'calendar';
@@ -38,6 +39,12 @@ export default function AdminReservationsManagementPage() {
   const [selectedTableId, setSelectedTableId] = useState<string>('All');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedReservationIds, setSelectedReservationIds] = useState<Set<string>>(new Set());
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 20;
 
   // Modal states
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; message: string; onConfirm: () => void }>({
@@ -70,7 +77,8 @@ export default function AdminReservationsManagementPage() {
     }
 
     fetchData();
-  }, [user, authLoading, selectedStatus, selectedDate, selectedTableId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, selectedStatus, selectedDate, selectedTableId, currentPage]);
 
   const fetchData = async () => {
     try {
@@ -86,14 +94,19 @@ export default function AdminReservationsManagementPage() {
         confirmed: allItems.filter(r => r.status === ReservationStatus.Confirmed).length
       });
 
-      // Fetch filtered reservations for display
-      const reservationsParams: any = {};
+      // Fetch filtered reservations for display with pagination
+      const reservationsParams: any = {
+        page: currentPage,
+        pageSize: pageSize
+      };
       if (selectedStatus !== 'All') reservationsParams.status = selectedStatus;
       if (selectedDate) reservationsParams.date = selectedDate;
       if (selectedTableId !== 'All') reservationsParams.tableId = selectedTableId;
 
       const reservationsResult = await reservationService.getReservations(reservationsParams);
       setReservations(reservationsResult.items);
+      setTotalPages(reservationsResult.totalPages || 1);
+      setTotalCount(reservationsResult.totalCount || 0);
 
       // Fetch tables for filter
       const tablesResult = await reservationService.getTables();
@@ -287,6 +300,27 @@ export default function AdminReservationsManagementPage() {
     });
   };
 
+  // Filter handlers that reset pagination
+  const handleStatusChange = (status: ReservationStatus | 'All') => {
+    setSelectedStatus(status);
+    setCurrentPage(1);
+  };
+
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    setCurrentPage(1);
+  };
+
+  const handleTableChange = (tableId: string) => {
+    setSelectedTableId(tableId);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Filter reservations by search query
   const filteredReservations = reservations.filter(reservation => {
     if (!searchQuery.trim()) return true;
@@ -330,11 +364,11 @@ export default function AdminReservationsManagementPage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           selectedStatus={selectedStatus}
-          onStatusChange={setSelectedStatus}
+          onStatusChange={handleStatusChange}
           selectedDate={selectedDate}
-          onDateChange={setSelectedDate}
+          onDateChange={handleDateChange}
           selectedTableId={selectedTableId}
-          onTableChange={setSelectedTableId}
+          onTableChange={handleTableChange}
           tables={tables}
           searchPlaceholder={t('search_reservations', 'Search by name, email, phone, or table...')}
           allStatusesLabel={t('all_statuses', 'All Statuses')}
@@ -414,6 +448,30 @@ export default function AdminReservationsManagementPage() {
               cancelLabel={t('cancel', 'Cancel')}
             />
           )
+        )}
+
+        {/* Pagination - Only show in list view */}
+        {viewMode === 'list' && !isLoading && filteredReservations.length > 0 && totalPages > 1 && (
+          <>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              isLoading={isLoading}
+            />
+
+            {/* Pagination Info */}
+            {totalCount > 0 && (
+              <p style={{ textAlign: 'center', marginTop: '1rem', color: '#666' }}>
+                {t('showing_items', {
+                  start: (currentPage - 1) * pageSize + 1,
+                  end: Math.min(currentPage * pageSize, totalCount),
+                  total: totalCount,
+                  defaultValue: `Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalCount)} of ${totalCount} items`
+                })}
+              </p>
+            )}
+          </>
         )}
       </div>
 

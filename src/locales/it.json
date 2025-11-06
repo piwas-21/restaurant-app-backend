@@ -1076,5 +1076,6 @@
   "qr_download_success": "Codice QR scaricato con successo",
   "qr_print_success": "Apertura finestra di stampa...",
   "qr_generation_failed": "Impossibile generare il codice QR",
-  "qr_code_ready": "Codice QR è pronto"
+  "qr_code_ready": "Codice QR è pronto",
+  "showing_items": "Visualizzazione di {{start}}-{{end}} su {{total}} elementi"
 }

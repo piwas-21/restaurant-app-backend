@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { getCategories } from "@/services/categoryService";
 import { getProducts } from "@/services/menuService";
 import type { ApiCategory, MenuItem } from "@/types/menu";
@@ -17,6 +17,13 @@ export function usePublicMenu() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 10;
+
+  // Use ref to track the latest selectedView without causing re-renders
+  const selectedViewRef = useRef(selectedView);
+
+  useEffect(() => {
+    selectedViewRef.current = selectedView;
+  }, [selectedView]);
 
   // Load categories once - fetch all categories for menu display
   useEffect(() => {
@@ -37,13 +44,13 @@ export function usePublicMenu() {
     init();
   }, []);
 
-  const fetchProducts = useCallback(async (page: number = 1) => {
+  const fetchProducts = useCallback(async (page: number, categoryId: string | typeof ALL_ITEMS_KEY | null) => {
     setIsLoading(true);
     setError(null);
     setItems([]);
     try {
-      const categoryId = selectedView === ALL_ITEMS_KEY ? null : selectedView;
-      const response = await getProducts(page, pageSize, categoryId || undefined);
+      const catId = categoryId === ALL_ITEMS_KEY ? null : categoryId;
+      const response = await getProducts(page, pageSize, catId || undefined);
       if (!response.success) throw new Error(response.message || "Failed to fetch products");
 
       // Update pagination metadata
@@ -70,10 +77,10 @@ export function usePublicMenu() {
           : { en: { name: p.name, description: p.description || '', ingredient: '' } };
         return {
           id: p.id,
-          name: p.name || 'Unnamed Item', // Base name for fallback
-          description: p.description || '', // Base description for description fallback
-          ingredients: Array.isArray(p.ingredients) ? p.ingredients : [], // Base ingredients for ingredients fallback
-          detailedIngredients: Array.isArray(p.detailedIngredients) ? p.detailedIngredients : [], // Detailed ingredients with optional/pricing
+          name: p.name || 'Unnamed Item',
+          description: p.description || '',
+          ingredients: Array.isArray(p.ingredients) ? p.ingredients : [],
+          detailedIngredients: Array.isArray(p.detailedIngredients) ? p.detailedIngredients : [],
           content: normalizedContent,
           price: typeof p.basePrice === "number" ? p.basePrice : parseFloat(p.basePrice || "0"),
           image: primaryImage,
@@ -82,7 +89,7 @@ export function usePublicMenu() {
           preparationTimeMinutes: typeof p.preparationTimeMinutes === "number" ? p.preparationTimeMinutes : undefined,
           variations: Array.isArray(p.variations) ? p.variations : [],
           suggestedSideItems: Array.isArray(p.suggestedSideItems) ? p.suggestedSideItems : [],
-          categoryKey: categoryId || undefined,
+          categoryKey: catId || undefined,
           isSpecial: p.isSpecial,
           isActive: p.isActive,
           isAvailable: p.isAvailable,
@@ -100,17 +107,17 @@ export function usePublicMenu() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedView, pageSize]);
+  }, [pageSize]);
 
   // Fetch products when selection changes (reset to page 1)
   useEffect(() => {
     if (!selectedView) return;
     setCurrentPage(1);
-    fetchProducts(1);
+    fetchProducts(1, selectedView);
   }, [selectedView, fetchProducts]);
 
   const handlePageChange = useCallback((page: number) => {
-    fetchProducts(page);
+    fetchProducts(page, selectedViewRef.current);
     // Scroll to top of menu section
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [fetchProducts]);
@@ -127,6 +134,6 @@ export function usePublicMenu() {
     totalCount,
     pageSize,
     onPageChange: handlePageChange,
-    refetch: () => fetchProducts(currentPage),
+    refetch: () => fetchProducts(currentPage, selectedViewRef.current),
   } as const;
 }

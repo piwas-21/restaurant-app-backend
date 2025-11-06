@@ -1082,5 +1082,6 @@
   "qr_download_success": "QR kodu başarıyla indirildi",
   "qr_print_success": "Yazdırma penceresi açılıyor...",
   "qr_generation_failed": "QR kodu oluşturulamadı",
-  "qr_code_ready": "QR Kodu hazır"
+  "qr_code_ready": "QR Kodu hazır",
+  "showing_items": "{{total}} öğeden {{start}}-{{end}} gösteriliyor"
 }

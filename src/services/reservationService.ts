@@ -84,6 +84,7 @@ export const reservationService = {
     if (params?.date) queryParams.append('date', params.date);
     if (params?.tableId) queryParams.append('tableId', params.tableId);
     if (params?.status !== undefined) queryParams.append('status', String(params.status));
+    // Backend expects lowercase 'page' and 'pageSize'
     if (params?.page) queryParams.append('page', String(params.page));
     if (params?.pageSize) queryParams.append('pageSize', String(params.pageSize));
 

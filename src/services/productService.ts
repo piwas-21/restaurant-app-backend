@@ -56,7 +56,8 @@ export const deleteProduct = async (productId: string) => {
 // Special Products API Functions
 
 export const getSpecialProducts = async (page: number = 1, pageSize: number = 20) => {
-  return await apiClient.get(`${PRODUCTS_API_URL}/specials?page=${page}&pageSize=${pageSize}`);
+  // Backend expects 'Page' and 'PageSize' (PascalCase)
+  return await apiClient.get(`${PRODUCTS_API_URL}/specials?Page=${page}&PageSize=${pageSize}`);
 };
 
 export const getFeaturedSpecial = async () => {

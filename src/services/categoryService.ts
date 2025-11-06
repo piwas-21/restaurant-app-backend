@@ -47,7 +47,8 @@ export const uploadCategoryImage = async (categoryId: string, imageFile: File) =
 
 export const getCategories = async (pageNumber: number = 1, pageSize: number = 100) => {
   try {
-    const url = `${CATEGORIES_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    // Backend expects 'PageNumber' and 'PageSize' (PascalCase)
+    const url = `${CATEGORIES_API_URL}?PageNumber=${pageNumber}&PageSize=${pageSize}`;
     return await apiClient.get(url);
   } catch {
     // Fallback to mock API if real API fails

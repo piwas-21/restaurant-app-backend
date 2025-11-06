@@ -8,6 +8,7 @@ import SpecialsTable from '@/components/admin/specials-management/SpecialsTable'
 import FeaturedSpecialCard from '@/components/admin/specials-management/FeaturedSpecialCard';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
+import Pagination from '@/components/common/Pagination';
 import { useSpecialsManagement } from '@/hooks/useSpecialsManagement';
 import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
@@ -18,6 +19,10 @@ export default function SpecialsManagementPage() {
     featuredSpecial,
     isLoading,
     error,
+    totalCount,
+    currentPage,
+    pageSize,
+    fetchSpecialProducts,
     handleSetFeaturedSpecial,
     handleUnsetFeaturedSpecial,
   } = useSpecialsManagement();
@@ -75,6 +80,13 @@ export default function SpecialsManagementPage() {
     }
   };
 
+  const handlePageChange = (page: number) => {
+    fetchSpecialProducts(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const totalPages = Math.ceil(totalCount / pageSize);
+
   return (
     <AdminAuthGuard>
       <main className={styles.adminContainer}>
@@ -95,6 +107,30 @@ export default function SpecialsManagementPage() {
             error={error}
             onSetFeatured={handleSetFeaturedClick}
           />
+
+          {/* Pagination */}
+          {!isLoading && specialProducts.length > 0 && totalPages > 1 && (
+            <>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+              />
+
+              {/* Pagination Info */}
+              {totalCount > 0 && (
+                <p style={{ textAlign: 'center', marginTop: '1rem', color: '#666' }}>
+                  {t('showing_items', {
+                    start: (currentPage - 1) * pageSize + 1,
+                    end: Math.min(currentPage * pageSize, totalCount),
+                    total: totalCount,
+                    defaultValue: `Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalCount)} of ${totalCount} items`
+                  })}
+                </p>
+              )}
+            </>
+          )}
         </section>
       </main>
 

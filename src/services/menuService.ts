@@ -53,11 +53,12 @@ export const getProducts = async (
   categoryId?: string | null
 ): Promise<{ success: boolean; message: string; data: PaginatedProducts; errors: any }> => {
   try {
-    let url = `${PRODUCTS_API_URL}?pageNumber=${pageNumber}&pageSize=${pageSize}`;
+    // Backend expects 'Page' and 'PageSize' (PascalCase), not 'pageNumber' and 'pageSize' (camelCase)
+    let url = `${PRODUCTS_API_URL}?Page=${pageNumber}&PageSize=${pageSize}`;
     if (categoryId) {
       url += `&CategoryId=${categoryId}`;
     }
-    return await apiClient.get(url);
+    return await apiClient.get(url) as { success: boolean; message: string; data: PaginatedProducts; errors: any };
   } catch {
     // Fallback to mock API if real API fails
     return mockApiClient.getProducts(pageNumber, pageSize, categoryId);

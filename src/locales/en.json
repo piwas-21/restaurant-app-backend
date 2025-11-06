@@ -1150,5 +1150,6 @@
   "delete_category_confirmation_message": "Are you sure you want to delete category '{{name}}'?",
   "view_products": "View Products",
   "yes": "Yes",
-  "no": "No"
+  "no": "No",
+  "showing_items": "Showing {{start}}-{{end}} of {{total}} items"
 }

@@ -1078,6 +1078,7 @@
   "qr_download_success": "Code QR téléchargé avec succès",
   "qr_print_success": "Ouverture de la fenêtre d'impression...",
   "qr_generation_failed": "Échec de la génération du code QR",
-  "qr_code_ready": "Code QR est prêt"
+  "qr_code_ready": "Code QR est prêt",
+  "showing_items": "Affichage de {{start}}-{{end}} sur {{total}} éléments"
 }
 

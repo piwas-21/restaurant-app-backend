@@ -13,6 +13,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import ProductsTable from '@/components/admin/menu-management/ProductsTable';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
+import Pagination from '@/components/common/Pagination';
 import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 
 const MenuManagementContent = () => {
@@ -26,7 +27,12 @@ const MenuManagementContent = () => {
     selectedCategoryId,
     isLoading,
     error,
+    currentPage,
+    totalPages,
+    totalCount,
+    pageSize,
     handleCategoryChange,
+    handlePageChange,
     fetchProducts,
   } = useMenuManagement();
 
@@ -104,6 +110,30 @@ const MenuManagementContent = () => {
             onEdit={handleOpenEditModal}
             onDelete={handleDeleteClick}
           />
+
+          {/* Pagination */}
+          {!isLoading && products.length > 0 && (
+            <>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+              />
+
+              {/* Pagination Info */}
+              {totalCount > 0 && (
+                <p style={{ textAlign: 'center', marginTop: '1rem', color: '#666' }}>
+                  {t('showing_items', {
+                    start: (currentPage - 1) * pageSize + 1,
+                    end: Math.min(currentPage * pageSize, totalCount),
+                    total: totalCount,
+                    defaultValue: `Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalCount)} of ${totalCount} items`
+                  })}
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
       <CreateProductModal
