@@ -82,7 +82,7 @@ export const useOrderHelpers = () => {
       case 'Paid':
         return t('payment_status_paid', 'Paid');
       case 'PartiallyPaid':
-        return t('payment_status_partiallypaid', 'Partially Paid');
+        return t('payment_status_partially_paid', 'Partially Paid');
       case 'Refunded':
         return t('payment_status_refunded', 'Refunded');
       case 'Failed':

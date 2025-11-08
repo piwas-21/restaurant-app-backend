@@ -55,7 +55,7 @@
   margin: 0 0 0.8rem 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary, #333);
+  color: var(--primary-color, #e70b0b);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -83,14 +83,14 @@
 
 .variationItem {
   padding: 0.8rem;
-  background-color: var(--background-subtle, #f9f9f9);
+  background-color: var(--card-background, #f9f9f9);
   border-radius: 8px;
   border: 1px solid var(--border-color, #eee);
 }
 
 .variationName {
   font-weight: 600;
-  color: var(--text-primary, #333);
+  color: var(--text-color, #333);
   margin-right: 0.5rem;
 }
 
@@ -103,7 +103,7 @@
 .variationDescription {
   margin: 0.5rem 0 0 0;
   font-size: 0.9rem;
-  color: var(--text-secondary, #666);
+  color: var(--text-color, #666);
   font-style: italic;
 }
 
@@ -116,8 +116,8 @@
 
 .sideItemCard {
   padding: 0.8rem;
-  background-color: var(--info-color-xlight, #e3f2fd);
-  border: 1px solid var(--info-color-light, #42a5f5);
+  background-color: var(--card-background, #e3f2fd);
+  border: 1px solid var(--border-color, #eee);
   border-radius: 8px;
 }
 
@@ -130,7 +130,7 @@
 
 .sideItemName {
   font-weight: 600;
-  color: var(--info-color-dark, #0d47a1);
+  color: var(--text-color, #0d47a1);
 }
 
 .requiredBadge {
@@ -147,7 +147,7 @@
 .sideItemDescription {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--info-color-dark, #0d47a1);
+  color: var(--text-color, #0d47a1);
   font-style: italic;
 }
 

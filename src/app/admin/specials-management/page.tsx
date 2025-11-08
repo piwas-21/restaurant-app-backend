@@ -63,7 +63,21 @@ export default function SpecialsManagementPage() {
       return;
     }
 
-    setResultModalMessage(result.message);
+    // Translate the message
+    let translatedMessage = result.message;
+    if (result.success) {
+      if (confirmationAction === 'set') {
+        translatedMessage = t('featured_special_set_success', {
+          name: selectedProductName,
+          defaultValue: `Successfully set '${selectedProductName}' as the featured special`
+        });
+      } else if (confirmationAction === 'unset') {
+        translatedMessage = t('featured_special_removed_success',
+          'Featured special removed successfully');
+      }
+    }
+
+    setResultModalMessage(translatedMessage);
     setIsResultModalSuccess(result.success);
     setIsResultModalOpen(true);
     setSelectedProductId(null);

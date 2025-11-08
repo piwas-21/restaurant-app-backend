@@ -146,8 +146,8 @@ html[data-theme="dark"] .selectFieldReservations {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .reservationsContainer {
-    margin: 1rem;
-    padding: 1.5rem;
+    margin: 0.75rem;
+    padding: 1.25rem;
   }
 
   .pageTitle {
@@ -156,38 +156,87 @@ html[data-theme="dark"] .selectFieldReservations {
 
   .pageDescription {
     font-size: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .formRow {
     flex-direction: column;
-    gap: 1.25rem; /* Adjust gap for stacked elements */
+    gap: 1rem; /* Adjust gap for stacked elements */
   }
-  
+
   .formDescription {
-    padding: 0.8rem;
+    padding: 0.7rem;
     font-size: 0.95rem;
+    margin-bottom: 0.75rem;
   }
 
   .submitButtonReservations {
     width: 100%;
-    padding: 0.8rem 1.5rem;
+    padding: 0.75rem 1.25rem;
     font-size: 1rem;
   }
 }
 
 @media (max-width: 480px) {
   .reservationsContainer {
-    padding: 1rem;
+    margin: 0;
+    padding: 0.75rem;
   }
+
   .pageTitle {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
   }
+
+  .pageDescription {
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .reservationForm {
+    gap: 1rem;
+  }
+
+  .formRow {
+    gap: 0.75rem;
+  }
+
+  .formGroupHalf,
+  .formGroup {
+    gap: 0.4rem;
+  }
+
+  .formGroup label {
+    font-size: 0.85rem;
+  }
+
+  .formDescription {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
   .inputFieldReservations,
   .selectFieldReservations,
   .textareaFieldReservations {
-    padding: 0.75rem 0.9rem;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  .textareaFieldReservations {
+    min-height: 90px;
+  }
+
+  .submitButtonReservations {
+    width: 100%;
+    padding: 0.65rem 1rem;
     font-size: 0.95rem;
+    margin-top: 1rem;
+  }
+
+  .confirmationNote {
+    font-size: 0.85rem;
+    margin-top: 1rem;
   }
 }
 

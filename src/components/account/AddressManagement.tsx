@@ -21,6 +21,7 @@ export default function AddressManagement() {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<AddressDto | null>(null);
   const [error, setError] = useState<string>('');
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ show: boolean; addressId: string | null }>({ show: false, addressId: null });
 
   const loadAddresses = async () => {
     try {
@@ -54,17 +55,21 @@ export default function AddressManagement() {
   };
 
   const handleDelete = async (addressId: string) => {
-    if (!confirm(t('address_delete_confirm', 'Are you sure you want to delete this address?'))) {
-      return;
-    }
+    setDeleteConfirmModal({ show: true, addressId });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmModal.addressId) return;
 
     try {
-      await deleteAddress(addressId);
+      await deleteAddress(deleteConfirmModal.addressId);
       await loadAddresses();
+      setDeleteConfirmModal({ show: false, addressId: null });
     } catch (err: any) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete address:', err);
       setError(t('address_delete_error', 'Failed to delete address. Please try again.'));
+      setDeleteConfirmModal({ show: false, addressId: null });
     }
   };
 
@@ -146,6 +151,31 @@ export default function AddressManagement() {
             setEditingAddress(null);
           }}
         />
+      )}
+
+      {deleteConfirmModal.show && (
+        <div className={styles.modalOverlay} onClick={() => setDeleteConfirmModal({ show: false, addressId: null })}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2>{t('confirm_delete_title', 'Delete Address')}</h2>
+            <p>{t('address_delete_confirm', 'Are you sure you want to delete this address?')}</p>
+            <div className={styles.formActions}>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal({ show: false, addressId: null })}
+                className={styles.cancelButton}
+              >
+                {t('cancel_button', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className={styles.deleteButton}
+              >
+                {t('delete_button', 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -83,6 +83,8 @@ export const OrdersFilters: React.FC<OrdersFiltersProps> = ({
             <option value="Paid">{t('payment_status_paid', 'Paid')}</option>
             <option value="PartiallyPaid">{t('payment_status_partially_paid', 'Partially Paid')}</option>
             <option value="Refunded">{t('payment_status_refunded', 'Refunded')}</option>
+            <option value="Failed">{t('payment_status_failed', 'Failed')}</option>
+            <option value="Overpaid">{t('payment_status_overpaid', 'Overpaid')}</option>
           </select>
         </div>
 

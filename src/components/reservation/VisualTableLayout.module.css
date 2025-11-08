@@ -568,9 +568,9 @@
   }
 
   .entrance {
-    width: 40px;
-    height: 55px;
-    font-size: 1.75rem;
+    width: 35px;
+    height: 48px;
+    font-size: 1.5rem;
   }
 
   .entrance::after {
@@ -580,23 +580,23 @@
   }
 
   .table.round {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 
   .table.rectangular {
-    width: 70px;
-    height: 42px;
+    width: 58px;
+    height: 35px;
   }
 
   .table.square {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 
   .table.large {
-    width: 90px;
-    height: 55px;
+    width: 75px;
+    height: 45px;
   }
 
   .tableContent {

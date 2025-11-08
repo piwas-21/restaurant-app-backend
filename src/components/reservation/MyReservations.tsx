@@ -7,6 +7,8 @@ import { ReservationDto, ReservationStatus, ReservationStatusLabel } from '@/typ
 import styles from './MyReservations.module.css';
 import statusStyles from '../../styles/orderStatus.module.css';
 import { Calendar, Clock, Users, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import CancelReservationModal from './CancelReservationModal';
+import CancelSuccessModal from './CancelSuccessModal';
 
 export default function MyReservations() {
   const { t } = useTranslation();
@@ -15,6 +17,9 @@ export default function MyReservations() {
   const [expandedReservation, setExpandedReservation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     loadReservations();
@@ -36,17 +41,15 @@ export default function MyReservations() {
   };
 
   const handleCancelReservation = async (id: string) => {
-    if (!confirm(t('my_reservations_cancel_confirm', 'Are you sure you want to cancel this reservation?'))) {
-      return;
-    }
-
     setCancelling(id);
+    setCancelError(null);
     try {
       await reservationService.cancelReservation(id);
-      alert(t('my_reservations_cancelled_success', 'Reservation cancelled successfully!'));
+      setShowCancelModal(null);
+      setShowSuccessModal(true);
       loadReservations();
     } catch (err: any) {
-      alert(err.message || t('my_reservations_cancel_error', 'Failed to cancel reservation'));
+      setCancelError(err.message || t('my_reservations_cancel_error', 'Failed to cancel reservation'));
     } finally {
       setCancelling(null);
     }
@@ -206,14 +209,18 @@ export default function MyReservations() {
                     <div className={styles.actions}>
                       <button
                         className={styles.cancelButton}
-                        onClick={() => handleCancelReservation(reservation.id)}
+                        onClick={() => setShowCancelModal(reservation.id)}
                         disabled={cancelling === reservation.id}
                       >
-                        {cancelling === reservation.id
-                          ? t('my_reservations_cancelling', 'Cancelling...')
-                          : t('cancel_reservation', 'Cancel Reservation')}
+                        {t('cancel_reservation', 'Cancel Reservation')}
                       </button>
-                      <button className={styles.modifyButton}>
+                      <button
+                        className={styles.modifyButton}
+                        onClick={() => {
+                          // TODO: Implement modify reservation functionality
+                          alert(t('feature_coming_soon', 'This feature is coming soon'));
+                        }}
+                      >
                         {t('modify_reservation', 'Modify')}
                       </button>
                     </div>
@@ -224,6 +231,28 @@ export default function MyReservations() {
           ))}
         </div>
       </section>
+
+      <CancelReservationModal
+        isOpen={showCancelModal !== null}
+        onConfirm={() => showCancelModal && handleCancelReservation(showCancelModal)}
+        onCancel={() => setShowCancelModal(null)}
+        isLoading={cancelling !== null}
+      />
+
+      <CancelSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          setShowCancelModal(null);
+        }}
+      />
+
+      {cancelError && (
+        <div className={styles.errorAlert}>
+          <p>{cancelError}</p>
+          <button onClick={() => setCancelError(null)}>×</button>
+        </div>
+      )}
     </div>
   );
 }

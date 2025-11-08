@@ -106,12 +106,25 @@ export default function MyOrders() {
     }
   };
 
+  const getOrderTypeTranslationKey = (orderType: string): string => {
+    switch (orderType) {
+      case 'DineIn': return 'order_type_dine_in';
+      case 'Takeaway': return 'order_type_takeaway';
+      case 'Delivery': return 'order_type_delivery';
+      default: return `order_type_${orderType.toLowerCase()}`;
+    }
+  };
+
   const getOrderStatusTranslationKey = (status: OrderStatus): string => {
     switch (status) {
+      case "Pending": return 'order_status_pending';
+      case "Confirmed": return 'order_status_confirmed';
+      case "Preparing": return 'order_status_preparing';
+      case "Ready": return 'order_status_ready';
+      case "InTransit": return 'order_status_intransit';
       case "Delivered": return 'order_status_delivered';
-      case "In Progress": return 'order_status_in_progress';
+      case "Completed": return 'order_status_completed';
       case "Cancelled": return 'order_status_cancelled';
-      case "Pending Payment": return 'order_status_pending_payment';
       default: return status;
     }
   };
@@ -155,7 +168,7 @@ export default function MyOrders() {
                   </div>
                   <div>
                     <span className={styles.orderDetailLabel}>{t('order_type_label', 'Type')}</span>
-                    <span className={styles.orderDetailValue}>{t(`order_type_${order.orderType.toLowerCase()}`, order.orderType)}</span>
+                    <span className={styles.orderDetailValue}>{t(getOrderTypeTranslationKey(order.orderType), order.orderType)}</span>
                   </div>
                   <div>
                     <span className={styles.orderDetailLabel}>{t('order_status_label', 'Status')}</span>

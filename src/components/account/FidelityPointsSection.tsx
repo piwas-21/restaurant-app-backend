@@ -13,6 +13,7 @@ export default function FidelityPointsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showLearnMoreModal, setShowLearnMoreModal] = useState(false);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -127,10 +128,7 @@ export default function FidelityPointsSection() {
           {t('view_history', 'View History')}
         </button>
         <button
-          onClick={() => {
-            // TODO: Scroll to "Learn More" section or open info modal
-            alert(t('points_info', '100 points = $1.00 discount. Earn points with every order!'));
-          }}
+          onClick={() => setShowLearnMoreModal(true)}
           className={styles.learnMoreButton}
         >
           {t('learn_more', 'Learn More')}
@@ -154,6 +152,42 @@ export default function FidelityPointsSection() {
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
       />
+
+      {showLearnMoreModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowLearnMoreModal(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>{t('learn_more', 'Learn More')}</h2>
+              <button
+                className={styles.closeButton}
+                onClick={() => setShowLearnMoreModal(false)}
+                aria-label={t('close', 'Close')}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p><strong>{t('how_fidelity_works', 'How Fidelity Points Work:')}</strong></p>
+              <ul>
+                <li>{t('fidelity_rule_1', 'Earn 1 point for every CHF 1.00 you spend')}</li>
+                <li>{t('fidelity_rule_2', '100 points = CHF 1.00 discount on future orders')}</li>
+                <li>{t('fidelity_rule_3', 'Points never expire as long as you use your account')}</li>
+                <li>{t('fidelity_rule_4', 'Automatically applied to your orders at checkout')}</li>
+              </ul>
+              <p><strong>{t('example_title', 'Example:')}</strong></p>
+              <p>{t('example_text', 'Spend CHF 50.00 → Earn 50 points → Get CHF 0.50 discount on next order')}</p>
+            </div>
+            <div className={styles.formActions}>
+              <button
+                onClick={() => setShowLearnMoreModal(false)}
+                className={styles.closeModalButton}
+              >
+                {t('close', 'Close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

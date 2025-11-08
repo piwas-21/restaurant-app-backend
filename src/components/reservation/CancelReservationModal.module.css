@@ -1,0 +1,158 @@
+/* Cancel Reservation Modal Styles */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modalContent {
+  background: var(--card-background, white);
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-color, #111827);
+  margin: 0;
+}
+
+.modalBody {
+  padding: 24px;
+}
+
+.confirmMessage {
+  color: var(--text-color);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.modalActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.cancelButton {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--secondary-color, #f0f0f0);
+  color: var(--text-color);
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background-color: var(--secondary-hover, #e0e0e0);
+}
+
+.cancelButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirmButton {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--danger-color, #dc3545);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirmButton:hover:not(:disabled) {
+  background-color: var(--danger-hover, #c82333);
+}
+
+.confirmButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .modalContent {
+  background: var(--secondary-color, #2c2c2c);
+}
+
+[data-theme="dark"] .modalHeader {
+  border-bottom-color: var(--border-color, #444);
+}
+
+[data-theme="dark"] .modalTitle {
+  color: var(--text-color, #e0e0e0);
+}
+
+[data-theme="dark"] .confirmMessage {
+  color: var(--text-secondary, #b0b0b0);
+}
+
+[data-theme="dark"] .cancelButton {
+  background-color: var(--secondary-color, #3a3a3a);
+  color: var(--text-color, #e0e0e0);
+}
+
+[data-theme="dark"] .cancelButton:hover:not(:disabled) {
+  background-color: var(--background-color, #444);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .modalOverlay {
+    padding: 16px;
+  }
+
+  .modalContent {
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .modalHeader {
+    padding: 16px 20px;
+  }
+
+  .modalTitle {
+    font-size: 1.1rem;
+  }
+
+  .modalBody {
+    padding: 20px;
+  }
+
+  .modalActions {
+    padding: 16px 20px;
+    flex-direction: column-reverse;
+  }
+
+  .cancelButton,
+  .confirmButton {
+    width: 100%;
+  }
+}

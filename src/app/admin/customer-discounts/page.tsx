@@ -15,37 +15,78 @@ import {
 import { adminFidelityService } from '@/services/adminFidelityService';
 import type { CustomerDiscountRule } from '@/types/fidelity';
 import CustomerDiscountForm from '@/components/admin/CustomerDiscountForm';
+import DeleteDiscountModal from '@/components/admin/DeleteDiscountModal';
 import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
 import styles from './customer-discounts.module.css';
 
 export default function CustomerDiscountsPage() {
   const { t } = useTranslation();
   const { enqueueSnackbar } = useSnackbar();
+  const [allDiscounts, setAllDiscounts] = useState<CustomerDiscountRule[]>([]);
   const [discounts, setDiscounts] = useState<CustomerDiscountRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<CustomerDiscountRule | null>(null);
   const [filterUserId, setFilterUserId] = useState<string>('');
   const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [discountToDelete, setDiscountToDelete] = useState<CustomerDiscountRule | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchDiscounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterUserId, showActiveOnly]);
+  }, [showActiveOnly]);
+
+  useEffect(() => {
+    if (allDiscounts.length > 0) {
+      applyFilters(allDiscounts, filterUserId, showActiveOnly);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterUserId]);
 
   const fetchDiscounts = async () => {
     try {
       setLoading(true);
       const data = await adminFidelityService.getCustomerDiscounts(
-        filterUserId || undefined,
+        undefined,
         showActiveOnly
       );
-      setDiscounts(data);
+      setAllDiscounts(data);
+      applyFilters(data, filterUserId, showActiveOnly);
     } catch {
       enqueueSnackbar(t('failed_load_customer_discounts', 'Failed to load customer discounts'), { variant: 'error' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = (data: CustomerDiscountRule[], search: string, activeOnly: boolean) => {
+    let filtered = data;
+
+    // Filter by search term (userId, userName, or email)
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filtered = filtered.filter(discount => {
+        const userId = discount.userId?.toLowerCase() || '';
+        const userName = discount.userName?.toLowerCase() || '';
+        const userEmail = discount.userEmail?.toLowerCase() || '';
+        return userId.includes(searchLower) || userName.includes(searchLower) || userEmail.includes(searchLower);
+      });
+    }
+
+    // Filter by active status
+    if (activeOnly) {
+      filtered = filtered.filter(discount => {
+        if (!discount.isActive) return false;
+        const now = new Date();
+        if (discount.validFrom && new Date(discount.validFrom) > now) return false;
+        if (discount.validUntil && new Date(discount.validUntil) < now) return false;
+        return true;
+      });
+    }
+
+    setDiscounts(filtered);
   };
 
   const handleCreate = () => {
@@ -58,16 +99,31 @@ export default function CustomerDiscountsPage() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(t('confirm_delete_discount', 'Are you sure you want to delete this discount?'))) return;
+  const handleDelete = async (discount: CustomerDiscountRule) => {
+    setDiscountToDelete(discount);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!discountToDelete) return;
 
     try {
-      await adminFidelityService.deleteCustomerDiscount(id);
+      setIsDeleting(true);
+      await adminFidelityService.deleteCustomerDiscount(discountToDelete.id);
       enqueueSnackbar(t('discount_deleted_successfully', 'Discount deleted successfully'), { variant: 'success' });
+      setIsDeleteModalOpen(false);
+      setDiscountToDelete(null);
       fetchDiscounts();
     } catch {
       enqueueSnackbar(t('failed_delete_discount', 'Failed to delete discount'), { variant: 'error' });
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setDiscountToDelete(null);
   };
 
   const handleFormSuccess = () => {
@@ -110,6 +166,15 @@ export default function CustomerDiscountsPage() {
     );
   };
 
+  const getDiscountTypeTranslation = (discountType: string) => {
+    const typeMap: Record<string, string> = {
+      'Percentage': 'discount_type_percentage',
+      'FixedAmount': 'discount_type_fixed_amount',
+    };
+    const key = typeMap[discountType] || `discount_type_${discountType}`;
+    return t(key, discountType);
+  };
+
   return (
     <AdminAuthGuard>
       <div className={styles.container}>
@@ -129,7 +194,7 @@ export default function CustomerDiscountsPage() {
           <Filter size={18} />
           <input
             type="text"
-            placeholder={t('filter_by_user_id', 'Filter by User ID...')}
+            placeholder={t('filter_by_user', 'Filter by User ID, Name, or Email...')}
             value={filterUserId}
             onChange={(e) => setFilterUserId(e.target.value)}
             className={styles.filterInput}
@@ -201,7 +266,7 @@ export default function CustomerDiscountsPage() {
                   </td>
                   <td>
                     <span className={`${styles.badge} ${styles.badgeType}`}>
-                      {adminFidelityService.getDiscountTypeLabel(discount.discountType)}
+                      {getDiscountTypeTranslation(discount.discountType)}
                     </span>
                   </td>
                   <td className={styles.valueCell}>
@@ -244,7 +309,7 @@ export default function CustomerDiscountsPage() {
                         <Edit size={18} />
                       </button>
                       <button
-                        onClick={() => handleDelete(discount.id)}
+                        onClick={() => handleDelete(discount)}
                         className={`${styles.actionButton} ${styles.deleteButton}`}
                         title={t('delete', 'Delete')}
                       >
@@ -269,6 +334,14 @@ export default function CustomerDiscountsPage() {
           onSuccess={handleFormSuccess}
         />
       )}
+
+      <DeleteDiscountModal
+        isOpen={isDeleteModalOpen}
+        discountName={discountToDelete?.name || ''}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isLoading={isDeleting}
+      />
       </div>
     </AdminAuthGuard>
   );
