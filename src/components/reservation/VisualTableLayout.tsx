@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTableHelpers } from '@/hooks/useTableHelpers';
 import { TableDto } from '@/types/reservation';
 import styles from './VisualTableLayout.module.css';
 
@@ -23,6 +24,7 @@ export default function VisualTableLayout({
   bookedTableIds = []
 }: VisualTableLayoutProps) {
   const { t } = useTranslation();
+  const { getShapeLabel } = useTableHelpers();
   const [entrancePosition, setEntrancePosition] = useState({ x: 50, y: 10 });
   const [activeTooltipTableId, setActiveTooltipTableId] = useState<string | null>(null);
 
@@ -121,7 +123,7 @@ export default function VisualTableLayout({
           </div>
           <div className={styles.tooltipRow}>
             <span className={styles.tooltipIcon}>⬜</span>
-            <span>{shape.charAt(0).toUpperCase() + shape.slice(1)} {t('table', 'table')}</span>
+            <span>{getShapeLabel(shape)} {t('table', 'table')}</span>
           </div>
           <div className={styles.tooltipRow}>
             <span className={styles.tooltipIcon}>{table.isOutdoor ? '🌳' : '🏠'}</span>

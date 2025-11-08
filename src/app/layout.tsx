@@ -2,7 +2,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import AppInternalLayout from "./app-internal-layout";
 import ClientProviders from "./client-providers";
-import { Metadata } from 'next';
+import { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
   title: 'RUMI Restaurant',
@@ -10,7 +10,13 @@ export const metadata: Metadata = {
   icons: {
     icon: '/rumi-letter-r-icon.svg',
   },
-  viewport: 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1.0,
+  maximumScale: 5.0,
+  userScalable: true,
 };
 
 const inter = Inter({ subsets: ["latin"] });

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRoleHelpers } from '@/hooks/useRoleHelpers';
 import { Phone, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 import tableStyles from './MembersTable.module.css';
@@ -16,6 +17,7 @@ interface MembersTableProps {
 
 const MembersTable: React.FC<MembersTableProps> = ({ users, onEdit, onDelete, isLoading = false }) => {
   const { t } = useTranslation();
+  const { getRoleLabel, getRoleClassName } = useRoleHelpers();
 
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return '-';
@@ -96,8 +98,8 @@ const MembersTable: React.FC<MembersTableProps> = ({ users, onEdit, onDelete, is
                   </div>
                 </td>
                 <td>
-                  <span className={`${tableStyles.roleBadge} ${tableStyles[user.role.toLowerCase()]}`}>
-                    {user.role}
+                  <span className={`${tableStyles.roleBadge} ${tableStyles[getRoleClassName(user.role)]}`}>
+                    {getRoleLabel(user.role)}
                   </span>
                 </td>
                 <td>

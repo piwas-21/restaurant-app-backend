@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import { useTableHelpers } from '@/hooks/useTableHelpers';
 import tableLayoutService from '@/services/tableLayoutService';
 import { reservationService } from '@/services/reservationService';
 import type { TableDto, ReservationDto } from '@/types/reservation';
@@ -24,6 +25,7 @@ interface TableReservationStats {
 function TableStatisticsPage() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { getShapeLabel } = useTableHelpers();
   const [tables, setTables] = useState<TableDto[]>([]);
   const [reservations, setReservations] = useState<ReservationDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -390,7 +392,7 @@ function TableStatisticsPage() {
                   </div>
                   <div className={styles.tableDetail}>
                     <span className={styles.tableDetailLabel}>{t('shape', 'Shape')}:</span>
-                    <span className={styles.tableDetailValue}>{table.shape || 'circle'}</span>
+                    <span className={styles.tableDetailValue}>{getShapeLabel(table.shape)}</span>
                   </div>
                   <div className={styles.tableDetail}>
                     <span className={styles.tableDetailLabel}>{t('location', 'Location')}:</span>

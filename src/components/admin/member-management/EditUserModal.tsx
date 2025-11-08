@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useRoleHelpers } from '@/hooks/useRoleHelpers';
 import type { UserDto, UserRole } from '@/types/user';
 import styles from '@/app/styles/RegisterStaffModal.module.css';
 
@@ -15,6 +16,7 @@ interface EditUserModalProps {
 
 const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, onSave }) => {
   const { t } = useTranslation();
+  const { getRoleLabel, staffRoles } = useRoleHelpers();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -187,10 +189,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, on
                 value={formData.role}
                 onChange={(e) => handleChange('role', e.target.value as UserRole)}
               >
-                <option value="Server">Server</option>
-                <option value="Cashier">Cashier</option>
-                <option value="KitchenStaff">Kitchen Staff</option>
-                <option value="Admin">Admin</option>
+                {staffRoles.map((role) => (
+                  <option key={role} value={role}>
+                    {getRoleLabel(role)}
+                  </option>
+                ))}
               </select>
             </div>
           )}

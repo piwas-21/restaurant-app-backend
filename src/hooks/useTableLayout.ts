@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TableDto, UpdateTableDto, CreateTableDto } from '@/types/reservation';
 import tableLayoutService from '@/services/tableLayoutService';
 
@@ -6,6 +7,7 @@ const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 500;
 
 export function useTableLayout() {
+  const { t } = useTranslation();
   const [tables, setTables] = useState<TableDto[]>([]);
   const [selectedTable, setSelectedTable] = useState<TableDto | null>(null);
   const [draggingTable, setDraggingTable] = useState<string | null>(null);
@@ -30,11 +32,11 @@ export function useTableLayout() {
       const data = await tableLayoutService.getAllTables();
       setTables(data);
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to load tables');
+      showMessage('error', error.message || t('failed_to_load_tables', 'Failed to load tables'));
     } finally {
       setLoading(false);
     }
-  }, [showMessage]);
+  }, [showMessage, t]);
 
   const loadEntrancePosition = useCallback(() => {
     const saved = localStorage.getItem('entrancePosition');
@@ -75,26 +77,26 @@ export function useTableLayout() {
       setTables(prev => prev.filter(t => t.id !== selectedTable.id));
       setSelectedTable(null);
       setShowDeleteModal(false);
-      showMessage('success', `Table ${selectedTable.tableNumber} deleted successfully!`);
+      showMessage('success', t('table_deleted_successfully', 'Table {{tableNumber}} deleted successfully!').replace('{{tableNumber}}', selectedTable.tableNumber));
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to delete table');
+      showMessage('error', error.message || t('failed_to_delete_table', 'Failed to delete table'));
     } finally {
       setSaving(false);
     }
-  }, [selectedTable, showMessage]);
+  }, [selectedTable, showMessage, t]);
 
   const handleCreateTable = useCallback(async (tableData: CreateTableDto): Promise<TableDto> => {
     try {
       const newTable = await tableLayoutService.createTable(tableData);
       setTables(prev => [...prev, newTable]);
       setSelectedTable(newTable);
-      showMessage('success', `Table ${newTable.tableNumber} created successfully!`);
+      showMessage('success', t('table_created_successfully', 'Table {{tableNumber}} created successfully!').replace('{{tableNumber}}', newTable.tableNumber));
       return newTable;
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to create table');
+      showMessage('error', error.message || t('failed_to_create_table', 'Failed to create table'));
       throw error;
     }
-  }, [showMessage]);
+  }, [showMessage, t]);
 
   const handleSaveLayout = useCallback(async () => {
     try {
@@ -118,13 +120,13 @@ export function useTableLayout() {
 
       await Promise.all(updates);
       await loadTables();
-      showMessage('success', 'Layout saved successfully!');
+      showMessage('success', t('layout_saved_successfully', 'Layout saved successfully!'));
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to save layout');
+      showMessage('error', error.message || t('failed_to_save_layout', 'Failed to save layout'));
     } finally {
       setSaving(false);
     }
-  }, [tables, loadTables, showMessage]);
+  }, [tables, loadTables, showMessage, t]);
 
   const toggleTableSelection = useCallback((tableId: string) => {
     setSelectedTableIds(prev => {
@@ -140,7 +142,7 @@ export function useTableLayout() {
 
   const bulkActivateTables = useCallback(async () => {
     if (selectedTableIds.size === 0) {
-      showMessage('error', 'No tables selected');
+      showMessage('error', t('no_tables_selected', 'No tables selected'));
       return;
     }
 
@@ -163,21 +165,21 @@ export function useTableLayout() {
       const updated = (await Promise.all(updates)).filter(Boolean);
       if (updated.length > 0) {
         await loadTables();
-        showMessage('success', `Activated ${updated.length} table(s)`);
+        showMessage('success', t('tables_activated', 'Activated {{count}} table(s)').replace('{{count}}', updated.length.toString()));
         setSelectedTableIds(new Set());
       } else {
-        showMessage('error', 'No inactive tables to activate');
+        showMessage('error', t('no_inactive_tables', 'No inactive tables to activate'));
       }
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to activate tables');
+      showMessage('error', error.message || t('failed_to_activate_tables', 'Failed to activate tables'));
     } finally {
       setSaving(false);
     }
-  }, [selectedTableIds, tables, loadTables, showMessage]);
+  }, [selectedTableIds, tables, loadTables, showMessage, t]);
 
   const bulkDeactivateTables = useCallback(async () => {
     if (selectedTableIds.size === 0) {
-      showMessage('error', 'No tables selected');
+      showMessage('error', t('no_tables_selected', 'No tables selected'));
       return;
     }
 
@@ -200,27 +202,27 @@ export function useTableLayout() {
       const updated = (await Promise.all(updates)).filter(Boolean);
       if (updated.length > 0) {
         await loadTables();
-        showMessage('success', `Deactivated ${updated.length} table(s)`);
+        showMessage('success', t('tables_deactivated', 'Deactivated {{count}} table(s)').replace('{{count}}', updated.length.toString()));
         setSelectedTableIds(new Set());
       } else {
-        showMessage('error', 'No active tables to deactivate');
+        showMessage('error', t('no_active_tables', 'No active tables to deactivate'));
       }
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to deactivate tables');
+      showMessage('error', error.message || t('failed_to_deactivate_tables', 'Failed to deactivate tables'));
     } finally {
       setSaving(false);
     }
-  }, [selectedTableIds, tables, loadTables, showMessage]);
+  }, [selectedTableIds, tables, loadTables, showMessage, t]);
 
   const bulkDeleteTables = useCallback(async () => {
     if (selectedTableIds.size === 0) {
-      showMessage('error', 'No tables selected');
+      showMessage('error', t('no_tables_selected', 'No tables selected'));
       return;
     }
 
     setDeleteModalData({ tableCount: selectedTableIds.size });
     setShowDeleteModal(true);
-  }, [selectedTableIds.size, showMessage]);
+  }, [selectedTableIds.size, showMessage, t]);
 
   const confirmBulkDeleteTables = useCallback(async () => {
     if (selectedTableIds.size === 0) return;
@@ -236,14 +238,14 @@ export function useTableLayout() {
       await Promise.all(deletes);
       await loadTables();
       setShowDeleteModal(false);
-      showMessage('success', `Deleted ${count} table(s)`);
+      showMessage('success', t('tables_deleted', 'Deleted {{count}} table(s)').replace('{{count}}', count.toString()));
       setSelectedTableIds(new Set());
     } catch (error: any) {
-      showMessage('error', error.message || 'Failed to delete tables');
+      showMessage('error', error.message || t('failed_to_delete_tables', 'Failed to delete tables'));
     } finally {
       setSaving(false);
     }
-  }, [selectedTableIds, loadTables, showMessage]);
+  }, [selectedTableIds, loadTables, showMessage, t]);
 
   return {
     // State

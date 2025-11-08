@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTableHelpers } from '@/hooks/useTableHelpers';
 import { X } from 'lucide-react';
 import type { TableDto } from '@/types/reservation';
 import styles from './TablePropertiesModal.module.css';
@@ -20,6 +21,7 @@ export default function TablePropertiesModal({
   onSave,
 }: TablePropertiesModalProps) {
   const { t } = useTranslation();
+  const { allShapes, getShapeLabel } = useTableHelpers();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,9 +106,11 @@ export default function TablePropertiesModal({
               className={styles.select}
               disabled={saving}
             >
-              <option value="circle">{t('circle', 'Circle')}</option>
-              <option value="square">{t('square', 'Square')}</option>
-              <option value="rectangle">{t('rectangle', 'Rectangle')}</option>
+              {allShapes.map((shape) => (
+                <option key={shape} value={shape}>
+                  {getShapeLabel(shape)}
+                </option>
+              ))}
             </select>
           </div>
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRoleHelpers } from '@/hooks/useRoleHelpers';
 import { UserCircle } from 'lucide-react';
 import styles from '../app/styles/UserMenu.module.css';
 import { useAuth } from './AuthContext';
@@ -9,6 +10,7 @@ import Link from 'next/link';
 
 export default function UserMenu() {
   const { t } = useTranslation();
+  const { getRoleLabel } = useRoleHelpers();
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -54,7 +56,7 @@ export default function UserMenu() {
         <div className={styles.dropdownMenu}>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{user.firstName} {user.lastName}</p>
-            <p className={styles.userRole}>{t(`roles.${user.role.toLowerCase()}`)}</p>
+            <p className={styles.userRole}>{getRoleLabel(user.role)}</p>
           </div>
           {user.role.toLowerCase() === 'customer' && (
             <>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTableHelpers } from '@/hooks/useTableHelpers';
 import { CreateTableDto, TableDto } from '@/types/reservation';
 import styles from './CreateTableModal.module.css';
 
@@ -21,6 +22,7 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
   canvasHeight,
 }) => {
   const { t } = useTranslation();
+  const { allShapes, getShapeLabel } = useTableHelpers();
   const [formData, setFormData] = useState({
     tableNumber: '',
     maxGuests: 4,
@@ -134,9 +136,11 @@ export const CreateTableModal: React.FC<CreateTableModalProps> = ({
               onChange={(e) => setFormData(prev => ({ ...prev, shape: e.target.value }))}
               disabled={creating}
             >
-              <option value="circle">{t('circle', 'Circle')}</option>
-              <option value="square">{t('square', 'Square')}</option>
-              <option value="rectangle">{t('rectangle', 'Rectangle')}</option>
+              {allShapes.map((shape) => (
+                <option key={shape} value={shape}>
+                  {getShapeLabel(shape)}
+                </option>
+              ))}
             </select>
           </div>
 

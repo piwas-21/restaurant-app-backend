@@ -6,6 +6,7 @@ import { staffRegistrationSchema } from '@/schemas/auth.schema';
 import styles from '@/app/styles/RegisterStaffModal.module.css';
 import { useTranslation } from 'react-i18next';
 import { registerStaff } from '@/services/userService';
+import { useRoleHelpers } from '@/hooks/useRoleHelpers';
 
 type RegisterStaffFormValues = z.infer<typeof staffRegistrationSchema>;
 
@@ -17,6 +18,7 @@ interface RegisterStaffModalProps {
 
 const RegisterStaffModal: React.FC<RegisterStaffModalProps> = ({ isOpen, onClose, onStaffRegistered }) => {
   const { t } = useTranslation();
+  const { getRoleLabel, staffRoles } = useRoleHelpers();
   const modalContentRef = useRef<HTMLDivElement>(null);
   const {
     register,
@@ -99,10 +101,11 @@ const RegisterStaffModal: React.FC<RegisterStaffModalProps> = ({ isOpen, onClose
           <div className={styles.formGroup}>
             <label htmlFor="role">{t('role')}</label>
             <select id="role" {...register('role')}>
-              <option value="Server">Server</option>
-              <option value="Cashier">Cashier</option>
-              <option value="KitchenStaff">Kitchen Staff</option>
-              <option value="Admin">Admin</option>
+              {staffRoles.map((role) => (
+                <option key={role} value={role}>
+                  {getRoleLabel(role)}
+                </option>
+              ))}
             </select>
             {errors.role && <p className={styles.errorMessage}>{errors.role.message}</p>}
           </div>
