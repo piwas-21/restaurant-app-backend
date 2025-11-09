@@ -63,7 +63,7 @@ export default function UserMenu() {
               <Link href="/account" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
                 {t('user_menu.my_account', 'My Account')}
               </Link>
-              <Link href="/my-orders" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+              <Link href="/orders" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
                 {t('user_menu.my_orders', 'My Orders')}
               </Link>
               <Link href="/my-reservations" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>

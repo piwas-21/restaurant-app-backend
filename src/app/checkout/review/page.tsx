@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useCheckout } from '@/contexts/CheckoutContext';
 import { useCart } from '@/components/cart/CartContext';
 import { useSession } from '@/hooks/useSession';
-import { createOrder, getOrderById } from '@/services/orderService';
+import { createOrder } from '@/services/orderService';
 import { sendOrderConfirmationEmails } from '@/services/emailService';
 import FidelityPointsCheckout from '@/components/checkout/FidelityPointsCheckout';
 import OrderTypeSection from '@/components/checkout/OrderTypeSection';
@@ -55,15 +55,29 @@ export default function ReviewPage() {
 
   // Order confirmation modal state
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; orderNumber: string; customerEmail: string } | null>(null);
 
-  // Check if user is logged in
+  // Check if user is logged in based on session
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    // Check if there's a user token in localStorage or session
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    setIsLoggedIn(!!token);
-  }, []);
+    // Check if user has an active session
+    setIsLoggedIn(!!sessionId);
+  }, [sessionId]);
+
+  // Auto-show modal when order is confirmed
+  useEffect(() => {
+    if (confirmedOrder) {
+      // eslint-disable-next-line no-console
+      console.log('Order confirmed, showing modal:', confirmedOrder);
+      setShowConfirmationModal(true);
+    }
+  }, [confirmedOrder]);
+
+  // Debug modal state
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('Modal state changed:', { showConfirmationModal, confirmedOrder, isLoggedIn });
+  }, [showConfirmationModal, confirmedOrder, isLoggedIn]);
 
   // Handler for points redemption
   const handlePointsRedemption = (points: number, discountAmount: number) => {
@@ -107,8 +121,11 @@ export default function ReviewPage() {
     fetchTaxConfig();
   }, [checkoutState.orderType, cartState.basket]);
 
-  // Check prerequisites
+  // Check prerequisites (but don't redirect if order was just confirmed)
   useEffect(() => {
+    // Don't redirect if we have a confirmed order being shown
+    if (confirmedOrder) return;
+
     if (cartState.items.length === 0) {
       router.push('/cart');
     } else if (!checkoutState.orderType) {
@@ -116,9 +133,10 @@ export default function ReviewPage() {
     } else if (!checkoutState.customerInfo) {
       router.push('/checkout/customer-info');
     }
-  }, [cartState.items.length, checkoutState.orderType, checkoutState.customerInfo, router]);
+  }, [cartState.items.length, checkoutState.orderType, checkoutState.customerInfo, router, confirmedOrder]);
 
-  if (cartState.items.length === 0 || !checkoutState.orderType || !checkoutState.customerInfo) {
+  // Show loading state only if we don't have a confirmed order (modal will display instead)
+  if ((cartState.items.length === 0 || !checkoutState.orderType || !checkoutState.customerInfo) && !confirmedOrder) {
     return (
       <main className={styles.container}>
         <div className={styles.loadingState}>
@@ -126,6 +144,21 @@ export default function ReviewPage() {
           <p>{t('loading', 'Loading...')}</p>
         </div>
       </main>
+    );
+  }
+
+  // If order is confirmed, only show the modal (don't render the form which needs customerInfo)
+  if (confirmedOrder) {
+    return (
+      <>
+        <OrderConfirmationModal
+          isOpen={showConfirmationModal}
+          orderNumber={confirmedOrder.orderNumber}
+          customerEmail={confirmedOrder.customerEmail || ''}
+          isLoggedIn={isLoggedIn}
+          onClose={handleCloseConfirmationModal}
+        />
+      </>
     );
   }
 
@@ -197,11 +230,18 @@ export default function ReviewPage() {
       // Submit order
       const createdOrder = await createOrder(orderCommand);
 
-      // Store order info for modal
+      // eslint-disable-next-line no-console
+      console.log('Order created successfully:', { id: createdOrder.id, orderNumber: createdOrder.orderNumber });
+
+      // Store order info for modal (capture email before clearing checkout state)
       setConfirmedOrder({
         id: createdOrder.id,
         orderNumber: createdOrder.orderNumber,
+        customerEmail: checkoutState.customerInfo?.email || '',
       });
+
+      // eslint-disable-next-line no-console
+      console.log('Setting confirmed order state');
 
       // Clear cart and checkout state
       await clearCart();
@@ -209,13 +249,11 @@ export default function ReviewPage() {
 
       // Send confirmation emails to both customer and admin (fire and forget)
       try {
-        await sendOrderConfirmationEmails(
-          createdOrder.id,
-          checkoutState.customerInfo?.email || '',
-          checkoutState.customerInfo?.name || 'Customer',
-          createdOrder.orderNumber,
-          createdOrder
-        );
+        // eslint-disable-next-line no-console
+        console.log('Sending confirmation emails for order:', createdOrder.id);
+        await sendOrderConfirmationEmails(createdOrder.id);
+        // eslint-disable-next-line no-console
+        console.log('Confirmation emails sent');
       } catch (emailError) {
         // eslint-disable-next-line no-console
         console.warn('Failed to send confirmation emails:', emailError);
@@ -228,8 +266,7 @@ export default function ReviewPage() {
         anchorOrigin: { vertical: 'bottom', horizontal: 'right' },
       });
 
-      // Show confirmation modal
-      setShowConfirmationModal(true);
+      // Modal will automatically show via useEffect watching confirmedOrder
 
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -250,6 +287,7 @@ export default function ReviewPage() {
   };
 
   return (
+    <>
     <main className={styles.container}>
       <div className={styles.content}>
         {/* Header */}
@@ -311,17 +349,7 @@ export default function ReviewPage() {
           </div>
         </div>
       </div>
-
-      {/* Order Confirmation Modal */}
-      {confirmedOrder && (
-        <OrderConfirmationModal
-          isOpen={showConfirmationModal}
-          orderNumber={confirmedOrder.orderNumber}
-          customerEmail={checkoutState.customerInfo?.email || ''}
-          isLoggedIn={isLoggedIn}
-          onClose={handleCloseConfirmationModal}
-        />
-      )}
     </main>
+  </>
   );
 }

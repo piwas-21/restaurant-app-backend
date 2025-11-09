@@ -1,0 +1,10 @@
+- take a look at the frontend and backend apps (they are both in this workspace).
+- and create a plan with small tasks (write them in an md file) to clean-up and implementations on both backend and frontend side.
+- then start to work on them.
+- the frontend is running on http://localhost:3000/
+- the backend is running on http://localhost:5221/
+- playwright mcp server is also running if you need.
+- here is admin login credentials if you need: email: admin@email.com, password: Rumi.123
+- make sure that anything newly added is compatible with frontend's overall theme both dark and light modes.
+- make sure that any text newly added is included into the all language locale files.
+- follow best-coding practices and create seperated components/files/stylings for each section.

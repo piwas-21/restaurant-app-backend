@@ -2,7 +2,7 @@
 .container {
   min-height: calc(100vh - 80px);
   padding: 2rem 1rem;
-  background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+  background: var(--background-color);
 }
 
 .content {
@@ -25,11 +25,11 @@
 /* Success Header */
 .successHeader {
   text-align: center;
-  background: white;
-  border-radius: 16px;
+  background: var(--card-background);
+  border-radius: 12px;
   padding: 3rem 2rem;
   margin-bottom: 2rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   animation: scaleIn 0.5s ease-out;
 }
 
@@ -50,33 +50,34 @@
   justify-content: center;
   width: 120px;
   height: 120px;
-  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, #a60000 100%);
   color: white;
   border-radius: 50%;
   margin-bottom: 1.5rem;
-  box-shadow: 0 10px 30px rgba(56, 161, 105, 0.3);
+  box-shadow: 0 8px 24px rgba(192, 0, 0, 0.2);
   animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
   0%, 100% {
-    box-shadow: 0 10px 30px rgba(56, 161, 105, 0.3);
+    box-shadow: 0 8px 24px rgba(192, 0, 0, 0.2);
   }
   50% {
-    box-shadow: 0 10px 40px rgba(56, 161, 105, 0.5);
+    box-shadow: 0 12px 32px rgba(192, 0, 0, 0.3);
   }
 }
 
 .successTitle {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--text-color);
   margin: 0 0 1rem 0;
+  font-family: var(--font-family-serif);
 }
 
 .successSubtitle {
   font-size: 1.125rem;
-  color: #718096;
+  color: var(--text-muted);
   margin: 0 0 2rem 0;
   max-width: 600px;
   margin-left: auto;
@@ -88,10 +89,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1.25rem 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, #a60000 100%);
   color: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(192, 0, 0, 0.15);
 }
 
 .orderNumber svg {
@@ -117,30 +118,30 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  background: white;
+  background: var(--card-background);
   border-radius: 12px;
   padding: 1.75rem 2rem;
   margin-bottom: 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border-left: 4px solid #38a169;
+  border-left: 4px solid var(--primary-color);
 }
 
 .clockIcon {
-  color: #38a169;
+  color: var(--primary-color);
   flex-shrink: 0;
 }
 
 .timeInfo h2 {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--text-color);
   margin: 0 0 0.5rem 0;
 }
 
 .timeValue {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #38a169;
+  color: var(--primary-color);
   margin: 0;
 }
 
@@ -167,7 +168,7 @@
 
 /* Section */
 .section {
-  background: white;
+  background: var(--card-background);
   border-radius: 12px;
   padding: 1.75rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -179,14 +180,15 @@
   gap: 0.75rem;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text-color);
   margin: 0 0 1.25rem 0;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border-color);
+  font-family: var(--font-family-serif);
 }
 
 .sectionTitle svg {
-  color: #667eea;
+  color: var(--primary-color);
 }
 
 /* Info Card */
@@ -201,7 +203,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #f7fafc;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .infoRow:last-child {
@@ -214,7 +216,7 @@
   gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #718096;
+  color: var(--text-muted);
 }
 
 .infoLabel svg {
@@ -225,12 +227,12 @@
 .infoValue {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--text-color);
 }
 
 .statusBadge {
   padding: 0.375rem 0.875rem;
-  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+  background: var(--primary-color);
   color: white;
   border-radius: 20px;
   font-size: 0.8125rem;
@@ -243,32 +245,32 @@
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background-color: #f7fafc;
+  background-color: var(--background-light);
   border-radius: 8px;
   margin-top: 0.5rem;
 }
 
 .addressIcon {
-  color: #667eea;
+  color: var(--primary-color);
   flex-shrink: 0;
   margin-top: 0.25rem;
 }
 
 .addressTitle {
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text-color);
   margin: 0 0 0.5rem 0;
 }
 
 .deliveryAddress p {
   margin: 0.25rem 0;
   font-size: 0.9375rem;
-  color: #2d3748;
+  color: var(--text-color);
 }
 
 .additionalInfo {
   font-style: italic;
-  color: #718096 !important;
+  color: var(--text-muted) !important;
   font-size: 0.875rem !important;
 }
 
@@ -284,7 +286,7 @@
   grid-template-columns: auto 1fr auto;
   gap: 1rem;
   padding: 1rem;
-  background-color: #f7fafc;
+  background-color: var(--background-light);
   border-radius: 8px;
   align-items: center;
 }
@@ -295,7 +297,7 @@
   border-radius: 6px;
   overflow: hidden;
   flex-shrink: 0;
-  background-color: #e2e8f0;
+  background-color: var(--border-color);
 }
 
 .itemDetails {
@@ -307,26 +309,26 @@
 .itemName {
   font-size: 1rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text-color);
   margin: 0;
 }
 
 .itemVariation {
   font-size: 0.875rem;
-  color: #718096;
+  color: var(--text-muted);
   margin: 0;
 }
 
 .itemInstructions {
   font-size: 0.8rem;
-  color: #a0aec0;
+  color: var(--text-muted);
   margin: 0;
   padding-top: 0.25rem;
 }
 
 .itemQuantity {
   font-size: 0.875rem;
-  color: #4a5568;
+  color: var(--text-color);
   margin: 0;
   font-weight: 500;
 }
@@ -334,13 +336,13 @@
 .itemPrice {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--primary-color);
   text-align: right;
 }
 
 .notes {
   font-size: 0.9375rem;
-  color: #4a5568;
+  color: var(--text-color);
   line-height: 1.6;
   margin: 0;
   font-style: italic;
@@ -348,7 +350,7 @@
 
 /* Summary Card */
 .summaryCard {
-  background: white;
+  background: var(--card-background);
   border-radius: 12px;
   padding: 1.75rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -359,10 +361,11 @@
 .summaryTitle {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text-color);
   margin: 0 0 1.5rem 0;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border-color);
+  font-family: var(--font-family-serif);
 }
 
 .summaryRows {
@@ -377,11 +380,11 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.9375rem;
-  color: #4a5568;
+  color: var(--text-color);
 }
 
 .summaryRow.discount {
-  color: #38a169;
+  color: var(--primary-color);
   font-weight: 600;
 }
 
@@ -391,28 +394,28 @@
   align-items: center;
   padding: 1.25rem 0;
   margin-top: 1rem;
-  border-top: 2px solid #e2e8f0;
+  border-top: 2px solid var(--border-color);
   font-size: 1.125rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text-color);
 }
 
 .totalAmount {
   font-size: 1.5rem;
-  color: #38a169;
+  color: var(--primary-color);
 }
 
 /* Payment Information */
 .paymentInfo {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 2px solid #e2e8f0;
+  border-top: 2px solid var(--border-color);
 }
 
 .paymentTitle {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--text-color);
   margin: 0 0 0.75rem 0;
 }
 
@@ -426,8 +429,8 @@
 
 .paymentStatus {
   padding: 0.25rem 0.75rem;
-  background-color: #c6f6d5;
-  color: #22543d;
+  background-color: var(--primary-color);
+  color: white;
   border-radius: 12px;
   font-weight: 600;
   font-size: 0.75rem;
@@ -448,7 +451,7 @@
   font-size: 1rem;
   font-weight: 700;
   color: white;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, #a60000 100%);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -462,7 +465,7 @@
 
 .trackButton:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(192, 0, 0, 0.2);
 }
 
 .trackButton:active {
@@ -474,9 +477,9 @@
   padding: 0.875rem 1.5rem;
   font-size: 1rem;
   font-weight: 600;
-  color: #4a5568;
-  background-color: #edf2f7;
-  border: none;
+  color: var(--text-color);
+  background-color: var(--background-light);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -488,7 +491,7 @@
 }
 
 .menuButton:hover {
-  background-color: #e2e8f0;
+  background-color: var(--border-color);
   transform: translateY(-1px);
 }
 
@@ -500,19 +503,19 @@
 .helpText {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-color);
   text-align: center;
 }
 
 .helpText p {
   font-size: 0.875rem;
-  color: #718096;
+  color: var(--text-muted);
   margin: 0.5rem 0;
 }
 
 .helpNote {
   font-style: italic;
-  color: #a0aec0 !important;
+  color: var(--text-muted) !important;
 }
 
 /* Loading State */
@@ -527,7 +530,7 @@
 
 .spinner {
   animation: spin 1s linear infinite;
-  color: #38a169;
+  color: var(--primary-color);
 }
 
 @keyframes spin {
@@ -541,7 +544,7 @@
 
 .loadingState p {
   font-size: 1.125rem;
-  color: #718096;
+  color: var(--text-muted);
 }
 
 /* Error State */
@@ -563,13 +566,14 @@
 .errorState h1 {
   font-size: 2rem;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--text-color);
   margin: 0;
+  font-family: var(--font-family-serif);
 }
 
 .errorState p {
   font-size: 1.125rem;
-  color: #718096;
+  color: var(--text-muted);
   margin: 0;
   max-width: 500px;
 }
@@ -685,126 +689,7 @@
   }
 }
 
-/* Dark Mode Support */
+/* Dark Mode Support - Uses CSS variables, no additional styling needed */
 @media (prefers-color-scheme: dark) {
-  .container {
-    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-  }
-
-  .successHeader,
-  .estimatedTime,
-  .section,
-  .summaryCard {
-    background: #2d3748;
-  }
-
-  .successTitle {
-    color: #f7fafc;
-  }
-
-  .successSubtitle {
-    color: #cbd5e0;
-  }
-
-  .timeInfo h2 {
-    color: #e2e8f0;
-  }
-
-  .sectionTitle {
-    color: #e2e8f0;
-    border-bottom-color: #4a5568;
-  }
-
-  .infoLabel {
-    color: #a0aec0;
-  }
-
-  .infoValue {
-    color: #e2e8f0;
-  }
-
-  .infoRow {
-    border-bottom-color: #1a202c;
-  }
-
-  .deliveryAddress {
-    background-color: #1a202c;
-  }
-
-  .deliveryAddress p,
-  .addressTitle {
-    color: #e2e8f0;
-  }
-
-  .orderItem {
-    background-color: #1a202c;
-  }
-
-  .itemName {
-    color: #e2e8f0;
-  }
-
-  .itemPrice {
-    color: #f7fafc;
-  }
-
-  .notes {
-    color: #cbd5e0;
-  }
-
-  .summaryTitle {
-    color: #e2e8f0;
-    border-bottom-color: #4a5568;
-  }
-
-  .summaryRow {
-    color: #cbd5e0;
-  }
-
-  .summaryTotal {
-    color: #f7fafc;
-    border-top-color: #4a5568;
-  }
-
-  .paymentInfo {
-    border-top-color: #4a5568;
-  }
-
-  .paymentTitle {
-    color: #e2e8f0;
-  }
-
-  .paymentStatus {
-    background-color: #2f855a;
-    color: #c6f6d5;
-  }
-
-  .menuButton {
-    background-color: #1a202c;
-    color: #e2e8f0;
-  }
-
-  .menuButton:hover {
-    background-color: #4a5568;
-  }
-
-  .helpText {
-    border-top-color: #4a5568;
-  }
-
-  .helpText p {
-    color: #a0aec0;
-  }
-
-  .errorState h1 {
-    color: #f7fafc;
-  }
-
-  .errorState p {
-    color: #cbd5e0;
-  }
-
-  .loadingState p {
-    color: #cbd5e0;
-  }
+  /* Dark mode colors are handled by CSS variables in globals.css */
 }

@@ -32,7 +32,7 @@ import styles from '../styles/OrdersPage.module.css';
 export default function OrdersPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const { addItem } = useCart();
 
@@ -71,13 +71,18 @@ export default function OrdersPage() {
   }, [selectedStatus, t, enqueueSnackbar]);
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking user status
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
       router.push('/login');
       return;
     }
 
     fetchOrders();
-  }, [user, router, fetchOrders]);
+  }, [authLoading, user, router, fetchOrders]);
 
   const handleReorder = async (order: OrderDto) => {
     try {
@@ -216,12 +221,12 @@ export default function OrdersPage() {
     'Cancelled',
   ];
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <main className={styles.container}>
         <div className={styles.loadingState}>
           <Loader2 size={64} className={styles.spinner} />
-          <p>{t('loading_orders', 'Loading your orders...')}</p>
+          <p>{authLoading ? t('authenticating', 'Authenticating...') : t('loading_orders', 'Loading your orders...')}</p>
         </div>
       </main>
     );

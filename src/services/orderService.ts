@@ -35,7 +35,7 @@ export async function createOrder(command: CreateOrderCommand): Promise<OrderDto
     const response = await apiClient.post<OrderDtoApiResponse>(
       '/api/Orders',
       command,
-      { requireAuth: true }
+      { requireAuth: false }
     );
     if (!response.data) {
       throw new Error('Failed to create order');

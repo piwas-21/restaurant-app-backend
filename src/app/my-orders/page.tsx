@@ -1,5 +1,6 @@
-import MyOrders from '@/components/orders/MyOrders';
+import { redirect } from 'next/navigation';
 
 export default function MyOrdersPage() {
-  return <MyOrders />;
+  // Redirect to the new /orders page
+  redirect('/orders');
 }

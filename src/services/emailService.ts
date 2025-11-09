@@ -5,103 +5,32 @@
  */
 
 import { apiClient } from '@/utils/apiClient';
-import { OrderDto } from '@/types/order';
-
-export interface SendOrderConfirmationEmailRequest {
-  orderId: string;
-  customerEmail: string;
-  customerName: string;
-  orderNumber: string;
-  orderDetails: OrderDto;
-  recipientType: 'customer' | 'admin';
-}
-
-/**
- * Send order confirmation email to customer
- *
- * @param orderId - Order ID
- * @param customerEmail - Customer email address
- * @param customerName - Customer name
- * @param orderNumber - Order number
- * @param orderDetails - Full order details
- * @returns Promise that resolves when email is sent
- */
-export async function sendOrderConfirmationEmailToCustomer(
-  orderId: string,
-  customerEmail: string,
-  customerName: string,
-  orderNumber: string,
-  orderDetails: OrderDto
-): Promise<void> {
-  try {
-    await apiClient.post<void>(
-      '/api/Emails/send-order-confirmation',
-      {
-        orderId,
-        customerEmail,
-        customerName,
-        orderNumber,
-        recipientType: 'customer',
-      },
-      { requireAuth: false }
-    );
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error sending customer confirmation email:', error);
-    // Don't throw - email sending should not block the order process
-  }
-}
-
-/**
- * Send order confirmation email to admin
- *
- * @param orderId - Order ID
- * @param orderNumber - Order number
- * @param orderDetails - Full order details
- * @returns Promise that resolves when email is sent
- */
-export async function sendOrderConfirmationEmailToAdmin(
-  orderId: string,
-  orderNumber: string,
-  orderDetails: OrderDto
-): Promise<void> {
-  try {
-    await apiClient.post<void>(
-      '/api/Emails/send-order-confirmation-admin',
-      {
-        orderId,
-        orderNumber,
-        recipientType: 'admin',
-      },
-      { requireAuth: false }
-    );
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error sending admin confirmation email:', error);
-    // Don't throw - email sending should not block the order process
-  }
-}
 
 /**
  * Send order confirmation emails to both customer and admin
+ * This sends a single API request that handles both customer and admin emails
  *
  * @param orderId - Order ID
- * @param customerEmail - Customer email address
- * @param customerName - Customer name
- * @param orderNumber - Order number
- * @param orderDetails - Full order details
- * @returns Promise that resolves when both emails are sent
+ * @returns Promise that resolves when emails are sent
  */
 export async function sendOrderConfirmationEmails(
-  orderId: string,
-  customerEmail: string,
-  customerName: string,
-  orderNumber: string,
-  orderDetails: OrderDto
+  orderId: string
 ): Promise<void> {
-  // Send both emails in parallel, but don't fail if one fails
-  await Promise.all([
-    sendOrderConfirmationEmailToCustomer(orderId, customerEmail, customerName, orderNumber, orderDetails),
-    sendOrderConfirmationEmailToAdmin(orderId, orderNumber, orderDetails),
-  ]);
+  try {
+    // eslint-disable-next-line no-console
+    console.log('Sending order confirmation emails for order:', orderId);
+
+    const response = await apiClient.post<{ data: string }>(
+      `/api/Orders/${orderId}/send-confirmation-email`,
+      {},
+      { requireAuth: false }
+    );
+
+    // eslint-disable-next-line no-console
+    console.log('Order confirmation emails sent successfully:', response);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error sending order confirmation emails:', error);
+    // Don't throw - email sending should not block the order process
+  }
 }
