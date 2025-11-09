@@ -88,6 +88,18 @@
   text-align: center;
 }
 
+.fieldError {
+  color: var(--danger-color-dark);
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+}
+
+.inputError {
+  border-color: var(--danger-color-dark) !important;
+  background-color: var(--danger-color-xlight);
+}
+
 .switchFormText {
   text-align: center;
   margin-top: 1.5rem;

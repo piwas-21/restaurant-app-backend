@@ -20,7 +20,8 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [generalError, setGeneralError] = useState("");
   const firstNameInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -29,16 +30,43 @@ export default function RegisterPage() {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.id]: e.target.value });
+    const fieldName = e.target.id;
+    setFormData({ ...formData, [fieldName]: e.target.value });
+    // Clear error for this field when user starts typing
+    if (errors[fieldName]) {
+      setErrors({ ...errors, [fieldName]: '' });
+    }
+  };
+
+  const getTranslatedError = (message: string): string => {
+    if (message.includes("Invalid") || message.includes("email")) {
+      return t('validation_invalid_email', 'Invalid email address');
+    }
+    if (message.includes("at least 6")) {
+      return t('validation_min_6_chars', 'Must be at least 6 characters');
+    }
+    if (message.includes("at least 2")) {
+      return t('validation_min_2_chars', 'Must be at least 2 characters');
+    }
+    if (message.includes("do not match") || message.includes("Passwords")) {
+      return t('validation_passwords_match', 'Passwords do not match');
+    }
+    return message;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setErrors({});
+    setGeneralError("");
 
     const validationResult = customerRegistrationSchema.safeParse(formData);
     if (!validationResult.success) {
-      setError(validationResult.error.issues.map(issue => issue.message).join(", "));
+      const fieldErrors: { [key: string]: string } = {};
+      validationResult.error.issues.forEach(issue => {
+        const fieldName = issue.path[0] as string;
+        fieldErrors[fieldName] = getTranslatedError(issue.message);
+      });
+      setErrors(fieldErrors);
       return;
     }
 
@@ -52,20 +80,20 @@ export default function RegisterPage() {
         router.push('/');
       } else {
         const apiErrors = Array.isArray(response?.errors) ? response.errors.join(', ') : '';
-        setError(apiErrors || response?.message || "Failed to register.");
+        setGeneralError(apiErrors || response?.message || t('failed_to_register', "Failed to register."));
       }
     } catch (err) {
-      setError("An unexpected error occurred.");
+      setGeneralError(t('unexpected_error', "An unexpected error occurred."));
     }
   };
 
   return (
     <div className={styles.authContainer}>
       <form className={styles.authForm} onSubmit={handleSubmit}>
-        <h1>Register</h1>
-        {error && <p className={styles.errorMessage}>{error}</p>}
+        <h1>{t('register_page_title', 'Register')}</h1>
+        {generalError && <p className={styles.errorMessage}>{generalError}</p>}
         <div className={styles.formGroup}>
-          <label htmlFor="firstName">First Name</label>
+          <label htmlFor="firstName">{t('first_name', 'First Name')}</label>
           <input
             type="text"
             id="firstName"
@@ -73,27 +101,39 @@ export default function RegisterPage() {
             value={formData.firstName}
             onChange={handleChange}
             required
+            className={errors.firstName ? styles.inputError : ''}
           />
+          {errors.firstName && (
+            <p className={styles.fieldError}>{errors.firstName}</p>
+          )}
         </div>
         <div className={styles.formGroup}>
-          <label htmlFor="lastName">Last Name</label>
+          <label htmlFor="lastName">{t('last_name', 'Last Name')}</label>
           <input
             type="text"
             id="lastName"
             value={formData.lastName}
             onChange={handleChange}
             required
+            className={errors.lastName ? styles.inputError : ''}
           />
+          {errors.lastName && (
+            <p className={styles.fieldError}>{errors.lastName}</p>
+          )}
         </div>
         <div className={styles.formGroup}>
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">{t('email', 'Email')}</label>
           <input
             type="email"
             id="email"
             value={formData.email}
             onChange={handleChange}
             required
+            className={errors.email ? styles.inputError : ''}
           />
+          {errors.email && (
+            <p className={styles.fieldError}>{errors.email}</p>
+          )}
         </div>
         <div className={styles.formGroup}>
           <label htmlFor="password">{t('password_label', 'Password')}</label>
@@ -103,7 +143,11 @@ export default function RegisterPage() {
             value={formData.password}
             onChange={handleChange}
             required
+            className={errors.password ? styles.inputError : ''}
           />
+          {errors.password && (
+            <p className={styles.fieldError}>{errors.password}</p>
+          )}
         </div>
         <div className={styles.formGroup}>
           <label htmlFor="confirmPassword">{t('confirm_password_label', 'Confirm Password')}</label>
@@ -113,11 +157,15 @@ export default function RegisterPage() {
             value={formData.confirmPassword}
             onChange={handleChange}
             required
+            className={errors.confirmPassword ? styles.inputError : ''}
           />
+          {errors.confirmPassword && (
+            <p className={styles.fieldError}>{errors.confirmPassword}</p>
+          )}
         </div>
         <button type="submit" className={styles.submitButton}>{t('register_button', 'Register')}</button>
         <p className={styles.switchFormText}>
-          Already have an account? <Link href="/auth/login">{t('login_button', 'Login')}</Link>
+          {t('already_have_account', 'Already have an account?')} <Link href="/auth/login">{t('login_button', 'Login')}</Link>
         </p>
       </form>
     </div>

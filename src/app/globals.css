@@ -28,6 +28,9 @@
   --warning-color-xlight: #FFF5E1;
   --warning-color-dark: #A06000;
   --danger-color: #dc3545;
+  --danger-color-dark: #c82333;
+  --danger-color-light: #f5c6cb;
+  --danger-color-xlight: #f8d7da;
   --primary-color-xlight: rgba(0, 123, 255, 0.1);
   --success-color-light: #C8E6C9;
   --success-color-xlight: #E8F5E9;
@@ -49,6 +52,9 @@ html[data-theme="dark"] {
   --link-hover-color: #f08080;
   --success-color: #81C784;
   --error-color: #E57373;
+  --danger-color-dark: #ff6b6b;
+  --danger-color-light: #ee5a6f;
+  --danger-color-xlight: #ffe0e6;
   /* Added variables for nav styling in dark mode */
   --nav-link-color: var(--text-color);
   --nav-link-hover-bg: rgba(255, 255, 255, 0.1);

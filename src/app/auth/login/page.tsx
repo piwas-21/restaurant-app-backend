@@ -4,10 +4,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import styles from "@/AuthPage.module.css";
 import { useRouter } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
 import { login as loginUser } from '@/authService';
 import { useAuth } from '@/components/AuthContext';
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -24,7 +26,7 @@ export default function LoginPage() {
     setError("");
 
     if (!email || !password) {
-      setError("Email and password are required.");
+      setError(t('email_and_password_required', 'Email and password are required.'));
       return;
     }
 
@@ -34,7 +36,7 @@ export default function LoginPage() {
       if (response.success) {
         login(response.data);
         const userRole = response.data.role.toLowerCase();
-        
+
         switch (userRole) {
           case "admin":
             router.push("/admin/dashboard");
@@ -56,21 +58,21 @@ export default function LoginPage() {
             break;
         }
       } else {
-        setError(response.message || "An unknown error occurred.");
+        setError(response.message || t('unknown_error', 'An unknown error occurred.'));
       }
     } catch {
-      setError("Failed to connect to the server.");
+      setError(t('failed_to_connect_server', 'Failed to connect to the server.'));
     }
   };
 
   return (
     <main className={styles.authContainer}>
       <div className={styles.authForm} role="form" aria-labelledby="login-heading">
-        <h1 id="login-heading">Login</h1>
+        <h1 id="login-heading">{t('login_page_title', 'Login')}</h1>
         <form onSubmit={handleSubmit} noValidate>
           {error && <p className={styles.errorMessage} role="alert">{error}</p>}
           <div className={styles.formGroup}>
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">{t('email', 'Email')}</label>
             <input
               type="email"
               id="email"
@@ -84,7 +86,7 @@ export default function LoginPage() {
             />
           </div>
           <div className={styles.formGroup}>
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">{t('password_label', 'Password')}</label>
             <input
               type="password"
               id="password"
@@ -96,10 +98,10 @@ export default function LoginPage() {
               autoComplete="current-password"
             />
           </div>
-          <button type="submit" className={styles.submitButton}>Login</button>
+          <button type="submit" className={styles.submitButton}>{t('login_button', 'Login')}</button>
         </form>
         <p className={styles.switchFormText}>
-          Don&apos;t have an account? <Link href="/auth/register">Register here</Link>
+          {t('dont_have_account_auth', "Don't have an account?")} <Link href="/auth/register">{t('register_here', 'Register here')}</Link>
         </p>
       </div>
     </main>

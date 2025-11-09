@@ -171,6 +171,7 @@
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .rateLabel {
@@ -186,6 +187,41 @@
 
 [data-theme="dark"] .rateValue {
   color: var(--primary-color-dark, #7c8ff5);
+}
+
+.orderTypesDisplay {
+  margin-top: 0.75rem;
+}
+
+.orderTypesLabel {
+  display: block;
+  color: var(--text-secondary, #666);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.orderTypesBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.orderTypeBadge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background: rgba(102, 126, 234, 0.1);
+  color: var(--primary-color, #667eea);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .orderTypeBadge {
+  background: rgba(124, 143, 245, 0.15);
+  color: var(--primary-color-dark, #7c8ff5);
+  border-color: rgba(124, 143, 245, 0.3);
 }
 
 .configActions {
@@ -389,10 +425,35 @@
   transition: border-color 0.2s;
 }
 
+/* Remove number input arrows/spinners */
+.formGroup input[type="number"]::-webkit-outer-spin-button,
+.formGroup input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.formGroup input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.formGroup input.inputError {
+  border-color: #dc3545;
+}
+
 .formGroup input:focus,
 .formGroup textarea:focus {
   outline: none;
   border-color: var(--primary-color, #667eea);
+}
+
+.formGroup input.inputError:focus {
+  border-color: #dc3545;
+}
+
+.errorText {
+  color: #dc3545 !important;
+  font-weight: 500;
 }
 
 [data-theme="dark"] .formGroup input,
@@ -415,11 +476,27 @@
   gap: 0.5rem;
   cursor: pointer;
   font-weight: normal !important;
+  margin-bottom: 0.5rem;
 }
 
 .checkboxLabel input[type="checkbox"] {
   width: auto;
   cursor: pointer;
+}
+
+.checkboxGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--hover-background, #f9f9f9);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+[data-theme="dark"] .checkboxGroup {
+  background: var(--hover-background-dark, #333);
+  border-color: var(--border-color-dark, #444);
 }
 
 .formActions {
@@ -460,8 +537,14 @@
   color: white;
 }
 
-.submitButton:hover {
+.submitButton:hover:not(:disabled) {
   background: var(--primary-hover, #5568d3);
+}
+
+.submitButton:disabled {
+  background: var(--text-secondary, #999);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 [data-theme="dark"] .cancelButton {

@@ -53,14 +53,18 @@ export type PaymentStatus =
  * Delivery address for orders
  */
 export interface CreateOrderDeliveryAddressDto {
-  street: string;
+  useAddressId?: string;
+  label?: string;
+  addressLine1: string;
+  addressLine2?: string;
   city: string;
   state?: string;
   postalCode: string;
   country: string;
+  phone?: string;
   latitude?: number;
   longitude?: number;
-  additionalInfo?: string;
+  deliveryInstructions?: string;
 }
 
 export interface DeliveryAddressDto {

@@ -5,20 +5,35 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useCheckout } from '@/contexts/CheckoutContext';
 import { useCart } from '@/components/cart/CartContext';
+import { useTableContext } from '@/contexts/TableContext';
+import { OrderType } from '@/types/order';
+import { getCurrentUser } from '@/services/userService';
 import {
   User,
   Mail,
   Phone,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Utensils,
+  Star,
+  LogIn
 } from 'lucide-react';
 import styles from '../../styles/CustomerInfoPage.module.css';
 
 export default function CustomerInfoPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { state: checkoutState, setCustomerInfo } = useCheckout();
+  const { state: checkoutState, setCustomerInfo, setOrderType, setTableNumber } = useCheckout();
   const { state: cartState } = useCart();
+  const { tableContext, hasTableContext } = useTableContext();
+
+  // Auto-set dine-in order type if coming from QR scan
+  useEffect(() => {
+    if (hasTableContext && tableContext.tableNumber && !checkoutState.orderType) {
+      setOrderType(OrderType.DineIn);
+      setTableNumber(tableContext.tableNumber);
+    }
+  }, [hasTableContext, tableContext, checkoutState.orderType, setOrderType, setTableNumber]);
 
   // Form state
   const [name, setName] = useState(checkoutState.customerInfo?.name || '');
@@ -33,21 +48,59 @@ export default function CustomerInfoPage() {
   // Save preference state
   const [saveInfo, setSaveInfo] = useState(false);
 
-  // Load saved customer info from localStorage on mount
+  // User auth state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  // Load user data and saved customer info on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('rumi_saved_customer_info');
-      if (saved && !checkoutState.customerInfo) {
-        try {
-          const parsed = JSON.parse(saved);
-          setName(parsed.name || '');
-          setEmail(parsed.email || '');
-          setPhone(parsed.phone || '');
-        } catch {
-          // Ignore parse errors
+    const loadUserData = async () => {
+      setIsLoadingUser(true);
+      try {
+        // Check if user has an auth token (means they're logged in)
+        if (typeof window !== 'undefined') {
+          const authToken = localStorage.getItem('auth_token');
+
+          if (authToken && !checkoutState.customerInfo) {
+            // User is logged in, try to fetch their data
+            try {
+              const user = await getCurrentUser();
+              if (user) {
+                // Prefill with user data
+                setName(user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email);
+                setEmail(user.email || '');
+                setPhone(user.phoneNumber || '');
+                setIsLoggedIn(true);
+                return;
+              }
+            } catch (err) {
+              // Token might be expired, continue to load from localStorage
+              console.error('Failed to fetch user profile:', err);
+            }
+          }
         }
+
+        // User is not logged in or fetch failed - try to load from localStorage
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('rumi_saved_customer_info');
+          if (saved && !checkoutState.customerInfo) {
+            try {
+              const parsed = JSON.parse(saved);
+              setName(parsed.name || '');
+              setEmail(parsed.email || '');
+              setPhone(parsed.phone || '');
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        }
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoadingUser(false);
       }
-    }
+    };
+
+    loadUserData();
   }, [checkoutState.customerInfo]);
 
   // Check if cart is empty
@@ -68,8 +121,8 @@ export default function CustomerInfoPage() {
     );
   }
 
-  // Check if order type is selected
-  if (!checkoutState.orderType) {
+  // Check if order type is selected (skip this check if coming from QR scan)
+  if (!checkoutState.orderType && !hasTableContext) {
     return (
       <main className={styles.container}>
         <div className={styles.emptyState}>
@@ -120,16 +173,15 @@ export default function CustomerInfoPage() {
   };
 
   const validatePhone = (value: string): boolean => {
+    // Phone is now optional
     if (!value.trim()) {
-      setPhoneError(t('phone_required', 'Phone number is required'));
-      return false;
+      setPhoneError('');
+      return true;
     }
-    // Swiss phone number pattern (flexible format)
-    // Accepts: +41 XX XXX XX XX, 0XX XXX XX XX, etc.
-    const phonePattern = /^(\+41|0041|0)?[\s]?[1-9]\d{1,2}[\s]?\d{3}[\s]?\d{2}[\s]?\d{2}$/;
-    const cleanedPhone = value.replace(/[\s-]/g, '');
-    if (!phonePattern.test(cleanedPhone)) {
-      setPhoneError(t('phone_invalid', 'Please enter a valid Swiss phone number'));
+    // Accept any phone number format with at least 5 digits
+    const phonePattern = /^[+\s\-()0-9]{5,}$/;
+    if (!phonePattern.test(value.trim())) {
+      setPhoneError(t('phone_invalid', 'Please enter a valid phone number'));
       return false;
     }
     setPhoneError('');
@@ -178,7 +230,12 @@ export default function CustomerInfoPage() {
   };
 
   const handleBack = () => {
-    router.push('/checkout/order-type');
+    // If user came from QR scan, go back to cart
+    if (hasTableContext) {
+      router.push('/cart');
+    } else {
+      router.push('/checkout/order-type');
+    }
   };
 
   return (
@@ -191,25 +248,37 @@ export default function CustomerInfoPage() {
           </p>
         </div>
 
-        {/* Order Type Summary */}
-        <div className={styles.orderTypeSummary}>
-          <span className={styles.label}>{t('order_type', 'Order Type')}:</span>
-          <span className={styles.value}>
-            {checkoutState.orderType === 'DineIn' && t('order_type_dine_in', 'Dine In')}
-            {checkoutState.orderType === 'Takeaway' && t('order_type_takeaway', 'Takeaway')}
-            {checkoutState.orderType === 'Delivery' && t('order_type_delivery', 'Delivery')}
-          </span>
-          {checkoutState.orderType === 'DineIn' && checkoutState.tableNumber && (
-            <span className={styles.detail}>
-              {t('table', 'Table')} {checkoutState.tableNumber}
+        {/* Table Banner for QR Scan Users */}
+        {hasTableContext && tableContext.tableNumber && (
+          <div className={styles.tableBanner}>
+            <Utensils size={24} className={styles.tableBannerIcon} />
+            <span className={styles.tableBannerText}>
+              {t('ordering_for_table', 'Ordering for Table {{number}}', { number: tableContext.tableNumber })}
             </span>
-          )}
-          {checkoutState.orderType === 'Delivery' && checkoutState.deliveryAddress && (
-            <span className={styles.detail}>
-              {checkoutState.deliveryAddress.street}, {checkoutState.deliveryAddress.city}
+          </div>
+        )}
+
+        {/* Order Type Summary for non-QR users */}
+        {!hasTableContext && checkoutState.orderType && (
+          <div className={styles.orderTypeSummary}>
+            <span className={styles.label}>{t('order_type', 'Order Type')}:</span>
+            <span className={styles.value}>
+              {checkoutState.orderType === 'DineIn' && t('order_type_dine_in', 'Dine In')}
+              {checkoutState.orderType === 'Takeaway' && t('order_type_takeaway', 'Takeaway')}
+              {checkoutState.orderType === 'Delivery' && t('order_type_delivery', 'Delivery')}
             </span>
-          )}
-        </div>
+            {checkoutState.orderType === 'DineIn' && checkoutState.tableNumber && (
+              <span className={styles.detail}>
+                {t('table', 'Table')} {checkoutState.tableNumber}
+              </span>
+            )}
+            {checkoutState.orderType === 'Delivery' && checkoutState.deliveryAddress && (
+              <span className={styles.detail}>
+                {checkoutState.deliveryAddress.street}, {checkoutState.deliveryAddress.city}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Customer Info Form */}
         <form className={styles.form} onSubmit={(e) => { e.preventDefault(); handleContinue(); }}>
@@ -274,7 +343,7 @@ export default function CustomerInfoPage() {
             <label htmlFor="phone" className={styles.label}>
               <Phone size={20} />
               {t('phone_number', 'Phone Number')}
-              <span className={styles.required}>*</span>
+              <span className={styles.optional}>{t('optional', '(Optional)')}</span>
             </label>
             <input
               type="tel"
@@ -285,7 +354,7 @@ export default function CustomerInfoPage() {
                 if (phoneError) setPhoneError('');
               }}
               onBlur={handlePhoneBlur}
-              placeholder={t('enter_phone', '079 123 45 67')}
+              placeholder={t('enter_phone', '+1 555 123 4567 or any phone number')}
               className={`${styles.input} ${phoneError ? styles.inputError : ''}`}
               autoComplete="tel"
             />
@@ -296,25 +365,27 @@ export default function CustomerInfoPage() {
               </p>
             )}
             <p className={styles.hint}>
-              {t('phone_hint', 'Swiss phone number (e.g., +41 79 123 45 67 or 079 123 45 67)')}
+              {t('phone_hint_optional', 'You can enter a phone number in any format (e.g., +1 555 123 4567 or 555-123-4567)')}
             </p>
           </div>
 
-          {/* Save Info Checkbox */}
-          <div className={styles.checkboxGroup}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={saveInfo}
-                onChange={(e) => setSaveInfo(e.target.checked)}
-                className={styles.checkbox}
-              />
-              <span>{t('save_info_for_next_time', 'Save my information for next time')}</span>
-            </label>
-            <p className={styles.checkboxHint}>
-              {t('save_info_hint', 'Your information will be stored locally on your device')}
-            </p>
-          </div>
+          {/* Save Info Checkbox - Only show if not logged in */}
+          {!isLoggedIn && (
+            <div className={styles.checkboxGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={saveInfo}
+                  onChange={(e) => setSaveInfo(e.target.checked)}
+                  className={styles.checkbox}
+                />
+                <span>{t('save_info_for_next_time', 'Save my information for next time')}</span>
+              </label>
+              <p className={styles.checkboxHint}>
+                {t('save_info_hint', 'Your information will be stored locally on your device')}
+              </p>
+            </div>
+          )}
 
           {/* Actions */}
           <div className={styles.actions}>
@@ -334,6 +405,59 @@ export default function CustomerInfoPage() {
             </button>
           </div>
         </form>
+
+        {/* Registration Encouragement Section - Show if not logged in */}
+        {!isLoadingUser && !isLoggedIn && (
+          <div className={styles.registrationSection}>
+            <div className={styles.registrationCard}>
+              <div className={styles.registrationHeader}>
+                <Star size={24} className={styles.registrationIcon} />
+                <h2 className={styles.registrationTitle}>
+                  {t('dont_have_account', 'Don\'t have an account yet?')}
+                </h2>
+              </div>
+              <p className={styles.registrationDescription}>
+                {t('register_benefits', 'Create a RUMI account to unlock exclusive benefits')}
+              </p>
+              <div className={styles.benefitsList}>
+                <div className={styles.benefitItem}>
+                  <Star size={18} className={styles.benefitIcon} />
+                  <span>{t('benefit_fidelity', 'Earn Fidelity Points on every order')}</span>
+                </div>
+                <div className={styles.benefitItem}>
+                  <Star size={18} className={styles.benefitIcon} />
+                  <span>{t('benefit_rewards', 'Redeem points for discounts')}</span>
+                </div>
+                <div className={styles.benefitItem}>
+                  <Star size={18} className={styles.benefitIcon} />
+                  <span>{t('benefit_tracking', 'Track your order history')}</span>
+                </div>
+                <div className={styles.benefitItem}>
+                  <Star size={18} className={styles.benefitIcon} />
+                  <span>{t('benefit_reservations', 'Manage your reservations easily')}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push('/auth/register')}
+                className={styles.registerButton}
+              >
+                <LogIn size={18} />
+                {t('register_now', 'Register Now')}
+              </button>
+              <p className={styles.registrationFooter}>
+                {t('already_member', 'Already a member?')}
+                <button
+                  type="button"
+                  onClick={() => router.push('/auth/login')}
+                  className={styles.loginLink}
+                >
+                  {t('login_here', 'Login here')}
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

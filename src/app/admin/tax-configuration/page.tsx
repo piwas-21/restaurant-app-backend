@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSnackbar } from 'notistack';
+import { useTranslation } from 'react-i18next';
 import {
   Trash2,
   Edit,
@@ -11,8 +12,10 @@ import {
   ToggleRight
 } from 'lucide-react';
 import { AdminAuthGuard } from '@/components/admin/AdminAuthGuard';
+import ConfirmationModal from '@/components/common/ConfirmationModal';
 import { adminTaxConfigurationService } from '@/services/adminTaxConfigurationService';
 import type { TaxConfiguration } from '@/services/adminTaxConfigurationService';
+import { OrderType } from '@/types/order';
 import styles from './tax-configuration.module.css';
 
 interface TaxFormData {
@@ -20,19 +23,26 @@ interface TaxFormData {
   rate: number;
   isEnabled: boolean;
   description: string;
+  applicableOrderTypes: OrderType[];
 }
 
 export default function TaxConfigurationPage() {
   const { enqueueSnackbar } = useSnackbar();
+  const { t } = useTranslation();
   const [taxConfigs, setTaxConfigs] = useState<TaxConfiguration[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<TaxConfiguration | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingTaxId, setDeletingTaxId] = useState<string | null>(null);
+  const [rateInput, setRateInput] = useState<string>('0');
+  const [isRateValid, setIsRateValid] = useState(true);
   const [formData, setFormData] = useState<TaxFormData>({
     name: '',
     rate: 0,
     isEnabled: false,
-    description: ''
+    description: '',
+    applicableOrderTypes: []
   });
 
   useEffect(() => {
@@ -46,7 +56,7 @@ export default function TaxConfigurationPage() {
       const data = await adminTaxConfigurationService.getAllTaxConfigurations();
       setTaxConfigs(data);
     } catch {
-      enqueueSnackbar('Failed to load tax configurations', { variant: 'error' });
+      enqueueSnackbar(t('tax_failed_to_load', 'Failed to load tax configurations'), { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -54,35 +64,49 @@ export default function TaxConfigurationPage() {
 
   const handleCreate = () => {
     setEditingConfig(null);
+    setRateInput('');
+    setIsRateValid(true);
     setFormData({
       name: '',
       rate: 0,
       isEnabled: false,
-      description: ''
+      description: '',
+      applicableOrderTypes: []
     });
     setIsFormOpen(true);
   };
 
   const handleEdit = (config: TaxConfiguration) => {
     setEditingConfig(config);
+    setRateInput(config.rate.toString());
+    setIsRateValid(true);
     setFormData({
       name: config.name,
       rate: config.rate,
       isEnabled: config.isEnabled,
-      description: config.description
+      description: config.description,
+      applicableOrderTypes: config.applicableOrderTypes || []
     });
     setIsFormOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this tax configuration?')) return;
+    setDeletingTaxId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingTaxId) return;
 
     try {
-      await adminTaxConfigurationService.deleteTaxConfiguration(id);
-      enqueueSnackbar('Tax configuration deleted successfully', { variant: 'success' });
+      await adminTaxConfigurationService.deleteTaxConfiguration(deletingTaxId);
+      enqueueSnackbar(t('tax_deleted_successfully', 'Tax configuration deleted successfully'), { variant: 'success' });
       fetchTaxConfigs();
     } catch {
-      enqueueSnackbar('Failed to delete tax configuration', { variant: 'error' });
+      enqueueSnackbar(t('tax_failed_to_delete', 'Failed to delete tax configuration'), { variant: 'error' });
+    } finally {
+      setIsDeleteModalOpen(false);
+      setDeletingTaxId(null);
     }
   };
 
@@ -100,14 +124,15 @@ export default function TaxConfigurationPage() {
       }
 
       enqueueSnackbar(
-        `Tax configuration ${editingConfig ? 'updated' : 'created'} successfully`,
+        t(editingConfig ? 'tax_updated_successfully' : 'tax_created_successfully',
+          `Tax configuration ${editingConfig ? 'updated' : 'created'} successfully`),
         { variant: 'success' }
       );
 
       setIsFormOpen(false);
       fetchTaxConfigs();
     } catch {
-      enqueueSnackbar('Failed to save tax configuration', { variant: 'error' });
+      enqueueSnackbar(t('tax_failed_to_save', 'Failed to save tax configuration'), { variant: 'error' });
     }
   };
 
@@ -118,17 +143,59 @@ export default function TaxConfigurationPage() {
         name: config.name,
         rate: config.rate,
         isEnabled: !config.isEnabled,
-        description: config.description
+        description: config.description,
+        applicableOrderTypes: config.applicableOrderTypes || []
       });
 
       enqueueSnackbar(
-        `Tax ${!config.isEnabled ? 'enabled' : 'disabled'} successfully`,
+        t(config.isEnabled ? 'tax_disabled_successfully' : 'tax_enabled_successfully',
+          `Tax ${!config.isEnabled ? 'enabled' : 'disabled'} successfully`),
         { variant: 'success' }
       );
 
       fetchTaxConfigs();
     } catch {
-      enqueueSnackbar('Failed to toggle tax configuration', { variant: 'error' });
+      enqueueSnackbar(t('tax_failed_to_toggle', 'Failed to toggle tax configuration'), { variant: 'error' });
+    };
+  };
+
+  const handleRateChange = (value: string) => {
+    setRateInput(value);
+
+    // Allow empty string
+    if (value === '') {
+      setIsRateValid(true);
+      setFormData({ ...formData, rate: 0 });
+      return;
+    }
+
+    // Validate if it's a valid number
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) {
+      setIsRateValid(false);
+      return;
+    }
+
+    // Check if within valid range
+    if (numValue < 0 || numValue > 100) {
+      setIsRateValid(false);
+      return;
+    }
+
+    setIsRateValid(true);
+    setFormData({ ...formData, rate: numValue });
+  };
+
+  const getOrderTypeLabel = (orderType: OrderType): string => {
+    switch (orderType) {
+      case OrderType.DineIn:
+        return t('order_type_dine_in', 'Dine-In');
+      case OrderType.Takeaway:
+        return t('order_type_takeaway', 'Takeaway');
+      case OrderType.Delivery:
+        return t('order_type_delivery', 'Delivery');
+      default:
+        return orderType;
     }
   };
 
@@ -139,28 +206,28 @@ export default function TaxConfigurationPage() {
           <div className={styles.headerContent}>
             <DollarSign className={styles.headerIcon} />
             <div>
-              <h1 className={styles.title}>Tax Configuration</h1>
+              <h1 className={styles.title}>{t('tax_configuration', 'Tax Configuration')}</h1>
               <p className={styles.subtitle}>
-                Manage tax rates and enable/disable tax calculations
+                {t('tax_configuration_subtitle', 'Manage tax rates and enable/disable tax calculations')}
               </p>
             </div>
           </div>
           <button onClick={handleCreate} className={styles.createButton}>
             <Plus size={20} />
-            Add Tax Configuration
+            {t('add_tax_configuration', 'Add Tax Configuration')}
           </button>
         </div>
 
         {loading ? (
-          <div className={styles.loading}>Loading...</div>
+          <div className={styles.loading}>{t('loading', 'Loading...')}</div>
         ) : (
           <div className={styles.configList}>
             {taxConfigs.length === 0 ? (
               <div className={styles.emptyState}>
                 <DollarSign size={48} />
-                <p>No tax configurations found</p>
+                <p>{t('no_tax_configurations', 'No tax configurations found')}</p>
                 <button onClick={handleCreate} className={styles.emptyButton}>
-                  Create First Tax Configuration
+                  {t('create_first_tax_configuration', 'Create First Tax Configuration')}
                 </button>
               </div>
             ) : (
@@ -178,10 +245,10 @@ export default function TaxConfigurationPage() {
                     </div>
                     <div className={styles.configStatus}>
                       {config.isEnabled ? (
-                        <span className={styles.statusBadge}>Active</span>
+                        <span className={styles.statusBadge}>{t('active', 'Active')}</span>
                       ) : (
                         <span className={`${styles.statusBadge} ${styles.inactive}`}>
-                          Inactive
+                          {t('inactive', 'Inactive')}
                         </span>
                       )}
                     </div>
@@ -189,10 +256,26 @@ export default function TaxConfigurationPage() {
 
                   <div className={styles.configDetails}>
                     <div className={styles.rateDisplay}>
-                      <span className={styles.rateLabel}>Rate:</span>
+                      <span className={styles.rateLabel}>{t('rate', 'Rate')}:</span>
                       <span className={styles.rateValue}>
-                        {(config.rate * 100).toFixed(2)}%
+                        {config.rate.toFixed(2)}%
                       </span>
+                    </div>
+                    <div className={styles.orderTypesDisplay}>
+                      <span className={styles.orderTypesLabel}>{t('applies_to', 'Applies to')}:</span>
+                      <div className={styles.orderTypesBadges}>
+                        {config.applicableOrderTypes && config.applicableOrderTypes.length > 0 ? (
+                          config.applicableOrderTypes.map((type) => (
+                            <span key={type} className={styles.orderTypeBadge}>
+                              {getOrderTypeLabel(type)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className={styles.orderTypeBadge} style={{ opacity: 0.5 }}>
+                            {t('no_order_types_selected', 'No order types selected')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -200,31 +283,31 @@ export default function TaxConfigurationPage() {
                     <button
                       onClick={() => handleToggle(config)}
                       className={styles.toggleButton}
-                      title={config.isEnabled ? 'Disable' : 'Enable'}
+                      title={config.isEnabled ? t('disable', 'Disable') : t('enable', 'Enable')}
                     >
                       {config.isEnabled ? (
                         <>
                           <ToggleRight size={20} />
-                          Disable
+                          {t('disable', 'Disable')}
                         </>
                       ) : (
                         <>
                           <ToggleLeft size={20} />
-                          Enable
+                          {t('enable', 'Enable')}
                         </>
                       )}
                     </button>
                     <button
                       onClick={() => handleEdit(config)}
                       className={styles.editButton}
-                      title="Edit"
+                      title={t('edit', 'Edit')}
                     >
                       <Edit size={18} />
                     </button>
                     <button
                       onClick={() => handleDelete(config.id)}
                       className={styles.deleteButton}
-                      title="Delete"
+                      title={t('delete', 'Delete')}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -239,7 +322,11 @@ export default function TaxConfigurationPage() {
           <div className={styles.modal}>
             <div className={styles.modalContent}>
               <div className={styles.modalHeader}>
-                <h2>{editingConfig ? 'Edit' : 'Create'} Tax Configuration</h2>
+                <h2>
+                  {editingConfig
+                    ? t('edit_tax_configuration', 'Edit Tax Configuration')
+                    : t('create_tax_configuration', 'Create Tax Configuration')}
+                </h2>
                 <button
                   onClick={() => setIsFormOpen(false)}
                   className={styles.closeButton}
@@ -250,46 +337,101 @@ export default function TaxConfigurationPage() {
 
               <form onSubmit={handleSubmit} className={styles.form}>
                 <div className={styles.formGroup}>
-                  <label htmlFor="name">Name</label>
+                  <label htmlFor="name">{t('name', 'Name')}</label>
                   <input
                     id="name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g., VAT, Sales Tax"
+                    placeholder={t('tax_name_placeholder', 'e.g., VAT, Sales Tax')}
                     required
                   />
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label htmlFor="rate">Rate (%)</label>
+                  <label htmlFor="rate">{t('rate_percent', 'Rate (%)')}</label>
                   <input
                     id="rate"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.rate * 100}
-                    onChange={(e) =>
-                      setFormData({ ...formData, rate: parseFloat(e.target.value) / 100 })
-                    }
-                    placeholder="e.g., 8.00"
+                    type="text"
+                    inputMode="decimal"
+                    value={rateInput}
+                    onChange={(e) => handleRateChange(e.target.value)}
+                    placeholder={t('tax_rate_placeholder', 'e.g., 8.00')}
+                    className={!isRateValid ? styles.inputError : ''}
                     required
                   />
-                  <small>Current rate: {(formData.rate * 100).toFixed(2)}%</small>
+                  {!isRateValid && (
+                    <small className={styles.errorText}>
+                      {t('rate_must_be_valid_number', 'Rate must be a valid number between 0 and 100')}
+                    </small>
+                  )}
+                  {isRateValid && rateInput && (
+                    <small>{t('current_rate', 'Current rate')}: {formData.rate.toFixed(2)}%</small>
+                  )}
                 </div>
 
                 <div className={styles.formGroup}>
-                  <label htmlFor="description">Description</label>
+                  <label htmlFor="description">{t('description', 'Description')}</label>
                   <textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    placeholder="e.g., Standard VAT rate for Switzerland"
+                    placeholder={t('tax_description_placeholder', 'e.g., Standard VAT rate for Switzerland')}
                     rows={3}
                   />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label>{t('applicable_order_types', 'Applicable Order Types')}</label>
+                  <small style={{ display: 'block', marginBottom: '0.5rem' }}>
+                    {t('order_types_hint', 'Select which order types this tax applies to (Swiss regulations: Dine-in has different rate than Takeaway/Delivery)')}
+                  </small>
+                  <div className={styles.checkboxGroup}>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={formData.applicableOrderTypes.includes(OrderType.DineIn)}
+                        onChange={(e) => {
+                          const types = e.target.checked
+                            ? [...formData.applicableOrderTypes, OrderType.DineIn]
+                            : formData.applicableOrderTypes.filter(t => t !== OrderType.DineIn);
+                          setFormData({ ...formData, applicableOrderTypes: types });
+                        }}
+                      />
+                      <span>{t('dine_in_restaurant', 'Dine-In (Restaurant)')}</span>
+                    </label>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={formData.applicableOrderTypes.includes(OrderType.Takeaway)}
+                        onChange={(e) => {
+                          const types = e.target.checked
+                            ? [...formData.applicableOrderTypes, OrderType.Takeaway]
+                            : formData.applicableOrderTypes.filter(t => t !== OrderType.Takeaway);
+                          setFormData({ ...formData, applicableOrderTypes: types });
+                        }}
+                      />
+                      <span>{t('takeaway_to_go', 'Takeaway (To Go)')}</span>
+                    </label>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={formData.applicableOrderTypes.includes(OrderType.Delivery)}
+                        onChange={(e) => {
+                          const types = e.target.checked
+                            ? [...formData.applicableOrderTypes, OrderType.Delivery]
+                            : formData.applicableOrderTypes.filter(t => t !== OrderType.Delivery);
+                          setFormData({ ...formData, applicableOrderTypes: types });
+                        }}
+                      />
+                      <span>{t('delivery', 'Delivery')}</span>
+                    </label>
+                  </div>
+                  <small style={{ display: 'block', marginTop: '0.5rem', color: '#f44336' }}>
+                    {formData.applicableOrderTypes.length === 0 && t('select_at_least_one_order_type', 'Please select at least one order type')}
+                  </small>
                 </div>
 
                 <div className={styles.formGroup}>
@@ -301,10 +443,10 @@ export default function TaxConfigurationPage() {
                         setFormData({ ...formData, isEnabled: e.target.checked })
                       }
                     />
-                    <span>Enable this tax configuration</span>
+                    <span>{t('enable_this_tax_configuration', 'Enable this tax configuration')}</span>
                   </label>
                   <small>
-                    Note: Enabling this will disable any other active tax configuration
+                    {t('multiple_taxes_can_be_enabled', 'Multiple tax configurations can be enabled. The system will automatically apply the appropriate tax based on the order type.')}
                   </small>
                 </div>
 
@@ -314,16 +456,30 @@ export default function TaxConfigurationPage() {
                     onClick={() => setIsFormOpen(false)}
                     className={styles.cancelButton}
                   >
-                    Cancel
+                    {t('cancel', 'Cancel')}
                   </button>
-                  <button type="submit" className={styles.submitButton}>
-                    {editingConfig ? 'Update' : 'Create'}
+                  <button
+                    type="submit"
+                    className={styles.submitButton}
+                    disabled={!isRateValid || !rateInput}
+                  >
+                    {editingConfig ? t('update', 'Update') : t('create', 'Create')}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         )}
+
+        <ConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setDeletingTaxId(null);
+          }}
+          onConfirm={confirmDelete}
+          message={t('tax_delete_confirm', 'Are you sure you want to delete this tax configuration?')}
+        />
       </div>
     </AdminAuthGuard>
   );

@@ -1,4 +1,5 @@
 import { apiClient } from '@/utils/apiClient';
+import { OrderType } from '@/types/order';
 
 /**
  * API Response wrapper
@@ -19,6 +20,7 @@ export interface TaxConfiguration {
   rate: number;
   isEnabled: boolean;
   description: string;
+  applicableOrderTypes: OrderType[]; // DineIn, Takeaway, Delivery
 }
 
 /**
@@ -29,6 +31,7 @@ export interface CreateTaxConfigurationDto {
   rate: number;
   isEnabled: boolean;
   description: string;
+  applicableOrderTypes: OrderType[];
 }
 
 /**
@@ -45,6 +48,7 @@ const ENDPOINTS = {
   TAX_CONFIGURATION: '/api/TaxConfiguration',
   TAX_CONFIGURATION_ACTIVE: '/api/TaxConfiguration/active',
   TAX_CONFIGURATION_BY_ID: (id: string) => `/api/TaxConfiguration/${id}`,
+  TAX_CONFIGURATION_BY_ORDER_TYPE: (orderType: OrderType) => `/api/TaxConfiguration/by-order-type/${orderType}`,
 } as const;
 
 /**
@@ -115,5 +119,16 @@ export const adminTaxConfigurationService = {
     await apiClient.delete<ApiResponse<boolean>>(
       ENDPOINTS.TAX_CONFIGURATION_BY_ID(id)
     );
+  },
+
+  /**
+   * Get applicable tax configuration for a specific order type
+   * Uses the backend endpoint to get tax based on order type
+   */
+  async getTaxForOrderType(orderType: OrderType): Promise<TaxConfiguration | null> {
+    const response = await apiClient.get<ApiResponse<TaxConfiguration | null>>(
+      ENDPOINTS.TAX_CONFIGURATION_BY_ORDER_TYPE(orderType)
+    );
+    return response.data;
   },
 };

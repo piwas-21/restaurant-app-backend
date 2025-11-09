@@ -12,9 +12,11 @@ import {
   Utensils,
   Truck,
   ChevronRight,
-  MapPin,
-  Hash
+  MapPin
 } from 'lucide-react';
+import TableSelector from '@/components/checkout/TableSelector';
+import { getCurrentUser } from '@/services/userService';
+import { getMyAddresses, createAddress, AddressDto } from '@/services/addressService';
 import styles from '../../styles/OrderTypePage.module.css';
 
 export default function OrderTypePage() {
@@ -35,6 +37,15 @@ export default function OrderTypePage() {
   const [additionalInfo, setAdditionalInfo] = useState(checkoutState.deliveryAddress?.additionalInfo || '');
   const [addressError, setAddressError] = useState('');
 
+  // Saved addresses state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<AddressDto[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(true);
+  const [saveThisAddress, setSaveThisAddress] = useState(false);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+
   // Check for table context from QR code scan
   useEffect(() => {
     if (hasTableContext && tableContext.tableNumber) {
@@ -45,6 +56,33 @@ export default function OrderTypePage() {
       setTableNumber(tableContext.tableNumber);
     }
   }, [hasTableContext, tableContext, setOrderType, setTableNumber]);
+
+  // Fetch saved addresses when delivery is selected and user is logged in
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (user) {
+          setIsLoggedIn(true);
+          setLoadingAddresses(true);
+          const addresses = await getMyAddresses();
+          setSavedAddresses(addresses);
+          setShowNewAddressForm(addresses.length === 0);
+        }
+      } catch (error) {
+        // User is not logged in or error fetching addresses
+        setIsLoggedIn(false);
+        setSavedAddresses([]);
+        setShowNewAddressForm(true);
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+
+    if (selectedType === OrderType.Delivery) {
+      fetchAddresses();
+    }
+  }, [selectedType]);
 
   // Check if cart is empty
   if (cartState.items.length === 0) {
@@ -66,18 +104,26 @@ export default function OrderTypePage() {
 
   const handleTypeSelect = (type: OrderType) => {
     setSelectedType(type);
-    setTableError('');
     setAddressError('');
   };
 
-  const validateTableNumber = (): boolean => {
+  const handleSelectSavedAddress = (address: AddressDto) => {
+    setSelectedAddressId(address.id);
+    setStreet(address.addressLine1);
+    setCity(address.city);
+    setPostalCode(address.postalCode);
+    setCountry(address.country || 'Switzerland');
+    setAdditionalInfo(address.deliveryInstructions || '');
+    setShowNewAddressForm(false);
+  };
+
+  const handleTableSelect = (tableNumber: string) => {
+    setTableNum(tableNumber);
+  };
+
+  const validateTableSelection = (): boolean => {
     if (!tableNum.trim()) {
-      setTableError(t('table_number_required', 'Please enter a table number'));
-      return false;
-    }
-    const tableNumber = parseInt(tableNum);
-    if (isNaN(tableNumber) || tableNumber < 1 || tableNumber > 100) {
-      setTableError(t('table_number_invalid', 'Please enter a valid table number (1-100)'));
+      setTableError(t('table_not_selected', 'Please select a table'));
       return false;
     }
     setTableError('');
@@ -85,39 +131,55 @@ export default function OrderTypePage() {
   };
 
   const validateDeliveryAddress = (): boolean => {
+    console.log('Validating delivery address:', { street, city, postalCode });
     if (!street.trim()) {
       setAddressError(t('street_required', 'Street address is required'));
+      console.log('Validation failed: street is empty');
       return false;
     }
     if (!city.trim()) {
       setAddressError(t('city_required', 'City is required'));
+      console.log('Validation failed: city is empty');
       return false;
     }
     if (!postalCode.trim()) {
       setAddressError(t('postal_code_required', 'Postal code is required'));
+      console.log('Validation failed: postal code is empty');
       return false;
     }
-    if (!/^\d{4}$/.test(postalCode.trim())) {
-      setAddressError(t('postal_code_invalid', 'Please enter a valid Swiss postal code (4 digits)'));
+    // Allow various postal code formats: 4 digits (CH), alphanumeric (NL, DE, etc.)
+    if (!/^[A-Z0-9\s\-]{2,10}$/i.test(postalCode.trim())) {
+      setAddressError(t('postal_code_invalid', 'Please enter a valid postal code'));
+      console.log('Validation failed: invalid postal code format');
       return false;
     }
     setAddressError('');
+    console.log('Validation passed');
     return true;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    // eslint-disable-next-line no-console
+    console.log('handleContinue clicked', { selectedType, showNewAddressForm, isLoggedIn, saveThisAddress });
+
     if (!selectedType) {
+      // eslint-disable-next-line no-console
+      console.log('No selectedType, returning');
       return;
     }
 
     // Validate based on order type
     if (selectedType === OrderType.DineIn) {
-      if (!validateTableNumber()) {
+      // eslint-disable-next-line no-console
+      console.log('Processing DineIn order');
+      if (!validateTableSelection()) {
         return;
       }
       setTableNumber(tableNum);
       setDeliveryAddress({ street: '', city: '', postalCode: '', country: '' });
     } else if (selectedType === OrderType.Delivery) {
+      // eslint-disable-next-line no-console
+      console.log('Processing Delivery order');
       if (!validateDeliveryAddress()) {
         return;
       }
@@ -129,13 +191,43 @@ export default function OrderTypePage() {
         additionalInfo: additionalInfo.trim(),
       });
       setTableNumber('');
+
+      // Save address if user checked the checkbox and is logged in
+      if (saveThisAddress && isLoggedIn) {
+        // eslint-disable-next-line no-console
+        console.log('Saving address...');
+        setSavingAddress(true);
+        try {
+          await createAddress({
+            label: `${city.trim()}, ${postalCode.trim()}`,
+            addressLine1: street.trim(),
+            city: city.trim(),
+            postalCode: postalCode.trim(),
+            country: country.trim(),
+            deliveryInstructions: additionalInfo.trim(),
+          });
+          // eslint-disable-next-line no-console
+          console.log('Address saved successfully');
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.log('Error saving address:', error);
+          setSavingAddress(false);
+          setAddressError(t('failed_to_save_address', 'Failed to save address. Please try again.'));
+          return;
+        }
+        setSavingAddress(false);
+      }
     } else {
       // Takeaway - clear both
+      // eslint-disable-next-line no-console
+      console.log('Processing Takeaway order');
       setTableNumber('');
       setDeliveryAddress({ street: '', city: '', postalCode: '', country: '' });
     }
 
     // Save order type
+    // eslint-disable-next-line no-console
+    console.log('Setting order type and navigating...');
     setOrderType(selectedType);
 
     // Navigate to customer info page
@@ -186,36 +278,26 @@ export default function OrderTypePage() {
           ))}
         </div>
 
-        {/* Dine-in Table Number Input */}
+        {/* Dine-in Table Selector */}
         {selectedType === OrderType.DineIn && (
           <div className={styles.detailsSection}>
-            <div className={styles.inputGroup}>
-              <label htmlFor="tableNumber" className={styles.label}>
-                <Hash size={20} />
-                {t('table_number', 'Table Number')}
-                <span className={styles.required}>*</span>
-              </label>
-              <input
-                type="number"
-                id="tableNumber"
-                value={tableNum}
-                onChange={(e) => {
-                  setTableNum(e.target.value);
-                  setTableError('');
-                }}
-                placeholder={t('enter_table_number', 'Enter your table number')}
-                className={`${styles.input} ${tableError ? styles.inputError : ''}`}
-                min="1"
-                max="100"
-                readOnly={hasTableContext}
-              />
-              {tableError && <p className={styles.error}>{tableError}</p>}
-              {hasTableContext && (
-                <p className={styles.infoText}>
-                  {t('table_from_qr', 'Table number set from QR code scan')}
-                </p>
-              )}
-            </div>
+            <h3 className={styles.sectionTitle}>
+              <Utensils size={20} />
+              {t('select_your_table', 'Select your Table')}
+            </h3>
+
+            <TableSelector
+              selectedTable={tableNum}
+              onTableSelect={handleTableSelect}
+              disabled={hasTableContext}
+            />
+
+            {tableError && <p className={styles.error}>{tableError}</p>}
+            {hasTableContext && (
+              <p className={styles.infoText}>
+                {t('table_from_qr', 'Table number set from QR code scan')}
+              </p>
+            )}
           </div>
         )}
 
@@ -227,7 +309,54 @@ export default function OrderTypePage() {
               {t('delivery_address', 'Delivery Address')}
             </h3>
 
-            <div className={styles.addressForm}>
+            {/* Saved Addresses Section (for logged-in users) */}
+            {isLoggedIn && !loadingAddresses && savedAddresses.length > 0 && (
+              <div className={styles.savedAddressesSection}>
+                <h4 className={styles.savedAddressesTitle}>
+                  {t('saved_addresses', 'Your Saved Addresses')}
+                </h4>
+                <div className={styles.savedAddressesList}>
+                  {savedAddresses.map((address) => (
+                    <button
+                      key={address.id}
+                      className={`${styles.savedAddressCard} ${
+                        selectedAddressId === address.id ? styles.selected : ''
+                      }`}
+                      onClick={() => handleSelectSavedAddress(address)}
+                      type="button"
+                    >
+                      <div className={styles.addressContent}>
+                        <p className={styles.addressLabel}>{address.label}</p>
+                        <p className={styles.addressDetails}>
+                          {address.addressLine1}, {address.postalCode} {address.city}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {!showNewAddressForm && (
+                  <button
+                    className={styles.addNewAddressBtn}
+                    onClick={() => {
+                      setShowNewAddressForm(true);
+                      setSelectedAddressId(null);
+                      setStreet('');
+                      setCity('');
+                      setPostalCode('');
+                      setCountry('Switzerland');
+                      setAdditionalInfo('');
+                    }}
+                    type="button"
+                  >
+                    {t('add_new_address', 'Add New Address')}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Address Form */}
+            {showNewAddressForm && (
+              <div className={styles.addressForm}>
               <div className={styles.inputGroup}>
                 <label htmlFor="street" className={styles.label}>
                   {t('street_address', 'Street Address')}
@@ -315,7 +444,23 @@ export default function OrderTypePage() {
               </div>
 
               {addressError && <p className={styles.error}>{addressError}</p>}
+
+              {/* Save Address Checkbox - only for logged-in users */}
+              {isLoggedIn && (
+                <div className={styles.checkboxGroup}>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={saveThisAddress}
+                      onChange={(e) => setSaveThisAddress(e.target.checked)}
+                      className={styles.checkbox}
+                    />
+                    <span>{t('save_this_address', 'Save this address for future orders')}</span>
+                  </label>
+                </div>
+              )}
             </div>
+            )}
           </div>
         )}
 
@@ -324,16 +469,17 @@ export default function OrderTypePage() {
           <button
             onClick={() => router.back()}
             className={styles.backButton}
+            disabled={savingAddress}
           >
             {t('back', 'Back')}
           </button>
           <button
             onClick={handleContinue}
-            disabled={!selectedType}
+            disabled={!selectedType || savingAddress}
             className={styles.continueButton}
           >
-            {t('continue', 'Continue')}
-            <ChevronRight size={20} />
+            {savingAddress ? t('saving', 'Saving...') : t('continue', 'Continue')}
+            {!savingAddress && <ChevronRight size={20} />}
           </button>
         </div>
       </div>

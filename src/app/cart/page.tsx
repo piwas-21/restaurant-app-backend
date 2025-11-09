@@ -1,40 +1,37 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/components/cart/CartContext';
+import { useTableContext } from '@/contexts/TableContext';
 import styles from '../styles/CartPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Plus, Minus, ShoppingCart, Tag, Loader2 } from 'lucide-react';
 import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
-import { adminTaxConfigurationService } from '@/services/adminTaxConfigurationService';
-import type { TaxConfiguration } from '@/services/adminTaxConfigurationService';
 
 export default function CartPage() {
+  const router = useRouter();
   const { state, removeItem, updateItem, applyPromoCode, removePromoCode, getTotal, getItemCount } = useCart();
+  const { hasTableContext } = useTableContext();
   const { t } = useTranslation();
   const [promoCode, setPromoCode] = useState('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [editingInstructions, setEditingInstructions] = useState<string | null>(null);
   const [instructionsValue, setInstructionsValue] = useState('');
-  const [taxConfig, setTaxConfig] = useState<TaxConfiguration | null>(null);
 
   // Check if customer has active discount
   const customerHasDiscount = hasActiveDiscount(state.basket?.customerDiscount || 0);
 
-  // Fetch active tax configuration
-  useEffect(() => {
-    const fetchTaxConfig = async () => {
-      try {
-        const config = await adminTaxConfigurationService.getActiveTaxConfiguration();
-        setTaxConfig(config);
-      } catch {
-        // Silently fail if tax config can't be fetched
-      }
-    };
-    fetchTaxConfig();
-  }, []);
+  const handleCheckout = () => {
+    // If user scanned QR code, skip order-type and go directly to customer-info
+    if (hasTableContext) {
+      router.push('/checkout/customer-info');
+    } else {
+      router.push('/checkout/order-type');
+    }
+  };
 
   const handleRemoveItem = async (basketItemId: string | undefined) => {
     if (!basketItemId) return;
@@ -379,13 +376,6 @@ export default function CartPage() {
               </div>
             )}
 
-            {state.basket && state.basket.tax > 0 && (
-              <div className={styles.priceRow}>
-                <span>{taxConfig?.name || t('tax', 'Tax')}:</span>
-                <span>CHF {state.basket.tax.toFixed(2)}</span>
-              </div>
-            )}
-
             <div className={styles.totalRow}>
               <span>{t('total', 'Total')}:</span>
               <span className={styles.totalAmount}>
@@ -395,9 +385,9 @@ export default function CartPage() {
           </div>
 
           {/* Checkout Button */}
-          <Link href="/checkout/order-type" className={styles.checkoutButton}>
+          <button onClick={handleCheckout} className={styles.checkoutButton}>
             {t('proceed_to_checkout', 'Proceed to Checkout')} ({getItemCount()} {t('items', 'items')})
-          </Link>
+          </button>
         </div>
       </div>
     </main>
