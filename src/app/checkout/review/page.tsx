@@ -57,12 +57,16 @@ export default function ReviewPage() {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; orderNumber: string; customerEmail: string } | null>(null);
 
-  // Check if user is logged in based on session
+  // Check if user is logged in based on auth token
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
-    // Check if user has an active session
-    setIsLoggedIn(!!sessionId);
-  }, [sessionId]);
+    // Check if user has an authentication token (logged in)
+    // Note: sessionId exists for both guests and logged-in users
+    if (typeof window !== 'undefined') {
+      const authToken = localStorage.getItem('auth_token');
+      setIsLoggedIn(!!authToken);
+    }
+  }, []);
 
   // Auto-show modal when order is confirmed
   useEffect(() => {
