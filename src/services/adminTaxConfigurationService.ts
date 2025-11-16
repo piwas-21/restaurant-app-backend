@@ -68,10 +68,12 @@ export const adminTaxConfigurationService = {
 
   /**
    * Get active tax configuration
+   * This endpoint is public - does NOT require authentication
    */
   async getActiveTaxConfiguration(): Promise<TaxConfiguration | null> {
     const response = await apiClient.get<ApiResponse<TaxConfiguration | null>>(
-      ENDPOINTS.TAX_CONFIGURATION_ACTIVE
+      ENDPOINTS.TAX_CONFIGURATION_ACTIVE,
+      { requireAuth: false }  // Explicitly public endpoint
     );
     return response.data;
   },
