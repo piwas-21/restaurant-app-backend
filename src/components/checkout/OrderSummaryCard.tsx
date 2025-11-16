@@ -54,7 +54,7 @@ export default function OrderSummaryCard({
       <div className={styles.summaryRows}>
         <div className={styles.summaryRow}>
           <span>{t('subtotal', 'Subtotal')}</span>
-          <span>{formatPrice(basket?.subTotal || 0)}</span>
+          <span>{formatPrice((basket?.subTotal || 0) - taxAmount)}</span>
         </div>
 
         {(basket?.discount ?? 0) > 0 && (
