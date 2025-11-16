@@ -103,22 +103,24 @@ export default function ReviewPage() {
     const fetchTaxConfig = async () => {
       if (!checkoutState.orderType) return;
 
+      // Always use tax amount from backend API response (backend extracts tax from subtotal)
+      // SubTotal = ItemsTotal - Tax
+      if (cartState.basket) {
+        setTaxAmount(cartState.basket.tax || 0);
+      } else {
+        setTaxAmount(0);
+      }
+
+      // Try to fetch tax config details for display
+      // If it fails, we can still show the tax amount from basket
       try {
         const config = await adminTaxConfigurationService.getTaxForOrderType(checkoutState.orderType);
         setTaxConfig(config);
-
-        // Use tax amount from backend API response instead of calculating locally
-        // Backend now extracts tax from subtotal: SubTotal = ItemsTotal - Tax
-        if (cartState.basket) {
-          setTaxAmount(cartState.basket.tax || 0);
-        } else {
-          setTaxAmount(0);
-        }
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Failed to fetch tax configuration:', error);
+        console.warn('Failed to fetch tax configuration (non-critical):', error);
+        // Tax config fetch is optional - tax amount from basket is sufficient for display
         setTaxConfig(null);
-        setTaxAmount(0);
       }
     };
     fetchTaxConfig();

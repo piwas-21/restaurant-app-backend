@@ -85,9 +85,11 @@ export default function OrderSummaryCard({
           </div>
         )}
 
-        {taxConfig && taxAmount > 0 && (
+        {taxAmount > 0 && (
           <div className={styles.summaryRow}>
-            <span>{taxConfig.name} ({taxConfig.rate}%)</span>
+            <span>
+              {taxConfig ? `${taxConfig.name} (${taxConfig.rate}%)` : t('tax', 'Tax')}
+            </span>
             <span>{formatPrice(taxAmount)}</span>
           </div>
         )}
