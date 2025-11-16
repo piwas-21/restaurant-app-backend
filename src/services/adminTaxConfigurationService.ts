@@ -124,10 +124,12 @@ export const adminTaxConfigurationService = {
   /**
    * Get applicable tax configuration for a specific order type
    * Uses the backend endpoint to get tax based on order type
+   * This endpoint is public - does NOT require authentication
    */
   async getTaxForOrderType(orderType: OrderType): Promise<TaxConfiguration | null> {
     const response = await apiClient.get<ApiResponse<TaxConfiguration | null>>(
-      ENDPOINTS.TAX_CONFIGURATION_BY_ORDER_TYPE(orderType)
+      ENDPOINTS.TAX_CONFIGURATION_BY_ORDER_TYPE(orderType),
+      { requireAuth: false }  // Explicitly public endpoint
     );
     return response.data;
   },
