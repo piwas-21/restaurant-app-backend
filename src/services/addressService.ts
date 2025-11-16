@@ -94,7 +94,7 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
   } catch (error) {
     // Don't log auth errors - they're expected for non-authenticated users during checkout
     // Only log unexpected errors
-    if (error instanceof Error && !error.message.toLowerCase().includes('authenticated')) {
+    if (error instanceof Error && !error.message.toLowerCase().includes('auth')) {
       // eslint-disable-next-line no-console
       console.error('Error fetching addresses:', error);
     }
