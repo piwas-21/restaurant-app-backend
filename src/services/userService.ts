@@ -29,8 +29,12 @@ export async function getCurrentUser(): Promise<UserDto> {
 
     return json.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error fetching user profile:', error);
+    // Don't log auth errors - they're expected for non-authenticated users during checkout
+    // Only log unexpected errors
+    if (error instanceof Error && !error.message.includes('Authentication')) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching user profile:', error);
+    }
     throw error;
   }
 }

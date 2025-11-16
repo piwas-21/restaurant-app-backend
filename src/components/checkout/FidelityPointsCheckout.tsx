@@ -44,8 +44,8 @@ export default function FidelityPointsCheckout({
       setMaxRedeemablePoints(maxPoints);
 
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error loading fidelity points:', err);
+      // Silently handle errors (e.g., non-authenticated users)
+      // Don't log auth errors to avoid console noise during checkout for non-logged-in users
     } finally {
       setLoading(false);
     }

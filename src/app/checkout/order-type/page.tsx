@@ -71,6 +71,8 @@ export default function OrderTypePage() {
         }
       } catch (error) {
         // User is not logged in or error fetching addresses
+        // Non-authenticated users can still proceed with checkout by entering address manually
+        // Don't log the error to avoid console noise for expected auth failures
         setIsLoggedIn(false);
         setSavedAddresses([]);
         setShowNewAddressForm(true);

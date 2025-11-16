@@ -25,13 +25,23 @@ const FIDELITY_ENDPOINTS = {
 export const fidelityPointsService = {
   /**
    * Get user's current fidelity points balance
+   * For non-authenticated users, this will throw an error (expected during checkout)
    */
   async getBalance(): Promise<FidelityPointBalance> {
-    const response = await apiClient.get<ApiResponse<FidelityPointBalance>>(
-      FIDELITY_ENDPOINTS.BALANCE,
-      { requireAuth: true }
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get<ApiResponse<FidelityPointBalance>>(
+        FIDELITY_ENDPOINTS.BALANCE,
+        { requireAuth: true }
+      );
+      return response.data;
+    } catch (error) {
+      // Don't log auth errors - they're expected for non-authenticated users during checkout
+      if (error instanceof Error && !error.message.includes('Authentication')) {
+        // eslint-disable-next-line no-console
+        console.error('Error loading fidelity points balance:', error);
+      }
+      throw error;
+    }
   },
 
   /**
@@ -58,14 +68,23 @@ export const fidelityPointsService = {
    * @returns Discount amount in currency
    */
   async calculateDiscount(points: number): Promise<number> {
-    const queryParams = new URLSearchParams({
-      points: points.toString(),
-    });
-    const response = await apiClient.get<ApiResponse<number>>(
-      `${FIDELITY_ENDPOINTS.CALCULATE_DISCOUNT}?${queryParams.toString()}`,
-      { requireAuth: true }
-    );
-    return response.data;
+    try {
+      const queryParams = new URLSearchParams({
+        points: points.toString(),
+      });
+      const response = await apiClient.get<ApiResponse<number>>(
+        `${FIDELITY_ENDPOINTS.CALCULATE_DISCOUNT}?${queryParams.toString()}`,
+        { requireAuth: true }
+      );
+      return response.data;
+    } catch (error) {
+      // Don't log auth errors
+      if (error instanceof Error && !error.message.includes('Authentication')) {
+        // eslint-disable-next-line no-console
+        console.error('Error calculating fidelity discount:', error);
+      }
+      throw error;
+    }
   },
 
   /**

@@ -92,8 +92,12 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
 
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error fetching addresses:', error);
+    // Don't log auth errors - they're expected for non-authenticated users during checkout
+    // Only log unexpected errors
+    if (error instanceof Error && !error.message.includes('Authentication')) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching addresses:', error);
+    }
     throw error;
   }
 }
