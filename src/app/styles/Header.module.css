@@ -178,6 +178,86 @@
   .hamburgerMenu {
     display: block;
   }
+
+  .adminMainContent {
+    margin-left: 0;
+  }
+
+  .adminSidebarToggleFloating {
+    display: flex !important;
+  }
+}
+
+/* Admin main content wrapper */
+.adminMainContent {
+  margin-left: 0;
+  transition: margin-left 0.3s ease-in-out;
+  position: relative;
+}
+
+/* Floating admin sidebar toggle button */
+.adminSidebarToggleFloating {
+  display: none;
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: var(--primary-color-dark, #343a40);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 1rem;
+  margin: 0;
+  transition: all 0.3s ease;
+  z-index: 998;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 50px;
+  width: 50px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+}
+
+.adminSidebarToggleFloating:hover {
+  background-color: var(--primary-color, #1f3a3a);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.adminSidebarToggleFloating:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.adminSidebarToggleFloating svg {
+  display: block;
+}
+
+[data-theme="dark"] .adminSidebarToggleFloating {
+  background-color: #1f1f1f;
+}
+
+[data-theme="dark"] .adminSidebarToggleFloating:hover {
+  background-color: #2a2a2a;
+}
+
+/* Admin sidebar backdrop for mobile */
+.adminSidebarBackdrop {
+  display: none;
+  position: fixed;
+  top: 80px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.adminSidebarBackdrop.visible {
+  display: block;
+  opacity: 1;
 }
 
 /* Desktop specific styles */
@@ -202,5 +282,20 @@
     display: flex; /* For desktop, arrange them in a row */
     align-items: center;
     gap: 0.5rem; /* Adjust gap for desktop view */
+  }
+
+  .adminSidebarToggleFloating {
+    display: none !important;
+  }
+
+  .adminMainContent {
+    margin-left: 0;
+  }
+}
+
+/* Ensure no margin on mobile */
+@media (max-width: 768px) {
+  .adminMainContent {
+    margin-left: 0 !important;
   }
 }

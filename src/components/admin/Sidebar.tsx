@@ -7,7 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3, DollarSign } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
-const Sidebar = () => {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
   const { t, i18n } = useTranslation();
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
@@ -102,7 +107,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : ''}`}>
       <div className={styles.sidebarTitle} suppressHydrationWarning>
         {isClient ? t('admin_dashboard_title') : 'Admin Dashboard'}
       </div>
@@ -120,6 +125,7 @@ const Sidebar = () => {
                 <Link
                   href={item.href}
                   className={pathname.startsWith(item.href) ? styles.activeLink : ''}
+                  onClick={onClose}
                 >
                   <Icon size={20} strokeWidth={2} />
                   <span suppressHydrationWarning>{label}</span>

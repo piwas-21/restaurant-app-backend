@@ -17,7 +17,7 @@ import FooterCookieLink from "@/components/FooterCookieLink";
 import UserMenu from "@/components/UserMenu";
 import { useAuth } from "@/components/AuthContext";
 import Sidebar from "@/components/admin/Sidebar";
-import { Home, UtensilsCrossed, CalendarCheck, ShoppingCart, LayoutDashboard, Menu, X } from "lucide-react";
+import { Home, UtensilsCrossed, CalendarCheck, ShoppingCart, LayoutDashboard, Menu, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCart } from "@/components/cart/CartContext";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -33,6 +33,7 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
   const isAdminPage = pathname.startsWith('/admin');
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [adminSidebarOpen, setAdminSidebarOpen] = useState(false);
   const headerHeight = "80px";
   const sidebarWidth = "250px";
 
@@ -50,6 +51,8 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
     : "/rumi_logo_transparent.png";
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
   const closeMobileMenu = () => setMobileMenuOpen(false);
+  const toggleAdminSidebar = () => setAdminSidebarOpen(!adminSidebarOpen);
+  const closeAdminSidebar = () => setAdminSidebarOpen(false);
 
   const headerStyles: CSSProperties = {
     padding: "0 1rem",
@@ -133,8 +136,36 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {isAdminPage && <Sidebar />}
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', marginLeft: isAdminPage ? sidebarWidth : "0" }}>
+      {isAdminPage && (
+        <>
+          <Sidebar isOpen={adminSidebarOpen} onClose={closeAdminSidebar} />
+          {adminSidebarOpen && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                zIndex: 999,
+                display: 'none'
+              }}
+              className={navStyles.adminSidebarBackdrop}
+              onClick={closeAdminSidebar}
+              aria-hidden="true"
+            />
+          )}
+        </>
+      )}
+      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }} className={isAdminPage ? navStyles.adminMainContent : ''}>
+        {isAdminPage && (
+          <button
+            className={navStyles.adminSidebarToggleFloating}
+            onClick={toggleAdminSidebar}
+            aria-label={isClient ? (adminSidebarOpen ? t('close_menu') : t('open_menu')) : "Toggle sidebar"}
+            aria-expanded={adminSidebarOpen}
+          >
+            {adminSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+        )}
         {
           <header style={headerStyles} className={isHomePage && theme !== 'dark' ? 'home-overlay-header' : undefined}>
             <div style={{
@@ -148,9 +179,11 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
               <Link href="/" style={{ textDecoration: "none", color: "var(--primary-color)", display: "flex", alignItems: "center" }} onClick={closeMobileMenu}>
                 <Image src={logoSrc} alt="RUMI Restaurant Logo" width={180} height={90} style={{ marginRight: "10px", objectFit: "contain", maxHeight: `calc(${headerHeight} - 10px)` }} priority />
               </Link>
-              <button className={navStyles.hamburgerMenu} onClick={toggleMobileMenu} aria-label={isClient ? (mobileMenuOpen ? t('close_menu') : t('open_menu')) : "Open menu"} aria-expanded={mobileMenuOpen}>
-                {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
-              </button>
+              {!isAdminPage && (
+                <button className={navStyles.hamburgerMenu} onClick={toggleMobileMenu} aria-label={isClient ? (mobileMenuOpen ? t('close_menu') : t('open_menu')) : "Open menu"} aria-expanded={mobileMenuOpen}>
+                  {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                </button>
+              )}
               {/* Mobile menu backdrop */}
               <div
                 className={`${navStyles.mobileMenuBackdrop} ${mobileMenuOpen ? navStyles.visible : ''}`}

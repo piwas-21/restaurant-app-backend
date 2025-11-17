@@ -10,9 +10,14 @@
   background-color: var(--primary-color-dark, #343a40);
   color: var(--button-text-color, white);
   position: fixed;
-  height: 100%;
+  left: 0;
+  top: 0;
+  height: 100vh;
   overflow-y: auto;
   padding-top: 2rem; /* Align with page content padding */
+  z-index: 1000;
+  transform: translateX(0);
+  transition: transform 0.3s ease-in-out;
 }
 
 .sidebar nav ul {
@@ -894,4 +899,156 @@
 
 [data-theme="dark"] .emptyState {
   color: #aaa;
+}
+
+/* Responsive Admin Layout - Mobile & Tablet */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 250px;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .sidebar.sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .adminMainContent {
+    margin-left: 0;
+  }
+}
+
+/* Backdrop for admin sidebar on mobile */
+.adminSidebarBackdrop {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .adminSidebarBackdrop {
+    display: block !important;
+  }
+}
+
+/* Admin sidebar toggle button styling */
+.adminSidebarToggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 0.5rem;
+  margin-right: 1rem;
+  transition: opacity 0.2s ease;
+}
+
+.adminSidebarToggle:hover {
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .adminSidebarToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Responsive table on mobile */
+@media (max-width: 768px) {
+  .adminTable {
+    min-width: 500px;
+  }
+
+  .adminTable th,
+  .adminTable td {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .pageTitle {
+    font-size: 1.5rem;
+  }
+
+  .adminHeader {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .adminHeader h1 {
+    font-size: 1.5rem;
+  }
+
+  .adminContainer {
+    padding: 1rem;
+  }
+
+  .adminContent {
+    padding: 1rem;
+  }
+
+  .sidebarTitle {
+    font-size: 1.2rem;
+    padding: 1rem 1.5rem 0.75rem;
+  }
+
+  .sidebar nav ul li a {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+/* Responsive design for very small screens */
+@media (max-width: 480px) {
+  .sidebar {
+    width: 85vw;
+    max-width: 250px;
+  }
+
+  .pageTitle {
+    font-size: 1.3rem;
+  }
+
+  .adminTable th,
+  .adminTable td {
+    padding: 0.4rem 0.25rem;
+    font-size: 0.8rem;
+  }
+
+  .adminButton {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
+  }
+
+  .adminContainer {
+    padding: 0.75rem;
+  }
+
+  .pageHeader {
+    padding: 0.75rem;
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
+/* Desktop - sidebar always visible and push content right */
+@media (min-width: 769px) {
+  .sidebar {
+    position: relative;
+    transform: none;
+    height: auto;
+    top: auto;
+    left: auto;
+  }
+
+  .adminMainContent {
+    margin-left: 250px;
+  }
 }
