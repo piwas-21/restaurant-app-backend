@@ -17,6 +17,7 @@ import {
 import TableSelector from '@/components/checkout/TableSelector';
 import { getCurrentUser } from '@/services/userService';
 import { getMyAddresses, createAddress, AddressDto } from '@/services/addressService';
+import { orderTypeConfigurationService } from '@/services/orderTypeConfigurationService';
 import styles from '../../styles/OrderTypePage.module.css';
 
 export default function OrderTypePage() {
@@ -46,6 +47,10 @@ export default function OrderTypePage() {
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
 
+  // Enabled order types state
+  const [enabledOrderTypes, setEnabledOrderTypes] = useState<OrderType[]>([]);
+  const [loadingOrderTypes, setLoadingOrderTypes] = useState(true);
+
   // Check for table context from QR code scan
   useEffect(() => {
     if (hasTableContext && tableContext.tableNumber) {
@@ -56,6 +61,25 @@ export default function OrderTypePage() {
       setTableNumber(tableContext.tableNumber);
     }
   }, [hasTableContext, tableContext, setOrderType, setTableNumber]);
+
+  // Fetch enabled order types on mount
+  useEffect(() => {
+    const fetchEnabledOrderTypes = async () => {
+      try {
+        setLoadingOrderTypes(true);
+        const enabled = await orderTypeConfigurationService.getEnabled();
+        setEnabledOrderTypes(enabled);
+      } catch (error) {
+        console.error('Error fetching enabled order types:', error);
+        // Fallback to all order types if fetch fails
+        setEnabledOrderTypes([OrderType.DineIn, OrderType.Takeaway, OrderType.Delivery]);
+      } finally {
+        setLoadingOrderTypes(false);
+      }
+    };
+
+    fetchEnabledOrderTypes();
+  }, []);
 
   // Fetch saved addresses when delivery is selected and user is logged in
   useEffect(() => {
@@ -257,6 +281,39 @@ export default function OrderTypePage() {
     },
   ];
 
+  // Filter order types to show only enabled ones
+  const availableOrderTypes = orderTypes.filter(ot => enabledOrderTypes.includes(ot.type));
+
+  // Show loading state while fetching order types
+  if (loadingOrderTypes) {
+    return (
+      <main className={styles.container}>
+        <div className={styles.emptyState}>
+          <h1>{t('checkout_title', 'Checkout')}</h1>
+          <p>{t('common.loading', 'Loading...')}</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Show error if no order types are available
+  if (availableOrderTypes.length === 0) {
+    return (
+      <main className={styles.container}>
+        <div className={styles.emptyState}>
+          <h1>{t('checkout_title', 'Checkout')}</h1>
+          <p>{t('no_order_types_available', 'No order types are currently available. Please contact the restaurant.')}</p>
+          <button
+            onClick={() => router.push('/menu')}
+            className={styles.browseButton}
+          >
+            {t('cart_browse_menu_button', 'Browse Menu')}
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className={styles.container}>
       <div className={styles.content}>
@@ -267,7 +324,7 @@ export default function OrderTypePage() {
 
         {/* Order Type Selection */}
         <div className={styles.orderTypes}>
-          {orderTypes.map(({ type, icon: Icon, title, description }) => (
+          {availableOrderTypes.map(({ type, icon: Icon, title, description }) => (
             <button
               key={type}
               className={`${styles.orderTypeCard} ${selectedType === type ? styles.selected : ''}`}

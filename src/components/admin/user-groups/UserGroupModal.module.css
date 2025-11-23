@@ -1,0 +1,45 @@
+.sectionHeader {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.sectionTitle .optionalText {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: normal;
+}
+
+.discountFormContainer {
+  margin-top: 15px;
+  position: relative;
+}
+
+.removeDiscountButton {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.removeDiscountButton:hover {
+  background: #d9363e;
+}

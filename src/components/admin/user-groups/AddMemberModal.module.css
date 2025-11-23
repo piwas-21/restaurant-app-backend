@@ -1,0 +1,66 @@
+.searchContainer {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.searchInput {
+  flex: 1;
+}
+
+.searchButton {
+  width: auto;
+  padding: 0 15px;
+}
+
+.userListContainer {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.loadingContainer {
+  padding: 20px;
+  text-align: center;
+}
+
+.userList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.userListItem {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.userListItem:last-child {
+  border-bottom: none;
+}
+
+.userListItem:hover {
+  background-color: var(--background-color);
+}
+
+.userName {
+  font-weight: bold;
+}
+
+.userEmail {
+  font-size: 0.9em;
+  color: var(--text-color);
+}
+
+.emptyState {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-color);
+}

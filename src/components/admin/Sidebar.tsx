@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3, DollarSign } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3, DollarSign, Settings, UserCog } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 interface SidebarProps {
@@ -42,6 +42,12 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
       icon: Users
     },
     {
+      href: '/admin/user-groups',
+      key: 'admin_user_groups_title',
+      fallback: 'User Groups',
+      icon: UserCog
+    },
+    {
       href: '/admin/category-management',
       key: 'admin_category_management_title',
       icon: FolderTree
@@ -61,6 +67,12 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
       key: 'admin_orders_management',
       fallback: 'Orders Management',
       icon: ClipboardList
+    },
+    {
+      href: '/admin/order-type-management',
+      key: 'order_type_management',
+      fallback: 'Order Type Management',
+      icon: Settings
     },
     {
       href: '/admin/reservations-management',

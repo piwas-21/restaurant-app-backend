@@ -177,3 +177,22 @@
     background-color: #ccc;
   }
 
+  .addButton {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--primary-color, #4a90e2);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .addButton:hover {
+    background: var(--primary-dark, #3a7bc8);
+  }
+

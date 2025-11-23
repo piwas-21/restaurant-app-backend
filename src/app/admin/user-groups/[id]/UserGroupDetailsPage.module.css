@@ -1,0 +1,47 @@
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.groupInfoCard {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: var(--card-background);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.groupInfoCard h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.groupInfoCard p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.groupInfoCard strong {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.section {
+  margin-bottom: 30px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.sectionHeader h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}

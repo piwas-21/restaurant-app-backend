@@ -1,0 +1,22 @@
+.qrModalContent {
+  max-width: 400px;
+  text-align: center;
+}
+
+.qrCodeContainer {
+  margin: 20px auto;
+  padding: 20px;
+  background: white;
+  display: inline-block;
+}
+
+.qrCodeText {
+  margin-bottom: 20px;
+  word-break: break-all;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.centeredButtonGroup {
+  justify-content: center;
+}

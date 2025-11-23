@@ -13,8 +13,10 @@ import CancelOrderDialog from '@/components/cashier/CancelOrderDialog';
 import FocusOrderDialog from '@/components/cashier/FocusOrderDialog';
 import NotificationCenter from '@/components/cashier/NotificationCenter';
 import { OrderType } from '@/types/order';
+import { QRCodeValidationResult } from '@/types/userGroupTypes';
 import styles from '@/app/styles/CashierPage.module.css';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, QrCode } from 'lucide-react';
+import QRScannerDialog from '@/components/cashier/QRScannerDialog';
 
 export default function CashierPage() {
   const { t } = useTranslation();
@@ -45,6 +47,7 @@ export default function CashierPage() {
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showFocusDialog, setShowFocusDialog] = useState(false);
+  const [showQRScannerDialog, setShowQRScannerDialog] = useState(false);
 
   // Dialog feedback messages
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -271,6 +274,16 @@ export default function CashierPage() {
           </div>
 
           <button
+            className={styles.refreshButton}
+            onClick={() => setShowQRScannerDialog(true)}
+            title={t('cashier.scan_qr_code') || 'Scan QR Code'}
+            style={{ marginRight: '10px' }}
+          >
+            <QrCode size={16} />
+            {t('cashier.scan_qr') || 'Scan QR'}
+          </button>
+
+          <button
             className={`${styles.refreshButton} ${isRefreshing ? 'loading' : ''}`}
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -455,6 +468,16 @@ export default function CashierPage() {
         isOpen={showFocusDialog}
         onClose={() => setShowFocusDialog(false)}
         onConfirm={handleToggleFocus}
+      />
+
+      <QRScannerDialog
+        isOpen={showQRScannerDialog}
+        onClose={() => setShowQRScannerDialog(false)}
+        onApplyDiscount={(result: QRCodeValidationResult) => {
+          // In a real implementation, this would apply the discount to the selected order
+          // For now, we just show a success message
+          showSuccess(t('cashier.discount_info_loaded') || 'Discount information loaded');
+        }}
       />
       </div>
     </div>
