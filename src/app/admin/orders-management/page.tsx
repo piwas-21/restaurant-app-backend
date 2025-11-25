@@ -228,7 +228,7 @@ export default function AdminOrdersPage() {
     if (!selectedOrder) return;
 
     const command: UpdateOrderStatusCommand = {
-      status,
+      newStatus: status,
       notes: notes || undefined,
     };
 
@@ -340,7 +340,7 @@ export default function AdminOrdersPage() {
     for (let i = 0; i < selectedOrders.length; i++) {
       const order = selectedOrders[i];
       try {
-        const command: UpdateOrderStatusCommand = { status, notes };
+        const command: UpdateOrderStatusCommand = { newStatus: status, notes };
         await updateOrderStatus(order.id, command);
         successCount++;
       } catch {

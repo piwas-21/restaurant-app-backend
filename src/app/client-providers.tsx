@@ -12,54 +12,57 @@ import { SessionProvider } from "@/contexts/SessionContext";
 import { CheckoutProvider } from "@/contexts/CheckoutContext";
 import { TableContextProvider } from "@/contexts/TableContext";
 import { X } from "lucide-react";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <SessionProvider>
-        <ThemeProvider>
-          <I18nextProvider i18n={i18n}>
-            <CookieConsentProvider>
-              <TableContextProvider>
-                <CartProvider>
-                  <CheckoutProvider>
-                    <SnackbarProvider
-                    maxSnack={3}
-                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                    autoHideDuration={4000}
-                    action={(snackbarKey) => (
-                      <button
-                        onClick={() => closeSnackbar(snackbarKey)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'inherit',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginLeft: '8px',
-                          opacity: 0.8,
-                          transition: 'opacity 0.2s',
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
-                        aria-label="Close notification"
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
+      <AuthProvider>
+        <SessionProvider>
+          <ThemeProvider>
+            <I18nextProvider i18n={i18n}>
+              <CookieConsentProvider>
+                <TableContextProvider>
+                  <CartProvider>
+                    <CheckoutProvider>
+                      <SnackbarProvider
+                      maxSnack={3}
+                      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                      autoHideDuration={4000}
+                      action={(snackbarKey) => (
+                        <button
+                          onClick={() => closeSnackbar(snackbarKey)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'inherit',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginLeft: '8px',
+                            opacity: 0.8,
+                            transition: 'opacity 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                          onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
+                          aria-label="Close notification"
+                        >
+                          <X size={18} strokeWidth={2} />
+                        </button>
+                      )}
                       >
-                        <X size={18} strokeWidth={2} />
-                      </button>
-                    )}
-                    >
-                      {children}
-                    </SnackbarProvider>
-                  </CheckoutProvider>
-                </CartProvider>
-              </TableContextProvider>
-            </CookieConsentProvider>
-          </I18nextProvider>
-        </ThemeProvider>
-      </SessionProvider>
-    </AuthProvider>
+                        {children}
+                      </SnackbarProvider>
+                    </CheckoutProvider>
+                  </CartProvider>
+                </TableContextProvider>
+              </CookieConsentProvider>
+            </I18nextProvider>
+          </ThemeProvider>
+        </SessionProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }

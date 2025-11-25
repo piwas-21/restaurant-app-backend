@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { login as loginUser } from '@/authService';
 import { useAuth } from '@/components/AuthContext';
+import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -103,6 +104,7 @@ export default function LoginPage() {
         <p className={styles.switchFormText}>
           {t('dont_have_account_auth', "Don't have an account?")} <Link href="/auth/register">{t('register_here', 'Register here')}</Link>
         </p>
+        <SocialLoginButtons />
       </div>
     </main>
   );

@@ -821,6 +821,135 @@
   }
 }
 
+.confirmButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid #059669;
+  background-color: #059669;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirmButton:hover {
+  background-color: #047857;
+  border-color: #047857;
+}
+
+.confirmButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .confirmButton {
+    background-color: #059669;
+    border-color: #059669;
+  }
+
+  .confirmButton:hover {
+    background-color: #047857;
+    border-color: #047857;
+  }
+}
+
+.confirmDelayButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid #2563eb;
+  background-color: var(--background-color, white);
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirmDelayButton:hover {
+  background-color: #2563eb;
+  color: white;
+}
+
+.confirmDelayButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .confirmDelayButton {
+    background-color: var(--secondary-color, #2c2c2c);
+    border-color: #2563eb;
+  }
+
+  .confirmDelayButton:hover {
+    background-color: #2563eb;
+    color: white;
+  }
+}
+
+.delayOptions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.delayOption {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #d1d5db);
+  background-color: var(--background-color, white);
+  color: var(--text-color, #374151);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delayOption:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.delayOptionActive {
+  background-color: #2563eb;
+  border-color: #2563eb;
+  color: white;
+}
+
+.delayOptionActive:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+@media (prefers-color-scheme: dark) {
+  .delayOption {
+    background-color: var(--secondary-color, #2c2c2c);
+    border-color: var(--border-color, #444444);
+    color: var(--text-color, #f0f0f0);
+  }
+
+  .delayOption:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+  }
+
+  .delayOptionActive {
+    background-color: #2563eb;
+    border-color: #2563eb;
+    color: white;
+  }
+}
+
+
 .refundButton {
   display: flex;
   align-items: center;
@@ -1281,5 +1410,25 @@
   /* Page breaks */
   .section:nth-child(n+6) {
     page-break-before: auto;
+  }
+}
+
+.successIcon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #059669;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: bold;
+  margin: 0 auto 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .successIcon {
+    background-color: #047857;
   }
 }

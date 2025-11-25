@@ -18,6 +18,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@hookform/resolvers": "^5.2.1",
+    "@react-oauth/google": "^0.12.2",
     "date-fns": "^4.1.0",
     "i18next": "^25.1.2",
     "i18next-browser-languagedetector": "^8.1.0",
@@ -28,11 +29,13 @@
     "notistack": "^3.0.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
+    "react-apple-login": "^1.1.6",
     "react-big-calendar": "^1.19.4",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.62.0",
     "react-hot-toast": "^2.5.2",
     "react-i18next": "^15.5.1",
+    "react-is": "^19.2.0",
     "recharts": "^3.3.0",
     "zod": "^3.25.76"
   },

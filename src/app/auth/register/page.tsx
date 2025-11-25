@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { customerRegistrationSchema } from '@/schemas/auth.schema';
 import { registerCustomer } from '@/authService';
 import { useAuth } from '@/components/AuthContext';
+import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -167,6 +168,7 @@ export default function RegisterPage() {
         <p className={styles.switchFormText}>
           {t('already_have_account', 'Already have an account?')} <Link href="/auth/login">{t('login_button', 'Login')}</Link>
         </p>
+        <SocialLoginButtons />
       </form>
     </div>
   );

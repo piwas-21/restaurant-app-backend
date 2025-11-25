@@ -192,3 +192,49 @@ export async function verifyEmail(formData: VerifyEmailCommand) {
 
   return response.json();
 }
+
+export async function googleLogin(idToken: string) {
+  const response = await fetch(`${AUTH_API_URL}/google-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ idToken }),
+  });
+
+  const data = await response.json();
+  if (response.ok && data?.success) {
+    try {
+      if (data.data?.token) localStorage.setItem('auth_token', data.data.token);
+      if (data.data?.refreshToken) localStorage.setItem('refresh_token', data.data.refreshToken);
+    } catch (e) {
+      console.warn('Could not persist tokens to localStorage', e);
+    }
+  }
+  return data;
+}
+
+export async function appleLogin(idToken: string, user?: { firstName: string; lastName: string }) {
+  const response = await fetch(`${AUTH_API_URL}/apple-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+        idToken,
+        firstName: user?.firstName,
+        lastName: user?.lastName
+    }),
+  });
+
+  const data = await response.json();
+  if (response.ok && data?.success) {
+    try {
+      if (data.data?.token) localStorage.setItem('auth_token', data.data.token);
+      if (data.data?.refreshToken) localStorage.setItem('refresh_token', data.data.refreshToken);
+    } catch (e) {
+      console.warn('Could not persist tokens to localStorage', e);
+    }
+  }
+  return data;
+}

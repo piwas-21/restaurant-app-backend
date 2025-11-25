@@ -37,7 +37,8 @@ export type OrderStatus =
   | 'InTransit'
   | 'Delivered'
   | 'Completed'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'PendingCustomerApproval';
 
 /**
  * Payment status values
@@ -227,8 +228,9 @@ export interface OrderDto {
  * Update order status command
  */
 export interface UpdateOrderStatusCommand {
-  status: OrderStatus;
+  newStatus: OrderStatus;
   notes?: string;
+  estimatedPreparationMinutes?: number;
 }
 
 /**

@@ -1,0 +1,66 @@
+.container {
+  margin-top: 1.5rem;
+  width: 100%;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.divider span {
+  padding: 0 0.75rem;
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.googleWrapper {
+    display: flex;
+    justify-content: center;
+}
+
+.appleWrapper {
+    width: 100%;
+}
+
+.appleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  background-color: #000;
+  color: #fff;
+  border: 1px solid #000;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  height: 40px; /* Match Google button height roughly */
+  gap: 8px;
+}
+
+.appleButton:hover {
+  background-color: #333;
+  border-color: #333;
+}
+
+.appleIcon {
+    margin-bottom: 2px;
+}

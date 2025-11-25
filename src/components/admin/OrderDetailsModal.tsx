@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OrderDto } from '@/types/order';
-import { cancelOrder, refundPayment } from '@/services/orderService';
+import { cancelOrder, refundPayment, updateOrderStatus } from '@/services/orderService';
 import { exportOrderToCSV } from '@/utils/exportUtils';
 import { exportOrderToPDF } from '@/utils/pdfExportUtils';
 import { getStatusBadgeClasses, getPaymentBadgeClasses, getFocusBadgeClass } from '@/utils/orderStatusStyles';
@@ -50,9 +50,54 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
   const [isRefunding, setIsRefunding] = useState(false);
   const [error, setError] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showConfirmDelayModal, setShowConfirmDelayModal] = useState(false);
+  const [delayMinutes, setDelayMinutes] = useState<number>(15);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCancelSuccessModal, setShowCancelSuccessModal] = useState(false);
 
   const canCancelOrder = () => {
     return order.status !== 'Completed' && order.status !== 'Delivered' && order.status !== 'Cancelled';
+  };
+
+  const canConfirmOrder = () => {
+    return order.status === 'Pending';
+  };
+
+  const handleConfirmOrder = async (withDelay: boolean = false) => {
+    try {
+      setIsConfirming(true);
+      setError('');
+      
+      const prepMinutes = withDelay ? delayMinutes : 15; // Default 15 mins if no delay specified
+      
+      const updatedOrder = await updateOrderStatus(order.id, {
+        newStatus: withDelay ? 'PendingCustomerApproval' : 'Confirmed',
+        estimatedPreparationMinutes: prepMinutes,
+        notes: withDelay ? `Confirmed with ${prepMinutes} min delay` : 'Order confirmed'
+      });
+      
+      if (onOrderUpdated) {
+        onOrderUpdated(updatedOrder);
+      }
+      
+      setShowConfirmDelayModal(false);
+      setShowSuccessModal(true);
+    } catch (err) {
+      setError(t('failed_to_confirm_order', 'Failed to confirm order. Please try again.'));
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    onClose();
+  };
+
+  const handleCancelSuccessClose = () => {
+    setShowCancelSuccessModal(false);
+    onClose();
   };
 
   const handleCancelOrder = async () => {
@@ -69,8 +114,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
         onOrderUpdated(updatedOrder);
       }
       setShowCancelModal(false);
-      alert(t('order_cancelled_successfully', 'Order cancelled successfully'));
-      onClose();
+      setShowCancelSuccessModal(true);
     } catch (err) {
       setError(t('failed_to_cancel_order', 'Failed to cancel order. Please try again.'));
     } finally {
@@ -520,6 +564,34 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
         {/* Footer */}
         <div className={styles.footer}>
           <div className={styles.footerActions}>
+            {canConfirmOrder() && (
+              <>
+                <button
+                  onClick={() => handleConfirmOrder(false)}
+                  className={styles.confirmButton}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? (
+                    <>
+                      <Loader2 size={18} className={styles.spinner} />
+                      {t('confirming', 'Confirming...')}
+                    </>
+                  ) : (
+                    <>
+                      ✓ {t('confirm_order', 'Confirm Order')}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowConfirmDelayModal(true)}
+                  className={styles.confirmDelayButton}
+                  disabled={isConfirming}
+                >
+                  <Clock size={18} />
+                  {t('confirm_with_delay', 'Confirm with Delay')}
+                </button>
+              </>
+            )}
             {canCancelOrder() && (
               <button
                 onClick={() => setShowCancelModal(true)}
@@ -593,6 +665,101 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                     <>
                       <Ban size={18} />
                       {t('cancel_order', 'Cancel Order')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirm with Delay Modal */}
+        {showConfirmDelayModal && (
+          <div className={styles.confirmModal}>
+            <div className={styles.confirmModalContent}>
+              <h3 className={styles.confirmModalTitle}>
+                <Clock size={20} />
+                {t('confirm_with_delay', 'Confirm with Delay')}
+              </h3>
+              <p className={styles.confirmModalMessage}>
+                {t('confirm_delay_message', 'Select the estimated preparation time for this order.')}
+              </p>
+              <div className={styles.formGroup}>
+                <label htmlFor="delayMinutes">{t('preparation_time', 'Preparation Time')} *</label>
+                <div className={styles.delayOptions}>
+                  <button
+                    type="button"
+                    onClick={() => setDelayMinutes(5)}
+                    className={`${styles.delayOption} ${delayMinutes === 5 ? styles.delayOptionActive : ''}`}
+                  >
+                    5 {t('minutes', 'min')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDelayMinutes(10)}
+                    className={`${styles.delayOption} ${delayMinutes === 10 ? styles.delayOptionActive : ''}`}
+                  >
+                    10 {t('minutes', 'min')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDelayMinutes(15)}
+                    className={`${styles.delayOption} ${delayMinutes === 15 ? styles.delayOptionActive : ''}`}
+                  >
+                    15 {t('minutes', 'min')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDelayMinutes(20)}
+                    className={`${styles.delayOption} ${delayMinutes === 20 ? styles.delayOptionActive : ''}`}
+                  >
+                    20 {t('minutes', 'min')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDelayMinutes(30)}
+                    className={`${styles.delayOption} ${delayMinutes === 30 ? styles.delayOptionActive : ''}`}
+                  >
+                    30 {t('minutes', 'min')}
+                  </button>
+                </div>
+                <input
+                  id="delayMinutes"
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={delayMinutes}
+                  onChange={(e) => setDelayMinutes(parseInt(e.target.value) || 15)}
+                  className={styles.input}
+                  placeholder={t('custom_minutes', 'Custom minutes')}
+                />
+              </div>
+              {error && <div className={styles.errorMessage}>{error}</div>}
+              <div className={styles.confirmModalActions}>
+                <button
+                  onClick={() => {
+                    setShowConfirmDelayModal(false);
+                    setDelayMinutes(15);
+                    setError('');
+                  }}
+                  className={styles.cancelButton}
+                  disabled={isConfirming}
+                >
+                  {t('cancel', 'Cancel')}
+                </button>
+                <button
+                  onClick={() => handleConfirmOrder(true)}
+                  className={styles.confirmButton}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? (
+                    <>
+                      <Loader2 size={18} className={styles.spinner} />
+                      {t('confirming', 'Confirming...')}
+                    </>
+                  ) : (
+                    <>
+                      ✓ {t('confirm_order', 'Confirm Order')}
                     </>
                   )}
                 </button>
@@ -683,6 +850,51 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
                       {t('refund_payment', 'Refund Payment')}
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className={styles.confirmModal}>
+            <div className={styles.confirmModalContent}>
+              <div className={styles.successIcon}>✓</div>
+              <h3 className={styles.confirmModalTitle}>
+                {t('order_confirmed_successfully', 'Order confirmed successfully')}
+              </h3>
+              <p className={styles.confirmModalMessage}>
+                {t('order_confirmed_message', 'The customer will receive a confirmation email shortly.')}
+              </p>
+              <div className={styles.confirmModalActions}>
+                <button
+                  onClick={handleSuccessClose}
+                  className={styles.confirmButton}
+                >
+                  {t('close', 'Close')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Success Modal */}
+        {showCancelSuccessModal && (
+          <div className={styles.confirmModal}>
+            <div className={styles.confirmModalContent}>
+              <div className={styles.successIcon}>✓</div>
+              <h3 className={styles.confirmModalTitle}>
+                {t('order_cancelled_successfully', 'Order cancelled successfully')}
+              </h3>
+              <p className={styles.confirmModalMessage}>
+                {t('order_cancelled_message', 'The order has been cancelled.')}
+              </p>
+              <div className={styles.confirmModalActions}>
+                <button
+                  onClick={handleCancelSuccessClose}
+                  className={styles.confirmButton}
+                >
+                  {t('close', 'Close')}
                 </button>
               </div>
             </div>
