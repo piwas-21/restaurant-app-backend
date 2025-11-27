@@ -90,8 +90,8 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
           <p>
             <strong>{t('ingredients')}:</strong> {getLocalizedIngredients() || <em>{t('no_ingredients_added')}</em>}
           </p>
-          <div style={{ marginBottom: '1rem', justifyItems: 'flex-start', display: 'inline-flex', marginTop: '1rem' }}>
-            <p style={{ marginRight: '1rem' }}><strong>{t('allergens')}:</strong></p>
+          <div className={detailsStyles.inlineBadges} style={{ marginBottom: '1rem', marginTop: '1rem', alignItems: 'flex-start' }}>
+            <span style={{ marginTop: '0.25rem' }}><strong>{t('allergens')}:</strong></span>
             <AllergenDisplay
               allergens={product.allergens}
               id="product-details-allergens"

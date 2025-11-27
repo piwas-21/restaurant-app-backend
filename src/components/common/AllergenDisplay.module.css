@@ -18,10 +18,10 @@
 
 .allergensContent {
   display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
+  flex-wrap: wrap; /* Allow wrapping to new lines */
+  justify-content: flex-start; /* Align to the left */
   gap: 0.5rem;
-  overflow: hidden;
+  max-width: 100%; /* Respect container width */
 }
 
 .allergenTag {

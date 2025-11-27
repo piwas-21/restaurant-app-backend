@@ -67,7 +67,9 @@ const ProductDetailsPage = () => {
             <VariationsTable variations={product.variations} productId={product.id} onUpdated={fetchProductData} product={product} />
             <SuggestedSideItemsTable suggestedSideItems={product.suggestedSideItems} productId={product.id} onUpdated={fetchProductData} product={product} />
           </div>
-          <ImageGallery images={product.images} productName={product.name} onImageUpdate={fetchProductData} />
+          <div className={detailsStyles.imageGalleryContainer}>
+            <ImageGallery images={product.images} productName={product.name} onImageUpdate={fetchProductData} />
+          </div>
         </div>
       </div>
       <EditProductModal

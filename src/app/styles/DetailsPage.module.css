@@ -1,9 +1,16 @@
 /* styles/DetailsPage.module.css */
 
+/* Override adminContent padding when it contains detailsContainer */
 .detailsContainer {
+  margin: -2rem; /* Counteract the adminContent padding */
+  padding: 2rem; /* Add it back to the container itself */
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent children from overflowing */
 }
 
 .mainContent {
@@ -24,6 +31,10 @@
   border-radius: 8px;
   background-color: var(--card-background);
   box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  width: 100%;
+  max-width: 720px; /* Keep content contained but responsive */
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent content overflow */
 }
 
 .infoSection h2,
@@ -69,10 +80,6 @@
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.inlineBadges span {
-  opacity: 0.5;
 }
 
 /* Search results wrap for side item picker */
@@ -177,8 +184,6 @@
   padding: 0 0.5rem;
 }
 
-
-
 .imageActions .formGroup {
   margin-bottom: 0;
 }
@@ -204,7 +209,6 @@
   border-color: var(--border-color-dark, #555);
 }
 
-
 /* Variations table specific styling */
 .variationsTable {
   margin-top: 1rem;
@@ -213,7 +217,7 @@
   border-spacing: 0;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  overflow: hidden; /* Ensures border-radius is respected by children */
+  overflow: hidden;
 }
 
 .variationsTable th, .variationsTable td {
@@ -236,173 +240,126 @@
 }
 
 /* ===========================================
-   RESPONSIVE DESIGN - Mobile First Approach
+   RESPONSIVE DESIGN
    =========================================== */
 
-/* Extra Small Devices (phones, less than 576px) - Default styles above */
-.detailsContainer {
-  padding: 0;
-}
+/* Mobile Devices (less than 768px) */
+@media (max-width: 767px) {
+  .detailsContainer {
+    gap: 1rem;
+  }
 
-.infoSection {
-  padding: 1rem;
-  margin: 0;
-}
+  .mainContent {
+    gap: 1rem;
+  }
 
-.infoSection h2,
-.infoSection h3 {
-  font-size: 1.1rem;
-  margin-bottom: 0.75rem;
-}
-
-.headerRow {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.actionRow {
-  width: 100%;
-  justify-content: flex-start;
-}
-
-.formGrid {
-  gap: 0.75rem;
-}
-
-/* Table responsive - horizontal scroll on mobile */
-.variationsTable {
-  display: block;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.variationsTable thead,
-.variationsTable tbody,
-.variationsTable th,
-.variationsTable td,
-.variationsTable tr {
-  display: block;
-}
-
-.variationsTable thead tr {
-  position: absolute;
-  top: -9999px;
-  left: -9999px;
-}
-
-.variationsTable tr {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  margin-bottom: 0.75rem;
-  padding: 0.5rem;
-}
-
-.variationsTable td {
-  border: none;
-  position: relative;
-  padding-left: 40%;
-  text-align: right;
-}
-
-.variationsTable td:before {
-  content: attr(data-label);
-  position: absolute;
-  left: 1rem;
-  width: calc(40% - 2rem);
-  padding-right: 0.5rem;
-  white-space: nowrap;
-  text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary, #666);
-}
-
-[data-theme="dark"] .variationsTable td:before {
-  color: var(--text-secondary, #aaa);
-}
-
-/* Image gallery responsive */
-.primaryImage {
-  max-height: 300px;
-}
-
-.thumbnailContainer {
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: 0.5rem;
-}
-
-.thumbnail {
-  height: 60px;
-}
-
-.imageActions {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem;
-}
-
-.imageActionGroup {
-  width: 100%;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.sortOrderInput {
-  width: 100%;
-}
-
-/* Small Devices (landscape phones, 576px and up) */
-@media (min-width: 576px) {
   .infoSection {
-    padding: 1.25rem;
+    padding: 1rem;
   }
 
   .infoSection h2,
   .infoSection h3 {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
   }
 
-  .primaryImage {
-    max-height: 350px;
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
   }
 
-  .thumbnailContainer {
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  .actionRow {
+    width: 100%;
   }
 
-  .thumbnail {
-    height: 70px;
+  .formGrid {
+    gap: 0.75rem;
   }
 
-  .imageActionGroup {
-    flex-direction: row;
-    align-items: center;
+  /* Mobile table - card layout */
+  .variationsTable {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: none;
   }
 
-  .sortOrderInput {
-    width: 70px;
+  .variationsTable thead {
+    display: none;
   }
 
-  /* Table - still card style but with better spacing */
+  .variationsTable tbody,
+  .variationsTable tr,
   .variationsTable td {
-    padding-left: 35%;
+    display: block;
+  }
+
+  .variationsTable tr {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .variationsTable td {
+    border: none;
+    position: relative;
+    padding: 0.5rem 0.5rem 0.5rem 40%;
+    text-align: right;
   }
 
   .variationsTable td:before {
-    width: calc(35% - 2rem);
+    content: attr(data-label);
+    position: absolute;
+    left: 0.75rem;
+    width: 35%;
+    padding-right: 0.5rem;
+    white-space: nowrap;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary, #666);
+  }
+
+  [data-theme="dark"] .variationsTable td:before {
+    color: var(--text-secondary, #aaa);
+  }
+
+  .primaryImage {
+    max-height: 300px;
+  }
+
+  .thumbnailContainer {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .thumbnail {
+    height: 60px;
+  }
+
+  .imageActions {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem;
+  }
+
+  .imageActionGroup {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .sortOrderInput {
+    width: 100%;
   }
 }
 
-/* Medium Devices (tablets, 768px and up) */
-@media (min-width: 768px) {
+/* Tablets (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
   .detailsContainer {
     gap: 1.5rem;
-  }
-
-  .infoSection {
-    padding: 1.5rem;
   }
 
   .infoSection h2,
@@ -410,97 +367,34 @@
     font-size: 1.3rem;
   }
 
-  .headerRow {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .actionRow {
-    width: auto;
-  }
-
-  .formGrid {
-    gap: 1rem;
-  }
-
-  /* Better table view for tablets */
-  .variationsTable {
-    display: table;
-    overflow-x: visible;
-  }
-
-  .variationsTable thead,
-  .variationsTable tbody,
-  .variationsTable th,
-  .variationsTable td,
-  .variationsTable tr {
-    display: table-row-group;
-  }
-
-  .variationsTable thead {
-    display: table-header-group;
-  }
-
-  .variationsTable tr {
-    display: table-row;
-    border: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .variationsTable th,
-  .variationsTable td {
-    display: table-cell;
-    padding: 0.8rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .variationsTable td:before {
-    content: none;
-  }
-
-  .variationsTable td {
-    padding-left: 1rem;
-  }
-
   .primaryImage {
     max-height: 400px;
   }
-
-  .thumbnailContainer {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 0.75rem;
-  }
-
-  .thumbnail {
-    height: 80px;
-  }
-
-  .imageActions {
-    flex-direction: row;
-    align-items: center;
-    padding: 1rem;
-  }
-
-  .imageActionGroup {
-    width: auto;
-  }
 }
 
-/* Large Devices (desktops, 992px and up) */
+/* Desktop (992px and up) - Enable sidebar layout */
 @media (min-width: 992px) {
-  .detailsContainer {
-    gap: 2rem;
-  }
-
-  .infoSection h2,
-  .infoSection h3 {
-    font-size: 1.4rem;
-  }
-
   .infoGrid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Sidebar layout for desktop */
+  .detailsContainer {
+    display: grid !important; /* Force grid layout */
+    grid-template-columns: 1fr 350px !important;
+    gap: 2rem !important;
+  }
+
+  .mainContent {
+    grid-column: 1;
+    min-width: 0; /* Prevent grid blowout */
+  }
+
+  .imageGalleryContainer {
+    grid-column: 2;
+    grid-row: 1 / span 10;
+    position: sticky;
+    top: 2rem;
   }
 
   .primaryImage {
@@ -508,25 +402,10 @@
   }
 }
 
-/* Extra Large Devices (large desktops, 1200px and up) */
+/* Large Desktop (1200px and up) - Wider sidebar */
 @media (min-width: 1200px) {
-  /* Layout optimization for large screens */
   .detailsContainer {
-    display: grid;
     grid-template-columns: 1fr 400px;
-    gap: 2rem;
-  }
-
-  .mainContent {
-    grid-column: 1;
-  }
-
-  .imageGalleryContainer {
-    grid-column: 2;
-    grid-row: 1;
-    position: sticky;
-    top: 2rem;
-    align-self: start;
   }
 
   .primaryImage {
@@ -534,7 +413,7 @@
   }
 }
 
-/* Ultra Wide Screens (1600px and up) - Maximum content width */
+/* Ultra Wide (1600px and up) */
 @media (min-width: 1600px) {
   .detailsContainer {
     grid-template-columns: 1fr 450px;
