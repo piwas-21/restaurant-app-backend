@@ -17,7 +17,10 @@ import SuggestedSideItemsTable from '@/components/admin/product-details/Suggeste
 import PageHeader from '@/components/admin/PageHeader';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
-import { deleteProduct } from '@/services/productService';
+import { deleteProduct, updateProduct } from '@/services/productService';
+import MenuScheduleEditor from '@/components/admin/menu-editor/MenuScheduleEditor';
+import MenuSectionEditor from '@/components/admin/menu-editor/MenuSectionEditor';
+
 
 const ProductDetailsPage = () => {
   const { t } = useTranslation();
@@ -64,8 +67,45 @@ const ProductDetailsPage = () => {
             <DetailsEditor product={product} onUpdated={fetchProductData} />
             <CategoriesEditor product={product} onUpdated={fetchProductData} />
             <MultilingualContentEditor product={product} onUpdated={fetchProductData} />
-            <VariationsTable variations={product.variations} productId={product.id} onUpdated={fetchProductData} product={product} />
-            <SuggestedSideItemsTable suggestedSideItems={product.suggestedSideItems} productId={product.id} onUpdated={fetchProductData} product={product} />
+            
+            {/* Menu Bundle Editors - Only show for menu type products */}
+            {product.type === 'menu' && product.menuDefinition && (
+              <>
+                <MenuScheduleEditor
+                  menuDefinition={product.menuDefinition}
+                  onChange={async (menuDefinition) => {
+                    try {
+                      const updatedProduct = { ...product, menuDefinition };
+                      await updateProduct(product.id, updatedProduct);
+                      fetchProductData(); // Refresh to show saved data
+                    } catch (error) {
+                      console.error('Error saving menu definition:', error);
+                    }
+                  }}
+                />
+                <MenuSectionEditor
+                  sections={product.menuDefinition.sections}
+                  onChange={async (sections) => {
+                    try {
+                      const updatedMenuDefinition = { ...product.menuDefinition, sections };
+                      const updatedProduct = { ...product, menuDefinition: updatedMenuDefinition };
+                      await updateProduct(product.id, updatedProduct);
+                      fetchProductData(); // Refresh to show saved data
+                    } catch (error) {
+                      console.error('Error saving sections:', error);
+                    }
+                  }}
+                />
+              </>
+            )}
+            
+            {/* Hide variations and side items for menu type */}
+            {product.type !== 'menu' && (
+              <>
+                <VariationsTable variations={product.variations} productId={product.id} onUpdated={fetchProductData} product={product} />
+                <SuggestedSideItemsTable suggestedSideItems={product.suggestedSideItems} productId={product.id} onUpdated={fetchProductData} product={product} />
+              </>
+            )}
           </div>
           <div className={detailsStyles.imageGalleryContainer}>
             <ImageGallery images={product.images} productName={product.name} onImageUpdate={fetchProductData} />

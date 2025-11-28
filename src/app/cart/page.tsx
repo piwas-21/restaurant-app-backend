@@ -265,6 +265,23 @@ export default function CartPage() {
                     )}
                     </div>
                   )}
+
+                  {/* Child Items for Menu Bundles */}
+                  {item.childItems && item.childItems.length > 0 && (
+                    <div className={styles.childItemsContainer}>
+                      <h4 className={styles.childItemsTitle}>{t('includes', 'Includes')}:</h4>
+                      <ul className={styles.childItemsList}>
+                        {item.childItems.map((childItem, idx) => (
+                          <li key={idx} className={styles.childItem}>
+                            <span className={styles.childItemName}>• {childItem.productName}</span>
+                            {childItem.unitPrice > 0 && (
+                              <span className={styles.childItemPrice}>+CHF {childItem.unitPrice.toFixed(2)}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 {/* Item Controls */}

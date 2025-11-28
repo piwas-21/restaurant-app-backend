@@ -45,6 +45,7 @@ export interface ProductCustomization {
     id: string;
     quantity: number;
   }>;
+  selectedMenuOptions?: SelectedMenuOption[]; // For menu bundle customization
   specialInstructions?: string;
   totalPrice: number;
 }
@@ -82,7 +83,7 @@ export interface MenuItem {
 
 export type ApiCategory = { id: string; name: string };
 
-export type ProductType = 'mainItem' | 'sideItem' | 'beverage' | 'dessert' | 'sauce' | 'addOn';
+export type ProductType = 'mainItem' | 'sideItem' | 'beverage' | 'dessert' | 'sauce' | 'addOn' | 'menu';
 
 /**
  * Kitchen type enum for product kitchen designation
@@ -190,6 +191,7 @@ export interface DetailedProduct {
   variations: DetailedProductVariation[];
   suggestedSideItems: SuggestedSideItem[];
   kitchenType?: KitchenType;
+  menuDefinition?: MenuDefinition; // For menu bundle products
 }
 
 export interface DetailedProductResponse {
@@ -222,4 +224,61 @@ export interface FeaturedSpecialResponse {
   message?: string;
   data: FeaturedSpecial | null;
   errors?: string[];
+}
+
+// ============================================
+// Menu Bundle Interfaces
+// ============================================
+
+/**
+ * Menu bundle definition with sections and scheduling
+ */
+export interface MenuDefinition {
+  id: string;
+  isAlwaysAvailable: boolean;
+  startTime?: string; // HH:mm format
+  endTime?: string; // HH:mm format
+  availableMonday: boolean;
+  availableTuesday: boolean;
+  availableWednesday: boolean;
+  availableThursday: boolean;
+  availableFriday: boolean;
+  availableSaturday: boolean;
+  availableSunday: boolean;
+  sections: MenuSection[];
+}
+
+/**
+ * Section within a menu (e.g., "Choose Drink", "Select Side")
+ */
+export interface MenuSection {
+  id: string;
+  name: string;
+  description?: string;
+  displayOrder: number;
+  isRequired: boolean;
+  minSelection: number;
+  maxSelection: number;
+  items: MenuSectionItem[];
+}
+
+/**
+ * Individual item choice within a menu section
+ */
+export interface MenuSectionItem {
+  id: string;
+  productId: string;
+  productName?: string;
+  additionalPrice: number;
+  displayOrder: number;
+  isDefault: boolean;
+}
+
+/**
+ * Selected menu option by customer
+ */
+export interface SelectedMenuOption {
+  sectionId: string;
+  itemId: string;
+  quantity: number;
 }

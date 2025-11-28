@@ -71,3 +71,13 @@ export const setFeaturedSpecial = async (productId: string) => {
 export const unsetFeaturedSpecial = async () => {
   return await apiClient.delete(`${PRODUCTS_API_URL}/featured-special`);
 };
+
+// Product Search
+export const searchProducts = async (query: string) => {
+  return await apiClient.get(`${PRODUCTS_API_URL}?search=${encodeURIComponent(query)}&pageSize=20`);
+};
+
+// Menu Definition Management
+export const updateMenuDefinition = async (productId: string, menuDefinition: any) => {
+  return await apiClient.put(`${PRODUCTS_API_URL}/${productId}/menu-definition`, menuDefinition);
+};

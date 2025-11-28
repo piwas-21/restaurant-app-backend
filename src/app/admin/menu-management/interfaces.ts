@@ -1,5 +1,7 @@
 // src/interfaces/Product.ts
 
+import { MenuDefinition } from '@/types/menu';
+
 export interface ProductImage {
   id: string;
   url: string;
@@ -63,6 +65,7 @@ export interface ProductDetails {
   variations: Variation[];
   images: ProductImage[];
   suggestedSideItems: SideItem[];
+  menuDefinition?: MenuDefinition; // For menu bundle products
   content?: any; // To match the full product object for the edit modal
 }
 

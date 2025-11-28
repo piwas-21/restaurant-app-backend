@@ -62,6 +62,8 @@ export interface BasketItemDto {
   addedIngredientNames?: string[];
   // Selected side items with quantities
   selectedSideItems?: BasketSideItemDto[];
+  // Child items for menu bundles (hierarchical structure)
+  childItems?: BasketItemDto[];
 }
 
 /**
@@ -107,6 +109,7 @@ export interface AddToBasketDto {
   excludedIngredients?: string[];
   ingredientQuantities?: Record<string, number>;
   selectedSideItems?: Array<{ id: string; quantity: number }>;
+  selectedMenuOptions?: Array<{ sectionId: string; itemId: string; quantity: number }>;
 }
 
 /**

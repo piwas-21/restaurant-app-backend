@@ -7,6 +7,8 @@ import type { MenuItem as MenuItemType, DetailedProduct } from "@/types/menu";
 import { useTranslation } from "react-i18next";
 import { getProductById } from "@/services/menuService";
 import AllergenDisplay from "@/components/common/AllergenDisplay";
+import MenuCustomizationModal from "./MenuCustomizationModal";
+import { addItemToBasket } from "@/services/basketService";
 
 type Props = {
   isOpen: boolean;
@@ -180,6 +182,36 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
   const totalPrice = calculateTotalPrice();
   const hasCustomizations = optionalIngredients.length > 0 || (detailedProduct?.suggestedSideItems && detailedProduct.suggestedSideItems.length > 0);
 
+  // Check if this is a menu bundle product
+  const isMenuProduct = detailedProduct?.type === 'menu' && detailedProduct?.menuDefinition;
+
+  // If it's a menu product, show the MenuCustomizationModal instead
+  if (isMenuProduct && detailedProduct) {
+    return (
+      <MenuCustomizationModal
+        isOpen={isOpen}
+        onClose={onClose}
+        productId={detailedProduct.id}
+        productName={title}
+        basePrice={price}
+        menuDefinition={detailedProduct.menuDefinition!}
+        onAddToBasket={async (selectedOptions, totalPrice) => {
+          try {
+            await addItemToBasket({
+              productId: detailedProduct.id,
+              quantity: 1,
+              selectedMenuOptions: selectedOptions,
+            });
+            onClose();
+          } catch (error) {
+            console.error('Error adding menu to basket:', error);
+          }
+        }}
+      />
+    );
+  }
+
+  // Regular product modal
   return createPortal(
     <div className={styles.productDetailsModal} onClick={onClose}>
       <div className={styles.productDetailsContent} onClick={(e) => e.stopPropagation()}>
