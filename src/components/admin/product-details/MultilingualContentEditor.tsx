@@ -10,9 +10,10 @@ import { ProductDetails } from '@/app/admin/menu-management/interfaces';
 import { buildProductPayload } from './buildProductPayload';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import { getCategories } from '@/services/categoryService';
+import { LANGUAGE_CODES } from '@/config/languageConfig';
 
 interface Category { id: string; name: string; }
-const supportedLanguages = ["en", "tr", "es", "ar", "de", "fr", "it"];
+const supportedLanguages = LANGUAGE_CODES;
 
 interface Props {
   product: ProductDetails;

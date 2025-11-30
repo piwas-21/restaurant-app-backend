@@ -5,18 +5,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Image from 'next/image';
 import styles from "../app/styles/LanguageSwitcher.module.css";
+import { SUPPORTED_LANGUAGES, LanguageCode } from "@/config/languageConfig";
 
-const languages = [
-  { code: "fr", name: "Français", flag: "/flags/fr.svg" },
-  { code: "en", name: "English", flag: "/flags/en.svg" },
-  { code: "it", name: "Italiano", flag: "/flags/it.svg" },
-  { code: "de", name: "Deutsch", flag: "/flags/de.svg" },
-  { code: "ar", name: "العربية", flag: "/flags/ar.svg" },
-  { code: "tr", name: "Türkçe", flag: "/flags/tr.svg" },
-  { code: "es", name: "Español", flag: "/flags/es.svg" },
-] as const;
+const languages = SUPPORTED_LANGUAGES;
 
-export type LanguageCode = typeof languages[number]['code'];
+export type { LanguageCode };
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();

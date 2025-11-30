@@ -40,16 +40,80 @@ const baseProductSchema = z.object({
   suggestedSideItemIds: z.array(z.string()).default([]),
 });
 
-export const createProductSchema = baseProductSchema;
+// Menu Definition Schemas
+const menuSectionItemSchema = z.object({
+  productId: z.string().min(1, 'Product is required'),
+  additionalPrice: z.coerce.number().min(0).default(0),
+  displayOrder: z.coerce.number().int().default(0),
+  isDefault: z.boolean().default(false),
+});
+
+const menuSectionSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Section name is required'),
+  description: z.string().optional(),
+  displayOrder: z.coerce.number().int().default(0),
+  isRequired: z.boolean().default(true),
+  minSelection: z.coerce.number().int().min(0).default(1),
+  maxSelection: z.coerce.number().int().min(1).default(1),
+  items: z.array(menuSectionItemSchema).default([]),
+});
+
+const menuDefinitionSchema = z.object({
+  id: z.string().optional(),
+  isAlwaysAvailable: z.boolean().default(true),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  availableMonday: z.boolean().default(true),
+  availableTuesday: z.boolean().default(true),
+  availableWednesday: z.boolean().default(true),
+  availableThursday: z.boolean().default(true),
+  availableFriday: z.boolean().default(true),
+  availableSaturday: z.boolean().default(true),
+  availableSunday: z.boolean().default(true),
+  sections: z.array(menuSectionSchema).default([]),
+});
+
+export const createProductSchema = baseProductSchema.extend({
+  menuDefinition: menuDefinitionSchema.optional(),
+});
+
+// Dedicated schema for Menu Bundles (cleaner, no redundant fields)
+const baseMenuBundleSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  basePrice: z.coerce.number().min(0),
+  isActive: z.boolean().default(true),
+  isAvailable: z.boolean().default(true),
+  isSpecial: z.boolean().default(false),
+  type: z.literal('menu'),
+  preparationTimeMinutes: z.coerce.number().min(0).default(0),
+  displayOrder: z.coerce.number().int().default(0),
+  content: z.array(contentSchema).default([]).refine(items => {
+    if (!items) return true;
+    const languages = items.map(item => item.language);
+    return new Set(languages).size === languages.length;
+  }, { message: 'Each language can only be used once' }),
+  menuDefinition: menuDefinitionSchema,
+});
+
+export const createMenuBundleSchema = baseMenuBundleSchema;
 
 export const editProductSchema = baseProductSchema.extend({
   id: z.string().optional(),
   preparationTimeMinutes: z.coerce.number().optional(),
   displayOrder: z.coerce.number().optional(),
+  menuDefinition: menuDefinitionSchema.optional(),
 }).refine(d => !d.categoryIds || d.categoryIds.length === 0 || !!d.primaryCategoryId, {
   path: ['primaryCategoryId'],
   message: 'Primary category is required when categories are selected',
 });
 
+export const editMenuBundleSchema = baseMenuBundleSchema.extend({
+  id: z.string().optional(),
+});
+
 export type FormData = z.infer<typeof createProductSchema>;
 export type EditFormData = z.infer<typeof editProductSchema>;
+export type MenuBundleFormData = z.infer<typeof createMenuBundleSchema>;
+export type EditMenuBundleFormData = z.infer<typeof editMenuBundleSchema>;

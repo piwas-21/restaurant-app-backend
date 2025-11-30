@@ -1,6 +1,6 @@
 import { UseFormSetError, UseFormReset } from 'react-hook-form';
 import { FormData, EditFormData } from './schemas';
-import { createProduct } from '@/services/menuService';
+import { createProduct, createMenuBundle, updateMenuBundle } from '@/services/menuService';
 import { updateProduct, uploadBulkProductImages } from '@/services/productService';
 
 interface SubmitProductFormParams {
@@ -70,15 +70,36 @@ export const submitProductForm = async ({
       return cleaned;
     });
 
+
+
+// ...
+
     // Format the product data
     const productData = {
       ...data,
       content,
+      primaryCategoryId: data.primaryCategoryId || null,
       variations: data.variations || [],
-      detailedIngredients: cleanedIngredients
+      detailedIngredients: cleanedIngredients,
+      menuDefinition: data.menuDefinition ? {
+        ...data.menuDefinition,
+        id: data.menuDefinition.id || null,
+        sections: data.menuDefinition.sections?.map((section: any) => ({
+          ...section,
+          id: (section.id && (section.id.startsWith('temp-') || section.id === '')) ? null : section.id,
+        })) || [],
+        startTime: data.menuDefinition.startTime ? (data.menuDefinition.startTime.length === 5 ? `${data.menuDefinition.startTime}:00` : data.menuDefinition.startTime) : null,
+        endTime: data.menuDefinition.endTime ? (data.menuDefinition.endTime.length === 5 ? `${data.menuDefinition.endTime}:00` : data.menuDefinition.endTime) : null,
+      } : undefined
     };
 
-    const productResponse = await createProduct(productData) as { success: boolean; data?: { id: string }; message?: string };
+    let productResponse;
+    if (data.menuDefinition) {
+       // It's a menu bundle
+       productResponse = await createMenuBundle(productData) as { success: boolean; data?: { id: string }; message?: string };
+    } else {
+       productResponse = await createProduct(productData) as { success: boolean; data?: { id: string }; message?: string };
+    }
     if (productResponse.success && productResponse.data?.id) {
       if (imageFiles.length > 0) {
         setSubmissionStatus('uploading');
@@ -95,8 +116,23 @@ export const submitProductForm = async ({
     } else {
       setError('root', { message: productResponse.message || 'Failed to create product' });
     }
-  } catch {
-    setError('root', { message: 'An unexpected error occurred.' });
+  } catch (error: any) {
+    console.error("Submit error:", error);
+    // Extract meaningful error message from backend response
+    let errorMessage = 'An unexpected error occurred.';
+    if (error?.response?.data) {
+        if (error.response.data.errors) {
+            // Combine validation errors
+            errorMessage = Object.values(error.response.data.errors).flat().join(', ');
+        } else if (error.response.data.title) {
+            errorMessage = error.response.data.title;
+        } else if (error.response.data.message) {
+            errorMessage = error.response.data.message;
+        }
+    } else if (error?.message) {
+        errorMessage = error.message;
+    }
+    setError('root', { message: errorMessage });
   } finally {
     setSubmissionStatus('idle');
   }
@@ -173,11 +209,22 @@ export const submitEditProductForm = async ({
       basePrice: parseNum(data.basePrice, 0),
       preparationTimeMinutes: typeof data.preparationTimeMinutes === 'number' ? data.preparationTimeMinutes : parseInt(String(data.preparationTimeMinutes || '0'), 10) || 0,
       allergens: Array.isArray(data.allergens) ? data.allergens.filter(Boolean) : [],
-      categoryIds,
-      primaryCategoryId,
+
+      categoryIds: categoryIds || [],
+      primaryCategoryId: primaryCategoryId || null,
       variations: cleanedVariations,
       content: formattedContent,
       detailedIngredients: cleanedIngredients,
+      menuDefinition: data.menuDefinition ? {
+        ...data.menuDefinition,
+        id: data.menuDefinition.id || null,
+        sections: data.menuDefinition.sections?.map((section: any) => ({
+          ...section,
+          id: (section.id && (section.id.startsWith('temp-') || section.id === '')) ? null : section.id,
+        })) || [],
+        startTime: data.menuDefinition.startTime ? (data.menuDefinition.startTime.length === 5 ? `${data.menuDefinition.startTime}:00` : data.menuDefinition.startTime) : null,
+        endTime: data.menuDefinition.endTime ? (data.menuDefinition.endTime.length === 5 ? `${data.menuDefinition.endTime}:00` : data.menuDefinition.endTime) : null,
+      } : undefined
     } as any;
 
     const response = await updateProduct(product.id, productData) as { success: boolean; message?: string };

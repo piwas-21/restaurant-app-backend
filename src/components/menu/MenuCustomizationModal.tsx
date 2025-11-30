@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './MenuCustomization.module.css';
 import { MenuDefinition, MenuSection, SelectedMenuOption } from '@/types/menu';
+import { useTranslation } from 'react-i18next';
 
 interface MenuCustomizationModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
   menuDefinition,
   onAddToBasket,
 }) => {
+  const { t } = useTranslation();
   const [selectedOptions, setSelectedOptions] = useState<Map<string, SelectedMenuOption[]>>(new Map());
   const [validationErrors, setValidationErrors] = useState<Map<string, string>>(new Map());
 
@@ -122,7 +124,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
       if (section.isRequired && totalQuantity < section.minSelection) {
         errors.set(
           section.id,
-          `Please select at least ${section.minSelection} option(s)`
+          `${t('please_select_at_least')} ${section.minSelection} ${t('options')}`
         );
         isValid = false;
       }
@@ -163,7 +165,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
 
         <div className={styles.modalBody}>
           <div className={styles.priceDisplay}>
-            <span>Base Price:</span>
+            <span>{t('base_price')}:</span>
             <span className={styles.price}>${basePrice.toFixed(2)}</span>
           </div>
 
@@ -184,9 +186,9 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
                   )}
                   <p className={styles.selectionInfo}>
                     {section.minSelection === section.maxSelection
-                      ? `Choose ${section.maxSelection}`
-                      : `Choose ${section.minSelection}-${section.maxSelection}`}
-                    {totalQuantity > 0 && ` (${totalQuantity} selected)`}
+                      ? `${t('choose')} ${section.maxSelection}`
+                      : `${t('choose')} ${section.minSelection}-${section.maxSelection}`}
+                    {totalQuantity > 0 && ` (${totalQuantity} ${t('selected')})`}
                   </p>
                 </div>
 
@@ -236,11 +238,11 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
 
         <div className={styles.modalFooter}>
           <div className={styles.totalPrice}>
-            <span>Total:</span>
+            <span>{t('total')}:</span>
             <span className={styles.price}>${totalPrice.toFixed(2)}</span>
           </div>
           <button onClick={handleAddToBasket} className={styles.addButton}>
-            Add to Basket
+            {t('add_to_basket')}
           </button>
         </div>
       </div>

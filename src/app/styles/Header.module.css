@@ -39,8 +39,7 @@
 }
 
 .switcherGroup {
-  /* Styles for desktop view if needed - by default, they'll be flex items due to parent */
-  display: contents; /* Makes the div not affect layout in flex container on desktop */
+  display: contents;
 }
 
 /* Cart badge counter */
@@ -279,9 +278,9 @@
     display: none !important;
   }
   .switcherGroup {
-    display: flex; /* For desktop, arrange them in a row */
+    display: flex;
     align-items: center;
-    gap: 0.5rem; /* Adjust gap for desktop view */
+    gap: 0.5rem;
   }
 
   .adminSidebarToggleFloating {

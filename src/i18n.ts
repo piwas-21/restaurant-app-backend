@@ -11,6 +11,8 @@ import translationIT from "./locales/it.json";
 import translationAR from "./locales/ar.json";
 import translationFR from "./locales/fr.json";
 import translationES from "./locales/es.json";
+import translationRU from "./locales/ru.json";
+import translationZH from "./locales/zh.json";
 
 const resources = {
   en: { translation: translationEN },
@@ -20,6 +22,8 @@ const resources = {
   ar: { translation: translationAR },
   fr: { translation: translationFR },
   es: { translation: translationES },
+  ru: { translation: translationRU },
+  zh: { translation: translationZH },
 };
 
 // Check if we're in the browser

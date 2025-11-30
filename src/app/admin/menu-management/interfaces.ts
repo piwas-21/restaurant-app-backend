@@ -57,6 +57,7 @@ export interface ProductDetails {
   isAvailable: boolean;
   isSpecial?: boolean;
   preparationTimeMinutes: number;
+  displayOrder?: number;
   type: string;
   ingredients: string[]; // Legacy field - kept for backward compatibility
   detailedIngredients?: ProductIngredient[];

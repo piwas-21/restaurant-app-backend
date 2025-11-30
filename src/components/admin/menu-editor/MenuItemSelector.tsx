@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import styles from './MenuEditor.module.css';
 import { MenuSectionItem } from '@/types/menu';
 import { searchProducts } from '@/services/productService';
+import { useTranslation } from 'react-i18next';
+import ConfirmationModal from '@/components/common/ConfirmationModal';
 
 interface MenuItemSelectorProps {
   items: MenuSectionItem[];
@@ -17,10 +19,12 @@ interface Product {
 }
 
 const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
   // Debounced search
   useEffect(() => {
@@ -69,9 +73,16 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
     onChange(newItems);
   };
 
-  const removeItem = (index: number) => {
-    const newItems = items.filter((_, i) => i !== index);
-    onChange(newItems);
+  const confirmRemoveItem = (index: number) => {
+    setItemToDelete(index);
+  };
+
+  const handleRemoveItem = () => {
+    if (itemToDelete !== null) {
+      const newItems = items.filter((_, i) => i !== itemToDelete);
+      onChange(newItems);
+      setItemToDelete(null);
+    }
   };
 
   const moveItem = (index: number, direction: 'up' | 'down') => {
@@ -99,7 +110,7 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
 
   return (
     <div className={styles.itemSelector}>
-      <h4 className={styles.sectionTitle}>Section Items</h4>
+      <h4 className={styles.sectionTitle}>{t('section_items')}</h4>
 
       {/* Product Search */}
       <div className={styles.productSearch}>
@@ -107,7 +118,7 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search products to add..."
+          placeholder={t('search_products_placeholder')}
           className={styles.searchInput}
         />
         {showResults && searchResults.length > 0 && (
@@ -126,7 +137,7 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
         )}
         {isSearching && (
           <div className={styles.searchResults}>
-            <div className={styles.searchResultItem}>Searching...</div>
+            <div className={styles.searchResultItem}>{t('searching')}</div>
           </div>
         )}
       </div>
@@ -136,11 +147,11 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
         <table className={styles.itemsTable}>
           <thead>
             <tr>
-              <th>Order</th>
-              <th>Product</th>
-              <th>Additional Price</th>
-              <th>Default</th>
-              <th>Actions</th>
+              <th>{t('order')}</th>
+              <th>{t('product')}</th>
+              <th>{t('additional_price')}</th>
+              <th>{t('default')}</th>
+              <th>{t('actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -152,7 +163,7 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
                       onClick={() => moveItem(index, 'up')}
                       disabled={index === 0}
                       className={styles.iconButton}
-                      title="Move up"
+                      title={t('move_up')}
                     >
                       ↑
                     </button>
@@ -160,7 +171,7 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
                       onClick={() => moveItem(index, 'down')}
                       disabled={index === items.length - 1}
                       className={styles.iconButton}
-                      title="Move down"
+                      title={t('move_down')}
                     >
                       ↓
                     </button>
@@ -194,9 +205,9 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
                 </td>
                 <td>
                   <button
-                    onClick={() => removeItem(index)}
+                    onClick={() => confirmRemoveItem(index)}
                     className={`${styles.iconButton} ${styles.danger}`}
-                    title="Remove item"
+                    title={t('remove_item')}
                   >
                     ×
                   </button>
@@ -207,9 +218,15 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange }) 
         </table>
       ) : (
         <div className={styles.emptyState}>
-          <p>No items added yet. Search and add products above.</p>
+          <p>{t('no_items_added')}</p>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={itemToDelete !== null}
+        onClose={() => setItemToDelete(null)}
+        onConfirm={handleRemoveItem}
+        message={t('confirm_delete_item', 'Are you sure you want to remove this item?')}
+      />
     </div>
   );
 };

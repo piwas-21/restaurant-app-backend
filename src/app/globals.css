@@ -60,6 +60,7 @@ html[data-theme="dark"] {
   --nav-link-hover-bg: rgba(255, 255, 255, 0.1);
   --nav-link-active-color: var(--primary-color);
   --nav-link-active-bg: rgba(255, 255, 255, 0.05);
+  --secondary-color-light: #3e3d3d;
 }
 
 html,

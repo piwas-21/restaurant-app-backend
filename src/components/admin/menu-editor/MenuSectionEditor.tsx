@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './MenuEditor.module.css';
 import { MenuSection, MenuSectionItem } from '@/types/menu';
 import MenuItemSelector from './MenuItemSelector';
 import { useTranslation } from 'react-i18next';
+import ConfirmationModal from '@/components/common/ConfirmationModal';
 
 interface MenuSectionEditorProps {
   sections: MenuSection[];
@@ -16,7 +17,16 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
   onChange,
 }) => {
   const { t } = useTranslation();
+  const [localSections, setLocalSections] = useState<MenuSection[]>(sections);
+  const [hasChanges, setHasChanges] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [sectionToDelete, setSectionToDelete] = useState<number | null>(null);
+
+  // Reset local state when sections prop changes
+  useEffect(() => {
+    setLocalSections(sections);
+    setHasChanges(false);
+  }, [sections]);
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -33,36 +43,46 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
       id: `temp-${Date.now()}`,
       name: '',
       description: '',
-      displayOrder: sections.length,
+      displayOrder: localSections.length,
       isRequired: true,
       minSelection: 1,
       maxSelection: 1,
       items: [],
     };
-    onChange([...sections, newSection]);
+    setLocalSections([...localSections, newSection]);
     setExpandedSections(new Set([...expandedSections, newSection.id]));
+    setHasChanges(true);
   };
 
   const updateSection = (index: number, updates: Partial<MenuSection>) => {
-    const newSections = [...sections];
+    const newSections = [...localSections];
     newSections[index] = { ...newSections[index], ...updates };
-    onChange(newSections);
+    setLocalSections(newSections);
+    setHasChanges(true);
   };
 
-  const removeSection = (index: number) => {
-    const newSections = sections.filter((_, i) => i !== index);
-    onChange(newSections);
+  const confirmRemoveSection = (index: number) => {
+    setSectionToDelete(index);
+  };
+
+  const handleRemoveSection = () => {
+    if (sectionToDelete !== null) {
+      const newSections = localSections.filter((_, i) => i !== sectionToDelete);
+      setLocalSections(newSections);
+      setSectionToDelete(null);
+      setHasChanges(true);
+    }
   };
 
   const moveSection = (index: number, direction: 'up' | 'down') => {
     if (
       (direction === 'up' && index === 0) ||
-      (direction === 'down' && index === sections.length - 1)
+      (direction === 'down' && index === localSections.length - 1)
     ) {
       return;
     }
 
-    const newSections = [...sections];
+    const newSections = [...localSections];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newSections[index], newSections[targetIndex]] = [
       newSections[targetIndex],
@@ -74,11 +94,22 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
       section.displayOrder = i;
     });
 
-    onChange(newSections);
+    setLocalSections(newSections);
+    setHasChanges(true);
   };
 
   const updateSectionItems = (index: number, items: MenuSectionItem[]) => {
     updateSection(index, { items });
+  };
+
+  const handleSave = () => {
+    onChange(localSections);
+    setHasChanges(false);
+  };
+
+  const handleCancel = () => {
+    setLocalSections(sections);
+    setHasChanges(false);
   };
 
   return (
@@ -90,7 +121,7 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
         </button>
       </div>
 
-      {sections.length === 0 ? (
+      {localSections.length === 0 ? (
         <div className={styles.emptyState}>
           <p>{t('no_sections_yet')}</p>
           <p className={styles.helpText}>
@@ -99,7 +130,7 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
         </div>
       ) : (
         <div className={styles.sectionList}>
-          {sections.map((section, index) => (
+          {localSections.map((section, index) => (
             <div key={section.id} className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
                 <div className={styles.sectionHeaderLeft}>
@@ -119,7 +150,7 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
                   </button>
                   <button
                     onClick={() => moveSection(index, 'down')}
-                    disabled={index === sections.length - 1}
+                    disabled={index === localSections.length - 1}
                     className={styles.iconButton}
                     title={t('move_down')}
                   >
@@ -133,7 +164,7 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
                     {expandedSections.has(section.id) ? '−' : '+'}
                   </button>
                   <button
-                    onClick={() => removeSection(index)}
+                    onClick={() => confirmRemoveSection(index)}
                     className={`${styles.iconButton} ${styles.danger}`}
                     title={t('delete_section')}
                   >
@@ -229,6 +260,25 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
           ))}
         </div>
       )}
+
+      {/* Save/Cancel Buttons */}
+      {hasChanges && (
+        <div className={styles.editorActions}>
+          <button onClick={handleCancel} className={styles.cancelButton}>
+            {t('cancel')}
+          </button>
+          <button onClick={handleSave} className={styles.saveButton}>
+            {t('save')}
+          </button>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={sectionToDelete !== null}
+        onClose={() => setSectionToDelete(null)}
+        onConfirm={handleRemoveSection}
+        message={t('confirm_delete_section', 'Are you sure you want to delete this section?')}
+      />
     </div>
   );
 };

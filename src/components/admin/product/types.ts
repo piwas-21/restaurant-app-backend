@@ -1,6 +1,8 @@
 // Product-related types and interfaces
-export const productTypes = ['mainItem', 'beverage', 'dessert', 'sauce', 'addOn'] as const;
-export const supportedLanguages = ['en', 'tr', 'es', 'ar', 'de', 'fr', 'it'] as const;
+import { LANGUAGE_CODES } from '@/config/languageConfig';
+
+export const productTypes = ['mainItem', 'beverage', 'dessert', 'sauce', 'addOn', 'menu'] as const;
+export const supportedLanguages = LANGUAGE_CODES;
 
 export type ProductType = typeof productTypes[number];
 export type SupportedLanguage = typeof supportedLanguages[number];

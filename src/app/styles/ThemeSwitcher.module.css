@@ -9,7 +9,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  width: 100%;
+  width: min-content;
   min-width: auto;
   height: auto;
   transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;

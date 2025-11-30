@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getProducts } from '@/services/menuService';
+import { getProducts, getMenuBundles } from '@/services/menuService';
 import { getCategories } from '@/services/categoryService';
 import { Product, Category } from '@/app/admin/menu-management/interfaces';
 
-export const useMenuManagement = () => {
+export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialCategoryId = searchParams.get('categoryId');
@@ -25,7 +25,14 @@ export const useMenuManagement = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await getProducts(page, pageSize, selectedCategoryId);
+      let response: any;
+      if (activeTab === 'menus') {
+        // Use dedicated endpoint for menu bundles (category-free)
+        response = await getMenuBundles(page, pageSize);
+      } else {
+        // Use generic products endpoint (backend now excludes menus by default)
+        response = await getProducts(page, pageSize, selectedCategoryId);
+      }
 
       if (response.success) {
         setProducts(response.data.items);
@@ -33,14 +40,14 @@ export const useMenuManagement = () => {
         setTotalCount(response.data.totalCount || 0);
         setCurrentPage(page);
       } else {
-        setError(response.message || 'Failed to fetch products');
+        setError(response.message || 'Failed to fetch items');
       }
     } catch {
       setError('An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategoryId, pageSize]);
+  }, [activeTab, selectedCategoryId, pageSize]); // selectedCategoryId only affects products tab
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -86,6 +93,6 @@ export const useMenuManagement = () => {
     pageSize,
     handleCategoryChange,
     handlePageChange,
-    fetchProducts: () => fetchProducts(currentPage),
+    fetchProducts: (page?: number) => fetchProducts(page || currentPage),
   };
 };

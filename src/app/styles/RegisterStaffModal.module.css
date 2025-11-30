@@ -196,3 +196,19 @@
     background: var(--primary-dark, #3a7bc8);
   }
 
+
+.sectionDivider {
+  height: 1px;
+  background-color: #e0e0e0;
+  margin: 2rem 0;
+  width: 100%;
+}
+
+.activeChip {
+  background-color: #e0e0e0;
+  border-color: #333;
+}
+
+.activeChip label {
+  font-weight: 500;
+}

@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
+
 import styles from './MenuEditor.module.css';
 import { MenuDefinition } from '@/types/menu';
 import { useTranslation } from 'react-i18next';
@@ -25,26 +27,47 @@ const MenuScheduleEditor: React.FC<MenuScheduleEditorProps> = ({
   onChange,
 }) => {
   const { t } = useTranslation();
+  const [localMenuDefinition, setLocalMenuDefinition] = useState<MenuDefinition>(menuDefinition);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Reset local state when menuDefinition prop changes
+  useEffect(() => {
+    setLocalMenuDefinition(menuDefinition);
+    setHasChanges(false);
+  }, [menuDefinition]);
 
   const handleToggleAlwaysAvailable = () => {
-    onChange({
-      ...menuDefinition,
-      isAlwaysAvailable: !menuDefinition.isAlwaysAvailable,
+    setLocalMenuDefinition({
+      ...localMenuDefinition,
+      isAlwaysAvailable: !localMenuDefinition.isAlwaysAvailable,
     });
+    setHasChanges(true);
   };
 
   const handleTimeChange = (field: 'startTime' | 'endTime', value: string) => {
-    onChange({
-      ...menuDefinition,
+    setLocalMenuDefinition({
+      ...localMenuDefinition,
       [field]: value,
     });
+    setHasChanges(true);
   };
 
   const handleDayToggle = (dayKey: string) => {
-    onChange({
-      ...menuDefinition,
-      [dayKey]: !menuDefinition[dayKey as keyof MenuDefinition],
+    setLocalMenuDefinition({
+      ...localMenuDefinition,
+      [dayKey]: !localMenuDefinition[dayKey as keyof MenuDefinition],
     });
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    onChange(localMenuDefinition);
+    setHasChanges(false);
+  };
+
+  const handleCancel = () => {
+    setLocalMenuDefinition(menuDefinition);
+    setHasChanges(false);
   };
 
   return (
@@ -52,42 +75,44 @@ const MenuScheduleEditor: React.FC<MenuScheduleEditorProps> = ({
       <h3 className={styles.sectionTitle}>{t('menu_availability_schedule')}</h3>
 
       {/* Always Available Toggle */}
-      <div className={styles.formGroup}>
-        <label className={styles.toggleLabel}>
-          <input
-            type="checkbox"
-            checked={menuDefinition.isAlwaysAvailable}
-            onChange={handleToggleAlwaysAvailable}
-            className={styles.checkbox}
-          />
-          <span>{t('always_available')}</span>
-        </label>
+      <div className={modalStyles.formGroup}>
+        <div className={modalStyles.chipGroup}>
+            <div className={modalStyles.chip}>
+                <input
+                    type="checkbox"
+                    id="always-available"
+                    checked={localMenuDefinition.isAlwaysAvailable}
+                    onChange={handleToggleAlwaysAvailable}
+                />
+                <label htmlFor="always-available">{t('always_available')}</label>
+            </div>
+        </div>
         <p className={styles.helpText}>
           {t('always_available_help')}
         </p>
       </div>
 
       {/* Time Range */}
-      {!menuDefinition.isAlwaysAvailable && (
+      {!localMenuDefinition.isAlwaysAvailable && (
         <>
           <div className={styles.timeRange}>
-            <div className={styles.formGroup}>
+            <div className={modalStyles.formGroup}>
               <label htmlFor="startTime">{t('start_time')}</label>
               <input
                 id="startTime"
                 type="time"
-                value={menuDefinition.startTime || ''}
+                value={localMenuDefinition.startTime || ''}
                 onChange={(e) => handleTimeChange('startTime', e.target.value)}
                 className={styles.timeInput}
               />
             </div>
 
-            <div className={styles.formGroup}>
+            <div className={modalStyles.formGroup}>
               <label htmlFor="endTime">{t('end_time')}</label>
               <input
                 id="endTime"
                 type="time"
-                value={menuDefinition.endTime || ''}
+                value={localMenuDefinition.endTime || ''}
                 onChange={(e) => handleTimeChange('endTime', e.target.value)}
                 className={styles.timeInput}
               />
@@ -95,23 +120,35 @@ const MenuScheduleEditor: React.FC<MenuScheduleEditorProps> = ({
           </div>
 
           {/* Days of Week */}
-          <div className={styles.formGroup}>
+          <div className={modalStyles.formGroup}>
             <label>{t('available_days')}</label>
-            <div className={styles.daysGrid}>
+            <div className={modalStyles.chipGroup}>
               {DAYS_OF_WEEK.map(({ key, label }) => (
-                <label key={key} className={styles.dayCheckbox}>
+                <div key={key} className={modalStyles.chip}>
                   <input
                     type="checkbox"
-                    checked={menuDefinition[key as keyof MenuDefinition] as boolean}
+                    id={`day-${key}`}
+                    checked={localMenuDefinition[key as keyof MenuDefinition] as boolean}
                     onChange={() => handleDayToggle(key)}
-                    className={styles.checkbox}
                   />
-                  <span>{t(label)}</span>
-                </label>
+                  <label htmlFor={`day-${key}`}>{t(label)}</label>
+                </div>
               ))}
             </div>
           </div>
         </>
+      )}
+
+      {/* Save/Cancel Buttons */}
+      {hasChanges && (
+        <div className={styles.editorActions}>
+          <button onClick={handleCancel} className={styles.cancelButton}>
+            {t('cancel')}
+          </button>
+          <button onClick={handleSave} className={styles.saveButton}>
+            {t('save')}
+          </button>
+        </div>
       )}
     </div>
   );

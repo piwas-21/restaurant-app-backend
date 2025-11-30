@@ -313,6 +313,54 @@
   color: var(--text-secondary);
 }
 
+/* Editor Actions (Save/Cancel Buttons) */
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.saveButton,
+.cancelButton {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.saveButton {
+  background: var(--primary-color);
+  color: white;
+}
+
+.saveButton:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+}
+
+.saveButton:active {
+  transform: translateY(0);
+}
+
+.cancelButton {
+  background: var(--secondary-color-light);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.cancelButton:hover {
+  background: var(--hover-background);
+  border-color: var(--text-secondary);
+}
+
 @media (max-width: 768px) {
   .timeRange,
   .formRow {
@@ -321,5 +369,14 @@
 
   .daysGrid {
     grid-template-columns: 1fr;
+  }
+
+  .editorActions {
+    flex-direction: column-reverse;
+  }
+
+  .saveButton,
+  .cancelButton {
+    width: 100%;
   }
 }

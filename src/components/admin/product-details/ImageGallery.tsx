@@ -16,9 +16,9 @@ interface ImageGalleryProps {
   onImageUpdate: () => void;
 }
 
-const ImageGallery: React.FC<ImageGalleryProps> = ({ images, productName, onImageUpdate }) => {
+const ImageGallery: React.FC<ImageGalleryProps> = ({ images = [], productName, onImageUpdate }) => {
   const [selectedImage, setSelectedImage] = useState<ProductImage | null>(null);
-  const [imageList, setImageList] = useState<ProductImage[]>(images);
+  const [imageList, setImageList] = useState<ProductImage[]>(images || []);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,10 +27,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images, productName, onImag
   const { t } = useTranslation();
 
   useEffect(() => {
-    setImageList(images);
-    if (images && images.length > 0) {
-      const primary = images.find(img => img.isPrimary) || images[0];
+    const validImages = images || [];
+    setImageList(validImages);
+    if (validImages.length > 0) {
+      const primary = validImages.find(img => img.isPrimary) || validImages[0];
       setSelectedImage(primary);
+    } else {
+      setSelectedImage(null);
     }
   }, [images]);
 

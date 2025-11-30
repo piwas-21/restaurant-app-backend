@@ -29,6 +29,37 @@ interface ContentData {
   };
 }
 
+export interface MenuSectionItemData {
+  productId: string;
+  additionalPrice: number;
+  displayOrder: number;
+  isDefault: boolean;
+}
+
+export interface MenuSectionData {
+  name: string;
+  description?: string;
+  displayOrder: number;
+  isRequired: boolean;
+  minSelection: number;
+  maxSelection: number;
+  items: MenuSectionItemData[];
+}
+
+export interface MenuDefinitionData {
+  isAlwaysAvailable: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  availableMonday: boolean;
+  availableTuesday: boolean;
+  availableWednesday: boolean;
+  availableThursday: boolean;
+  availableFriday: boolean;
+  availableSaturday: boolean;
+  availableSunday: boolean;
+  sections: MenuSectionData[];
+}
+
 export interface CreateProductData {
   name: string;
   description?: string;
@@ -41,10 +72,11 @@ export interface CreateProductData {
   allergens?: string[];
   displayOrder?: number;
   categoryIds: string[];
-  primaryCategoryId: string;
+  primaryCategoryId: string | null;
   variations?: VariationData[];
   content?: ContentData;
   detailedIngredients?: any[];
+  menuDefinition?: MenuDefinitionData;
 }
 
 export const getProducts = async (
@@ -53,7 +85,6 @@ export const getProducts = async (
   categoryId?: string | null
 ): Promise<{ success: boolean; message: string; data: PaginatedProducts; errors: any }> => {
   try {
-    // Backend expects 'Page' and 'PageSize' (PascalCase), not 'pageNumber' and 'pageSize' (camelCase)
     let url = `${PRODUCTS_API_URL}?Page=${pageNumber}&PageSize=${pageSize}`;
     if (categoryId) {
       url += `&CategoryId=${categoryId}`;
@@ -65,12 +96,60 @@ export const getProducts = async (
   }
 };
 
+export const MENUS_API_URL = `${API_BASE_URL}/Menus`;
+
+export const createMenuBundle = async (menuData: any) => {
+  try {
+    return await apiClient.post(MENUS_API_URL, menuData);
+  } catch (error) {
+    console.error("Create Menu Bundle Failed:", error);
+    throw error;
+  }
+};
+
+export const updateMenuBundle = async (id: string, menuData: any) => {
+  try {
+    return await apiClient.put(`${MENUS_API_URL}/${id}`, menuData);
+  } catch (error) {
+    console.error("Update Menu Bundle Failed:", error);
+    throw error;
+  }
+};
+
+export const getMenuBundles = async (page: number = 1, pageSize: number = 10) => {
+  try {
+    const url = `${MENUS_API_URL}?page=${page}&pageSize=${pageSize}`;
+    return await apiClient.get(url);
+  } catch (error) {
+    console.error("Get Menu Bundles Failed:", error);
+    throw error;
+  }
+};
+
+export const getMenuBundleById = async (id: string) => {
+  try {
+    return await apiClient.get(`${MENUS_API_URL}/${id}`);
+  } catch (error) {
+    console.error("Get Menu Bundle Failed:", error);
+    throw error;
+  }
+};
+
+export const deleteMenuBundle = async (id: string) => {
+  try {
+    return await apiClient.delete(`${MENUS_API_URL}/${id}`);
+  } catch (error) {
+    console.error("Delete Menu Bundle Failed:", error);
+    throw error;
+  }
+};
+
 export const createProduct = async (productData: CreateProductData) => {
   try {
     return await apiClient.post(PRODUCTS_API_URL, productData);
-  } catch {
-    // Fallback to mock API if real API fails
-    return mockApiClient.createProduct(productData);
+  } catch (error) {
+    console.error("Create Product Failed:", error);
+    throw error;
   }
 };
 
