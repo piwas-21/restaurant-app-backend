@@ -72,7 +72,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
       const prepMinutes = withDelay ? delayMinutes : 15; // Default 15 mins if no delay specified
       
       const updatedOrder = await updateOrderStatus(order.id, {
-        newStatus: withDelay ? 'PendingCustomerApproval' : 'Confirmed',
+        newStatus: withDelay ? 'PendingApproval' : 'Confirmed',
         estimatedPreparationMinutes: prepMinutes,
         notes: withDelay ? `Confirmed with ${prepMinutes} min delay` : 'Order confirmed'
       });

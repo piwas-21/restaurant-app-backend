@@ -212,7 +212,7 @@ export default function MenuPage() {
         bundle={selectedBundle}
         isOpen={showBundleDetails}
         onClose={() => setShowBundleDetails(false)}
-        onAddToCart={handleAddBundleToCart}
+        onAddToCart={handleCustomizeBundle}
         currentLanguage={currentLanguage}
       />
 

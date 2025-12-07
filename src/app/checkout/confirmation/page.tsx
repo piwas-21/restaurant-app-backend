@@ -173,7 +173,7 @@ function ConfirmationContent() {
             <CheckCircle size={80} />
           </div>
           <h1 className={styles.successTitle}>
-            {t('order_confirmed', 'Order Confirmed!')}
+            {t('order_received', 'Order Received')}
           </h1>
           <p className={styles.successSubtitle}>
             {t('order_confirmation_message', 'Thank you for your order. We have received it and will start preparing it shortly.')}

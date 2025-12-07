@@ -71,6 +71,7 @@ export default function CustomerInfoPage() {
                 setEmail(user.email || '');
                 setPhone(user.phoneNumber || '');
                 setIsLoggedIn(true);
+                setIsLoadingUser(false);
                 return;
               }
             } catch (err) {
@@ -81,6 +82,7 @@ export default function CustomerInfoPage() {
         }
 
         // User is not logged in or fetch failed - try to load from localStorage
+        setIsLoggedIn(false);
         if (typeof window !== 'undefined') {
           const saved = localStorage.getItem('rumi_saved_customer_info');
           if (saved && !checkoutState.customerInfo) {
@@ -94,7 +96,6 @@ export default function CustomerInfoPage() {
             }
           }
         }
-        setIsLoggedIn(false);
       } finally {
         setIsLoadingUser(false);
       }

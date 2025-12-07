@@ -172,3 +172,28 @@
   color: var(--error-color, #f44336);
   font-style: italic;
 }
+
+/* Ingredient tags styling */
+.allergyTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.allergyTag {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background-color: var(--card-background, #f5f5f5);
+  color: var(--text-color, #333);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.itemPrice {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-color, #e70b0b);
+  text-align: center;
+}

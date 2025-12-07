@@ -1877,5 +1877,6 @@
   "loading_menu_bundles": "Cargando combos de menú...",
   "no_bundles_available": "No hay combos de menú disponibles en este momento",
   "availability_mode": "Modo de Disponibilidad",
-  "custom_schedule": "Horario Personalizado"
+  "custom_schedule": "Horario Personalizado",
+  "order_received": "Pedido Recibido"
 }

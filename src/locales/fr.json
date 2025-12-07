@@ -1875,5 +1875,6 @@
   "loading_menu_bundles": "Chargement des packs menu...",
   "no_bundles_available": "Aucun pack menu disponible pour le moment",
   "availability_mode": "Mode de disponibilité",
-  "custom_schedule": "Horaire personnalisé"
+  "custom_schedule": "Horaire personnalisé",
+  "order_received": "Commande reçue"
 }

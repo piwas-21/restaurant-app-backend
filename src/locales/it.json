@@ -1875,5 +1875,6 @@
   "loading_menu_bundles": "Caricamento pacchetti menu...",
   "no_bundles_available": "Nessun pacchetto menu disponibile al momento",
   "availability_mode": "Modalità Disponibilità",
-  "custom_schedule": "Programma Personalizzato"
+  "custom_schedule": "Programma Personalizzato",
+  "order_received": "Ordine ricevuto"
 }

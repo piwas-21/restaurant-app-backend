@@ -38,7 +38,7 @@ export type OrderStatus =
   | 'Delivered'
   | 'Completed'
   | 'Cancelled'
-  | 'PendingCustomerApproval';
+  | 'PendingApproval';
 
 /**
  * Payment status values

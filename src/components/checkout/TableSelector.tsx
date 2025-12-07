@@ -41,7 +41,14 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
       const result = await response.json();
 
       if (result.success && result.data) {
-        setTables(result.data);
+        // Sort tables using natural/alphanumeric sorting
+        const sortedTables = [...result.data].sort((a, b) => {
+          return a.tableNumber.localeCompare(b.tableNumber, undefined, {
+            numeric: true,
+            sensitivity: 'base'
+          });
+        });
+        setTables(sortedTables);
       } else {
         setError(result.message || 'Failed to load tables');
       }

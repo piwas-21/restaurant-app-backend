@@ -273,7 +273,7 @@ export default function CartPage() {
                       <ul className={styles.childItemsList}>
                         {item.childItems.map((childItem, idx) => (
                           <li key={idx} className={styles.childItem}>
-                            <span className={styles.childItemName}>• {childItem.productName}</span>
+                            <span className={styles.childItemName}>{childItem.productName}</span>
                             {childItem.unitPrice > 0 && (
                               <span className={styles.childItemPrice}>+CHF {childItem.unitPrice.toFixed(2)}</span>
                             )}

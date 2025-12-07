@@ -1914,5 +1914,6 @@
   "loading_menu_bundles": "正在加载菜单套餐...",
   "no_bundles_available": "目前没有可用的菜单套餐",
   "availability_mode": "可用性模式",
-  "custom_schedule": "自定义时间表"
+  "custom_schedule": "自定义时间表",
+  "order_received": "订单已收到"
 }

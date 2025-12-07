@@ -7,7 +7,7 @@ import { OrderDto } from '@/types/order';
 import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
 import styles from './MyOrders.module.css';
 
-export type OrderStatus = "Delivered" | "In Progress" | "Cancelled" | "Pending Payment" | "Pending" | "Confirmed" | "Preparing" | "Ready" | "InTransit" | "Completed" | "PendingCustomerApproval";
+export type OrderStatus = "Delivered" | "In Progress" | "Cancelled" | "Pending Payment" | "Pending" | "Confirmed" | "Preparing" | "Ready" | "InTransit" | "Completed" | "PendingApproval";
 
 
 
@@ -127,7 +127,7 @@ export default function MyOrders() {
       case "Delivered": return 'order_status_delivered';
       case "Completed": return 'order_status_completed';
       case "Cancelled": return 'order_status_cancelled';
-      case "PendingCustomerApproval": return 'order_status_pending_approval';
+      case "PendingApproval": return 'order_status_pending_approval';
       default: return status;
     }
   };

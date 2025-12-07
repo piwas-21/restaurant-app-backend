@@ -42,7 +42,7 @@ export default function OrderConfirmationModal({
           </div>
         </div>
 
-        <h2 className={styles.title}>{t('order_confirmed', 'Order Confirmed!')}</h2>
+        <h2 className={styles.title}>{t('order_received', 'Order Received')}</h2>
 
         <p className={styles.message}>
           {t('order_confirmation_message', 'Thank you for your order. We have received it and will start preparing it shortly.')}

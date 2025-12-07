@@ -1874,5 +1874,6 @@
   "loading_menu_bundles": "جارٍ تحميل حزم القائمة...",
   "no_bundles_available": "لا حزم قائمة متاحة حاليا",
   "availability_mode": "وضع المتاحة",
-  "custom_schedule": "جدول مخصص"
+  "custom_schedule": "جدول مخصص",
+  "order_received": "تم استلام الطلب"
 }
