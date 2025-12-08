@@ -1809,5 +1809,6 @@
   "no_bundles_available": "Наборы меню в данный момент недоступны",
   "availability_mode": "Режим доступности",
   "custom_schedule": "Пользовательское расписание",
-  "order_received": "Заказ получен"
+  "order_received": "Заказ получен",
+  "uploaded_images": "Загруженные изображения"
 }

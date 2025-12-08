@@ -11,6 +11,10 @@ interface Variation {
   priceModifier: number;
   isActive: boolean;
   displayOrder: number;
+  content?: Record<string, {
+    name: string;
+    description?: string;
+  }>;
 }
 
 interface VariationsSectionProps {
@@ -18,6 +22,7 @@ interface VariationsSectionProps {
   selectedVariationId: string | null;
   onVariationChange: (variationId: string | null) => void;
   basePrice: number;
+  currentLanguage: string;
 }
 
 export default function VariationsSection({
@@ -25,6 +30,7 @@ export default function VariationsSection({
   selectedVariationId,
   onVariationChange,
   basePrice,
+  currentLanguage,
 }: VariationsSectionProps) {
   const { t } = useTranslation();
 
@@ -36,6 +42,14 @@ export default function VariationsSection({
   if (activeVariations.length === 0) {
     return null;
   }
+
+  const getVariationContent = (variation: Variation) => {
+    const content = variation.content?.[currentLanguage] || variation.content?.en;
+    return {
+      name: content?.name || variation.name,
+      description: content?.description || variation.description
+    };
+  };
 
   return (
     <div className={styles.section}>
@@ -64,6 +78,8 @@ export default function VariationsSection({
 
         {/* Variation options */}
         {activeVariations.map((variation) => {
+          const { name, description } = getVariationContent(variation);
+          
           // priceModifier is always additive (positive = add, negative = subtract)
           const varPrice = basePrice + variation.priceModifier;
           const priceChangeText = variation.priceModifier >= 0
@@ -83,10 +99,10 @@ export default function VariationsSection({
               />
               <div className={styles.variationContent}>
                 <div className={styles.variationInfo}>
-                  <span className={styles.variationName}>{variation.name}</span>
-                  {variation.description && (
+                  <span className={styles.variationName}>{name}</span>
+                  {description && (
                     <span className={styles.variationDescription}>
-                      {variation.description}
+                      {description}
                     </span>
                   )}
                 </div>

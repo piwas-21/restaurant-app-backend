@@ -44,6 +44,10 @@ export interface BasketItemDto {
   variationName?: string;
   menuId?: string;
   menuName?: string;
+  variationContent?: Record<string, {
+    name: string;
+    description?: string;
+  }>;
   menuDate?: string;
   menuItems?: MenuItemSummaryDto[];
   quantity: number;

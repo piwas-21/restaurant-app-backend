@@ -12,6 +12,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
   control,
   imageFiles,
   setImageFiles,
+  existingImages = [],
 }) => {
   const { t } = useTranslation();
 
@@ -61,7 +62,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
 
       <div className={modalStyles.formGroup}>
         <label>
-          {t('product_images')} ({t('optional')})
+          {t('product_images')} {t('optional')}
         </label>
         <input
           type="file"
@@ -70,11 +71,24 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
           onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
         />
         {imageFiles.length > 0 && <p>{t('files_selected', { count: imageFiles.length })}</p>}
+        
+        {existingImages && existingImages.length > 0 && (
+          <div className={styles.existingImagesList}>
+            <p><strong>{t('uploaded_images')}:</strong></p>
+            <ul>
+              {existingImages.map((img) => (
+                <li key={img.id}>
+                  {img.url.split('/').pop()} {img.isPrimary && <span>({t('primary')})</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className={modalStyles.formGroup}>
         <h3>
-          {t('allergens')} ({t('optional')})
+          {t('allergens')} {t('optional')}
         </h3>
         <Controller
           name="allergens"

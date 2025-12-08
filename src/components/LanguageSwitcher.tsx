@@ -43,6 +43,32 @@ export default function LanguageSwitcher() {
   // Fallback to English if current language details are not found (should not happen with proper setup)
   const currentLanguageDetails = languages.find(l => l.code === i18n.resolvedLanguage) || languages.find(l => l.code === 'en') || languages[0];
 
+  const listRef = useRef<HTMLUListElement>(null);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+
+  useEffect(() => {
+    if (dropdownOpen && listRef.current) {
+      // Check if scrollable
+      const { scrollHeight, clientHeight } = listRef.current;
+      setShowScrollIndicator(scrollHeight > clientHeight);
+    }
+  }, [dropdownOpen]);
+
+  const handleScroll = () => {
+    if (listRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+      // Hide indicator if near bottom
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 5;
+      setShowScrollIndicator(!isNearBottom);
+    }
+  };
+
+  const scrollDown = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent dropdown from closing
+    if (listRef.current) {
+      listRef.current.scrollBy({ top: 100, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className={styles.languageSwitcher} ref={dropdownRef}>
@@ -58,19 +84,31 @@ export default function LanguageSwitcher() {
         <span className={styles.arrow}>{dropdownOpen ? "▲" : "▼"}</span>
       </button>
       {dropdownOpen && (
-        <ul className={styles.dropdownMenu} role="listbox">
-          {languages.map((language) => (
-            <li key={language.code} role="option" aria-selected={language.code === i18n.resolvedLanguage}>
-              <button
-                onClick={() => changeLanguage(language.code)}
-                className={styles.dropdownItem}
-              >
-                <Image src={language.flag} alt={language.name} width={20} height={15} />
-                <span>{language.name}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className={styles.dropdownContainer}>
+          <ul 
+            className={styles.dropdownMenu} 
+            role="listbox" 
+            ref={listRef}
+            onScroll={handleScroll}
+          >
+            {languages.map((language) => (
+              <li key={language.code} role="option" aria-selected={language.code === i18n.resolvedLanguage}>
+                <button
+                  onClick={() => changeLanguage(language.code)}
+                  className={styles.dropdownItem}
+                >
+                  <Image src={language.flag} alt={language.name} width={20} height={15} />
+                  <span>{language.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {showScrollIndicator && (
+             <div className={styles.scrollIndicator} onClick={scrollDown} role="button" aria-label="Scroll down">
+               ▼
+             </div>
+          )}
+        </div>
       )}
     </div>
   );

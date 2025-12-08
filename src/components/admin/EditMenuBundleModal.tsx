@@ -251,7 +251,7 @@ const EditMenuBundleModal: React.FC<EditProductModalProps> = ({
 
               <div className={modalStyles.formGroup}>
                 <label>
-                  {t('menu_image')} ({t('optional')})
+                  {t('menu_image')} {t('optional')}
                 </label>
                 <input
                   type="file"

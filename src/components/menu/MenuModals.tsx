@@ -111,7 +111,7 @@ export default function MenuModals({
             isSpecial: true,
             content: {},
             images: featuredSpecial.images || (featuredSpecial.imageUrl ? [{ url: featuredSpecial.imageUrl, alt: featuredSpecial.name }] : []),
-            variations: featuredSpecial.variations || [],
+            variations: featuredSpecial.variations || [], // Ensure these variations have their content property populated if available in FeaturedSpecial
             suggestedSideItems: featuredSpecial.suggestedSideItems || [],
             categories: [],
           }}

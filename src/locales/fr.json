@@ -1876,5 +1876,6 @@
   "no_bundles_available": "Aucun pack menu disponible pour le moment",
   "availability_mode": "Mode de disponibilité",
   "custom_schedule": "Horaire personnalisé",
-  "order_received": "Commande reçue"
+  "order_received": "Commande reçue",
+  "uploaded_images": "Images téléchargées"
 }

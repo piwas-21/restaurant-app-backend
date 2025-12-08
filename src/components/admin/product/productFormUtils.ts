@@ -243,6 +243,7 @@ export const submitEditProductForm = async ({
         priceModifier: parseNum(v.priceModifier, 0),
         isActive: v.isActive ?? true,
         displayOrder: Number.isInteger(v.displayOrder as any) ? (v.displayOrder as any) : 0,
+        content: v.content,
       }));
 
     // Process ingredients: check for new ones and create them globally

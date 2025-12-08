@@ -68,10 +68,10 @@ export default function TableCanvas({
     const isSquare = shape === 'square';
 
     const shapeStyle: React.CSSProperties = isRound
-      ? { borderRadius: '50%', width: '80px', height: '80px' }
+      ? { borderRadius: '50%', width: '8%', height: '10%' }
       : isSquare
-      ? { width: '60px', height: '60px' }
-      : { width: '100px', height: '70px' };
+      ? { width: '8%', height: '8%' }
+      : { width: '12%', height: '14%' };
 
     const leftPercent = (table.positionX / CANVAS_WIDTH) * 100;
     const topPercent = (table.positionY / CANVAS_HEIGHT) * 100;

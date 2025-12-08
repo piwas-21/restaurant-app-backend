@@ -1876,5 +1876,6 @@
   "no_bundles_available": "Şu anda menü paketi mevcut değil",
   "availability_mode": "Uygunluk Modu",
   "custom_schedule": "Özel Program",
-  "order_received": "Sipariş alındı"
+  "order_received": "Sipariş alındı",
+  "uploaded_images": "Yüklü Görseller"
 }

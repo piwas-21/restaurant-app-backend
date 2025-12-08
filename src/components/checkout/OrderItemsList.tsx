@@ -16,6 +16,10 @@ interface CartItem {
   productName?: string;
   productImageUrl?: string;
   variationName?: string;
+  variationContent?: Record<string, {
+    name: string;
+    description?: string;
+  }>;
   quantity: number;
   unitPrice: number;
   itemTotal: number;
@@ -28,7 +32,8 @@ interface OrderItemsListProps {
 }
 
 export default function OrderItemsList({ items, formatPrice }: OrderItemsListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = (i18n.language?.split("-")[0] || "en") as string;
   const router = useRouter();
 
   return (
@@ -47,24 +52,29 @@ export default function OrderItemsList({ items, formatPrice }: OrderItemsListPro
         </button>
       </div>
       <div className={styles.itemsList}>
-        {items.map((item, index) => (
-          <div key={item.id || `item-${index}`} className={styles.cartItem}>
-            {item.productImageUrl && (
-              <div className={styles.itemImage}>
-                <Image
-                  src={item.productImageUrl}
-                  alt={item.productName || ''}
-                  width={60}
-                  height={60}
-                  style={{ objectFit: 'cover' }}
-                />
-              </div>
-            )}
-            <div className={styles.itemDetails}>
-              <h3 className={styles.itemName}>{item.productName}</h3>
-              {item.variationName && (
-                <p className={styles.itemVariation}>{item.variationName}</p>
+        {items.map((item, index) => {
+          const variationName = item.variationContent?.[currentLanguage]?.name || 
+                                item.variationContent?.en?.name || 
+                                item.variationName;
+
+          return (
+            <div key={item.id || `item-${index}`} className={styles.cartItem}>
+              {item.productImageUrl && (
+                <div className={styles.itemImage}>
+                  <Image
+                    src={item.productImageUrl}
+                    alt={item.productName || ''}
+                    width={60}
+                    height={60}
+                    style={{ objectFit: 'cover' }}
+                  />
+                </div>
               )}
+              <div className={styles.itemDetails}>
+                <h3 className={styles.itemName}>{item.productName}</h3>
+                {variationName && (
+                  <p className={styles.itemVariation}>{variationName}</p>
+                )}
               {item.specialInstructions && (
                 <p className={styles.itemInstructions}>
                   <i>{item.specialInstructions}</i>
@@ -78,7 +88,8 @@ export default function OrderItemsList({ items, formatPrice }: OrderItemsListPro
               {formatPrice(item.itemTotal)}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     </section>
   );

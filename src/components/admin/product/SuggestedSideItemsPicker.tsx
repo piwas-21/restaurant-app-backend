@@ -128,7 +128,7 @@ export const SuggestedSideItemsPicker: React.FC<SuggestedSideItemsPickerProps> =
 
   return (
     <div className={modalStyles.formGroup}>
-      <h3>{t('suggested_side_items')} ({t('optional')})</h3>
+      <h3>{t('suggested_side_items')} {t('optional')}</h3>
       {errors.suggestedSideItemIds && (
         <p className={modalStyles.errorMessage}>{errors.suggestedSideItemIds.message}</p>
       )}

@@ -15,7 +15,8 @@ export default function CartPage() {
   const router = useRouter();
   const { state, removeItem, updateItem, applyPromoCode, removePromoCode, getTotal, getItemCount } = useCart();
   const { hasTableContext } = useTableContext();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = (i18n.language?.split("-")[0] || "en") as string;
   const [promoCode, setPromoCode] = useState('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [editingInstructions, setEditingInstructions] = useState<string | null>(null);
@@ -120,6 +121,10 @@ export default function CartPage() {
         <div className={styles.cartItemsList}>
           {state.items.map((item) => {
             const itemId = item.basketItemId || item.id || item.productId;
+            const variationName = item.variationContent?.[currentLanguage]?.name || 
+                                  item.variationContent?.en?.name || 
+                                  item.variationName;
+
             return (
               <div key={itemId} className={styles.cartItem}>
                 {/* Item Image */}
@@ -138,9 +143,9 @@ export default function CartPage() {
                 {/* Item Details */}
                 <div className={styles.itemDetails}>
                   <h2 className={styles.itemName}>{item.productName || 'Unknown Item'}</h2>
-                  {item.variationName && (
+                  {variationName && (
                     <p className={styles.itemVariation}>
-                      <strong>{t('variation', 'Size/Variation')}:</strong> {item.variationName}
+                      <strong>{t('variation', 'Size/Variation')}:</strong> {variationName}
                     </p>
                   )}
 

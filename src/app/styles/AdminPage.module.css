@@ -1079,3 +1079,32 @@
   color: var(--link-hover-color);
   border-bottom-color: var(--link-hover-color);
 }
+
+.existingImagesList {
+  margin-top: 1rem;
+  background-color: var(--secondary-color-light, #f8f9fa);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #dee2e6);
+}
+
+.existingImagesList p {
+  margin-bottom: 0.5rem;
+  color: var(--text-color, #333);
+}
+
+.existingImagesList ul {
+  padding-left: 1.5rem;
+  margin: 0;
+}
+
+.existingImagesList li {
+  margin-bottom: 0.25rem;
+  color: var(--text-secondary, #555);
+  word-break: break-all;
+}
+
+[data-theme="dark"] .existingImagesList {
+  background-color: var(--secondary-color, #2c2c2c);
+  border-color: var(--border-color, #444);
+}

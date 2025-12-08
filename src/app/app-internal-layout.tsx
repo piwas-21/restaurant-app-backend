@@ -194,7 +194,7 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
                 {renderNavLinks()}
                 {isClient && !isLoading && (
                   <>
-                    {user ? <UserMenu /> : <Link href="/auth/login" className={`nav-link ${pathname === '/auth/login' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_login', 'Login')}</Link>}
+                    {user ? <UserMenu onMobileMenuClose={closeMobileMenu} /> : <Link href="/auth/login" className={`nav-link ${pathname === '/auth/login' ? 'active' : ''}`} onClick={closeMobileMenu}>{t('nav_login', 'Login')}</Link>}
                     <div className={navStyles.switcherGroup}>
                       <LanguageSwitcher />
                       <ThemeSwitcher />

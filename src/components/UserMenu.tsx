@@ -8,7 +8,11 @@ import styles from '../app/styles/UserMenu.module.css';
 import { useAuth } from './AuthContext';
 import Link from 'next/link';
 
-export default function UserMenu() {
+interface UserMenuProps {
+  onMobileMenuClose?: () => void;
+}
+
+export default function UserMenu({ onMobileMenuClose }: UserMenuProps) {
   const { t } = useTranslation();
   const { getRoleLabel } = useRoleHelpers();
   const { user, logout } = useAuth();
@@ -60,18 +64,18 @@ export default function UserMenu() {
           </div>
           {user.role.toLowerCase() === 'customer' && (
             <>
-              <Link href="/account" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+              <Link href="/account" className={styles.dropdownLink} onClick={() => { setDropdownOpen(false); onMobileMenuClose?.(); }}>
                 {t('user_menu.my_account', 'My Account')}
               </Link>
-              <Link href="/orders" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+              <Link href="/orders" className={styles.dropdownLink} onClick={() => { setDropdownOpen(false); onMobileMenuClose?.(); }}>
                 {t('user_menu.my_orders', 'My Orders')}
               </Link>
-              <Link href="/my-reservations" className={styles.dropdownLink} onClick={() => setDropdownOpen(false)}>
+              <Link href="/my-reservations" className={styles.dropdownLink} onClick={() => { setDropdownOpen(false); onMobileMenuClose?.(); }}>
                 {t('nav_reservations', 'Reservations')}
               </Link>
             </>
           )}
-          <button onClick={handleLogout} className={styles.logoutButton}>
+          <button onClick={() => { handleLogout(); onMobileMenuClose?.(); }} className={styles.logoutButton}>
             {t('user_menu.logout')}
           </button>
         </div>

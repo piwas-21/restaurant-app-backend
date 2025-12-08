@@ -21,7 +21,7 @@ interface VariationsTableProps {
 }
 
 const VariationsTable: React.FC<VariationsTableProps> = ({ variations, productId, onUpdated, product }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [local, setLocal] = useState<Variation[]>(variations || []);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -249,19 +249,25 @@ const VariationsTable: React.FC<VariationsTableProps> = ({ variations, productId
           {local.map((v, idx) => (
             <tr key={v.id || v.name} className={!v.isActive ? detailsStyles.inactiveRow : ''}>
               <td>
-                {editingIndex===idx && draft ? (
+                {editingIndex === idx && draft ? (
                   <input
                     ref={editNameInputRef}
-                    value={draft.name||''}
-                    onChange={e=>updateDraftName(e.target.value)}
+                    value={draft.name || ''}
+                    onChange={e => updateDraftName(e.target.value)}
                     className={nameFieldError ? modalStyles.fieldError : ''}
                   />
-                ) : v.name}
+                ) : (
+                  // Multilingual display
+                  (v as any).content?.[i18n.language.split("-")[0]]?.name || v.name
+                )}
               </td>
               <td>
                 {editingIndex===idx && draft ? (
                   <input value={draft.description||''} onChange={e=>setDraft({...draft, description: e.target.value})} />
-                ) : (v.description || '-')}
+                ) : (
+                  // Multilingual display
+                  (v as any).content?.[i18n.language.split("-")[0]]?.description || v.description || '-'
+                )}
               </td>
               <td>
                 {editingIndex===idx && draft ? (

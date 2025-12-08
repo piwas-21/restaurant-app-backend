@@ -9,6 +9,10 @@ export const variationSchema = z.object({
   priceModifier: z.coerce.number(),
   isActive: z.boolean().default(true),
   displayOrder: z.coerce.number().int().default(0),
+  content: z.record(z.string(), z.object({
+    name: z.string().optional(),
+    description: z.string().optional()
+  })).optional().default({}),
 });
 
 export const contentSchema = z.object({

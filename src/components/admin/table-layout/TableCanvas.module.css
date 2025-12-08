@@ -18,8 +18,8 @@
 
 .entrance {
   position: absolute;
-  width: 60px;
-  height: 80px;
+  width: 3cqi;
+  height: 4cqi;
   font-size: 4rem;
   cursor: grab;
   user-select: none;
@@ -70,35 +70,35 @@
 .table {
   position: absolute;
   background: white;
-  border: 3px solid #4CAF50;
+  border: 0.3cqi solid #4CAF50;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
+  font-size: 1.5cqi;
   font-weight: 600;
   user-select: none;
   transform: translate(-50%, -50%);
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.3cqi 2cqi rgba(0, 0, 0, 0.1);
 }
 
 .table:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1cqi 3cqi rgba(0, 0, 0, 0.2);
   z-index: 5;
 }
 
 .table.selected {
   border-color: #2196F3;
-  border-width: 4px;
-  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.2), 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-width: 0.5cqi;
+  box-shadow: 0 0 0 0.5cqi rgba(33, 150, 243, 0.2), 0 1cqi 3cqi rgba(0, 0, 0, 0.2);
   z-index: 6;
 }
 
 .table.inSelection {
   border-color: #FF9800;
-  border-width: 4px;
-  box-shadow: 0 0 0 4px rgba(255, 152, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-width: 0.7cqi;
+  box-shadow: 0 0 0 0.7cqi rgba(255, 152, 0, 0.2), 0 1cqi 3cqi rgba(0, 0, 0, 0.2);
 }
 
 .table.inactive {
@@ -107,13 +107,13 @@
 }
 
 .tableNumber {
-  font-size: 1.1rem;
+  font-size: 1.5cqi;
   color: #333;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5cqi;
 }
 
 .guestCount {
-  font-size: 0.75rem;
+  font-size: 1cqi;
   color: #666;
 }
 
@@ -121,17 +121,17 @@
 .inactiveBadge,
 .checkmark {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  font-size: 1rem;
+  top: -1cqi;
+  right: -1cqi;
+  font-size: 1cqi;
   background: white;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  width: 2cqi;
+  height: 2cqi;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0.5cqi 1cqi rgba(0, 0, 0, 0.2);
 }
 
 .inactiveBadge {
@@ -147,20 +147,20 @@
 
 .rotationHandle {
   position: absolute;
-  top: -20px;
-  right: -20px;
-  width: 28px;
-  height: 28px;
+  top: -1cqi;
+  right: -1cqi;
+  width: 2cqi;
+  height: 2cqi;
   background: #2196F3;
-  border: 2px solid white;
+  border: 0.1cqi solid white;
   border-radius: 50%;
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 0.875rem;
-  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.5);
+  font-size: 0.9cqi;
+  box-shadow: 0 0.3cqi 2cqi rgba(33, 150, 243, 0.5);
   z-index: 10;
   transition: all 0.2s;
 }
@@ -168,14 +168,14 @@
 .rotationHandle:hover {
   transform: scale(1.2);
   background: #1976D2;
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.6);
+  box-shadow: 0 1cqi 3cqi rgba(33, 150, 243, 0.6);
 }
 
 .rotationHandle.rotating {
   cursor: grabbing;
   transform: scale(1.3);
   background: #1565C0;
-  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.7);
+  box-shadow: 0 1cqi 3cqi rgba(33, 150, 243, 0.7);
 }
 
 .emptyState {

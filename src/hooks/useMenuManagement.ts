@@ -79,19 +79,23 @@ export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') 
     fetchCategories();
   }, []);
 
-  // Clear products immediately when tab changes to prevent showing stale data
+  // Fetch when tab or category changes
   useEffect(() => {
     activeTabRef.current = activeTab; // Update ref to current tab
-    setProducts([]);
-    setCurrentPage(1);
+    // Only reset products on tab change to avoid flash, but consistent behavior is key
+    // for category change we might want to keep showing old until new loads?
+    // accepted pattern: setProducts([]) to show loading state cleanly or keep it.
+    // Existing code did setProducts([]) on tab change.
+    
+    // We want to reset page to 1 when tab OR category changes
+    setCurrentPage(1); 
     fetchProducts(1);
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedCategoryId]); // Added selectedCategoryId dependency
 
   const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const categoryId = event.target.value;
     setSelectedCategoryId(categoryId === 'all' ? null : categoryId);
-    setCurrentPage(1);
-    router.push('/admin/menu-management');
+    // Removed router.push which was clearing params/state unnecessarily
   };
 
   const handlePageChange = (page: number) => {

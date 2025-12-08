@@ -1875,5 +1875,6 @@
   "no_bundles_available": "لا حزم قائمة متاحة حاليا",
   "availability_mode": "وضع المتاحة",
   "custom_schedule": "جدول مخصص",
-  "order_received": "تم استلام الطلب"
+  "order_received": "تم استلام الطلب",
+  "uploaded_images": "الصور المحملة"
 }

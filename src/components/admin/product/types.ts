@@ -33,6 +33,10 @@ export interface Variation {
   priceModifier: number;
   isActive: boolean;
   displayOrder: number;
+  content: Record<string, {
+    name: string;
+    description?: string;
+  }>;
 }
 
 export interface ContentItem {
@@ -101,6 +105,7 @@ export interface ProductDetailsProps {
   control: any;
   imageFiles: File[];
   setImageFiles: (files: File[]) => void;
+  existingImages?: { id: string; url: string; altText?: string; isPrimary: boolean }[];
 }
 
 export interface MultilingualContentProps {

@@ -196,6 +196,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
               control={control}
               imageFiles={imageFiles}
               setImageFiles={setImageFiles}
+              existingImages={product.images || []}
             />
           </div>
 

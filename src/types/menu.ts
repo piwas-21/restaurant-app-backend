@@ -71,6 +71,10 @@ export interface MenuItem {
     priceModifier: number;
     displayOrder: number;
     description?: string;
+    content?: Record<string, {
+      name: string;
+      description?: string;
+    }>;
   }>;
   suggestedSideItems?: SuggestedSideItem[]; // Full side item objects
   categoryKey?: string;
@@ -142,6 +146,10 @@ export interface DetailedProductVariation {
   finalPrice: number;
   isActive: boolean;
   displayOrder: number;
+  content?: Record<string, {
+    name: string;
+    description?: string;
+  }>;
 }
 
 export interface SuggestedSideItem {

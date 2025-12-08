@@ -279,25 +279,31 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
                 {detailedProduct.variations
                   .filter(v => v.isActive)
                   .sort((a, b) => a.displayOrder - b.displayOrder)
-                  .map((variation, idx) => (
-                    <div key={`${item.id}-variation-${idx}`} className={styles.variationItem}>
-                      <span className={styles.variationName}>{variation.name}</span>
-                      <span className={styles.variationPrice}>
-                        CHF {variation.finalPrice.toFixed(2)}
-                        {variation.priceModifier !== 0 && (
-                          <span className={styles.priceModifier}>
-                            {variation.priceModifier > 0
-                              ? ` (+${variation.priceModifier.toFixed(2)})`
-                              : ` (${variation.priceModifier.toFixed(2)})`
-                            }
-                          </span>
+                  .map((variation, idx) => {
+                    // Try to get name/description in current language
+                    const varName = variation.content?.[currentLanguage]?.name || variation.content?.en?.name || variation.name;
+                    const varDesc = variation.content?.[currentLanguage]?.description || variation.content?.en?.description || variation.description;
+
+                    return (
+                      <div key={`${item.id}-variation-${idx}`} className={styles.variationItem}>
+                        <span className={styles.variationName}>{varName}</span>
+                        <span className={styles.variationPrice}>
+                          CHF {variation.finalPrice.toFixed(2)}
+                          {variation.priceModifier !== 0 && (
+                            <span className={styles.priceModifier}>
+                              {variation.priceModifier > 0
+                                ? ` (+${variation.priceModifier.toFixed(2)})`
+                                : ` (${variation.priceModifier.toFixed(2)})`
+                              }
+                            </span>
+                          )}
+                        </span>
+                        {varDesc && (
+                          <p className={styles.variationDescription}>{varDesc}</p>
                         )}
-                      </span>
-                      {variation.description && (
-                        <p className={styles.variationDescription}>{variation.description}</p>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           )}

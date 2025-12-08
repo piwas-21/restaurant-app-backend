@@ -1884,5 +1884,6 @@
   "no_bundles_available": "Noch keine Menü-Bundles verfügbar",
   "availability_mode": "Verfügbarkeitsmodus",
   "custom_schedule": "Personalisierter Terminplan",
-  "order_received": "Bestellung erhalten"
+  "order_received": "Bestellung erhalten",
+  "uploaded_images": "Hochgeladene Bilder"
 }
