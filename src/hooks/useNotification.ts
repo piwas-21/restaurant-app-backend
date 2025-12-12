@@ -14,42 +14,82 @@ export interface Notification {
 export function useNotification() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationIdRef = useRef(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
+  // Initialize AudioContext on first user interaction
+  const initializeAudio = useCallback(() => {
+    if (audioContextRef.current) return;
+
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContextClass();
+      setAudioEnabled(true);
+      console.log('Audio initialized successfully');
+    } catch (error) {
+      console.error('Could not initialize audio context:', error);
+    }
+  }, []);
+
+  // Toggle audio on/off
+  const toggleAudio = useCallback(() => {
+    if (!audioContextRef.current) {
+      initializeAudio();
+    } else {
+      setAudioEnabled(prev => !prev);
+      console.log(`Audio ${!audioEnabled ? 'enabled' : 'disabled'}`);
+    }
+  }, [initializeAudio, audioEnabled]);
 
   // Play notification sound using Web Audio API
   const playNotificationSound = useCallback(() => {
+    if (!audioContextRef.current || !audioEnabled) {
+      if (!audioContextRef.current) {
+        console.warn('AudioContext not initialized. User interaction required.');
+      }
+      return;
+    }
+
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = audioContextRef.current;
+      
+      // Resume context if suspended (required by some browsers)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
       const now = audioContext.currentTime;
 
-      // Create oscillator for beep sound
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      // Pleasant notification chime (3 notes: E5, G#5, E6)
+      const playNote = (frequency: number, startTime: number, duration: number, volume: number) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Use sine wave for pleasant tone
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+        
+        // Envelope: quick attack, slow decay
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // Musical chime: E5 (659.25 Hz), G#5 (830.61 Hz), E6 (1318.51 Hz)
+      playNote(659.25, now, 0.3, 0.2);           // E5
+      playNote(830.61, now + 0.1, 0.4, 0.15);    // G#5
+      playNote(1318.51, now + 0.2, 0.6, 0.1);    // E6 (high note)
 
-      // Double beep pattern: high-low
-      oscillator.frequency.setValueAtTime(800, now); // High frequency
-      gainNode.gain.setValueAtTime(0.3, now);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-
-      oscillator.start(now);
-      oscillator.stop(now + 0.1);
-
-      // Second beep
-      const osc2 = audioContext.createOscillator();
-      osc2.connect(gainNode);
-      osc2.frequency.setValueAtTime(600, now + 0.15); // Lower frequency
-      gainNode.gain.setValueAtTime(0.3, now + 0.15);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-
-      osc2.start(now + 0.15);
-      osc2.stop(now + 0.25);
     } catch (error) {
-      // Silently fail if audio context not available
       console.error('Could not play notification sound:', error);
     }
-  }, []);
+  }, [audioEnabled]);
 
   const addNotification = useCallback(
     (notification: Omit<Notification, 'id'>) => {
@@ -117,5 +157,7 @@ export function useNotification() {
     removeNotification,
     notifyNewOrder,
     notifyOrderReady,
+    audioEnabled,
+    toggleAudio,
   };
 }

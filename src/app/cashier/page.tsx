@@ -58,6 +58,8 @@ export default function CashierPage() {
     notifications,
     removeNotification,
     notifyNewOrder,
+    audioEnabled,
+    toggleAudio,
   } = useNotification();
   const previousOrderCountRef = useRef(0);
   const isInitialLoadRef = useRef(true);
@@ -130,10 +132,28 @@ export default function CashierPage() {
           order.customerName || ''
         );
       });
+
+      // Visual flash effect for new orders (fallback when sound disabled)
+      if (!audioEnabled) {
+        const flashEl = document.createElement('div');
+        flashEl.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(255, 152, 0, 0.3);
+          pointer-events: none;
+          z-index: 9999;
+          animation: flash 0.5s ease-out;
+        `;
+        document.body.appendChild(flashEl);
+        setTimeout(() => flashEl.remove(), 500);
+      }
     }
 
     previousOrderCountRef.current = orders.length;
-  }, [orders, notifyNewOrder]);
+  }, [orders, notifyNewOrder, audioEnabled]);
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -272,6 +292,25 @@ export default function CashierPage() {
               {isConnected ? t('cashier.connected') || 'Connected' : t('cashier.disconnected') || 'Disconnected'}
             </span>
           </div>
+
+          <button
+            className={styles.refreshButton}
+            onClick={toggleAudio}
+            title={audioEnabled 
+              ? (t('cashier.disable_sound') || 'Disable notification sounds')
+              : (t('cashier.enable_sound') || 'Enable notification sounds')
+            }
+            style={{ 
+              marginRight: '10px',
+              backgroundColor: audioEnabled ? '#4caf50' : '#ff9800',
+              color: 'white'
+            }}
+          >
+            {audioEnabled ? '🔕' : '🔔'} {audioEnabled 
+              ? (t('cashier.disable_sound') || 'Disable Sound')
+              : (t('cashier.enable_sound') || 'Enable Sound')
+            }
+          </button>
 
           <button
             className={styles.refreshButton}

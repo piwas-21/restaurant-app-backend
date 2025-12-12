@@ -1929,5 +1929,7 @@
   "sending": "جاري الإرسال...",
   "resend_email": "إعادة إرسال البريد الإلكتروني",
   "email_verification_required": "يرجى التحقق من عنوان بريدك الإلكتروني قبل تسجيل الدخول.",
-  "resend_verification_email": "إعادة إرسال بريد التحقق"
+  "resend_verification_email": "إعادة إرسال بريد التحقق",
+  "cashier.enable_sound": "تمكين صوت الإشعارات",
+  "cashier.disable_sound": "إيقاف صوت الإشعارات"
 }

@@ -1863,5 +1863,7 @@
   "sending": "Отправка...",
   "resend_email": "Отправить письмо повторно",
   "email_verification_required": "Пожалуйста, подтвердите свой адрес электронной почты перед входом.",
-  "resend_verification_email": "Отправить письмо для подтверждения повторно"
+  "resend_verification_email": "Отправить письмо для подтверждения повторно",
+  "cashier.enable_sound": "Включить звук уведомления",
+  "cashier.disable_sound": "Выключить звук уведомления"
 }

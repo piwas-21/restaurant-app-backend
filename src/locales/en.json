@@ -1930,5 +1930,7 @@
   "sending": "Sending...",
   "resend_email": "Resend Email",
   "email_verification_required": "Please verify your email address before logging in.",
-  "resend_verification_email": "Resend Verification Email"
+  "resend_verification_email": "Resend Verification Email",
+  "cashier.enable_sound": "Enable notification sounds",
+  "cashier.disable_sound": "Disable notification sounds"
 }

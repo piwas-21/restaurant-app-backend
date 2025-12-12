@@ -178,9 +178,12 @@ export function useCashierOrders(): UseCashierOrdersReturn {
         }
       });
 
-      eventSource.onerror = () => {
-        // eslint-disable-next-line no-console
-        console.warn('SSE connection error, attempting to reconnect...');
+      eventSource.onerror = (event) => {
+        console.error('SSE connection error:', {
+          readyState: eventSource.readyState,
+          url: url,
+          event: event
+        });
         setIsConnected(false);
         eventSourceRef.current?.close();
         eventSourceRef.current = null;
@@ -189,6 +192,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
         if (reconnectAttemptRef.current < maxReconnectAttemptsRef.current) {
           reconnectAttemptRef.current += 1;
           const backoffMs = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
+          console.warn(`SSE reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttemptsRef.current} in ${backoffMs}ms`);
 
           if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
           pollingTimeoutRef.current = setTimeout(() => {
@@ -196,8 +200,8 @@ export function useCashierOrders(): UseCashierOrdersReturn {
           }, backoffMs);
         } else {
           // Fall back to polling if SSE fails too many times
-          // eslint-disable-next-line no-console
-          console.warn('SSE connection failed, falling back to polling');
+          console.warn('SSE connection failed after max attempts, falling back to polling');
+          setError('Real-time updates unavailable - using 10s polling');
           setupPolling();
         }
       };

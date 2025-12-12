@@ -1930,5 +1930,7 @@
   "sending": "Gönderiliyor...",
   "resend_email": "E-postayı Tekrar Gönder",
   "email_verification_required": "Giriş yapmadan önce lütfen e-posta adresinizi doğrulayın.",
-  "resend_verification_email": "Doğrulama E-postasını Tekrar Gönder"
+  "resend_verification_email": "Doğrulama E-postasını Tekrar Gönder",
+  "cashier.enable_sound": "Bildirim seslerini etkinleştir",
+  "cashier.disable_sound": "Bildirim seslerini devre dışı bırak"
 }

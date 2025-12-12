@@ -1938,5 +1938,7 @@
   "sending": "Senden...",
   "resend_email": "E-Mail erneut senden",
   "email_verification_required": "Bitte verifizieren Sie Ihre E-Mail-Adresse, bevor Sie sich anmelden.",
-  "resend_verification_email": "Verifizierungs-E-Mail erneut senden"
+  "resend_verification_email": "Verifizierungs-E-Mail erneut senden",
+  "cashier.enable_sound": "Benachrichtigungstöne aktivieren",
+  "cashier.disable_sound": "Benachrichtigungstöne deaktivieren"
 }

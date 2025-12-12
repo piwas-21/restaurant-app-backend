@@ -1932,5 +1932,7 @@
   "sending": "Enviando...",
   "resend_email": "Reenviar Correo Electrónico",
   "email_verification_required": "Por favor, verifica tu dirección de correo electrónico antes de iniciar sesión.",
-  "resend_verification_email": "Reenviar Correo Electrónico de Verificación"
+  "resend_verification_email": "Reenviar Correo Electrónico de Verificación",
+  "cashier.enable_sound": "Activar sonidos de notificación",
+  "cashier.disable_sound": "Desactivar sonidos de notificación"
 }

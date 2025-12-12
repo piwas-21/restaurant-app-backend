@@ -79,7 +79,9 @@ export default function RegisterPage() {
     try {
       const response = await registerCustomer(formData);
       if (response?.success) {
-        setRegistrationSuccess(true);
+        // Redirect directly to login instead of showing verification screen
+        // (Email verification temporarily disabled)
+        router.push('/auth/login?registered=true');
       } else {
         const apiErrors = Array.isArray(response?.errors) ? response.errors.join(', ') : '';
         setGeneralError(apiErrors || response?.message || t('failed_to_register', "Failed to register."));

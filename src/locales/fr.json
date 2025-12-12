@@ -1930,5 +1930,7 @@
   "sending": "Envoi...",
   "resend_email": "Renvoyer l'e-mail",
   "email_verification_required": "Veuillez vérifier votre adresse e-mail avant de vous connecter.",
-  "resend_verification_email": "Renvoyer l'e-mail de vérification"
+  "resend_verification_email": "Renvoyer l'e-mail de vérification",
+  "cashier.enable_sound": "Activer les sons de notification",
+  "cashier.disable_sound": "Désactiver les sons de notification"
 }
