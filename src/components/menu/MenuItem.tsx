@@ -34,6 +34,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
   const [showFeedbackForm, setShowFeedbackForm] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showCustomization, setShowCustomization] = useState(false);
+  const [detailedProduct, setDetailedProduct] = useState<MenuItemType | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // Get current language - component will re-render when i18n.language changes
   const currentLanguage = (i18n.language.split("-")[0] || "en") as LanguageCode;
@@ -41,13 +43,35 @@ const MenuItem: React.FC<MenuItemProps> = ({
   // Check if product has customization options
   const hasCustomizationOptions =
     (item.variations && item.variations.length > 0) ||
-    (item.detailedIngredients && item.detailedIngredients.some(ing => ing.isOptional)) ||
+    (item.detailedIngredients && item.detailedIngredients.length > 0) ||
     (item.suggestedSideItems && item.suggestedSideItems.length > 0);
 
   const handleAddItemToCart = useCallback(async () => {
-    // If product has customization options, show customization modal
+    // If product has customization options, fetch full details and show customization modal
     if (hasCustomizationOptions) {
-      setShowCustomization(true);
+      setIsLoadingDetails(true);
+      try {
+        // Fetch full product details to ensure we have detailedIngredients and suggestedSideItems
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products/${item.id}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            setDetailedProduct(result.data);
+            setShowCustomization(true);
+          } else {
+            throw new Error('Failed to load product details');
+          }
+        } else {
+          throw new Error('Failed to fetch product details');
+        }
+      } catch (error) {
+        console.error('Error fetching product details:', error);
+        enqueueSnackbar(t("error_loading_product", "Failed to load product details"), {
+          variant: "error",
+        });
+      } finally {
+        setIsLoadingDetails(false);
+      }
       return;
     }
 
@@ -174,14 +198,33 @@ const MenuItem: React.FC<MenuItemProps> = ({
         />
       )}
       <ProductDetailsModal isOpen={showDetails} item={item} onClose={() => setShowDetails(false)} />
-      {showCustomization && (
+      {showCustomization && detailedProduct && (
         <CustomizationModal
-          product={item}
+          product={detailedProduct}
           isOpen={showCustomization}
-          onClose={() => setShowCustomization(false)}
+          onClose={() => {
+            setShowCustomization(false);
+            setDetailedProduct(null);
+          }}
           onAddToCart={handleCustomizationConfirm}
         />
       )}
+      {isLoadingDetails && (
+        <div style={{ 
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 9999,
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '20px',
+          borderRadius: '8px'
+        }}>
+          {t('loading', 'Loading...')}
+        </div>
+      )}
+
     </div>
   );
 };

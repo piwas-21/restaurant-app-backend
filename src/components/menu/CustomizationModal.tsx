@@ -201,7 +201,7 @@ export default function CustomizationModal({
       : (product as MenuItem).price || 0;
 
   // Check if product has any customization options
-  const hasOptionalIngredients = product.detailedIngredients?.some((i) => i.isOptional);
+  const hasIngredients = product.detailedIngredients && product.detailedIngredients.length > 0;
   const hasVariations = product.variations && product.variations.length > 0;
   const hasSuggestedSides =
     "suggestedSideItems" in product &&
@@ -254,8 +254,8 @@ export default function CustomizationModal({
             />
           )}
 
-          {/* Optional Ingredients Section */}
-          {hasOptionalIngredients && (
+          {/* Ingredients Section - Show for ALL ingredients, not just optional */}
+          {hasIngredients && (
             <OptionalIngredientsSection
               ingredients={product.detailedIngredients || []}
               selectedIngredients={selectedIngredients}
