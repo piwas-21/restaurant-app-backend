@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/components/AuthContext';
 import { reservationService } from '@/services/reservationService';
 import {
   ReservationFormData,
@@ -15,6 +16,7 @@ type WizardStep = 'guests' | 'date' | 'time' | 'table' | 'details' | 'summary';
 
 export default function ReservationWizard() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<WizardStep>('guests');
   const [formData, setFormData] = useState<ReservationFormData>({
     customerName: '',
@@ -28,6 +30,18 @@ export default function ReservationWizard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Prefill customer details from logged-in user
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        customerName: `${user.firstName} ${user.lastName}`.trim(),
+        customerEmail: user.email || '',
+        customerPhone: '' // User interface doesn't have phone
+      }));
+    }
+  }, [user]);
 
   const steps: WizardStep[] = ['guests', 'date', 'time', 'table', 'details', 'summary'];
   const currentStepIndex = steps.indexOf(currentStep);
@@ -110,6 +124,17 @@ export default function ReservationWizard() {
     }
   };
 
+  // Compute filtered time slots based on selected table
+  // If a table is selected, only show time slots where that table is available
+  const filteredTimeSlots = availableSlots?.timeSlots.filter(slot => {
+    if (!formData.selectedTable) {
+      // No table selected - show all time slots
+      return true;
+    }
+    // Table selected - only show slots where this table is available
+    return slot.availableTables.some(table => table.id === formData.selectedTable?.id);
+  }) || [];
+
   return (
     <div className={styles.wizard}>
       <div className={styles.header}>
@@ -172,18 +197,23 @@ export default function ReservationWizard() {
         {currentStep === 'time' && (
           <div className={styles.step}>
             <h2>{t('reservation_select_time_slot')}</h2>
+            {formData.selectedTable && (
+              <p className={styles.infoMessage}>
+                {t('reservation_showing_slots_for_table', { tableNumber: formData.selectedTable.tableNumber })}
+              </p>
+            )}
             {loading ? (
               <div>Loading...</div>
-            ) : availableSlots && availableSlots.timeSlots.length > 0 ? (
+            ) : filteredTimeSlots.length > 0 ? (
               <div className={styles.timeSlots}>
-                {availableSlots.timeSlots.map((slot, index) => (
+                {filteredTimeSlots.map((slot, index) => (
                   <button
                     key={index}
                     className={`${styles.timeSlotButton} ${
                       formData.selectedTimeSlot === slot ? styles.selected : ''
                     }`}
                     onClick={() => {
-                      setFormData({ ...formData, selectedTimeSlot: slot, selectedTable: undefined });
+                      setFormData({ ...formData, selectedTimeSlot: slot });
                       handleNext();
                     }}
                   >
@@ -204,6 +234,9 @@ export default function ReservationWizard() {
         {currentStep === 'table' && formData.selectedTimeSlot && (
           <div className={styles.step}>
             <h2>{t('reservation_select_table')}</h2>
+            <p className={styles.infoMessage}>
+              {t('reservation_tip_select_table_filter')}
+            </p>
             <div className={styles.tables}>
               {formData.selectedTimeSlot.availableTables.map((table) => (
                 <button
@@ -211,7 +244,10 @@ export default function ReservationWizard() {
                   className={`${styles.tableCard} ${
                     formData.selectedTable?.id === table.id ? styles.selected : ''
                   }`}
-                  onClick={() => setFormData({ ...formData, selectedTable: table })}
+                  onClick={() => {
+                    setFormData({ ...formData, selectedTable: table });
+                    // Don't clear time slot - allow user to go back and see filtered time slots
+                  }}
                 >
                   <div className={styles.tableNumber}>
                     {t('reservation_table_number', { number: table.tableNumber })}

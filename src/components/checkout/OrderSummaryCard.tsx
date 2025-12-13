@@ -26,6 +26,7 @@ interface OrderSummaryCardProps {
   taxAmount: number;
   pointsDiscount: number;
   redeemedPoints: number;
+  tipAmount: number;
   isSubmitting: boolean;
   submitError: string;
   formatPrice: (price: number) => string;
@@ -39,6 +40,7 @@ export default function OrderSummaryCard({
   taxAmount,
   pointsDiscount,
   redeemedPoints,
+  tipAmount,
   isSubmitting,
   submitError,
   formatPrice,
@@ -94,12 +96,19 @@ export default function OrderSummaryCard({
             <span>{formatPrice(taxAmount)}</span>
           </div>
         )}
+
+        {tipAmount > 0 && (
+          <div className={styles.summaryRow}>
+            <span>{t('tip', 'Tip')}</span>
+            <span>{formatPrice(tipAmount)}</span>
+          </div>
+        )}
       </div>
 
       <div className={styles.summaryTotal}>
         <span>{t('total', 'Total')}</span>
         <span className={styles.totalAmount}>
-          {formatTotal((basket?.total || 0) - pointsDiscount)}
+          {formatTotal((basket?.total || 0) - pointsDiscount + tipAmount)}
         </span>
       </div>
 

@@ -22,6 +22,7 @@ import FeaturedSpecialComponent from "@/components/menu/FeaturedSpecial";
 import MenuBundleDetailsModal from "@/components/menu/MenuBundleDetailsModal";
 import { MenuBundleItem, SelectedMenuOption } from '@/types/menu';
 import MenuCustomizationModal from '@/components/menu/MenuCustomizationModal';
+import FloatingCartButton from '@/components/menu/FloatingCartButton';
 
 export default function MenuPage() {
   const { t, i18n } = useTranslation();
@@ -29,6 +30,7 @@ export default function MenuPage() {
   const [selectedBundle, setSelectedBundle] = useState<MenuBundleItem | null>(null);
   const [showBundleDetails, setShowBundleDetails] = useState(false);
   const [selectedBundleForCustomization, setSelectedBundleForCustomization] = useState<MenuBundleItem | null>(null);
+  const [cartAnimationTrigger, setCartAnimationTrigger] = useState(false);
 
   const currentLanguage = (i18n.language.split("-")[0] || "en") as LanguageCode;
 
@@ -68,7 +70,7 @@ export default function MenuPage() {
     setShowFeaturedCustomization,
   } = useFeaturedSpecial();
 
-  const { addItem } = useCart();
+  const { addItem, state: cartState } = useCart();
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
@@ -128,6 +130,10 @@ export default function MenuPage() {
       enqueueSnackbar(t('item_added_to_cart_toast', { itemName: bundleName }), {
         variant: 'success',
       });
+      
+      // Trigger cart animation
+      setCartAnimationTrigger(true);
+      setTimeout(() => setCartAnimationTrigger(false), 100);
     } catch (error) {
       console.error('Error adding bundle to cart:', error);
       enqueueSnackbar(t('error_adding_to_cart', 'Failed to add bundle to cart'), {
@@ -156,6 +162,10 @@ export default function MenuPage() {
           if (!category) return String(selectedView);
           return getCategoryDisplayName(category.name, t);
         })();
+
+  // Calculate cart totals for floating button
+  const itemCount = cartState.items.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotal = cartState.basket?.total || 0;
 
   return (
     <main className={styles.menuContainer} aria-labelledby="menu-page-heading">
@@ -241,6 +251,13 @@ export default function MenuPage() {
           {t("view_cart_checkout_button")}
         </Link>
       </div>
+
+      {/* Floating Cart Button */}
+      <FloatingCartButton
+        itemCount={itemCount}
+        totalPrice={cartTotal}
+        onAnimate={cartAnimationTrigger}
+      />
     </main>
   );
 }

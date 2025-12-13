@@ -22,6 +22,7 @@ import {
   OrderPaymentDtoApiResponse,
   PagedResult,
   OrderPaymentDto,
+  ApiResponse,
 } from '@/types/order';
 
 /**
@@ -200,6 +201,25 @@ export async function cancelOrder(
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error cancelling order:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an order (soft delete - Admin only)
+ *
+ * @param orderId - Order ID
+ */
+export async function deleteOrder(orderId: string): Promise<void> {
+  try {
+    const response = await apiClient.delete<ApiResponse<boolean>>(`/api/Orders/${orderId}`, { requireAuth: true });
+
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to delete order');
+    }
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Error deleting order:', error);
     throw error;
   }
 }

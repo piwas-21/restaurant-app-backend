@@ -170,6 +170,8 @@ export interface CreateOrderCommand {
   basketTotal?: number;
   // Fidelity Points
   pointsToRedeem?: number;
+  // Tip
+  tip?: number;
   isFocusOrder?: boolean;
   priority?: number;
   focusReason?: string;

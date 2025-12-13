@@ -4,10 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/components/AuthContext';
-import { getOrders, updateOrderStatus, toggleFocusOrder } from '@/services/orderService';
+import { getOrders, updateOrderStatus, toggleFocusOrder, deleteOrder } from '@/services/orderService';
 import { OrderDto, OrderStatus, UpdateOrderStatusCommand, ToggleFocusOrderCommand } from '@/types/order';
 import { useSnackbar } from 'notistack';
 import OrderDetailsModal from '@/components/admin/OrderDetailsModal';
+import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
 import DateRangeFilter from '@/components/admin/DateRangeFilter';
 import OrderAnalytics from '@/components/admin/OrderAnalytics';
 import AdvancedOrderAnalytics from '@/components/admin/AdvancedOrderAnalytics';
@@ -71,6 +72,7 @@ export default function AdminOrdersPage() {
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [showBulkStatusModal, setShowBulkStatusModal] = useState(false);
   const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Bulk status update
   const [isUpdatingBulkStatus, setIsUpdatingBulkStatus] = useState(false);
@@ -97,11 +99,11 @@ export default function AdminOrdersPage() {
       description: t('close_open_modals', 'Close open modals'),
       translationKey: 'close_open_modals',
       action: () => {
-        setShowDetailsModal(false);
         setShowStatusModal(false);
         setShowFocusModal(false);
         setShowBulkStatusModal(false);
         setShowKeyboardShortcutsModal(false);
+        setShowDeleteModal(false);
       },
     },
     {
@@ -268,6 +270,28 @@ export default function AdminOrdersPage() {
     setShowFocusModal(false);
     setSelectedOrder(null);
     fetchOrders();
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      await deleteOrder(selectedOrder.id);
+
+      enqueueSnackbar(t('order_deleted_success', 'Order deleted successfully'), {
+        variant: 'success',
+        anchorOrigin: { vertical: 'bottom', horizontal: 'right' },
+      });
+
+      setShowDeleteModal(false);
+      setSelectedOrder(null);
+      fetchOrders();
+    } catch (error) {
+      enqueueSnackbar(t('order_delete_failed', 'Failed to delete order'), {
+        variant: 'error',
+        anchorOrigin: { vertical: 'bottom', horizontal: 'right' },
+      });
+    }
   };
 
   const handleDateRangeChange = (startDate: string | null, endDate: string | null) => {
@@ -525,6 +549,10 @@ export default function AdminOrdersPage() {
                 setSelectedOrder(order);
                 setShowFocusModal(true);
               }}
+              onDeleteOrder={(order) => {
+                setSelectedOrder(order);
+                setShowDeleteModal(true);
+              }}
             />
 
             <OrdersPagination
@@ -593,6 +621,17 @@ export default function AdminOrdersPage() {
           <KeyboardShortcutsModal
             shortcuts={keyboardShortcuts}
             onClose={() => setShowKeyboardShortcutsModal(false)}
+          />
+        )}
+
+        {showDeleteModal && selectedOrder && (
+          <DeleteConfirmationModal
+            order={selectedOrder}
+            onClose={() => {
+              setShowDeleteModal(false);
+              setSelectedOrder(null);
+            }}
+            onConfirm={handleDeleteOrder}
           />
         )}
       </div>

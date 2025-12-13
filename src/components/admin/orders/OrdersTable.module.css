@@ -226,6 +226,15 @@
   transform: scale(1.1);
 }
 
+.deleteButton {
+  color: var(--color-error);
+}
+
+.deleteButton:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--color-error);
+}
+
 @media (prefers-color-scheme: dark) {
   .actionButton {
     background: var(--secondary-color, #2c2c2c);

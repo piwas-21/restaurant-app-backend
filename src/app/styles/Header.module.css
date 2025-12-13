@@ -193,7 +193,7 @@
 
 /* Floating admin sidebar toggle button */
 .adminSidebarToggleFloating {
-  display: none;
+  display: none; /* Hidden by default on desktop */
   position: fixed;
   left: 20px;
   top: 50%;
@@ -211,14 +211,14 @@
   flex-shrink: 0;
   height: 50px;
   width: 50px;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  display: flex;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .adminSidebarToggleFloating:hover {
   background-color: var(--primary-color, #1f3a3a);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  transform: translateY(-50%) scale(1.05);
 }
 
 .adminSidebarToggleFloating:active {
@@ -257,7 +257,7 @@
 }
 
 /* Desktop specific styles */
-@media (min-width: 769px) {
+@media (min-width: 1025px) {
   .navLinksContainer {
     display: flex !important;
     flex-direction: row !important;
@@ -289,8 +289,12 @@
   }
 }
 
-/* Ensure no margin on mobile */
-@media (max-width: 768px) {
+/* Ensure button shows on mobile and tablet */
+@media (max-width: 1024px) {
+  .adminSidebarToggleFloating {
+    display: flex !important;
+  }
+  
   .adminMainContent {
     margin-left: 0 !important;
   }

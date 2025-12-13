@@ -38,6 +38,7 @@ interface CheckoutState {
   deliveryAddress: DeliveryAddress | null;
   customerInfo: CustomerInfo | null;
   specialInstructions: string;
+  tipAmount: number;
 }
 
 /**
@@ -50,6 +51,7 @@ interface CheckoutContextType {
   setDeliveryAddress: (address: DeliveryAddress) => void;
   setCustomerInfo: (info: CustomerInfo) => void;
   setSpecialInstructions: (instructions: string) => void;
+  setTipAmount: (tipAmount: number) => void;
   clearCheckout: () => void;
 }
 
@@ -61,6 +63,7 @@ const initialState: CheckoutState = {
   deliveryAddress: null,
   customerInfo: null,
   specialInstructions: '',
+  tipAmount: 0,
 };
 
 const CheckoutContext = createContext<CheckoutContextType | undefined>(undefined);
@@ -134,6 +137,10 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, specialInstructions: instructions }));
   };
 
+  const setTipAmount = (tipAmount: number) => {
+    setState((prev) => ({ ...prev, tipAmount }));
+  };
+
   const clearCheckout = () => {
     setState(initialState);
     if (typeof window !== 'undefined') {
@@ -148,6 +155,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     setDeliveryAddress,
     setCustomerInfo,
     setSpecialInstructions,
+    setTipAmount,
     clearCheckout,
   };
 

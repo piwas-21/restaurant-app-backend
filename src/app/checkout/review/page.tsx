@@ -13,6 +13,7 @@ import OrderTypeSection from '@/components/checkout/OrderTypeSection';
 import CustomerInfoSection from '@/components/checkout/CustomerInfoSection';
 import OrderItemsList from '@/components/checkout/OrderItemsList';
 import PaymentMethodSelector from '@/components/checkout/PaymentMethodSelector';
+import TipSelector from '@/components/checkout/TipSelector';
 import OrderSummaryCard from '@/components/checkout/OrderSummaryCard';
 import OrderConfirmationModal from '@/components/checkout/OrderConfirmationModal';
 import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
@@ -34,7 +35,7 @@ export default function ReviewPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
-  const { state: checkoutState, clearCheckout } = useCheckout();
+  const { state: checkoutState, clearCheckout, setTipAmount } = useCheckout();
   const { state: cartState, clearCart } = useCart();
   const { sessionId } = useSession();
 
@@ -230,7 +231,7 @@ export default function ReviewPage() {
         items: orderItems,
         payments: [{
           paymentMethod: selectedPaymentMethod,
-          amount: (cartState.basket?.total || 0) - pointsDiscount,
+          amount: (cartState.basket?.total || 0) - pointsDiscount + (checkoutState.tipAmount || 0),
         }],
         promoCode: cartState.basket?.promoCode || undefined,
         // Pass basket pre-calculated values to ensure consistency
@@ -238,9 +239,11 @@ export default function ReviewPage() {
         basketTax: cartState.basket?.tax,
         basketDiscount: cartState.basket?.discount,
         basketCustomerDiscount: cartState.basket?.customerDiscount,
-        basketTotal: (cartState.basket?.total || 0) - pointsDiscount,
+        basketTotal: (cartState.basket?.total || 0) - pointsDiscount + (checkoutState.tipAmount || 0),
         // Fidelity Points
         pointsToRedeem: redeemedPoints,
+        // Tip
+        tip: checkoutState.tipAmount || 0,
       };
 
       // Submit order
@@ -345,6 +348,12 @@ export default function ReviewPage() {
 
           {/* Right Column - Order Summary */}
           <div className={styles.rightColumn}>
+            <TipSelector
+              subtotal={cartState.basket?.subTotal || 0}
+              selectedTipAmount={checkoutState.tipAmount || 0}
+              onTipChange={setTipAmount}
+            />
+
             <FidelityPointsCheckout
               orderSubtotal={cartState.basket?.subTotal || 0}
               onPointsRedemption={handlePointsRedemption}
@@ -356,6 +365,7 @@ export default function ReviewPage() {
               taxAmount={taxAmount}
               pointsDiscount={pointsDiscount}
               redeemedPoints={redeemedPoints}
+              tipAmount={checkoutState.tipAmount || 0}
               isSubmitting={isSubmitting}
               submitError={submitError}
               formatPrice={formatPrice}

@@ -11,6 +11,8 @@ interface Table {
   maxGuests: number;
   isOutdoor: boolean;
   isActive: boolean;
+  isReserved?: boolean;  // NEW
+  reservedUntil?: string;  // NEW
 }
 
 interface TableSelectorProps {
@@ -104,11 +106,13 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
         {tables.map((table) => (
           <button
             key={table.id}
-            onClick={() => !disabled && onTableSelect(table.tableNumber)}
-            disabled={disabled}
+            onClick={() => !disabled && !table.isReserved && onTableSelect(table.tableNumber)}
+            disabled={disabled || table.isReserved}
             className={`${styles.tableCard} ${
               selectedTable === table.tableNumber ? styles.selected : ''
-            } ${disabled ? styles.disabled : ''}`}
+            } ${disabled || table.isReserved ? styles.disabled : ''} ${
+              table.isReserved ? styles.reserved : ''
+            }`}
           >
             <div className={styles.tableIcon}>
               <Utensils size={28} />
@@ -124,6 +128,11 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
               {table.isOutdoor && (
                 <span className={styles.outdoorBadge}>
                   {t('outdoor', 'Outdoor')}
+                </span>
+              )}
+              {table.isReserved && (
+                <span className={styles.reservedBadge}>
+                  {t('reserved', 'Reserved')}
                 </span>
               )}
             </div>

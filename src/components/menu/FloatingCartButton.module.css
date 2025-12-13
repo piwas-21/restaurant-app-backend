@@ -1,0 +1,231 @@
+.floatingButton {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 100;
+  
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  
+  padding: 12px 20px;
+  min-width: 160px;
+  height: 64px;
+  
+  background: linear-gradient(135deg, var(--color-primary, #c00000) 0%, #a00000 100%);
+  color: var(--color-white, #ffffff);
+  
+  border: none;
+  border-radius: 32px;
+  
+  box-shadow: 0 8px 32px rgba(192, 0, 0, 0.3),
+              0 2px 8px rgba(0, 0, 0, 0.15);
+  
+  cursor: pointer;
+  
+  transform: translateY(100px);
+  opacity: 0;
+  
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.floatingButton.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.floatingButton:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 48px rgba(192, 0, 0, 0.4),
+              0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.floatingButton:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.floatingButton:focus {
+  outline: none;
+  box-shadow: 0 8px 32px rgba(192, 0, 0, 0.3),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              0 0 0 4px rgba(192, 0, 0, 0.2);
+}
+
+/* Pulse animation when item added */
+.floatingButton.pulse {
+  animation: cartPulse 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes cartPulse {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(0) scale(1.1);
+  }
+  50% {
+    transform: translateY(0) scale(1.05);
+  }
+  75% {
+    transform: translateY(0) scale(1.08);
+  }
+}
+
+/* Icon Container */
+.iconContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Item Count Badge */
+.badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  
+  background: #dc3545;
+  color: white;
+  
+  border-radius: 10px;
+  border: 2px solid var(--color-white, #ffffff);
+  
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  
+  animation: badgePop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes badgePop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Price Container */
+.priceContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.totalLabel {
+  font-size: 11px;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.totalPrice {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .floatingButton {
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    
+    justify-content: space-between;
+    
+    min-width: auto;
+    height: 56px;
+    padding: 12px 20px;
+    
+    border-radius: 28px;
+  }
+
+  .priceContainer {
+    align-items: flex-end;
+  }
+
+  .totalLabel {
+    font-size: 10px;
+  }
+
+  .totalPrice {
+    font-size: 18px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .floatingButton {
+    padding: 10px 16px;
+    height: 52px;
+    gap: 10px;
+  }
+
+  .iconContainer svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .badge {
+    min-width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+
+  .totalPrice {
+    font-size: 16px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .floatingButton {
+    background: linear-gradient(135deg, #e06666 0%, #c00000 100%);
+    box-shadow: 0 8px 32px rgba(224, 102, 102, 0.3),
+                0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .floatingButton:hover {
+    box-shadow: 0 12px 48px rgba(224, 102, 102, 0.4),
+                0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .floatingButton:focus {
+    box-shadow: 0 8px 32px rgba(224, 102, 102, 0.3),
+                0 2px 8px rgba(0, 0, 0, 0.3),
+                0 0 0 4px rgba(224, 102, 102, 0.2);
+  }
+}
+
+/* Accessibility - Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .floatingButton,
+  .floatingButton.pulse,
+  .badge {
+    animation: none;
+    transition: none;
+  }
+
+  .floatingButton:hover {
+    transform: none;
+  }
+}

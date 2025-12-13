@@ -1,7 +1,7 @@
 import React from 'react';
 import { OrderDto } from '@/types/order';
 import { useTranslation } from 'react-i18next';
-import { Eye, RefreshCw, Star } from 'lucide-react';
+import { Eye, RefreshCw, Star, Trash2 } from 'lucide-react';
 import { useOrderHelpers } from '@/hooks/useOrderHelpers';
 import { getStatusBadgeClasses, getPaymentBadgeClasses } from '@/utils/orderStatusStyles';
 import styles from './OrdersTable.module.css';
@@ -14,6 +14,7 @@ interface OrdersTableProps {
   onViewDetails: (order: OrderDto) => void;
   onUpdateStatus: (order: OrderDto) => void;
   onToggleFocus: (order: OrderDto) => void;
+  onDeleteOrder: (order: OrderDto) => void;
 }
 
 export const OrdersTable: React.FC<OrdersTableProps> = ({
@@ -24,6 +25,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
   onViewDetails,
   onUpdateStatus,
   onToggleFocus,
+  onDeleteOrder,
 }) => {
   const { t } = useTranslation();
   const { formatPrice, formatDate, getOrderTypeIcon, getOrderTypeLabel, getStatusLabel, getPaymentStatusLabel } = useOrderHelpers();
@@ -121,6 +123,13 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                     }
                   >
                     <Star size={16} />
+                  </button>
+                  <button
+                    onClick={() => onDeleteOrder(order)}
+                    className={`${styles.actionButton} ${styles.deleteButton}`}
+                    title={t('delete_order', 'Delete Order')}
+                  >
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </td>

@@ -2,25 +2,28 @@
 
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import { CheckCircle } from 'lucide-react'; // Added import
+import { useAuth } from '@/components/AuthContext'; // Added import
 import styles from './ReservationSuccessModal.module.css';
 
 interface ReservationSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isLoggedIn: boolean;
-  customerEmail: string;
-  numberOfTables: number;
+  isLoggedIn: boolean; // Kept as per original, as new prop 'reservationDetails' was not fully defined
+  customerEmail: string; // Kept as per original
+  numberOfTables: number; // Kept as per original
 }
 
 export default function ReservationSuccessModal({
   isOpen,
   onClose,
-  isLoggedIn,
-  customerEmail,
-  numberOfTables
+  isLoggedIn, // Kept as per original
+  customerEmail, // Kept as per original
+  numberOfTables // Kept as per original
 }: ReservationSuccessModalProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { user } = useAuth(); // Added useAuth hook
 
   if (!isOpen) return null;
 

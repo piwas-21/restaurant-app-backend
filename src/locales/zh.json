@@ -122,7 +122,6 @@
   "reservation_confirmation_note": "在我们确认之前，预订尚未生效。10 人以上请直接致电餐厅。",
   "reservation_validation_error": "请填写所有必填项：日期、时间、人数、姓名和电话。",
   "reservation_request_sent": "预订请求已发送！（详情见控制台）我们将联系您确认。",
-
   "sarma_name": "葡萄叶包饭（纯素）",
   "sarma_description": "精选葡萄叶包裹米饭、香草和香料的馅料。经典土耳其前菜。",
   "falafel_name": "炸豆丸子（纯素）",
@@ -131,12 +130,10 @@
   "adana_kebab_description": "香辣碎羊肉串，炭烤后配粗麦饭和烤蔬菜。",
   "iskender_kebab_special_name": "伊斯肯德尔烤肉特餐",
   "iskender_kebab_special_description": "多汁旋转烤肉放在皮塔饼上，淋以番茄酱、酸奶和热融黄油。真正的土耳其美味！",
-
   "starters_category": "前菜",
   "main_courses_category": "主菜",
   "desserts_category": "甜点",
   "drinks_category": "饮品",
-
   "home_page_title": "RUMI 餐厅 - 瑞士日内瓦正宗土耳其美食",
   "home_page_description": "在日内瓦的 RUMI 餐厅体验土耳其的丰富风味。从烤肉到前菜，应有尽有。提供清真选项。",
   "home_hero_title": "探索正宗土耳其风味",
@@ -151,15 +148,12 @@
   "home_location_title": "找到我们",
   "home_menu_cta": "浏览菜单",
   "home_reservations_cta": "预订餐桌",
-
   "rumi_address_street": "Rue du Grand-Pré 45",
   "rumi_address_city_country": "1202 日内瓦，瑞士",
   "rumi_phone_number": "+41 22 786 33 33",
   "phone_label": "电话",
-
   "google_maps_iframe_title": "RUMI 餐厅 Google 地图位置",
   "google_maps_iframe_aria_label": "显示餐厅位置的 Google 地图 iframe",
-
   "menu_page_title": "RUMI 餐厅菜单 - 前菜、主菜、甜点 | 日内瓦",
   "menu_page_description": "探索日内瓦 RUMI 餐厅的正宗土耳其菜单。从烤肉到传统甜点。提供清真选项。",
   "menu_categories_label": "菜单分类",
@@ -172,7 +166,6 @@
   "vegetarian": "素食",
   "halal": "清真",
   "gluten-free": "无麸质",
-
   "admin_dashboard_title": "管理后台",
   "admin_menu_management_title": "菜单管理",
   "admin_specials_management_title": "特餐管理",
@@ -195,7 +188,6 @@
   "failed_to_deactivate_tables": "停用餐桌失败",
   "tables_deleted": "已删除 {{count}} 张餐桌",
   "failed_to_delete_tables": "删除餐桌失败",
-
   "point_rules": "积分规则",
   "customer_discounts": "客户折扣",
   "tax_configuration": "税费配置",
@@ -209,7 +201,6 @@
   "active_rules_count": "已启用 {{count}} 条规则",
   "customer_discounts_description": "为特定客户创建独家折扣规则",
   "active_discounts_count": "已启用 {{count}} 个折扣",
-
   "total_points_issued": "已发放积分总数",
   "points_value": "{{value}} 价值",
   "total_points_redeemed": "已兑换积分总数",
@@ -218,7 +209,6 @@
   "average_points_per_user": "平均：{{avg}} 分/用户",
   "total_discount_given": "已给予的折扣总额",
   "lifetime_customer_savings": "客户累计节省金额",
-
   "active_point_rules": "启用的积分规则",
   "earning_rules_configured": "已配置积分规则",
   "active_customer_discounts": "启用的客户折扣",
@@ -227,11 +217,10 @@
   "confirm_delete_discount": "您确定要删除此折扣吗？",
   "discount_deleted_successfully": "折扣删除成功",
   "failed_delete_discount": "删除折扣失败",
-
   "delete_discount_title": "删除折扣",
   "delete_discount_confirm_message": "确定要删除折扣“{{name}}”吗？此操作不可撤销。",
   "delete_discount_action": "删除折扣",
-  "deleting": "正在删除...",
+  "deleting": "删除中...",
   "manage_exclusive_customer_discount_rules": "管理专属客户折扣规则",
   "create_discount": "创建折扣",
   "filter_by_user_id": "按用户 ID 筛选...",
@@ -286,7 +275,6 @@
   "max_usage_count_help": "该折扣最多可使用的次数",
   "active_discounts_help": "只有启用的折扣可用于订单",
   "update_discount": "更新折扣",
-
   "specials_table_header": "特餐列表",
   "featured_special_label": "特色特餐",
   "set_as_featured": "设为特色",
@@ -310,14 +298,12 @@
   "currently_featured": "当前特色",
   "featured_special": "特色特餐",
   "featured_since": "设为特色于",
-
   "admin_member_management_title": "会员管理",
   "admin_welcome": "欢迎，管理员！",
   "admin_dashboard_intro": "在这里管理餐厅的内容与设置。",
   "admin_manage_menu_items": "管理菜单项目",
   "admin_manage_daily_specials": "管理每日特餐",
   "admin_manage_members": "管理会员",
-
   "cashier_interface_title": "收银台",
   "orders_list_title": "当前订单",
   "order_id_header": "订单 ID",
@@ -337,7 +323,6 @@
   "quantity_short_label": "数量",
   "no_orders_message": "暂无订单。",
   "table_number_label_short": "桌号",
-
   "server_interface_title": "服务员",
   "active_table_orders_title": "当前桌台订单",
   "table_number_label": "桌号",
@@ -355,7 +340,6 @@
   "no_active_table_orders_message": "暂无桌台订单。",
   "order_timestamp_label": "下单时间",
   "order_notes_label": "备注",
-
   "kitchen_staff_dashboard_title": "厨房",
   "orders_to_prepare_title": "待制作订单",
   "order_id_label": "订单 ID",
@@ -372,7 +356,6 @@
   "no_orders_to_prepare_message": "暂无需要制作的订单。",
   "filter_by_dish_type_label": "按菜品类型筛选：",
   "all_dish_types_filter": "所有类型",
-
   "account_page_title": "我的账户",
   "personal_information_title": "个人信息",
   "email_label": "电子邮件",
@@ -392,7 +375,6 @@
   "field_required_error": "{{fieldName}} 为必填项。",
   "invalid_email_error": "请输入有效的电子邮件地址。",
   "invalid_phone_error": "请输入有效的电话号码。",
-
   "password_management_title": "密码管理",
   "current_password_label": "当前密码",
   "current_password_placeholder": "请输入当前密码",
@@ -410,7 +392,6 @@
   "password_strength_strong": "强",
   "password_security_rules_error": "密码至少 8 位，需包含大写、小写、数字和特殊字符。",
   "incorrect_current_password_error": "当前密码错误。",
-
   "order_history_title": "订单历史",
   "order_date_label": "日期",
   "order_total_label": "总计",
@@ -418,12 +399,10 @@
   "no_orders_history_message": "暂无订单记录。",
   "order_status_in_progress": "进行中",
   "order_status_pending_payment": "待支付",
-
   "fidelity_points_title": "积分",
   "total_fidelity_points_label": "您的总积分：",
   "earn_more_points_message": "每次下单都可获得更多积分！",
   "points_to_next_reward_message": "再获得 {{points}} 分即可享受下一奖励！",
-
   "order_items_title": "订单中的商品",
   "item_label": "商品",
   "quantity_label": "数量",
@@ -431,7 +410,6 @@
   "subtotal_label": "小计",
   "no_items_in_this_order": "该订单暂无商品详情。",
   "delivery_address_title": "送餐地址",
-
   "filter_by_diet_allergen": "按饮食/过敏过滤",
   "filter_vegan": "纯素",
   "filter_vegetarian": "素食",
@@ -441,7 +419,6 @@
   "filter_contains_nuts": "含坚果",
   "filter_reset": "重置过滤",
   "no_items_match_filters": "没有符合当前过滤条件的商品。",
-
   "feedback_form_heading": "留下您的反馈",
   "feedback_form_rating_label": "您的评分",
   "feedback_form_star_rating_aria_label": "{{count}} 星评分",
@@ -456,17 +433,13 @@
   "feedback_form_submit_success_message": "感谢您的反馈！",
   "average_rating_label": "平均评分：{{rating}}/5（{{count}} 条评论）",
   "no_reviews_yet": "暂无评论，快来成为第一位！",
-
   "images_count_label": "张图片",
   "previous_image_button_label": "上一张",
   "next_image_button_label": "下一张",
-
   "customer_phone_label": "电话号码：",
   "customer_phone_placeholder": "请输入您的电话号码",
-
   "switch_to_dark_mode": "切换到深色模式",
   "switch_to_light_mode": "切换到浅色模式",
-
   "nav_home": "首页",
   "nav_menu": "菜单",
   "nav_reservations": "预订",
@@ -475,12 +448,10 @@
   "nav_cashier": "收银台",
   "nav_kitchen": "厨房",
   "nav_server": "服务员",
-
   "close_image_modal_button": "关闭",
   "open_menu": "打开菜单",
   "close_menu": "关闭菜单",
   "each": "每份",
-
   "cookie_consent_banner_text": "我们使用本地存储来提升体验，包括记住您的语言偏好。点击“接受”即表示您同意。您可随时管理偏好设置。",
   "cookie_consent_accept": "接受",
   "cookie_consent_decline": "拒绝",
@@ -491,19 +462,16 @@
   "cookie_settings_save": "保存偏好",
   "cookie_settings_close_aria": "关闭设置",
   "cookie_settings_footer_link": "管理 Cookie 偏好",
-
   "user_menu.aria_label": "用户菜单",
   "user_menu.avatar_alt": "用户头像",
   "user_menu.logout": "退出登录",
   "user_menu.my_account": "我的账户",
   "user_menu.my_orders": "我的订单",
-
   "roles.admin": "管理员",
   "roles.customer": "客户",
   "roles.cashier": "收银员",
   "roles.kitchen-staff": "厨房工作人员",
   "roles.server": "服务员",
-
   "edit": "编辑",
   "delete": "删除",
   "add_new_member": "新增成员",
@@ -1703,7 +1671,7 @@
   "cashier.total_amount": "总金额",
   "cashier.payment_info": "支付信息",
   "cashier.payment_history": "支付历史",
-   "cashier.loading_orders": "正在加载订单...",
+  "cashier.loading_orders": "正在加载订单...",
   "cashier.connection_status": "连接状态",
   "cashier.connection_lost": "连接丢失",
   "cashier.retrying": "正在重试...",
@@ -1737,7 +1705,6 @@
   "cashier.failed_to_toggle_focus": "切换焦点失败",
   "cashier.note_info_title": "备注信息",
   "cashier.note_info": "备注信息",
-
   "order_type_management": "订单类型管理",
   "order_type_management_desc": "启用或禁用您餐厅的订单类型",
   "order_type_enabled": "已启用",
@@ -1747,7 +1714,6 @@
   "order_type_updated_successfully": "订单类型更新成功",
   "failed_to_load_configurations": "加载订单类型配置失败",
   "failed_to_update_order_type": "更新订单类型失败",
-
   "admin_user_groups_title": "用户组",
   "user_groups_management": "用户组管理",
   "create_user_group": "创建用户组",
@@ -1784,7 +1750,6 @@
   "initial_discount": "初始折扣",
   "group_name_required": "组名为必填项",
   "discount_validation_error": "添加初始折扣时必须填写折扣名称和值",
-
   "or_continue_with": "或继续使用",
   "google_login_failed": "Google 登录失败",
   "login_error": "登录过程中出现错误",
@@ -1793,7 +1758,6 @@
   "social_login_google_error": "Google 登录失败，请重试。",
   "social_login_apple_success": "成功通过 Apple 登录！",
   "social_login_apple_error": "Apple 登录失败，请重试。",
-
   "confirm_order": "确认订单",
   "confirm_with_delay": "延迟确认",
   "confirming": "正在确认...",
@@ -1804,10 +1768,8 @@
   "order_confirmed_message": "客户将很快收到确认邮件。",
   "order_cancelled_message": "订单已取消。",
   "order_status_pending_approval": "等待批准",
-
   "footer_privacy_policy": "隐私政策",
   "footer_terms_of_usage": "使用条款",
-
   "privacy_policy": {
     "title": "隐私政策",
     "last_updated": "最后更新：{{date}}",
@@ -1826,7 +1788,6 @@
     "contact_title": "4. 联系我们",
     "contact_text": "如果您对本政策有疑问或意见，可通过电子邮件或邮寄方式联系我们："
   },
-
   "terms_of_usage": {
     "title": "使用条款",
     "last_updated": "最后更新：{{date}}",
@@ -1971,5 +1932,40 @@
   "email_verification_required": "请在登录前验证您的邮箱地址。",
   "resend_verification_email": "重新发送验证邮件",
   "cashier.enable_sound": "启用通知声音",
-  "cashier.disable_sound": "禁用通知声音"
+  "cashier.disable_sound": "禁用通知声音",
+  "tip_optional": "添加小费（可选）",
+  "custom_tip": "自定义金额",
+  "no_tip": "无小费",
+  "enter_custom_tip": "输入自定义小费金额",
+  "delete_order": "删除订单",
+  "delete_order_confirm": "删除订单？",
+  "delete_order_warning": "此操作无法撤消。订单将被永久删除。",
+  "confirm_delete_order": "输入订单号以确认删除",
+  "order_deleted_success": "订单已成功删除",
+  "order_delete_failed": "删除订单失败",
+  "floating_cart_button_label": "查看购物车",
+  "cart_items_count": "{count} 项",
+  "cart_total_label": "总计",
+  "reserved": "已预订",
+  "restaurant_settings": "餐厅设置",
+  "restaurant_settings_desc": "管理餐厅配置和营业时间",
+  "working_hours": "营业时间",
+  "order_types": "订单类型",
+  "general_settings": "常规设置",
+  "coming_soon": "即将推出",
+  "order_types_settings_desc": "订单类型配置将移至此处",
+  "general_settings_desc": "餐厅常规设置将在此处提供",
+  "failed_to_load_working_hours": "加载营业时间失败",
+  "restaurant_currently_open": "餐厅目前营业中",
+  "restaurant_currently_closed": "餐厅目前已关闭",
+  "open_time": "营业时间",
+  "close_time": "关闭时间",
+  "closed": "关闭",
+  "open": "营业",
+  "optional_notes": "可选备注...",
+  "close_time_must_be_after_open": "{{day}}的关闭时间必须晚于营业时间",
+  "working_hours_updated": "营业时间更新成功",
+  "failed_to_update_working_hours": "更新营业时间失败",
+  "reservation_showing_slots_for_table": "显示桌号 {{tableNumber}} 可用的时间段",
+  "reservation_tip_select_table_filter": "提示：选择一张桌子，然后返回以查看该桌子可用的时间段"
 }

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3, DollarSign, Settings, UserCog } from 'lucide-react';
+import { Users, FolderTree, UtensilsCrossed, Sparkles, Award, Gift, TrendingUp, ClipboardList, CalendarCheck, MapPin, BarChart3, DollarSign, Settings, UserCog, LayoutDashboard } from 'lucide-react';
 import styles from '@/app/styles/AdminPage.module.css';
 
 interface SidebarProps {
@@ -13,7 +13,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
 
@@ -22,23 +22,17 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
     setIsClient(true);
   }, []);
 
-  // Force re-render when language changes
-  useEffect(() => {
-    const handleLanguageChange = () => {
-      setIsClient(true);
-    };
-
-    i18n.on('languageChanged', handleLanguageChange);
-
-    return () => {
-      i18n.off('languageChanged', handleLanguageChange);
-    };
-  }, [i18n]);
-
   const navItems = [
+    {
+      href: '/admin/dashboard',
+      key: 'admin_dashboard_title',
+      fallback: 'Admin Dashboard',
+      icon: LayoutDashboard
+    },
     {
       href: '/admin/member-management',
       key: 'admin_member_management_title',
+      fallback: 'Member Management',
       icon: Users
     },
     {
@@ -50,28 +44,31 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
     {
       href: '/admin/category-management',
       key: 'admin_category_management_title',
+      fallback: 'Category Management',
       icon: FolderTree
     },
     {
       href: '/admin/menu-management',
       key: 'admin_menu_management_title',
+      fallback: 'Menu Management',
       icon: UtensilsCrossed
     },
     {
       href: '/admin/specials-management',
       key: 'admin_specials_management_title',
+      fallback: 'Specials Management',
       icon: Sparkles
     },
     {
       href: '/admin/orders-management',
-      key: 'admin_orders_management',
+      key: 'admin_orders_management_title',
       fallback: 'Orders Management',
       icon: ClipboardList
     },
     {
-      href: '/admin/order-type-management',
-      key: 'order_type_management',
-      fallback: 'Order Type Management',
+      href: '/admin/restaurant-settings',
+      key: 'restaurant_settings',
+      fallback: 'Restaurant Settings',
       icon: Settings
     },
     {
@@ -83,7 +80,7 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
     {
       href: '/admin/table-layout-editor',
       key: 'table_layout_editor',
-      fallback: 'Table Layout Editor',
+      fallback: 'Table Layout',
       icon: MapPin
     },
     {
@@ -105,12 +102,6 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
       icon: Gift
     },
     {
-      href: '/admin/tax-configuration',
-      key: 'tax_configuration',
-      fallback: 'Tax Configuration',
-      icon: DollarSign
-    },
-    {
       href: '/admin/fidelity-analytics',
       key: 'fidelity_analytics',
       fallback: 'Fidelity Analytics',
@@ -119,7 +110,14 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
   ];
 
   return (
-    <aside className={`${styles.sidebar} ${isOpen ? 'open' : ''}`}>
+    <aside 
+      className={`${styles.sidebar} ${isOpen ? 'open' : ''}`} 
+      data-open={isOpen}
+      style={{
+        zIndex: 2002,
+        transform: isOpen ? 'translateX(0)' : undefined,
+      }}
+    >
       <div className={styles.sidebarTitle} suppressHydrationWarning>
         {isClient ? t('admin_dashboard_title') : 'Admin Dashboard'}
       </div>

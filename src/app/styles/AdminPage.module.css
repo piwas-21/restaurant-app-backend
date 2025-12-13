@@ -14,10 +14,13 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
-  padding-top: 2rem; /* Align with page content padding */
-  z-index: 1000;
+  padding-top: 2rem;
+  z-index: 2000; /* Below inline style z-index of 2002 when open */
   transform: translateX(0);
   transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
 }
 
 .sidebar nav ul {
@@ -148,10 +151,14 @@
 @media (max-width: 1024px) {
   .sidebar {
     transform: translateX(-100%);
+    box-shadow: none;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
+  .sidebar[data-open="true"],
+  .sidebar:global(.open) {
+    /* Inline style will set transform: translateX(0) */
+    /* Just add shadow here */
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3);
   }
 
   .adminMainContent {

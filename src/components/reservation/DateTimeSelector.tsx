@@ -8,6 +8,7 @@ interface DateTimeSelectorProps {
   onDateChange: (date: string) => void;
   onTimeChange: (time: string) => void;
   loading?: boolean;
+  availableTimeSlots?: string[];
 }
 
 export default function DateTimeSelector({
@@ -15,7 +16,8 @@ export default function DateTimeSelector({
   selectedTime,
   onDateChange,
   onTimeChange,
-  loading = false
+  loading = false,
+  availableTimeSlots
 }: DateTimeSelectorProps) {
   const { t, i18n } = useTranslation();
   const [mounted, setMounted] = useState(false);
@@ -31,10 +33,10 @@ export default function DateTimeSelector({
     return date;
   });
 
-  // Time slots
-  const timeSlots = [
+  // Use provided time slots or fallback (though fallback shouldn't be needed with proper logic)
+  const timeSlots = availableTimeSlots || [
     '11:00', '12:00', '13:00', '14:00',
-    '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'
+    '17:00', '18:00', '19:00', '20:00', '21:00'
   ];
 
   return (

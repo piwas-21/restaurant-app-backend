@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/components/AuthContext';
 import { reservationService } from '@/services/reservationService';
 import { TableDto } from '@/types/reservation';
 import VisualTableLayout from '@/components/reservation/VisualTableLayout';
@@ -16,6 +17,7 @@ import { enqueueSnackbar } from 'notistack';
 
 export default function ReservationsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   // State
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -51,17 +53,45 @@ export default function ReservationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Check availability when date/time/guests change
+  // Prefill customer details from logged-in user
   useEffect(() => {
-    if (selectedDate && selectedTime) {
-      checkAvailability();
+    if (user) {
+      setCustomerName(`${user.firstName} ${user.lastName}`.trim());
+      setCustomerEmail(user.email || '');
+      // Phone not available in User interface
+    }
+  }, [user]);
+
+  // Check availability when date or guests change
+  useEffect(() => {
+    if (selectedDate) {
+      fetchTimeSlots();
     } else {
-      // If no date/time selected, reset booked tables (all tables available)
+      setAvailableTimeSlots([]);
       setBookedTableIds([]);
       setCapacityWarning('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, selectedTime, numberOfGuests]);
+  }, [selectedDate, numberOfGuests]);
+
+  // Update booked tables when time changes or slots update
+  useEffect(() => {
+    if (selectedDate && availableTimeSlots.length > 0) {
+      if (selectedTime) {
+        // Check if selected time is still valid
+        const slotExists = availableTimeSlots.some((s: any) => s.startTime.startsWith(selectedTime));
+        if (!slotExists) {
+          setSelectedTime('');
+          setBookedTableIds([]);
+          return;
+        }
+        updateTableAvailability();
+      }
+    } else {
+      setBookedTableIds([]);
+      setCapacityWarning('');
+    }
+  }, [selectedTime, availableTimeSlots]);
 
   const loadAllTables = async () => {
     try {
@@ -72,8 +102,8 @@ export default function ReservationsPage() {
     }
   };
 
-  const checkAvailability = async () => {
-    if (!selectedDate || !selectedTime) return;
+  const fetchTimeSlots = async () => {
+    if (!selectedDate) return;
 
     setLoading(true);
     setCapacityWarning(''); // Clear previous warnings
@@ -82,99 +112,108 @@ export default function ReservationsPage() {
       const result = await reservationService.getAvailableTimeSlots(selectedDate, numberOfGuests);
 
       // Handle API errors
-      if (result.error) {
-        setBookedTableIds(allTables.map(t => t.id));
-        setLoading(false);
-        return;
-      }
-
-      if (!result.data) {
-        setBookedTableIds(allTables.map(t => t.id));
-        setLoading(false);
+      if (result.error || !result.data) {
+        setAvailableTimeSlots([]);
         return;
       }
 
       // Store all time slots for showing available times
       setAvailableTimeSlots(result.data.timeSlots || []);
-
-      // Find the time slot that matches the selected time
-      const slot = result.data.timeSlots.find(s => s.startTime.startsWith(selectedTime));
-
-      if (slot) {
-        // We found the selected time slot - check availability
-        const availableIds = new Set(slot.availableTables.map(t => t.id));
-        const booked = allTables.filter(t => !availableIds.has(t.id)).map(t => t.id);
-        setBookedTableIds(booked);
-
-        // Check capacity: are there any tables that can accommodate the party size?
-        const tablesWithCapacity = slot.availableTables.filter(t => t.maxGuests >= numberOfGuests);
-
-        if (tablesWithCapacity.length === 0 && slot.availableTables.length > 0) {
-          // Tables are available but none have sufficient capacity
-          setCapacityWarning(
-            t('capacity_warning_message',
-              'We don\'t have a single table that can accommodate all {{guests}} guests. However, you can select multiple tables and request to combine them, or proceed with your selection and our staff will review your request to find the best arrangement.',
-              { guests: numberOfGuests }
-            )
-          );
-        }
-      } else {
-        // Selected time slot not found - all tables are booked at this time
-        setBookedTableIds(allTables.map(t => t.id));
-      }
-
-      // Check if guest size exceeds ALL tables in restaurant (not just available ones)
-      if (allTables.length > 0) {
-        const maxRestaurantCapacity = Math.max(...allTables.map(t => t.maxGuests));
-        if (numberOfGuests > maxRestaurantCapacity) {
-          setCapacityWarning(
-            t('capacity_warning_message',
-              'We don\'t have a single table that can accommodate all {{guests}} guests. However, you can select multiple tables and request to combine them, or proceed with your selection and our staff will review your request to find the best arrangement.',
-              { guests: numberOfGuests }
-            )
-          );
-        }
-      }
     } catch {
-      // Unexpected network errors
-      setBookedTableIds(allTables.map(t => t.id));
+      setAvailableTimeSlots([]);
     } finally {
       setLoading(false);
     }
-  };  const handleTableSelect = (table: TableDto) => {
+  };
+
+  const updateTableAvailability = () => {
+    // Find the time slot that matches the selected time
+    // API returns times like "12:00:00", we match start
+    const slot = availableTimeSlots.find(s => s.startTime.startsWith(selectedTime));
+
+    if (slot) {
+      // We found the selected time slot - check availability
+      const availableIds = new Set(slot.availableTables.map((t: any) => t.id));
+      const booked = allTables.filter(t => !availableIds.has(t.id)).map(t => t.id);
+      setBookedTableIds(booked);
+
+      // Check capacity: are there any tables that can accommodate the party size?
+      const tablesWithCapacity = slot.availableTables.filter((t: any) => t.maxGuests >= numberOfGuests);
+
+      if (tablesWithCapacity.length === 0 && slot.availableTables.length > 0) {
+        // Tables are available but none have sufficient capacity
+        setCapacityWarning(
+          t('capacity_warning_message',
+            'We don\'t have a single table that can accommodate all {{guests}} guests. However, you can select multiple tables and request to combine them, or proceed with your selection and our staff will review your request to find the best arrangement.',
+            { guests: numberOfGuests }
+          )
+        );
+      }
+    } else {
+      // Selected time slot not available in the list
+      // This implies the time is fully booked or restaurant closed at this time
+      // The user shouldn't be able to select this time ideally, but if they did (via old state):
+      setBookedTableIds(allTables.map(t => t.id));
+    }
+
+    // Check if guest size exceeds ALL tables in restaurant (not just available ones)
+    if (allTables.length > 0) {
+      const maxRestaurantCapacity = Math.max(...allTables.map(t => t.maxGuests));
+      if (numberOfGuests > maxRestaurantCapacity) {
+        setCapacityWarning(
+          t('capacity_warning_message',
+            'We don\'t have a single table that can accommodate all {{guests}} guests. However, you can select multiple tables and request to combine them, or proceed with your selection and our staff will review your request to find the best arrangement.',
+            { guests: numberOfGuests }
+          )
+        );
+      }
+    }
+  };
+
+  const handleTableSelect = (table: TableDto) => {
     const isBooked = bookedTableIds.includes(table.id);
     const isSelected = selectedTableIds.includes(table.id);
 
-    // If table is booked and not selected, show available times (but still allow selection)
-    if (isBooked && !isSelected && selectedDate && availableTimeSlots.length > 0) {
-      const availableTimes = availableTimeSlots
-        .filter(slot => slot.availableTables.some((t: TableDto) => t.id === table.id))
-        .map(slot => {
-          const start = slot.startTime.substring(0, 5); // HH:mm
-          return start;
-        });
+    // If table is booked and not already selected, prevent selection and show info
+    if (isBooked && !isSelected) {
+      if (selectedDate && availableTimeSlots.length > 0) {
+        const availableTimes = availableTimeSlots
+          .filter(slot => slot.availableTables.some((t: TableDto) => t.id === table.id))
+          .map(slot => {
+            const start = slot.startTime.substring(0, 5); // HH:mm
+            return start;
+          });
 
-      if (availableTimes.length > 0) {
-        enqueueSnackbar(
-          t('table_booked_available_at', 'Table {{tableNumber}} is booked at this time. Available at: {{times}}', {
-            tableNumber: table.tableNumber,
-            times: availableTimes.join(', ')
-          }),
-          { variant: 'info', autoHideDuration: 5000 }
-        );
+        if (availableTimes.length > 0) {
+          enqueueSnackbar(
+            t('table_booked_available_at', 'Table {{tableNumber}} is booked at this time. Available at: {{times}}', {
+              tableNumber: table.tableNumber,
+              times: availableTimes.join(', ')
+            }),
+            { variant: 'info', autoHideDuration: 5000 }
+          );
+        } else {
+          enqueueSnackbar(
+            t('table_not_available_today', 'Table {{tableNumber}} is not available today for {{guests}} guests', {
+              tableNumber: table.tableNumber,
+              guests: numberOfGuests
+            }),
+            { variant: 'warning' }
+          );
+        }
       } else {
         enqueueSnackbar(
-          t('table_not_available_today', 'Table {{tableNumber}} is not available today for {{guests}} guests', {
-            tableNumber: table.tableNumber,
-            guests: numberOfGuests
+          t('table_booked', 'Table {{tableNumber}} is currently booked', {
+            tableNumber: table.tableNumber
           }),
           { variant: 'warning' }
         );
       }
-      // Still allow selection even for booked tables
+      // Do NOT allow selection of booked tables
+      return;
     }
 
-    // Allow selection/deselection for ALL tables
+    // Allow selection/deselection for available tables only
     setSelectedTableIds(prev => {
       if (prev.includes(table.id)) {
         // Deselect if already selected
@@ -248,9 +287,19 @@ export default function ReservationsPage() {
       setRequestCombineTables(false);
       setSpecialRequests('');
     } catch (err: any) {
+      // Extract detailed error message from API response
+      let errorMessage = t('reservation_failed', 'Failed to create reservation');
+      
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors) && err.response.data.errors.length > 0) {
+        // Show the first specific error from the API
+        errorMessage = err.response.data.errors[0];
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       enqueueSnackbar(
-        err.message || t('reservation_failed', 'Failed to create reservation'),
-        { variant: 'error' }
+        errorMessage,
+        { variant: 'error', autoHideDuration: 6000 }
       );
     } finally {
       setSubmitting(false);
@@ -304,6 +353,7 @@ export default function ReservationsPage() {
                 onDateChange={setSelectedDate}
                 onTimeChange={setSelectedTime}
                 loading={loading}
+                availableTimeSlots={availableTimeSlots.map((s: any) => s.startTime.substring(0, 5))}
               />
 
               <SelectedTableInfo

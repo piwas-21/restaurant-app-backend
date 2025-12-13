@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'next/navigation';
 import { 
   orderTypeConfigurationService,
   OrderTypeConfigurationDto 
@@ -10,16 +9,14 @@ import {
 import { OrderType } from '@/types/order';
 import { Utensils, Store, Truck } from 'lucide-react';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
-import styles from './OrderTypeManagement.module.css';
+import { enqueueSnackbar } from 'notistack';
+import styles from './OrderTypeManager.module.css';
 
-export default function OrderTypeManagementPage() {
+export default function OrderTypeManager() {
   const { t } = useTranslation();
-  const router = useRouter();
   const [configurations, setConfigurations] = useState<OrderTypeConfigurationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -35,8 +32,9 @@ export default function OrderTypeManagementPage() {
       const data = await orderTypeConfigurationService.getAll();
       setConfigurations(data);
     } catch (err) {
-      setError(t('failed_to_load_configurations', 'Failed to load order type configurations'));
-      console.error('Error fetching order type configurations:', err);
+      enqueueSnackbar(t('failed_to_load_configurations', 'Failed to load order type configurations'), {
+        variant: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -72,8 +70,6 @@ export default function OrderTypeManagementPage() {
   const updateOrderType = async (orderType: OrderType, isEnabled: boolean) => {
     try {
       setSaving(true);
-      setError('');
-      setSuccessMessage('');
 
       await orderTypeConfigurationService.update({
         orderType,
@@ -89,13 +85,13 @@ export default function OrderTypeManagementPage() {
         )
       );
 
-      setSuccessMessage(t('order_type_updated_successfully', 'Order type updated successfully'));
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(''), 3000);
+      enqueueSnackbar(t('order_type_updated_successfully', 'Order type updated successfully'), {
+        variant: 'success'
+      });
     } catch (err) {
-      setError(t('failed_to_update_order_type', 'Failed to update order type'));
-      console.error('Error updating order type:', err);
+      enqueueSnackbar(t('failed_to_update_order_type', 'Failed to update order type'), {
+        variant: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -117,11 +113,11 @@ export default function OrderTypeManagementPage() {
   const getOrderTypeIcon = (orderType: OrderType) => {
     switch (orderType) {
       case OrderType.DineIn:
-        return <Utensils size={32} />;
+        return <Utensils size={28} />;
       case OrderType.Takeaway:
-        return <Store size={32} />;
+        return <Store size={28} />;
       case OrderType.Delivery:
-        return <Truck size={32} />;
+        return <Truck size={28} />;
       default:
         return null;
     }
@@ -142,39 +138,14 @@ export default function OrderTypeManagementPage() {
 
   if (loading) {
     return (
-      <div className={styles.container}>
-        <div className={styles.loading}>
-          {t('common.loading', 'Loading...')}
-        </div>
+      <div className={styles.loading}>
+        <p>{t('common.loading', 'Loading...')}</p>
       </div>
     );
   }
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>
-            {t('order_type_management', 'Order Type Management')}
-          </h1>
-          <p className={styles.subtitle}>
-            {t('order_type_management_desc', 'Enable or disable order types for your restaurant')}
-          </p>
-        </div>
-      </div>
-
-      {error && (
-        <div className={styles.errorMessage}>
-          {error}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className={styles.successMessage}>
-          {successMessage}
-        </div>
-      )}
-
       <div className={styles.configurationsGrid}>
         {configurations.map((config) => (
           <div
@@ -196,7 +167,7 @@ export default function OrderTypeManagementPage() {
             </div>
 
             <div className={styles.cardActions}>
-              <div className={styles.statusBadge}>
+              <div className={`${styles.statusBadge} ${config.isEnabled ? styles.statusEnabled : styles.statusDisabled}`}>
                 {config.isEnabled
                   ? t('order_type_enabled', 'Enabled')
                   : t('order_type_disabled', 'Disabled')}
