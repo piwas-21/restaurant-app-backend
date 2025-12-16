@@ -1967,5 +1967,23 @@
   "working_hours_updated": "Horaires d'ouverture mis à jour avec succès",
   "failed_to_update_working_hours": "Échec de la mise à jour des horaires d'ouverture",
   "reservation_showing_slots_for_table": "Affichage des créneaux horaires disponibles pour la Table {{tableNumber}}",
-  "reservation_tip_select_table_filter": "Astuce : Sélectionnez une table, puis revenez pour ne voir que les heures où cette table est disponible"
+  "reservation_tip_select_table_filter": "Astuce : Sélectionnez une table, puis revenez pour ne voir que les heures où cette table est disponible",
+   "cashier": {
+    "auto_print": "Impression automatique",
+    "auto_print_settings": "Paramètres d’impression automatique",
+    "enable_auto_print": "Activer l’impression automatique",
+    "disable_auto_print": "Désactiver l’impression automatique",
+    "order_types_to_print": "Types de commandes à imprimer",
+    "order_statuses_to_print": "Statuts des commandes à imprimer",
+    "what_to_print": "Que faut-il imprimer",
+    "print_all_kitchen": "Ticket cuisine (tous les articles)",
+    "print_front_kitchen": "Cuisine avant uniquement",
+    "print_back_kitchen": "Cuisine arrière uniquement",
+    "print_customer_bill": "Facture client",
+    "settings_saved": "Paramètres d’impression automatique enregistrés",
+    "at_least_one_option": "Veuillez sélectionner au moins un type de commande, un statut et un contenu d’impression",
+    "save_note": "Enregistrer la note"
+  },
+  "restaurant_closed_on_date": "Le restaurant est fermé le {{day}}, {{date}}. Veuillez sélectionner une autre date.",
+  "selected_tables_not_available": "La ou les tables sélectionnées {{tables}} ne sont plus disponibles pour ce créneau horaire. Veuillez choisir d’autres tables ou un autre horaire."
 }

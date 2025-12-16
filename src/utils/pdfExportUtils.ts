@@ -58,9 +58,55 @@ const escapeHtml = (text: string): string => {
 };
 
 /**
- * Export a single order to PDF using browser's print functionality
+ * Helper to print HTML content using a hidden iframe
+ * This avoids opening new tabs/windows for each print job
  */
-export const exportOrderToPDF = (order: OrderDto, t?: TranslationFunction): void => {
+export const printHtmlContent = (htmlContent: string): void => {
+  // Create a hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  
+  document.body.appendChild(iframe);
+  
+  const doc = iframe.contentWindow?.document;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    throw new Error('Could not access iframe document');
+  }
+
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  // Wait for content to load then print
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.error('Print failed', e);
+    } finally {
+      // Clean up after a delay to allow print dialog to initialize
+      // Note: In some browsers, removing iframe too early can cancel print.
+      // 1 minute timeout should be safe enough while preventing DOM clutter
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 60000);
+    }
+  };
+};
+
+/**
+ * Generate HTML for a single order receipt
+ */
+export const generateOrderReceiptHtml = (order: OrderDto, t?: TranslationFunction): string => {
   const translate = t || ((key: string, fallback: string) => fallback);
 
   // Build order items HTML
@@ -116,14 +162,7 @@ export const exportOrderToPDF = (order: OrderDto, t?: TranslationFunction): void
     </div>
   ` : '';
 
-  // Create print window
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    throw new Error('Failed to open print window. Please check popup settings.');
-  }
-
-  // Generate HTML with full order details
-  printWindow.document.write(`
+  return `
     <!DOCTYPE html>
     <html>
       <head>
@@ -151,8 +190,8 @@ export const exportOrderToPDF = (order: OrderDto, t?: TranslationFunction): void
             line-height: 1.5;
             color: #1a1a1a;
             background: white;
-            margin: 50px;
-            padding: 0;
+            margin: 0; /* Changed from 50px for iframe compatibility */
+            padding: 20px;
           }
           .header {
             text-align: center;
@@ -359,29 +398,19 @@ export const exportOrderToPDF = (order: OrderDto, t?: TranslationFunction): void
 
         ${paymentsSection}
         ${notesSection}
-
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 250);
-          };
-        </script>
       </body>
     </html>
-  `);
-
-  printWindow.document.close();
+  `;
 };
 
 /**
- * Export order items by kitchen type for kitchen staff
+ * Generate HTML for kitchen items
  */
-export const exportKitchenItemsToPDF = (
+export const generateKitchenItemsHtml = (
   order: OrderDto,
   kitchenType: 'FrontKitchen' | 'BackKitchen' | 'All',
   t?: TranslationFunction
-): void => {
+): string | null => {
   const translate = t || ((key: string, fallback: string) => fallback);
 
   // Filter items by kitchen type
@@ -391,8 +420,7 @@ export const exportKitchenItemsToPDF = (
   });
 
   if (filteredItems.length === 0) {
-    alert(translate('cashier.no_items_for_kitchen', 'No items for this kitchen type'));
-    return;
+    return null;
   }
 
   // Get kitchen type label
@@ -419,14 +447,7 @@ export const exportKitchenItemsToPDF = (
     </tr>
   `).join('');
 
-  // Create print window
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    throw new Error('Failed to open print window. Please check popup settings.');
-  }
-
-  // Generate HTML for kitchen order
-  printWindow.document.write(`
+  return `
     <!DOCTYPE html>
     <html>
       <head>
@@ -454,8 +475,8 @@ export const exportKitchenItemsToPDF = (
             line-height: 1.6;
             color: #1a1a1a;
             background: white;
-            margin: 40px;
-            padding: 0;
+            margin: 0; /* Changed from 40px for iframe compatibility */
+            padding: 20px;
           }
           .header {
             text-align: center;
@@ -593,19 +614,36 @@ export const exportKitchenItemsToPDF = (
         <div class="timestamp">
           ${translate('printed_at', 'Printed at')}: ${new Date().toLocaleString()}
         </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 250);
-          };
-        </script>
       </body>
     </html>
-  `);
+  `;
+};
 
-  printWindow.document.close();
+/**
+ * Export a single order to PDF using browser's print functionality
+ */
+export const exportOrderToPDF = (order: OrderDto, t?: TranslationFunction): void => {
+  const html = generateOrderReceiptHtml(order, t);
+  printHtmlContent(html);
+};
+
+/**
+ * Export order items by kitchen type for kitchen staff
+ */
+export const exportKitchenItemsToPDF = (
+  order: OrderDto,
+  kitchenType: 'FrontKitchen' | 'BackKitchen' | 'All',
+  t?: TranslationFunction
+): void => {
+  const translate = t || ((key: string, fallback: string) => fallback);
+  const html = generateKitchenItemsHtml(order, kitchenType, t);
+
+  if (!html) {
+    alert(translate('cashier.no_items_for_kitchen', 'No items for this kitchen type'));
+    return;
+  }
+
+  printHtmlContent(html);
 };
 
 /**
@@ -631,14 +669,7 @@ export const exportOrdersToPDF = (orders: OrderDto[], t?: TranslationFunction): 
   const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
   const paidOrders = orders.filter(o => o.paymentStatus === 'Paid').length;
 
-  // Create print window
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    throw new Error('Failed to open print window. Please check popup settings.');
-  }
-
-  // Generate HTML with orders summary
-  printWindow.document.write(`
+  const html = `
     <!DOCTYPE html>
     <html>
       <head>
@@ -666,6 +697,8 @@ export const exportOrdersToPDF = (orders: OrderDto[], t?: TranslationFunction): 
             line-height: 1.5;
             color: #1a1a1a;
             background: white;
+            margin: 0;
+            padding: 20px;
           }
           .header {
             text-align: center;
@@ -764,17 +797,10 @@ export const exportOrdersToPDF = (orders: OrderDto[], t?: TranslationFunction): 
             </tr>
           </table>
         </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 250);
-          };
-        </script>
       </body>
     </html>
-  `);
-
-  printWindow.document.close();
+  `;
+  
+  printHtmlContent(html);
 };
+

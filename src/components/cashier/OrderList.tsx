@@ -3,8 +3,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from '../../app/styles/CashierPage.module.css';
-import { OrderDto } from '@/types/order';
+import { OrderDto, OrderStatus } from '@/types/order';
 import { OrderType } from '@/types/order';
+import { getOrderStatusTranslationKey } from '@/utils/orderStatusStyles';
 
 interface OrderListProps {
   orders: OrderDto[];
@@ -121,14 +122,14 @@ export default function OrderList({
                 className={styles.orderStatusBadge}
                 style={{ backgroundColor: statusColor }}
               >
-                {t(`order_status.${order.status.toLowerCase()}`, order.status)}
+                {t(getOrderStatusTranslationKey(order.status as OrderStatus), order.status)}
               </span>
             </div>
 
             <div className={styles.orderCardBody}>
               <div className={styles.orderCustomer}>
                 <span className={styles.customerName}>
-                  {order.customerName || t('guest.label', 'Guest')}
+                  {order.customerName || t('guest', 'Guest')}
                 </span>
                 {order.type === OrderType.DineIn && order.tableNumber && (
                   <span className={styles.tableNumber}>

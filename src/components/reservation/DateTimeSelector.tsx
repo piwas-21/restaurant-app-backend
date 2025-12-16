@@ -92,15 +92,20 @@ export default function DateTimeSelector({
           ))}
         </div>
         <div className={styles.customInputWrapper}>
-          <label className={styles.customLabel}>{t('or_enter_time', 'Or enter time')}:</label>
-          <input
-            type="time"
+          <label className={styles.customLabel}>{t('or_select_time', 'Or select time')}:</label>
+          <select
             value={selectedTime}
             onChange={(e) => onTimeChange(e.target.value)}
             className={styles.customInput}
-            min="11:00"
-            max="22:00"
-          />
+            disabled={loading || !availableTimeSlots || availableTimeSlots.length === 0}
+          >
+            <option value="">{t('select_time', 'Select a time...')}</option>
+            {timeSlots.map(time => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </>

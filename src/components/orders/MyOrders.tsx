@@ -3,13 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getMyOrders } from '@/services/orderService';
-import { OrderDto } from '@/types/order';
-import { formatPriceWithRounding, hasActiveDiscount } from '@/utils/priceRounding';
+import { OrderDto, OrderStatus } from '@/types/order';
 import styles from './MyOrders.module.css';
-
-export type OrderStatus = "Delivered" | "In Progress" | "Cancelled" | "Pending Payment" | "Pending" | "Confirmed" | "Preparing" | "Ready" | "InTransit" | "Completed" | "PendingApproval";
-
-
+import { getOrderStatusTranslationKey } from '@/utils/orderStatusStyles';
 
 export interface OrderItemDetail {
   id: string;
@@ -114,21 +110,6 @@ export default function MyOrders() {
       case 'Takeaway': return 'order_type_takeaway';
       case 'Delivery': return 'order_type_delivery';
       default: return `order_type_${orderType.toLowerCase()}`;
-    }
-  };
-
-  const getOrderStatusTranslationKey = (status: OrderStatus): string => {
-    switch (status) {
-      case "Pending": return 'order_status_pending';
-      case "Confirmed": return 'order_status_confirmed';
-      case "Preparing": return 'order_status_preparing';
-      case "Ready": return 'order_status_ready';
-      case "InTransit": return 'order_status_intransit';
-      case "Delivered": return 'order_status_delivered';
-      case "Completed": return 'order_status_completed';
-      case "Cancelled": return 'order_status_cancelled';
-      case "PendingApproval": return 'order_status_pending_approval';
-      default: return status;
     }
   };
 

@@ -39,17 +39,10 @@ export default function ReservationsPage() {
 
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Load all tables on mount
   useEffect(() => {
     loadAllTables();
-
-    // Check if user is logged in (only on client side)
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      setIsLoggedIn(!!token);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -118,7 +111,23 @@ export default function ReservationsPage() {
       }
 
       // Store all time slots for showing available times
-      setAvailableTimeSlots(result.data.timeSlots || []);
+      const timeSlots = result.data.timeSlots || [];
+      setAvailableTimeSlots(timeSlots);
+
+      // Check if restaurant is closed on this day (no time slots)
+      if (timeSlots.length === 0) {
+        const dateObj = new Date(selectedDate);
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+        enqueueSnackbar(
+          t('restaurant_closed_on_date', 'Restaurant is closed on {{day}}, {{date}}. Please select another date.', {
+            day: dayName,
+            date: dateObj.toLocaleDateString()
+          }),
+          { variant: 'warning', autoHideDuration: 5000 }
+        );
+        // Clear the selected date to prompt user to choose another
+        setSelectedDate('');
+      }
     } catch {
       setAvailableTimeSlots([]);
     } finally {
@@ -242,6 +251,20 @@ export default function ReservationsPage() {
       return;
     }
 
+    // Re-validate table availability before submission
+    const unavailableTables = selectedTableIds.filter(id => bookedTableIds.includes(id));
+    if (unavailableTables.length > 0) {
+      const tableNumbers = unavailableTables
+        .map(id => allTables.find(t => t.id === id)?.tableNumber)
+        .filter(Boolean)
+        .join(', ');
+      enqueueSnackbar(
+        t('selected_tables_not_available', 'Selected table(s) {{tables}} are no longer available for this time slot. Please select different tables or time.', { tables: tableNumbers }),
+        { variant: 'error' }
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -290,12 +313,19 @@ export default function ReservationsPage() {
       // Extract detailed error message from API response
       let errorMessage = t('reservation_failed', 'Failed to create reservation');
       
-      if (err.response?.data?.errors && Array.isArray(err.response.data.errors) && err.response.data.errors.length > 0) {
-        // Show the first specific error from the API
+      // Try to get the specific error message from the API
+      if (err?.response?.data?.errors && Array.isArray(err.response.data.errors) && err.response.data.errors.length > 0) {
+        // Show the first specific error from the API errors array
         errorMessage = err.response.data.errors[0];
-      } else if (err.message) {
+      } else if (err?.response?.data?.message && err.response.data.message !== 'Operation failed') {
+        // Use the message field if it's not the generic "Operation failed"
+        errorMessage = err.response.data.message;
+      } else if (err?.message && err.message !== 'Request failed with status code 400') {
+        // Use error message if it's not generic
         errorMessage = err.message;
       }
+      
+      console.error('Reservation error:', err?.response?.data || err); // Log for debugging
       
       enqueueSnackbar(
         errorMessage,
@@ -307,6 +337,19 @@ export default function ReservationsPage() {
   };
 
   const selectedTables = allTables.filter(t => selectedTableIds.includes(t.id));
+  
+  // Filter time slots based on selected tables
+  // If tables are selected, only show times when ALL selected tables are available
+  const filteredTimeSlots = selectedTableIds.length > 0
+    ? availableTimeSlots
+        .filter(slot => {
+          // Check if all selected tables are available in this time slot
+          const slotTableIds = slot.availableTables.map((t: any) => t.id);
+          return selectedTableIds.every(selectedId => slotTableIds.includes(selectedId));
+        })
+        .map((s: any) => s.startTime.substring(0, 5)) // HH:mm
+    : availableTimeSlots.map((s: any) => s.startTime.substring(0, 5)); // Show all slots if no table selected
+
   const canSubmit = selectedTableIds.length > 0 && selectedDate && selectedTime && customerName && customerEmail;
 
   return (
@@ -353,7 +396,7 @@ export default function ReservationsPage() {
                 onDateChange={setSelectedDate}
                 onTimeChange={setSelectedTime}
                 loading={loading}
-                availableTimeSlots={availableTimeSlots.map((s: any) => s.startTime.substring(0, 5))}
+                availableTimeSlots={filteredTimeSlots}
               />
 
               <SelectedTableInfo
@@ -390,7 +433,6 @@ export default function ReservationsPage() {
       <ReservationSuccessModal
         isOpen={showSuccessModal}
         onClose={handleCloseSuccessModal}
-        isLoggedIn={isLoggedIn}
         customerEmail={customerEmail}
         numberOfTables={selectedTableIds.length}
       />

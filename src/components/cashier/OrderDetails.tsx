@@ -111,7 +111,7 @@ export default function OrderDetails({
               <option value="">{t('cashier.update_status', 'Update Status')}</option>
               {nextStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {t(`order_status.${status.toLowerCase()}`, status)}
+                  {t(`order_status_${status.toLowerCase()}`, status)}
                 </option>
               ))}
             </select>
@@ -135,7 +135,7 @@ export default function OrderDetails({
           {order.status !== 'Completed' && order.status !== 'Cancelled' && (
             <button className={`${styles.actionButton} ${styles.actionButtonDanger}`} onClick={onCancel}>
               <XCircle size={18} />
-              {t('cashier.cancel', 'Cancel')}
+              {t('cancel', 'Cancel')}
             </button>
           )}
 
@@ -143,7 +143,7 @@ export default function OrderDetails({
             className={`${styles.actionButton} ${order.isFocusOrder ? styles.actionButtonSecondary : styles.actionButtonInfo}`}
             onClick={onToggleFocus}
           >
-            {order.isFocusOrder ? '⭐' : '☆'} {order.isFocusOrder ? t('cashier.unfocus', 'Unfocus') : t('cashier.focus', 'Focus')}
+            {order.isFocusOrder ? '⭐' : '☆'} {order.isFocusOrder ? t('remove_focus', 'Unfocus') : t('cashier.mark_as_focus', 'Focus')}
           </button>
         </div>
       </div>
@@ -164,7 +164,7 @@ export default function OrderDetails({
             className={styles.statusBadge}
             style={{ backgroundColor: getStatusColor(order.status), color: 'white' }}
           >
-            {t(`order_status.${order.status.toLowerCase()}`, order.status)}
+            {t(`order_status_${order.status.toLowerCase()}`, order.status)}
           </span>
         </div>
       </div>
@@ -177,30 +177,30 @@ export default function OrderDetails({
           <div className={styles.infoCard}>
             <h3 className={styles.infoCardHeader}>
               <User size={18} />
-              {t('customer.info', 'Customer')}
+              {t('customer', 'Customer')}
             </h3>
             <div className={styles.infoGrid}>
               {order.customerName && (
                 <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>{t('customer.name', 'Name')}</span>
+                  <span className={styles.infoLabel}>{t('name', 'Name')}</span>
                   <span className={styles.infoValue}>{order.customerName}</span>
                 </div>
               )}
               {order.customerEmail && (
                 <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>{t('customer.email', 'Email')}</span>
+                  <span className={styles.infoLabel}>{t('email', 'Email')}</span>
                   <span className={styles.infoValue}>{order.customerEmail}</span>
                 </div>
               )}
               {order.customerPhone && (
                 <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>{t('customer.phone', 'Phone')}</span>
+                  <span className={styles.infoLabel}>{t('phone', 'Phone')}</span>
                   <span className={styles.infoValue}>{order.customerPhone}</span>
                 </div>
               )}
               {order.type === 'DineIn' && order.tableNumber && (
                 <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>{t('order.table', 'Table')}</span>
+                  <span className={styles.infoLabel}>{t('table', 'Table')}</span>
                   <span className={`${styles.infoValue} ${styles.infoValueLarge}`}>#{order.tableNumber}</span>
                 </div>
               )}
@@ -212,7 +212,7 @@ export default function OrderDetails({
                 <div className={styles.infoItem}>
                   <span className={styles.infoLabel}>
                     <MapPin size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
-                    {t('order.delivery_address', 'Delivery Address')}
+                    {t('delivery_address', 'Delivery Address')}
                   </span>
                   <span className={styles.infoValue}>
                     {order.deliveryAddress.addressLine1}
@@ -229,7 +229,7 @@ export default function OrderDetails({
           <div className={styles.infoCard}>
             <h3 className={styles.infoCardHeader}>
               <ShoppingBag size={18} />
-              {t('order.items', 'Items')}
+              {t('items', 'Items')}
             </h3>
             <div className={styles.itemsList}>
               {order.items?.map((item, idx) => (
@@ -259,34 +259,34 @@ export default function OrderDetails({
         <div className={styles.rightColumn}>
           {/* Order Summary */}
           <div className={styles.infoCard}>
-            <h3 className={styles.infoCardHeader}>{t('order.summary', 'Order Summary')}</h3>
+            <h3 className={styles.infoCardHeader}>{t('order_summary', 'Order Summary')}</h3>
             <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>{t('order.subtotal', 'Subtotal')}</span>
+              <span className={styles.summaryLabel}>{t('subtotal', 'Subtotal')}</span>
               <span className={styles.summaryValue}>CHF {order.subTotal?.toFixed(2)}</span>
             </div>
             {order.tax > 0 && (
               <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>{t('order.tax', 'Tax')}</span>
+                <span className={styles.summaryLabel}>{t('tax', 'Tax')}</span>
                 <span className={styles.summaryValue}>CHF {order.tax?.toFixed(2)}</span>
               </div>
             )}
             {order.deliveryFee > 0 && (
               <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>{t('order.delivery_fee', 'Delivery Fee')}</span>
+                <span className={styles.summaryLabel}>{t('delivery_fee', 'Delivery Fee')}</span>
                 <span className={styles.summaryValue}>CHF {order.deliveryFee?.toFixed(2)}</span>
               </div>
             )}
             {order.discount > 0 && (
               <div className={styles.summaryRow}>
                 <span className={styles.summaryLabel} style={{ color: 'var(--primary-color)' }}>
-                  {t('order.discount', 'Discount')}
+                  {t('order_discount', 'Discount')}
                 </span>
                 <span className={styles.summaryValue} style={{ color: 'var(--primary-color)' }}>
                   -CHF {order.discount?.toFixed(2)}</span>
               </div>
             )}
             <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
-              <span className={styles.summaryLabel}>{t('order.total', 'Total')}</span>
+              <span className={styles.summaryLabel}>{t('order_total', 'Total')}</span>
               <span className={styles.summaryValue}>CHF {order.total?.toFixed(2)}</span>
             </div>
           </div>
@@ -295,14 +295,14 @@ export default function OrderDetails({
       <div className={styles.infoCard}>
         <h3 className={styles.infoCardHeader}>
           <CreditCard size={18} />
-          {t('payment.status', 'Payment Status')}
+          {t('payment_status', 'Payment Status')}
         </h3>
         <div className={styles.summaryRow}>
-          <span className={styles.summaryLabel}>{t('payment.total_paid', 'Total Paid')}</span>
+          <span className={styles.summaryLabel}>{t('cashier.total_paid', 'Total Paid')}</span>
           <span className={styles.summaryValue}>CHF {order.totalPaid?.toFixed(2)}</span>
         </div>
         <div className={styles.summaryRow}>
-          <span className={styles.summaryLabel}>{t('payment.remaining', 'Remaining')}</span>
+          <span className={styles.summaryLabel}>{t('cashier.remaining', 'Remaining')}</span>
           <span 
             className={styles.summaryValue}
             style={{ color: order.remainingAmount! > 0 ? '#ef4444' : '#10b981' }}

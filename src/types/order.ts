@@ -35,6 +35,7 @@ export type OrderStatus =
   | 'Preparing'
   | 'Ready'
   | 'InTransit'
+  | 'In Progress'
   | 'Delivered'
   | 'Completed'
   | 'Cancelled'

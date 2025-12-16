@@ -1144,11 +1144,22 @@
   "max_guests_count": "{{count}} guests",
   "max_guests": "Max Guests",
   "outdoor_table": "Outdoor Table",
-  "activate": "Activate",
-  "deactivate": "Deactivate",
-  "enable": "Enable",
-  "disable": "Disable",
-  "creating": "Creating...",
+  "cashier": {
+    "auto_print": "Auto Print",
+    "auto_print_settings": "Auto Print Settings",
+    "enable_auto_print": "Enable Auto Print",
+    "disable_auto_print": "Disable Auto Print",
+    "order_types_to_print": "Order Types to Print",
+    "order_statuses_to_print": "Order Statuses to Print",
+    "what_to_print": "What to Print",
+    "print_all_kitchen": "Kitchen Receipt (All Items)",
+    "print_front_kitchen": "Front Kitchen Only",
+    "print_back_kitchen": "Back Kitchen Only",
+    "print_customer_bill": "Customer Bill",
+    "settings_saved": "Auto print settings saved",
+    "at_least_one_option": "Please select at least one order type, status, and print content",
+    "save_note": "Save Note"
+  },
   "update": "Update",
   "select_your_table": "Select your Table",
   "book_your_table": "Book your table",
@@ -1967,5 +1978,7 @@
   "optional_notes": "Optional notes...",
   "close_time_must_be_after_open": "Close time must be after open time for {{day}}",
   "working_hours_updated": "Working hours updated successfully",
-  "failed_to_update_working_hours": "Failed to update working hours"
+  "failed_to_update_working_hours": "Failed to update working hours",
+  "restaurant_closed_on_date": "Restaurant is closed on {{day}}, {{date}}. Please select another date.",
+  "selected_tables_not_available": "Selected table(s) {{tables}} are no longer available for this time slot. Please select different tables or time."
 }

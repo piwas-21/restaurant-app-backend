@@ -1967,5 +1967,23 @@
   "working_hours_updated": "营业时间更新成功",
   "failed_to_update_working_hours": "更新营业时间失败",
   "reservation_showing_slots_for_table": "显示桌号 {{tableNumber}} 可用的时间段",
-  "reservation_tip_select_table_filter": "提示：选择一张桌子，然后返回以查看该桌子可用的时间段"
+  "reservation_tip_select_table_filter": "提示：选择一张桌子，然后返回以查看该桌子可用的时间段",
+  "cashier": {
+    "auto_print": "自动打印",
+    "auto_print_settings": "自动打印设置",
+    "enable_auto_print": "启用自动打印",
+    "disable_auto_print": "禁用自动打印",
+    "order_types_to_print": "要打印的订单类型",
+    "order_statuses_to_print": "要打印的订单状态",
+    "what_to_print": "打印内容",
+    "print_all_kitchen": "厨房小票（全部商品）",
+    "print_front_kitchen": "仅前厨",
+    "print_back_kitchen": "仅后厨",
+    "print_customer_bill": "顾客账单",
+    "settings_saved": "自动打印设置已保存",
+    "at_least_one_option": "请至少选择一个订单类型、订单状态和打印内容",
+    "save_note": "保存备注"
+  },
+  "restaurant_closed_on_date": "餐厅在 {{day}}，{{date}} 关闭。请选择其他日期。",
+  "selected_tables_not_available": "所选桌位 {{tables}} 在该时间段已不可用。请选择其他桌位或时间。"
 }

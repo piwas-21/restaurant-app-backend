@@ -9,17 +9,15 @@ import styles from './ReservationSuccessModal.module.css';
 interface ReservationSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isLoggedIn: boolean; // Kept as per original, as new prop 'reservationDetails' was not fully defined
-  customerEmail: string; // Kept as per original
-  numberOfTables: number; // Kept as per original
+  customerEmail: string;
+  numberOfTables: number;
 }
 
 export default function ReservationSuccessModal({
   isOpen,
   onClose,
-  isLoggedIn, // Kept as per original
-  customerEmail, // Kept as per original
-  numberOfTables // Kept as per original
+  customerEmail,
+  numberOfTables
 }: ReservationSuccessModalProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -66,7 +64,7 @@ export default function ReservationSuccessModal({
         </div>
 
         <div className={styles.actions}>
-          {isLoggedIn ? (
+          {user ? (
             <>
               <button className={styles.primaryButton} onClick={handleViewReservations}>
                 {t('view_my_reservations', 'View My Reservations')}

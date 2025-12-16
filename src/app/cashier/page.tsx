@@ -16,9 +16,12 @@ import NotificationCenter from '@/components/cashier/NotificationCenter';
 import { OrderType } from '@/types/order';
 import { QRCodeValidationResult } from '@/types/userGroupTypes';
 import styles from '@/app/styles/CashierPage.module.css';
-import { RefreshCw, QrCode } from 'lucide-react';
+import { RefreshCw, QrCode, Printer, Settings } from 'lucide-react';
 import QRScannerDialog from '@/components/cashier/QRScannerDialog';
+import AutoPrintSettingsModal from '@/components/cashier/AutoPrintSettingsModal';
 import { quickConfirmOrder, quickCancelOrder } from '@/services/cashierService';
+import { exportKitchenItemsToPDF, exportOrderToPDF } from '@/utils/pdfExportUtils';
+import { AutoPrintSettings, DEFAULT_AUTO_PRINT_SETTINGS } from '@/types/cashier';
 
 export default function CashierPage() {
   const { t } = useTranslation();
@@ -42,6 +45,8 @@ export default function CashierPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoPrintSettings, setAutoPrintSettings] = useState<AutoPrintSettings>(DEFAULT_AUTO_PRINT_SETTINGS);
+  const [showAutoPrintSettings, setShowAutoPrintSettings] = useState(false);
 
   // Dialog State
   const [showStatusDialog, setShowStatusDialog] = useState(false);
@@ -71,6 +76,41 @@ export default function CashierPage() {
   const previousOrderCountRef = useRef(0);
   const previousOrderStatusesRef = useRef<Map<string, string>>(new Map());
   const isInitialLoadRef = useRef(true);
+
+  // Load auto-print settings from local storage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('cashier_auto_print_settings');
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setAutoPrintSettings(parsed);
+      } catch (e) {
+        console.error('Failed to parse auto-print settings:', e);
+      }
+    }
+  }, []);
+
+  // Toggle auto-print enabled/disabled
+  const toggleAutoPrint = () => {
+    const newSettings = {
+      ...autoPrintSettings,
+      enabled: !autoPrintSettings.enabled,
+    };
+    setAutoPrintSettings(newSettings);
+    localStorage.setItem('cashier_auto_print_settings', JSON.stringify(newSettings));
+    if (newSettings.enabled) {
+      showSuccess(t('cashier.enable_auto_print') || 'Auto print enabled');
+    } else {
+      showSuccess(t('cashier.disable_auto_print') || 'Auto print disabled');
+    }
+  };
+
+  // Save auto-print settings
+  const saveAutoPrintSettings = (settings: AutoPrintSettings) => {
+    setAutoPrintSettings(settings);
+    localStorage.setItem('cashier_auto_print_settings', JSON.stringify(settings));
+    showSuccess(t('cashier.settings_saved') || 'Auto print settings saved');
+  };
 
   // Get selected order
   const selectedOrder = useMemo(() => {
@@ -148,6 +188,35 @@ export default function CashierPage() {
         ) {
           setPendingOrderForConfirm(order.id);
           setShowQuickConfirmModal(true);
+        }
+
+        // Auto-print based on settings
+        if (autoPrintSettings.enabled) {
+          // Check if order type matches
+          const shouldPrintType = 
+            (order.type === OrderType.DineIn && autoPrintSettings.orderTypes.dineIn) ||
+            (order.type === OrderType.Takeaway && autoPrintSettings.orderTypes.takeaway) ||
+            (order.type === OrderType.Delivery && autoPrintSettings.orderTypes.delivery);
+          
+          // Check if order status matches
+          const orderStatus = order.status?.toLowerCase() || 'pending';
+          const shouldPrintStatus = autoPrintSettings.orderStatuses[orderStatus as keyof typeof autoPrintSettings.orderStatuses];
+          
+          if (shouldPrintType && shouldPrintStatus) {
+            // Print all selected content types
+            if (autoPrintSettings.printContent.all) {
+              exportKitchenItemsToPDF(order, 'All', t);
+            }
+            if (autoPrintSettings.printContent.frontKitchen) {
+              exportKitchenItemsToPDF(order, 'FrontKitchen', t);
+            }
+            if (autoPrintSettings.printContent.backKitchen) {
+              exportKitchenItemsToPDF(order, 'BackKitchen', t);
+            }
+            if (autoPrintSettings.printContent.bill) {
+              exportOrderToPDF(order, t);
+            }
+          }
         }
       });
 
@@ -390,6 +459,38 @@ export default function CashierPage() {
             }
           </button>
 
+          {/* <button
+            className={styles.refreshButton}
+            onClick={toggleAutoPrint}
+            title={autoPrintSettings.enabled 
+              ? (t('cashier.disable_auto_print') || 'Disable Auto Print')
+              : (t('cashier.enable_auto_print') || 'Enable Auto Print')
+            }
+            style={{ 
+              marginRight: '10px',
+              backgroundColor: autoPrintSettings.enabled ? '#2196f3' : '#607d8b',
+              color: 'white'
+            }}
+          >
+            <Printer size={16} />
+            {t('cashier.auto_print') || 'Auto Print'}
+          </button>
+
+          {autoPrintSettings.enabled && (
+            <button
+              className={styles.refreshButton}
+              onClick={() => setShowAutoPrintSettings(true)}
+              title={t('cashier.auto_print_settings') || 'Auto Print Settings'}
+              style={{ 
+                marginRight: '10px',
+                backgroundColor: '#4caf50',
+                color: 'white'
+              }}
+            >
+              <Settings size={16} />
+            </button>
+          )} */}
+
           <button
             className={styles.refreshButton}
             onClick={() => setShowQRScannerDialog(true)}
@@ -604,6 +705,13 @@ export default function CashierPage() {
         onClose={handleQuickConfirmModalClose}
         onConfirm={handleQuickConfirm}
         onCancel={handleQuickCancel}
+      />
+
+      <AutoPrintSettingsModal
+        isOpen={showAutoPrintSettings}
+        onClose={() => setShowAutoPrintSettings(false)}
+        settings={autoPrintSettings}
+        onSave={saveAutoPrintSettings}
       />
       </div>
     </div>

@@ -1969,5 +1969,23 @@
   "working_hours_updated": "Horario de apertura actualizado correctamente",
   "failed_to_update_working_hours": "Error al actualizar el horario de apertura",
   "reservation_showing_slots_for_table": "Mostrando los slots de tiempo disponibles para el Tisch {{tableNumber}}",
-  "reservation_tip_select_table_filter": "Tipp: Wählen Sie einen Tisch aus und gehen Sie dann zurück, um nur die Zeiten zu sehen, zu denen dieser Tisch verfügbar ist"
+  "reservation_tip_select_table_filter": "Tipp: Wählen Sie einen Tisch aus und gehen Sie dann zurück, um nur die Zeiten zu sehen, zu denen dieser Tisch verfügbar ist",
+  "cashier": {
+    "auto_print": "Impresión automática",
+    "auto_print_settings": "Configuración de impresión automática",
+    "enable_auto_print": "Habilitar impresión automática",
+    "disable_auto_print": "Deshabilitar impresión automática",
+    "order_types_to_print": "Tipos de pedidos a imprimir",
+    "order_statuses_to_print": "Estados de pedidos a imprimir",
+    "what_to_print": "Qué imprimir",
+    "print_all_kitchen": "Recibo de cocina (todos los artículos)",
+    "print_front_kitchen": "Solo cocina frontal",
+    "print_back_kitchen": "Solo cocina trasera",
+    "print_customer_bill": "Factura del cliente",
+    "settings_saved": "Configuración de impresión automática guardada",
+    "at_least_one_option": "Seleccione al menos un tipo de pedido, estado y contenido de impresión",
+    "save_note": "Guardar nota"
+  },
+  "restaurant_closed_on_date": "El restaurante está cerrado el {{day}}, {{date}}. Por favor, seleccione otra fecha.",
+  "selected_tables_not_available": "La(s) mesa(s) seleccionada(s) {{tables}} ya no están disponibles para este horario. Por favor, seleccione otras mesas u otro horario."
 }

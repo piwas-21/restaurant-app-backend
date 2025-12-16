@@ -1445,10 +1445,21 @@
   "cashier.dine_in": "Mekanda Tüketim",
   "cashier.takeaway": "Paket Servis",
   "cashier.delivery": "Teslimat",
-  "cashier.pending": "Bekleniyor",
-  "cashier.confirmed": "Onaylandı",
-  "cashier.preparing": "Hazırlanıyor",
-  "cashier.ready": "Hazır",
+  "cashier": {
+    "auto_print": "Otomatik Yazdır",
+    "auto_print_settings": "Otomatik Yazdırma Ayarları",
+    "enable_auto_print": "Otomatik Yazdırmayı Aç",
+    "disable_auto_print": "Otomatik Yazdırmayı Kapat",
+    "order_types_to_print": "Yazdırılacak Sipariş Türleri",
+    "order_statuses_to_print": "Yazdırılacak Sipariş Durumları",
+    "what_to_print": "Ne Yazdırılacak",
+    "print_all_kitchen": "Mutfak Fişi (Tüm Ürünler)",
+    "print_front_kitchen": "Sadece Ön Mutfak",
+    "print_back_kitchen": "Sadece Arka Mutfak",
+    "print_customer_bill": "Müşteri Faturası",
+    "settings_saved": "Otomatik yazdırma ayarları kaydedildi",
+    "at_least_one_option": "Lütfen en az bir sipariş türü, durumu ve yazdırma içeriği seçin"
+  },
   "cashier.completed": "Tamamlandı",
   "cashier.unpaid": "Ödenmemiş",
   "cashier.partially_paid": "Kısmen Ödendi",
@@ -1967,5 +1978,7 @@
   "working_hours_updated": "Çalışma saatleri başarıyla güncellendi",
   "failed_to_update_working_hours": "Çalışma saatleri güncellenemedi",
   "reservation_showing_slots_for_table": "Masa {{tableNumber}} için uygun zaman dilimleri gösteriliyor",
-  "reservation_tip_select_table_filter": "İpucu: Bir masa seçin, ardından o masanın uygun olduğu zamanları görmek için geri dönün"
+  "reservation_tip_select_table_filter": "İpucu: Bir masa seçin, ardından o masanın uygun olduğu zamanları görmek için geri dönün",
+  "restaurant_closed_on_date": "Restaurant {{day}}, {{date}} tarihinde kapalı. Lütfen başka bir tarih seçin.",
+  "selected_tables_not_available": "Seçilen masa(s) {{tables}} bu zaman diliminde artık mevcut değil. Lütfen farklı masa veya zaman seçin."
 }

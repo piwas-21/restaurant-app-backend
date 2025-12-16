@@ -1967,5 +1967,23 @@
   "working_hours_updated": "Orari di apertura aggiornati con successo",
   "failed_to_update_working_hours": "Aggiornamento degli orari di apertura fallito",
   "reservation_showing_slots_for_table": "Mostra fasce orarie disponibili per il tavolo {{tableNumber}}",
-  "reservation_tip_select_table_filter": "Suggerimento: seleziona un tavolo, quindi torna indietro per vedere solo gli orari in cui quel tavolo è disponibile"
+  "reservation_tip_select_table_filter": "Suggerimento: seleziona un tavolo, quindi torna indietro per vedere solo gli orari in cui quel tavolo è disponibile",
+  "cashier": {
+    "auto_print": "Stampa automatica",
+    "auto_print_settings": "Impostazioni di stampa automatica",
+    "enable_auto_print": "Abilita stampa automatica",
+    "disable_auto_print": "Disabilita stampa automatica",
+    "order_types_to_print": "Tipi di ordini da stampare",
+    "order_statuses_to_print": "Stati degli ordini da stampare",
+    "what_to_print": "Cosa stampare",
+    "print_all_kitchen": "Ricevuta cucina (tutti gli articoli)",
+    "print_front_kitchen": "Solo cucina anteriore",
+    "print_back_kitchen": "Solo cucina posteriore",
+    "print_customer_bill": "Conto cliente",
+    "settings_saved": "Impostazioni di stampa automatica salvate",
+    "at_least_one_option": "Seleziona almeno un tipo di ordine, uno stato e un contenuto di stampa",
+    "save_note": "Salva nota"
+  },
+  "restaurant_closed_on_date": "Il ristorante è chiuso il {{day}}, {{date}}. Seleziona un'altra data.",
+  "selected_tables_not_available": "Il/i tavolo/i selezionato/i {{tables}} non è/sono più disponibile/i per questa fascia oraria. Seleziona tavoli o orari diversi."
 }

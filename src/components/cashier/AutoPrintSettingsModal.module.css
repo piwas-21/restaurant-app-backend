@@ -1,0 +1,270 @@
+/* Auto Print Settings Modal */
+.settingsModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.settingsContent {
+  background: var(--background-color);
+  color: var(--text-color);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-theme="dark"] .settingsContent {
+  background: var(--secondary-color);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+.settingsHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settingsHeader h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary-color);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  font-size: 28px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+}
+
+.closeButton:hover {
+  color: var(--text-color);
+}
+
+.settingsBody {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.settingsBody::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settingsBody::-webkit-scrollbar-track {
+  background: var(--secondary-color);
+  border-radius: 4px;
+}
+
+.settingsBody::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.settingsBody::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary-color);
+}
+
+.settingsSection {
+  margin-bottom: 1.5rem;
+}
+
+.settingsSection:last-child {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.optionsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.optionLabel {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--secondary-color);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-color);
+  font-size: 0.95rem;
+  user-select: none;
+  font-weight: 500;
+}
+
+.optionLabel:hover {
+  border-color: var(--primary-color);
+  background-color: rgba(192, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .optionLabel:hover {
+  background-color: rgba(224, 102, 102, 0.1);
+}
+
+.optionLabel input[type="checkbox"],
+.optionLabel input[type="radio"] {
+  margin-right: 0.75rem;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-color);
+}
+
+.optionLabel:has(input:checked) {
+  border-color: var(--primary-color);
+  background-color: rgba(192, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .optionLabel:has(input:checked) {
+  background-color: rgba(224, 102, 102, 0.15);
+}
+
+.settingsFooter {
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.cancelButton,
+.saveButton {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.cancelButton {
+  background-color: transparent;
+  color: var(--text-color);
+  border: 2px solid var(--border-color);
+}
+
+.cancelButton:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--text-secondary-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cancelButton:active {
+  transform: translateY(0);
+}
+
+.saveButton {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.saveButton:hover {
+  background-color: var(--primary-color-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(192, 0, 0, 0.2);
+}
+
+.saveButton:active {
+  transform: translateY(0);
+}
+
+[data-theme="dark"] .saveButton {
+  background-color: var(--primary-color);
+}
+
+[data-theme="dark"] .saveButton:hover {
+  background-color: var(--primary-color-dark);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .settingsContent {
+    max-width: 95%;
+  }
+
+  .settingsHeader {
+    padding: 1.25rem;
+  }
+
+  .settingsHeader h2 {
+    font-size: 1.25rem;
+  }
+
+  .settingsBody {
+    padding: 1.25rem;
+  }
+
+  .settingsFooter {
+    padding: 1.25rem;
+    flex-direction: column-reverse;
+  }
+
+  .cancelButton,
+  .saveButton {
+    width: 100%;
+  }
+}

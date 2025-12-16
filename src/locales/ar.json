@@ -1966,5 +1966,23 @@
   "working_hours_updated": "تم تحديث ساعات العمل بنجاح",
   "failed_to_update_working_hours": "فشل تحديث ساعات العمل",
   "reservation_showing_slots_for_table": "عرض الفترات الزمنية المتاحة للطاولة {{tableNumber}}",
-  "reservation_tip_select_table_filter": "نصيحة: اختر طاولة، ثم عد لترى الأوقات المتاحة لتلك الطاولة فقط"
+  "reservation_tip_select_table_filter": "نصيحة: اختر طاولة، ثم عد لترى الأوقات المتاحة لتلك الطاولة فقط",
+  "cashier": {
+    "auto_print": "الطباعة التلقائية",
+    "auto_print_settings": "إعدادات الطباعة التلقائية",
+    "enable_auto_print": "تفعيل الطباعة التلقائية",
+    "disable_auto_print": "تعطيل الطباعة التلقائية",
+    "order_types_to_print": "أنواع الطلبات للطباعة",
+    "order_statuses_to_print": "حالات الطلبات للطباعة",
+    "what_to_print": "ماذا يتم طباعته",
+    "print_all_kitchen": "إيصال المطبخ (جميع العناصر)",
+    "print_front_kitchen": "مطبخ الواجهة فقط",
+    "print_back_kitchen": "مطبخ الخلفية فقط",
+    "print_customer_bill": "فاتورة العميل",
+    "settings_saved": "تم حفظ إعدادات الطباعة التلقائية",
+    "at_least_one_option": "يرجى اختيار نوع طلب واحد على الأقل، وحالة، ومحتوى الطباعة",
+    "save_note": "حفظ الملاحظة"
+  },
+  "restaurant_closed_on_date": "المطعم مغلق يوم {{day}}، {{date}}. يرجى اختيار تاريخ آخر.",
+  "selected_tables_not_available": "الطاولة/الطاولات المحددة {{tables}} لم تعد متاحة في هذا الوقت. يرجى اختيار طاولات أو وقت مختلف."
 }

@@ -73,8 +73,8 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
             defaultSelected.add(ing.id);
             defaultQuantities[ing.id] = 1;
           }
-          // Also select optional ingredients that are included in base price (default ingredients)
-          else if (ing.isIncludedInBasePrice) {
+          // Also select all optional ingredients by default (users can deselect if they don't want)
+          else {
             defaultSelected.add(ing.id);
             defaultQuantities[ing.id] = 1;
           }
@@ -94,7 +94,22 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
     
     // Add ingredient costs
     detailedIngredients.forEach(ing => {
-      if (selectedIngredients.has(ing.id) && !ing.isIncludedInBasePrice) {
+      if (ing.isIncludedInBasePrice) {
+        // Ingredient price is included in base price for 1 quantity
+        const isSelected = selectedIngredients.has(ing.id);
+        const quantity = ingredientQuantities[ing.id] || 1;
+        
+        if (!isSelected) {
+          // Deselected: deduct the included quantity (1)
+          total -= ing.price;
+        } else if (quantity > 1) {
+          // Selected with more than 1: add extra quantities beyond the free one
+          total += ing.price * (quantity - 1);
+        }
+        // quantity == 1: already in base price, no change
+      } else if (selectedIngredients.has(ing.id)) {
+        // Regular optional ingredient (not included in base)
+        // Add price if user selected it
         const quantity = ingredientQuantities[ing.id] || 1;
         total += ing.price * quantity;
       }
@@ -307,9 +322,11 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                                 <span className={styles.itemPrice}>
                                   {ingredient.isIncludedInBasePrice
                                     ? isSelected
-                                      ? "" // Already in base price
+                                      ? quantity > 1
+                                        ? `+CHF ${(ingredient.price * (quantity - 1)).toFixed(2)}` // Show extra cost when quantity > 1
+                                        : "" // Quantity 1 is already in base price
                                       : `-CHF ${ingredient.price.toFixed(2)}` // Deducted when deselected
-                                    : `+CHF ${ingredient.price.toFixed(2)}`} {/* Added when selected */}
+                                    : `+CHF ${(ingredient.price * quantity).toFixed(2)}`} {/* Added when selected */}
                                 </span>
                               )}
                             </div>

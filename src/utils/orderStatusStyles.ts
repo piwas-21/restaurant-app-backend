@@ -1,4 +1,5 @@
 import styles from '@/styles/orderStatus.module.css';
+import { OrderStatus } from '@/types/order';
 
 /**
  * Get the CSS class name for an order status badge
@@ -72,3 +73,18 @@ export const getPaymentBadgeClasses = (status: string): string => {
 export const getFocusBadgeClass = (): string => {
   return styles.focusBadge;
 };
+
+export const getOrderStatusTranslationKey = (status: OrderStatus): string => {
+    switch (status) {
+      case "Pending": return 'order_status_pending';
+      case "Confirmed": return 'order_status_confirmed';
+      case "Preparing": return 'order_status_preparing';
+      case "Ready": return 'order_status_ready';
+      case "InTransit": return 'order_status_intransit';
+      case "Delivered": return 'order_status_delivered';
+      case "Completed": return 'order_status_completed';
+      case "Cancelled": return 'order_status_cancelled';
+      case "PendingApproval": return 'order_status_pending_approval';
+      default: return status;
+    }
+  };

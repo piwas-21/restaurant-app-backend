@@ -70,6 +70,10 @@ export default function VisualTableLayout({
     const transformStyle = rotation !== 0 ? `rotate(${rotation}deg)` : undefined;
 
     const handleTableClick = () => {
+      // Prevent selection of booked tables
+      if (status === 'booked') {
+        return;
+      }
       // Set this table as the active tooltip
       setActiveTooltipTableId(table.id);
       onSelectTable(table);
@@ -78,12 +82,13 @@ export default function VisualTableLayout({
   return (
     <div
       key={table.id}
-      className={`${styles.table} ${styles[status]} ${shapeClass} ${isLarge ? styles.large : ''}`}
+      className={`${styles.table} ${styles[status]} ${shapeClass} ${isLarge ? styles.large : ''} ${status === 'booked' ? styles.disabled : ''}`}
       onClick={handleTableClick}
       style={{
         left: `${leftPercent}%`,
         top: `${topPercent}%`,
         transform: transformStyle,
+        cursor: status === 'booked' ? 'not-allowed' : 'pointer',
       }}
     >
       {/* Table content */}
