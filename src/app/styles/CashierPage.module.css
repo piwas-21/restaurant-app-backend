@@ -7,251 +7,7 @@
   color: var(--text-color);
 }
 
-/* Top Header */
-.topHeader {
-  padding: 1.5rem;
-  background: var(--card-background);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-  z-index: 10;
-}
-
-.headerLeft {
-  display: flex;
-  align-items: center;
-}
-
-.headerRight {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-/* Order Type Navigation */
-.orderTypeNav {
-  display: flex;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
-  background: var(--background-light);
-  border-bottom: 1px solid var(--border-color);
-  overflow-x: auto;
-  z-index: 9;
-}
-
-.navTab {
-  padding: 0.625rem 1.25rem;
-  background: transparent;
-  color: var(--text-muted);
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.navTab:hover {
-  color: var(--text-color);
-  border-bottom-color: var(--primary-color);
-}
-
-.navTabActive {
-  color: var(--primary-color);
-  border-bottom-color: var(--primary-color);
-}
-
-/* Main Container */
-.container {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  background: var(--background-color);
-}
-
-/* Header Title */
-.headerTitle {
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-family: var(--font-family-serif);
-  color: var(--text-color);
-  margin: 0;
-}
-
-.connectionStatus {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--background-light);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
-.connectionStatusConnected {
-  color: #10b981;
-}
-
-.connectionStatusDisconnected {
-  color: #ef4444;
-}
-
-.connectionDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-.connectionDotConnected {
-  background: #10b981;
-}
-
-.connectionDotDisconnected {
-  background: #ef4444;
-  animation: none;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.refreshButton {
-  padding: 0.625rem 1.25rem;
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.refreshButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(192, 0, 0, 0.2);
-}
-
-.refreshButton:active {
-  transform: translateY(0);
-}
-
-.refreshButton.loading svg {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Main Content */
-.content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* Sidebar - Order List */
-.sidebar {
-  width: 480px;
-  border-right: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  background: var(--card-background);
-  overflow: hidden;
-}
-
-.sidebarHeader {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.sidebarTitle {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-color);
-  margin: 0 0 1rem 0;
-}
-
-.filterBar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.searchInput {
-  width: 100%;
-  padding: 0.625rem 1rem;
-  background: var(--background-light);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-color);
-  font-size: 0.9375rem;
-  transition: all 0.2s;
-}
-
-.searchInput:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.1);
-}
-
-.filterSelects {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.filterSelect {
-  flex: 1;
-  padding: 0.5rem;
-  background: var(--background-light);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-color);
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.filterSelect:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
-.orderList {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.orderListEmpty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-  font-size: 0.9375rem;
-}
-
-/* Modern Order Cards */
+/* Modern Order Cards - Used by OrderList component */
 .orderCard {
   padding: 1.25rem;
   margin-bottom: 1rem;
@@ -360,36 +116,12 @@
   font-weight: 500;
 }
 
-/* Main Area - Order Details */
-.main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.detailsContainer {
-  flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
+/* Table Canvas Wrapper - Used by OrderDetails */
 .tableCanvasWrapper {
   flex-shrink: 0;
 }
 
-.noOrderSelected {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-  font-size: 1.125rem;
-}
-
+/* Loading and Error States */
 .loadingState {
   display: flex;
   align-items: center;
@@ -401,6 +133,15 @@
 .spinner {
   animation: spin 1s linear infinite;
   color: var(--primary-color);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .errorState {
@@ -422,79 +163,7 @@
   color: var(--text-muted);
 }
 
-/* Responsive Design */
-@media (max-width: 1200px) {
-  .sidebar {
-    width: 420px;
-  }
-
-  .detailsContainer {
-    padding: 1.5rem;
-  }
-}
-
-@media (max-width: 1024px) {
-  .container {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    max-height: 40vh;
-  }
-
-  .content {
-    flex-direction: column;
-  }
-
-  .main {
-    flex: 1;
-  }
-
-  .detailsContainer {
-    padding: 1rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .topHeader {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .headerRight {
-    width: 100%;
-  }
-
-  .headerTitle {
-    font-size: 1.5rem;
-  }
-
-  .orderTypeNav {
-    padding: 0.75rem 1rem;
-  }
-
-  .navTab {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-  }
-
-  .sidebar {
-    max-height: 35vh;
-  }
-
-  .filterSelects {
-    flex-direction: column;
-  }
-
-  .filterSelect {
-    width: 100%;
-  }
-}
-
-/* Notes Section */
+/* Notes Section - Used by OrderDetails */
 .notesSection {
   border-top: 1px solid var(--border-color);
   margin-top: 2rem;

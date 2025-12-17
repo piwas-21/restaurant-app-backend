@@ -88,9 +88,10 @@ export default function CustomizationModal({
     return total * quantity;
   }, [product, selectedVariationId, selectedIngredients, selectedSideItems, quantity]);
 
-  // Reset state when modal opens/closes
+  // Reset state and initialize defaults when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
+      // Reset when closing
       setQuantity(1);
       setSelectedVariationId(null);
       setSelectedIngredients([]);
@@ -99,17 +100,12 @@ export default function CustomizationModal({
       setSelectedSideItems([]);
       setSpecialInstructions("");
       setIsSubmitting(false);
-    }
-  }, [isOpen]);
-
-  // Initialize default selected ingredients
-  // 1. Non-optional ingredients should be selected by default
-  // 2. Optional ingredients with isIncludedInBasePrice should be pre-selected
-  useEffect(() => {
-    if (isOpen && product.detailedIngredients) {
+    } else if (product.detailedIngredients) {
+      // Initialize when opening - select optional ingredients by default
       const defaultSelected = product.detailedIngredients
         .filter((ing) => ing.isActive && (!ing.isOptional || ing.isIncludedInBasePrice))
         .map((ing) => ing.id);
+      
       setSelectedIngredients(defaultSelected);
 
       // Initialize quantities for default selected ingredients

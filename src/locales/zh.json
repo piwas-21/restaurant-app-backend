@@ -1985,5 +1985,11 @@
     "save_note": "保存备注"
   },
   "restaurant_closed_on_date": "餐厅在 {{day}}，{{date}} 关闭。请选择其他日期。",
-  "selected_tables_not_available": "所选桌位 {{tables}} 在该时间段已不可用。请选择其他桌位或时间。"
+  "selected_tables_not_available": "所选桌位 {{tables}} 在该时间段已不可用。请选择其他桌位或时间。",
+  "select_notification_sound": "选择通知声音",
+  "repeat_until_mouse_moves": "重复直到鼠标移动",
+  "repeat_sound_desc": "持续播放直到您回到座位",
+  "click_to_select_or_test": "点击声音进行选择，或在选择前进行测试",
+  "sound": "声音",
+  "select_sound": "选择通知声音"
 }

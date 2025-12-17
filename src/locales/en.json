@@ -1980,5 +1980,11 @@
   "working_hours_updated": "Working hours updated successfully",
   "failed_to_update_working_hours": "Failed to update working hours",
   "restaurant_closed_on_date": "Restaurant is closed on {{day}}, {{date}}. Please select another date.",
-  "selected_tables_not_available": "Selected table(s) {{tables}} are no longer available for this time slot. Please select different tables or time."
+  "selected_tables_not_available": "Selected table(s) {{tables}} are no longer available for this time slot. Please select different tables or time.",
+  "select_notification_sound": "Select Notification Sound",
+  "repeat_until_mouse_moves": "Repeat until mouse moves",
+  "repeat_sound_desc": "Keeps playing until you return to the desk",
+  "click_to_select_or_test": "Click a sound to select, or test before choosing",
+  "sound": "Sound",
+  "select_sound": "Select notification sound"
 }

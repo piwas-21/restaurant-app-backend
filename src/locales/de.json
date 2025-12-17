@@ -1993,5 +1993,11 @@
     "save_note": "Notiz speichern"
   },
   "restaurant_closed_on_date": "Das Restaurant ist am {{day}}, {{date}} geschlossen. Bitte wählen Sie ein anderes Datum.",
-  "selected_tables_not_available": "Die ausgewählten Tische {{tables}} sind für dieses Zeitfenster nicht mehr verfügbar. Bitte wählen Sie andere Tische oder eine andere Uhrzeit."
+  "selected_tables_not_available": "Die ausgewählten Tische {{tables}} sind für dieses Zeitfenster nicht mehr verfügbar. Bitte wählen Sie andere Tische oder eine andere Uhrzeit.",
+  "select_notification_sound": "Benachrichtigungston auswählen",
+  "repeat_until_mouse_moves": "Wiederholen, bis die Maus bewegt wird",
+  "repeat_sound_desc": "Spielt so lange ab, bis Sie zum Platz zurückkehren",
+  "click_to_select_or_test": "Klicken Sie auf einen Ton zum Auswählen oder Testen",
+  "sound": "Ton",
+  "select_sound": "Benachrichtigungston auswählen"
 }

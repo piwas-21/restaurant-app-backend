@@ -1984,5 +1984,11 @@
     "save_note": "حفظ الملاحظة"
   },
   "restaurant_closed_on_date": "المطعم مغلق يوم {{day}}، {{date}}. يرجى اختيار تاريخ آخر.",
-  "selected_tables_not_available": "الطاولة/الطاولات المحددة {{tables}} لم تعد متاحة في هذا الوقت. يرجى اختيار طاولات أو وقت مختلف."
+  "selected_tables_not_available": "الطاولة/الطاولات المحددة {{tables}} لم تعد متاحة في هذا الوقت. يرجى اختيار طاولات أو وقت مختلف.",
+  "select_notification_sound": "اختر صوت التنبيه",
+  "repeat_until_mouse_moves": "تكرار حتى تتحرك الفأرة",
+  "repeat_sound_desc": "يستمر في التشغيل حتى تعود إلى المكتب",
+  "click_to_select_or_test": "انقر على صوت للاختيار، أو اختبره قبل الاختيار",
+  "sound": "صوت",
+  "select_sound": "اختر صوت التنبيه"
 }

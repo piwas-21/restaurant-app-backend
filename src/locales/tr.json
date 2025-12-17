@@ -1980,5 +1980,11 @@
   "reservation_showing_slots_for_table": "Masa {{tableNumber}} için uygun zaman dilimleri gösteriliyor",
   "reservation_tip_select_table_filter": "İpucu: Bir masa seçin, ardından o masanın uygun olduğu zamanları görmek için geri dönün",
   "restaurant_closed_on_date": "Restaurant {{day}}, {{date}} tarihinde kapalı. Lütfen başka bir tarih seçin.",
-  "selected_tables_not_available": "Seçilen masa(s) {{tables}} bu zaman diliminde artık mevcut değil. Lütfen farklı masa veya zaman seçin."
+  "selected_tables_not_available": "Seçilen masa(s) {{tables}} bu zaman diliminde artık mevcut değil. Lütfen farklı masa veya zaman seçin.",
+  "select_notification_sound": "Bildirim Sesini Seç",
+  "repeat_until_mouse_moves": "Fare hareket edene kadar tekrarla",
+  "repeat_sound_desc": "Masaya dönene kadar çalmaya devam eder",
+  "click_to_select_or_test": "Seçmek için bir sese tıklayın veya seçmeden önce test edin",
+  "sound": "Ses",
+  "select_sound": "Bildirim sesini seç"
 }

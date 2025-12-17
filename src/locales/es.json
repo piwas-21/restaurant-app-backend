@@ -1987,5 +1987,11 @@
     "save_note": "Guardar nota"
   },
   "restaurant_closed_on_date": "El restaurante está cerrado el {{day}}, {{date}}. Por favor, seleccione otra fecha.",
-  "selected_tables_not_available": "La(s) mesa(s) seleccionada(s) {{tables}} ya no están disponibles para este horario. Por favor, seleccione otras mesas u otro horario."
+  "selected_tables_not_available": "La(s) mesa(s) seleccionada(s) {{tables}} ya no están disponibles para este horario. Por favor, seleccione otras mesas u otro horario.",
+  "select_notification_sound": "Seleccionar sonido de notificación",
+  "repeat_until_mouse_moves": "Repetir hasta que el ratón se mueva",
+  "repeat_sound_desc": "Sigue sonando hasta que regreses al escritorio",
+  "click_to_select_or_test": "Haz clic en un sonido para seleccionar, o pruébalo antes de elegir",
+  "sound": "Sonido",
+  "select_sound": "Seleccionar sonido de notificación"
 }

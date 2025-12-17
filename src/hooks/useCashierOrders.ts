@@ -64,6 +64,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
    */
   const connectToSSE = useCallback(() => {
     if (eventSourceRef.current) {
+      console.log('⚠️ SSE: Already connected, skipping duplicate connection');
       return; // Already connected
     }
 
@@ -79,23 +80,22 @@ export function useCashierOrders(): UseCashierOrdersReturn {
         url += `?token=${encodeURIComponent(authToken)}`;
       }
 
-      // eslint-disable-next-line no-console
-      console.log('Connecting to SSE endpoint:', endpoint);
+      console.log('🔌 SSE: Initiating connection to:', endpoint, '| API URL:', apiUrl);
+      console.log('🔌 SSE: Auth token present:', !!authToken);
 
       const eventSource = new EventSource(url);
+      console.log('🔌 SSE: EventSource created, readyState:', eventSource.readyState);
 
       // Listen for successful connection before marking as connected
       eventSource.addEventListener('connected', (event) => {
         try {
           const data = JSON.parse(event.data);
-          // eslint-disable-next-line no-console
-          console.log('SSE connected with clientId:', data.clientId);
+          console.log('✅ SSE: Successfully connected with clientId:', data.clientId);
           setIsConnected(true);
           setError(null);
           reconnectAttemptRef.current = 0;
         } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error('Error parsing connected event:', err);
+          console.error('❌ SSE: Error parsing connected event:', err);
         }
       });
 
@@ -179,10 +179,12 @@ export function useCashierOrders(): UseCashierOrdersReturn {
       });
 
       eventSource.onerror = (event) => {
-        console.error('SSE connection error:', {
+        console.error('❌ SSE: Connection error occurred:', {
           readyState: eventSource.readyState,
+          readyStateText: eventSource.readyState === 0 ? 'CONNECTING' : eventSource.readyState === 1 ? 'OPEN' : 'CLOSED',
           url: url,
-          event: event
+          hasAuthToken: !!authToken,
+          timestamp: new Date().toISOString()
         });
         setIsConnected(false);
         eventSourceRef.current?.close();
@@ -192,15 +194,16 @@ export function useCashierOrders(): UseCashierOrdersReturn {
         if (reconnectAttemptRef.current < maxReconnectAttemptsRef.current) {
           reconnectAttemptRef.current += 1;
           const backoffMs = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
-          console.warn(`SSE reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttemptsRef.current} in ${backoffMs}ms`);
+          console.warn(`🔄 SSE: Reconnect attempt ${reconnectAttemptRef.current}/${maxReconnectAttemptsRef.current} scheduled in ${backoffMs}ms`);
 
           if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
           pollingTimeoutRef.current = setTimeout(() => {
+            console.log('🔄 SSE: Executing reconnection attempt...');
             connectToSSE();
           }, backoffMs);
         } else {
           // Fall back to polling if SSE fails too many times
-          console.warn('SSE connection failed after max attempts, falling back to polling');
+          console.warn('⚠️ SSE: Connection failed after max attempts, falling back to polling');
           setError('Real-time updates unavailable - using 10s polling');
           setupPolling();
         }
@@ -244,14 +247,21 @@ export function useCashierOrders(): UseCashierOrdersReturn {
    * Initialize SSE connection and handle cleanup
    */
   useEffect(() => {
+    console.log('🔌 Initializing cashier orders hook...');
+    
     // Initial fetch
     refreshOrders();
 
-    // Try to connect to SSE
-    connectToSSE();
+    // Small delay to ensure component is fully mounted before SSE connection
+    const connectionTimeout = setTimeout(() => {
+      console.log('🔌 Attempting SSE connection...');
+      connectToSSE();
+    }, 100);
 
     return () => {
       // Cleanup on unmount
+      console.log('🔌 Cleaning up cashier orders hook...');
+      clearTimeout(connectionTimeout);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -261,7 +271,8 @@ export function useCashierOrders(): UseCashierOrdersReturn {
         pollingTimeoutRef.current = null;
       }
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array is intentional - only run on mount
 
   /**
    * Update order status

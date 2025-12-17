@@ -4,6 +4,9 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCashierOrders } from '@/hooks/useCashierOrders';
 import { useNotification } from '@/hooks/useNotification';
+import CashierHeader from '@/components/cashier/CashierHeader';
+import OrderTypeNav from '@/components/cashier/OrderTypeNav';
+import CashierMainContent from '@/components/cashier/CashierMainContent';
 import OrderList from '@/components/cashier/OrderList';
 import OrderDetails from '@/components/cashier/OrderDetails';
 import StatusUpdateDialog from '@/components/cashier/StatusUpdateDialog';
@@ -13,18 +16,19 @@ import CancelOrderDialog from '@/components/cashier/CancelOrderDialog';
 import FocusOrderDialog from '@/components/cashier/FocusOrderDialog';
 import QuickConfirmModal from '@/components/cashier/QuickConfirmModal';
 import NotificationCenter from '@/components/cashier/NotificationCenter';
-import { OrderType } from '@/types/order';
-import { QRCodeValidationResult } from '@/types/userGroupTypes';
-import styles from '@/app/styles/CashierPage.module.css';
-import { RefreshCw, QrCode, Printer, Settings } from 'lucide-react';
 import QRScannerDialog from '@/components/cashier/QRScannerDialog';
 import AutoPrintSettingsModal from '@/components/cashier/AutoPrintSettingsModal';
+import { OrderType } from '@/types/order';
+import { QRCodeValidationResult } from '@/types/userGroupTypes';
 import { quickConfirmOrder, quickCancelOrder } from '@/services/cashierService';
 import { exportKitchenItemsToPDF, exportOrderToPDF } from '@/utils/pdfExportUtils';
 import { AutoPrintSettings, DEFAULT_AUTO_PRINT_SETTINGS } from '@/types/cashier';
+import styles from '@/app/styles/CashierPage.module.css';
 
 export default function CashierPage() {
   const { t } = useTranslation();
+  
+  // Orders hook
   const {
     orders,
     isConnected,
@@ -38,6 +42,22 @@ export default function CashierPage() {
     toggleFocusOrder,
   } = useCashierOrders();
 
+  // Notifications hook
+  const {
+    notifications,
+    removeNotification,
+    notifyNewOrder,
+    notifyOrderUpdate,
+    playOrderUpdateSound,
+    audioEnabled,
+    toggleAudio,
+    soundType,
+    changeSoundType,
+    playSoundByType,
+    repeatUntilMouseMoves,
+    toggleRepeatSound,
+  } = useNotification();
+
   // UI State
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +65,7 @@ export default function CashierPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Auto-print settings (logic is active, UI buttons are commented out in CashierHeader.tsx)
   const [autoPrintSettings, setAutoPrintSettings] = useState<AutoPrintSettings>(DEFAULT_AUTO_PRINT_SETTINGS);
   const [showAutoPrintSettings, setShowAutoPrintSettings] = useState(false);
 
@@ -63,16 +84,6 @@ export default function CashierPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Notifications
-  const {
-    notifications,
-    removeNotification,
-    notifyNewOrder,
-    notifyOrderUpdate,
-    playOrderUpdateSound,
-    audioEnabled,
-    toggleAudio,
-  } = useNotification();
   const previousOrderCountRef = useRef(0);
   const previousOrderStatusesRef = useRef<Map<string, string>>(new Map());
   const isInitialLoadRef = useRef(true);
@@ -175,19 +186,45 @@ export default function CashierPage() {
       );
 
       newOrders.forEach((order) => {
+        console.log('🆕 New order detected:', {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          type: order.type,
+          status: order.status,
+          isDismissed: dismissedOrders.has(order.id)
+        });
+
         notifyNewOrder(
           order.orderNumber || order.id,
           order.customerName || ''
         );
 
         // Auto-show quick-confirm modal for non-dine-in orders
-        if (
+        const shouldShowModal = 
           order.type !== OrderType.DineIn &&
           order.status === 'Pending' &&
-          !dismissedOrders.has(order.id)
-        ) {
+          !dismissedOrders.has(order.id);
+
+        console.log('📋 Quick confirm modal check:', {
+          orderType: order.type,
+          isNotDineIn: order.type !== OrderType.DineIn,
+          status: order.status,
+          isPending: order.status === 'Pending',
+          isDismissed: dismissedOrders.has(order.id),
+          shouldShowModal
+        });
+
+        if (shouldShowModal) {
+          console.log('✅ Showing quick confirm modal for order:', order.orderNumber);
           setPendingOrderForConfirm(order.id);
           setShowQuickConfirmModal(true);
+        } else {
+          console.log('❌ NOT showing modal. Reason:', 
+            order.type === OrderType.DineIn ? 'Dine-in order' :
+            order.status !== 'Pending' ? `Status is ${order.status}` :
+            dismissedOrders.has(order.id) ? 'Already dismissed' :
+            'Unknown'
+          );
         }
 
         // Auto-print based on settings
@@ -240,7 +277,7 @@ export default function CashierPage() {
     }
 
     previousOrderCountRef.current = orders.length;
-  }, [orders, notifyNewOrder, audioEnabled, dismissedOrders]);
+  }, [orders, notifyNewOrder, audioEnabled, dismissedOrders, autoPrintSettings, t]);
 
   // Monitor order status changes (e.g., customer approvals)
   useEffect(() => {
@@ -280,13 +317,13 @@ export default function CashierPage() {
     setSelectedOrderId(orderId);
   }, []);
 
-  // Handle status change (called from OrderDetails button)
+  // Handle status change
   const handleStatusChange = useCallback(async (newStatus: string) => {
     if (!selectedOrder) return;
 
     try {
       const updated = await updateOrderStatus(selectedOrder.id, newStatus);
-      setSelectedOrderId(updated.id); // Keep selected
+      setSelectedOrderId(updated.id);
       showSuccess(t('cashier.status_updated') || 'Status updated successfully');
     } catch (err) {
       showError((err as Error).message || t('cashier.status_update_failed') || 'Failed to update status');
@@ -295,13 +332,13 @@ export default function CashierPage() {
     }
   }, [selectedOrder, updateOrderStatus, t]);
 
-  // Handle add payment (called from OrderDetails button)
+  // Handle add payment
   const handleAddPayment = useCallback(async (paymentData: any) => {
     if (!selectedOrder) return;
 
     try {
       const updated = await addPayment(selectedOrder.id, paymentData);
-      setSelectedOrderId(updated.id); // Keep selected
+      setSelectedOrderId(updated.id);
       showSuccess(t('cashier.payment_added') || 'Payment added successfully');
     } catch (err) {
       showError((err as Error).message || t('cashier.payment_failed') || 'Failed to add payment');
@@ -310,13 +347,13 @@ export default function CashierPage() {
     }
   }, [selectedOrder, addPayment, t]);
 
-  // Handle refund (called from OrderDetails button)
+  // Handle refund
   const handleRefund = useCallback(async (paymentId: string, amount?: number) => {
     if (!selectedOrder) return;
 
     try {
       const updated = await refundPayment(selectedOrder.id, paymentId, amount);
-      setSelectedOrderId(updated.id); // Keep selected
+      setSelectedOrderId(updated.id);
       showSuccess(t('cashier.refund_completed') || 'Refund completed successfully');
     } catch (err) {
       showError((err as Error).message || t('cashier.refund_failed') || 'Failed to process refund');
@@ -325,13 +362,13 @@ export default function CashierPage() {
     }
   }, [selectedOrder, refundPayment, t]);
 
-  // Handle cancel order (called from OrderDetails button)
+  // Handle cancel order
   const handleCancelOrder = useCallback(async (reason?: string) => {
     if (!selectedOrder) return;
 
     try {
       await cancelOrder(selectedOrder.id, reason);
-      setSelectedOrderId(null); // Deselect
+      setSelectedOrderId(null);
       showSuccess(t('cashier.order_cancelled') || 'Order cancelled successfully');
     } catch (err) {
       showError((err as Error).message || t('cashier.cancel_failed') || 'Failed to cancel order');
@@ -346,7 +383,7 @@ export default function CashierPage() {
 
     try {
       const updated = await toggleFocusOrder(selectedOrder.id, isFocus, priority, reason);
-      setSelectedOrderId(updated.id); // Keep selected
+      setSelectedOrderId(updated.id);
       showSuccess(
         isFocus
           ? t('cashier.order_marked_focus') || 'Order marked as focus'
@@ -363,11 +400,11 @@ export default function CashierPage() {
   const handleQuickConfirm = useCallback(async (orderNumber: string, preparationMinutes: number) => {
     try {
       await quickConfirmOrder(orderNumber, preparationMinutes);
-      await refreshOrders(); // Refresh to get updated order
+      await refreshOrders();
       showSuccess(`Order ${orderNumber} confirmed with ${preparationMinutes} min preparation time`);
     } catch (err) {
       showError((err as Error).message || 'Failed to confirm order');
-      throw err; // Re-throw so modal can handle
+      throw err;
     }
   }, [refreshOrders]);
 
@@ -375,18 +412,17 @@ export default function CashierPage() {
   const handleQuickCancel = useCallback(async (orderNumber: string) => {
     try {
       await quickCancelOrder(orderNumber);
-      await refreshOrders(); // Refresh to get updated order
+      await refreshOrders();
       showSuccess(`Order ${orderNumber} has been cancelled`);
     } catch (err) {
       showError((err as Error).message || 'Failed to cancel order');
-      throw err; // Re-throw so modal can handle
+      throw err;
     }
   }, [refreshOrders]);
 
   // Handle modal close (dismiss)
   const handleQuickConfirmModalClose = useCallback(() => {
     if (pendingOrderForConfirm) {
-      // Mark as dismissed so it doesn't auto-popup again
       setDismissedOrders(prev => new Set(prev).add(pendingOrderForConfirm));
     }
     setShowQuickConfirmModal(false);
@@ -418,240 +454,55 @@ export default function CashierPage() {
         onDismiss={removeNotification}
       />
 
-      {/* Top Header */}
-      <div className={styles.topHeader}>
-        <div className={styles.headerLeft}>
-          <h1 className={styles.headerTitle}>{t('cashier.title') || 'Cashier'}</h1>
-        </div>
-
-        <div className={styles.headerRight}>
-          <div
-            className={`${styles.connectionStatus} ${
-              isConnected ? styles.connectionStatusConnected : styles.connectionStatusDisconnected
-            }`}
-          >
-            <div
-              className={`${styles.connectionDot} ${
-                isConnected ? styles.connectionDotConnected : styles.connectionDotDisconnected
-              }`}
-            />
-            <span>
-              {isConnected ? t('cashier.connected') || 'Connected' : t('cashier.disconnected') || 'Disconnected'}
-            </span>
-          </div>
-
-          <button
-            className={styles.refreshButton}
-            onClick={toggleAudio}
-            title={audioEnabled 
-              ? (t('cashier.disable_sound') || 'Disable notification sounds')
-              : (t('cashier.enable_sound') || 'Enable notification sounds')
-            }
-            style={{ 
-              marginRight: '10px',
-              backgroundColor: audioEnabled ? '#4caf50' : '#ff9800',
-              color: 'white'
-            }}
-          >
-            {audioEnabled ? '🔕' : '🔔'} {audioEnabled 
-              ? (t('cashier.disable_sound') || 'Disable Sound')
-              : (t('cashier.enable_sound') || 'Enable Sound')
-            }
-          </button>
-
-          {/* <button
-            className={styles.refreshButton}
-            onClick={toggleAutoPrint}
-            title={autoPrintSettings.enabled 
-              ? (t('cashier.disable_auto_print') || 'Disable Auto Print')
-              : (t('cashier.enable_auto_print') || 'Enable Auto Print')
-            }
-            style={{ 
-              marginRight: '10px',
-              backgroundColor: autoPrintSettings.enabled ? '#2196f3' : '#607d8b',
-              color: 'white'
-            }}
-          >
-            <Printer size={16} />
-            {t('cashier.auto_print') || 'Auto Print'}
-          </button>
-
-          {autoPrintSettings.enabled && (
-            <button
-              className={styles.refreshButton}
-              onClick={() => setShowAutoPrintSettings(true)}
-              title={t('cashier.auto_print_settings') || 'Auto Print Settings'}
-              style={{ 
-                marginRight: '10px',
-                backgroundColor: '#4caf50',
-                color: 'white'
-              }}
-            >
-              <Settings size={16} />
-            </button>
-          )} */}
-
-          <button
-            className={styles.refreshButton}
-            onClick={() => setShowQRScannerDialog(true)}
-            title={t('cashier.scan_qr_code') || 'Scan QR Code'}
-            style={{ marginRight: '10px' }}
-          >
-            <QrCode size={16} />
-            {t('cashier.scan_qr') || 'Scan QR'}
-          </button>
-
-          <button
-            className={`${styles.refreshButton} ${isRefreshing ? 'loading' : ''}`}
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            title={t('cashier.refresh') || 'Refresh orders'}
-          >
-            <RefreshCw size={16} />
-            {isRefreshing ? t('cashier.refreshing') || 'Refreshing...' : t('cashier.refresh') || 'Refresh'}
-          </button>
-        </div>
-      </div>
+      {/* Header */}
+      <CashierHeader
+        isConnected={isConnected}
+        isRefreshing={isRefreshing}
+        audioEnabled={audioEnabled}
+        soundType={soundType}
+        repeatUntilMouseMoves={repeatUntilMouseMoves}
+        onRefresh={handleRefresh}
+        onToggleAudio={toggleAudio}
+        onSoundTypeChange={changeSoundType}
+        onTestSound={playSoundByType}
+        onToggleRepeat={toggleRepeatSound}
+        onOpenQRScanner={() => setShowQRScannerDialog(true)}
+      />
 
       {/* Messages */}
       {successMessage && <div className="alert alert-success">{successMessage}</div>}
       {errorMessage && <div className="alert alert-error">{errorMessage}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Order Type Navigation Tabs */}
-      <div className={styles.orderTypeNav}>
-        <button
-          className={`${styles.navTab} ${orderTypeFilter === 'all' ? styles.navTabActive : ''}`}
-          onClick={() => setOrderTypeFilter('all')}
-        >
-          All Orders
-        </button>
-        <button
-          className={`${styles.navTab} ${orderTypeFilter === OrderType.DineIn ? styles.navTabActive : ''}`}
-          onClick={() => setOrderTypeFilter(OrderType.DineIn)}
-        >
-          Dine In
-        </button>
-        <button
-          className={`${styles.navTab} ${orderTypeFilter === OrderType.Takeaway ? styles.navTabActive : ''}`}
-          onClick={() => setOrderTypeFilter(OrderType.Takeaway)}
-        >
-          Takeaway
-        </button>
-        <button
-          className={`${styles.navTab} ${orderTypeFilter === OrderType.Delivery ? styles.navTabActive : ''}`}
-          onClick={() => setOrderTypeFilter(OrderType.Delivery)}
-        >
-          Delivery
-        </button>
-      </div>
+      {/* Order Type Navigation */}
+      <OrderTypeNav
+        activeFilter={orderTypeFilter}
+        onFilterChange={setOrderTypeFilter}
+      />
 
-      <div className={styles.container}>
-        {/* Main Content */}
-        <div className={styles.content}>
-        {/* Sidebar - Order List */}
-        <div className={styles.sidebar}>
-          <div className={styles.sidebarHeader}>
-            <h2 className={styles.sidebarTitle}>{t('cashier.orders') || 'Orders'}</h2>
-
-            {/* Search and Filters */}
-            <div className={styles.filterBar}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder={t('cashier.search_placeholder') || 'Search by order # or customer...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-
-              <div className={styles.filterSelects}>
-                <select
-                  className={styles.filterSelect}
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  title={t('cashier.filter_status') || 'Filter by status'}
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Preparing">Preparing</option>
-                  <option value="Ready">Ready</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-
-                <select
-                  className={styles.filterSelect}
-                  value={paymentStatusFilter}
-                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                  title={t('cashier.filter_payment_status') || 'Filter by payment status'}
-                >
-                  <option value="all">All Payment Statuses</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Paid">Paid</option>
-                  <option value="PartiallyPaid">Partially Paid</option>
-                  <option value="Refunded">Refunded</option>
-                </select>
-
-                <select
-                  className={styles.filterSelect}
-                  value={orderTypeFilter}
-                  onChange={(e) => setOrderTypeFilter(e.target.value)}
-                  title={t('cashier.filter_type') || 'Filter by order type'}
-                >
-                  <option value="all">All Types</option>
-                  <option value={OrderType.DineIn}>Dine In</option>
-                  <option value={OrderType.Takeaway}>Takeaway</option>
-                  <option value={OrderType.Delivery}>Delivery</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Order List */}
-          {isLoading && !orders.length ? (
-            <div className={styles.orderListEmpty}>
-              <span>{t('cashier.loading') || 'Loading orders...'}</span>
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className={styles.orderListEmpty}>
-              <span>{t('cashier.no_orders') || 'No orders found'}</span>
-            </div>
-          ) : (
-            <div className={styles.orderList}>
-              <OrderList
-                orders={filteredOrders}
-                selectedOrderId={selectedOrderId}
-                onSelectOrder={handleSelectOrder}
-                isLoading={isLoading}
-                error={error}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Main Area - Order Details */}
-        <div className={styles.main}>
-          <div className={styles.detailsContainer}>
-            {/* Order Details */}
-            {selectedOrder ? (
-              <OrderDetails
-                order={selectedOrder}
-                onStatusChange={handleStatusChange}
-                onAddPayment={() => setShowPaymentDialog(true)}
-                onRefund={() => setShowRefundDialog(true)}
-                onCancel={() => setShowCancelDialog(true)}
-                onToggleFocus={() => setShowFocusDialog(true)}
-                onQuickConfirm={openQuickConfirmModal}
-              />
-            ) : (
-              <div className={styles.noOrderSelected}>
-                <span>{t('cashier.select_order') || 'Select an order to view details'}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Main Content */}
+      <CashierMainContent
+        filteredOrders={filteredOrders}
+        selectedOrder={selectedOrder}
+        selectedOrderId={selectedOrderId}
+        isLoading={isLoading}
+        error={error}
+        searchQuery={searchQuery}
+        statusFilter={statusFilter}
+        paymentStatusFilter={paymentStatusFilter}
+        orderTypeFilter={orderTypeFilter}
+        onSelectOrder={handleSelectOrder}
+        onStatusChange={handleStatusChange}
+        onAddPayment={() => setShowPaymentDialog(true)}
+        onRefund={() => setShowRefundDialog(true)}
+        onCancel={() => setShowCancelDialog(true)}
+        onToggleFocus={() => setShowFocusDialog(true)}
+        onQuickConfirm={openQuickConfirmModal}
+        onSearchChange={setSearchQuery}
+        onStatusFilterChange={setStatusFilter}
+        onPaymentStatusFilterChange={setPaymentStatusFilter}
+        onOrderTypeFilterChange={setOrderTypeFilter}
+      />
 
       {/* Dialogs */}
       <StatusUpdateDialog
@@ -693,8 +544,6 @@ export default function CashierPage() {
         isOpen={showQRScannerDialog}
         onClose={() => setShowQRScannerDialog(false)}
         onApplyDiscount={(result: QRCodeValidationResult) => {
-          // In a real implementation, this would apply the discount to the selected order
-          // For now, we just show a success message
           showSuccess(t('cashier.discount_info_loaded') || 'Discount information loaded');
         }}
       />
@@ -713,7 +562,6 @@ export default function CashierPage() {
         settings={autoPrintSettings}
         onSave={saveAutoPrintSettings}
       />
-      </div>
     </div>
   );
 }
