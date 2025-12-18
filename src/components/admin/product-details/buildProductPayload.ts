@@ -67,8 +67,9 @@ export function buildProductPayload(product: ProductDetails, categories?: Catego
       name: v.name,
       priceModifier: v.priceModifier,
       isActive: v.isActive,
-      displayOrder: 0,
-      description: (v as any).description
+      displayOrder: v.displayOrder || 0,
+      description: (v as any).description,
+      content: (v as any).content
     })),
     suggestedSideItemIds: (product.suggestedSideItems || []).map((s: SideItem) => s.id),
     content,

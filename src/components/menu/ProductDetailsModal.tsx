@@ -262,7 +262,7 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
             />
           </div>
 
-          {(detailedProduct?.preparationTimeMinutes || item.preparationTimeMinutes) && (
+          {((detailedProduct?.preparationTimeMinutes ?? 0) > 0 || (item.preparationTimeMinutes ?? 0) > 0) && (
             <div className={styles.productDetailSection}>
               <h4>{t('preparation_time', 'Preparation Time')}:</h4>
               <p className={styles.preparationTime}>

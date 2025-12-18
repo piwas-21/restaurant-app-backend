@@ -2,7 +2,8 @@
 .orderDetailsWrapper {
   max-width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 1.5rem;
+  min-height: 100%;
 }
 
 /* Main Content Grid - 2 columns */
@@ -326,7 +327,8 @@
   border: 1px solid var(--border-color);
   border-radius: 10px;
   margin-top: 1.5rem;
-  overflow: hidden;
+  margin-bottom: 1.5rem;
+  overflow: visible;
 }
 
 .notesHeader {
@@ -477,6 +479,10 @@
 }
 
 @media (max-width: 768px) {
+  .orderDetailsWrapper {
+    padding: 1rem;
+  }
+
   .actionBarGrid {
     grid-template-columns: 1fr 1fr;
   }
@@ -497,5 +503,11 @@
 
   .stickyActionBar {
     padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .orderDetailsWrapper {
+    padding: 0.75rem;
   }
 }

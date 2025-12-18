@@ -25,7 +25,16 @@ const ProductInformation: React.FC<ProductInformationProps> = ({ product, onUpda
   const { t, i18n } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string;
+    description: string;
+    basePrice: number;
+    type: string;
+    isActive: boolean;
+    isAvailable: boolean;
+    isSpecial: any;
+    preparationTimeMinutes: number;
+  }>({
     name: product.name,
     description: product.description,
     basePrice: product.basePrice,
@@ -33,7 +42,7 @@ const ProductInformation: React.FC<ProductInformationProps> = ({ product, onUpda
     isActive: product.isActive,
     isAvailable: product.isAvailable,
     isSpecial: (product as any) && (product as any).isSpecial ? (product as any).isSpecial : false,
-    preparationTimeMinutes: product.preparationTimeMinutes,
+    preparationTimeMinutes: product.preparationTimeMinutes || 0,
   });
 
   const currentLanguage = (i18n.language.split('-')[0] || 'en') as string;
@@ -105,9 +114,11 @@ const ProductInformation: React.FC<ProductInformationProps> = ({ product, onUpda
           <p>
             <strong>{t('type')}:</strong> {t(`product_type_${product.type}`)}
           </p>
-          <p>
-            <strong>{t('prep_time')}:</strong> {product.preparationTimeMinutes} {t('minutes')}
-          </p>
+          {product.preparationTimeMinutes > 0 && (
+            <p>
+              <strong>{t('prep_time')}:</strong> {product.preparationTimeMinutes} {t('minutes')}
+            </p>
+          )}
         </>
       ) : (
         <div className={detailsStyles.formGrid}>
@@ -146,6 +157,7 @@ const ProductInformation: React.FC<ProductInformationProps> = ({ product, onUpda
             <label>{t('prep_time')}</label>
             <input
               type="number"
+              min="0"
               value={form.preparationTimeMinutes}
               onChange={(e) => setForm((f) => ({ ...f, preparationTimeMinutes: parseInt(e.target.value || '0', 10) }))}
             />

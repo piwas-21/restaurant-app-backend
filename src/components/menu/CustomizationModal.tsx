@@ -101,9 +101,9 @@ export default function CustomizationModal({
       setSpecialInstructions("");
       setIsSubmitting(false);
     } else if (product.detailedIngredients) {
-      // Initialize when opening - select optional ingredients by default
+      // Initialize when opening - select ALL active ingredients by default (both required and optional)
       const defaultSelected = product.detailedIngredients
-        .filter((ing) => ing.isActive && (!ing.isOptional || ing.isIncludedInBasePrice))
+        .filter((ing) => ing.isActive)
         .map((ing) => ing.id);
       
       setSelectedIngredients(defaultSelected);
