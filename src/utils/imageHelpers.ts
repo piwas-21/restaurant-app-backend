@@ -4,7 +4,7 @@ import type { LanguageCode } from '@/components/LanguageSwitcher';
 /**
  * Gets fallback image for menu items
  */
-export const FALLBACK_IMAGE = '/images/placeholder-falafel.jpeg';
+export const FALLBACK_IMAGE = '/images/placeholder-app.png';
 
 export function setFallbackImage(menuItem: MenuItem): void {
   if (menuItem && menuItem.image !== FALLBACK_IMAGE) {

@@ -88,6 +88,16 @@ export interface DeliveryAddressDto {
 }
 
 /**
+ * Ingredient customization details for an order item
+ */
+export interface OrderItemIngredientDto {
+  ingredientId: string;
+  ingredientName: string;
+  quantity: number;
+  isRemoved: boolean; // true if customer deselected/removed this ingredient
+}
+
+/**
  * Order item details
  */
 export interface CreateOrderItemDto {
@@ -98,7 +108,10 @@ export interface CreateOrderItemDto {
   unitPrice: number;
   customizationPrice?: number;
   specialInstructions?: string;
+  ingredientQuantities?: Record<string, number>; // Ingredient quantities for kitchen print
+  childItems?: CreateOrderItemDto[]; // Child items (e.g. side items, additionals)
 }
+
 
 export interface OrderItemDto extends CreateOrderItemDto {
   id: string;
@@ -109,6 +122,8 @@ export interface OrderItemDto extends CreateOrderItemDto {
   menuName?: string;
   itemTotal: number;
   kitchenType?: string; // FrontKitchen, BackKitchen, or None
+  ingredientCustomizations?: OrderItemIngredientDto[]; // Selected/removed ingredients
+  sideItems?: OrderItemDto[]; // Child order items (additionals)
 }
 
 /**

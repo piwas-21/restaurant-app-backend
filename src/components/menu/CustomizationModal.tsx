@@ -188,7 +188,7 @@ export default function CustomizationModal({
 
   // Get product image
   const productImage =
-    ("image" in product ? product.image : product.imageUrl) || "/images/placeholder-falafel.jpeg";
+    ("image" in product ? product.image : product.imageUrl) || "/images/placeholder-app.png";
 
   // Get base price depending on product type
   const basePrice =

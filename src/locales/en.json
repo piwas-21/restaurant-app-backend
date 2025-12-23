@@ -1986,5 +1986,20 @@
   "repeat_sound_desc": "Keeps playing until you return to the desk",
   "click_to_select_or_test": "Click a sound to select, or test before choosing",
   "sound": "Sound",
-  "select_sound": "Select notification sound"
+  "select_sound": "Select notification sound",
+  "diagnostics": "Diagnostics",
+  "real_time_connection": "Real-time Connection",
+  "environment": "Environment",
+  "last_activity": "Last Activity",
+  "refresh_connection": "Refresh Connection",
+  "notification_sound": "Notification Sound",
+  "sound_enabled": "Sound Enabled",
+  "audio_status": "Audio Status",
+  "enable_sound": "Enable Sound",
+  "test_sound": "Test Sound",
+  "tips": "Tips",
+  "click_or_interact_with_the_page_to_allow_audio": "Click or interact with the page to allow audio.",
+  "check_your_browsers_autoplay_settings": "Check your browser's autoplay settings.",
+  "check_your_internet_connection": "Check your internet connection.",
+  "try_a_hard_refresh": "Try a hard refresh (Ctrl+F5)."
 }

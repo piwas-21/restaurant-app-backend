@@ -1986,5 +1986,20 @@
   "repeat_sound_desc": "Masaya dönene kadar çalmaya devam eder",
   "click_to_select_or_test": "Seçmek için bir sese tıklayın veya seçmeden önce test edin",
   "sound": "Ses",
-  "select_sound": "Bildirim sesini seç"
+  "select_sound": "Bildirim sesini seç",
+  "diagnostics": "Tanılama",
+  "real_time_connection": "Gerçek zamanlı bağlantı",
+  "environment": "Ortam",
+  "last_activity": "Son etkinlik",
+  "refresh_connection": "Bağlantıyı yenile",
+  "notification_sound": "Bildirim sesi",
+  "sound_enabled": "Ses etkin",
+  "audio_status": "Ses durumu",
+  "enable_sound": "Sesi etkinleştir",
+  "test_sound": "Sesi test et",
+  "tips": "İpuçları",
+  "click_or_interact_with_the_page_to_allow_audio": "Sese izin vermek için sayfaya tıklayın veya etkileşim kurun.",
+  "check_your_browsers_autoplay_settings": "Tarayıcınızın otomatik oynatma ayarlarını kontrol edin.",
+  "check_your_internet_connection": "İnternet bağlantınızı kontrol edin.",
+  "try_a_hard_refresh": "Zorla yenilemeyi deneyin (Ctrl+F5)."
 }

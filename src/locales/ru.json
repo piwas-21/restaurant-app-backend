@@ -1931,5 +1931,20 @@
   "repeat_sound_desc": "Продолжает звучать, пока вы не вернетесь к месту",
   "click_to_select_or_test": "Нажмите на звук, чтобы выбрать или проверить перед выбором",
   "sound": "Звук",
-  "select_sound": "Выбрать звук уведомления"
+  "select_sound": "Выбрать звук уведомления",
+  "diagnostics": "Диагностика",
+  "real_time_connection": "Соединение в реальном времени",
+  "environment": "Среда",
+  "last_activity": "Последняя активность",
+  "refresh_connection": "Обновить соединение",
+  "notification_sound": "Звук уведомлений",
+  "sound_enabled": "Звук включен",
+  "audio_status": "Статус аудио",
+  "enable_sound": "Включить звук",
+  "test_sound": "Проверить звук",
+  "tips": "Советы",
+  "click_or_interact_with_the_page_to_allow_audio": "Нажмите или взаимодействуйте со страницей, чтобы разрешить воспроизведение аудио.",
+  "check_your_browsers_autoplay_settings": "Проверьте настройки автовоспроизведения в браузере.",
+  "check_your_internet_connection": "Проверьте подключение к интернету.",
+  "try_a_hard_refresh": "Попробуйте жёсткое обновление (Ctrl+F5)."
 }

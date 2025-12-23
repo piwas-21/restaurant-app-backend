@@ -1999,5 +1999,20 @@
   "repeat_sound_desc": "Spielt so lange ab, bis Sie zum Platz zurückkehren",
   "click_to_select_or_test": "Klicken Sie auf einen Ton zum Auswählen oder Testen",
   "sound": "Ton",
-  "select_sound": "Benachrichtigungston auswählen"
+  "select_sound": "Benachrichtigungston auswählen",
+  "diagnostics": "Diagnose",
+  "real_time_connection": "Echtzeitverbindung",
+  "environment": "Umgebung",
+  "last_activity": "Letzte Aktivität",
+  "refresh_connection": "Verbindung aktualisieren",
+  "notification_sound": "Benachrichtigungston",
+  "sound_enabled": "Sound aktiviert",
+  "audio_status": "Audiostatus",
+  "enable_sound": "Sound aktivieren",
+  "test_sound": "Sound testen",
+  "tips": "Tipps",
+  "click_or_interact_with_the_page_to_allow_audio": "Klicken Sie auf die Seite oder interagieren Sie mit ihr, um Audio zuzulassen.",
+  "check_your_browsers_autoplay_settings": "Überprüfen Sie die Autoplay-Einstellungen Ihres Browsers.",
+  "check_your_internet_connection": "Überprüfen Sie Ihre Internetverbindung.",
+  "try_a_hard_refresh": "Versuchen Sie eine harte Aktualisierung (Strg+F5)."
 }

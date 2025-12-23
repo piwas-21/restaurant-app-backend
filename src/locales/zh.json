@@ -1991,5 +1991,20 @@
   "repeat_sound_desc": "持续播放直到您回到座位",
   "click_to_select_or_test": "点击声音进行选择，或在选择前进行测试",
   "sound": "声音",
-  "select_sound": "选择通知声音"
+  "select_sound": "选择通知声音",
+  "diagnostics": "诊断",
+  "real_time_connection": "实时连接",
+  "environment": "环境",
+  "last_activity": "最后活动",
+  "refresh_connection": "刷新连接",
+  "notification_sound": "通知声音",
+  "sound_enabled": "声音已启用",
+  "audio_status": "音频状态",
+  "enable_sound": "启用声音",
+  "test_sound": "测试声音",
+  "tips": "提示",
+  "click_or_interact_with_the_page_to_allow_audio": "点击或与页面交互以允许播放音频。",
+  "check_your_browsers_autoplay_settings": "检查浏览器的自动播放设置。",
+  "check_your_internet_connection": "检查您的互联网连接。",
+  "try_a_hard_refresh": "尝试强制刷新（Ctrl+F5）。"
 }

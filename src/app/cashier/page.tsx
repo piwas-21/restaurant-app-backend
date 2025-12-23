@@ -18,6 +18,7 @@ import QuickConfirmModal from '@/components/cashier/QuickConfirmModal';
 import NotificationCenter from '@/components/cashier/NotificationCenter';
 import QRScannerDialog from '@/components/cashier/QRScannerDialog';
 import AutoPrintSettingsModal from '@/components/cashier/AutoPrintSettingsModal';
+import CashierDiagnostics from '@/components/cashier/CashierDiagnostics';
 import { OrderType } from '@/types/order';
 import { QRCodeValidationResult } from '@/types/userGroupTypes';
 import { quickConfirmOrder, quickCancelOrder } from '@/services/cashierService';
@@ -34,6 +35,8 @@ export default function CashierPage() {
     isConnected,
     isLoading,
     error,
+    lastEventTime,
+    connectionState,
     refreshOrders,
     updateOrderStatus,
     addPayment,
@@ -50,7 +53,10 @@ export default function CashierPage() {
     notifyOrderUpdate,
     playOrderUpdateSound,
     audioEnabled,
+    audioReady,
+    audioBlockedByPolicy,
     toggleAudio,
+    resumeAudioContext,
     soundType,
     changeSoundType,
     playSoundByType,
@@ -77,14 +83,17 @@ export default function CashierPage() {
   const [showFocusDialog, setShowFocusDialog] = useState(false);
   const [showQRScannerDialog, setShowQRScannerDialog] = useState(false);
   const [showQuickConfirmModal, setShowQuickConfirmModal] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [pendingOrderForConfirm, setPendingOrderForConfirm] = useState<string | null>(null);
   const [dismissedOrders, setDismissedOrders] = useState<Set<string>>(new Set());
+  const [pendingOrderQueue, setPendingOrderQueue] = useState<string[]>([]); // Queue for multiple orders
 
   // Dialog feedback messages
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const previousOrderCountRef = useRef(0);
+  // Use ID-based tracking instead of position-based
+  const seenOrderIdsRef = useRef<Set<string>>(new Set());
   const previousOrderStatusesRef = useRef<Map<string, string>>(new Map());
   const isInitialLoadRef = useRef(true);
 
@@ -169,115 +178,114 @@ export default function CashierPage() {
     }
   }, [orderTypeFilter, statusFilter, paymentStatusFilter, searchQuery, filteredOrders, selectedOrderId]);
 
-  // Notify on new orders
+  // Notify on new orders using ID-based tracking
   useEffect(() => {
-    // Skip notification on initial load
+    // Skip notification on initial load - just mark all orders as seen
     if (isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
-      previousOrderCountRef.current = orders.length;
+      orders.forEach(order => seenOrderIdsRef.current.add(order.id));
       return;
     }
 
-    // Check if new orders were added
-    if (orders.length > previousOrderCountRef.current) {
-      const newOrders = orders.slice(
-        0,
-        orders.length - previousOrderCountRef.current
-      );
+    // Find truly new orders using ID-based tracking
+    const newOrders = orders.filter(order => !seenOrderIdsRef.current.has(order.id));
+    
+    if (newOrders.length === 0) return;
 
-      newOrders.forEach((order) => {
-        console.log('🆕 New order detected:', {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          type: order.type,
-          status: order.status,
-          isDismissed: dismissedOrders.has(order.id)
-        });
+    console.log(`🆕 Detected ${newOrders.length} new order(s)`);
+    
+    const ordersForModal: string[] = [];
 
-        notifyNewOrder(
-          order.orderNumber || order.id,
-          order.customerName || ''
-        );
-
-        // Auto-show quick-confirm modal for non-dine-in orders
-        const shouldShowModal = 
-          order.type !== OrderType.DineIn &&
-          order.status === 'Pending' &&
-          !dismissedOrders.has(order.id);
-
-        console.log('📋 Quick confirm modal check:', {
-          orderType: order.type,
-          isNotDineIn: order.type !== OrderType.DineIn,
-          status: order.status,
-          isPending: order.status === 'Pending',
-          isDismissed: dismissedOrders.has(order.id),
-          shouldShowModal
-        });
-
-        if (shouldShowModal) {
-          console.log('✅ Showing quick confirm modal for order:', order.orderNumber);
-          setPendingOrderForConfirm(order.id);
-          setShowQuickConfirmModal(true);
-        } else {
-          console.log('❌ NOT showing modal. Reason:', 
-            order.type === OrderType.DineIn ? 'Dine-in order' :
-            order.status !== 'Pending' ? `Status is ${order.status}` :
-            dismissedOrders.has(order.id) ? 'Already dismissed' :
-            'Unknown'
-          );
-        }
-
-        // Auto-print based on settings
-        if (autoPrintSettings.enabled) {
-          // Check if order type matches
-          const shouldPrintType = 
-            (order.type === OrderType.DineIn && autoPrintSettings.orderTypes.dineIn) ||
-            (order.type === OrderType.Takeaway && autoPrintSettings.orderTypes.takeaway) ||
-            (order.type === OrderType.Delivery && autoPrintSettings.orderTypes.delivery);
-          
-          // Check if order status matches
-          const orderStatus = order.status?.toLowerCase() || 'pending';
-          const shouldPrintStatus = autoPrintSettings.orderStatuses[orderStatus as keyof typeof autoPrintSettings.orderStatuses];
-          
-          if (shouldPrintType && shouldPrintStatus) {
-            // Print all selected content types
-            if (autoPrintSettings.printContent.all) {
-              exportKitchenItemsToPDF(order, 'All', t);
-            }
-            if (autoPrintSettings.printContent.frontKitchen) {
-              exportKitchenItemsToPDF(order, 'FrontKitchen', t);
-            }
-            if (autoPrintSettings.printContent.backKitchen) {
-              exportKitchenItemsToPDF(order, 'BackKitchen', t);
-            }
-            if (autoPrintSettings.printContent.bill) {
-              exportOrderToPDF(order, t);
-            }
-          }
-        }
+    newOrders.forEach((order) => {
+      // Mark as seen immediately to prevent duplicates
+      seenOrderIdsRef.current.add(order.id);
+      
+      console.log('🆕 New order:', {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        type: order.type,
+        status: order.status,
       });
 
-      // Visual flash effect for new orders (fallback when sound disabled)
-      if (!audioEnabled) {
-        const flashEl = document.createElement('div');
-        flashEl.style.cssText = `
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(255, 152, 0, 0.3);
-          pointer-events: none;
-          z-index: 9999;
-          animation: flash 0.5s ease-out;
-        `;
-        document.body.appendChild(flashEl);
-        setTimeout(() => flashEl.remove(), 500);
+      // Notify (this triggers sound)
+      notifyNewOrder(
+        order.orderNumber || order.id,
+        order.customerName || ''
+      );
+
+      // Check if should show modal
+      const shouldShowModal = 
+        order.type !== OrderType.DineIn &&
+        order.status === 'Pending' &&
+        !dismissedOrders.has(order.id);
+
+      if (shouldShowModal) {
+        ordersForModal.push(order.id);
       }
+
+      // Auto-print based on settings
+      if (autoPrintSettings.enabled) {
+        const shouldPrintType = 
+          (order.type === OrderType.DineIn && autoPrintSettings.orderTypes.dineIn) ||
+          (order.type === OrderType.Takeaway && autoPrintSettings.orderTypes.takeaway) ||
+          (order.type === OrderType.Delivery && autoPrintSettings.orderTypes.delivery);
+        
+        const orderStatus = order.status?.toLowerCase() || 'pending';
+        const shouldPrintStatus = autoPrintSettings.orderStatuses[orderStatus as keyof typeof autoPrintSettings.orderStatuses];
+        
+        if (shouldPrintType && shouldPrintStatus) {
+          if (autoPrintSettings.printContent.all) {
+            exportKitchenItemsToPDF(order, 'All', t);
+          }
+          if (autoPrintSettings.printContent.frontKitchen) {
+            exportKitchenItemsToPDF(order, 'FrontKitchen', t);
+          }
+          if (autoPrintSettings.printContent.backKitchen) {
+            exportKitchenItemsToPDF(order, 'BackKitchen', t);
+          }
+          if (autoPrintSettings.printContent.bill) {
+            exportOrderToPDF(order, t);
+          }
+        }
+      }
+    });
+
+    // Queue orders for modal display (use setTimeout to avoid React state batching issues)
+    if (ordersForModal.length > 0) {
+      setTimeout(() => {
+        setPendingOrderQueue(prev => [...prev, ...ordersForModal]);
+      }, 0);
     }
 
-    previousOrderCountRef.current = orders.length;
+    // Visual flash effect for new orders (fallback when sound disabled)
+    if (!audioEnabled && newOrders.length > 0) {
+      const flashEl = document.createElement('div');
+      flashEl.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 152, 0, 0.3);
+        pointer-events: none;
+        z-index: 9999;
+        animation: flash 0.5s ease-out;
+      `;
+      document.body.appendChild(flashEl);
+      setTimeout(() => flashEl.remove(), 500);
+    }
   }, [orders, notifyNewOrder, audioEnabled, dismissedOrders, autoPrintSettings, t]);
+
+  // Process pending order queue for modal display
+  useEffect(() => {
+    if (pendingOrderQueue.length > 0 && !showQuickConfirmModal) {
+      const nextOrderId = pendingOrderQueue[0];
+      console.log('📋 Showing modal for queued order:', nextOrderId);
+      setPendingOrderForConfirm(nextOrderId);
+      setShowQuickConfirmModal(true);
+      setPendingOrderQueue(prev => prev.slice(1));
+    }
+  }, [pendingOrderQueue, showQuickConfirmModal]);
 
   // Monitor order status changes (e.g., customer approvals)
   useEffect(() => {
@@ -459,6 +467,7 @@ export default function CashierPage() {
         isConnected={isConnected}
         isRefreshing={isRefreshing}
         audioEnabled={audioEnabled}
+        audioBlockedByPolicy={audioBlockedByPolicy}
         soundType={soundType}
         repeatUntilMouseMoves={repeatUntilMouseMoves}
         onRefresh={handleRefresh}
@@ -467,6 +476,7 @@ export default function CashierPage() {
         onTestSound={playSoundByType}
         onToggleRepeat={toggleRepeatSound}
         onOpenQRScanner={() => setShowQRScannerDialog(true)}
+        onOpenDiagnostics={() => setShowDiagnostics(!showDiagnostics)}
       />
 
       {/* Messages */}
@@ -562,6 +572,32 @@ export default function CashierPage() {
         settings={autoPrintSettings}
         onSave={saveAutoPrintSettings}
       />
+
+      {/* Diagnostic Panel */}
+      {showDiagnostics && (
+        <div style={{ 
+          position: 'fixed', 
+          top: '20px', 
+          right: '20px', 
+          zIndex: 9999,
+          maxWidth: '400px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+        }}>
+          <CashierDiagnostics
+            sseConnected={isConnected}
+            sseConnectionState={connectionState}
+            sseLastEventTime={lastEventTime}
+            sseError={error}
+            audioEnabled={audioEnabled}
+            audioReady={audioReady}
+            audioBlockedByPolicy={audioBlockedByPolicy}
+            onTestSound={() => playSoundByType(soundType)}
+            onEnableAudio={resumeAudioContext}
+            onRefreshConnection={handleRefresh}
+            onClose={() => setShowDiagnostics(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

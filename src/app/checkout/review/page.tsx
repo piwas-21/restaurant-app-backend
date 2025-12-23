@@ -194,15 +194,46 @@ export default function ReviewPage() {
 
     try {
       // Convert basket items to order items
-      const orderItems: CreateOrderItemDto[] = cartState.items.map(item => ({
-        productId: item.productId || '',
-        productVariationId: item.productVariationId,
-        menuId: item.menuId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        customizationPrice: item.customizationPrice || 0,
-        specialInstructions: item.specialInstructions,
-      }));
+      const orderItems: CreateOrderItemDto[] = cartState.items.map(item => {
+        // Process ingredient quantities - set to 0 for deselected ingredients
+        let processedIngredientQuantities: Record<string, number> | undefined;
+        if (item.ingredientQuantities && Object.keys(item.ingredientQuantities).length > 0) {
+          processedIngredientQuantities = { ...item.ingredientQuantities };
+          
+          // If selectedIngredients exists, mark deselected ingredients with quantity 0
+          if (item.selectedIngredients && Array.isArray(item.selectedIngredients)) {
+            Object.keys(processedIngredientQuantities).forEach(ingredientId => {
+              // If ingredient is NOT in selectedIngredients, it was deselected
+              if (!item.selectedIngredients!.includes(ingredientId)) {
+                processedIngredientQuantities![ingredientId] = 0;
+              }
+            });
+          }
+        }
+
+        const orderItem: CreateOrderItemDto = {
+          productId: item.productId || '',
+          productVariationId: item.productVariationId,
+          menuId: item.menuId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          customizationPrice: item.customizationPrice || 0,
+          specialInstructions: item.specialInstructions,
+          ingredientQuantities: processedIngredientQuantities, // Use processed quantities
+        };
+
+        // Map side items to child items if they exist
+        if (item.selectedSideItems && item.selectedSideItems.length > 0) {
+          orderItem.childItems = item.selectedSideItems.map(sideItem => ({
+            productId: sideItem.id,
+            quantity: sideItem.quantity,
+            unitPrice: sideItem.price || 0,
+            customizationPrice: 0,
+          }));
+        }
+
+        return orderItem;
+      });
 
       // Prepare delivery address if delivery order
       let deliveryAddress: CreateOrderDeliveryAddressDto | undefined;

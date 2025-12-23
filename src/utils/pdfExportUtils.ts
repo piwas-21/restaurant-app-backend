@@ -435,17 +435,76 @@ export const generateKitchenItemsHtml = (
     }
   };
 
-  // Build order items HTML
-  const itemsRows = filteredItems.map(item => `
-    <tr>
-      <td>${escapeHtml(item.productName || item.menuName || translate('item', 'Item'))}</td>
-      <td style="text-align: center;">${item.quantity}</td>
-      ${kitchenType === 'All' ? `
-        <td style="text-align: right;">${formatCurrency(item.unitPrice)}</td>
-        <td style="text-align: right;">${formatCurrency(item.itemTotal)}</td>
-      ` : ''}
-    </tr>
-  `).join('');
+
+
+  // Build order items HTML with detailed customizations
+  const itemsRows = filteredItems.map(item => {
+    let itemHtml = `
+      <tr>
+        <td colspan="${kitchenType === 'All' ? '4' : '2'}">
+          <div style="font-weight: bold; margin-bottom: 4px;">
+            ${escapeHtml(item.productName || item.menuName || translate('item', 'Item'))} x${item.quantity}
+          </div>`;
+
+    // Show variation if selected
+    if (item.variationName) {
+      itemHtml += `
+          <div style="margin-left: 12px; font-size: 11pt; margin-bottom: 2px;">
+            <strong>${translate('variation', 'Variation')}:</strong> ${escapeHtml(item.variationName)}
+          </div>`;
+    }
+
+    // Show ingredient customizations
+    if (item.ingredientCustomizations && item.ingredientCustomizations.length > 0) {
+      itemHtml += `
+          <div style="margin-left: 12px; font-size: 10pt; margin-top: 4px;">
+            <strong>${translate('ingredients', 'Ingredients')}:</strong>`;
+      
+      item.ingredientCustomizations.forEach(ing => {
+        if (ing.isRemoved) {
+          // Strikethrough for removed ingredients
+          itemHtml += `
+            <div style="margin-left: 8px; text-decoration: line-through;">• ${escapeHtml(ing.ingredientName)}</div>`;
+        } else {
+          // Show selected ingredients with quantity
+          itemHtml += `
+            <div style="margin-left: 8px;">• ${escapeHtml(ing.ingredientName)}${ing.quantity > 1 ? ` x${ing.quantity}` : ''}</div>`;
+        }
+      });
+      
+      itemHtml += `
+          </div>`;
+    }
+
+    // Show side items/additionals
+    if (item.sideItems && item.sideItems.length > 0) {
+      itemHtml += `
+          <div style="margin-left: 12px; font-size: 10pt; margin-top: 4px;">
+            <strong>${translate('additionals', 'Additionals')}:</strong>`;
+      
+      item.sideItems.forEach(side => {
+        itemHtml += `
+            <div style="margin-left: 8px;">+ ${escapeHtml(side.productName || 'Item')}${side.quantity > 1 ? ` x${side.quantity}` : ''}</div>`;
+      });
+      
+      itemHtml += `
+          </div>`;
+    }
+
+    // Show special instructions
+    if (item.specialInstructions) {
+      itemHtml += `
+          <div style="margin-left: 12px; font-size: 10pt; font-style: italic; background: #f0f0f0; padding: 4px; margin-top: 4px; border-left: 3px solid #000;">
+            <strong>${translate('special_instructions', 'Special')}:</strong> ${escapeHtml(item.specialInstructions)}
+          </div>`;
+    }
+
+    itemHtml += `
+        </td>
+      </tr>`;
+
+    return itemHtml;
+  }).join('');
 
   return `
     <!DOCTYPE html>
@@ -456,7 +515,7 @@ export const generateKitchenItemsHtml = (
         <style>
           @page {
             size: A4 portrait;
-            margin: 20mm;
+            margin: 15mm;
           }
           @media print {
             body {
@@ -470,93 +529,78 @@ export const generateKitchenItemsHtml = (
             box-sizing: border-box;
           }
           body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Courier New', monospace;
             font-size: 12pt;
-            line-height: 1.6;
-            color: #1a1a1a;
+            line-height: 1.4;
+            color: #000;
             background: white;
-            margin: 0; /* Changed from 40px for iframe compatibility */
-            padding: 20px;
+            margin: 0;
+            padding: 15px;
           }
           .header {
             text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #c0392b;
-            padding-bottom: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 8px;
           }
           .header h1 {
-            font-size: 20pt;
-            color: #c0392b;
-            margin-bottom: 5px;
-          }
-          .header h2 {
-            font-size: 14pt;
-            color: #555;
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 3px;
           }
           .order-info {
-            margin: 15px 0;
-            padding: 10px;
-            background: #f3f4f6;
-            border-left: 4px solid #c0392b;
+            margin: 12px 0;
+            padding: 8px;
+            border: 1px solid #000;
           }
           .order-info p {
-            margin: 3px 0;
+            margin: 2px 0;
             font-size: 11pt;
           }
           .order-info .order-number {
-            font-size: 18pt;
+            font-size: 16pt;
             font-weight: bold;
-            color: #c0392b;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
           }
           table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
+            margin: 12px 0;
           }
           table.items-table {
-            border: 1px solid #e5e7eb;
+            border: 1px solid #000;
           }
           table.items-table thead {
-            background: #c0392b;
+            background: #000;
             color: white;
           }
           table.items-table th,
           table.items-table td {
-            padding: 8px 10px;
+            padding: 6px 8px;
             text-align: left;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #000;
           }
           table.items-table th {
             font-weight: bold;
           }
-          .item-instructions {
-            font-size: 10pt;
-            color: #666;
-            font-style: italic;
-            margin-top: 3px;
-          }
           .customer-info {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f3f4f6;
-            border-left: 4px solid #3b82f6;
+            margin-top: 12px;
+            padding: 8px;
+            border: 1px solid #000;
             font-size: 11pt;
           }
           .timestamp {
             text-align: center;
-            font-size: 10pt;
-            color: #999;
-            margin-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 10px;
+            font-size: 9pt;
+            margin-top: 15px;
+            border-top: 1px solid #000;
+            padding-top: 8px;
           }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>Rumi Restaurant</h1>
-          <h2>${getKitchenTypeLabel()}</h2>
+          <h1>${getKitchenTypeLabel()}</h1>
         </div>
 
         <div class="order-info">
@@ -574,7 +618,7 @@ export const generateKitchenItemsHtml = (
         ` : ''}
 
         <div>
-          <h3 style="font-size: 13pt; color: #c0392b; margin: 15px 0 10px 0;">${translate('order_items', 'Items')}</h3>
+          <h3 style="font-size: 12pt; margin: 12px 0 8px 0; font-weight: bold;">${translate('order_items', 'Items')}</h3>
           <table class="items-table">
             <thead>
               <tr>
@@ -593,18 +637,18 @@ export const generateKitchenItemsHtml = (
         </div>
 
         ${kitchenType === 'All' ? `
-          <div style="margin-top: 20px; border-top: 2px solid #333; padding-top: 10px;">
-            <div style="display: flex; justify-content: space-between; margin: 5px 0; margin-left: 60%;">
+          <div style="margin-top: 15px; border-top: 2px solid #000; padding-top: 8px;">
+            <div style="display: flex; justify-content: space-between; margin: 4px 0; margin-left: 60%;">
               <span><strong>${translate('subtotal', 'Subtotal')}:</strong></span>
               <span>${formatCurrency(order.subTotal)}</span>
             </div>
             ${order.tax > 0 ? `
-              <div style="display: flex; justify-content: space-between; margin: 5px 0; margin-left: 60%;">
+              <div style="display: flex; justify-content: space-between; margin: 4px 0; margin-left: 60%;">
                 <span><strong>${translate('tax', 'Tax')}:</strong></span>
                 <span>${formatCurrency(order.tax)}</span>
               </div>
             ` : ''}
-            <div style="display: flex; justify-content: space-between; margin: 10px 0; margin-left: 60%; font-weight: bold; font-size: 13pt;">
+            <div style="display: flex; justify-content: space-between; margin: 8px 0; margin-left: 60%; font-weight: bold; font-size: 13pt;">
               <span>${translate('total', 'Total')}:</span>
               <span>${formatCurrency(order.total)}</span>
             </div>

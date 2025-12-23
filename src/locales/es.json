@@ -1993,5 +1993,20 @@
   "repeat_sound_desc": "Sigue sonando hasta que regreses al escritorio",
   "click_to_select_or_test": "Haz clic en un sonido para seleccionar, o pruébalo antes de elegir",
   "sound": "Sonido",
-  "select_sound": "Seleccionar sonido de notificación"
+  "select_sound": "Seleccionar sonido de notificación",
+  "diagnostics": "Diagnósticos",
+  "real_time_connection": "Conexión en tiempo real",
+  "environment": "Entorno",
+  "last_activity": "Última actividad",
+  "refresh_connection": "Actualizar conexión",
+  "notification_sound": "Sonido de notificación",
+  "sound_enabled": "Sonido habilitado",
+  "audio_status": "Estado de audio",
+  "enable_sound": "Habilitar sonido",
+  "test_sound": "Probar sonido",
+  "tips": "Consejos",
+  "click_or_interact_with_the_page_to_allow_audio": "Haz clic o interactúa con la página para permitir el audio.",
+  "check_your_browsers_autoplay_settings": "Comprueba la configuración de reproducción automática de tu navegador.",
+  "check_your_internet_connection": "Comprueba tu conexión a Internet.",
+  "try_a_hard_refresh": "Intenta una actualización forzada (Ctrl+F5)."
 }

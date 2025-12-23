@@ -35,7 +35,7 @@ const MenuBundleCard: React.FC<MenuBundleCardProps> = ({
   const primaryImage =
     bundle.images && bundle.images.length > 0
       ? bundle.images[0].url
-      : '/images/placeholder-falafel.jpeg';
+      : '/images/placeholder-app.png';
 
   // Get default items to show in the card
   const defaultItems =

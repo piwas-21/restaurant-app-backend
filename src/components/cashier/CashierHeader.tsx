@@ -9,6 +9,7 @@ interface CashierHeaderProps {
   isConnected: boolean;
   isRefreshing: boolean;
   audioEnabled: boolean;
+  audioBlockedByPolicy?: boolean; // NEW: Warn when audio is blocked
   soundType: NotificationSoundType;
   repeatUntilMouseMoves: boolean;
   onRefresh: () => void;
@@ -17,6 +18,7 @@ interface CashierHeaderProps {
   onTestSound: (type: NotificationSoundType) => void;
   onToggleRepeat: () => void;
   onOpenQRScanner: () => void;
+  onOpenDiagnostics?: () => void; // NEW: Open diagnostic panel
   // autoPrintEnabled?: boolean;
   // onToggleAutoPrint?: () => void;
   // onOpenAutoPrintSettings?: () => void;
@@ -26,6 +28,7 @@ export default function CashierHeader({
   isConnected,
   isRefreshing,
   audioEnabled,
+  audioBlockedByPolicy,
   soundType,
   repeatUntilMouseMoves,
   onRefresh,
@@ -33,7 +36,8 @@ export default function CashierHeader({
   onSoundTypeChange,
   onTestSound,
   onToggleRepeat,
-  onOpenQRScanner
+  onOpenQRScanner,
+  onOpenDiagnostics
 }: CashierHeaderProps) {
   const { t } = useTranslation();
   const [showSoundSelector, setShowSoundSelector] = useState(false);
@@ -67,6 +71,25 @@ export default function CashierHeader({
             {isConnected ? t('cashier.connected') || 'Connected' : t('cashier.disconnected') || 'Disconnected'}
           </span>
         </div>
+
+        {/* Audio Blocked Warning */}
+        {audioBlockedByPolicy && (
+          <div className={styles.connectionStatus} style={{ backgroundColor: '#fff3cd', borderColor: '#ffc107', color: '#856404' }}>
+            <span>⚠️ {t('cashier.audio_blocked') || 'Audio Blocked'}</span>
+          </div>
+        )}
+
+        {/* Diagnostics Button */}
+        {onOpenDiagnostics && (
+          <button
+            className={styles.button}
+            onClick={onOpenDiagnostics}
+            title={t('diagnostics') || 'System Diagnostics'}
+            style={{ backgroundColor: '#607d8b' }}
+          >
+            🔍 {t('diagnostics') || 'Diagnostics'}
+          </button>
+        )}
 
         {/* Sound Toggle Button */}
         <button

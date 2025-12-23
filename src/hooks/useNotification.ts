@@ -23,23 +23,68 @@ export function useNotification() {
   const notificationIdRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioReady, setAudioReady] = useState(false);
+  const [audioBlockedByPolicy, setAudioBlockedByPolicy] = useState(false);
   const [soundType, setSoundType] = useState<NotificationSoundType>('chime');
   const [repeatUntilMouseMoves, setRepeatUntilMouseMoves] = useState(false);
   const repeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUserInteractedRef = useRef(false);
 
   // Initialize AudioContext on first user interaction
   const initializeAudio = useCallback(() => {
-    if (audioContextRef.current) return;
+    if (audioContextRef.current) {
+      console.log('🔊 AudioContext already exists, state:', audioContextRef.current.state);
+      return;
+    }
 
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new AudioContextClass();
+      
+      const state = audioContextRef.current.state;
+      console.log('🔊 AudioContext created, state:', state);
+      
+      if (state === 'running') {
+        setAudioReady(true);
+        setAudioBlockedByPolicy(false);
+        console.log('✅ Audio is ready to play');
+      } else if (state === 'suspended') {
+        setAudioBlockedByPolicy(true);
+        console.warn('⚠️ AudioContext is suspended - user interaction required');
+      }
+      
       setAudioEnabled(true);
-      console.log('Audio initialized successfully');
     } catch (error) {
-      console.error('Could not initialize audio context:', error);
+      console.error('❌ Could not initialize audio context:', error);
+      setAudioBlockedByPolicy(true);
     }
   }, []);
+
+  // Resume audio context (requires user gesture on Firefox)
+  const resumeAudioContext = useCallback(async () => {
+    if (!audioContextRef.current) {
+      console.log('🔊 No AudioContext to resume, initializing...');
+      initializeAudio();
+      return;
+    }
+
+    try {
+      if (audioContextRef.current.state === 'suspended') {
+        console.log('🔊 Attempting to resume suspended AudioContext...');
+        await audioContextRef.current.resume();
+        console.log('✅ AudioContext resumed, state:', audioContextRef.current.state);
+        setAudioReady(true);
+        setAudioBlockedByPolicy(false);
+        hasUserInteractedRef.current = true;
+      } else {
+        console.log('🔊 AudioContext state:', audioContextRef.current.state);
+        setAudioReady(audioContextRef.current.state === 'running');
+      }
+    } catch (error) {
+      console.error('❌ Failed to resume AudioContext:', error);
+      setAudioBlockedByPolicy(true);
+    }
+  }, [initializeAudio]);
 
   // Load sound type preference from localStorage
   useEffect(() => {
@@ -54,10 +99,9 @@ export function useNotification() {
     }
   }, []);
 
-  // Auto-initialize audio on mount if enabled by default
+  // Auto-initialize audio on mount
   useEffect(() => {
     if (audioEnabled && !audioContextRef.current) {
-      // Use requestAnimationFrame to avoid blocking other initializations (like SSE)
       requestAnimationFrame(() => {
         console.log('🔊 Auto-initializing audio context...');
         initializeAudio();
@@ -65,173 +109,179 @@ export function useNotification() {
     }
   }, [audioEnabled, initializeAudio]);
 
+  // Set up event listeners for user interaction to resume audio
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (!hasUserInteractedRef.current) {
+        console.log('👆 User interaction detected, attempting to enable audio...');
+        hasUserInteractedRef.current = true;
+        resumeAudioContext();
+      }
+    };
+
+    const events = ['click', 'touchstart', 'keydown'];
+    events.forEach(event => {
+      document.addEventListener(event, handleUserInteraction, { once: true });
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleUserInteraction);
+      });
+    };
+  }, [resumeAudioContext]);
+
+  // Resume audio context when tab becomes visible (important for Firefox/Chrome)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && audioContextRef.current) {
+        const state = audioContextRef.current.state;
+        console.log('👁️ Tab visible, AudioContext state:', state);
+        
+        if (state === 'suspended' && hasUserInteractedRef.current) {
+          console.log('🔊 Attempting to resume audio after visibility change...');
+          audioContextRef.current.resume().then(() => {
+            setAudioReady(audioContextRef.current?.state === 'running');
+            setAudioBlockedByPolicy(audioContextRef.current?.state !== 'running');
+          }).catch(err => {
+            console.warn('⚠️ Failed to resume audio on visibility change:', err);
+          });
+        } else if (state === 'running') {
+          setAudioReady(true);
+          setAudioBlockedByPolicy(false);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // Toggle audio on/off
-  const toggleAudio = useCallback(() => {
+  const toggleAudio = useCallback(async () => {
     if (!audioContextRef.current) {
       initializeAudio();
+      setTimeout(() => resumeAudioContext(), 100);
     } else {
-      setAudioEnabled(prev => !prev);
-      console.log(`Audio ${!audioEnabled ? 'enabled' : 'disabled'}`);
-    }
-  }, [initializeAudio, audioEnabled]);
-
-  // Play notification sound using Web Audio API
-  const playNotificationSound = useCallback(() => {
-    if (!audioContextRef.current || !audioEnabled) {
-      if (!audioContextRef.current) {
-        console.warn('AudioContext not initialized. User interaction required.');
+      const newEnabled = !audioEnabled;
+      setAudioEnabled(newEnabled);
+      console.log(`🔊 Audio ${newEnabled ? 'enabled' : 'disabled'}`);
+      
+      if (newEnabled && audioContextRef.current.state === 'suspended') {
+        await resumeAudioContext();
       }
+    }
+  }, [initializeAudio, resumeAudioContext, audioEnabled]);
+
+  // Helper function to play notes
+  const playNotes = useCallback((audioContext: AudioContext, type: NotificationSoundType) => {
+    const now = audioContext.currentTime;
+
+    const playNote = (frequency: number, startTime: number, duration: number, volume: number, waveType: OscillatorType = 'sine') => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.type = waveType;
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+      
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
+
+    switch (type) {
+      case 'chime':
+        playNote(659.25, now, 0.3, 0.2);
+        playNote(830.61, now + 0.1, 0.4, 0.15);
+        playNote(1318.51, now + 0.2, 0.6, 0.1);
+        break;
+      case 'bell':
+        playNote(1046.5, now, 0.8, 0.3);
+        playNote(1318.51, now + 0.05, 0.85, 0.25);
+        playNote(1568, now + 0.1, 0.9, 0.2);
+        playNote(2093, now + 0.15, 1.0, 0.15);
+        break;
+      case 'ping':
+        playNote(880, now, 0.15, 0.12);
+        playNote(1760, now + 0.05, 0.2, 0.08);
+        break;
+      case 'alert':
+        playNote(987.77, now, 0.15, 0.35, 'square');
+        playNote(987.77, now + 0.2, 0.15, 0.35, 'square');
+        playNote(987.77, now + 0.4, 0.15, 0.35, 'square');
+        break;
+      case 'melody':
+        playNote(523.25, now, 0.4, 0.12);
+        playNote(659.25, now + 0.3, 0.4, 0.1);
+        playNote(783.99, now + 0.6, 0.4, 0.08);
+        playNote(1046.5, now + 0.9, 0.6, 0.1);
+        playNote(783.99, now + 1.3, 0.5, 0.08);
+        break;
+    }
+  }, []);
+
+  // Play notification sound
+  const playNotificationSound = useCallback(() => {
+    if (!audioEnabled) {
+      return;
+    }
+    
+    if (!audioContextRef.current) {
+      console.warn('⚠️ AudioContext not initialized');
+      setAudioBlockedByPolicy(true);
+      initializeAudio();
       return;
     }
 
+    const audioContext = audioContextRef.current;
+    
+    // Resume context if suspended
+    if (audioContext.state === 'suspended') {
+      console.warn('⚠️ AudioContext suspended, attempting resume...');
+      audioContext.resume().then(() => {
+        if (audioContext.state === 'running') {
+          setAudioReady(true);
+          setAudioBlockedByPolicy(false);
+          playNotes(audioContext, soundType);
+        }
+      }).catch(err => {
+        console.error('Failed to resume AudioContext:', err);
+        setAudioBlockedByPolicy(true);
+      });
+      return;
+    }
+    
     try {
-      const audioContext = audioContextRef.current;
-      
-      // Resume context if suspended (required by some browsers)
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-
-      const now = audioContext.currentTime;
-
-      // Helper function to play a note
-      const playNote = (frequency: number, startTime: number, duration: number, volume: number, waveType: OscillatorType = 'sine') => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.type = waveType;
-        oscillator.frequency.setValueAtTime(frequency, startTime);
-        
-        // Envelope: quick attack, slow decay
-        gainNode.gain.setValueAtTime(0, startTime);
-        gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration);
-      };
-
-      // Play different sounds based on selected type
-      switch (soundType) {
-        case 'chime': // Default: Pleasant 3-note chime (medium)
-          playNote(659.25, now, 0.3, 0.2);           // E5
-          playNote(830.61, now + 0.1, 0.4, 0.15);    // G#5
-          playNote(1318.51, now + 0.2, 0.6, 0.1);    // E6
-          break;
-
-        case 'bell': // Loud & Long: Classic bell sound
-          playNote(1046.5, now, 0.8, 0.3);           // C6
-          playNote(1318.51, now + 0.05, 0.85, 0.25); // E6
-          playNote(1568, now + 0.1, 0.9, 0.2);       // G6
-          playNote(2093, now + 0.15, 1.0, 0.15);     // C7
-          break;
-
-        case 'ping': // Soft & Short: Gentle single ping
-          playNote(880, now, 0.15, 0.12);            // A5
-          playNote(1760, now + 0.05, 0.2, 0.08);     // A6
-          break;
-
-        case 'alert': // Loud & Short: Urgent alert
-          playNote(987.77, now, 0.15, 0.35, 'square');     // B5
-          playNote(987.77, now + 0.2, 0.15, 0.35, 'square'); // B5
-          playNote(987.77, now + 0.4, 0.15, 0.35, 'square'); // B5
-          break;
-
-        case 'melody': // Soft & Long: Calming melody
-          playNote(523.25, now, 0.4, 0.12);          // C5
-          playNote(659.25, now + 0.3, 0.4, 0.1);     // E5
-          playNote(783.99, now + 0.6, 0.4, 0.08);    // G5
-          playNote(1046.5, now + 0.9, 0.6, 0.1);     // C6
-          playNote(783.99, now + 1.3, 0.5, 0.08);    // G5
-          break;
-      }
-
+      playNotes(audioContext, soundType);
     } catch (error) {
       console.error('Could not play notification sound:', error);
     }
-  }, [audioEnabled, soundType]);
+  }, [audioEnabled, soundType, initializeAudio, playNotes]);
 
-  // Play a specific sound type (useful for testing)
+  // Play a specific sound type
   const playSoundByType = useCallback((type: NotificationSoundType) => {
     if (!audioContextRef.current || !audioEnabled) {
-      if (!audioContextRef.current) {
-        console.warn('AudioContext not initialized. User interaction required.');
-      }
       return;
     }
 
     try {
       const audioContext = audioContextRef.current;
       
-      // Resume context if suspended (required by some browsers)
       if (audioContext.state === 'suspended') {
         audioContext.resume();
       }
 
-      const now = audioContext.currentTime;
-
-      // Helper function to play a note
-      const playNote = (frequency: number, startTime: number, duration: number, volume: number, waveType: OscillatorType = 'sine') => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.type = waveType;
-        oscillator.frequency.setValueAtTime(frequency, startTime);
-        
-        // Envelope: quick attack, slow decay
-        gainNode.gain.setValueAtTime(0, startTime);
-        gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration);
-      };
-
-      // Play different sounds based on provided type
-      switch (type) {
-        case 'chime':
-          playNote(659.25, now, 0.3, 0.2);
-          playNote(830.61, now + 0.1, 0.4, 0.15);
-          playNote(1318.51, now + 0.2, 0.6, 0.1);
-          break;
-
-        case 'bell':
-          playNote(1046.5, now, 0.8, 0.3);
-          playNote(1318.51, now + 0.05, 0.85, 0.25);
-          playNote(1568, now + 0.1, 0.9, 0.2);
-          playNote(2093, now + 0.15, 1.0, 0.15);
-          break;
-
-        case 'ping':
-          playNote(880, now, 0.15, 0.12);
-          playNote(1760, now + 0.05, 0.2, 0.08);
-          break;
-
-        case 'alert':
-          playNote(987.77, now, 0.15, 0.35, 'square');
-          playNote(987.77, now + 0.2, 0.15, 0.35, 'square');
-          playNote(987.77, now + 0.4, 0.15, 0.35, 'square');
-          break;
-
-        case 'melody':
-          playNote(523.25, now, 0.4, 0.12);
-          playNote(659.25, now + 0.3, 0.4, 0.1);
-          playNote(783.99, now + 0.6, 0.4, 0.08);
-          playNote(1046.5, now + 0.9, 0.6, 0.1);
-          playNote(783.99, now + 1.3, 0.5, 0.08);
-          break;
-      }
-
+      playNotes(audioContext, type);
     } catch (error) {
       console.error('Could not play notification sound:', error);
     }
-  }, [audioEnabled]);
+  }, [audioEnabled, playNotes]);
 
   // Stop repeating sound
   const stopRepeating = useCallback(() => {
@@ -245,30 +295,24 @@ export function useNotification() {
   const startRepeatingUntilMouseMoves = useCallback(() => {
     if (!repeatUntilMouseMoves || !audioEnabled) return;
 
-    // Stop any existing repeat
     stopRepeating();
-
-    // Play immediately
     playNotificationSound();
 
-    // Calculate repeat interval based on sound type duration
     const getRepeatInterval = () => {
       switch (soundType) {
-        case 'bell': return 1500; // Longer sound
-        case 'melody': return 2200; // Longest sound
-        case 'ping': return 600; // Shortest sound
-        case 'alert': return 1000; // Short bursts
-        case 'chime': 
+        case 'bell': return 1500;
+        case 'melody': return 2200;
+        case 'ping': return 600;
+        case 'alert': return 1000;
+        case 'chime':
         default: return 1200;
       }
     };
 
-    // Set up repeating
     repeatIntervalRef.current = setInterval(() => {
       playNotificationSound();
     }, getRepeatInterval());
 
-    // Set up mouse move listener to stop
     const handleMouseMove = () => {
       stopRepeating();
       document.removeEventListener('mousemove', handleMouseMove);
@@ -290,17 +334,15 @@ export function useNotification() {
       const newNotification: Notification = {
         ...notification,
         id,
-        duration: notification.duration ?? 5000, // Default 5 seconds
+        duration: notification.duration ?? 5000,
       };
 
-      // Play sound if requested
       if (newNotification.sound) {
         playNotificationSound();
       }
 
       setNotifications((prev) => [newNotification, ...prev]);
 
-      // Auto-dismiss if duration is set
       if (newNotification.duration && newNotification.duration > 0) {
         const timeoutId = setTimeout(() => {
           removeNotification(id);
@@ -311,6 +353,7 @@ export function useNotification() {
 
       return { id };
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [playNotificationSound]
   );
 
@@ -328,7 +371,6 @@ export function useNotification() {
         sound: true,
       });
       
-      // Use repeating sound if enabled
       if (repeatUntilMouseMoves) {
         startRepeatingUntilMouseMoves();
       }
@@ -362,7 +404,7 @@ export function useNotification() {
     [addNotification]
   );
 
-  // Play a different notification sound for order updates (lower pitch, softer)
+  // Play a different notification sound for order updates
   const playOrderUpdateSound = useCallback(() => {
     if (!audioContextRef.current || !audioEnabled) return;
 
@@ -375,7 +417,6 @@ export function useNotification() {
 
       const now = audioContext.currentTime;
 
-      // Different sound: C4, E4, G4 (softer, lower pitch than new order)
       const playNote = (frequency: number, startTime: number, duration: number, volume: number) => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
@@ -394,10 +435,10 @@ export function useNotification() {
         oscillator.stop(startTime + duration);
       };
 
-      // Lower, softer sound: C4 (261.63 Hz), E4 (329.63 Hz), G4 (392 Hz)
-      playNote(261.63, now, 0.25, 0.15);         // C4
-      playNote(329.63, now + 0.08, 0.3, 0.12);   // E4
-      playNote(392, now + 0.16, 0.5, 0.08);      // G4
+      // Lower, softer sound
+      playNote(261.63, now, 0.25, 0.15);
+      playNote(329.63, now + 0.08, 0.3, 0.12);
+      playNote(392, now + 0.16, 0.5, 0.08);
 
     } catch (error) {
       console.error('Could not play order update sound:', error);
@@ -428,11 +469,14 @@ export function useNotification() {
     notifyOrderUpdate,
     playOrderUpdateSound,
     audioEnabled,
+    audioReady,
+    audioBlockedByPolicy,
     toggleAudio,
+    resumeAudioContext,
     soundType,
     changeSoundType,
-    playNotificationSound, // Expose for testing
-    playSoundByType, // Expose for testing specific sounds
+    playNotificationSound,
+    playSoundByType,
     repeatUntilMouseMoves,
     toggleRepeatSound,
   };

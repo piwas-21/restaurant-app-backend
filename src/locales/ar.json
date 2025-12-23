@@ -1990,5 +1990,20 @@
   "repeat_sound_desc": "يستمر في التشغيل حتى تعود إلى المكتب",
   "click_to_select_or_test": "انقر على صوت للاختيار، أو اختبره قبل الاختيار",
   "sound": "صوت",
-  "select_sound": "اختر صوت التنبيه"
+  "select_sound": "اختر صوت التنبيه",
+  "diagnostics": "التشخيص",
+  "real_time_connection": "الاتصال في الوقت الحقيقي",
+  "environment": "البيئة",
+  "last_activity": "آخر نشاط",
+  "refresh_connection": "تحديث الاتصال",
+  "notification_sound": "صوت الإشعارات",
+  "sound_enabled": "الصوت مفعل",
+  "audio_status": "حالة الصوت",
+  "enable_sound": "تفعيل الصوت",
+  "test_sound": "اختبار الصوت",
+  "tips": "نصائح",
+  "click_or_interact_with_the_page_to_allow_audio": "انقر أو تفاعل مع الصفحة للسماح بتشغيل الصوت.",
+  "check_your_browsers_autoplay_settings": "تحقق من إعدادات التشغيل التلقائي في المتصفح.",
+  "check_your_internet_connection": "تحقق من اتصال الإنترنت.",
+  "try_a_hard_refresh": "جرّب تحديث الصفحة بشكل كامل (Ctrl+F5)."
 }

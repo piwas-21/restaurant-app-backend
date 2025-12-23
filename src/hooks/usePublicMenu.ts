@@ -61,7 +61,7 @@ export function usePublicMenu() {
       setCurrentPage(page);
 
       const mapped: MenuItem[] = (response.data?.items || []).map((p: any) => {
-        const primaryImage = p.imageUrl || (Array.isArray(p.images) && p.images.length > 0 ? p.images[0].url : "/images/placeholder-falafel.jpeg");
+        const primaryImage = p.imageUrl || (Array.isArray(p.images) && p.images.length > 0 ? p.images[0].url : "/images/placeholder-app.png");
         const gallery = Array.isArray(p.images)
           ? p.images.map((img: any) => ({ url: img.url, alt: img.altText || p.name }))
           : [];

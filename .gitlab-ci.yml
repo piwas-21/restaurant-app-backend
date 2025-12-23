@@ -110,7 +110,7 @@ build_image:
           docker build
           --build-arg NEXT_PUBLIC_API_URL=https://www.rumirestaurant.ch
           --build-arg NEXT_PUBLIC_IMAGE_BASE_URL=https://rumi-test-backend-bucket.s3.eu-central-1.amazonaws.com
-          --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=427271437441-jj36848laka0hnm7dcgkpodgu3gt0kc0.apps.googleusercontent.com
+          --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=102252528656-3quqh29v8b7psntuo04r7duambcs1i0t.apps.googleusercontent.com
           -t $IMAGE_NAME:$IMAGE_TAG .
         - docker push $IMAGE_NAME:$IMAGE_TAG
 
