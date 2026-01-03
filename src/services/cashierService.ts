@@ -23,6 +23,7 @@ export async function getCashierOrders(filters?: {
   type?: string;
   page?: number;
   pageSize?: number;
+  modifiedSince?: Date;  // For efficient polling - returns orders modified after this timestamp
 }): Promise<PagedResult<OrderDto>> {
   const params = new URLSearchParams();
 
@@ -32,6 +33,7 @@ export async function getCashierOrders(filters?: {
     if (filters.type) params.append('type', filters.type);
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
+    if (filters.modifiedSince) params.append('modifiedSince', filters.modifiedSince.toISOString());
   }
 
   const queryString = params.toString();

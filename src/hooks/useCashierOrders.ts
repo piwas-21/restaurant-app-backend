@@ -32,11 +32,13 @@ interface UseCashierOrdersReturn {
   ) => Promise<OrderDto>;
 }
 
-// Health check interval (20 seconds for more frequent monitoring)
+// PRIMARY: Polling interval (5 seconds) - guaranteed order delivery
+const POLLING_INTERVAL_MS = 5000;
+// SSE health check interval (20 seconds for monitoring)
 const HEALTH_CHECK_INTERVAL_MS = 20000;
-// Maximum time without any event before considering connection dead (35 seconds - allows for 3+ missed heartbeats)
+// Maximum time without any SSE event before considering connection dead
 const MAX_SILENCE_MS = 35000;
-// Minimum time between reconnection attempts (prevents rapid reconnects)
+// Minimum time between SSE reconnection attempts
 const MIN_RECONNECT_INTERVAL_MS = 2000;
 
 export function useCashierOrders(): UseCashierOrdersReturn {
@@ -57,19 +59,41 @@ export function useCashierOrders(): UseCashierOrdersReturn {
   const lastReconnectTimeRef = useRef<number>(0);
   const connectionIdRef = useRef<string>(''); // Track connection ID to prevent stale closures
   const isMountedRef = useRef(true);
+  const lastPolledAtRef = useRef<Date | null>(null);  // Track last poll time for modifiedSince
+  const primaryPollingIntervalRef = useRef<NodeJS.Timeout | null>(null); // Primary polling mechanism
   const maxReconnectAttempts = 15;
 
   /**
-   * Fetch orders from API
+   * Fetch orders from API (supports modifiedSince for efficient polling)
    */
-  const refreshOrders = useCallback(async () => {
+  const refreshOrders = useCallback(async (modifiedSince?: Date) => {
     if (!isMountedRef.current) return;
     
     try {
       setError(null);
-      const result = await getCashierOrders();
+      // Use modifiedSince parameter for efficient polling
+      const result = await getCashierOrders(modifiedSince ? { modifiedSince } : undefined);
       if (isMountedRef.current) {
-        setOrders(result.items || []);
+        if (modifiedSince && result.items && result.items.length > 0) {
+          // Incremental update: merge new/updated orders
+          console.log(`📦 Polling: Found ${result.items.length} new/updated orders`);
+          setOrders((prev) => {
+            const newOrders = [...prev];
+            for (const order of result.items) {
+              const existingIndex = newOrders.findIndex(o => o.id === order.id);
+              if (existingIndex >= 0) {
+                newOrders[existingIndex] = order; // Update existing
+              } else {
+                newOrders.unshift(order); // Add new at start
+              }
+            }
+            return newOrders;
+          });
+        } else if (!modifiedSince) {
+          // Full refresh
+          setOrders(result.items || []);
+        }
+        lastPolledAtRef.current = new Date();
         setIsLoading(false);
       }
     } catch (err) {
@@ -323,9 +347,9 @@ export function useCashierOrders(): UseCashierOrdersReturn {
             }
           }, backoffMs);
         } else {
-          console.warn('⚠️ SSE: Max reconnect attempts reached, falling back to polling');
-          setError('Real-time updates unavailable - using polling');
-          setupPolling();
+          console.warn('⚠️ SSE: Max reconnect attempts reached, continuing with polling only');
+          setError('Real-time SSE unavailable - using polling (every 5s)');
+          // No need to setupPolling - primary polling is already running
         }
       };
 
@@ -375,37 +399,38 @@ export function useCashierOrders(): UseCashierOrdersReturn {
       if (isMountedRef.current) {
         setIsConnected(false);
         setConnectionState('error');
-        setError('Failed to establish SSE connection');
-        setupPolling();
+        setError('SSE unavailable - using polling (every 5s)');
+        // No need to setupPolling - primary polling is already running
       }
     }
   }, [cleanupSSE]); // Minimal dependencies
 
   /**
-   * Setup polling fallback (every 10 seconds)
+   * Start primary polling mechanism (runs ALWAYS, not just as fallback)
    */
-  const setupPolling = useCallback(() => {
-    if (!isMountedRef.current) return;
+  const startPrimaryPolling = useCallback(() => {
+    if (primaryPollingIntervalRef.current) return; // Already running
     
-    setIsConnected(false);
-    setConnectionState('disconnected');
-
-    const pollOrders = async () => {
+    console.log('🔄 Starting PRIMARY polling (every 5s)');
+    
+    primaryPollingIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
       
-      try {
-        await refreshOrders();
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-      
-      if (isMountedRef.current) {
-        pollingTimeoutRef.current = setTimeout(pollOrders, 10000);
-      }
-    };
-
-    pollOrders();
+      // Use modifiedSince for efficient incremental updates
+      const since = lastPolledAtRef.current;
+      refreshOrders(since || undefined);
+    }, POLLING_INTERVAL_MS);
   }, [refreshOrders]);
+
+  /**
+   * Stop primary polling
+   */
+  const stopPrimaryPolling = useCallback(() => {
+    if (primaryPollingIntervalRef.current) {
+      clearInterval(primaryPollingIntervalRef.current);
+      primaryPollingIntervalRef.current = null;
+    }
+  }, []);
 
   /**
    * Handle visibility change - reconnect when tab becomes visible
@@ -472,28 +497,37 @@ export function useCashierOrders(): UseCashierOrdersReturn {
   }, [connectToSSE, refreshOrders]);
 
   /**
-   * Initialize SSE connection and handle cleanup
+   * Initialize polling (primary) and SSE (enhancement) connections
    */
   useEffect(() => {
     console.log('🔌 Initializing cashier orders hook...');
     isMountedRef.current = true;
     
-    // Initial fetch
+    // Initial full fetch
     refreshOrders();
 
-    // Delay SSE connection slightly to ensure component is fully mounted
-    // This also helps with React StrictMode double-render
-    const connectionTimeout = setTimeout(() => {
+    // Start PRIMARY polling mechanism (guaranteed order delivery every 5s)
+    const pollingStartTimeout = setTimeout(() => {
       if (isMountedRef.current) {
-        console.log('🔌 Attempting initial SSE connection...');
+        startPrimaryPolling();
+      }
+    }, 100);
+
+    // Start SSE as optional ENHANCEMENT (provides instant updates when working)
+    // Delay slightly to ensure component is fully mounted
+    const sseTimeout = setTimeout(() => {
+      if (isMountedRef.current) {
+        console.log('🔌 Attempting SSE connection (enhancement)...');
         connectToSSE();
       }
-    }, 250);
+    }, 500);
 
     return () => {
       console.log('🔌 Cleaning up cashier orders hook...');
       isMountedRef.current = false;
-      clearTimeout(connectionTimeout);
+      clearTimeout(pollingStartTimeout);
+      clearTimeout(sseTimeout);
+      stopPrimaryPolling();
       cleanupSSE();
       if (pollingTimeoutRef.current) {
         clearTimeout(pollingTimeoutRef.current);
