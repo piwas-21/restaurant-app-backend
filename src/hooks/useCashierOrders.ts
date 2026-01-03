@@ -338,7 +338,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
         const lastEvent = lastEventTimeRef.current;
         const currentEventSource = eventSourceRef.current;
         
-        // Check if connection is actually open
+        // 1. Check if connection is closed or null
         if (!currentEventSource || currentEventSource.readyState === EventSource.CLOSED) {
           console.warn('⚠️ SSE: Connection closed, reconnecting...');
           reconnectAttemptRef.current = 0;
@@ -346,8 +346,21 @@ export function useCashierOrders(): UseCashierOrdersReturn {
           return;
         }
 
-        // Check for silence timeout
-        if (lastEvent) {
+        // 2. Check if stuck in CONNECTING state (0) for too long
+        // If we are connecting but haven't received 'connected' event or any data
+        if (currentEventSource.readyState === EventSource.CONNECTING) {
+             const connectingDuration = Date.now() - lastReconnectTimeRef.current;
+             // If connecting for more than 15 seconds, assume stuck
+             if (connectingDuration > 15000) {
+                 console.warn(`⚠️ SSE: Stuck in CONNECTING state for ${Math.round(connectingDuration/1000)}s, forcing reconnect...`);
+                 eventSourceRef.current?.close(); // Force close
+                 connectToSSE();
+                 return;
+             }
+        }
+
+        // 3. Check for silence timeout (only if OPEN/connected)
+        if (currentEventSource.readyState === EventSource.OPEN && lastEvent) {
           const silenceMs = Date.now() - lastEvent.getTime();
           if (silenceMs > MAX_SILENCE_MS) {
             console.warn(`⚠️ SSE: No events for ${Math.round(silenceMs / 1000)}s, reconnecting...`);
