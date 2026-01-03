@@ -32,10 +32,10 @@ interface UseCashierOrdersReturn {
   ) => Promise<OrderDto>;
 }
 
-// Health check interval (30 seconds)
-const HEALTH_CHECK_INTERVAL_MS = 30000;
-// Maximum time without any event before considering connection dead (60 seconds - slightly more than 4 heartbeats)
-const MAX_SILENCE_MS = 60000;
+// Health check interval (20 seconds for more frequent monitoring)
+const HEALTH_CHECK_INTERVAL_MS = 20000;
+// Maximum time without any event before considering connection dead (35 seconds - allows for 3+ missed heartbeats)
+const MAX_SILENCE_MS = 35000;
 // Minimum time between reconnection attempts (prevents rapid reconnects)
 const MIN_RECONNECT_INTERVAL_MS = 2000;
 
