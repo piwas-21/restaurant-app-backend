@@ -56,6 +56,42 @@ public class OrdersController : ControllerBase
     }
 
     /// <summary>
+    /// Get confirmed orders for printer apps (no authentication required)
+    /// This endpoint is specifically for internal printer applications to poll for orders to print.
+    /// Only returns orders with status "Confirmed" that were modified since the given timestamp.
+    /// </summary>
+    [HttpGet("printer-feed")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<PagedResult<OrderDto>>>> GetPrinterFeed(
+        [FromQuery] DateTime? modifiedSince)
+    {
+        _logger.LogInformation("🖨️ Printer feed request - modifiedSince: {Since}", modifiedSince);
+        
+        var query = new GetOrdersQuery(
+            Status: "Confirmed",
+            PaymentStatus: null,
+            OrderType: null,
+            StartDate: null,
+            EndDate: null,
+            UserId: null,
+            Search: null,
+            IsFocusOrder: null,
+            ModifiedSince: modifiedSince,
+            OrderBy: "OrderDate",
+            Descending: true,
+            Page: 1,
+            PageSize: 50  // Return up to 50 orders at a time
+        );
+        
+        var result = await _mediator.SendQuery(query);
+        
+        _logger.LogInformation("🖨️ Printer feed returning {Count} orders", 
+            result.Data?.Items?.Count ?? 0);
+        
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Get all orders with optional filters
     /// </summary>
     [HttpPost("tryEvent")]
