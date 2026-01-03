@@ -82,7 +82,7 @@ public class EventsController : ControllerBase
             Status = "Pending",
             Type = "Delivery",
             CustomerName = "Test Customer",
-            TotalAmount = 99.99m,
+            RemainingAmount = 99.99m,
             OrderDate = DateTime.UtcNow
         };
 
