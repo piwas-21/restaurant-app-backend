@@ -20,6 +20,7 @@ public record GetOrdersQuery(
     Guid? UserId,
     string? Search,
     bool? IsFocusOrder,
+    DateTime? ModifiedSince = null,  // For efficient polling - returns orders modified after this timestamp
     string? OrderBy = "OrderDate",
     bool Descending = true,
     int Page = 1,
@@ -105,6 +106,15 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
         if (query.IsFocusOrder.HasValue)
         {
             ordersQuery = ordersQuery.Where(o => o.IsFocusOrder == query.IsFocusOrder.Value);
+        }
+
+        // ModifiedSince filter - returns orders created or updated after the timestamp
+        // Used for efficient polling to only fetch new/changed orders
+        if (query.ModifiedSince.HasValue)
+        {
+            ordersQuery = ordersQuery.Where(o => 
+                o.CreatedAt > query.ModifiedSince.Value || 
+                (o.UpdatedAt.HasValue && o.UpdatedAt.Value > query.ModifiedSince.Value));
         }
 
         if (!string.IsNullOrEmpty(query.Search))
