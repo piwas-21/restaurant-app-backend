@@ -20,7 +20,7 @@ import {
 import { OrderDto } from '@/types/order';
 import styles from './OrderDetails.module.css';
 import { getPaymentMethodLabel } from '@/utils/paymentMethodDisplay';
-import { exportKitchenItemsToPDF } from '@/utils/pdfExportUtils';
+import { exportOrderToPDF, exportKitchenItemsToPDF } from '@/utils/pdfExportUtils';
 
 interface OrderDetailsProps {
   order: OrderDto | null;
@@ -363,7 +363,7 @@ export default function OrderDetails({
         <div className={styles.actionBarGrid}>
           <button
             className={`${styles.actionButton} ${styles.actionButtonInfo}`}
-            onClick={() => exportKitchenItemsToPDF(order, 'All', t)}
+            onClick={() => exportOrderToPDF(order, t)}
           >
             <Printer size={16} />
             {t('cashier.print_bill', 'Print Bill')}
