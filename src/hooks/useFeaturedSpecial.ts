@@ -75,6 +75,7 @@ export function useFeaturedSpecial() {
         specialInstructions: customization.specialInstructions,
         selectedIngredients: customization.selectedIngredients,
         excludedIngredients: customization.excludedIngredients,
+        ingredientQuantities: customization.ingredientQuantities,
         selectedSideItems: customization.selectedSideItems,
       });
 
