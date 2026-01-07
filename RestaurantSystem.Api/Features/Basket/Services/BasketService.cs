@@ -411,10 +411,40 @@ public class BasketService : IBasketService
                 }
 
                 // Serialize ingredient quantities to JSON
+                // Build from selectedIngredients if ingredientQuantities wasn't provided
                 string? ingredientQuantitiesJson = null;
                 if (item.IngredientQuantities != null && item.IngredientQuantities.Count > 0)
                 {
                     ingredientQuantitiesJson = JsonSerializer.Serialize(item.IngredientQuantities);
+                }
+                else if (product.DetailedIngredients != null && product.DetailedIngredients.Any())
+                {
+                    // Build ingredientQuantities from selectedIngredients
+                    // This ensures kitchen prints can show "NO xxx" for deselected ingredients
+                    var selectedIngredientIds = item.SelectedIngredients ?? new List<Guid>();
+                    var builtQuantities = new Dictionary<Guid, int>();
+                    
+                    foreach (var ingredient in product.DetailedIngredients.Where(i => i.IsActive))
+                    {
+                        bool isSelected = selectedIngredientIds.Contains(ingredient.Id);
+                        
+                        if (isSelected)
+                        {
+                            // Selected ingredient: quantity 1 (or from ingredientQuantities if provided)
+                            builtQuantities[ingredient.Id] = 1;
+                        }
+                        else if (ingredient.IsOptional || ingredient.IsIncludedInBasePrice)
+                        {
+                            // Optional ingredient not selected: mark as deselected (quantity 0)
+                            builtQuantities[ingredient.Id] = 0;
+                        }
+                        // Non-optional ingredients that are not selected are implicitly included
+                    }
+                    
+                    if (builtQuantities.Count > 0)
+                    {
+                        ingredientQuantitiesJson = JsonSerializer.Serialize(builtQuantities);
+                    }
                 }
 
                 // Create new basket item

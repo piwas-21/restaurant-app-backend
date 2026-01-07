@@ -92,7 +92,24 @@ public class OrderMappingService : IOrderMappingService
     {
         // Parse ingredient customizations
         List<OrderItemIngredientDto>? ingredientCustomizations = null;
-        if (!string.IsNullOrEmpty(item.IngredientQuantitiesJson) && item.Product?.DetailedIngredients != null)
+        
+        // Get product ingredients - either from direct Product or from Menu's first MenuItem's Product
+        ICollection<ProductIngredient>? productIngredients = null;
+        if (item.Product?.DetailedIngredients != null)
+        {
+            productIngredients = item.Product.DetailedIngredients;
+        }
+        else if (item.Menu?.MenuItems?.Any() == true)
+        {
+            // For menu items (e.g., Chief's Special), get ingredients from the menu's product
+            var firstMenuItem = item.Menu.MenuItems.FirstOrDefault();
+            if (firstMenuItem?.Product?.DetailedIngredients != null)
+            {
+                productIngredients = firstMenuItem.Product.DetailedIngredients;
+            }
+        }
+        
+        if (!string.IsNullOrEmpty(item.IngredientQuantitiesJson) && productIngredients != null)
         {
             try
             {
@@ -100,9 +117,6 @@ public class OrderMappingService : IOrderMappingService
                 if (selectedIngredients != null && selectedIngredients.Any())
                 {
                     ingredientCustomizations = new List<OrderItemIngredientDto>();
-                    
-                    // Get all product ingredients
-                    var productIngredients = item.Product.DetailedIngredients.ToList();
                     
                     // Map ingredient customizations
                     // Show all ingredients for kitchen (both selected and removed)
@@ -138,6 +152,14 @@ public class OrderMappingService : IOrderMappingService
                 _logger.LogWarning(ex, "Failed to parse ingredient quantities for order item {ItemId}", item.Id);
             }
         }
+        
+        // Get KitchenType from Product or Menu's first MenuItem's Product
+        string? kitchenType = item.Product?.KitchenType.ToString();
+        if (kitchenType == null && item.Menu?.MenuItems?.Any() == true)
+        {
+            var firstMenuItem = item.Menu.MenuItems.FirstOrDefault();
+            kitchenType = firstMenuItem?.Product?.KitchenType.ToString();
+        }
 
         // Map child items (side items/additionals)
         List<OrderItemDto>? sideItems = null;
@@ -158,7 +180,7 @@ public class OrderMappingService : IOrderMappingService
             UnitPrice = item.UnitPrice,
             ItemTotal = item.ItemTotal,
             SpecialInstructions = item.SpecialInstructions,
-            KitchenType = item.Product?.KitchenType.ToString(),
+            KitchenType = kitchenType,
             IngredientCustomizations = ingredientCustomizations,
             SideItems = sideItems
         };
@@ -214,14 +236,60 @@ public class OrderMappingService : IOrderMappingService
             await _context.Entry(order).Collection(o => o.Items).LoadAsync(cancellationToken);
         }
 
-        // Load Product for each item to access KitchenType
+        // Load Product for each item to access KitchenType and DetailedIngredients
         if (order.Items != null)
         {
             foreach (var item in order.Items)
             {
-                if (!_context.Entry(item).Reference(i => i.Product).IsLoaded)
+                // Load Product for regular product items
+                if (item.ProductId.HasValue && !_context.Entry(item).Reference(i => i.Product).IsLoaded)
                 {
                     await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
+                    
+                    // Load DetailedIngredients with GlobalIngredient for ingredient names
+                    if (item.Product != null && !_context.Entry(item.Product).Collection(p => p.DetailedIngredients).IsLoaded)
+                    {
+                        await _context.Entry(item.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
+                        foreach (var ing in item.Product.DetailedIngredients)
+                        {
+                            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
+                            {
+                                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
+                            }
+                        }
+                    }
+                }
+                
+                // Load Menu and its Product for menu items (e.g., Chief's Special)
+                if (item.MenuId.HasValue && !_context.Entry(item).Reference(i => i.Menu).IsLoaded)
+                {
+                    await _context.Entry(item).Reference(i => i.Menu).LoadAsync(cancellationToken);
+                    
+                    if (item.Menu != null && !_context.Entry(item.Menu).Collection(m => m.MenuItems).IsLoaded)
+                    {
+                        await _context.Entry(item.Menu).Collection(m => m.MenuItems).LoadAsync(cancellationToken);
+                        
+                        // Load Product and DetailedIngredients for each menu item
+                        foreach (var menuItem in item.Menu.MenuItems)
+                        {
+                            if (!_context.Entry(menuItem).Reference(mi => mi.Product).IsLoaded)
+                            {
+                                await _context.Entry(menuItem).Reference(mi => mi.Product).LoadAsync(cancellationToken);
+                            }
+                            
+                            if (menuItem.Product != null && !_context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).IsLoaded)
+                            {
+                                await _context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
+                                foreach (var ing in menuItem.Product.DetailedIngredients)
+                                {
+                                    if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
+                                    {
+                                        await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
