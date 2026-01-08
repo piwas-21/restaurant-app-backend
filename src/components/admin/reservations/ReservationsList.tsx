@@ -9,11 +9,13 @@ interface ReservationsListProps {
   onToggleSelection: (id: string) => void;
   onConfirm: (id: string) => void;
   onCancel: (id: string) => void;
+  onDelete: (id: string) => void;
   tableLabel: string;
   guestsLabel: string;
   specialRequestsLabel: string;
   confirmLabel: string;
   cancelLabel: string;
+  deleteLabel: string;
 }
 
 export const ReservationsList: React.FC<ReservationsListProps> = ({
@@ -22,11 +24,13 @@ export const ReservationsList: React.FC<ReservationsListProps> = ({
   onToggleSelection,
   onConfirm,
   onCancel,
+  onDelete,
   tableLabel,
   guestsLabel,
   specialRequestsLabel,
   confirmLabel,
   cancelLabel,
+  deleteLabel,
 }) => {
   return (
     <div className={styles.reservationsList}>
@@ -38,11 +42,13 @@ export const ReservationsList: React.FC<ReservationsListProps> = ({
           onToggleSelection={onToggleSelection}
           onConfirm={onConfirm}
           onCancel={onCancel}
+          onDelete={onDelete}
           tableLabel={tableLabel}
           guestsLabel={guestsLabel}
           specialRequestsLabel={specialRequestsLabel}
           confirmLabel={confirmLabel}
           cancelLabel={cancelLabel}
+          deleteLabel={deleteLabel}
         />
       ))}
     </div>

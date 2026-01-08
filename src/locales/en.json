@@ -2010,5 +2010,11 @@
   "confirm_now": "Confirm Now",
   "or": "or",
   "confirm_with_prep_time": "Confirm with preparation time:",
-  "customer_notification_info": "The customer will be notified automatically after you take action."
+  "customer_notification_info": "The customer will be notified automatically after you take action.",
+  "delete_reservation": "Delete",
+  "confirm_delete_reservation": "Are you sure you want to permanently delete this reservation? This action cannot be undone.",
+  "reservation_deleted_success": "Reservation deleted successfully",
+  "failed_to_delete_reservation": "Failed to delete reservation",
+  "confirm_bulk_delete": "Permanently delete {{count}} reservations?",
+  "bulk_delete_success": "Deleted {{success}} of {{total}} reservations"
 }

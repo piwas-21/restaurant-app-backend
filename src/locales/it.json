@@ -2015,5 +2015,11 @@
   "confirm_now": "Conferma ora",
   "or": "oppure",
   "confirm_with_prep_time": "Conferma con tempo di preparazione:",
-  "customer_notification_info": "Il cliente verrà notificato automaticamente dopo che avrai effettuato un’azione."
+  "customer_notification_info": "Il cliente verrà notificato automaticamente dopo che avrai effettuato un’azione.",
+  "delete_reservation": "Elimina",
+  "confirm_delete_reservation": "Sei sicuro di voler eliminare definitivamente questa prenotazione? Questa azione non può essere annullata.",
+  "reservation_deleted_success": "Prenotazione eliminata con successo",
+  "failed_to_delete_reservation": "Impossibile eliminare la prenotazione",
+  "confirm_bulk_delete": "Eliminare definitivamente {{count}} prenotazioni?",
+  "bulk_delete_success": "Eliminate {{success}} di {{total}} prenotazioni"
 }

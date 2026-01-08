@@ -199,6 +199,14 @@ export const reservationService = {
     }
   },
 
+  async deleteReservation(id: string): Promise<void> {
+    const response = await apiClient.delete<ApiResponse<boolean>>(`/api/reservations/${id}`);
+
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to delete reservation');
+    }
+  },
+
   // Helper functions
   formatTimeSlot(startTime: string, endTime: string): string {
     // Convert "HH:mm:ss" format to "HH:mm"

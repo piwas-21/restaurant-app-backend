@@ -2015,5 +2015,11 @@
   "confirm_now": "Confirmer maintenant",
   "or": "ou",
   "confirm_with_prep_time": "Confirmer avec le temps de préparation :",
-  "customer_notification_info": "Le client sera automatiquement informé après votre action."
+  "customer_notification_info": "Le client sera automatiquement informé après votre action.",
+  "delete_reservation": "Supprimer",
+  "confirm_delete_reservation": "Êtes-vous sûr de vouloir supprimer définitivement cette réservation ? Cette action est irréversible.",
+  "reservation_deleted_success": "Réservation supprimée avec succès",
+  "failed_to_delete_reservation": "Échec de la suppression de la réservation",
+  "confirm_bulk_delete": "Supprimer définitivement {{count}} réservations ?",
+  "bulk_delete_success": "{{success}} réservations supprimées sur {{total}}"
 }

@@ -2010,5 +2010,11 @@
   "confirm_now": "Şimdi onayla",
   "or": "veya",
   "confirm_with_prep_time": "Hazırlık süresiyle onayla:",
-  "customer_notification_info": "Bir işlem yaptıktan sonra müşteri otomatik olarak bilgilendirilecektir."
+  "customer_notification_info": "Bir işlem yaptıktan sonra müşteri otomatik olarak bilgilendirilecektir.",
+  "delete_reservation": "Sil",
+  "confirm_delete_reservation": "Bu rezervasyonu kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+  "reservation_deleted_success": "Rezervasyon başarıyla silindi",
+  "failed_to_delete_reservation": "Rezervasyon silinemedi",
+  "confirm_bulk_delete": "{{count}} rezervasyonu kalıcı olarak sil?",
+  "bulk_delete_success": "{{total}} rezervasyondan {{success}} tanesi silindi"
 }

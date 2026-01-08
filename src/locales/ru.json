@@ -1955,5 +1955,11 @@
   "confirm_now": "Подтвердить сейчас",
   "or": "или",
   "confirm_with_prep_time": "Подтвердить с временем приготовления:",
-  "customer_notification_info": "Клиент будет автоматически уведомлён после вашего действия."
+  "customer_notification_info": "Клиент будет автоматически уведомлён после вашего действия.",
+  "delete_reservation": "Удалить",
+  "confirm_delete_reservation": "Вы уверены, что хотите безвозвратно удалить это бронирование? Это действие нельзя отменить.",
+  "reservation_deleted_success": "Бронирование успешно удалено",
+  "failed_to_delete_reservation": "Не удалось удалить бронирование",
+  "confirm_bulk_delete": "Удалить безвозвратно {{count}} бронирований?",
+  "bulk_delete_success": "Удалено {{success}} из {{total}} бронирований"
 }

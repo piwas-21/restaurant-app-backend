@@ -166,6 +166,7 @@
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -178,7 +179,8 @@
 }
 
 .confirmButton,
-.cancelButton {
+.cancelButton,
+.deleteButton {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -210,6 +212,16 @@
 
 .cancelButton:hover {
   background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.deleteButton {
+  background: #6b7280;
+  color: white;
+}
+
+.deleteButton:hover {
+  background: #4b5563;
   transform: translateY(-1px);
 }
 

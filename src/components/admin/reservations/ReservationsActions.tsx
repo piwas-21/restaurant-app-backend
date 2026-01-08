@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileText, Check, X } from 'lucide-react';
+import { Download, FileText, Check, X, Trash2 } from 'lucide-react';
 import styles from './ReservationsActions.module.css';
 
 interface ReservationsActionsProps {
@@ -8,12 +8,14 @@ interface ReservationsActionsProps {
   onExportPDF: () => void;
   onBulkConfirm: () => void;
   onBulkCancel: () => void;
+  onBulkDelete: () => void;
   onClearSelection: () => void;
   exportCSVLabel: string;
   exportPDFLabel: string;
   selectedLabel: string;
   confirmSelectedLabel: string;
   cancelSelectedLabel: string;
+  deleteSelectedLabel: string;
   clearSelectionLabel: string;
 }
 
@@ -23,12 +25,14 @@ export const ReservationsActions: React.FC<ReservationsActionsProps> = ({
   onExportPDF,
   onBulkConfirm,
   onBulkCancel,
+  onBulkDelete,
   onClearSelection,
   exportCSVLabel,
   exportPDFLabel,
   selectedLabel,
   confirmSelectedLabel,
   cancelSelectedLabel,
+  deleteSelectedLabel,
   clearSelectionLabel,
 }) => {
   return (
@@ -56,6 +60,10 @@ export const ReservationsActions: React.FC<ReservationsActionsProps> = ({
           <button onClick={onBulkCancel} className={styles.bulkCancelButton}>
             <X size={16} />
             {cancelSelectedLabel}
+          </button>
+          <button onClick={onBulkDelete} className={styles.bulkDeleteButton}>
+            <Trash2 size={16} />
+            {deleteSelectedLabel}
           </button>
           <button onClick={onClearSelection} className={styles.clearSelectionButton}>
             {clearSelectionLabel}

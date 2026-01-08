@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, MapPin, Users, Check, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Check, X, Trash2 } from 'lucide-react';
 import { ReservationDto, ReservationStatus } from '@/types/reservation';
 import { reservationService } from '@/services/reservationService';
 import styles from './ReservationCard.module.css';
@@ -10,11 +10,13 @@ interface ReservationCardProps {
   onToggleSelection: (id: string) => void;
   onConfirm: (id: string) => void;
   onCancel: (id: string) => void;
+  onDelete: (id: string) => void;
   tableLabel: string;
   guestsLabel: string;
   specialRequestsLabel: string;
   confirmLabel: string;
   cancelLabel: string;
+  deleteLabel: string;
 }
 
 export const ReservationCard: React.FC<ReservationCardProps> = ({
@@ -23,11 +25,13 @@ export const ReservationCard: React.FC<ReservationCardProps> = ({
   onToggleSelection,
   onConfirm,
   onCancel,
+  onDelete,
   tableLabel,
   guestsLabel,
   specialRequestsLabel,
   confirmLabel,
   cancelLabel,
+  deleteLabel,
 }) => {
   const statusLabel = reservationService.getStatusLabel(reservation.status) || 'pending';
   const dataStatus = statusLabel.toLowerCase().replace(/\s+/g, '');
@@ -152,6 +156,16 @@ export const ReservationCard: React.FC<ReservationCardProps> = ({
             {cancelLabel}
           </button>
         )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(reservation.id);
+          }}
+          className={styles.deleteButton}
+        >
+          <Trash2 size={16} />
+          {deleteLabel}
+        </button>
       </div>
     </div>
   );

@@ -2014,5 +2014,11 @@
   "confirm_now": "تأكيد الآن",
   "or": "أو",
   "confirm_with_prep_time": "التأكيد مع وقت التحضير:",
-  "customer_notification_info": "سيتم إخطار العميل تلقائيًا بعد اتخاذ الإجراء."
+  "customer_notification_info": "سيتم إخطار العميل تلقائيًا بعد اتخاذ الإجراء.",
+  "delete_reservation": "حذف",
+  "confirm_delete_reservation": "هل أنت متأكد أنك تريد حذف هذا الحجز نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.",
+  "reservation_deleted_success": "تم حذف الحجز بنجاح",
+  "failed_to_delete_reservation": "فشل حذف الحجز",
+  "confirm_bulk_delete": "هل تريد حذف {{count}} حجوزات نهائياً؟",
+  "bulk_delete_success": "تم حذف {{success}} من أصل {{total}} حجوزات"
 }

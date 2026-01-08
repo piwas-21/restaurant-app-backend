@@ -2023,5 +2023,11 @@
   "confirm_now": "Jetzt bestätigen",
   "or": "oder",
   "confirm_with_prep_time": "Bestätigen mit Vorbereitungszeit:",
-  "customer_notification_info": "Der Kunde wird automatisch benachrichtigt, nachdem Sie eine Aktion durchgeführt haben."
+  "customer_notification_info": "Der Kunde wird automatisch benachrichtigt, nachdem Sie eine Aktion durchgeführt haben.",
+  "delete_reservation": "Löschen",
+  "confirm_delete_reservation": "Sind Sie sicher, dass Sie diese Reservierung dauerhaft löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+  "reservation_deleted_success": "Reservierung erfolgreich gelöscht",
+  "failed_to_delete_reservation": "Fehler beim Löschen der Reservierung",
+  "confirm_bulk_delete": "{{count}} Reservierungen dauerhaft löschen?",
+  "bulk_delete_success": "{{success}} von {{total}} Reservierungen gelöscht"
 }

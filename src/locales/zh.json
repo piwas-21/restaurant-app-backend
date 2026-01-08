@@ -2015,5 +2015,11 @@
   "confirm_now": "立即确认",
   "or": "或",
   "confirm_with_prep_time": "确认并设置准备时间：",
-  "customer_notification_info": "在您采取操作后，系统将自动通知客户。"
+  "customer_notification_info": "在您采取操作后，系统将自动通知客户。",
+  "delete_reservation": "删除",
+  "confirm_delete_reservation": "您确定要永久删除此预订吗？此操作无法撤销。",
+  "reservation_deleted_success": "预订已成功删除",
+  "failed_to_delete_reservation": "删除预订失败",
+  "confirm_bulk_delete": "永久删除 {{count}} 个预订？",
+  "bulk_delete_success": "已删除 {{success}} / {{total}} 个预订"
 }

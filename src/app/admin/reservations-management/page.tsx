@@ -166,6 +166,32 @@ export default function AdminReservationsManagementPage() {
     });
   };
 
+  const handleDelete = async (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_delete_reservation', 'Are you sure you want to permanently delete this reservation? This action cannot be undone.'),
+      onConfirm: async () => {
+        setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
+
+        try {
+          await reservationService.deleteReservation(id);
+          setResultModal({
+            isOpen: true,
+            message: t('reservation_deleted_success', 'Reservation deleted successfully'),
+            isSuccess: true
+          });
+          fetchData();
+        } catch (err: any) {
+          setResultModal({
+            isOpen: true,
+            message: err.message || t('failed_to_delete_reservation', 'Failed to delete reservation'),
+            isSuccess: false
+          });
+        }
+      }
+    });
+  };
+
   // Export handlers
   const handleExportCSV = () => {
     const dataToExport = selectedReservationIds.size > 0
@@ -300,6 +326,38 @@ export default function AdminReservationsManagementPage() {
     });
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedReservationIds.size === 0) return;
+
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirm_bulk_delete', `Permanently delete ${selectedReservationIds.size} reservations?`),
+      onConfirm: async () => {
+        setConfirmModal({ isOpen: false, message: '', onConfirm: () => {} });
+
+        let successCount = 0;
+        for (const id of selectedReservationIds) {
+          try {
+            await reservationService.deleteReservation(id);
+            successCount++;
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error(`Failed to delete reservation ${id}:`, err);
+          }
+        }
+
+        setResultModal({
+          isOpen: true,
+          message: t('bulk_delete_success', `Deleted ${successCount} of ${selectedReservationIds.size} reservations`),
+          isSuccess: successCount > 0
+        });
+
+        setSelectedReservationIds(new Set());
+        fetchData();
+      }
+    });
+  };
+
   // Filter handlers that reset pagination
   const handleStatusChange = (status: ReservationStatus | 'All') => {
     setSelectedStatus(status);
@@ -400,12 +458,14 @@ export default function AdminReservationsManagementPage() {
           onExportPDF={handleExportPDF}
           onBulkConfirm={handleBulkConfirm}
           onBulkCancel={handleBulkCancel}
+          onBulkDelete={handleBulkDelete}
           onClearSelection={() => setSelectedReservationIds(new Set())}
           exportCSVLabel={t('export_csv', 'Export CSV')}
           exportPDFLabel={t('export_pdf', 'Export PDF')}
           selectedLabel={t('selected', 'selected')}
           confirmSelectedLabel={t('confirm_selected', 'Confirm')}
           cancelSelectedLabel={t('cancel_selected', 'Cancel')}
+          deleteSelectedLabel={t('delete_selected', 'Delete')}
           clearSelectionLabel={t('clear_selection', 'Clear Selection')}
         />
 
@@ -441,11 +501,13 @@ export default function AdminReservationsManagementPage() {
               onToggleSelection={toggleReservationSelection}
               onConfirm={handleConfirm}
               onCancel={handleCancel}
+              onDelete={handleDelete}
               tableLabel={t('table', 'Table')}
               guestsLabel={t('guests', 'guests')}
               specialRequestsLabel={t('special_requests', 'Special Requests')}
               confirmLabel={t('confirm', 'Confirm')}
               cancelLabel={t('cancel', 'Cancel')}
+              deleteLabel={t('delete_reservation', 'Delete')}
             />
           )
         )}
