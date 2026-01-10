@@ -20,4 +20,17 @@ public record TableDto
     // Reservation status
     public bool IsReserved { get; set; }
     public DateTime? ReservedUntil { get; set; }
+    
+    // Order-based occupancy
+    public bool IsOccupied { get; set; }
+    public int ActiveOrderCount { get; set; }
+    public List<TableOccupantDto>? Occupants { get; set; }
+}
+
+public record TableOccupantDto
+{
+    public string? CustomerName { get; set; }
+    public string? OrderNumber { get; set; }
+    public DateTime OrderDate { get; set; }
+    public bool IsLoggedInUser { get; set; }
 }

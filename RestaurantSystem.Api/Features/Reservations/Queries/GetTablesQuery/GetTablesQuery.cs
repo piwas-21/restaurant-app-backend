@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Reservations.Queries.GetTablesQuery;
@@ -39,6 +40,38 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
             }
 
             var now = DateTime.UtcNow;
+            
+            // Define active order statuses (orders still at table)
+            var activeOrderStatuses = new[] 
+            { 
+                OrderStatus.Pending, 
+                OrderStatus.Confirmed, 
+                OrderStatus.Preparing, 
+                OrderStatus.Ready,
+                OrderStatus.PendingApproval 
+            };
+            
+            // Get active dine-in orders grouped by table number
+            var activeOrdersByTable = await _context.Orders
+                .Where(o => o.TableNumber != null 
+                    && o.Type == OrderType.DineIn
+                    && activeOrderStatuses.Contains(o.Status)
+                    && !o.IsDeleted)
+                .GroupBy(o => o.TableNumber!.Value)
+                .Select(g => new 
+                {
+                    TableNumber = g.Key.ToString(),
+                    OrderCount = g.Count(),
+                    Occupants = g.Select(o => new TableOccupantDto 
+                    {
+                        CustomerName = o.CustomerName,
+                        OrderNumber = o.OrderNumber,
+                        OrderDate = o.OrderDate,
+                        IsLoggedInUser = o.UserId != null
+                    }).ToList()
+                })
+                .ToDictionaryAsync(x => x.TableNumber, cancellationToken);
+            
             var tables = await tablesQuery
                 .OrderBy(t => t.TableNumber)
                 .Select(t => new TableDto
@@ -69,6 +102,23 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                         .FirstOrDefault()
                 })
                 .ToListAsync(cancellationToken);
+            
+            // Populate order-based occupancy for each table
+            foreach (var table in tables)
+            {
+                if (activeOrdersByTable.TryGetValue(table.TableNumber, out var orderInfo))
+                {
+                    table.IsOccupied = true;
+                    table.ActiveOrderCount = orderInfo.OrderCount;
+                    table.Occupants = orderInfo.Occupants;
+                }
+                else
+                {
+                    table.IsOccupied = false;
+                    table.ActiveOrderCount = 0;
+                    table.Occupants = null;
+                }
+            }
 
             return ApiResponse<List<TableDto>>.SuccessWithData(tables);
         }
