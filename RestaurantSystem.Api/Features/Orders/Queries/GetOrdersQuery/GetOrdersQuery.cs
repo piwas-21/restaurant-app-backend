@@ -72,10 +72,24 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
             ordersQuery = ordersQuery.Where(o => o.UserId == _currentUserService.UserId.Value);
         }
 
-        // Apply filters
-        if (!string.IsNullOrEmpty(query.Status) && Enum.TryParse<OrderStatus>(query.Status, out var status))
+        // Apply filters - handle comma-separated status values
+        if (!string.IsNullOrEmpty(query.Status))
         {
-            ordersQuery = ordersQuery.Where(o => o.Status == status);
+            var statusStrings = query.Status.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            var statuses = new List<OrderStatus>();
+            
+            foreach (var s in statusStrings)
+            {
+                if (Enum.TryParse<OrderStatus>(s.Trim(), out var parsedStatus))
+                {
+                    statuses.Add(parsedStatus);
+                }
+            }
+            
+            if (statuses.Count > 0)
+            {
+                ordersQuery = ordersQuery.Where(o => statuses.Contains(o.Status));
+            }
         }
 
         if (!string.IsNullOrEmpty(query.PaymentStatus) && Enum.TryParse<PaymentStatus>(query.PaymentStatus, out var paymentStatus))

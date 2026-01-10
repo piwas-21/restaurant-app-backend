@@ -11,7 +11,7 @@ namespace RestaurantSystem.Api.Features.FidelityPoints.Controllers;
 
 [ApiController]
 [Route("api/admin/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Server")]
 public class CustomerDiscountsController : ControllerBase
 {
     private readonly ICustomerDiscountService _discountService;
@@ -144,9 +144,10 @@ public class CustomerDiscountsController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new customer discount rule
+    /// Create a new customer discount rule (Admin only)
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<CustomerDiscountRuleDto>), 201)]
     public async Task<IActionResult> Create(
         [FromBody] CreateCustomerDiscountRuleDto dto,
@@ -220,9 +221,10 @@ public class CustomerDiscountsController : ControllerBase
     }
 
     /// <summary>
-    /// Update an existing customer discount rule
+    /// Update an existing customer discount rule (Admin only)
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<CustomerDiscountRuleDto>), 200)]
     public async Task<IActionResult> Update(
         Guid id,
@@ -292,9 +294,10 @@ public class CustomerDiscountsController : ControllerBase
     }
 
     /// <summary>
-    /// Delete (deactivate) a customer discount rule
+    /// Delete (deactivate) a customer discount rule (Admin only)
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), 200)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {

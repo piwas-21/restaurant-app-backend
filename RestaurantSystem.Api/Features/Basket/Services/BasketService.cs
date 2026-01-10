@@ -47,24 +47,17 @@ public class BasketService : IBasketService
 
     public async Task<BasketDto?> GetBasketAsync(string sessionId, Guid? userId = null)
     {
-        // Try to get from cache first
-        var cacheKey = GetCacheKey(sessionId, userId);
-        var cachedBasket = await _cache.GetStringAsync(cacheKey);
-
-        if (!string.IsNullOrEmpty(cachedBasket))
-        {
-            return JsonSerializer.Deserialize<BasketDto>(cachedBasket);
-        }
-
-        // Get from database
+        // IMPORTANT: Caching disabled to fix race condition where stale basket data
+        // could be cached during concurrent add/update operations.
+        // The basket query is fast enough (indexed by session/user ID) that
+        // caching provides minimal benefit but creates significant consistency issues.
+        
+        // Get fresh data from database
         var basket = await GetBasketFromDatabase(sessionId, userId);
         if (basket == null)
             return null;
 
         var basketDto = await MapToBasketDtoAsync(basket);
-
-        // Cache the result
-        await CacheBasketAsync(cacheKey, basketDto);
 
         return basketDto;
     }
@@ -784,6 +777,8 @@ public class BasketService : IBasketService
     private async Task<Domain.Entities.Basket?> GetBasketFromDatabase(string? sessionId, Guid? userId)
     {
         var query = _context.Baskets
+            .AsNoTracking() // Ensure fresh data without EF Core tracking interference
+            .AsSplitQuery() // Prevent cartesian explosion with multiple Includes
             .Include(b => b.Items)
                 .ThenInclude(bi => bi.Product)
                     .ThenInclude(p => p.DetailedIngredients)

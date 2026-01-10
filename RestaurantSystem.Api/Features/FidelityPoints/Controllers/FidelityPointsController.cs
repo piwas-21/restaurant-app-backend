@@ -68,6 +68,44 @@ public class FidelityPointsController : ControllerBase
     }
 
     /// <summary>
+    /// Get a specific user's fidelity points balance (Staff only)
+    /// </summary>
+    [HttpGet("balance/{userId:guid}")]
+    [Authorize(Roles = "Admin,Chef,Server")]
+    [ProducesResponseType(typeof(ApiResponse<FidelityPointBalanceDto>), 200)]
+    public async Task<IActionResult> GetUserBalance(Guid userId, CancellationToken cancellationToken)
+    {
+        var balance = await _fidelityPointsService.GetUserBalanceAsync(userId, cancellationToken);
+
+        if (balance == null)
+        {
+            // Return zero balance if user doesn't have one yet
+            var emptyBalance = new FidelityPointBalanceDto
+            {
+                Id = Guid.Empty,
+                UserId = userId,
+                CurrentPoints = 0,
+                TotalEarnedPoints = 0,
+                TotalRedeemedPoints = 0,
+                LastUpdated = DateTime.UtcNow
+            };
+            return Ok(ApiResponse<FidelityPointBalanceDto>.SuccessWithData(emptyBalance));
+        }
+
+        var dto = new FidelityPointBalanceDto
+        {
+            Id = balance.Id,
+            UserId = balance.UserId,
+            CurrentPoints = balance.CurrentPoints,
+            TotalEarnedPoints = balance.TotalEarnedPoints,
+            TotalRedeemedPoints = balance.TotalRedeemedPoints,
+            LastUpdated = balance.LastUpdated
+        };
+
+        return Ok(ApiResponse<FidelityPointBalanceDto>.SuccessWithData(dto));
+    }
+
+    /// <summary>
     /// Get current user's fidelity points transaction history
     /// </summary>
     [HttpGet("history")]

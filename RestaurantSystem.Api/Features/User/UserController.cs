@@ -34,7 +34,7 @@ public class UserController : ControllerBase
     /// Get all users with optional filters
     /// </summary>
     [HttpGet("users")]
-    [RequireAdmin]
+    [Authorize(Roles = "Admin,Server")]
     public async Task<ActionResult<ApiResponse<PagedResult<UserDto>>>> GetUsers(
         [FromQuery] GetUsersQuery query)
     {

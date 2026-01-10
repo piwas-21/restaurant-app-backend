@@ -78,10 +78,10 @@ public class TablesController : ControllerBase
     }
 
     /// <summary>
-    /// Update a table (Admin only)
+    /// Update a table (Admin and Server can update)
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Server")]
     public async Task<ActionResult<ApiResponse<TableDto>>> UpdateTable(Guid id, [FromBody] UpdateTableDto tableData)
     {
         var command = new UpdateTableCommand(id, tableData);
@@ -150,10 +150,10 @@ public class TablesController : ControllerBase
     }
 
     /// <summary>
-    /// Release a reserved table (Admin only)
+    /// Release a reserved table (Admin and Server)
     /// </summary>
     [HttpPost("{tableNumber}/release")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Server")]
     public async Task<ActionResult<ApiResponse<bool>>> ReleaseTable(string tableNumber)
     {
         var command = new ReleaseTableCommand(tableNumber);
