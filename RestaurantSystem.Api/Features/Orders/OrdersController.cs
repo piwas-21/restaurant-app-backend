@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.AddPaymentToOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
+using RestaurantSystem.Api.Features.Orders.Commands.CompleteAllTableOrdersCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.RefundPaymentCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.ToggleFocusOrderCommand;
@@ -227,6 +228,22 @@ public class OrdersController : ControllerBase
         [FromBody] CancelOrderCommand command)
     {
         command.OrderId = orderId;
+        var result = await _mediator.SendCommand(command);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Complete all active orders for a table (Admin and Server only)
+    /// Intelligently transitions orders based on their status:
+    /// - Ready orders are marked as Completed
+    /// - Non-ready orders (Pending, Confirmed, Preparing) are Cancelled
+    /// </summary>
+    [HttpPost("table/{tableNumber}/complete-all")]
+    [Authorize(Roles = "Admin,Server")]
+    public async Task<ActionResult<ApiResponse<CompleteAllTableOrdersResult>>> CompleteAllTableOrders(
+        string tableNumber)
+    {
+        var command = new CompleteAllTableOrdersCommand(tableNumber);
         var result = await _mediator.SendCommand(command);
         return Ok(result);
     }
