@@ -1,9 +1,6 @@
 import { ZReportDto } from '@/types/order';
 import { printHtmlContent } from './pdfExportUtils';
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount);
-};
+import { formatCurrency } from './currency';
 
 const formatDate = (dateStr: string): string => {
   return new Date(dateStr).toLocaleDateString('de-CH', {

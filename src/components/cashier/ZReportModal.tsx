@@ -6,16 +6,13 @@ import { X, FileBarChart, Printer, Loader2 } from 'lucide-react';
 import { ZReportDto } from '@/types/order';
 import { getZReport } from '@/services/orderService';
 import { exportZReportToPDF } from '@/utils/zReportExportUtils';
+import { formatCurrency } from '@/utils/currency';
 import styles from './ZReportModal.module.css';
 
 interface ZReportModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount);
-};
 
 const getTodayISO = (): string => {
   const now = new Date();

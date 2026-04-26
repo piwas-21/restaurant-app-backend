@@ -177,7 +177,6 @@ export default function CashierHeader({
             className={styles.button}
             onClick={onOpenZReport}
             title={t('cashier.zreport.title') || 'Z-Report'}
-            style={{ backgroundColor: '#1976d2' }}
           >
             <FileBarChart size={16} />
             {t('cashier.zreport.title') || 'Z-Report'}
