@@ -19,6 +19,7 @@ using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries.GetFocusOrdersQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrderByIdQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
+using RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 using Microsoft.Extensions.Options;
@@ -54,6 +55,20 @@ public class OrdersController : ControllerBase
         [FromQuery] GetOrdersQuery query)
     {
         var result = await _mediator.SendQuery(query);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get Z-Report (end-of-day financial summary) for a specific date.
+    /// Date is interpreted as a calendar day in UTC; the report covers
+    /// [date 00:00 UTC, date+1 00:00 UTC). Defaults to today (UTC) if omitted.
+    /// </summary>
+    [HttpGet("z-report")]
+    [RequireAdminOrCashier]
+    public async Task<ActionResult<ApiResponse<ZReportDto>>> GetZReport([FromQuery] DateOnly? date)
+    {
+        var reportDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var result = await _mediator.SendQuery(new GetZReportQuery(reportDate));
         return Ok(result);
     }
 
