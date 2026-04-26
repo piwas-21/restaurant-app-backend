@@ -10,25 +10,34 @@ useDefault = true
 [allowlist]
 description = "Project-specific allowlist for known non-secret patterns"
 
-# Paths that legitimately contain hashed / sample / placeholder credentials
+# Paths that legitimately contain hashed / sample / placeholder credentials.
+# Patterns are anchored on either / or \ to work across Linux (CI) and Windows.
 paths = [
-  '''(?i).*[/\\]test[/\\].*''',
-  '''(?i).*[/\\]TestFixtures[/\\].*''',
-  '''(?i)RestaurantSystem\.IntegrationTests[/\\].*''',
+  # detect-secrets baseline IS a list of known false-positive hashes by design.
+  # Re-scanning it with gitleaks would always fire (every entry is a hash literal).
+  '''^\.secrets\.baseline$''',
+  # Test fixtures + integration tests
+  '''(?i)(^|/)test(s|-fixtures|fixtures)?(/|$)''',
+  '''(?i)(^|/)TestFixtures(/|$)''',
+  '''(?i)(^|/)RestaurantSystem\.IntegrationTests(/|$)''',
   # EF migrations sometimes embed sample seed data with placeholder hashes
-  '''(?i)RestaurantSystem\.Infrastructure[/\\]Persistence[/\\]Migrations[/\\].*''',
+  '''(?i)(^|/)RestaurantSystem\.Infrastructure/Persistence/Migrations(/|$)''',
   # Build output and dependency caches
-  '''bin[/\\].*''',
-  '''obj[/\\].*''',
-  '''node_modules[/\\].*''',
+  '''(^|/)bin(/|$)''',
+  '''(^|/)obj(/|$)''',
+  '''(^|/)node_modules(/|$)''',
 ]
 
 # Specific commits known to contain false-positive hits
 # (add via: gitleaks detect --report-path /tmp/leaks.json then commit hash)
 commits = []
 
-# Known-safe regexes for placeholder values used in dev / docs
+# Known-safe regexes for placeholder values used in dev / docs.
+# These match the literal strings shipped in dev-secrets.sh / templates.
 regexes = [
-  # ASP.NET Core dev-time JWT secret examples (only used in appsettings.Development.json)
+  # Placeholder shipped by scripts/dev-secrets.sh stub for JwtSettings.Secret.
+  # Devs replace this on first setup; it's never a real secret.
+  '''REPLACE_WITH_AT_LEAST_32_CHAR_SECRET''',
   '''YourSecretKeyForDevelopmentMustBeAtLeast32Characters''',
 ]
+
