@@ -147,7 +147,7 @@ public static partial class EmailTemplates
             </div>
 
             <p style='text-align: center; margin: 20px 0; color: #6b7280; font-size: 14px; margin-bottom: 12px; font-weight: 600;'>Or confirm with preparation time:</p>
-            
+
             <div style='text-align: center; margin: 20px 0;'>
                 <a href='{apiBaseUrl}/api/Orders/{orderNumber}/quick-confirm?minutes=15' style='display: inline-block; background: #7fa89bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>15 min</a>
                 <a href='{apiBaseUrl}/api/Orders/{orderNumber}/quick-confirm?minutes=30' style='display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>30 min</a>
@@ -256,7 +256,7 @@ public static partial class EmailTemplates
             </div>
 
             <p style='text-align: center; margin: 20px 0 12px 0; color: #9ca3af; font-size: 14px; font-weight: 500;'>Or confirm with preparation time:</p>
-            
+
             <div style='text-align: center; margin: 12px 0 24px 0;'>
                 <a href='{apiBaseUrl}/api/Orders/{orderNumber}/quick-confirm?minutes=15' style='display: inline-block; background: #6b9688; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>15 min</a>
                 <a href='{apiBaseUrl}/api/Orders/{orderNumber}/quick-confirm?minutes=30' style='display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>30 min</a>

@@ -28,9 +28,9 @@ sast:
 
 include:
   - template: Jobs/SAST.gitlab-ci.yml
-  
 
-# Docker Image building 
+
+# Docker Image building
 
 build_image:
     stage: build
@@ -74,6 +74,3 @@ trivy:
 #     project: restaurant-app3282120/rumi-argocd-gitops
 #     branch: main
 #     strategy: depend
-
-
-

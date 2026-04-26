@@ -11,7 +11,7 @@ public class BasketItem : Entity
     public decimal UnitPrice { get; set; }
     public decimal ItemTotal { get; set; }
     public string? SpecialInstructions { get; set; }
-    
+
     // Customization fields for optional ingredients
     public List<Guid>? SelectedIngredients { get; set; } // IDs of selected optional ingredients
     public List<Guid>? ExcludedIngredients { get; set; } // IDs of default ingredients to exclude
@@ -27,7 +27,7 @@ public class BasketItem : Entity
     public virtual Product? Product { get; set; } = null!;
     public virtual ProductVariation? ProductVariation { get; set; } = null;
     public virtual Menu? Menu { get; set; } = null!;
-    
+
     public Guid? ParentBasketItemId { get; set; }
     public virtual BasketItem? ParentBasketItem { get; set; }
     public virtual ICollection<BasketItem> ChildBasketItems { get; set; } = new List<BasketItem>();

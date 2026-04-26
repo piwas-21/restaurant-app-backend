@@ -37,9 +37,9 @@ public static partial class EmailTemplates
         <div class='content'>
             <h2>Hello {firstName} {lastName},</h2>
             <p>We received a request to delete your Restaurant System account. Your account is scheduled for permanent deletion on <strong>{scheduledDeletionDate:MMMM dd, yyyy}</strong>.</p>
-            
+
             <p>You have two options:</p>
-            
+
             <div style='text-align: center;'>
                 <p><strong>Option 1: Delete Immediately</strong></p>
                 <p>Click the button below to permanently delete your account right now. This action cannot be undone.</p>

@@ -97,7 +97,7 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                 // Default to 20 minutes if not specified
                 var prepMinutes = command.EstimatedPreparationMinutes ?? 20;
                 order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(prepMinutes);
-                
+
                 // Send confirmation email
                 if (!string.IsNullOrEmpty(order.CustomerEmail))
                 {
@@ -140,7 +140,7 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                         var approveUrl = $"{baseUrl}/api/orders/{order.Id}/approve-delay";
                         var rejectUrl = $"{baseUrl}/api/orders/{order.Id}/reject-delay";
 
-                        _logger.LogInformation("Sending order delay email for {OrderNumber}. BackendBaseUrl from config: {BaseUrl}", 
+                        _logger.LogInformation("Sending order delay email for {OrderNumber}. BackendBaseUrl from config: {BaseUrl}",
                             order.OrderNumber, baseUrl);
 
                         await _emailService.SendOrderDelayedEmailAsync(

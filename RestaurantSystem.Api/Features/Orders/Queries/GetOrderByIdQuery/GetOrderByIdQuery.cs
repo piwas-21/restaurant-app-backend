@@ -51,4 +51,3 @@ public class GetOrderByIdQueryHandler : IQueryHandler<GetOrderByIdQuery, ApiResp
         return ApiResponse<OrderDto>.SuccessWithData(orderDto);
     }
 }
-

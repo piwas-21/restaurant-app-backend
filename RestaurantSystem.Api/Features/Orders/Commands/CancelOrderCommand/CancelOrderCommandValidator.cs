@@ -16,4 +16,3 @@ public class CancelOrderCommandValidator : AbstractValidator<CancelOrderCommand>
             .WithMessage("Cancellation reason is required and must be at least 5 characters");
     }
 }
-

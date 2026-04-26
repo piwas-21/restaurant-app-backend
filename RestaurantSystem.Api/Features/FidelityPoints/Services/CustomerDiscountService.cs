@@ -21,14 +21,14 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<List<CustomerDiscountRule>> GetActiveDiscountsForUserAsync(
-        Guid userId, 
+        Guid userId,
         CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        
+
         return await _context.CustomerDiscountRules
             .AsNoTracking()
-            .Where(d => d.UserId == userId 
+            .Where(d => d.UserId == userId
                 && d.IsActive
                 && (d.ValidFrom == null || d.ValidFrom <= now)
                 && (d.ValidUntil == null || d.ValidUntil >= now)
@@ -37,8 +37,8 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<CustomerDiscountRule?> FindBestApplicableDiscountAsync(
-        Guid userId, 
-        decimal orderAmount, 
+        Guid userId,
+        decimal orderAmount,
         CancellationToken cancellationToken = default)
     {
         var activeDiscounts = await GetActiveDiscountsForUserAsync(userId, cancellationToken);
@@ -48,7 +48,7 @@ public class CustomerDiscountService : ICustomerDiscountService
 
         // Also fetch applicable group discounts
         var groupDiscounts = await GetApplicableGroupDiscountsAsync(userId, orderAmount, cancellationToken);
-        
+
         // Combine and find best
         var bestIndividual = applicableDiscounts
             .OrderByDescending(d => CalculateDiscountAmount(d, orderAmount))
@@ -70,8 +70,8 @@ public class CustomerDiscountService : ICustomerDiscountService
         var individualAmount = CalculateDiscountAmount(bestIndividual, orderAmount);
         var groupAmount = CalculateGroupDiscountAmount(bestGroup, orderAmount);
 
-        return individualAmount >= groupAmount 
-            ? bestIndividual 
+        return individualAmount >= groupAmount
+            ? bestIndividual
             : MapGroupDiscountToRule(bestGroup, orderAmount);
     }
 
@@ -84,7 +84,7 @@ public class CustomerDiscountService : ICustomerDiscountService
 
         // Get user's active group memberships
         var userGroupIds = await _context.GroupMemberships
-            .Where(m => m.UserId == userId && m.IsActive && 
+            .Where(m => m.UserId == userId && m.IsActive &&
                        (m.ExpiresAt == null || m.ExpiresAt > now))
             .Select(m => m.GroupId)
             .ToListAsync(cancellationToken);
@@ -95,7 +95,7 @@ public class CustomerDiscountService : ICustomerDiscountService
         // Get active discounts for these groups
         var groupDiscounts = await _context.GroupDiscounts
             .Include(gd => gd.Group)
-            .Where(gd => userGroupIds.Contains(gd.GroupId) && 
+            .Where(gd => userGroupIds.Contains(gd.GroupId) &&
                         gd.IsActive &&
                         gd.Group.IsActive &&
                         (gd.Group.ValidFrom == null || gd.Group.ValidFrom <= now) &&
@@ -122,8 +122,8 @@ public class CustomerDiscountService : ICustomerDiscountService
 
         // Only cap if MaximumDiscountAmount is set and greater than 0
         // Treating 0 as "no limit" to handle potential data entry errors where 0 was used instead of null
-        if (discount.MaximumDiscountAmount.HasValue && 
-            discount.MaximumDiscountAmount.Value > 0 && 
+        if (discount.MaximumDiscountAmount.HasValue &&
+            discount.MaximumDiscountAmount.Value > 0 &&
             amount > discount.MaximumDiscountAmount.Value)
         {
             amount = discount.MaximumDiscountAmount.Value;
@@ -166,7 +166,7 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<CustomerDiscountRule> ApplyDiscountAsync(
-        Guid discountRuleId, 
+        Guid discountRuleId,
         CancellationToken cancellationToken = default)
     {
         var discount = await _context.CustomerDiscountRules
@@ -192,7 +192,7 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<CustomerDiscountRule?> GetDiscountByIdAsync(
-        Guid discountId, 
+        Guid discountId,
         CancellationToken cancellationToken = default)
     {
         return await _context.CustomerDiscountRules
@@ -201,7 +201,7 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<List<CustomerDiscountRule>> GetAllDiscountsForUserAsync(
-        Guid userId, 
+        Guid userId,
         CancellationToken cancellationToken = default)
     {
         return await _context.CustomerDiscountRules
@@ -212,7 +212,7 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<CustomerDiscountRule> CreateDiscountAsync(
-        CustomerDiscountRule discount, 
+        CustomerDiscountRule discount,
         CancellationToken cancellationToken = default)
     {
         // Validate discount
@@ -237,7 +237,7 @@ public class CustomerDiscountService : ICustomerDiscountService
     }
 
     public async Task<CustomerDiscountRule> UpdateDiscountAsync(
-        CustomerDiscountRule discount, 
+        CustomerDiscountRule discount,
         CancellationToken cancellationToken = default)
     {
         var existing = await _context.CustomerDiscountRules

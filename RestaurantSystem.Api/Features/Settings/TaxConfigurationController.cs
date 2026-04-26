@@ -43,7 +43,7 @@ public class TaxConfigurationController : ControllerBase
     public async Task<ApiResponse<List<TaxConfigurationDto>>> GetAll(CancellationToken cancellationToken)
     {
         var taxConfigurations = await _taxConfigurationService.GetAllTaxConfigurationsAsync(cancellationToken);
-        
+
         var dtos = taxConfigurations.Select(t => new TaxConfigurationDto
         {
             Id = t.Id,
@@ -61,7 +61,7 @@ public class TaxConfigurationController : ControllerBase
     public async Task<ApiResponse<TaxConfigurationDto?>> GetActive(CancellationToken cancellationToken)
     {
         var taxConfiguration = await _taxConfigurationService.GetActiveTaxConfigurationAsync(cancellationToken);
-        
+
         if (taxConfiguration == null)
             return ApiResponse<TaxConfigurationDto?>.SuccessWithData(null);
 
@@ -82,7 +82,7 @@ public class TaxConfigurationController : ControllerBase
     public async Task<ApiResponse<TaxConfigurationDto?>> GetByOrderType(OrderType orderType, CancellationToken cancellationToken)
     {
         var taxConfiguration = await _taxConfigurationService.GetTaxConfigurationByOrderTypeAsync(orderType, cancellationToken);
-        
+
         if (taxConfiguration == null)
             return ApiResponse<TaxConfigurationDto?>.SuccessWithData(null);
 
@@ -104,7 +104,7 @@ public class TaxConfigurationController : ControllerBase
     public async Task<ApiResponse<TaxConfigurationDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var taxConfiguration = await _taxConfigurationService.GetTaxConfigurationByIdAsync(id, cancellationToken);
-        
+
         if (taxConfiguration == null)
             return ApiResponse<TaxConfigurationDto>.Failure("Tax configuration not found");
 
@@ -124,7 +124,7 @@ public class TaxConfigurationController : ControllerBase
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public async Task<ApiResponse<TaxConfigurationDto>> Create(
-        [FromBody] CreateTaxConfigurationDto dto, 
+        [FromBody] CreateTaxConfigurationDto dto,
         CancellationToken cancellationToken)
     {
         var taxConfiguration = new TaxConfiguration
@@ -155,7 +155,7 @@ public class TaxConfigurationController : ControllerBase
     [HttpPut]
     [Authorize(Roles = "Admin")]
     public async Task<ApiResponse<TaxConfigurationDto>> Update(
-        [FromBody] UpdateTaxConfigurationDto dto, 
+        [FromBody] UpdateTaxConfigurationDto dto,
         CancellationToken cancellationToken)
     {
         var taxConfiguration = new TaxConfiguration

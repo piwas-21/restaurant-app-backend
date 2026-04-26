@@ -40,29 +40,29 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
             }
 
             var now = DateTime.UtcNow;
-            
+
             // Define active order statuses (orders still at table)
-            var activeOrderStatuses = new[] 
-            { 
-                OrderStatus.Pending, 
-                OrderStatus.Confirmed, 
-                OrderStatus.Preparing, 
+            var activeOrderStatuses = new[]
+            {
+                OrderStatus.Pending,
+                OrderStatus.Confirmed,
+                OrderStatus.Preparing,
                 OrderStatus.Ready,
-                OrderStatus.PendingApproval 
+                OrderStatus.PendingApproval
             };
-            
+
             // Get active dine-in orders grouped by table number
             var activeOrdersByTable = await _context.Orders
-                .Where(o => o.TableNumber != null 
+                .Where(o => o.TableNumber != null
                     && o.Type == OrderType.DineIn
                     && activeOrderStatuses.Contains(o.Status)
                     && !o.IsDeleted)
                 .GroupBy(o => o.TableNumber!.Value)
-                .Select(g => new 
+                .Select(g => new
                 {
                     TableNumber = g.Key.ToString(),
                     OrderCount = g.Count(),
-                    Occupants = g.Select(o => new TableOccupantDto 
+                    Occupants = g.Select(o => new TableOccupantDto
                     {
                         CustomerName = o.CustomerName,
                         OrderNumber = o.OrderNumber,
@@ -71,7 +71,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                     }).ToList()
                 })
                 .ToDictionaryAsync(x => x.TableNumber, cancellationToken);
-            
+
             var tables = await tablesQuery
                 .OrderBy(t => t.TableNumber)
                 .Select(t => new TableDto
@@ -91,9 +91,9 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                     QRCodeData = t.QRCodeData,
                     QRCodeGeneratedAt = t.QRCodeGeneratedAt,
                     // Check if table has active reservation
-                    IsReserved = _context.TableReservations.Any(r => 
-                        r.TableId == t.Id && 
-                        r.IsActive && 
+                    IsReserved = _context.TableReservations.Any(r =>
+                        r.TableId == t.Id &&
+                        r.IsActive &&
                         r.ReservedUntil > now),
                     ReservedUntil = _context.TableReservations
                         .Where(r => r.TableId == t.Id && r.IsActive && r.ReservedUntil > now)
@@ -102,7 +102,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                         .FirstOrDefault()
                 })
                 .ToListAsync(cancellationToken);
-            
+
             // Populate order-based occupancy for each table
             foreach (var table in tables)
             {

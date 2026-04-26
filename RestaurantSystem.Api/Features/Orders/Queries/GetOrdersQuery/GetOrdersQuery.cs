@@ -35,8 +35,8 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
     private readonly ICurrentUserService _currentUserService;
 
     public GetOrdersQueryHandler(
-        ApplicationDbContext context, 
-        IOrderMappingService mappingService, 
+        ApplicationDbContext context,
+        IOrderMappingService mappingService,
         ILogger<GetOrdersQueryHandler> logger,
         ICurrentUserService currentUserService)
     {
@@ -77,7 +77,7 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
         {
             var statusStrings = query.Status.Split(',', StringSplitOptions.RemoveEmptyEntries);
             var statuses = new List<OrderStatus>();
-            
+
             foreach (var s in statusStrings)
             {
                 if (Enum.TryParse<OrderStatus>(s.Trim(), out var parsedStatus))
@@ -85,7 +85,7 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
                     statuses.Add(parsedStatus);
                 }
             }
-            
+
             if (statuses.Count > 0)
             {
                 ordersQuery = ordersQuery.Where(o => statuses.Contains(o.Status));
@@ -126,8 +126,8 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
         // Used for efficient polling to only fetch new/changed orders
         if (query.ModifiedSince.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => 
-                o.CreatedAt > query.ModifiedSince.Value || 
+            ordersQuery = ordersQuery.Where(o =>
+                o.CreatedAt > query.ModifiedSince.Value ||
                 (o.UpdatedAt.HasValue && o.UpdatedAt.Value > query.ModifiedSince.Value));
         }
 
@@ -176,4 +176,3 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
         return ApiResponse<PagedResult<OrderDto>>.SuccessWithData(pagedResult);
     }
 }
-

@@ -73,7 +73,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .Select(di => {
                     // Start with global translations if available
                     var content = new Dictionary<string, ProductIngredientContentDto>();
-                    
+
                     if (di.GlobalIngredient != null)
                     {
                         foreach (var trans in di.GlobalIngredient.Translations)

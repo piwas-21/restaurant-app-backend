@@ -79,7 +79,7 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
 
         // Notify Admin (via email or just status change event)
         // We can send an email to admin saying customer rejected.
-        
+
         var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
 
         await _orderEventService.NotifyOrderStatusChanged(orderDto, previousStatus);

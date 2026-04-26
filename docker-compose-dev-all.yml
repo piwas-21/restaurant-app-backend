@@ -53,7 +53,7 @@ services:
 networks:
   restaurant-network-dev:
     driver: bridge
-    
+
 volumes:
   postgres-data-dev:
   redis-data-dev:

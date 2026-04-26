@@ -22,9 +22,9 @@ public class ProductsControllerTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var result = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>("/api/products");
-        
+
         result.Should().NotBeNull();
-        
+
         result!.Success.Should().BeTrue();
         result.Data.Should().NotBeNull();
         result.Data?.Items.Should().HaveCountGreaterOrEqualTo(2); // From seed data

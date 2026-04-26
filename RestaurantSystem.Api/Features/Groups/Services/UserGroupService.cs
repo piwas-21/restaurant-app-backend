@@ -183,7 +183,7 @@ public class UserGroupService : IUserGroupService
         var qrData = $"GROUP:{groupId}:USER:{dto.UserId}:MEMBERSHIP:";
         var membershipId = Guid.NewGuid();
         qrData += membershipId.ToString();
-        
+
         // Add signature
         var signature = _qrCodeService.GenerateSignature(qrData);
         var uniqueQRCode = $"{qrData}:SIG:{signature}";

@@ -185,7 +185,7 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
                         order.FidelityPointsEarned,
                         order.SubTotal,
                         cancellationToken);
-                    
+
                     _logger.LogInformation("Awarded {Points} fidelity points to user {UserId} for order {OrderNumber} after payment completion",
                         order.FidelityPointsEarned, order.UserId, order.OrderNumber);
                 }

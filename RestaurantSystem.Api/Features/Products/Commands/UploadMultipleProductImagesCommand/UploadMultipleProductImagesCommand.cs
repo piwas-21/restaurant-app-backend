@@ -195,4 +195,3 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
             $"Successfully uploaded {uploadedImages.Count} images");
     }
 }
-

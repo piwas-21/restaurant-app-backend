@@ -100,26 +100,26 @@ public class OrdersController : ControllerBase
                 .Where(o => !o.IsDeleted)
                 .Where(o => o.Status == RestaurantSystem.Domain.Common.Enums.OrderStatus.Confirmed)
                 .AsQueryable();
-            
+
             // Filter by modifiedSince if provided
             if (modifiedSince.HasValue)
             {
-                ordersQuery = ordersQuery.Where(o => 
-                    o.CreatedAt > modifiedSince.Value || 
+                ordersQuery = ordersQuery.Where(o =>
+                    o.CreatedAt > modifiedSince.Value ||
                     (o.UpdatedAt.HasValue && o.UpdatedAt.Value > modifiedSince.Value));
             }
-            
+
             // Get orders (limit to 50)
             var orders = await ordersQuery
                 .OrderByDescending(o => o.OrderDate)
                 .Take(50)
                 .ToListAsync();
-            
+
             // Map to DTOs
             var orderDtos = orders.Select(mappingService.MapToOrderDto).ToList();
-            
+
             _logger.LogInformation("🖨️ Printer feed returning {Count} confirmed orders", orderDtos.Count);
-            
+
             // Return in same format as other endpoints
             return Ok(new
             {
@@ -428,13 +428,13 @@ public class OrdersController : ControllerBase
 
             // Define delay threshold - orders with prep time > this need customer approval
             const int delayThresholdMinutes = 10;
-            
+
             // Determine status based on preparation time
             // If delay is significant, ask customer for approval first
-            var newStatus = minutes > delayThresholdMinutes 
-                ? Domain.Common.Enums.OrderStatus.PendingApproval 
+            var newStatus = minutes > delayThresholdMinutes
+                ? Domain.Common.Enums.OrderStatus.PendingApproval
                 : Domain.Common.Enums.OrderStatus.Confirmed;
-            
+
             var statusNote = minutes > delayThresholdMinutes
                 ? $"Pending customer approval for {minutes} min preparation time"
                 : $"Confirmed via email with {minutes} min preparation time";
@@ -454,9 +454,9 @@ public class OrdersController : ControllerBase
             {
                 // Different messages based on whether it's immediate confirmation or pending approval
                 var (title, icon, color, heading, message) = minutes > delayThresholdMinutes
-                    ? ("Pending Customer Approval", "⏳", "#f59e0b", "Awaiting Customer Approval", 
+                    ? ("Pending Customer Approval", "⏳", "#f59e0b", "Awaiting Customer Approval",
                        $"Order <strong>{orderNumber}</strong> requires customer approval for the {minutes}-minute preparation time.<br><br>The customer will receive an email to approve or reject this delay.")
-                    : ("Order Confirmed", "✓", "#059669", "Order Confirmed!", 
+                    : ("Order Confirmed", "✓", "#059669", "Order Confirmed!",
                        $"Order <strong>{orderNumber}</strong> has been confirmed.<br><br>Preparation time: <strong>{minutes} minutes</strong>");
 
                 var frontendUrl = _emailSettings.FrontendBaseUrl;

@@ -35,7 +35,7 @@ public static partial class EmailTemplates
         <div class='content'>
             <h2>Welcome aboard, {firstName}!</h2>
             <p>Congratulations! Your account has been successfully created with the role of <strong>{role}</strong>.</p>
-            
+
             <div class='feature'>
                 <h3>🔐 Your Account Security</h3>
                 <p>Your account is protected with industry-standard security measures. Always keep your password safe and never share it with others.</p>

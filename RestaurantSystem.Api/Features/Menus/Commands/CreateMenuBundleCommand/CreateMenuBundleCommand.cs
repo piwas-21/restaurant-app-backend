@@ -48,7 +48,7 @@ public class CreateMenuBundleCommandValidator : AbstractValidator<CreateMenuBund
 
         RuleFor(x => x.MenuDefinition)
             .NotNull().WithMessage("Menu definition is required");
-            
+
         RuleFor(x => x.CategoryIds)
              .Must(x => x == null || x.Distinct().Count() == x.Count).WithMessage("Duplicate categories are not allowed");
 
@@ -165,9 +165,9 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = _currentUserService.GetAuditIdentifier()
             };
-            
+
             _context.MenuDefinitions.Add(menuDef);
-            
+
             if (command.MenuDefinition.Sections != null)
             {
                 foreach (var sectionDto in command.MenuDefinition.Sections)
@@ -184,9 +184,9 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
-                    
+
                     _context.MenuSections.Add(section);
-                    
+
                     if (sectionDto.Items != null)
                     {
                         foreach (var itemDto in sectionDto.Items)
@@ -212,9 +212,9 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             // Re-fetch to map to DTO (reusing MapToProductDto logic or similar)
             // Since we don't have access to private MapToProductDto from CreateProductCommandHandler,
-            // we should duplicate it or make it public/shared. 
+            // we should duplicate it or make it public/shared.
             // For now, I'll duplicate the relevant parts for Menu Bundle.
-            
+
              var createdProduct = await _context.Products
                 .Include(p => p.ProductCategories)
                     .ThenInclude(pc => pc.Category)

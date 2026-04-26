@@ -31,7 +31,7 @@ public static partial class EmailTemplates
             <td style='padding: 40px 20px;'>
                 <!-- Main Container -->
                 <table role='presentation' cellspacing='0' cellpadding='0' border='0' width='100%' style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);'>
-                    
+
                     <!-- Header with Gradient -->
                     <tr>
                         <td style='background: linear-gradient(135deg, #c79063 0%, #a67c52 100%); padding: 40px 30px; text-align: center;'>
@@ -59,7 +59,7 @@ public static partial class EmailTemplates
                                         <h2 style='margin: 0 0 20px; color: #1f2937; font-size: 26px; font-weight: 700; line-height: 1.3;'>Welcome to RUMI! 🎉</h2>
                                         <p style='margin: 0 0 16px; color: #4b5563; font-size: 16px; line-height: 1.6;'>Hello <strong style='color: #c79063;'>{firstName} {lastName}</strong>,</p>
                                         <p style='margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;'>Thank you for joining the RUMI family! We're excited to have you experience our culinary journey. To get started, please verify your email address.</p>
-                                        
+
                                         <!-- Verification Button -->
                                         <table role='presentation' cellspacing='0' cellpadding='0' border='0' width='100%'>
                                             <tr>

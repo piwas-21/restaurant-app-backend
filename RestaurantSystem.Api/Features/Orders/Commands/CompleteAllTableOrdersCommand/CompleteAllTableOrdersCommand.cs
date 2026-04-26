@@ -49,10 +49,10 @@ public class CompleteAllTableOrdersCommandHandler : ICommandHandler<CompleteAllT
             var activeOrders = await _context.Orders
                 .Include(o => o.Items)
                 .Include(o => o.StatusHistory)
-                .Where(o => !o.IsDeleted 
+                .Where(o => !o.IsDeleted
                     && o.Type == Domain.Common.Enums.OrderType.DineIn
                     && o.TableNumber == tableNumberInt
-                    && o.Status != OrderStatus.Completed 
+                    && o.Status != OrderStatus.Completed
                     && o.Status != OrderStatus.Cancelled)
                 .ToListAsync(cancellationToken);
 

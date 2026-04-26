@@ -50,7 +50,7 @@ public class MenusController : ControllerBase
         {
             return Unauthorized(ApiResponse<PagedResult<MenuBundleDto>>.Failure("Only admins can view unavailable menus"));
         }
-        
+
         var query = new GetMenuBundlesQuery(page, pageSize, null, includeUnavailable);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
@@ -64,12 +64,12 @@ public class MenusController : ControllerBase
     {
         var query = new GetMenuBundleByIdQuery(id);
         var result = await _mediator.SendQuery(query);
-        
+
         if (!result.Success)
         {
             return NotFound(result);
         }
-        
+
         return Ok(result);
     }
 
@@ -98,12 +98,12 @@ public class MenusController : ControllerBase
     {
         var command = new DeleteMenuBundleCommand(id);
         var result = await _mediator.SendCommand(command);
-        
+
         if (!result.Success)
         {
             return NotFound(result);
         }
-        
+
         return Ok(result);
     }
 }

@@ -46,7 +46,7 @@ public record OrderDto
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
-    
+
 
     // Additional Info
     public string? Notes { get; set; }

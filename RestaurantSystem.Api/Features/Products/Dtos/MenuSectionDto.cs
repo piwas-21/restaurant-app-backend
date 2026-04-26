@@ -6,7 +6,7 @@ public record MenuSectionDto
     public string Name { get; init; } = null!;
     public string? Description { get; init; }
     public int DisplayOrder { get; init; }
-    
+
     public bool IsRequired { get; init; }
     public int MinSelection { get; init; }
     public int MaxSelection { get; init; }

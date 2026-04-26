@@ -92,7 +92,7 @@ public class OrderMappingService : IOrderMappingService
     {
         // Parse ingredient customizations
         List<OrderItemIngredientDto>? ingredientCustomizations = null;
-        
+
         // Get product ingredients - either from direct Product or from Menu's first MenuItem's Product
         ICollection<ProductIngredient>? productIngredients = null;
         if (item.Product?.DetailedIngredients != null)
@@ -108,7 +108,7 @@ public class OrderMappingService : IOrderMappingService
                 productIngredients = firstMenuItem.Product.DetailedIngredients;
             }
         }
-        
+
         if (!string.IsNullOrEmpty(item.IngredientQuantitiesJson) && productIngredients != null)
         {
             try
@@ -117,7 +117,7 @@ public class OrderMappingService : IOrderMappingService
                 if (selectedIngredients != null && selectedIngredients.Any())
                 {
                     ingredientCustomizations = new List<OrderItemIngredientDto>();
-                    
+
                     // Map ingredient customizations
                     // Show all ingredients for kitchen (both selected and removed)
                     foreach (var ing in productIngredients)
@@ -152,7 +152,7 @@ public class OrderMappingService : IOrderMappingService
                 _logger.LogWarning(ex, "Failed to parse ingredient quantities for order item {ItemId}", item.Id);
             }
         }
-        
+
         // Get KitchenType from Product or Menu's first MenuItem's Product
         string? kitchenType = item.Product?.KitchenType.ToString();
         if (kitchenType == null && item.Menu?.MenuItems?.Any() == true)
@@ -245,7 +245,7 @@ public class OrderMappingService : IOrderMappingService
                 if (item.ProductId.HasValue && !_context.Entry(item).Reference(i => i.Product).IsLoaded)
                 {
                     await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
-                    
+
                     // Load DetailedIngredients with GlobalIngredient for ingredient names
                     if (item.Product != null && !_context.Entry(item.Product).Collection(p => p.DetailedIngredients).IsLoaded)
                     {
@@ -259,16 +259,16 @@ public class OrderMappingService : IOrderMappingService
                         }
                     }
                 }
-                
+
                 // Load Menu and its Product for menu items (e.g., Chief's Special)
                 if (item.MenuId.HasValue && !_context.Entry(item).Reference(i => i.Menu).IsLoaded)
                 {
                     await _context.Entry(item).Reference(i => i.Menu).LoadAsync(cancellationToken);
-                    
+
                     if (item.Menu != null && !_context.Entry(item.Menu).Collection(m => m.MenuItems).IsLoaded)
                     {
                         await _context.Entry(item.Menu).Collection(m => m.MenuItems).LoadAsync(cancellationToken);
-                        
+
                         // Load Product and DetailedIngredients for each menu item
                         foreach (var menuItem in item.Menu.MenuItems)
                         {
@@ -276,7 +276,7 @@ public class OrderMappingService : IOrderMappingService
                             {
                                 await _context.Entry(menuItem).Reference(mi => mi.Product).LoadAsync(cancellationToken);
                             }
-                            
+
                             if (menuItem.Product != null && !_context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).IsLoaded)
                             {
                                 await _context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);

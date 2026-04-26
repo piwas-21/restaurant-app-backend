@@ -23,9 +23,9 @@ public class GetUserStatisticsQueryHandler : IQueryHandler<GetUserStatisticsQuer
         try
         {
             _logger.LogInformation("Starting to retrieve user statistics");
-            
+
             var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
-            
+
             _logger.LogInformation("Counting customers...");
             var totalCustomers = await _context.Users
                 .Where(u => u.Role == UserRole.Customer && !u.IsDeleted)
@@ -87,7 +87,7 @@ public class GetUserStatisticsQueryHandler : IQueryHandler<GetUserStatisticsQuer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving user statistics. Message: {Message}, StackTrace: {StackTrace}", 
+            _logger.LogError(ex, "Error retrieving user statistics. Message: {Message}, StackTrace: {StackTrace}",
                 ex.Message, ex.StackTrace);
             return ApiResponse<UserStatisticsDto>.Failure($"Failed to retrieve user statistics: {ex.Message}");
         }

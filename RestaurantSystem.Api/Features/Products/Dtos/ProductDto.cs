@@ -32,4 +32,3 @@ public record ProductDto
     public MenuDefinitionDto? MenuDefinition { get; init; }
 
 }
-

@@ -119,4 +119,3 @@ public class RefreshTokenCommandHandler : ICommandHandler<RefreshTokenCommand, A
         }
     }
 }
-

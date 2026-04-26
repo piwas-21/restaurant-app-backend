@@ -145,7 +145,7 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         summary.Data!.ItemCount.Should().Be(3); // 2 products + 1 menu
         summary.Data.Total.Should().BeGreaterThan(0);
 
-        // Act & Assert - Step 4: Create Order from Basket  
+        // Act & Assert - Step 4: Create Order from Basket
         // Authenticate for order creation as it requires authentication
         AuthenticateAsTestUser();
 

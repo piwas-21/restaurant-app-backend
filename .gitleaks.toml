@@ -40,4 +40,3 @@ regexes = [
   '''REPLACE_WITH_AT_LEAST_32_CHAR_SECRET''',
   '''YourSecretKeyForDevelopmentMustBeAtLeast32Characters''',
 ]
-

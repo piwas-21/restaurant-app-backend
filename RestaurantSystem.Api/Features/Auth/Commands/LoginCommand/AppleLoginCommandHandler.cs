@@ -38,7 +38,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
             // In a production environment, you MUST verify the Apple ID token signature and claims.
             // For this implementation, we will decode the token to get the email and subject.
             // You should use a library or manual validation against Apple's public keys.
-            
+
             var handler = new JwtSecurityTokenHandler();
             var jsonToken = handler.ReadToken(request.IdToken) as JwtSecurityToken;
 
@@ -63,10 +63,10 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
                  // Apple might not return email on subsequent logins if the user chose "Hide My Email"
                  // In that case, you should rely on 'sub' (Subject) to identify the user.
                  // For this simplified implementation, we require email or we need to look up by 'sub' if we stored it.
-                 
+
                  // TODO: Implement lookup by 'sub' (Apple User ID) if email is missing.
                  // For now, we will fail if email is missing, but in reality, we should check if we have a user with this 'sub'.
-                 
+
                  // Let's try to find user by a custom claim or just fail for now.
                  return ApiResponse<AuthResponse>.Failure("Email missing", "Could not retrieve email from Apple token.");
             }
@@ -129,4 +129,3 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         }
     }
 }
-

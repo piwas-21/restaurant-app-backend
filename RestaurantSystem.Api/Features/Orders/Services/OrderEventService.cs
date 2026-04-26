@@ -15,7 +15,7 @@ public class OrderEventService : IOrderEventService, IDisposable
 
     // Consider a client stale if no activity for 3 minutes (should receive heartbeats every 10 seconds)
     private static readonly TimeSpan StaleClientTimeout = TimeSpan.FromMinutes(3);
-    
+
     // Event replay buffer - stores recent events to replay to reconnecting clients
     private readonly ConcurrentQueue<ReplayableEvent> _eventReplayBuffer = new();
     private const int MaxReplayBufferSize = 500;  // Maximum events to buffer (increased from 50)
@@ -78,7 +78,7 @@ public class OrderEventService : IOrderEventService, IDisposable
             _recentLogs.TryDequeue(out _);
         }
     }
-    
+
     /// <summary>
     /// Stores an event in the replay buffer for newly connecting clients
     /// </summary>
@@ -97,7 +97,7 @@ public class OrderEventService : IOrderEventService, IDisposable
         {
             _eventReplayBuffer.TryDequeue(out _);
         }
-        
+
         // Also remove events older than timeout
         var cutoff = DateTime.UtcNow.AddSeconds(-ReplayBufferTimeoutSeconds);
         while (_eventReplayBuffer.TryPeek(out var oldest) && oldest.Timestamp < cutoff)
@@ -105,7 +105,7 @@ public class OrderEventService : IOrderEventService, IDisposable
             _eventReplayBuffer.TryDequeue(out _);
         }
     }
-    
+
     /// <summary>
     /// Replays recent events to a newly connected client
     /// </summary>
@@ -182,7 +182,7 @@ public class OrderEventService : IOrderEventService, IDisposable
         {
             // Dispose the semaphore to prevent memory leak
             removedClient.WriteLock.Dispose();
-            
+
             var clientsByType = _clients.Values.GroupBy(c => c.ClientType).ToDictionary(g => g.Key, g => g.Count());
             var message = $"SSE client {clientId} ({removedClient.ClientType}) disconnected. Total clients: {_clients.Count} (Kitchen: {clientsByType.GetValueOrDefault(ClientType.Kitchen, 0)}, Service: {clientsByType.GetValueOrDefault(ClientType.Service, 0)}, Manager: {clientsByType.GetValueOrDefault(ClientType.Manager, 0)}, Stock: {clientsByType.GetValueOrDefault(ClientType.Stock, 0)})";
 
@@ -351,12 +351,12 @@ public class OrderEventService : IOrderEventService, IDisposable
             var warnMsg = $"No clients to broadcast event {eventData.EventType} for type {targetClientType}";
             _logger.LogWarning(warnMsg);
             AddLog("Warning", warnMsg, eventData.EventType);
-            
+
             // Still store event for replay - clients that connect soon will receive it
             StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
             return;
         }
-        
+
         // Store event for replay to newly connecting clients
         StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
 
@@ -408,12 +408,12 @@ public class OrderEventService : IOrderEventService, IDisposable
             var warnMsg = $"No clients to broadcast event {eventData.EventType} for type {targetClientType}";
             _logger.LogWarning(warnMsg);
             AddLog("Warning", warnMsg, eventData.EventType);
-            
+
             // Still store event for replay - clients that connect soon will receive it
             StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
             return;
         }
-        
+
         // Store event for replay to newly connecting clients
         StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
 
@@ -720,7 +720,7 @@ public class OrderEventService : IOrderEventService, IDisposable
         Stock,
         All
     }
-    
+
     /// <summary>
     /// Represents an event stored for replay to newly connecting clients
     /// </summary>

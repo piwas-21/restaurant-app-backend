@@ -43,7 +43,7 @@ public class RequestAccountDeletionCommandHandler : ICommandHandler<RequestAccou
 
         // Generate deletion token
         var token = await _userManager.GenerateUserTokenAsync(user, "Default", "AccountDeletion");
-        
+
         // Construct URLs
         var deleteUrl = $"{_emailSettings.FrontendBaseUrl}/delete-account?token={Uri.EscapeDataString(token)}&userId={user.Id}";
         var cancelUrl = $"{_emailSettings.FrontendBaseUrl}/auth/login"; // Login cancels usage

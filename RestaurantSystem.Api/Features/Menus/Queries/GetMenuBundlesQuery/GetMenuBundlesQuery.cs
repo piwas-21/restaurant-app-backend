@@ -135,8 +135,8 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
                         AdditionalPrice = i.AdditionalPrice,
                         DisplayOrder = i.DisplayOrder,
                         IsDefault = i.IsDefault,
-                        Ingredients = i.Product != null ? (i.Product.DetailedIngredients.Any() 
-                            ? i.Product.DetailedIngredients.Where(di => di.IsActive).Select(di => di.Name).ToList() 
+                        Ingredients = i.Product != null ? (i.Product.DetailedIngredients.Any()
+                            ? i.Product.DetailedIngredients.Where(di => di.IsActive).Select(di => di.Name).ToList()
                             : i.Product.Ingredients) : null,
                         Allergens = i.Product?.Allergens,
                         DetailedIngredients = i.Product?.DetailedIngredients

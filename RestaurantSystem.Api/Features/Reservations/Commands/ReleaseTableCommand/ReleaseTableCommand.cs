@@ -29,13 +29,13 @@ public class ReleaseTableCommandHandler : ICommandHandler<ReleaseTableCommand, A
         try
         {
             var now = DateTime.UtcNow;
-            
+
             // Find active reservation for this table
             var reservation = await _context.TableReservations
-                .FirstOrDefaultAsync(r => 
+                .FirstOrDefaultAsync(r =>
                     r.TableNumber == request.TableNumber &&
                     r.IsActive &&
-                    r.ReservedUntil > now, 
+                    r.ReservedUntil > now,
                     cancellationToken);
 
             if (reservation == null)

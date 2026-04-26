@@ -10,7 +10,7 @@ public class UserGroup : Entity
     public bool IsActive { get; set; }
     public DateTime? ValidFrom { get; set; }
     public DateTime? ValidUntil { get; set; }
-    
+
     // Navigation properties
     public ICollection<GroupMembership> Memberships { get; set; } = new List<GroupMembership>();
     public ICollection<GroupDiscount> Discounts { get; set; } = new List<GroupDiscount>();

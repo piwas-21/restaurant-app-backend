@@ -12,10 +12,10 @@ public class FidelityPointsService : IFidelityPointsService
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly IPointEarningRuleService _ruleService;
-    
+
     // Conversion rate: 100 points = $1.00
     private const int PointsPerDollar = 100;
-    
+
     public FidelityPointsService(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
@@ -33,10 +33,10 @@ public class FidelityPointsService : IFidelityPointsService
     }
 
     public async Task<FidelityPointsTransaction> AwardPointsAsync(
-        Guid userId, 
-        Guid orderId, 
-        int points, 
-        decimal orderTotal, 
+        Guid userId,
+        Guid orderId,
+        int points,
+        decimal orderTotal,
         CancellationToken cancellationToken = default)
     {
         if (points <= 0)
@@ -45,7 +45,7 @@ public class FidelityPointsService : IFidelityPointsService
         // Check if there's an existing transaction
         var hasExistingTransaction = _context.Database.CurrentTransaction != null;
         var transaction = hasExistingTransaction ? null : await _context.Database.BeginTransactionAsync(cancellationToken);
-        
+
         try
         {
             // Create transaction record
@@ -91,7 +91,7 @@ public class FidelityPointsService : IFidelityPointsService
             }
 
             await _context.SaveChangesAsync(cancellationToken);
-            
+
             if (!hasExistingTransaction && transaction != null)
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -117,9 +117,9 @@ public class FidelityPointsService : IFidelityPointsService
     }
 
     public async Task<(FidelityPointsTransaction Transaction, decimal DiscountAmount)> RedeemPointsAsync(
-        Guid userId, 
-        Guid orderId, 
-        int pointsToRedeem, 
+        Guid userId,
+        Guid orderId,
+        int pointsToRedeem,
         CancellationToken cancellationToken = default)
     {
         if (pointsToRedeem <= 0)
@@ -128,7 +128,7 @@ public class FidelityPointsService : IFidelityPointsService
         // Check if there's an existing transaction
         var hasExistingTransaction = _context.Database.CurrentTransaction != null;
         var transaction = hasExistingTransaction ? null : await _context.Database.BeginTransactionAsync(cancellationToken);
-        
+
         try
         {
             // Get user's current balance
@@ -166,7 +166,7 @@ public class FidelityPointsService : IFidelityPointsService
             balance.UpdatedBy = _currentUserService.UserId?.ToString() ?? userId.ToString();
 
             await _context.SaveChangesAsync(cancellationToken);
-            
+
             if (!hasExistingTransaction && transaction != null)
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -199,9 +199,9 @@ public class FidelityPointsService : IFidelityPointsService
     }
 
     public async Task<List<FidelityPointsTransaction>> GetPointsHistoryAsync(
-        Guid userId, 
-        int pageNumber = 1, 
-        int pageSize = 50, 
+        Guid userId,
+        int pageNumber = 1,
+        int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
         return await _context.FidelityPointsTransactions
@@ -214,9 +214,9 @@ public class FidelityPointsService : IFidelityPointsService
     }
 
     public async Task<FidelityPointsTransaction> AdjustPointsAsync(
-        Guid userId, 
-        int points, 
-        string reason, 
+        Guid userId,
+        int points,
+        string reason,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(reason))
@@ -225,7 +225,7 @@ public class FidelityPointsService : IFidelityPointsService
         // Check if there's an existing transaction
         var hasExistingTransaction = _context.Database.CurrentTransaction != null;
         var transaction = hasExistingTransaction ? null : await _context.Database.BeginTransactionAsync(cancellationToken);
-        
+
         try
         {
             // Create transaction record
@@ -268,14 +268,14 @@ public class FidelityPointsService : IFidelityPointsService
                     balance.TotalEarnedPoints += points;
                 else
                     balance.TotalRedeemedPoints += Math.Abs(points);
-                    
+
                 balance.LastUpdated = DateTime.UtcNow;
                 balance.UpdatedAt = DateTime.UtcNow;
                 balance.UpdatedBy = _currentUserService.GetAuditIdentifier();
             }
 
             await _context.SaveChangesAsync(cancellationToken);
-            
+
             if (!hasExistingTransaction && transaction != null)
             {
                 await transaction.CommitAsync(cancellationToken);

@@ -42,7 +42,7 @@ public class UnsetFeaturedSpecialCommandHandler : ICommandHandler<UnsetFeaturedS
         // Unset the featured special
         var productName = featuredProduct.Name;
         var productId = featuredProduct.Id;
-        
+
         featuredProduct.IsFeaturedSpecial = false;
 
         await _context.SaveChangesAsync(cancellationToken);

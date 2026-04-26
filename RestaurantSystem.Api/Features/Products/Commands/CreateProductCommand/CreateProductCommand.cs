@@ -249,7 +249,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         }
                     }
                 }
-            
+
             }
 
             await _context.SaveChangesAsync(cancellationToken);

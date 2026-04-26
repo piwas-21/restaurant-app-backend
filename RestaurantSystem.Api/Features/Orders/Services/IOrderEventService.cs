@@ -16,7 +16,7 @@ public interface IOrderEventService
     Task NotifyStockUpdate(string stock);
 
     object GetClientStatistics();
-    
+
     /// <summary>
     /// Replays recent events (within 60 seconds) to a newly connected client
     /// </summary>

@@ -45,7 +45,7 @@ public class ReactivateUserCommandHandler : ICommandHandler<ReactivateUserComman
         user.DeletedAt = null;
         user.DeletedBy = null;
 
-        _logger.LogInformation("User {UserId} reactivated by user {ReactivatedBy}", 
+        _logger.LogInformation("User {UserId} reactivated by user {ReactivatedBy}",
             command.UserId, _currentUserService.UserId);
 
         await _context.SaveChangesAsync(cancellationToken);

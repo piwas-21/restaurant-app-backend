@@ -50,7 +50,7 @@ public class CustomerDiscountsController : ControllerBase
         {
             // Get all discounts from all users
             var query = _context.CustomerDiscountRules.AsNoTracking();
-            
+
             if (activeOnly)
             {
                 var now = DateTime.UtcNow;
@@ -206,7 +206,7 @@ public class CustomerDiscountsController : ControllerBase
                 CreatedAt = createdDiscount.CreatedAt
             };
 
-            _logger.LogInformation("Created customer discount: {DiscountName} for user {UserId}", 
+            _logger.LogInformation("Created customer discount: {DiscountName} for user {UserId}",
                 createdDiscount.Name, createdDiscount.UserId);
 
             return CreatedAtAction(

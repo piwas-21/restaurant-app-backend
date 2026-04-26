@@ -10,7 +10,7 @@ public class GroupMembership : Entity
     public bool IsActive { get; set; }
     public DateTime JoinedAt { get; set; }
     public DateTime? ExpiresAt { get; set; }
-    
+
     // Navigation properties
     public UserGroup Group { get; set; } = null!;
     public ApplicationUser User { get; set; } = null!;

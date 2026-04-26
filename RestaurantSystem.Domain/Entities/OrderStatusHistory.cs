@@ -15,4 +15,3 @@ public class OrderStatusHistory : Entity
     // Navigation properties
     public virtual Order Order { get; set; } = null!;
 }
-

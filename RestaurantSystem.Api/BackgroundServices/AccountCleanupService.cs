@@ -46,7 +46,7 @@ public class AccountCleanupService : BackgroundService
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             var now = DateTime.UtcNow;
-            
+
             var usersToDelete = await context.Users
                 .Where(u => u.DeletionScheduledAt != null && u.DeletionScheduledAt < now)
                 .ToListAsync(stoppingToken);

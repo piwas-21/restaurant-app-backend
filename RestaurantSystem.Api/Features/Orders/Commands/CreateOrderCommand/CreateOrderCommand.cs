@@ -50,4 +50,3 @@ public record CreateOrderCommand : ICommand<ApiResponse<OrderDto>>
     // Multiple Payments
     public List<CreateOrderPaymentDto> Payments { get; set; } = new();
 }
-

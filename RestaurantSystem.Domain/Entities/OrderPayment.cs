@@ -29,4 +29,3 @@ public class OrderPayment : Entity
     // Navigation property
     public virtual Order Order { get; set; } = null!;
 }
-

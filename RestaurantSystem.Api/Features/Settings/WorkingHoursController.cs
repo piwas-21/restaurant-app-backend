@@ -36,7 +36,7 @@ public class WorkingHoursController : ControllerBase
     public async Task<ApiResponse<WorkingHoursDto>> GetByDay(DayOfWeek dayOfWeek, CancellationToken cancellationToken)
     {
         var workingHour = await _service.GetByDayAsync(dayOfWeek, cancellationToken);
-        
+
         if (workingHour == null)
             return ApiResponse<WorkingHoursDto>.Failure($"Working hours not found for {dayOfWeek}");
 
@@ -62,7 +62,7 @@ public class WorkingHoursController : ControllerBase
     public async Task<ApiResponse<WorkingHoursDto>> GetToday(CancellationToken cancellationToken)
     {
         var todayHours = await _service.GetTodayHoursAsync(cancellationToken);
-        
+
         if (todayHours == null)
             return ApiResponse<WorkingHoursDto>.Failure("Working hours not found for today");
 

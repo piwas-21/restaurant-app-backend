@@ -6,7 +6,7 @@ public record MenuDefinitionDto
     public bool IsAlwaysAvailable { get; init; }
     public TimeSpan? StartTime { get; init; }
     public TimeSpan? EndTime { get; init; }
-    
+
     public bool AvailableMonday { get; init; }
     public bool AvailableTuesday { get; init; }
     public bool AvailableWednesday { get; init; }

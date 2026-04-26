@@ -48,7 +48,7 @@ public class TableReservationCleanupService : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var now = DateTime.UtcNow;
-        
+
         var expiredReservations = await context.TableReservations
             .Where(r => r.IsActive && r.ReservedUntil <= now)
             .ToListAsync(cancellationToken);
@@ -60,7 +60,7 @@ public class TableReservationCleanupService : BackgroundService
                 reservation.IsActive = false;
                 reservation.ReleasedAt = now;
                 reservation.ReleaseReason = "Expired";
-                
+
                 _logger.LogInformation(
                     "Auto-released expired reservation for table {TableNumber} (was reserved until {ReservedUntil})",
                     reservation.TableNumber,
@@ -68,7 +68,7 @@ public class TableReservationCleanupService : BackgroundService
             }
 
             await context.SaveChangesAsync(cancellationToken);
-            
+
             _logger.LogInformation(
                 "Released {Count} expired table reservations",
                 expiredReservations.Count);

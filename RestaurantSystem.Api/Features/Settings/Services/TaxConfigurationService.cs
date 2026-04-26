@@ -38,10 +38,10 @@ public class TaxConfigurationService : ITaxConfigurationService
     public async Task<TaxConfiguration?> GetTaxConfigurationByOrderTypeAsync(OrderType orderType, CancellationToken cancellationToken = default)
     {
         var orderTypeValue = ((int)orderType).ToString();
-        
+
         return await _context.TaxConfigurations
             .AsNoTracking()
-            .Where(t => t.IsEnabled && 
+            .Where(t => t.IsEnabled &&
                        (t.ApplicableOrderTypes.Contains(orderTypeValue) || string.IsNullOrEmpty(t.ApplicableOrderTypes)))
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -102,7 +102,7 @@ public class TaxConfigurationService : ITaxConfigurationService
     public async Task<decimal> CalculateTaxAsync(decimal amount, CancellationToken cancellationToken = default)
     {
         var activeTax = await GetActiveTaxConfigurationAsync(cancellationToken);
-        
+
         if (activeTax == null || !activeTax.IsEnabled)
             return 0;
 
@@ -113,7 +113,7 @@ public class TaxConfigurationService : ITaxConfigurationService
     public async Task<decimal> CalculateTaxByOrderTypeAsync(decimal amount, OrderType orderType, CancellationToken cancellationToken = default)
     {
         var tax = await GetTaxConfigurationByOrderTypeAsync(orderType, cancellationToken);
-        
+
         if (tax == null || !tax.IsEnabled)
             return 0;
 

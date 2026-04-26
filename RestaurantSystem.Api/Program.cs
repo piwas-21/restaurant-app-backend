@@ -108,7 +108,7 @@ builder.Services.AddDistributedMemoryCache();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.EnableDynamicJson(); 
+dataSourceBuilder.EnableDynamicJson();
 var dataSource = dataSourceBuilder.Build();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -135,7 +135,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(opt =>
 .AddDefaultTokenProviders()
 .AddPasswordValidator<StrongPasswordValidator<ApplicationUser>>();
 
-// Configure Data Protection to persist keys 
+// Configure Data Protection to persist keys
 // This ensures email verification and password reset tokens remain valid across pod restarts
 // Keys are stored in a persistent directory that should be mounted as a volume in production
 var keysPath = Path.Combine(builder.Environment.ContentRootPath, "keys");
@@ -311,8 +311,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Health check endpoint for Kubernetes liveness/readiness probes
-app.MapGet("/health", () => Results.Ok(new 
-{ 
+app.MapGet("/health", () => Results.Ok(new
+{
     status = "healthy",
     timestamp = DateTime.UtcNow,
     service = "restaurant-system-api"
@@ -320,8 +320,8 @@ app.MapGet("/health", () => Results.Ok(new
 .WithName("HealthCheck")
 .WithOpenApi();
 
-app.MapGet("/api/health", () => Results.Ok(new 
-{ 
+app.MapGet("/api/health", () => Results.Ok(new
+{
     status = "healthy",
     timestamp = DateTime.UtcNow,
     service = "restaurant-system-api"
@@ -338,4 +338,3 @@ await app.Services.MigrateApplicationDatabaseAsync();
 app.Run();
 
 public partial class Program { } // Add this at the end of Program.cs
-

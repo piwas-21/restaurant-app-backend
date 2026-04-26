@@ -5,12 +5,12 @@ namespace RestaurantSystem.Domain.Entities;
 public class MenuDefinition : Entity
 {
     public Guid ProductId { get; set; }
-    
+
     // Scheduling
     public bool IsAlwaysAvailable { get; set; } = true;
     public TimeSpan? StartTime { get; set; }
     public TimeSpan? EndTime { get; set; }
-    
+
     // Bitmask for days of week (1=Monday, 2=Tuesday, etc. or 0-6)
     // Or simple boolean flags
     public bool AvailableMonday { get; set; } = true;

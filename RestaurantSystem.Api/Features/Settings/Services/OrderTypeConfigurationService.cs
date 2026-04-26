@@ -63,8 +63,8 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
     }
 
     public async Task<OrderTypeConfigurationDto> UpdateAsync(
-        OrderType orderType, 
-        bool isEnabled, 
+        OrderType orderType,
+        bool isEnabled,
         CancellationToken cancellationToken = default)
     {
         var configuration = await _context.OrderTypeConfigurations

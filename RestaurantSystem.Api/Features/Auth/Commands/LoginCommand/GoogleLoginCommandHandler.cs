@@ -37,8 +37,8 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
         {
             var settings = new GoogleJsonWebSignature.ValidationSettings()
             {
-                Audience = new List<string>() 
-                { 
+                Audience = new List<string>()
+                {
                     _configuration["Authentication:Google:ClientId"]!,          // Web
                     _configuration["Authentication:Google:AndroidClientId"]!,   // Android
                     _configuration["Authentication:Google:IosClientId"]!        // iOS
@@ -109,4 +109,3 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
         }
     }
 }
-

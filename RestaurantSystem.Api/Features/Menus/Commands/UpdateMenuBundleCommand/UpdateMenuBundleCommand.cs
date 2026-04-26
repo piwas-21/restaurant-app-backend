@@ -52,7 +52,7 @@ public class UpdateMenuBundleCommandValidator : AbstractValidator<UpdateMenuBund
 
         RuleFor(x => x.MenuDefinition)
             .NotNull().WithMessage("Menu definition is required");
-            
+
         RuleFor(x => x.CategoryIds)
              .Must(x => x == null || x.Distinct().Count() == x.Count).WithMessage("Duplicate categories are not allowed");
 
@@ -104,7 +104,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             {
                 var categoriesCount = await _context.Categories
                    .CountAsync(c => command.CategoryIds.Contains(c.Id), cancellationToken);
-                
+
                 if (categoriesCount != command.CategoryIds.Count)
                 {
                     return ApiResponse<ProductDto>.Failure("One or more categories not found");
@@ -125,7 +125,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
 
             // Update Categories
             _context.ProductCategories.RemoveRange(product.ProductCategories);
-            
+
             var displayOrder = 0;
             if (command.CategoryIds != null)
             {
@@ -223,9 +223,9 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
-                    
+
                     _context.MenuSections.Add(section);
-                    
+
                     if (sectionDto.Items != null)
                     {
                         foreach (var itemDto in sectionDto.Items)

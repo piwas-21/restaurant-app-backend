@@ -123,9 +123,9 @@ public class FidelityPointsController : ControllerBase
         if (pageSize < 1 || pageSize > 100) pageSize = 50;
 
         var transactions = await _fidelityPointsService.GetPointsHistoryAsync(
-            userId.Value, 
-            page, 
-            pageSize, 
+            userId.Value,
+            page,
+            pageSize,
             cancellationToken);
 
         var dtos = transactions.Select(t => new FidelityPointsTransactionDto

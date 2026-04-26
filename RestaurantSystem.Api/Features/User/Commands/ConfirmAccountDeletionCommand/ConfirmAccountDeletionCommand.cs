@@ -40,7 +40,7 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
         }
 
         // --- Cleanup dependent entities before deleting user ---
-        try 
+        try
         {
             // 1. Delete Baskets (Soft Delete or Hard Delete depending on strategy - using Hard as baskets are transient)
             // INCLUDE Soft-deleted baskets to avoid FK errors

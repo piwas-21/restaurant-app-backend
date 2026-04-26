@@ -48,7 +48,7 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
     public async Task<ApiResponse<AuthResponse>> Handle(UpdateStaffCommand command, CancellationToken cancellationToken)
     {
         _logger.LogInformation($"UpdateStaffCommand received - UserId: {command.UserId}, Email: {command.Email}, FirstName: {command.FirstName}");
-        
+
         // Check if current user is admin (this endpoint should be admin-only)
         var currentUser = await _currentUserService.GetUserAsync();
 
@@ -59,11 +59,11 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
 
         // Find user by ID (ignoring soft delete filter)
         _logger.LogInformation($"Attempting to find user with ID: {command.UserId}");
-        
+
         // Debug: Count all users
         var totalUsers = await _context.Users.IgnoreQueryFilters().CountAsync(cancellationToken);
         _logger.LogInformation($"Total users in database (ignoring filters): {totalUsers}");
-        
+
         var existingUser = await _context.Users
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == command.UserId, cancellationToken);
@@ -71,7 +71,7 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         if (existingUser == null)
         {
             _logger.LogWarning($"User not found with ID: {command.UserId}");
-            
+
             // Debug: List all user IDs
             var allUserIds = await _context.Users
                 .IgnoreQueryFilters()
@@ -79,7 +79,7 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
                 .Take(10)
                 .ToListAsync(cancellationToken);
             _logger.LogWarning($"First 10 user IDs in database: {string.Join(", ", allUserIds)}");
-            
+
             return ApiResponse<AuthResponse>.Failure("User doesn't exist", "Update failed");
         }
 

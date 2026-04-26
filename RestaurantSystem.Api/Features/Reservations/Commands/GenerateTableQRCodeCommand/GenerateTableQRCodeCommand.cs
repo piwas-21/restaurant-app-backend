@@ -33,7 +33,7 @@ public class GenerateTableQRCodeCommandHandler : ICommandHandler<GenerateTableQR
 
             // Generate unique QR code data: table_{tableId}_{uniqueGuid}
             var qrCodeData = $"table_{table.Id}_{Guid.NewGuid():N}";
-            
+
             table.QRCodeData = qrCodeData;
             table.QRCodeGeneratedAt = DateTime.UtcNow;
             table.UpdatedAt = DateTime.UtcNow;
@@ -50,7 +50,7 @@ public class GenerateTableQRCodeCommandHandler : ICommandHandler<GenerateTableQR
                 QRCodeUrl = $"/scan?qr={qrCodeData}"
             };
 
-            _logger.LogInformation("Generated QR code for table {TableNumber} (ID: {TableId})", 
+            _logger.LogInformation("Generated QR code for table {TableNumber} (ID: {TableId})",
                 table.TableNumber, table.Id);
 
             return ApiResponse<TableQRCodeDto>.SuccessWithData(result, "QR code generated successfully");

@@ -11,7 +11,7 @@ public class GroupDiscount : Entity
     public decimal? MinimumOrderAmount { get; set; }
     public decimal? MaximumDiscountAmount { get; set; }
     public bool IsActive { get; set; }
-    
+
     // Navigation properties
     public UserGroup Group { get; set; } = null!;
 }

@@ -43,7 +43,7 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
 
         bool shouldHardDelete = command.Permanent;
 
-        if (user.Role == UserRole.Server || user.Role == UserRole.Cashier || 
+        if (user.Role == UserRole.Server || user.Role == UserRole.Cashier ||
             user.Role == UserRole.KitchenStaff || user.Role == UserRole.Admin)
         {
             shouldHardDelete = true;
@@ -82,12 +82,12 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
                 await _context.UserAddresses.IgnoreQueryFilters().Where(x => x.UserId == command.UserId).ExecuteDeleteAsync(cancellationToken);
                 await _context.FidelityPointBalances.IgnoreQueryFilters().Where(x => x.UserId == command.UserId).ExecuteDeleteAsync(cancellationToken);
                 await _context.CustomerDiscountRules.IgnoreQueryFilters().Where(x => x.UserId == command.UserId).ExecuteDeleteAsync(cancellationToken);
-                
+
                 // Hard delete the user
                 await _context.Users.IgnoreQueryFilters().Where(u => u.Id == command.UserId).ExecuteDeleteAsync(cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
-                
+
                 _logger.LogInformation("User {UserId} ({Role}) and related data permanently deleted by user {DeletedBy}",
                     command.UserId, user.Role, _currentUserService.UserId);
             }
@@ -109,10 +109,10 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
             user.IsDeleted = true;
             user.DeletedAt = DateTime.UtcNow;
             user.DeletedBy = _currentUserService.GetAuditIdentifier();
-            
+
             _logger.LogInformation("Customer {UserId} soft deleted by user {DeletedBy}",
                 command.UserId, _currentUserService.UserId);
-            
+
             await _context.SaveChangesAsync(cancellationToken);
         }
 

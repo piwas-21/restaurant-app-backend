@@ -28,7 +28,7 @@ public static partial class EmailTemplates
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
-            
+
             return $@"
 <!DOCTYPE html>
 <html>

@@ -42,7 +42,7 @@ public class ValidateTableQRCodeQueryHandler : IQueryHandler<ValidateTableQRCode
                 QRCodeGeneratedAt = table.QRCodeGeneratedAt
             };
 
-            _logger.LogInformation("Valid QR code scanned for table {TableNumber} (ID: {TableId})", 
+            _logger.LogInformation("Valid QR code scanned for table {TableNumber} (ID: {TableId})",
                 table.TableNumber, table.Id);
 
             return ApiResponse<TableValidationDto>.SuccessWithData(result, "QR code is valid");

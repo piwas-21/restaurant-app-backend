@@ -43,7 +43,7 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var searchLower = query.Search.ToLower();
-            userQuery = userQuery.Where(u => 
+            userQuery = userQuery.Where(u =>
                 u.FirstName.ToLower().Contains(searchLower) ||
                 u.LastName.ToLower().Contains(searchLower) ||
                 u.Email.ToLower().Contains(searchLower) ||

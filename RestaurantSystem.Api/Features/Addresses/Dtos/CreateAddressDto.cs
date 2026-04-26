@@ -15,4 +15,3 @@ public record CreateAddressDto
     public double? Longitude { get; set; }
     public string? DeliveryInstructions { get; set; }
 }
-

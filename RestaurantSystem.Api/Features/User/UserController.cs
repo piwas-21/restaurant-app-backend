@@ -153,7 +153,7 @@ public class UserController : ControllerBase
     {
         var currentUserService = HttpContext.RequestServices.GetRequiredService<RestaurantSystem.Api.Common.Services.Interfaces.ICurrentUserService>();
         if (!currentUserService.UserId.HasValue) return Unauthorized();
-        
+
         var command = new RequestAccountDeletionCommand(currentUserService.UserId.Value);
         var result = await _mediator.SendCommand(command);
         return Ok(result);

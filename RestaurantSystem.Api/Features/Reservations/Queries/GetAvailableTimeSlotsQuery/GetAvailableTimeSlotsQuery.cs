@@ -55,7 +55,7 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
             var openingTime = workingHours.OpenTime;
             var closingTime = workingHours.CloseTime;
 
-            _logger.LogInformation("Using working hours for {DayOfWeek}: {OpenTime} - {CloseTime}", 
+            _logger.LogInformation("Using working hours for {DayOfWeek}: {OpenTime} - {CloseTime}",
                 dayOfWeek, openingTime, closingTime);
 
             // Get ALL active tables (not filtered by capacity)

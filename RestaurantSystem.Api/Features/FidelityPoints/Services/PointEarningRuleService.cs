@@ -40,14 +40,14 @@ public class PointEarningRuleService : IPointEarningRuleService
     }
 
     public async Task<PointEarningRule?> FindApplicableRuleAsync(
-        decimal orderAmount, 
+        decimal orderAmount,
         CancellationToken cancellationToken = default)
     {
         // Find the first matching rule ordered by priority
         return await _context.PointEarningRules
             .AsNoTracking()
-            .Where(r => r.IsActive 
-                && r.MinOrderAmount <= orderAmount 
+            .Where(r => r.IsActive
+                && r.MinOrderAmount <= orderAmount
                 && (r.MaxOrderAmount == null || r.MaxOrderAmount >= orderAmount))
             .OrderBy(r => r.Priority)
             .FirstOrDefaultAsync(cancellationToken);
@@ -61,7 +61,7 @@ public class PointEarningRuleService : IPointEarningRuleService
     }
 
     public async Task<PointEarningRule> CreateRuleAsync(
-        PointEarningRule rule, 
+        PointEarningRule rule,
         CancellationToken cancellationToken = default)
     {
         // Validate no overlap
@@ -81,7 +81,7 @@ public class PointEarningRuleService : IPointEarningRuleService
     }
 
     public async Task<PointEarningRule> UpdateRuleAsync(
-        PointEarningRule rule, 
+        PointEarningRule rule,
         CancellationToken cancellationToken = default)
     {
         var existing = await _context.PointEarningRules
@@ -124,7 +124,7 @@ public class PointEarningRuleService : IPointEarningRuleService
     }
 
     public async Task<bool> ValidateNoOverlapAsync(
-        PointEarningRule rule, 
+        PointEarningRule rule,
         CancellationToken cancellationToken = default)
     {
         // Get all active rules except the current one (if it's an update)

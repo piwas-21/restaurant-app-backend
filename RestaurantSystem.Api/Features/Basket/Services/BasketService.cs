@@ -52,7 +52,7 @@ public class BasketService : IBasketService
         // could be cached during concurrent add/update operations.
         // The basket query is fast enough (indexed by session/user ID) that
         // caching provides minimal benefit but creates significant consistency issues.
-        
+
         // Get fresh data from database
         var basket = await GetBasketFromDatabase(sessionId, userId);
         if (basket == null)
@@ -78,7 +78,7 @@ public class BasketService : IBasketService
             // Existing daily menu logic (keep for backward compatibility if needed, or remove if fully replacing)
             // For now, let's assume we are using the new ProductType.Menu structure via ProductId
         }
-        
+
         if (item.ProductId != Guid.Empty)
         {
             // Validate product exists and is available
@@ -103,31 +103,31 @@ public class BasketService : IBasketService
                 // Calculate total price including options
                 decimal menuTotalPrice = product.BasePrice;
                 var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
-                
+
                 // Validate required sections and calculate price
                 foreach (var section in product.MenuDefinition.Sections)
                 {
                     var sectionSelections = selectedOptions.Where(o => o.SectionId == section.Id).ToList();
-                    
+
                     // Count distinct items, not sum of quantities
                     var distinctItemCount = sectionSelections.Count;
-                    
+
                     // Log for debugging
                     _logger.LogInformation(
                         "Section '{SectionName}' validation: {ItemCount} items selected (min: {Min}, max: {Max})",
                         section.Name, distinctItemCount, section.MinSelection, section.MaxSelection
                     );
-                    
+
                     if (section.IsRequired && distinctItemCount < section.MinSelection)
                     {
                         throw new BadRequestException($"Section '{section.Name}' requires at least {section.MinSelection} selection(s)");
                     }
-                    
+
                     if (distinctItemCount > section.MaxSelection)
                     {
                         throw new BadRequestException($"Section '{section.Name}' allows at most {section.MaxSelection} selection(s)");
                     }
-                    
+
                     foreach (var selection in sectionSelections)
                     {
                         // Validate individual selection
@@ -135,11 +135,11 @@ public class BasketService : IBasketService
                         {
                             throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
                         }
-                        
+
                         var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId);
                         if (sectionItem == null)
                             throw new NotFoundException($"Item not found in section '{section.Name}'");
-                            
+
                         menuTotalPrice += sectionItem.AdditionalPrice * selection.Quantity;
                     }
                 }
@@ -156,48 +156,48 @@ public class BasketService : IBasketService
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = _currentUserService.GetAuditIdentifier()
                 };
-                
+
                 _context.BasketItems.Add(basketItem);
-                
+
                 // Create Child Basket Items for selected options
                 decimal totalCustomizationPrice = 0;
                 var childItemsToAdd = new List<BasketItem>();
-                
+
                 foreach (var option in selectedOptions)
                 {
                     var section = product.MenuDefinition.Sections.First(s => s.Id == option.SectionId);
                     var sectionItem = section.Items.First(i => i.ProductId == option.ItemId);
-                    
+
                     // Load the child product with its ingredients to calculate customization price
                     var childProduct = await _context.Products
                         .Include(p => p.DetailedIngredients)
                         .FirstOrDefaultAsync(p => p.Id == option.ItemId);
-                    
+
                     if (childProduct == null)
                         throw new NotFoundException($"Child product not found: {option.ItemId}");
-                    
+
                     // Calculate customization price for this child item based on selected ingredients
                     decimal childCustomizationPrice = 0;
                     if (childProduct.DetailedIngredients != null && childProduct.DetailedIngredients.Any())
                     {
                         var selectedIngredientIds = option.SelectedIngredients ?? new List<Guid>();
-                        
+
                         foreach (var ingredient in childProduct.DetailedIngredients.Where(i => i.IsOptional && i.IsActive))
                         {
                             bool isSelected = selectedIngredientIds.Contains(ingredient.Id);
                             int quantity = 1;
-                            
+
                             if (option.IngredientQuantities != null && option.IngredientQuantities.TryGetValue(ingredient.Id, out var qty))
                             {
                                 quantity = qty;
                             }
-                            
+
                             // Validate max quantity
                             if (quantity > ingredient.MaxQuantity)
                             {
                                 quantity = ingredient.MaxQuantity;
                             }
-                            
+
                             if (ingredient.IsIncludedInBasePrice)
                             {
                                 // Ingredient price is included in base price for 1 quantity
@@ -224,17 +224,17 @@ public class BasketService : IBasketService
                             }
                         }
                     }
-                    
+
                     // Add child customization price to total
                     totalCustomizationPrice += childCustomizationPrice * option.Quantity;
-                    
+
                     // Serialize ingredient quantities to JSON for child item
                     string? ingredientQuantitiesJson = null;
                     if (option.IngredientQuantities != null && option.IngredientQuantities.Count > 0)
                     {
                         ingredientQuantitiesJson = JsonSerializer.Serialize(option.IngredientQuantities);
                     }
-                    
+
                     var childItem = new BasketItem
                     {
                         BasketId = basket.Id,
@@ -252,18 +252,18 @@ public class BasketService : IBasketService
                     };
                     childItemsToAdd.Add(childItem);
                 }
-                
+
                 // Update parent item's price to include customization prices from children
                 basketItem.UnitPrice = menuTotalPrice + totalCustomizationPrice;
                 basketItem.ItemTotal = basketItem.UnitPrice * item.Quantity;
                 basketItem.CustomizationPrice = totalCustomizationPrice;
-                
+
                 // Add all child items to context
                 foreach (var childItem in childItemsToAdd)
                 {
                     _context.BasketItems.Add(childItem);
                 }
-                
+
                 await _context.SaveChangesAsync();
                 await RecalculateBasketTotalsAsync(basket.Id);
                 await InvalidateBasketCacheAsync(sessionId, userId);
@@ -292,19 +292,19 @@ public class BasketService : IBasketService
             {
                 // Compare special instructions
                 var sameInstructions = (bi.SpecialInstructions ?? "") == (item.SpecialInstructions ?? "");
-                
+
                 // Compare selected ingredients lists
                 var biSelected = bi.SelectedIngredients ?? new List<Guid>();
                 var itemSelected = item.SelectedIngredients ?? new List<Guid>();
-                var sameSelected = biSelected.Count == itemSelected.Count && 
+                var sameSelected = biSelected.Count == itemSelected.Count &&
                                    biSelected.OrderBy(x => x).SequenceEqual(itemSelected.OrderBy(x => x));
-                
-                // Compare excluded ingredients lists  
+
+                // Compare excluded ingredients lists
                 var biExcluded = bi.ExcludedIngredients ?? new List<Guid>();
                 var itemExcluded = item.ExcludedIngredients ?? new List<Guid>();
-                var sameExcluded = biExcluded.Count == itemExcluded.Count && 
+                var sameExcluded = biExcluded.Count == itemExcluded.Count &&
                                    biExcluded.OrderBy(x => x).SequenceEqual(itemExcluded.OrderBy(x => x));
-                
+
                 return sameInstructions && sameSelected && sameExcluded;
             });
 
@@ -417,11 +417,11 @@ public class BasketService : IBasketService
                     // This ensures kitchen prints can show "NO xxx" for deselected ingredients
                     var selectedIngredientIds = item.SelectedIngredients ?? new List<Guid>();
                     var builtQuantities = new Dictionary<Guid, int>();
-                    
+
                     foreach (var ingredient in product.DetailedIngredients.Where(i => i.IsActive))
                     {
                         bool isSelected = selectedIngredientIds.Contains(ingredient.Id);
-                        
+
                         if (isSelected)
                         {
                             // Selected ingredient: quantity 1 (or from ingredientQuantities if provided)
@@ -434,7 +434,7 @@ public class BasketService : IBasketService
                         }
                         // Non-optional ingredients that are not selected are implicitly included
                     }
-                    
+
                     if (builtQuantities.Count > 0)
                     {
                         ingredientQuantitiesJson = JsonSerializer.Serialize(builtQuantities);
@@ -479,7 +479,7 @@ public class BasketService : IBasketService
         // Get the user's basket first to ensure we're checking the right context
         var userId = _currentUserService.UserId;
         var basket = await GetBasketFromDatabase(sessionId, userId);
-        
+
         if (basket == null)
             throw new NotFoundException("Basket not found");
 
@@ -510,7 +510,7 @@ public class BasketService : IBasketService
         // Get the user's basket first to ensure we're checking the right context
         var userId = _currentUserService.UserId;
         var basket = await GetBasketFromDatabase(sessionId, userId);
-        
+
         if (basket == null)
             throw new NotFoundException("Basket not found");
 
@@ -707,7 +707,7 @@ public class BasketService : IBasketService
         // Calculate customer discount if user is logged in
         decimal customerDiscountAmount = 0;
         bool hasDiscount = false;
-        
+
         if (basket.UserId.HasValue && basket.UserId.Value != Guid.Empty)
         {
             var customerDiscount = await _customerDiscountService.FindBestApplicableDiscountAsync(
@@ -719,7 +719,7 @@ public class BasketService : IBasketService
             {
                 customerDiscountAmount = _customerDiscountService.CalculateDiscountAmount(customerDiscount, subTotal);
                 hasDiscount = PriceRoundingUtility.HasActiveDiscount(customerDiscountAmount);
-                
+
                 _logger.LogInformation(
                     "Applied customer discount '{DiscountName}' (ID: {DiscountId}) to basket {BasketId}: {DiscountAmount:C}",
                     customerDiscount.Name,
@@ -740,15 +740,15 @@ public class BasketService : IBasketService
         // Calculate total before rounding (without tax since order type is not yet known)
         decimal amountAfterDiscount = basket.SubTotal - customerDiscountAmount - basket.Discount;
         decimal calculatedTotal = amountAfterDiscount + basket.DeliveryFee;
-        
+
         // Apply special rounding for discounted customers
         basket.Total = PriceRoundingUtility.ApplySpecialRounding(calculatedTotal, hasDiscount);
-        
+
         basket.UpdatedAt = DateTime.UtcNow;
         basket.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         await _context.SaveChangesAsync();
-        
+
         // Invalidate cache after recalculating totals
         await InvalidateBasketCacheAsync(basket.SessionId, basket.UserId);
     }
@@ -945,7 +945,7 @@ public class BasketService : IBasketService
 
         // Filter out child items from the top-level list, as they are now nested under their parents
         // We only want items that do NOT have a parent to be at the top level
-        var rootItems = allItems.Where(i => 
+        var rootItems = allItems.Where(i =>
             !basket.Items.Any(bi => bi.Id == i.Id && bi.ParentBasketItemId.HasValue)
         ).ToList();
 

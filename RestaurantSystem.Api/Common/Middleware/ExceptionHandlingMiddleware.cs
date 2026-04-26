@@ -106,4 +106,3 @@ public static class ExceptionHandlingMiddlewareExtensions
         return builder.UseMiddleware<ExceptionHandlingMiddleware>();
     }
 }
-

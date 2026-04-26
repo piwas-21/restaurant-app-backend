@@ -26,7 +26,7 @@ public static class GlobalIngredientsSeeder
         logger.LogInformation("Seeding global ingredients...");
 
         // Ensure your ApplicationDbContext has a DbSet<GlobalIngredient> named GlobalIngredients
-        if (await context.GlobalIngredients.AnyAsync()) 
+        if (await context.GlobalIngredients.AnyAsync())
         {
             logger.LogInformation("Global ingredients already exist. Skipping seeding.");
             return;

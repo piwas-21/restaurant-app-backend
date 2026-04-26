@@ -88,7 +88,7 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
         // Or better, let's check if we can pass the minutes in the approval link?
         // The approval link is just /approve-delay.
         // Let's just set it to 30 mins for now as a fallback.
-        
+
         if (!order.EstimatedDeliveryTime.HasValue)
         {
              order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(30);

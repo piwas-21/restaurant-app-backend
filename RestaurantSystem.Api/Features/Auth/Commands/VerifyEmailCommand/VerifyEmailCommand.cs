@@ -23,7 +23,7 @@ public class VerifyEmailCommandHandler : ICommandHandler<VerifyEmailCommand, Api
     public async Task<ApiResponse<string>> Handle(VerifyEmailCommand command, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Email verification attempt for: {Email}", command.Email);
-        
+
         var user = await _userManager.FindByEmailAsync(command.Email);
 
         if (user == null || user.IsDeleted)

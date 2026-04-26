@@ -162,17 +162,17 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 .Where(v => v.Id.HasValue)
                 .Select(v => v.Id!.Value)
                 .ToList();
-            
+
             // Remove variations not in the incoming list
             var variationsToRemove = product.Variations
                 .Where(v => !incomingVariationIds.Contains(v.Id))
                 .ToList();
             _context.ProductVariations.RemoveRange(variationsToRemove);
-            
+
             foreach (var variationDto in command.Variations)
             {
                 ProductVariation variation;
-                
+
                 if (variationDto.Id.HasValue)
                 {
                     // Update existing variation
@@ -180,11 +180,11 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     if (variation == null)
                     {
                         // Variation ID was provided but not found, skip or log error
-                        _logger.LogWarning("Variation with ID {VariationId} not found for product {ProductId}", 
+                        _logger.LogWarning("Variation with ID {VariationId} not found for product {ProductId}",
                             variationDto.Id.Value, product.Id);
                         continue;
                     }
-                    
+
                     // Update properties
                     variation.Name = variationDto.Name;
                     variation.Description = variationDto.Description;
@@ -193,7 +193,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     variation.DisplayOrder = variationDto.DisplayOrder;
                     variation.UpdatedAt = DateTime.UtcNow;
                     variation.UpdatedBy = _currentUserService.GetAuditIdentifier();
-                    
+
                     // Remove and recreate descriptions for existing variations
                     var existingDescriptions = await _context.ProductVariationDescriptions
                         .Where(d => d.ProductVariationId == variation.Id)
@@ -216,7 +216,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     };
                     await _context.ProductVariations.AddAsync(variation, cancellationToken);
                 }
-                
+
                 // Add variation descriptions
                 if (variationDto.Content != null)
                 {
@@ -226,7 +226,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
                          var description = new ProductVariationDescription
                          {
-                             ProductVariation = variation, 
+                             ProductVariation = variation,
                              LanguageCode = languageCode,
                              Name = content.Name,
                              Description = content.Description,
@@ -304,7 +304,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     }
                 }
             }
-        
+
         // Update Menu Definition
         if (command.Type == ProductType.Menu && command.MenuDefinition != null)
         {
@@ -312,7 +312,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 .Include(m => m.Sections)
                     .ThenInclude(s => s.Items)
                 .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
-                
+
             if (menuDef == null)
             {
                 // Create new if not exists
@@ -324,7 +324,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 };
                 _context.MenuDefinitions.Add(menuDef);
             }
-            
+
             // Update properties
             menuDef.IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable;
             menuDef.StartTime = command.MenuDefinition.StartTime;
@@ -338,13 +338,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             menuDef.AvailableSunday = command.MenuDefinition.AvailableSunday;
             menuDef.UpdatedAt = DateTime.UtcNow;
             menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
-            
+
             // Update sections
             if (command.MenuDefinition.Sections != null)
             {
                 // Remove existing sections (simplest approach for now, can be optimized)
                 _context.MenuSections.RemoveRange(menuDef.Sections);
-                
+
                 foreach (var sectionDto in command.MenuDefinition.Sections)
                 {
                     var section = new MenuSection
@@ -359,9 +359,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
-                    
+
                     _context.MenuSections.Add(section);
-                    
+
                     if (sectionDto.Items != null)
                     {
                         foreach (var itemDto in sectionDto.Items)

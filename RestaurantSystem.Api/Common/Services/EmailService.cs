@@ -414,9 +414,9 @@ public class EmailService : IEmailService
         try
         {
             var subject = $"Welcome to {groupName}!";
-            
-            var expiryText = expiryDate.HasValue 
-                ? $"<p><strong>Membership Expires:</strong> {expiryDate.Value:MMMM dd, yyyy}</p>" 
+
+            var expiryText = expiryDate.HasValue
+                ? $"<p><strong>Membership Expires:</strong> {expiryDate.Value:MMMM dd, yyyy}</p>"
                 : "";
 
             var htmlBody = $@"
@@ -446,13 +446,13 @@ public class EmailService : IEmailService
             <p>You have been successfully added to <strong>{groupName}</strong>.</p>
             <p>{groupDescription}</p>
             {expiryText}
-            
+
             <div class=""qr-container"">
                 <h3>Your Membership QR Code</h3>
                 <img src=""cid:qrcode"" alt=""Membership QR Code"" class=""qr-code"" />
                 <p style=""font-size: 12px; color: #666; margin-top: 10px;"">Show this QR code at the restaurant to receive your member benefits.</p>
             </div>
-            
+
             <div style=""text-align: center; margin-top: 30px;"">
                 <p><strong>Add to your wallet for easy access:</strong></p>
                 <a href=""#"" class=""button"" style=""background-color: #000;"">📱 Add to Apple Wallet</a>
@@ -556,14 +556,14 @@ Thank you for being a valued member!";
                 message.To.Add(new MailAddress(to));
 
                 var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
-                
+
                 using var stream = new MemoryStream(imageData);
                 var imageResource = new LinkedResource(stream, "image/png")
                 {
                     ContentId = contentId
                 };
                 htmlView.LinkedResources.Add(imageResource);
-                
+
                 message.AlternateViews.Add(htmlView);
 
                 if (!string.IsNullOrEmpty(textBody))

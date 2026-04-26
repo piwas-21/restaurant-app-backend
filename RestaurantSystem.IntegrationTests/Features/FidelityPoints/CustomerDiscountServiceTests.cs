@@ -131,8 +131,8 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
     [InlineData(50, 20, 10)]      // 20% of 50 = 10
     [InlineData(200, 15, 30)]     // 15% of 200 = 30
     public void CalculateDiscountAmount_Percentage_ReturnsCorrectAmount(
-        decimal orderAmount, 
-        decimal discountValue, 
+        decimal orderAmount,
+        decimal discountValue,
         decimal expectedDiscount)
     {
         // Arrange
@@ -160,7 +160,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
     [InlineData(50, 5)]
     [InlineData(200, 5)]
     public void CalculateDiscountAmount_FixedAmount_ReturnsFixedValue(
-        decimal orderAmount, 
+        decimal orderAmount,
         decimal fixedDiscount)
     {
         // Arrange
@@ -406,7 +406,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
     {
         // Arrange
         var now = DateTime.UtcNow;
-        
+
         var active1 = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),

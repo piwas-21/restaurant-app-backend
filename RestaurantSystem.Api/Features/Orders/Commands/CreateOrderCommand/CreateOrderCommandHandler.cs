@@ -155,13 +155,13 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             // Calculate subTotal from all added items
             decimal subTotal = order.Items.Sum(i => i.ItemTotal);
-            
+
             // itemsTotal = sum of all item prices (what customer pays for items)
             decimal itemsTotal = subTotal;
 
             // If basket values are provided, use them directly to ensure consistency
             // Otherwise, calculate them as before
-            if (command.BasketSubTotal.HasValue && command.BasketTax.HasValue && 
+            if (command.BasketSubTotal.HasValue && command.BasketTax.HasValue &&
                 command.BasketTotal.HasValue)
             {
                 // Use pre-calculated basket values
@@ -169,7 +169,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 order.Tax = command.BasketTax.Value;
                 order.Discount = command.BasketDiscount ?? 0;
                 order.CustomerDiscountAmount = command.BasketCustomerDiscount ?? 0;
-                
+
                 _logger.LogInformation("Using pre-calculated basket values for order: SubTotal={SubTotal}, Tax={Tax}, Discount={Discount}, CustomerDiscount={CustomerDiscount}",
                     order.SubTotal, order.Tax, order.Discount, order.CustomerDiscountAmount);
             }
@@ -357,7 +357,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
                     _logger.LogInformation("Redeemed {Points} fidelity points for ${Discount} discount on order {OrderNumber}",
                         command.PointsToRedeem.Value, discountAmount, order.OrderNumber);
-                        
+
                     // Save the updates to the order
                     await _context.SaveChangesAsync(cancellationToken);
                 }
@@ -368,33 +368,33 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                     // The user can contact support to resolve
                 }
             }
-            
+
             // Award fidelity points after successful order creation
             // Award fidelity points after successful order creation ONLY if payment is completed
             // For pending payments (e.g. Cash), points will be awarded when payment is completed
-            if (userId.HasValue && order.FidelityPointsEarned > 0 && 
+            if (userId.HasValue && order.FidelityPointsEarned > 0 &&
                (order.PaymentStatus == PaymentStatus.Completed || order.PaymentStatus == PaymentStatus.Overpaid))
             {
                 try
                 {
                     await _fidelityPointsService.AwardPointsAsync(
-                        userId.Value, 
-                        order.Id, 
-                        order.FidelityPointsEarned, 
-                        order.SubTotal, 
+                        userId.Value,
+                        order.Id,
+                        order.FidelityPointsEarned,
+                        order.SubTotal,
                         cancellationToken);
-                    
+
                     _logger.LogInformation("Awarded {Points} fidelity points to user {UserId} for order {OrderNumber}",
                         order.FidelityPointsEarned, userId, order.OrderNumber);
                 }
                 catch (Exception ex)
                 {
                     // Log error but don't fail the order
-                    _logger.LogError(ex, "Failed to award fidelity points for order {OrderNumber}, but order was created successfully", 
+                    _logger.LogError(ex, "Failed to award fidelity points for order {OrderNumber}, but order was created successfully",
                         order.OrderNumber);
                 }
             }
-            
+
             await transaction.CommitAsync(cancellationToken);
 
             // Map to DTO
@@ -437,14 +437,14 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                         order.OrderNumber,
                         order.Type.ToString(),
                         estimatedPreparationMinutes: 15); // Default 15 minutes for dine-in
-                    
+
                     _logger.LogInformation("Sent order-confirmed email for Dine-in order {OrderNumber} to {Email}",
                         order.OrderNumber, order.CustomerEmail);
                 }
                 catch (Exception emailEx)
                 {
                     // Don't fail the order creation if email fails
-                    _logger.LogError(emailEx, "Failed to send order-confirmed email for Dine-in order {OrderNumber}", 
+                    _logger.LogError(emailEx, "Failed to send order-confirmed email for Dine-in order {OrderNumber}",
                         order.OrderNumber);
                 }
             }
@@ -455,20 +455,20 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 try
                 {
                     var tableNumber = order.TableNumber.Value.ToString();
-                    
+
                     // Find table by number
                     var table = await _context.Tables
                         .FirstOrDefaultAsync(t => t.TableNumber == tableNumber && t.IsActive, cancellationToken);
-                    
+
                     if (table != null)
                     {
                         // Check if table is already reserved
                         var now = DateTime.UtcNow;
                         var existingReservation = await _context.TableReservations
-                            .FirstOrDefaultAsync(r => 
-                                r.TableId == table.Id && 
-                                r.IsActive && 
-                                r.ReservedUntil > now, 
+                            .FirstOrDefaultAsync(r =>
+                                r.TableId == table.Id &&
+                                r.IsActive &&
+                                r.ReservedUntil > now,
                                 cancellationToken);
 
                         if (existingReservation == null)
@@ -483,10 +483,10 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                                 IsActive = true,
                                 CreatedBy = _currentUserService.GetAuditIdentifier()
                             };
-                            
+
                             _context.TableReservations.Add(reservation);
                             await _context.SaveChangesAsync(cancellationToken);
-                            
+
                             _logger.LogInformation(
                                 "Table {TableNumber} reserved for order {OrderNumber} until {ReservedUntil}",
                                 tableNumber, order.OrderNumber, reservation.ReservedUntil);
@@ -501,8 +501,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 }
                 catch (Exception reservationEx)
                 {
-                    _logger.LogError(reservationEx, 
-                        "Failed to create table reservation for order {OrderNumber}", 
+                    _logger.LogError(reservationEx,
+                        "Failed to create table reservation for order {OrderNumber}",
                         order.OrderNumber);
                     // Don't fail the order creation if reservation fails
                 }
@@ -699,7 +699,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         };
 
         order.Items.Add(orderItem);
-        
+
         // Only add to subtotal if it's a root item (children are included in parent price usually, or handled separately)
         // If child items have price 0, it doesn't matter. If they have price, we should check logic.
         // For Menu bundles, parent has full price, children have 0 or extra price.
@@ -712,14 +712,14 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         // Yes, because BasketItem.ItemTotal for child items represents the EXTRA cost (e.g. +$2 for large drink).
         // And Parent BasketItem.ItemTotal represents base price.
         // So summing all ItemTotals is correct.
-        
+
         // Wait, I need to pass subTotal back or update it.
         // Since I can't pass ref easily in async, I'll assume the caller calculates subTotal by summing order.Items.ItemTotal at the end?
         // No, the caller loop does `subTotal += orderItem.ItemTotal`.
         // I should probably return the created item or add to a list.
         // The method adds to `order.Items`.
         // I should update the caller to calculate subTotal AFTER all items are added.
-        
+
         if (itemDto.ChildItems != null)
         {
             foreach (var childDto in itemDto.ChildItems)

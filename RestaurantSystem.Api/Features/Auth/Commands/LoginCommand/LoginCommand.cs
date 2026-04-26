@@ -20,7 +20,7 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public LoginCommandHandler(
-        UserManager<ApplicationUser> userManager, 
+        UserManager<ApplicationUser> userManager,
         IConfiguration configuration,
         ITokenService tokenService,
         LoginEventHandler loginEventHandler,
@@ -96,4 +96,3 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
 
     }
 }
-
