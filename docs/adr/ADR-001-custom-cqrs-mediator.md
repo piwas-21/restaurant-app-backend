@@ -29,7 +29,6 @@ The mediator surface is exactly:
 
 ```csharp
 // In RestaurantSystem.Api/Abstraction/Messaging/
-public interface ICommand;                                 // void command
 public interface ICommand<TResult> { }                     // command with result
 public interface ICommandHandler<TCommand, TResult>
     where TCommand : ICommand<TResult>
@@ -43,6 +42,10 @@ public interface IQueryHandler<TQuery, TResult>
     Task<TResult> Handle(TQuery query, CancellationToken cancellationToken);
 }
 ```
+
+> A void `ICommand` interface also exists in `Abstraction/Messaging/` but is currently
+> unused — every command in the codebase returns `ApiResponse<T>` or similar. If a
+> truly fire-and-forget command lands, document the dispatch pattern here.
 
 Controllers dispatch via:
 ```csharp

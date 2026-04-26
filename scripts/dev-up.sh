@@ -70,9 +70,12 @@ done
 
 # ── 3. Apply migrations ──────────────────────────────────────────────
 info "[3/4] Applying EF Core migrations…"
-if ! command -v dotnet-ef >/dev/null 2>&1 && ! dotnet ef --version >/dev/null 2>&1; then
+if ! dotnet ef --version >/dev/null 2>&1; then
   warn "dotnet-ef not installed. Installing as a local tool…"
-  dotnet tool install --local dotnet-ef 2>/dev/null || dotnet new tool-manifest 2>/dev/null && dotnet tool install --local dotnet-ef
+  if [[ ! -f .config/dotnet-tools.json ]]; then
+    dotnet new tool-manifest
+  fi
+  dotnet tool install --local dotnet-ef
 fi
 
 dotnet ef database update \

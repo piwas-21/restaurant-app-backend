@@ -1,4 +1,5 @@
 # RUMI Backend — gitleaks config
+# Filename ".gitleaks.toml" is auto-discovered by gitleaks (no --config flag needed).
 # Runs in GitLab CI per .gitlab-ci.yml; complements local detect-secrets pre-commit hook.
 # Docs: https://github.com/gitleaks/gitleaks/blob/master/README.md
 

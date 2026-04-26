@@ -175,15 +175,17 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 ## §7 — Quality gates
 
-| Gate | When | What | Source of truth |
-|---|---|---|---|
-| `dotnet build RestaurantSystem.sln` | Pre-commit (manual now) | 0 errors | `dotnet build` |
-| Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
-| GitLab SAST | MR pipeline | Auto-injected analyzers | `.gitlab-ci.yml` |
-| Gitleaks | MR pipeline | No leaked credentials | [gitleaks.toml](gitleaks.toml) |
-| Trivy image scan | After build | No CRITICAL/HIGH CVEs | `.gitlab-ci.yml` |
+| Gate | When | What | Blocking? | Source of truth |
+|---|---|---|---|---|
+| `dotnet build RestaurantSystem.sln` | Pre-commit (manual now) | 0 errors | yes (manual) | `dotnet build` |
+| Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
+| GitLab SAST | MR pipeline | Auto-injected analyzers | yes | `.gitlab-ci.yml` |
+| Gitleaks | MR pipeline | No leaked credentials (allowlist via `.gitleaks.toml`) | yes | [.gitleaks.toml](.gitleaks.toml) |
+| Trivy image scan | After build | Reports CRITICAL/HIGH CVEs | **no** (currently `allow_failure: true`) | `.gitlab-ci.yml` |
 
-Format / lint / coverage gates land in Sprint 2. See [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md).
+Trivy is non-blocking today — it surfaces findings without failing the pipeline. Sprint 4 of [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) flips it to `exit-code: 1` for CRITICAL/HIGH.
+
+Format / lint / coverage gates land in Sprint 2. SAST quality gate + new-code coverage land in Sprint 3.
 
 ### Setup for a new developer
 ```bash
