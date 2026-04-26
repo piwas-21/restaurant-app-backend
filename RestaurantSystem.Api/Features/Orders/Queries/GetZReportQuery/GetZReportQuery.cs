@@ -7,10 +7,17 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
 
-public record GetZReportQuery(DateTime Date) : IQuery<ApiResponse<ZReportDto>>;
+// Date is a calendar day (no time, no timezone). The handler interprets it as
+// the UTC day boundaries [Date 00:00 UTC, Date+1 00:00 UTC). Callers that want
+// "today in restaurant local time" must convert before calling.
+public record GetZReportQuery(DateOnly Date) : IQuery<ApiResponse<ZReportDto>>;
 
 public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse<ZReportDto>>
 {
+    // How many top-selling items to include in the report. Promote to config
+    // (e.g. ReportSettings:TopItemsCount) if this needs to vary per deployment.
+    private const int TopItemsCount = 10;
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetZReportQueryHandler> _logger;
 
@@ -22,7 +29,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
 
     public async Task<ApiResponse<ZReportDto>> Handle(GetZReportQuery query, CancellationToken cancellationToken)
     {
-        var startOfDay = DateTime.SpecifyKind(query.Date.Date, DateTimeKind.Utc);
+        var startOfDay = query.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var startOfNextDay = startOfDay.AddDays(1);
 
         // Load all orders for the day with payments and items
@@ -120,7 +127,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
                 TotalRevenue = g.Sum(i => i.ItemTotal)
             })
             .OrderByDescending(i => i.QuantitySold)
-            .Take(10)
+            .Take(TopItemsCount)
             .ToList();
 
         var report = new ZReportDto
