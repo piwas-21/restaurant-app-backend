@@ -66,61 +66,59 @@
   border-color: #f87171;
 }
 
-/* Dark Theme Support */
-@media (prefers-color-scheme: dark) {
-  .statusPending {
-    background-color: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
-    border-color: #fbbf24;
-  }
+/* Dark Theme Support - uses data-theme attribute to match the app's theme toggle */
+:global(html[data-theme="dark"]) .statusPending {
+  background-color: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
 
-  .statusConfirmed {
-    background-color: rgba(96, 165, 250, 0.2);
-    color: #60a5fa;
-    border-color: #60a5fa;
-  }
+:global(html[data-theme="dark"]) .statusConfirmed {
+  background-color: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  border-color: #60a5fa;
+}
 
-  .statusPreparing {
-    background-color: rgba(129, 140, 248, 0.2);
-    color: #818cf8;
-    border-color: #818cf8;
-  }
+:global(html[data-theme="dark"]) .statusPreparing {
+  background-color: rgba(129, 140, 248, 0.2);
+  color: #818cf8;
+  border-color: #818cf8;
+}
 
-  .statusReady {
-    background-color: rgba(52, 211, 153, 0.2);
-    color: #34d399;
-    border-color: #34d399;
-  }
+:global(html[data-theme="dark"]) .statusReady {
+  background-color: rgba(52, 211, 153, 0.2);
+  color: #34d399;
+  border-color: #34d399;
+}
 
-  .statusInTransit {
-    background-color: rgba(167, 139, 250, 0.2);
-    color: #a78bfa;
-    border-color: #a78bfa;
-  }
+:global(html[data-theme="dark"]) .statusInTransit {
+  background-color: rgba(167, 139, 250, 0.2);
+  color: #a78bfa;
+  border-color: #a78bfa;
+}
 
-  .statusDelivered {
-    background-color: rgba(16, 185, 129, 0.2);
-    color: #10b981;
-    border-color: #10b981;
-  }
+:global(html[data-theme="dark"]) .statusDelivered {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border-color: #10b981;
+}
 
-  .statusCompleted {
-    background-color: rgba(16, 185, 129, 0.2);
-    color: #10b981;
-    border-color: #10b981;
-  }
+:global(html[data-theme="dark"]) .statusCompleted {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border-color: #10b981;
+}
 
-  .statusCancelled {
-    background-color: rgba(248, 113, 113, 0.2);
-    color: #f87171;
-    border-color: #f87171;
-  }
+:global(html[data-theme="dark"]) .statusCancelled {
+  background-color: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  border-color: #f87171;
+}
 
-  .statusNoShow {
-    background-color: rgba(248, 113, 113, 0.2);
-    color: #f87171;
-    border-color: #f87171;
-  }
+:global(html[data-theme="dark"]) .statusNoShow {
+  background-color: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  border-color: #f87171;
 }
 
 /* Payment Status Badges */
@@ -165,36 +163,34 @@
   border-color: #f87171;
 }
 
-@media (prefers-color-scheme: dark) {
-  .paymentPending {
-    background-color: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
-    border-color: #fbbf24;
-  }
+:global(html[data-theme="dark"]) .paymentPending {
+  background-color: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
 
-  .paymentPaid {
-    background-color: rgba(16, 185, 129, 0.2);
-    color: #10b981;
-    border-color: #10b981;
-  }
+:global(html[data-theme="dark"]) .paymentPaid {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border-color: #10b981;
+}
 
-  .paymentPartiallyPaid {
-    background-color: rgba(251, 146, 60, 0.2);
-    color: #fb923c;
-    border-color: #fb923c;
-  }
+:global(html[data-theme="dark"]) .paymentPartiallyPaid {
+  background-color: rgba(251, 146, 60, 0.2);
+  color: #fb923c;
+  border-color: #fb923c;
+}
 
-  .paymentRefunded {
-    background-color: rgba(129, 140, 248, 0.2);
-    color: #818cf8;
-    border-color: #818cf8;
-  }
+:global(html[data-theme="dark"]) .paymentRefunded {
+  background-color: rgba(129, 140, 248, 0.2);
+  color: #818cf8;
+  border-color: #818cf8;
+}
 
-  .paymentFailed {
-    background-color: rgba(248, 113, 113, 0.2);
-    color: #f87171;
-    border-color: #f87171;
-  }
+:global(html[data-theme="dark"]) .paymentFailed {
+  background-color: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  border-color: #f87171;
 }
 
 /* Focus Badge */
@@ -211,10 +207,8 @@
   border: 1px solid #fbbf24;
 }
 
-@media (prefers-color-scheme: dark) {
-  .focusBadge {
-    background-color: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
-    border-color: #fbbf24;
-  }
+:global(html[data-theme="dark"]) .focusBadge {
+  background-color: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border-color: #fbbf24;
 }
