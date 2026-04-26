@@ -75,4 +75,3 @@ export function buildProductPayload(product: ProductDetails, categories?: Catego
     content,
   };
 }
-

@@ -11,7 +11,7 @@
 ## Sprint task / issue
 <!-- Link the sprint task (docs/SPRINT-PLAN.md task ID) or GitLab issue number. -->
 - Closes #
-- Sprint task: 
+- Sprint task:
 
 ## Type
 - [ ] `feat` — new user-visible feature

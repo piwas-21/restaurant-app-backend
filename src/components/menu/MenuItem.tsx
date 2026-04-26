@@ -48,20 +48,20 @@ const MenuItem: React.FC<MenuItemProps> = ({
       if (!response.ok) {
         throw new Error('Failed to fetch product details');
       }
-      
+
       const result = await response.json();
       if (!result.success || !result.data) {
         throw new Error('Failed to load product details');
       }
-      
+
       const fullProduct = result.data;
-      
+
       // Check if product has customization options
       const hasCustomizationOptions =
         (fullProduct.variations && fullProduct.variations.length > 0) ||
         (fullProduct.detailedIngredients && fullProduct.detailedIngredients.length > 0) ||
         (fullProduct.suggestedSideItems && fullProduct.suggestedSideItems.length > 0);
-      
+
       if (hasCustomizationOptions) {
         // Show customization modal
         setDetailedProduct(fullProduct);
@@ -69,7 +69,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
         setIsLoadingDetails(false);
         return;
       }
-      
+
       // No customization needed, add directly to cart
       setIsLoadingDetails(false);
       const itemName =
@@ -214,7 +214,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
         />
       )}
       {isLoadingDetails && (
-        <div style={{ 
+        <div style={{
           position: 'fixed',
           top: '50%',
           left: '50%',

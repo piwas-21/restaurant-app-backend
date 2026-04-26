@@ -1,15 +1,15 @@
 /**
  * PDF Export Utilities
- * 
+ *
  * This file contains orchestration logic for printing/exporting orders.
  * HTML templates are in ./templates/ directory.
  */
 import { OrderDto } from '@/types/order';
 
 // Import templates
-import { 
-  generateSimpleReceiptHtml, 
-  generateKitchenReceiptHtml 
+import {
+  generateSimpleReceiptHtml,
+  generateKitchenReceiptHtml
 } from './templates';
 
 // Re-export templates for backward compatibility
@@ -35,9 +35,9 @@ export const printHtmlContent = (htmlContent: string): void => {
   iframe.style.width = '0';
   iframe.style.height = '0';
   iframe.style.border = '0';
-  
+
   document.body.appendChild(iframe);
-  
+
   const doc = iframe.contentWindow?.document;
   if (!doc) {
     document.body.removeChild(iframe);

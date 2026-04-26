@@ -235,6 +235,6 @@ kubectl logs -n rumi -l app=rumi-restaurant-backend --tail=100
 
 ---
 
-**Deployment Method**: GitOps with ArgoCD  
-**Last Updated**: October 13, 2025  
+**Deployment Method**: GitOps with ArgoCD
+**Last Updated**: October 13, 2025
 **Status**: ✅ Active

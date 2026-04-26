@@ -136,4 +136,3 @@ export const deleteStaff = async (userId: string, permanent: boolean = false): P
 export const getUserStatistics = async (): Promise<ApiResponse<UserStatistics>> => {
   return await apiClient.get<ApiResponse<UserStatistics>>(`${USER_API_URL}/statistics`);
 };
-

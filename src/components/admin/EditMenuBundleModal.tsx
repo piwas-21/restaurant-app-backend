@@ -275,9 +275,9 @@ const EditMenuBundleModal: React.FC<EditProductModalProps> = ({
               watch={watch}
               currentLanguage={currentLanguage}
             />
-            
+
             <div className={modalStyles.sectionDivider}></div>
-            
+
             <h3>{t('menu_availability')}</h3>
             <MenuScheduleEditor
               menuDefinition={menuDefinition}

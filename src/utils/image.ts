@@ -17,4 +17,3 @@ export const getFullImageUrl = (url: string) => {
 
   return "https://lh3.google.com/u/0/d/" + url;
 };
-

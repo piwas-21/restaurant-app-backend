@@ -59,7 +59,7 @@ export function useServerOrders(): UseServerOrdersReturn {
    */
   const refreshOrders = useCallback(async (modifiedSince?: Date) => {
     if (!isMountedRef.current) return;
-    
+
     try {
       setError(null);
       const result = await getDineInOrders(modifiedSince ? { modifiedSince } : undefined);
@@ -100,7 +100,7 @@ export function useServerOrders(): UseServerOrdersReturn {
    */
   const refreshTables = useCallback(async () => {
     if (!isMountedRef.current) return;
-    
+
     try {
       const tablesWithStatus = await getTablesWithStatus();
       if (isMountedRef.current) {
@@ -160,7 +160,7 @@ export function useServerOrders(): UseServerOrdersReturn {
 
     try {
       setConnectionState('connecting');
-      
+
       const authToken = localStorage.getItem('auth_token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5221';
       const endpoint = '/api/events/service';
@@ -197,7 +197,7 @@ export function useServerOrders(): UseServerOrdersReturn {
       // Handle heartbeat events
       eventSource.addEventListener('heartbeat', () => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         const eventTime = new Date();
         setLastEventTime(eventTime);
         lastEventTimeRef.current = eventTime;
@@ -206,11 +206,11 @@ export function useServerOrders(): UseServerOrdersReturn {
       // Handle order events
       eventSource.addEventListener('order-created', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const newOrder = data.order || data;
-          
+
           // Only add dine-in orders
           if (newOrder.type === 'DineIn') {
             console.log('📦 Server SSE: New dine-in order:', newOrder.orderNumber);
@@ -223,7 +223,7 @@ export function useServerOrders(): UseServerOrdersReturn {
             // Refresh tables to update status
             refreshTables();
           }
-          
+
           const eventTime = new Date();
           setLastEventTime(eventTime);
           lastEventTimeRef.current = eventTime;
@@ -235,7 +235,7 @@ export function useServerOrders(): UseServerOrdersReturn {
 
       eventSource.addEventListener('order-status-changed', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
@@ -247,7 +247,7 @@ export function useServerOrders(): UseServerOrdersReturn {
           );
           // Refresh tables to update status
           refreshTables();
-          
+
           const eventTime = new Date();
           setLastEventTime(eventTime);
           lastEventTimeRef.current = eventTime;
@@ -259,7 +259,7 @@ export function useServerOrders(): UseServerOrdersReturn {
 
       eventSource.addEventListener('order-completed', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
@@ -271,7 +271,7 @@ export function useServerOrders(): UseServerOrdersReturn {
             )
           );
           refreshTables();
-          
+
           const eventTime = new Date();
           setLastEventTime(eventTime);
           lastEventTimeRef.current = eventTime;
@@ -285,7 +285,7 @@ export function useServerOrders(): UseServerOrdersReturn {
         if (connectionIdRef.current !== connectionId) return;
 
         console.error(`❌ Server SSE: Connection error [${connectionId}]`);
-        
+
         if (!isMountedRef.current) return;
 
         setIsConnected(false);
@@ -314,7 +314,7 @@ export function useServerOrders(): UseServerOrdersReturn {
 
         const lastEvent = lastEventTimeRef.current;
         const currentEventSource = eventSourceRef.current;
-        
+
         if (!currentEventSource || currentEventSource.readyState === EventSource.CLOSED) {
           console.warn('⚠️ Server SSE: Connection closed, reconnecting...');
           reconnectAttemptRef.current = 0;
@@ -347,12 +347,12 @@ export function useServerOrders(): UseServerOrdersReturn {
    */
   const startPrimaryPolling = useCallback(() => {
     if (primaryPollingIntervalRef.current) return;
-    
+
     console.log('🔄 Server: Starting polling (every 5s)');
-    
+
     primaryPollingIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
-      
+
       const since = lastPolledAtRef.current;
       refreshOrders(since || undefined);
       refreshTables();
@@ -378,7 +378,7 @@ export function useServerOrders(): UseServerOrdersReturn {
         console.log('👁️ Server: Tab visible, refreshing...');
         refreshOrders();
         refreshTables();
-        
+
         const eventSource = eventSourceRef.current;
         if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
           reconnectAttemptRef.current = 0;
@@ -397,7 +397,7 @@ export function useServerOrders(): UseServerOrdersReturn {
   useEffect(() => {
     console.log('🔌 Server: Initializing...');
     isMountedRef.current = true;
-    
+
     // Initial fetch
     refreshOrders();
     refreshTables();

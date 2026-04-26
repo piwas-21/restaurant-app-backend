@@ -86,7 +86,7 @@ const MenuScheduleEditor: React.FC<MenuScheduleEditorProps> = ({
               checked={localMenuDefinition.isAlwaysAvailable}
               onChange={() => {}}
             />
-            <label 
+            <label
               onClick={() => {
                 setLocalMenuDefinition({ ...localMenuDefinition, isAlwaysAvailable: true });
                 setHasChanges(true);
@@ -104,7 +104,7 @@ const MenuScheduleEditor: React.FC<MenuScheduleEditorProps> = ({
               checked={!localMenuDefinition.isAlwaysAvailable}
               onChange={() => {}}
             />
-            <label 
+            <label
               onClick={() => {
                 setLocalMenuDefinition({ ...localMenuDefinition, isAlwaysAvailable: false });
                 setHasChanges(true);

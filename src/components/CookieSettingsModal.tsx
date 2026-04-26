@@ -36,17 +36,17 @@ export default function CookieSettingsModal() {
         </div>
         <div className={styles.modalBody}>
           <p>{t('cookie_settings_intro', 'Manage your cookie preferences. You can enable or disable specific cookie categories below.')}</p>
-          
+
           <div className={styles.preferenceItem}>
             <div className={styles.preferenceDetails}>
               <strong>{t('cookie_settings_preferences_title', 'Preferences')}</strong>
               <p>{t('cookie_settings_preferences_desc', 'These cookies remember your choices, like language or theme, to personalize your experience.')}</p>
             </div>
             <label className={styles.toggleSwitch}>
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={currentPreferences === true}
-                onChange={handlePreferenceChange} 
+                onChange={handlePreferenceChange}
               />
               <span className={styles.slider}></span>
             </label>

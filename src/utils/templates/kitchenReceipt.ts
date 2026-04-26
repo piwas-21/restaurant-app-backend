@@ -43,12 +43,12 @@ const getOrderTypeLabel = (type: string | undefined, t?: TranslationFunction): s
 // Build kitchen item HTML - with optional pricing
 const buildKitchenItemHtml = (item: OrderItemDto, translate: TranslationFunction, showPrices: boolean): string => {
   const itemName = item.productName || item.menuName || translate('item', 'Item');
-  
+
   // Calculate unit price with fallback
   const unitPriceValue = item.unitPrice || (item.quantity > 0 ? item.itemTotal / item.quantity : 0);
   const totalPrice = formatCurrency(item.itemTotal);
   const unitPrice = formatCurrency(unitPriceValue);
-  
+
   let html = `
     <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #ccc;">
       <div style="display: flex; justify-content: space-between; font-size: 13pt; font-weight: bold;">
@@ -67,10 +67,10 @@ const buildKitchenItemHtml = (item: OrderItemDto, translate: TranslationFunction
   }
 
   // Only show removed and extra ingredients
-  const customizedIngredients = item.ingredientCustomizations?.filter(ing => 
+  const customizedIngredients = item.ingredientCustomizations?.filter(ing =>
     ing.isRemoved || ing.quantity > 1
   ) || [];
-  
+
   if (customizedIngredients.length > 0) {
     customizedIngredients.forEach(ing => {
       if (ing.isRemoved) {
@@ -127,7 +127,7 @@ export const generateKitchenReceiptHtml = (
   const showPrices = kitchenType === 'All';
 
   // Kitchen type label
-  const kitchenLabel = kitchenType === 'FrontKitchen' 
+  const kitchenLabel = kitchenType === 'FrontKitchen'
     ? translate('kitchen_type_frontkitchen', 'Front Kitchen')
     : kitchenType === 'BackKitchen'
     ? translate('kitchen_type_backkitchen', 'Back Kitchen')

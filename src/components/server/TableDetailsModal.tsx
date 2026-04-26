@@ -140,7 +140,7 @@ export default function TableDetailsModal({
                   🍽️ {t('server.take_order', 'Take Order')}
                 </button>
               )}
-              
+
               {/* Mark as Available button for reserved tables */}
               {table.status === 'reserved' && (
                 <button
@@ -151,7 +151,7 @@ export default function TableDetailsModal({
                   {isUpdating ? '...' : '✅'} {t('server.mark_available', 'Mark as Available')}
                 </button>
               )}
-              
+
               {/* Mark as Available button for occupied tables with no active orders in UI */}
               {table.status === 'occupied' && activeOrders.length === 0 && (
                 <button
@@ -162,14 +162,14 @@ export default function TableDetailsModal({
                       setError(null);
                       // Complete any lingering orders in the database for this table
                       const result = await completeAllTableOrders(table.tableNumber);
-                      
+
                       if (result.totalProcessed > 0) {
                         console.log(
                           `Processed ${result.totalProcessed} orders for table ${table.tableNumber}: ` +
                           `${result.completedCount} completed, ${result.cancelledCount} cancelled`
                         );
                       }
-                      
+
                       onTableStatusChanged();
                       onClose();
                     } catch (err) {
@@ -183,14 +183,14 @@ export default function TableDetailsModal({
                   {isUpdating ? '...' : '✅'} {t('server.mark_available', 'Mark as Available')}
                 </button>
               )}
-              
+
               {/* Info for occupied tables with orders - status clears when orders complete */}
               {table.status === 'occupied' && activeOrders.length > 0 && (
                 <p className={styles.actionHint}>
                   ℹ️ {t('server.occupied_hint', 'Table will become available when all orders are completed')}
                 </p>
               )}
-              
+
               {table.status === 'closed' ? (
                 <button
                   className={styles.openTableButton}

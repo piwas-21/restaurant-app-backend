@@ -196,7 +196,7 @@ export default function ReviewPage() {
         let processedIngredientQuantities: Record<string, number> | undefined;
         if (item.ingredientQuantities && Object.keys(item.ingredientQuantities).length > 0) {
           processedIngredientQuantities = { ...item.ingredientQuantities };
-          
+
           // If selectedIngredients exists, mark deselected ingredients with quantity 0
           if (item.selectedIngredients && Array.isArray(item.selectedIngredients)) {
             Object.keys(processedIngredientQuantities).forEach(ingredientId => {

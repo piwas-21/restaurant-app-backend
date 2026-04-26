@@ -39,7 +39,7 @@ export default function DeleteAccountSection() {
           {t('danger_zone_title', 'Danger Zone')}
         </h2>
       </div>
-      
+
       <div className={styles.dangerZoneContent}>
         <p className={styles.warningText}>
           {t('delete_account_warning', 'Once you delete your account, there is no going back. Please be certain.')}
@@ -58,7 +58,7 @@ export default function DeleteAccountSection() {
             <span>{successMessage}</span>
           </div>
         )}
-        
+
         {errorMessage && (
           <div className={`${styles.alertBox} ${styles.error}`}>
             <XCircle size={20} className={styles.alertIcon} />

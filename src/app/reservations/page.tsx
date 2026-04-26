@@ -312,7 +312,7 @@ export default function ReservationsPage() {
     } catch (err: any) {
       // Extract detailed error message from API response
       let errorMessage = t('reservation_failed', 'Failed to create reservation');
-      
+
       // Try to get the specific error message from the API
       if (err?.response?.data?.errors && Array.isArray(err.response.data.errors) && err.response.data.errors.length > 0) {
         // Show the first specific error from the API errors array
@@ -324,9 +324,9 @@ export default function ReservationsPage() {
         // Use error message if it's not generic
         errorMessage = err.message;
       }
-      
+
       console.error('Reservation error:', err?.response?.data || err); // Log for debugging
-      
+
       enqueueSnackbar(
         errorMessage,
         { variant: 'error', autoHideDuration: 6000 }
@@ -337,7 +337,7 @@ export default function ReservationsPage() {
   };
 
   const selectedTables = allTables.filter(t => selectedTableIds.includes(t.id));
-  
+
   // Filter time slots based on selected tables
   // If tables are selected, only show times when ALL selected tables are available
   const filteredTimeSlots = selectedTableIds.length > 0

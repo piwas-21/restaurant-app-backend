@@ -29,19 +29,19 @@ export default function WorkingHoursManager() {
     try {
       setLoading(true);
       const hours = await workingHoursService.getAll();
-      
+
       // Convert dayOfWeek from string to number and sort by day of week (Monday first)
       const normalized: NormalizedWorkingHours[] = hours.map(wh => ({
         ...wh,
         dayOfWeek: dayNameToNumber(wh.dayOfWeek)
       }));
-      
+
       const sorted = normalized.sort((a, b) => {
         const aIndex = DAYS_ORDER.indexOf(a.dayOfWeek);
         const bIndex = DAYS_ORDER.indexOf(b.dayOfWeek);
         return aIndex - bIndex;
       });
-      
+
       setWorkingHours(sorted);
     } catch (error) {
       enqueueSnackbar(t('failed_to_load_working_hours', 'Failed to load working hours'), {
@@ -128,7 +128,7 @@ export default function WorkingHoursManager() {
 
     try {
       setSaving(true);
-      
+
       // Update all days
       const updatePromises = workingHours.map(wh => {
         const dto: UpdateWorkingHoursDto = {

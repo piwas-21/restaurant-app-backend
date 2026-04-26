@@ -1,6 +1,6 @@
 /**
  * Floating Cart Button Component
- * 
+ *
  * Always-visible cart button that floats at the bottom of the screen
  * Shows item count, total price, and provides quick access to cart
  */
@@ -77,7 +77,7 @@ export default function FloatingCartButton({
           </span>
         )}
       </div>
-      
+
       <div className={styles.priceContainer}>
         <span className={styles.totalLabel}>{t('cart_total_label', 'Total')}</span>
         <span className={styles.totalPrice}>{formatPrice(totalPrice)}</span>

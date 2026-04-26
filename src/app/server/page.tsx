@@ -120,7 +120,7 @@ export default function ServerPage() {
         {/* Right Panel - Orders */}
         <div className={styles.ordersPanel}>
           {selectedTableNumber && (
-            <button 
+            <button
               className={styles.clearSelectionButton}
               onClick={handleClearSelection}
             >

@@ -84,7 +84,7 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
 
   const handleTableClick = (table: Table) => {
     if (disabled || table.isReserved) return;
-    
+
     // If table is occupied, show confirmation modal
     if (table.isOccupied && table.activeOrderCount && table.activeOrderCount > 0) {
       // Check if table is at max capacity (maxGuests + 1)
@@ -156,7 +156,7 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
           {tables.map((table) => {
             const isFull = isTableFull(table);
             const isDisabled = disabled || table.isReserved || isFull;
-            
+
             return (
               <button
                 key={table.id}
@@ -193,7 +193,7 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
                   )}
                   {table.isOccupied && !table.isReserved && (
                     <span className={isFull ? styles.fullBadge : styles.occupiedBadge}>
-                      {isFull 
+                      {isFull
                         ? t('table_full', 'Full')
                         : t('table_occupied_badge', '{{count}} order(s)', { count: table.activeOrderCount || 0 })
                       }
@@ -225,7 +225,7 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
                 tableNumber: tableToShare.tableNumber
               })}
             </p>
-            
+
             {tableToShare.occupants && tableToShare.occupants.length > 0 && (
               <div className={styles.occupantsList}>
                 <p className={styles.occupantsTitle}>
@@ -245,13 +245,13 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
                 </ul>
               </div>
             )}
-            
+
             <p className={styles.capacityInfo}>
               {t('remaining_capacity', '{{count}} more guests can join', {
                 count: (tableToShare.maxGuests + 1) - (tableToShare.activeOrderCount || 0)
               })}
             </p>
-            
+
             <div className={styles.modalActions}>
               <button className={styles.cancelButton} onClick={cancelShareTable}>
                 {t('share_table_cancel', 'Choose Another Table')}
@@ -266,4 +266,3 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
     </>
   );
 }
-

@@ -340,4 +340,3 @@ export interface MenuBundleItem {
   preparationTimeMinutes?: number;
   displayOrder: number;
 }
-

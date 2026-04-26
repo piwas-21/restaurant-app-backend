@@ -84,7 +84,7 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
   const renderNavLinks = () => {
     if (isLoading) return null;
     const role = user?.role.toLowerCase();
-    
+
     // Cashier: Show only Cashier link
     if (role === 'cashier') {
       return (
@@ -96,7 +96,7 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
         </>
       );
     }
-    
+
     // Server: Show only Server link
     if (role === 'server') {
       return (
@@ -108,7 +108,7 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
         </>
       );
     }
-    
+
     // Admin: Show all customer links + admin dashboard
     if (role === 'admin') {
       return (
@@ -137,7 +137,7 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
         </>
       );
     }
-    
+
     // Regular users: Show customer navigation
     return (
       <>

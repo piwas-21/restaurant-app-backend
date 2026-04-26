@@ -53,7 +53,7 @@ const buildItemHtml = (item: OrderItemDto): string => {
   const itemName = item.productName || item.menuName || 'Item';
   const variation = item.variationName ? ` (${item.variationName})` : '';
   const totalPrice = formatCurrency(item.itemTotal);
-  
+
   return `
     <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #aaa;">
       <div style="display: flex; justify-content: space-between;">
@@ -78,7 +78,7 @@ export const generateSimpleReceiptHtml = (order: OrderDto, t?: TranslationFuncti
   const timeStr = orderDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Delivery address
-  const deliveryAddress = order.type === 'Delivery' && order.deliveryAddress 
+  const deliveryAddress = order.type === 'Delivery' && order.deliveryAddress
     ? `
       <div style="margin: 10px 0; padding: 8px; border: 1px dashed #000;">
         <strong>${translate('delivery_to', 'DELIVERY TO')}:</strong><br/>
@@ -90,7 +90,7 @@ export const generateSimpleReceiptHtml = (order: OrderDto, t?: TranslationFuncti
     ` : '';
 
   // Payments
-  const paymentsHtml = order.payments && order.payments.length > 0 
+  const paymentsHtml = order.payments && order.payments.length > 0
     ? `
       <div style="margin-top: 8px;">
         <strong>${translate('payment', 'PAYMENT')}:</strong>

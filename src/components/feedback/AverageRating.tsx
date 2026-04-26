@@ -30,4 +30,3 @@ const AverageRating: React.FC<AverageRatingProps> = ({ dishId, initialRatingData
 };
 
 export default AverageRating;
-

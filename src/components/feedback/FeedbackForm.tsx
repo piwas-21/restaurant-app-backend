@@ -58,7 +58,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) 
   return (
     <form onSubmit={handleSubmit} className={styles.feedbackForm} aria-labelledby="feedback-form-heading">
       <h3 id="feedback-form-heading" className="sr-only">{t('feedback_form_heading')}</h3>
-      
+
       <div className={styles.formGroup} role="group" aria-labelledby="rating-label">
         <label id="rating-label" className={styles.ratingLabel}>{t('feedback_form_rating_label')}:</label>
         <div className={styles.starRating} onMouseLeave={handleStarMouseLeave}>
@@ -74,7 +74,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) 
                 aria-label={t('feedback_form_star_rating_aria_label', { count: starValue })}
                 aria-pressed={starValue === rating}
               >
-                {isFilled ? '★' : '☆'} 
+                {isFilled ? '★' : '☆'}
               </button>
             );
           })}

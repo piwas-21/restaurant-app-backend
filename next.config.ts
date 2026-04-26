@@ -3,11 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker containers
   output: 'standalone',
-  
+
   experimental: {
     // allowedDevOrigins can be added if needed for cloud workstations
   },
-  
+
   /* Security Configuration */
   async headers() {
     return [
@@ -64,13 +64,13 @@ const nextConfig: NextConfig = {
       }
     ];
   },
-  
+
   // Disable powered-by header
   poweredByHeader: false,
-  
+
   // Production optimizations
   compress: true,
-  
+
   // Image optimization security
   images: {
     remotePatterns: [

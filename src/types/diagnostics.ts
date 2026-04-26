@@ -1,6 +1,6 @@
 /**
  * SSE Diagnostics Types
- * 
+ *
  * TypeScript interfaces for the /api/events/diagnostics endpoint response.
  * Used to display server-side SSE connection status in the diagnostics modal.
  */

@@ -39,7 +39,7 @@ export default function SoundSelector({
       <div className={styles.header}>
         {t('select_notification_sound') || 'Select Notification Sound'}
       </div>
-      
+
       {SOUND_OPTIONS.map((sound) => (
         <div
           key={sound.value}
@@ -68,7 +68,7 @@ export default function SoundSelector({
           </button>
         </div>
       ))}
-      
+
       {/* Repeat Sound Toggle */}
       <div className={styles.repeatSection}>
         <div
@@ -86,14 +86,14 @@ export default function SoundSelector({
               {t('repeat_sound_desc') || 'Keeps playing until you return to the desk'}
             </div>
           </div>
-          
+
           {/* Toggle Switch */}
           <div className={`${styles.toggleSwitch} ${repeatUntilMouseMoves ? styles.toggleSwitchActive : ''}`}>
             <div className={styles.toggleKnob} />
           </div>
         </div>
       </div>
-      
+
       <div className={styles.footer}>
         💡 {t('click_to_select_or_test') || 'Click a sound to select, or test before choosing'}
       </div>

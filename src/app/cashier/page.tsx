@@ -28,7 +28,7 @@ import styles from '@/app/styles/CashierPage.module.css';
 
 export default function CashierPage() {
   const { t } = useTranslation();
-  
+
   // Orders hook
   const {
     orders,
@@ -189,17 +189,17 @@ export default function CashierPage() {
 
     // Find truly new orders using ID-based tracking
     const newOrders = orders.filter(order => !seenOrderIdsRef.current.has(order.id));
-    
+
     if (newOrders.length === 0) return;
 
     console.log(`🆕 Detected ${newOrders.length} new order(s)`);
-    
+
     const ordersForModal: string[] = [];
 
     newOrders.forEach((order) => {
       // Mark as seen immediately to prevent duplicates
       seenOrderIdsRef.current.add(order.id);
-      
+
       console.log('🆕 New order:', {
         id: order.id,
         orderNumber: order.orderNumber,
@@ -214,7 +214,7 @@ export default function CashierPage() {
       );
 
       // Check if should show modal
-      const shouldShowModal = 
+      const shouldShowModal =
         order.type !== OrderType.DineIn &&
         order.status === 'Pending' &&
         !dismissedOrders.has(order.id);
@@ -225,14 +225,14 @@ export default function CashierPage() {
 
       // Auto-print based on settings
       if (autoPrintSettings.enabled) {
-        const shouldPrintType = 
+        const shouldPrintType =
           (order.type === OrderType.DineIn && autoPrintSettings.orderTypes.dineIn) ||
           (order.type === OrderType.Takeaway && autoPrintSettings.orderTypes.takeaway) ||
           (order.type === OrderType.Delivery && autoPrintSettings.orderTypes.delivery);
-        
+
         const orderStatus = order.status?.toLowerCase() || 'pending';
         const shouldPrintStatus = autoPrintSettings.orderStatuses[orderStatus as keyof typeof autoPrintSettings.orderStatuses];
-        
+
         if (shouldPrintType && shouldPrintStatus) {
           if (autoPrintSettings.printContent.all) {
             exportKitchenItemsToPDF(order, 'All', t);
@@ -294,14 +294,14 @@ export default function CashierPage() {
 
     orders.forEach((order) => {
       const previousStatus = previousOrderStatusesRef.current.get(order.id);
-      
+
       // If status changed (and we had a previous status)
       if (previousStatus && previousStatus !== order.status) {
         // Notify about the status change
         notifyOrderUpdate(order.orderNumber, order.status);
         playOrderUpdateSound();
       }
-      
+
       // Update the tracked status
       previousOrderStatusesRef.current.set(order.id, order.status);
     });
@@ -575,10 +575,10 @@ export default function CashierPage() {
 
       {/* Diagnostic Panel */}
       {showDiagnostics && (
-        <div style={{ 
-          position: 'fixed', 
-          top: '20px', 
-          right: '20px', 
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
           zIndex: 9999,
           maxWidth: '400px',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'

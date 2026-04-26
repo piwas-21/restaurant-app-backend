@@ -69,7 +69,7 @@ export const submitProductForm = async ({
         try {
           const searchResponse = await searchGlobalIngredients(ing.name) as { success: boolean; data?: any[] };
           if (searchResponse.success && searchResponse.data) {
-            const existing = searchResponse.data.find((item: any) => 
+            const existing = searchResponse.data.find((item: any) =>
               item.defaultName.toLowerCase() === ing.name.toLowerCase()
             );
             if (existing) {
@@ -93,7 +93,7 @@ export const submitProductForm = async ({
             }
           }
         }
-        
+
         // Also add the default name as English translation if not present, or just rely on defaultName
         if (translations.length > 0) {
            try {
@@ -254,7 +254,7 @@ export const submitEditProductForm = async ({
         try {
           const searchResponse = await searchGlobalIngredients(ing.name) as { success: boolean; data?: any[] };
           if (searchResponse.success && searchResponse.data) {
-            const existing = searchResponse.data.find((item: any) => 
+            const existing = searchResponse.data.find((item: any) =>
               item.defaultName.toLowerCase() === ing.name.toLowerCase()
             );
             if (existing) {
@@ -278,7 +278,7 @@ export const submitEditProductForm = async ({
             }
           }
         }
-        
+
         // Also add the default name as English translation if not present, or just rely on defaultName
         if (translations.length > 0) {
            try {

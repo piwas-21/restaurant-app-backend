@@ -23,7 +23,7 @@ export default function SocialLoginButtons() {
         if (response.success) {
           login(response.data);
           toast.success(t('login_success', 'Logged in successfully!'));
-          
+
           const userRole = response.data.role.toLowerCase();
           switch (userRole) {
             case "admin":
@@ -128,7 +128,7 @@ export default function SocialLoginButtons() {
             width="100%"
             />
         </div>
-        
+
         {/* Apple Login requires HTTPS and valid configuration to work properly */}
         {/* <div className={styles.appleWrapper}>
             <AppleLogin
@@ -139,8 +139,8 @@ export default function SocialLoginButtons() {
             scope="email name"
             responseMode="query"
             render={(renderProps) => (
-                <button 
-                onClick={renderProps.onClick} 
+                <button
+                onClick={renderProps.onClick}
                 className={styles.appleButton}
                 disabled={renderProps.disabled}
                 >

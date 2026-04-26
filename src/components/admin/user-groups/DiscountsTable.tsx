@@ -47,8 +47,8 @@ const DiscountsTable: React.FC<DiscountsTableProps> = ({
               <td>{discount.name}</td>
               <td>{discount.type === DiscountType.Percentage ? t('percentage') : t('fixed_amount')}</td>
               <td>
-                {discount.type === DiscountType.Percentage 
-                  ? `${discount.value}%` 
+                {discount.type === DiscountType.Percentage
+                  ? `${discount.value}%`
                   : `CHF ${discount.value.toFixed(2)}`}
               </td>
               <td>{discount.minimumOrderAmount ? `CHF ${discount.minimumOrderAmount.toFixed(2)}` : '-'}</td>

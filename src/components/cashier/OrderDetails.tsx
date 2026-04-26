@@ -74,7 +74,7 @@ export default function OrderDetails({
   const hasBackKitchenItems = order?.items?.some(item => item.kitchenType === 'BackKitchen');
 
   const orderTypeEmoji = order.type === 'DineIn' ? '🍽️' : order.type === 'Takeaway' ? '🛍️' : '🚚';
-  
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending': return '#fbbf24';
@@ -115,7 +115,7 @@ export default function OrderDetails({
                 {t('cashier.update_status', 'Update Status')}
                 <ChevronDown size={16} className={`${styles.chevron} ${isStatusMenuOpen ? styles.chevronRotate : ''}`} />
               </button>
-              
+
               {isStatusMenuOpen && (
                 <>
                   <div className={styles.dropdownOverlay} onClick={() => setIsStatusMenuOpen(false)} />
@@ -127,8 +127,8 @@ export default function OrderDetails({
                         onClick={() => handleStatusChange(status)}
                         disabled={isUpdating}
                       >
-                        <span 
-                          className={styles.statusIndicator} 
+                        <span
+                          className={styles.statusIndicator}
                           style={{ backgroundColor: getStatusColor(status) }}
                         />
                         {t(`order_status_${status.toLowerCase()}`, status)}
@@ -162,7 +162,7 @@ export default function OrderDetails({
             </button>
           )}
 
-          <button 
+          <button
             className={`${styles.actionButton} ${order.isFocusOrder ? styles.actionButtonSecondary : styles.actionButtonInfo}`}
             onClick={onToggleFocus}
           >
@@ -183,7 +183,7 @@ export default function OrderDetails({
               {new Date(order.orderDate).toLocaleString()}
             </p>
           </div>
-          <span 
+          <span
             className={styles.statusBadge}
             style={{ backgroundColor: getStatusColor(order.status), color: 'white' }}
           >
@@ -326,7 +326,7 @@ export default function OrderDetails({
         </div>
         <div className={styles.summaryRow}>
           <span className={styles.summaryLabel}>{t('cashier.remaining', 'Remaining')}</span>
-          <span 
+          <span
             className={styles.summaryValue}
             style={{ color: order.remainingAmount! > 0 ? '#ef4444' : '#10b981' }}
           >

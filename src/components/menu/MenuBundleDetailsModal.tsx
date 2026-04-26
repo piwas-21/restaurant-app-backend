@@ -98,7 +98,7 @@ const MenuBundleDetailsModal: React.FC<MenuBundleDetailsModalProps> = ({
                       })}
                     </span>
                   </div>
-                  
+
                   <div className={styles.itemsList}>
                     {section.items.map((item) => (
                       <div key={item.id} className={styles.itemRowWrapper}>
@@ -115,13 +115,13 @@ const MenuBundleDetailsModal: React.FC<MenuBundleDetailsModalProps> = ({
                             </span>
                           )}
                         </div>
-                        
+
                         {getIngredientNames(item) && (
                           <div className={styles.itemIngredients}>
                             {getIngredientNames(item)}
                           </div>
                         )}
-                        
+
                         {(item.allergens && item.allergens.length > 0) && (
                           <AllergenDisplay
                             allergens={item.allergens}

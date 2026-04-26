@@ -80,7 +80,7 @@ export default function TipSelector({
 
   const handleCustomAmountChange = (value: string) => {
     setCustomAmount(value);
-    
+
     // Parse and validate
     const amount = parseFloat(value);
     if (!isNaN(amount) && amount >= 0) {
@@ -117,7 +117,7 @@ export default function TipSelector({
           {t('tip_optional', 'Optional')}
         </span>
       </div>
-      
+
       <div className={styles.tipOptions}>
         {/* No Tip Option */}
         <button

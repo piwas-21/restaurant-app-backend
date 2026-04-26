@@ -20,7 +20,7 @@ export interface UpdateWorkingHoursDto {
 // Helper to convert day name to number
 export const dayNameToNumber = (day: string | number): number => {
   if (typeof day === 'number') return day;
-  
+
   const dayMap: Record<string, number> = {
     'Sunday': 0,
     'Monday': 1,
@@ -30,6 +30,6 @@ export const dayNameToNumber = (day: string | number): number => {
     'Friday': 5,
     'Saturday': 6
   };
-  
+
   return dayMap[day] ?? 0;
 };

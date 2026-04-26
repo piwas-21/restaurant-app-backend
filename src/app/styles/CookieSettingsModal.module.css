@@ -168,7 +168,7 @@ html[data-theme='dark'] .modalContent {
   color: var(--text-color-dark, #eee);
 }
 
-html[data-theme='dark'] .modalHeader, 
+html[data-theme='dark'] .modalHeader,
 html[data-theme='dark'] .modalFooter {
   border-color: var(--border-color-dark, #444);
 }

@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  Wifi, 
-  WifiOff, 
-  Volume2, 
-  VolumeX, 
-  RefreshCw, 
-  Play, 
-  Unlock, 
-  Info, 
+import {
+  Wifi,
+  WifiOff,
+  Volume2,
+  VolumeX,
+  RefreshCw,
+  Play,
+  Unlock,
+  Info,
   X,
   Monitor,
   AlertCircle,
@@ -31,12 +31,12 @@ interface CashierDiagnosticsProps {
   sseConnectionState: 'connecting' | 'connected' | 'disconnected' | 'error';
   sseLastEventTime: Date | null;
   sseError: string | null;
-  
+
   // Audio diagnostics
   audioEnabled: boolean;
   audioReady: boolean;
   audioBlockedByPolicy: boolean;
-  
+
   // Actions
   onTestSound: () => void;
   onEnableAudio: () => void;
@@ -58,7 +58,7 @@ export default function CashierDiagnostics({
   onClose
 }: CashierDiagnosticsProps) {
   const { t } = useTranslation();
-  
+
   // Server diagnostics state
   const [serverDiagnostics, setServerDiagnostics] = useState<SseDiagnostics | null>(null);
   const [serverLoading, setServerLoading] = useState(false);
@@ -210,8 +210,8 @@ export default function CashierDiagnostics({
           <div className={styles.sectionHeader}>
             <Server size={16} style={{ color: '#2196f3' }} />
             <h4 className={styles.sectionTitle}>{t('server_diagnostics') || 'Server Diagnostics'}</h4>
-            <button 
-              onClick={fetchServerDiagnostics} 
+            <button
+              onClick={fetchServerDiagnostics}
               className={styles.iconButton}
               disabled={serverLoading}
               title="Refresh server diagnostics"
@@ -330,9 +330,9 @@ export default function CashierDiagnostics({
               {/* Auto-refresh toggle */}
               <div className={styles.row} style={{ marginTop: '12px' }}>
                 <label className={styles.checkboxLabel}>
-                  <input 
-                    type="checkbox" 
-                    checked={autoRefresh} 
+                  <input
+                    type="checkbox"
+                    checked={autoRefresh}
                     onChange={(e) => setAutoRefresh(e.target.checked)}
                   />
                   Auto-refresh every 5s
@@ -375,9 +375,9 @@ export default function CashierDiagnostics({
                 {t('enable_sound') || 'Enable Sound'}
               </button>
             )}
-            <button 
-              onClick={onTestSound} 
-              disabled={!audioReady} 
+            <button
+              onClick={onTestSound}
+              disabled={!audioReady}
               className={`${styles.actionButton} ${styles.secondaryButton}`}
             >
               <Volume2 size={16} />

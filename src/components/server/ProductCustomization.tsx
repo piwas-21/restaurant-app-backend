@@ -88,7 +88,7 @@ export default function ProductCustomization({
         const response = await getProductById(product.id) as { success: boolean; data?: any };
         if (response.success && response.data) {
           setDetailedProduct(response.data);
-          
+
           // Reset selections
           setExcludedIngredients(new Set());
           setAddedOptionalIngredients(new Set());
@@ -96,7 +96,7 @@ export default function ProductCustomization({
           setSelectedVariation(null);
           setSpecialInstructions('');
           setQuantity(1);
-          
+
           // Initialize required side items
           if (response.data.suggestedSideItems) {
             const requiredSides = new Map<string, number>();
@@ -173,9 +173,9 @@ export default function ProductCustomization({
   }, [detailedProduct]);
 
   // Check if product has customizations
-  const hasCustomizations = standardIngredients.length > 0 || 
-    optionalIngredients.length > 0 || 
-    variations.length > 0 || 
+  const hasCustomizations = standardIngredients.length > 0 ||
+    optionalIngredients.length > 0 ||
+    variations.length > 0 ||
     sideItems.length > 0;
 
   // Toggle excluded ingredient
@@ -378,14 +378,14 @@ export default function ProductCustomization({
 
         <div className={styles.footer}>
           <div className={styles.quantityControl}>
-            <button 
+            <button
               className={styles.qtyButton}
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
             >
               −
             </button>
             <span className={styles.qtyValue}>{quantity}</span>
-            <button 
+            <button
               className={styles.qtyButton}
               onClick={() => setQuantity(quantity + 1)}
             >

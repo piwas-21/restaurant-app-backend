@@ -99,7 +99,7 @@ const MenuManagementContent = () => {
       } else {
          response = await deleteProduct(productToDelete) as { success: boolean; message?: string; data?: string };
       }
-      
+
       setIsConfirmationOpen(false);
       setResultModalMessage(response.data || response.message || '');
       setIsResultModalSuccess(response.success);

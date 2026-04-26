@@ -86,9 +86,9 @@ export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') 
     // for category change we might want to keep showing old until new loads?
     // accepted pattern: setProducts([]) to show loading state cleanly or keep it.
     // Existing code did setProducts([]) on tab change.
-    
+
     // We want to reset page to 1 when tab OR category changes
-    setCurrentPage(1); 
+    setCurrentPage(1);
     fetchProducts(1);
   }, [activeTab, selectedCategoryId]); // Added selectedCategoryId dependency
 

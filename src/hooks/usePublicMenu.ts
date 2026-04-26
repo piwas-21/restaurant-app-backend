@@ -128,7 +128,7 @@ export function usePublicMenu() {
         const gallery = Array.isArray(bundle.images)
           ? bundle.images.map((img: any) => ({ url: img.url, alt: img.altText || bundle.name }))
           : [];
-        
+
         return {
           id: bundle.id,
           name: bundle.name || 'Unnamed Bundle',

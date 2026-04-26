@@ -89,13 +89,13 @@ export async function getTablesWithStatus(): Promise<ServerTableDto[]> {
     const tableOrders = orders.filter(
       order => order.tableNumber?.toString() === table.tableNumber
     );
-    
+
     const upcomingReservation = reservations.find(
       res => res.tableId === table.id
     );
 
     let status: ServerTableDto['status'] = 'available';
-    
+
     if (!table.isActive) {
       status = 'closed';
     } else if (tableOrders.length > 0) {
@@ -105,7 +105,7 @@ export async function getTablesWithStatus(): Promise<ServerTableDto[]> {
       const now = new Date();
       const reservationTime = new Date(`${upcomingReservation.reservationDate}T${upcomingReservation.startTime}`);
       const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
-      
+
       if (reservationTime <= thirtyMinutesFromNow) {
         status = 'reserved';
       }
@@ -130,7 +130,7 @@ export async function getUpcomingReservations(): Promise<ReservationPagedResult<
   const response = await apiClient.get<ApiResponse<ReservationPagedResult<ReservationDto>>>(
     `/api/reservations?date=${today}&status=1&pageSize=50` // status=1 is Confirmed
   );
-  
+
   return response.data || { items: [], totalCount: 0, page: 1, pageSize: 50, totalPages: 0 };
 }
 
@@ -215,10 +215,10 @@ export async function getOrderById(orderId: string): Promise<OrderDto> {
  * Get orders for a specific table
  */
 export async function getOrdersForTable(tableNumber: string): Promise<OrderDto[]> {
-  const result = await getDineInOrders({ 
+  const result = await getDineInOrders({
     tableNumber: parseInt(tableNumber, 10),
     status: 'Pending,Confirmed,Preparing,Ready',
-    pageSize: 50 
+    pageSize: 50
   });
   return result.items || [];
 }
@@ -232,9 +232,9 @@ export async function closeTable(tableId: string): Promise<TableDto> {
   if (!tableResponse.data) {
     throw new Error('Table not found');
   }
-  
+
   const table = tableResponse.data;
-  
+
   // Update the table with isActive = false
   const response = await apiClient.put<ApiResponse<TableDto>>(
     `/api/tables/${tableId}`,
@@ -270,9 +270,9 @@ export async function openTable(tableId: string): Promise<TableDto> {
   if (!tableResponse.data) {
     throw new Error('Table not found');
   }
-  
+
   const table = tableResponse.data;
-  
+
   // Update the table with isActive = true
   const response = await apiClient.put<ApiResponse<TableDto>>(
     `/api/tables/${tableId}`,
@@ -445,19 +445,19 @@ export interface FidelityPointBalanceDto {
  */
 export async function searchUsers(query: string, pageSize: number = 10): Promise<UserDto[]> {
   if (!query || query.length < 2) return [];
-  
+
   const params = new URLSearchParams({
     Search: query,
     Role: 'Customer',
     IsDeleted: 'false',
     PageSize: pageSize.toString(),
   });
-  
+
   const response = await apiClient.get<ApiResponse<{ items: UserDto[] }>>(
     `/api/User/users?${params}`,
     { requireAuth: true }
   );
-  
+
   return response.data?.items || [];
 }
 

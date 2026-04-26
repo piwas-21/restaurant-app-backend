@@ -14,19 +14,19 @@ export default function FooterCookieLink() {
   }, []);
 
   // Use fallback text before mount, and translated text after mount
-  const buttonText = isMounted 
-    ? t('cookie_settings_footer_link', 'Manage Cookie Preferences') 
+  const buttonText = isMounted
+    ? t('cookie_settings_footer_link', 'Manage Cookie Preferences')
     : 'Manage Cookie Preferences';
 
   return (
-    <button 
-      onClick={openSettingsModal} 
-      style={{ 
-        background: 'none', 
-        border: 'none', 
+    <button
+      onClick={openSettingsModal}
+      style={{
+        background: 'none',
+        border: 'none',
         color: 'var(--text-color)',
-        textDecoration: 'underline', 
-        cursor: 'pointer', 
+        textDecoration: 'underline',
+        cursor: 'pointer',
         padding: '0.5rem 0',
         fontSize: '0.9rem'
       }}

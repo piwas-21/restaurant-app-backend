@@ -132,7 +132,7 @@ const MemberManagementPage = () => {
       setIsConfirmationModalOpen(false);
       const messageKey = isPermanent ? 'user_permanently_deleted' : 'user_deleted_successfully';
       const defaultMessage = isPermanent ? 'User permanently deleted' : 'User deleted successfully';
-      
+
       setResultModalMessage(t(messageKey, defaultMessage));
       setIsResultModalSuccess(result.success);
       setIsResultModalOpen(true);

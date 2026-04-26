@@ -115,7 +115,7 @@ export function ProductIngredientsManager({
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5113";
       const response = await fetch(`${apiUrl}/api/global-ingredients/search?query=${encodeURIComponent(query)}&limit=5`);
-      
+
       if (response.ok) {
         const result = await response.json();
         const items = result.data || [];
@@ -146,10 +146,10 @@ export function ProductIngredientsManager({
 
   const selectGlobalIngredient = (index: number, suggestion: GlobalIngredientSuggestion) => {
     const updated = [...ingredients];
-    
+
     // Set the ingredient name
     updated[index].name = suggestion.defaultName;
-    
+
     // Store the global ingredient ID (add this field if it doesn't exist)
     (updated[index] as any).globalIngredientId = suggestion.id;
 
@@ -167,7 +167,7 @@ export function ProductIngredientsManager({
     });
 
     onChange(updated);
-    
+
     // Hide suggestions
     setShowSuggestions(prev => ({ ...prev, [index]: false }));
   };

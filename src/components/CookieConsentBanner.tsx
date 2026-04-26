@@ -19,7 +19,7 @@ export default function CookieConsentBanner() {
   if (isConsentPending && consent.preferences !== null) {
       return null;
   }
-  
+
   // Only show when consent is loaded (isConsentPending is false) AND preferences is still null
   if (isConsentPending || consent.preferences !== null) {
     return null;

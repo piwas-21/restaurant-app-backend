@@ -418,7 +418,7 @@
   .detailsContainer {
     grid-template-columns: 1fr 450px;
   }
-  
+
   .primaryImage {
     max-height: 600px;
   }

@@ -47,7 +47,7 @@ const ProductDetailsPage = () => {
     setError(null);
     try {
       let response;
-      
+
       // Use type parameter to determine which API to call
       if (type === 'menu') {
         response = await getMenuBundleById(productId) as { success: boolean; data?: any; message?: string };
@@ -86,7 +86,7 @@ const ProductDetailsPage = () => {
       } else {
         response = await deleteProduct(product.id) as { success: boolean; message?: string; data?: string };
       }
-      
+
       setIsConfirmationOpen(false);
       setResultModalMessage(response.data || response.message || '');
       setIsResultModalSuccess(response.success);
@@ -110,21 +110,21 @@ const ProductDetailsPage = () => {
       <div className={styles.adminContainer}>
         <PageHeader title={product.name}>
           <div className={styles.pageActions}>
-            <button 
-              className={`${styles.adminButton} ${styles.edit}`} 
+            <button
+              className={`${styles.adminButton} ${styles.edit}`}
               onClick={() => setIsEditModalOpen(true)}
             >
               {isMenuBundle ? t('edit_menu_bundle') : t('edit_product')}
             </button>
-            <button 
-              className={`${styles.adminButton} ${styles.delete}`} 
+            <button
+              className={`${styles.adminButton} ${styles.delete}`}
               onClick={() => setIsConfirmationOpen(true)}
             >
               {isMenuBundle ? t('delete_menu_bundle') : t('delete_product')}
             </button>
           </div>
         </PageHeader>
-        
+
         {isMenuBundle ? (
           <MenuBundleDetails product={product} onUpdated={fetchProductData} />
         ) : (
@@ -134,24 +134,24 @@ const ProductDetailsPage = () => {
               <DetailsEditor product={product} onUpdated={fetchProductData} />
               <CategoriesEditor product={product} onUpdated={fetchProductData} />
               <MultilingualContentEditor product={product} onUpdated={fetchProductData} />
-              <VariationsTable 
-                variations={product.variations || []} 
-                productId={product.id} 
-                onUpdated={fetchProductData} 
-                product={product} 
+              <VariationsTable
+                variations={product.variations || []}
+                productId={product.id}
+                onUpdated={fetchProductData}
+                product={product}
               />
-              <SuggestedSideItemsTable 
-                suggestedSideItems={product.suggestedSideItems || []} 
-                productId={product.id} 
-                onUpdated={fetchProductData} 
-                product={product} 
+              <SuggestedSideItemsTable
+                suggestedSideItems={product.suggestedSideItems || []}
+                productId={product.id}
+                onUpdated={fetchProductData}
+                product={product}
               />
             </div>
             <div className={detailsStyles.sidebar}>
-              <ImageGallery 
-                images={product.images || []} 
-                productName={product.name} 
-                onImageUpdate={fetchProductData} 
+              <ImageGallery
+                images={product.images || []}
+                productName={product.name}
+                onImageUpdate={fetchProductData}
               />
             </div>
           </div>

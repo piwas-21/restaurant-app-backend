@@ -94,7 +94,7 @@ function DeleteAccountContent() {
               </div>
 
               <div className={styles.buttonGroup}>
-                <button 
+                <button
                   onClick={handleConfirmDelete}
                   className={styles.confirmButton}
                 >

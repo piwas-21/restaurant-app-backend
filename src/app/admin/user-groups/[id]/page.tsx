@@ -15,22 +15,22 @@ import DiscountModal from '@/components/admin/user-groups/DiscountModal';
 import QRCodeModal from '@/components/admin/user-groups/QRCodeModal';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
-import { 
-  UserGroupDto, 
-  GroupMembershipDto, 
-  GroupDiscountDto, 
-  CreateGroupDiscountDto, 
-  UpdateGroupDiscountDto 
+import {
+  UserGroupDto,
+  GroupMembershipDto,
+  GroupDiscountDto,
+  CreateGroupDiscountDto,
+  UpdateGroupDiscountDto
 } from '@/types/userGroupTypes';
-import { 
-  getUserGroup, 
-  getGroupMembers, 
-  addGroupMember, 
-  removeGroupMember, 
-  getGroupDiscounts, 
-  createGroupDiscount, 
-  updateGroupDiscount, 
-  deleteGroupDiscount 
+import {
+  getUserGroup,
+  getGroupMembers,
+  addGroupMember,
+  removeGroupMember,
+  getGroupDiscounts,
+  createGroupDiscount,
+  updateGroupDiscount,
+  deleteGroupDiscount
 } from '@/services/userGroupService';
 
 const UserGroupDetailsPage = () => {
@@ -43,17 +43,17 @@ const UserGroupDetailsPage = () => {
   const [members, setMembers] = useState<GroupMembershipDto[]>([]);
   const [discounts, setDiscounts] = useState<GroupDiscountDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [selectedDiscount, setSelectedDiscount] = useState<GroupDiscountDto | null>(null);
-  
+
   const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{ data: string; title: string } | null>(null);
-  
+
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ type: 'member' | 'discount', id: string, name: string } | null>(null);
-  
+
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [resultModalMessage, setResultModalMessage] = useState('');
   const [isResultModalSuccess, setIsResultModalSuccess] = useState(false);
@@ -70,7 +70,7 @@ const UserGroupDetailsPage = () => {
       ]);
 
       if (groupRes.success && groupRes.data) setGroup(groupRes.data);
-      
+
       if (membersRes.success && membersRes.data) setMembers(membersRes.data);
       else setMembers([]);
 
@@ -202,15 +202,15 @@ const UserGroupDetailsPage = () => {
     <AdminAuthGuard>
       <div className={styles.adminContainer}>
         <PageHeader title={group ? group.name : t('loading')}>
-          <button 
-            className={`${styles.adminButton} ${detailsStyles.backButton}`} 
+          <button
+            className={`${styles.adminButton} ${detailsStyles.backButton}`}
             onClick={() => router.push('/admin/user-groups')}
           >
             <ArrowLeft size={18} />
             {t('back_to_groups')}
           </button>
         </PageHeader>
-        
+
         <div className={styles.adminContent}>
           {group && (
             <div className={detailsStyles.groupInfoCard}>
@@ -225,8 +225,8 @@ const UserGroupDetailsPage = () => {
           <div className={detailsStyles.section}>
             <div className={detailsStyles.sectionHeader}>
               <h3>{t('members')}</h3>
-              <button 
-                className={`${styles.adminButton} ${styles.add}`} 
+              <button
+                className={`${styles.adminButton} ${styles.add}`}
                 onClick={() => setIsAddMemberModalOpen(true)}
               >
                 {t('add_member')}
@@ -243,8 +243,8 @@ const UserGroupDetailsPage = () => {
           <div className={detailsStyles.section}>
             <div className={detailsStyles.sectionHeader}>
               <h3>{t('discounts')}</h3>
-              <button 
-                className={`${styles.adminButton} ${styles.add}`} 
+              <button
+                className={`${styles.adminButton} ${styles.add}`}
                 onClick={() => {
                   setSelectedDiscount(null);
                   setIsDiscountModalOpen(true);

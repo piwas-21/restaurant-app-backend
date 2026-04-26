@@ -169,7 +169,7 @@ const UserGroupModal: React.FC<UserGroupModalProps> = ({
                   >
                     ×
                   </button>
-                  
+
                   <div className={styles.formGroup}>
                     <label htmlFor="discountName">{t('discount_name')} *</label>
                     <input id="discountName" {...register('discountName')} />

@@ -132,4 +132,3 @@ const DetailsEditor: React.FC<Props> = ({ product, onUpdated }) => {
 };
 
 export default DetailsEditor;
-

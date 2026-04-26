@@ -55,10 +55,10 @@ export default function OptionalIngredientsSection({
   const handleQuantityChange = (e: React.MouseEvent, ingredientId: string, change: number, max: number) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const currentQty = ingredientQuantities[ingredientId] || 1;
     const newQty = currentQty + change;
-    
+
     if (newQty >= 1 && newQty <= max) {
       onQuantityChange(ingredientId, newQty);
     }
@@ -113,7 +113,7 @@ export default function OptionalIngredientsSection({
               const maxQty = ingredient.maxQuantity || 1;
               const showQuantityControls = isSelected && maxQty > 1;
               const currentQty = ingredientQuantities[ingredient.id] || 1;
-              
+
               return (
                 <div key={ingredient.id} className={styles.ingredientItemWrapper}>
                   <label className={styles.ingredientItem}>
@@ -136,10 +136,10 @@ export default function OptionalIngredientsSection({
                       )}
                     </div>
                   </label>
-                  
+
                   {showQuantityControls && (
                     <div className={styles.quantityControls}>
-                      <button 
+                      <button
                         type="button"
                         className={styles.quantityBtn}
                         onClick={(e) => handleQuantityChange(e, ingredient.id, -1, maxQty)}
@@ -148,7 +148,7 @@ export default function OptionalIngredientsSection({
                         -
                       </button>
                       <span className={styles.quantityValue}>{currentQty}</span>
-                      <button 
+                      <button
                         type="button"
                         className={styles.quantityBtn}
                         onClick={(e) => handleQuantityChange(e, ingredient.id, 1, maxQty)}

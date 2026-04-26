@@ -68,7 +68,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
    */
   const refreshOrders = useCallback(async (modifiedSince?: Date) => {
     if (!isMountedRef.current) return;
-    
+
     try {
       setError(null);
       // Use modifiedSince parameter for efficient polling
@@ -161,7 +161,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
     try {
       setConnectionState('connecting');
-      
+
       const authToken = localStorage.getItem('auth_token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5221';
       const endpoint = '/api/events/service';
@@ -202,7 +202,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
       // Handle heartbeat events
       eventSource.addEventListener('heartbeat', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         const eventTime = new Date();
         setLastEventTime(eventTime);
         lastEventTimeRef.current = eventTime;
@@ -212,7 +212,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
       // Handle order events
       eventSource.addEventListener('order-created', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           console.log('📦 SSE: order-created:', data.order?.orderNumber || data.orderNumber);
@@ -235,7 +235,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
       eventSource.addEventListener('order-status-changed', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
@@ -256,7 +256,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
       eventSource.addEventListener('order-ready', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
@@ -277,7 +277,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
       eventSource.addEventListener('order-completed', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
@@ -298,7 +298,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
       eventSource.addEventListener('focus-order-update', (event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
-        
+
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
@@ -328,7 +328,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
           readyState: eventSource.readyState,
           readyStateText: ['CONNECTING', 'OPEN', 'CLOSED'][eventSource.readyState],
         });
-        
+
         if (!isMountedRef.current) return;
 
         setIsConnected(false);
@@ -361,7 +361,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
         const lastEvent = lastEventTimeRef.current;
         const currentEventSource = eventSourceRef.current;
-        
+
         // 1. Check if connection is closed or null
         if (!currentEventSource || currentEventSource.readyState === EventSource.CLOSED) {
           console.warn('⚠️ SSE: Connection closed, reconnecting...');
@@ -410,12 +410,12 @@ export function useCashierOrders(): UseCashierOrdersReturn {
    */
   const startPrimaryPolling = useCallback(() => {
     if (primaryPollingIntervalRef.current) return; // Already running
-    
+
     console.log('🔄 Starting PRIMARY polling (every 5s)');
-    
+
     primaryPollingIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
-      
+
       // Use modifiedSince for efficient incremental updates
       const since = lastPolledAtRef.current;
       refreshOrders(since || undefined);
@@ -439,10 +439,10 @@ export function useCashierOrders(): UseCashierOrdersReturn {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isMountedRef.current) {
         console.log('👁️ Tab became visible, checking connection...');
-        
+
         // Refresh orders immediately
         refreshOrders();
-        
+
         // Check if SSE needs reconnection
         const eventSource = eventSourceRef.current;
         if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
@@ -502,7 +502,7 @@ export function useCashierOrders(): UseCashierOrdersReturn {
   useEffect(() => {
     console.log('🔌 Initializing cashier orders hook...');
     isMountedRef.current = true;
-    
+
     // Initial full fetch
     refreshOrders();
 

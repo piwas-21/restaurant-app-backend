@@ -27,7 +27,7 @@ const MenuBundleDetails: React.FC<MenuBundleDetailsProps> = ({ product, onUpdate
     if (!product.menuDefinition) return;
     try {
       const updatedMenuDefinition = { ...product.menuDefinition, ...updates };
-      
+
       // Clean up temporary IDs from sections and items
       const cleanedSections = updatedMenuDefinition.sections?.map(s => {
         const sectionData: any = {
@@ -162,7 +162,7 @@ const MenuBundleDetails: React.FC<MenuBundleDetailsProps> = ({ product, onUpdate
       {/* Menu Schedule */}
       {product.menuDefinition && (
         <div className={styles.collapsibleSection}>
-          <div 
+          <div
             className={styles.collapsibleHeader}
             onClick={() => setScheduleOpen(!scheduleOpen)}
           >
@@ -210,7 +210,7 @@ const MenuBundleDetails: React.FC<MenuBundleDetailsProps> = ({ product, onUpdate
       {/* Menu Sections */}
       {product.menuDefinition && product.menuDefinition.sections && (
         <div className={styles.collapsibleSection}>
-          <div 
+          <div
             className={styles.collapsibleHeader}
             onClick={() => setSectionsOpen(!sectionsOpen)}
           >
@@ -265,7 +265,7 @@ const MenuBundleDetails: React.FC<MenuBundleDetailsProps> = ({ product, onUpdate
 
       {/* Multilingual Content */}
       <div className={styles.collapsibleSection}>
-        <div 
+        <div
           className={styles.collapsibleHeader}
           onClick={() => setContentOpen(!contentOpen)}
         >
@@ -283,7 +283,7 @@ const MenuBundleDetails: React.FC<MenuBundleDetailsProps> = ({ product, onUpdate
 
       {/* Product Information (Admin) */}
       <div className={styles.collapsibleSection}>
-        <div 
+        <div
           className={styles.collapsibleHeader}
           onClick={() => setInfoOpen(!infoOpen)}
         >

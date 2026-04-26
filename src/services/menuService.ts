@@ -187,4 +187,3 @@ export const getPublicMenuBundles = async (page: number = 1, pageSize: number = 
     throw error;
   }
 };
-

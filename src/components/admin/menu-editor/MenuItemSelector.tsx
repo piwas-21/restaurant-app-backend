@@ -78,7 +78,7 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange, ma
     if (checked) {
       // Count current defaults
       const currentDefaultCount = items.filter(item => item.isDefault).length;
-      
+
       // If maxSelection is 1, behave like radio buttons - uncheck others
       if (maxSelection === 1) {
         const newItems = items.map((item, i) => ({
@@ -88,14 +88,14 @@ const MenuItemSelector: React.FC<MenuItemSelectorProps> = ({ items, onChange, ma
         onChange(newItems);
         return;
       }
-      
+
       // For maxSelection > 1, check if we're at the limit
       if (currentDefaultCount >= maxSelection) {
         alert(t('max_default_items_reached', { max: maxSelection, defaultValue: `You can only mark up to ${maxSelection} item(s) as default for this section.` }));
         return;
       }
     }
-    
+
     updateItem(index, { isDefault: checked });
   };
 

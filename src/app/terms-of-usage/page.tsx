@@ -9,7 +9,7 @@ export default function TermsOfUsagePage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <h1 className="text-3xl font-bold mb-6">{t('terms_of_usage.title', 'Terms of Usage')}</h1>
-      
+
       <div className="prose dark:prose-invert max-w-none">
         <p className="mb-4">{t('terms_of_usage.last_updated', { date: new Date().toLocaleDateString() })}</p>
 

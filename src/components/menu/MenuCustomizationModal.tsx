@@ -50,10 +50,10 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
       const defaults = new Map<string, SelectedMenuOption[]>();
       menuDefinition.sections.forEach(section => {
         const defaultItems = section.items.filter(item => item.isDefault);
-        
+
         // Respect maxSelection when initializing defaults
         const itemsToSelect = defaultItems.slice(0, section.maxSelection);
-        
+
         if (itemsToSelect.length > 0) {
           defaults.set(
             section.id,
@@ -128,7 +128,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
         const item = section?.items.find(i => i.productId === selection.itemId);
         if (item) {
           total += item.additionalPrice * selection.quantity;
-          
+
           // Add customization price if exists
           const customizationKey = `${selection.sectionId}-${selection.itemId}`;
           const customization = itemCustomizations.get(customizationKey);
@@ -172,7 +172,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
       sectionSelections.forEach(selection => {
         const customizationKey = `${selection.sectionId}-${selection.itemId}`;
         const customization = itemCustomizations.get(customizationKey);
-        
+
         // Add customization data to the selection
         const enrichedSelection: SelectedMenuOption = {
           ...selection,
@@ -184,7 +184,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
             specialInstructions: customization.specialInstructions,
           }),
         };
-        
+
         allSelections.push(enrichedSelection);
       });
     });
@@ -200,7 +200,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
 
   const handleCustomizationConfirm = (customization: ProductCustomization) => {
     if (!customizingItem) return;
-    
+
     const customizationKey = `${customizingItem.sectionId}-${customizingItem.itemId}`;
     const newCustomizations = new Map(itemCustomizations);
     newCustomizations.set(customizationKey, customization);
@@ -210,7 +210,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
 
   const getItemForCustomization = () => {
     if (!customizingItem) return null;
-    
+
     const section = menuDefinition.sections.find(s => s.id === customizingItem.sectionId);
     const item = section?.items.find(i => i.productId === customizingItem.itemId);
     return item || null;
@@ -295,13 +295,13 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
                               </span>
                             )}
                           </div>
-                          
+
                           {getIngredientNames(item) && (
                             <div className={styles.optionIngredients}>
                               {getIngredientNames(item)}
                             </div>
                           )}
-                          
+
                           {item.allergens && item.allergens.length > 0 && (
                             <AllergenDisplay
                               allergens={item.allergens}
@@ -311,7 +311,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
                               className={styles.optionAllergens}
                             />
                           )}
-                          
+
                           {/* Customize button for selected items with customizable options */}
                           {isSelected && (item.detailedIngredients?.length || item.suggestedSideItems?.length) && (
                             <button
@@ -344,7 +344,7 @@ const MenuCustomizationModal: React.FC<MenuCustomizationModalProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Product Customization Modal */}
       {customizingItem && getItemForCustomization() && (
         <ProductCustomizationInBundle

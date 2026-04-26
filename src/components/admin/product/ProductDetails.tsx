@@ -71,7 +71,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({
           onChange={(e) => setImageFiles(Array.from(e.target.files || []))}
         />
         {imageFiles.length > 0 && <p>{t('files_selected', { count: imageFiles.length })}</p>}
-        
+
         {existingImages && existingImages.length > 0 && (
           <div className={styles.existingImagesList}>
             <p><strong>{t('uploaded_images')}:</strong></p>

@@ -77,7 +77,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
       {item.isDefault && (
         <div className={styles.defaultBadge}>Default</div>
       )}
-      
+
       <div className={styles.productCardContent}>
         {primaryImage && (
           <img
@@ -86,14 +86,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
             className={styles.productImage}
           />
         )}
-        
+
         <div className={styles.productInfo}>
           <h4 className={styles.productName}>{product.name}</h4>
-          
+
           {product.description && (
             <p className={styles.productDescription}>{product.description}</p>
           )}
-          
+
           <div className={styles.productPrice}>
             CHF {displayPrice.toFixed(2)}
             {hasAdditionalPrice && (
@@ -102,15 +102,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
               </span>
             )}
           </div>
-          
+
           <div className={styles.productTags}>
-            <AllergenDisplay 
+            <AllergenDisplay
               allergens={product.allergens}
               variant="compact"
               maxVisible={3}
               showLabel={false}
             />
-            
+
             {product.ingredients && product.ingredients.length > 0 && (
               <>
                 {product.ingredients.slice(0, 2).map((ingredient, idx) => (

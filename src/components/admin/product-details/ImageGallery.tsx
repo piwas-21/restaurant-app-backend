@@ -117,10 +117,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images = [], productName, o
           {imageList.length > 0 && (
             <>
               <div className={detailsStyles.primaryImageContainer}>
-                <img 
-                  src={selectedImage?.url} 
-                  alt={selectedImage?.altText || productName} 
-                  className={detailsStyles.primaryImage} 
+                <img
+                  src={selectedImage?.url}
+                  alt={selectedImage?.altText || productName}
+                  className={detailsStyles.primaryImage}
                 />
               </div>
               <div className={detailsStyles.thumbnailContainer}>
@@ -146,7 +146,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images = [], productName, o
               )}
             </>
           )}
-          
+
           <div className={detailsStyles.uploadSection}>
             {stagedFiles.length > 0 && (
               <div>

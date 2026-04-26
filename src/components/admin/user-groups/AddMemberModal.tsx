@@ -35,7 +35,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
-    
+
     setIsLoading(true);
     try {
       // Search for customers only
@@ -64,7 +64,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
     <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
         <h2>{t('add_member')}</h2>
-        
+
         <div className={styles.formGroup}>
           <label>{t('search_and_select_customer')}</label>
           <div className={modalStyles.searchContainer}>
@@ -76,8 +76,8 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className={modalStyles.searchInput}
             />
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={handleSearch}
               className={`${styles.submitButton} ${modalStyles.searchButton}`}
               disabled={isLoading}
@@ -93,7 +93,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
           ) : users.length > 0 ? (
             <ul className={modalStyles.userList}>
               {users.map((user) => (
-                <li 
+                <li
                   key={user.id}
                   onClick={() => setSelectedUserId(user.id)}
                   className={modalStyles.userListItem}
@@ -121,15 +121,15 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
         </div>
 
         <div className={styles.buttonGroup}>
-          <button 
-            onClick={handleSubmit} 
-            className={styles.submitButton} 
+          <button
+            onClick={handleSubmit}
+            className={styles.submitButton}
             disabled={!selectedUserId || isSubmitting}
           >
             {isSubmitting ? t('saving...') : t('add')}
           </button>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className={styles.cancelButton}
             disabled={isSubmitting}
           >

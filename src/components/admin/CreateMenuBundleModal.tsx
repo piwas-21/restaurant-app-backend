@@ -124,7 +124,7 @@ const CreateMenuBundleModal: React.FC<CreateProductModalProps> = ({
       data: data as any, // Cast to any to bypass strict FormData check in util
       imageFiles,
       currentLanguage,
-      detailedIngredients: [], 
+      detailedIngredients: [],
       setSubmissionStatus,
       setError: setError as any,
       onProductCreated,
@@ -223,9 +223,9 @@ const CreateMenuBundleModal: React.FC<CreateProductModalProps> = ({
               watch={watch}
               currentLanguage={currentLanguage}
             />
-            
+
             <div className={modalStyles.sectionDivider}></div>
-            
+
             <h3>{t('menu_availability')}</h3>
             <MenuScheduleEditor
               menuDefinition={menuDefinition}

@@ -85,7 +85,7 @@ export default function LoginPage() {
         }
       } else {
         // Check if it's an email verification error
-        if (response.message?.toLowerCase().includes('verify') || 
+        if (response.message?.toLowerCase().includes('verify') ||
             response.message?.toLowerCase().includes('verification') ||
             response.errors?.[0]?.toLowerCase().includes('verify')) {
           setNeedsVerification(true);
@@ -110,7 +110,7 @@ export default function LoginPage() {
               {needsVerification && (
                 <div style={{ marginTop: '1rem' }}>
                   {resendMessage && (
-                    <p style={{ 
+                    <p style={{
                       color: resendMessage.includes('resent') ? '#10b981' : '#ef4444',
                       fontSize: '0.9rem',
                       marginBottom: '0.75rem'

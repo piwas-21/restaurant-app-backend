@@ -37,14 +37,14 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
   currentLanguage,
 }) => {
   const { t } = useTranslation();
-  
+
   // Helper function to get translated ingredient name
   const getIngredientName = (ingredient: DetailedIngredient): string => {
-    return ingredient.content?.[currentLanguage]?.name || 
-           ingredient.content?.en?.name || 
+    return ingredient.content?.[currentLanguage]?.name ||
+           ingredient.content?.en?.name ||
            ingredient.name;
   };
-  
+
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set());
   const [excludedIngredients, setExcludedIngredients] = useState<Set<string>>(new Set());
   const [ingredientQuantities, setIngredientQuantities] = useState<Record<string, number>>({});
@@ -66,7 +66,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
         // Default: include all non-optional ingredients that are included in base price
         const defaultSelected = new Set<string>();
         const defaultQuantities: Record<string, number> = {};
-        
+
         detailedIngredients.forEach(ing => {
           // Always select non-optional ingredients
           if (!ing.isOptional) {
@@ -79,7 +79,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
             defaultQuantities[ing.id] = 1;
           }
         });
-        
+
         setSelectedIngredients(defaultSelected);
         setExcludedIngredients(new Set());
         setIngredientQuantities(defaultQuantities);
@@ -91,14 +91,14 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
 
   const calculateTotalPrice = (): number => {
     let total = basePrice;
-    
+
     // Add ingredient costs
     detailedIngredients.forEach(ing => {
       if (ing.isIncludedInBasePrice) {
         // Ingredient price is included in base price for 1 quantity
         const isSelected = selectedIngredients.has(ing.id);
         const quantity = ingredientQuantities[ing.id] || 1;
-        
+
         if (!isSelected) {
           // Deselected: deduct the included quantity (1)
           total -= ing.price;
@@ -114,7 +114,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
         total += ing.price * quantity;
       }
     });
-    
+
     // Add side item costs
     selectedSideItems.forEach((quantity, sideId) => {
       const side = suggestedSideItems.find(s => s.id === sideId);
@@ -122,7 +122,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
         total += side.sideItemBasePrice * quantity;
       }
     });
-    
+
     return total;
   };
 
@@ -156,7 +156,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
 
     const currentQty = ingredientQuantities[ingredientId] || 1;
     const newQty = Math.max(1, Math.min(ingredient.maxQuantity, currentQty + delta));
-    
+
     setIngredientQuantities({
       ...ingredientQuantities,
       [ingredientId]: newQty,
@@ -165,13 +165,13 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
 
   const handleSideItemToggle = (sideItem: SuggestedSideItem) => {
     const newSides = new Map(selectedSideItems);
-    
+
     if (newSides.has(sideItem.id)) {
       newSides.delete(sideItem.id);
     } else {
       newSides.set(sideItem.id, 1);
     }
-    
+
     setSelectedSideItems(newSides);
   };
 
@@ -179,7 +179,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
     const newSides = new Map(selectedSideItems);
     const currentQty = newSides.get(sideId) || 1;
     const newQty = Math.max(1, currentQty + delta);
-    
+
     newSides.set(sideId, newQty);
     setSelectedSideItems(newSides);
   };
@@ -196,7 +196,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
       specialInstructions: specialInstructions.trim() || undefined,
       totalPrice: calculateTotalPrice(),
     };
-    
+
     onConfirm(customization);
     onClose();
   };
@@ -230,7 +230,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
           {detailedIngredients.length > 0 && (
             <div className={styles.section}>
               <h4>{t('customize_ingredients')}</h4>
-              
+
               {/* Included Ingredients (non-optional) */}
               {detailedIngredients.filter(ing => !ing.isOptional).length > 0 && (
                 <div className={styles.ingredientGroup}>
@@ -242,8 +242,8 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                       const showQuantity = isSelected && ingredient.maxQuantity > 1;
 
                       return (
-                        <div 
-                          key={ingredient.id} 
+                        <div
+                          key={ingredient.id}
                           className={`${styles.customizationItem} ${isSelected ? styles.selected : ''} ${styles.disabled}`}
                         >
                           <label className={styles.itemLabel}>
@@ -265,7 +265,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                               )}
                             </div>
                           </label>
-                          
+
                           {showQuantity && (
                             <div className={styles.quantityControl}>
                               <button
@@ -291,7 +291,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                   </div>
                 </div>
               )}
-              
+
               {/* Optional Ingredients */}
               {detailedIngredients.filter(ing => ing.isOptional).length > 0 && (
                 <div className={styles.ingredientGroup}>
@@ -303,8 +303,8 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                       const showQuantity = isSelected && ingredient.maxQuantity > 1;
 
                       return (
-                        <div 
-                          key={ingredient.id} 
+                        <div
+                          key={ingredient.id}
                           className={`${styles.customizationItem} ${isSelected ? styles.selected : ''}`}
                         >
                           <label className={styles.itemLabel}>
@@ -331,7 +331,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                               )}
                             </div>
                           </label>
-                          
+
                           {showQuantity && (
                             <div className={styles.quantityControl}>
                               <button
@@ -390,7 +390,7 @@ const ProductCustomizationInBundle: React.FC<ProductCustomizationInBundleProps> 
                           </span>
                         </div>
                       </label>
-                      
+
                       {isSelected && (
                         <div className={styles.quantityControl}>
                           <button

@@ -53,8 +53,8 @@ export default function OrderItemsList({ items, formatPrice }: OrderItemsListPro
       </div>
       <div className={styles.itemsList}>
         {items.map((item, index) => {
-          const variationName = item.variationContent?.[currentLanguage]?.name || 
-                                item.variationContent?.en?.name || 
+          const variationName = item.variationContent?.[currentLanguage]?.name ||
+                                item.variationContent?.en?.name ||
                                 item.variationName;
 
           return (

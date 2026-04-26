@@ -59,7 +59,7 @@ export default function CashierMainContent({
         <div className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
             <h2 className={styles.sidebarTitle}>{t('cashier.orders') || 'Orders'}</h2>
-            
+
             {/* Filters inside sidebar */}
             <div className={styles.filterSection}>
               <input

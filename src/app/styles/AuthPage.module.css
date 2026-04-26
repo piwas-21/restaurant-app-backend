@@ -122,11 +122,11 @@
 @media (max-width: 768px) {
   .authContainer {
     padding: 1.5rem 1rem;
-    min-height: auto; 
+    min-height: auto;
   }
   .authForm {
     padding: 2rem;
-    margin: 1rem; 
+    margin: 1rem;
   }
   .authForm h1 {
     font-size: 1.8rem;

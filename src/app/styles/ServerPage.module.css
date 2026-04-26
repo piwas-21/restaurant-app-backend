@@ -189,7 +189,7 @@
   padding: 0.3rem 0.6rem;
   border-radius: 4px;
   display: inline-block;
-  min-width: 100px; 
+  min-width: 100px;
   text-align: center;
 }
 
@@ -224,7 +224,7 @@
 }
 
 .actionButton:hover {
-  background-color: var(--link-hover-color); 
+  background-color: var(--link-hover-color);
   border-color: var(--link-hover-color);
 }
 

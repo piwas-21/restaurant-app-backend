@@ -118,7 +118,7 @@ export default function OrderList({
                 <span className={styles.orderTypeIcon}>{orderTypeDisplay.icon}</span>
                 <span className={styles.orderNumber}>{order.orderNumber}</span>
               </div>
-              <span 
+              <span
                 className={styles.orderStatusBadge}
                 style={{ backgroundColor: statusColor }}
               >

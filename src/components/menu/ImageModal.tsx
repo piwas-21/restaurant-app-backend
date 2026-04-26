@@ -69,4 +69,3 @@ export default function ImageModal({ isOpen, images, currentIndex, onClose, onNe
     </div>
   );
 }
-

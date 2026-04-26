@@ -104,10 +104,10 @@ export default function MenuPage() {
       // Otherwise use default items (respecting maxSelection)
       const optionsToAdd = selectedOptions || bundle.menuDefinition.sections?.flatMap((section) => {
         const defaultItems = section.items.filter((item) => item.isDefault);
-        
+
         // Respect maxSelection when selecting defaults
         const itemsToSelect = defaultItems.slice(0, section.maxSelection);
-        
+
         return itemsToSelect.map((item) => ({
           sectionId: section.id,
           itemId: item.productId,
@@ -123,14 +123,14 @@ export default function MenuPage() {
         quantity: 1,
         selectedMenuOptions: optionsToAdd,
       });
-      
+
       // Close customization modal if open
       setSelectedBundleForCustomization(null);
 
       enqueueSnackbar(t('item_added_to_cart_toast', { itemName: bundleName }), {
         variant: 'success',
       });
-      
+
       // Trigger cart animation
       setCartAnimationTrigger(true);
       setTimeout(() => setCartAnimationTrigger(false), 100);
@@ -239,7 +239,7 @@ export default function MenuPage() {
           }
           basePrice={selectedBundleForCustomization.basePrice}
           menuDefinition={selectedBundleForCustomization.menuDefinition}
-          onAddToBasket={(selectedOptions, totalPrice) => 
+          onAddToBasket={(selectedOptions, totalPrice) =>
             handleAddBundleToCart(selectedBundleForCustomization, selectedOptions, totalPrice)
           }
           currentLanguage={currentLanguage}

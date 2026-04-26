@@ -105,7 +105,7 @@ export default function CustomizationModal({
       const defaultSelected = product.detailedIngredients
         .filter((ing) => ing.isActive)
         .map((ing) => ing.id);
-      
+
       setSelectedIngredients(defaultSelected);
 
       // Initialize quantities for default selected ingredients

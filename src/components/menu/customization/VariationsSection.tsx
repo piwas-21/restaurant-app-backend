@@ -81,7 +81,7 @@ export default function VariationsSection({
         {/* Variation options */}
         {activeVariations.map((variation) => {
           const { name, description } = getVariationContent(variation);
-          
+
           // priceModifier is always additive (positive = add, negative = subtract)
           const varPrice = basePrice + variation.priceModifier;
           const priceChangeText = variation.priceModifier >= 0

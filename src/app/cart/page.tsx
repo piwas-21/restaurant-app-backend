@@ -120,8 +120,8 @@ export default function CartPage() {
         <div className={styles.cartItemsList}>
           {state.items.map((item) => {
             const itemId = item.basketItemId || item.id || item.productId;
-            const variationName = item.variationContent?.[currentLanguage]?.name || 
-                                  item.variationContent?.en?.name || 
+            const variationName = item.variationContent?.[currentLanguage]?.name ||
+                                  item.variationContent?.en?.name ||
                                   item.variationName;
 
             return (

@@ -79,10 +79,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5221';
 const apiClient = {
   get: (endpoint: string) => {
     // For relative paths like '/api/Categories'
-    const url = endpoint.startsWith('http') 
-      ? endpoint 
+    const url = endpoint.startsWith('http')
+      ? endpoint
       : `${API_BASE_URL}${endpoint}`;
-    
+
     // Result: https://rumirestaurant.ch/api/Categories
     return fetchWithAuth(url);
   }
@@ -121,7 +121,7 @@ spec:
     http:
       paths:
       # ⭐ PATH-BASED ROUTING - This is the magic!
-      
+
       # Rule 1: API requests → Backend
       - path: /api
         pathType: Prefix           # ← Matches any path starting with /api
@@ -130,7 +130,7 @@ spec:
             name: rumi-restaurant-backend   # ← Routes to backend service
             port:
               number: 80
-      
+
       # Rule 2: Everything else → Frontend
       - path: /
         pathType: Prefix           # ← Matches everything

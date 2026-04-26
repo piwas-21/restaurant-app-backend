@@ -249,7 +249,7 @@ export default function AccountPage() {
             handlePasswordChangeSubmit={handlePasswordChangeSubmit}
             getStrengthBarStyle={getStrengthBarStyle}
           />
-          
+
           <DeleteAccountSection />
         </div>
 

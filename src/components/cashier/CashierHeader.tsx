@@ -95,15 +95,15 @@ export default function CashierHeader({
         <button
           className={styles.button}
           onClick={onToggleAudio}
-          title={audioEnabled 
+          title={audioEnabled
             ? (t('cashier.disable_sound') || 'Disable notification sounds')
             : (t('cashier.enable_sound') || 'Enable notification sounds')
           }
-          style={{ 
+          style={{
             backgroundColor: audioEnabled ? '#4caf50' : '#ff9800'
           }}
         >
-          {audioEnabled ? '🔕' : '🔔'} {audioEnabled 
+          {audioEnabled ? '🔕' : '🔔'} {audioEnabled
             ? (t('cashier.disable_sound') || 'Disable Sound')
             : (t('cashier.enable_sound') || 'Enable Sound')
           }
@@ -120,7 +120,7 @@ export default function CashierHeader({
             >
               🎵 {t('sound') || 'Sound'}
             </button>
-            
+
             <SoundSelector
               isOpen={showSoundSelector}
               onClose={() => setShowSoundSelector(false)}
@@ -147,10 +147,10 @@ export default function CashierHeader({
         {/* <button
           className={styles.button}
           onClick={onToggleAutoPrint}
-          title={autoPrintEnabled 
-            ? 'Auto-print enabled - Click to configure' 
+          title={autoPrintEnabled
+            ? 'Auto-print enabled - Click to configure'
             : 'Auto-print disabled - Click to enable'}
-          style={{ 
+          style={{
             backgroundColor: autoPrintEnabled ? '#4caf50' : '#757575'
           }}
         >

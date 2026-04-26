@@ -17,21 +17,21 @@ import { getUserGroups, createUserGroup, updateUserGroup, deleteUserGroup, creat
 const UserGroupsPage = () => {
   const { t } = useTranslation();
   const router = useRouter();
-  
+
   const [groups, setGroups] = useState<UserGroupDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<UserGroupDto | null>(null);
-  
+
   const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{ data: string; title: string } | null>(null);
-  
+
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<UserGroupDto | null>(null);
-  
+
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [resultModalMessage, setResultModalMessage] = useState('');
   const [isResultModalSuccess, setIsResultModalSuccess] = useState(false);
@@ -180,14 +180,14 @@ const UserGroupsPage = () => {
     <AdminAuthGuard>
       <div className={styles.adminContainer}>
         <PageHeader title={t('admin_user_groups_title')}>
-          <button 
-            className={`${styles.adminButton} ${styles.add}`} 
+          <button
+            className={`${styles.adminButton} ${styles.add}`}
             onClick={() => setIsCreateModalOpen(true)}
           >
             {t('create_user_group')}
           </button>
         </PageHeader>
-        
+
         <div className={styles.adminContent}>
           <UserGroupsTable
             groups={groups}

@@ -32,7 +32,7 @@ function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { t } = useTranslation();
-  
+
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState(t('verifying_email', 'Verifying your email...'));
 
@@ -49,7 +49,7 @@ function VerifyEmailContent() {
 
       try {
         const response = await verifyEmail({ email, token });
-        
+
         // Debug log
         console.log('Email verification response:', response);
 

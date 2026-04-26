@@ -121,7 +121,7 @@ export default function KitchenStaffPage() {
     if (!hasNonReadyItems) return false;
 
     if (dishTypeFilter === "all") return true;
-    
+
     return order.items.some(item => item.categoryKey === dishTypeFilter && item.status !== "Ready");
   });
 
@@ -139,10 +139,10 @@ export default function KitchenStaffPage() {
 
       <div className={styles.filterContainer}>
         <label htmlFor="dishTypeFilter">{t('filter_by_dish_type_label', 'Filter by Dish Type:')}</label>
-        <select 
-            id="dishTypeFilter" 
-            className={styles.select} 
-            value={dishTypeFilter} 
+        <select
+            id="dishTypeFilter"
+            className={styles.select}
+            value={dishTypeFilter}
             onChange={(e) => setDishTypeFilter(e.target.value)}
         >
             <option value="all">{t('all_dish_types_filter', 'All Types')}</option>
@@ -183,7 +183,7 @@ export default function KitchenStaffPage() {
                     <div className={styles.itemQuantity}>{item.quantity}</div>
                     <div className={styles.itemActions}>
                       {item.status === "Pending" && (
-                        <button 
+                        <button
                             className={styles.statusButton}
                             onClick={() => handleUpdateItemStatus(order.id, item.id, "Preparing")}
                         >
@@ -191,7 +191,7 @@ export default function KitchenStaffPage() {
                         </button>
                       )}
                       {item.status === "Preparing" && (
-                        <button 
+                        <button
                             className={`${styles.statusButton} ${styles.statusPreparing}`}
                             onClick={() => handleUpdateItemStatus(order.id, item.id, "Ready")}
                         >

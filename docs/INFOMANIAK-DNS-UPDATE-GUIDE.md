@@ -279,7 +279,7 @@ git commit -m "docs: Update DNS configuration for new cluster migration"
    ```bash
    # macOS
    sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
-   
+
    # Linux
    sudo systemd-resolve --flush-caches
    ```
@@ -384,8 +384,8 @@ The AWS Load Balancer Controller:
 - 3.125.236.124
 - 3.67.203.195
 
-**AWS Region:** eu-central-1  
-**EKS Cluster:** z2h-eks  
+**AWS Region:** eu-central-1
+**EKS Cluster:** z2h-eks
 **ACM Certificate ARN:** arn:aws:acm:eu-central-1:<AWS_ACCOUNT_ID>:certificate/ba079074-05de-49e4-b8d5-a7a75e6ac82a
 
 ### Useful Commands
@@ -422,5 +422,5 @@ dig +trace www.rumirestaurant.ch
 
 ---
 
-**Last Updated:** October 17, 2025  
+**Last Updated:** October 17, 2025
 **Next Review:** When cluster changes occur

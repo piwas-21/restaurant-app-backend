@@ -137,7 +137,7 @@ const QRScannerDialog: React.FC<QRScannerDialogProps> = ({
                   <ul style={{ paddingLeft: '20px', margin: 0 }}>
                     {result.applicableDiscounts.map((discount) => (
                       <li key={discount.id} style={{ marginBottom: '5px' }}>
-                        <strong>{discount.name}</strong>: 
+                        <strong>{discount.name}</strong>:
                         {discount.type === 'Percentage' ? ` ${discount.value}%` : ` CHF ${discount.value}`}
                         {discount.minimumOrderAmount && ` (Min Order: CHF ${discount.minimumOrderAmount})`}
                       </li>

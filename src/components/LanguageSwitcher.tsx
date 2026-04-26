@@ -85,9 +85,9 @@ export default function LanguageSwitcher() {
       </button>
       {dropdownOpen && (
         <div className={styles.dropdownContainer}>
-          <ul 
-            className={styles.dropdownMenu} 
-            role="listbox" 
+          <ul
+            className={styles.dropdownMenu}
+            role="listbox"
             ref={listRef}
             onScroll={handleScroll}
           >

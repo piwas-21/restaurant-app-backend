@@ -269,7 +269,7 @@ export async function appleLogin(idToken: string, user?: { firstName: string; la
   const response = await fetch(`${AUTH_API_URL}/apple-login`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ 
+    body: JSON.stringify({
         idToken,
         firstName: user?.firstName,
         lastName: user?.lastName
@@ -287,5 +287,3 @@ export async function appleLogin(idToken: string, user?: { firstName: string; la
   }
   return data;
 }
-
-

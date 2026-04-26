@@ -110,8 +110,8 @@ const Sidebar = ({ isOpen = true, onClose }: SidebarProps) => {
   ];
 
   return (
-    <aside 
-      className={`${styles.sidebar} ${isOpen ? 'open' : ''}`} 
+    <aside
+      className={`${styles.sidebar} ${isOpen ? 'open' : ''}`}
       data-open={isOpen}
       style={{
         zIndex: 2002,

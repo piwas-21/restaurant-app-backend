@@ -50,13 +50,13 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
       maxSelection: 1,
       items: [],
     };
-    
+
     // Update display orders for existing sections
     const updatedSections = localSections.map(s => ({
       ...s,
       displayOrder: s.displayOrder + 1
     }));
-    
+
     // Add new section at the beginning
     setLocalSections([newSection, ...updatedSections]);
     setExpandedSections(new Set([...expandedSections, newSection.id]));
@@ -113,17 +113,17 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    
+
     if (draggedIndex === null || draggedIndex === index) return;
 
     const newSections = [...localSections];
     const draggedSection = newSections[draggedIndex];
-    
+
     // Remove from old position
     newSections.splice(draggedIndex, 1);
     // Insert at new position
     newSections.splice(index, 0, draggedSection);
-    
+
     // Update display orders
     newSections.forEach((section, i) => {
       section.displayOrder = i;
@@ -171,8 +171,8 @@ const MenuSectionEditor: React.FC<MenuSectionEditorProps> = ({
       ) : (
         <div className={styles.sectionList}>
           {localSections.map((section, index) => (
-            <div 
-              key={section.id} 
+            <div
+              key={section.id}
               className={styles.sectionCard}
               draggable
               onDragStart={() => handleDragStart(index)}

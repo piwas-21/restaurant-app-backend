@@ -120,11 +120,11 @@ export default function RegisterPage() {
                 <CheckCircle size={24} />
               </div>
             </div>
-            
+
             <h1 className={successStyles.successTitle}>
               {t('registration_successful', 'Registration Successful!')}
             </h1>
-            
+
             <div className={successStyles.instructionsBox}>
               <p className={successStyles.instructionsText}>
                 {t('verify_email_instructions', 'We have sent a verification email to')}
@@ -132,7 +132,7 @@ export default function RegisterPage() {
               <div className={successStyles.emailHighlight}>
                 {formData.email}
               </div>
-              
+
               <ul className={successStyles.stepsList}>
                 <li>
                   <span className={successStyles.stepNumber}>1</span>

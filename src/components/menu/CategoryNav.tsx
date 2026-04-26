@@ -167,4 +167,3 @@ export default function CategoryNav({ categories, selectedView, onSelect, allLab
     </nav>
   );
 }
-

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  getCategories, 
+import {
+  getCategories,
   createServerOrder,
-  Product, 
+  Product,
   Category,
   UserDto,
   calculateDiscountFromPoints,
@@ -49,7 +49,7 @@ export default function TakeOrderModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Customization modal state
   const [selectedProductForCustomization, setSelectedProductForCustomization] = useState<Product | null>(null);
 
@@ -112,7 +112,7 @@ export default function TakeOrderModal({
   // Filter products by search (category filtering is done server-side)
   const filteredProducts = useMemo(() => {
     if (!searchQuery) return products;
-    
+
     const query = searchQuery.toLowerCase();
     return products.filter(p =>
       p.name.toLowerCase().includes(query) ||
@@ -149,7 +149,7 @@ export default function TakeOrderModal({
 
     setOrderItems(prev => {
       // Check if identical item already exists
-      const existingIndex = prev.findIndex(item => 
+      const existingIndex = prev.findIndex(item =>
         item.product.id === product.id &&
         item.variationId === result.variationId &&
         JSON.stringify(item.excludedIngredients) === JSON.stringify(result.excludedIngredients) &&
@@ -432,7 +432,7 @@ export default function TakeOrderModal({
                   onClick={handleSubmit}
                   disabled={isSubmitting || orderItems.length === 0}
                 >
-                  {isSubmitting 
+                  {isSubmitting
                     ? t('server.creating_order', 'Creating Order...')
                     : t('server.place_order', 'Place Order')}
                 </button>

@@ -9,7 +9,7 @@ export default function PrivacyPolicyPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <h1 className="text-3xl font-bold mb-6">{t('privacy_policy.title', 'Privacy Policy')}</h1>
-      
+
       <div className="prose dark:prose-invert max-w-none">
         <p className="mb-4">{t('privacy_policy.last_updated', { date: new Date().toLocaleDateString() })}</p>
 

@@ -44,7 +44,7 @@
 
 .ordersGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
 }
 
@@ -52,7 +52,7 @@
   background-color: var(--card-background);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1.5rem; 
+  padding: 1.5rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
@@ -74,22 +74,22 @@
 .orderInfo {
   font-size: 0.9rem;
   color: var(--text-secondary);
-  margin-bottom: 0.5rem; 
+  margin-bottom: 0.5rem;
 }
 
 .orderNotes {
-  background-color: var(--secondary-color-light, #f9f9f9); 
-  padding: 0.8rem; 
+  background-color: var(--secondary-color-light, #f9f9f9);
+  padding: 0.8rem;
   border-radius: 4px;
   margin-bottom: 1rem;
-  font-size: 0.9rem; 
-  border: 1px solid var(--border-color-light); 
-  color: var(--text-secondary); 
-  line-height: 1.5; 
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color-light);
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
 .orderNotes strong {
-  color: var(--text-color); 
+  color: var(--text-color);
 }
 
 .itemList {
@@ -100,7 +100,7 @@
 
 .itemEntry {
   display: grid;
-  grid-template-columns: 1fr auto auto; 
+  grid-template-columns: 1fr auto auto;
   gap: 0.75rem;
   align-items: center;
   padding: 0.75rem 0.5rem;
@@ -123,8 +123,8 @@
   background-color: var(--secondary-color);
   color: var(--text-color);
   border-radius: 4px;
-  min-width: 30px; 
-  border: 1px solid var(--border-color); 
+  min-width: 30px;
+  border: 1px solid var(--border-color);
 }
 
 .itemActions {
@@ -134,8 +134,8 @@
 }
 
 .statusButton {
-  padding: 0.4rem 0.8rem; 
-  font-size: 0.8rem; 
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
   border-radius: 4px;
   border: 1px solid var(--border-color);
   background-color: var(--secondary-color);
@@ -147,19 +147,19 @@
 }
 
 .statusButton:hover {
-  background-color: var(--card-background); 
+  background-color: var(--card-background);
   border-color: var(--link-hover-color);
 }
 
 .statusPreparing {
-  composes: statusButton; 
+  composes: statusButton;
   background-color: var(--warning-color);
-  color: var(--button-text-color); 
-  border-color: var(--warning-color); 
+  color: var(--button-text-color);
+  border-color: var(--warning-color);
 }
 
 .statusPreparing:hover {
-  background-color: var(--warning-color-dark); 
+  background-color: var(--warning-color-dark);
   border-color: var(--warning-color-dark);
 }
 
@@ -168,12 +168,12 @@
   font-style: italic;
   padding: 0.3rem 0.6rem;
   border-radius: 4px;
-  text-align: center; 
-  display: inline-block; 
-  min-width: 70px; 
+  text-align: center;
+  display: inline-block;
+  min-width: 70px;
 }
 
-.itemStatusTextPending { 
+.itemStatusTextPending {
   color: var(--text-secondary);
 }
 .itemStatusTextPreparing {
@@ -281,9 +281,9 @@
   color: var(--text-secondary);
 }
 [data-theme="dark"] .itemStatusTextPreparing {
-  background-color: var(--warning-color-dark); 
-  color: var(--warning-color-light); 
-  border-color: var(--warning-color); 
+  background-color: var(--warning-color-dark);
+  color: var(--warning-color-light);
+  border-color: var(--warning-color);
 }
 [data-theme="dark"] .itemStatusTextReady {
   background-color: var(--success-color-dark);
@@ -296,32 +296,32 @@
 }
 
 /* Responsive adjustments */
-@media (min-width: 576px) { 
+@media (min-width: 576px) {
   .filterContainer {
-    flex-direction: row; 
+    flex-direction: row;
     align-items: center;
   }
   .select {
-    width: auto; 
-    min-width: 200px; 
+    width: auto;
+    min-width: 200px;
   }
 }
 
 @media (max-width: 768px) {
   .ordersGrid {
-    grid-template-columns: 1fr; 
+    grid-template-columns: 1fr;
   }
   .itemEntry {
-    grid-template-columns: 1fr auto; 
+    grid-template-columns: 1fr auto;
     gap: 0.5rem;
   }
   .itemActions {
-    grid-column: span 2; 
-    justify-content: flex-start; 
+    grid-column: span 2;
+    justify-content: flex-start;
     margin-top: 0.5rem;
   }
   .statusButton {
-    flex-grow: 1; 
+    flex-grow: 1;
     text-align: center;
   }
 }

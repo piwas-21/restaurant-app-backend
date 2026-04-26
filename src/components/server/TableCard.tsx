@@ -79,8 +79,8 @@ export default function TableCard({ table, isSelected, onClick }: TableCardProps
         <div className={styles.orderCount}>
           <span className={styles.orderBadge}>{table.orderCount}</span>
           <span className={styles.orderLabel}>
-            {table.orderCount === 1 
-              ? t('server.order', 'order') 
+            {table.orderCount === 1
+              ? t('server.order', 'order')
               : t('server.orders', 'orders')}
           </span>
         </div>

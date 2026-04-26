@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 
-export type NotificationSoundType = 
+export type NotificationSoundType =
   | 'chime' // Default: Pleasant 3-note chime (medium)
   | 'bell' // Loud & Long: Classic bell sound
   | 'ping' // Soft & Short: Gentle single ping
@@ -40,10 +40,10 @@ export function useNotification() {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new AudioContextClass();
-      
+
       const state = audioContextRef.current.state;
       console.log('🔊 AudioContext created, state:', state);
-      
+
       if (state === 'running') {
         setAudioReady(true);
         setAudioBlockedByPolicy(false);
@@ -52,7 +52,7 @@ export function useNotification() {
         setAudioBlockedByPolicy(true);
         console.warn('⚠️ AudioContext is suspended - user interaction required');
       }
-      
+
       setAudioEnabled(true);
     } catch (error) {
       console.error('❌ Could not initialize audio context:', error);
@@ -92,7 +92,7 @@ export function useNotification() {
     if (savedSoundType && ['chime', 'bell', 'ping', 'alert', 'melody'].includes(savedSoundType)) {
       setSoundType(savedSoundType as NotificationSoundType);
     }
-    
+
     const savedRepeatSetting = localStorage.getItem('cashier_repeat_sound');
     if (savedRepeatSetting === 'true') {
       setRepeatUntilMouseMoves(true);
@@ -137,7 +137,7 @@ export function useNotification() {
       if (document.visibilityState === 'visible' && audioContextRef.current) {
         const state = audioContextRef.current.state;
         console.log('👁️ Tab visible, AudioContext state:', state);
-        
+
         if (state === 'suspended' && hasUserInteractedRef.current) {
           console.log('🔊 Attempting to resume audio after visibility change...');
           audioContextRef.current.resume().then(() => {
@@ -166,7 +166,7 @@ export function useNotification() {
       const newEnabled = !audioEnabled;
       setAudioEnabled(newEnabled);
       console.log(`🔊 Audio ${newEnabled ? 'enabled' : 'disabled'}`);
-      
+
       if (newEnabled && audioContextRef.current.state === 'suspended') {
         await resumeAudioContext();
       }
@@ -180,17 +180,17 @@ export function useNotification() {
     const playNote = (frequency: number, startTime: number, duration: number, volume: number, waveType: OscillatorType = 'sine') => {
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
       oscillator.type = waveType;
       oscillator.frequency.setValueAtTime(frequency, startTime);
-      
+
       gainNode.gain.setValueAtTime(0, startTime);
       gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-      
+
       oscillator.start(startTime);
       oscillator.stop(startTime + duration);
     };
@@ -231,7 +231,7 @@ export function useNotification() {
     if (!audioEnabled) {
       return;
     }
-    
+
     if (!audioContextRef.current) {
       console.warn('⚠️ AudioContext not initialized');
       setAudioBlockedByPolicy(true);
@@ -240,7 +240,7 @@ export function useNotification() {
     }
 
     const audioContext = audioContextRef.current;
-    
+
     // Resume context if suspended
     if (audioContext.state === 'suspended') {
       console.warn('⚠️ AudioContext suspended, attempting resume...');
@@ -256,7 +256,7 @@ export function useNotification() {
       });
       return;
     }
-    
+
     try {
       playNotes(audioContext, soundType);
     } catch (error) {
@@ -272,7 +272,7 @@ export function useNotification() {
 
     try {
       const audioContext = audioContextRef.current;
-      
+
       if (audioContext.state === 'suspended') {
         audioContext.resume();
       }
@@ -370,7 +370,7 @@ export function useNotification() {
         duration: 8000,
         sound: true,
       });
-      
+
       if (repeatUntilMouseMoves) {
         startRepeatingUntilMouseMoves();
       }
@@ -410,7 +410,7 @@ export function useNotification() {
 
     try {
       const audioContext = audioContextRef.current;
-      
+
       if (audioContext.state === 'suspended') {
         audioContext.resume();
       }
@@ -420,17 +420,17 @@ export function useNotification() {
       const playNote = (frequency: number, startTime: number, duration: number, volume: number) => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
+
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
+
         oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(frequency, startTime);
-        
+
         gainNode.gain.setValueAtTime(0, startTime);
         gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
         gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-        
+
         oscillator.start(startTime);
         oscillator.stop(startTime + duration);
       };

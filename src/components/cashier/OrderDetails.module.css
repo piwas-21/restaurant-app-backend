@@ -568,7 +568,7 @@
   .contentGrid {
     grid-template-columns: 1fr;
   }
-  
+
   .rightColumn {
     order: -1; /* Move summary to top on mobile */
   }

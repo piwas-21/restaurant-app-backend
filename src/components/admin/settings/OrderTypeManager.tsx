@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
+import {
   orderTypeConfigurationService,
-  OrderTypeConfigurationDto 
+  OrderTypeConfigurationDto
 } from '@/services/orderTypeConfigurationService';
 import { OrderType } from '@/types/order';
 import { Utensils, Store, Truck } from 'lucide-react';
@@ -42,7 +42,7 @@ export default function OrderTypeManager() {
 
   const handleToggle = async (orderType: OrderType, currentlyEnabled: boolean) => {
     const newEnabledState = !currentlyEnabled;
-    
+
     // Show confirmation modal when disabling
     if (!newEnabledState) {
       setPendingOrderType(orderType);
@@ -191,7 +191,7 @@ export default function OrderTypeManager() {
         isOpen={showConfirmModal}
         onClose={handleCancelDisable}
         onConfirm={handleConfirmDisable}
-        message={pendingOrderType ? t('confirm_disable_order_type', 
+        message={pendingOrderType ? t('confirm_disable_order_type',
           `Are you sure you want to disable {{orderType}}? Customers will not be able to select this option.`,
           { orderType: getOrderTypeName(pendingOrderType) }) : ''}
       />

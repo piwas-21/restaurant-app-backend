@@ -49,7 +49,7 @@ export const ProductVariations: React.FC<ProductVariationsProps> = ({
               {...register(`variations.${index}.displayOrder`)}
             />
           </div>
-          
+
           {/* Multilingual Support */}
           <div className={modalStyles.formGroup}>
              <details className={ingredientStyles.translations}>
