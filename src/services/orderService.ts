@@ -23,6 +23,8 @@ import {
   PagedResult,
   OrderPaymentDto,
   ApiResponse,
+  ZReportDto,
+  ZReportApiResponse,
 } from '@/types/order';
 
 /**
@@ -347,6 +349,33 @@ export async function refundPayment(
 }
 
 /**
+ * Get Z-Report (end-of-day financial summary) for a specific date
+ *
+ * @param date - ISO date string (YYYY-MM-DD), defaults to today on server
+ * @returns Z-Report data
+ */
+export async function getZReport(date?: string): Promise<ZReportDto> {
+  try {
+    const params = new URLSearchParams();
+    if (date) {
+      params.append('date', date);
+    }
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/Orders/z-report?${queryString}` : '/api/Orders/z-report';
+
+    const response = await apiClient.get<ZReportApiResponse>(endpoint, { requireAuth: true });
+    if (!response.data) {
+      throw new Error('Failed to fetch Z-Report');
+    }
+    return response.data;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching Z-Report:', error);
+    throw error;
+  }
+}
+
+/**
  * Order service object with all methods
  */
 export const orderService = {
@@ -360,4 +389,5 @@ export const orderService = {
   getFocusOrders,
   addPaymentToOrder,
   refundPayment,
+  getZReport,
 };

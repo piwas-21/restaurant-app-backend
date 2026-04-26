@@ -19,6 +19,7 @@ import NotificationCenter from '@/components/cashier/NotificationCenter';
 import QRScannerDialog from '@/components/cashier/QRScannerDialog';
 import AutoPrintSettingsModal from '@/components/cashier/AutoPrintSettingsModal';
 import CashierDiagnostics from '@/components/cashier/CashierDiagnostics';
+import ZReportModal from '@/components/cashier/ZReportModal';
 import { OrderType } from '@/types/order';
 import { QRCodeValidationResult } from '@/types/userGroupTypes';
 import { quickConfirmOrder, quickCancelOrder } from '@/services/cashierService';
@@ -84,6 +85,7 @@ export default function CashierPage() {
   const [showQRScannerDialog, setShowQRScannerDialog] = useState(false);
   const [showQuickConfirmModal, setShowQuickConfirmModal] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showZReport, setShowZReport] = useState(false);
   const [pendingOrderForConfirm, setPendingOrderForConfirm] = useState<string | null>(null);
   const [dismissedOrders, setDismissedOrders] = useState<Set<string>>(new Set());
   const [pendingOrderQueue, setPendingOrderQueue] = useState<string[]>([]); // Queue for multiple orders
@@ -476,6 +478,7 @@ export default function CashierPage() {
         onTestSound={playSoundByType}
         onToggleRepeat={toggleRepeatSound}
         onOpenQRScanner={() => setShowQRScannerDialog(true)}
+        onOpenZReport={() => setShowZReport(true)}
         onOpenDiagnostics={() => setShowDiagnostics(!showDiagnostics)}
       />
 
@@ -571,6 +574,11 @@ export default function CashierPage() {
         onClose={() => setShowAutoPrintSettings(false)}
         settings={autoPrintSettings}
         onSave={saveAutoPrintSettings}
+      />
+
+      <ZReportModal
+        isOpen={showZReport}
+        onClose={() => setShowZReport(false)}
       />
 
       {/* Diagnostic Panel */}
