@@ -19,7 +19,6 @@ using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries.GetFocusOrdersQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrderByIdQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
-using RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 using Microsoft.Extensions.Options;
@@ -59,22 +58,10 @@ public class OrdersController : ControllerBase
     }
 
     /// <summary>
-    /// Get Z-Report (end-of-day financial summary) for a specific date
-    /// </summary>
-    [HttpGet("z-report")]
-    [RequireAdminOrCashier]
-    public async Task<ActionResult<ApiResponse<ZReportDto>>> GetZReport([FromQuery] DateTime? date)
-    {
-        var reportDate = date ?? DateTime.UtcNow.Date;
-        var query = new GetZReportQuery(reportDate);
-        var result = await _mediator.SendQuery(query);
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Get confirmed orders for printer apps.
-    /// Requires API key via X-Api-Key header (configured in PrinterSettings:ApiKey).
-    /// If no API key is configured, the endpoint is open (development mode).
+    /// Get confirmed orders for printer apps (no authentication required)
+    /// This endpoint is specifically for internal printer applications to poll for orders to print.
+    /// Only returns orders with status "Confirmed" that were modified since the given timestamp.
+    /// Uses direct query to bypass authentication requirements.
     /// </summary>
     [HttpGet("printer-feed")]
     [AllowAnonymous]
@@ -85,17 +72,6 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            // Validate API key if configured
-            var configuredApiKey = HttpContext.RequestServices.GetRequiredService<IConfiguration>()["PrinterSettings:ApiKey"];
-            if (!string.IsNullOrEmpty(configuredApiKey))
-            {
-                var providedKey = Request.Headers["X-Api-Key"].FirstOrDefault();
-                if (providedKey != configuredApiKey)
-                {
-                    return Unauthorized(new { success = false, message = "Invalid or missing API key" });
-                }
-            }
-
             _logger.LogInformation("🖨️ Printer feed request - modifiedSince: {Since}", modifiedSince);
 
             // Direct database query - bypasses ICurrentUserService checks

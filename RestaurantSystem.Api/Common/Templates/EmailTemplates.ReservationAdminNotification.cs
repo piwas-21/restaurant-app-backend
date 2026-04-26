@@ -11,13 +11,12 @@ public static partial class EmailTemplates
 
         public static string GetHtmlBody(Guid reservationId, string customerName, string customerEmail, string customerPhone,
             DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string tableNumber,
-            string? specialRequests = null, string? baseUrl = null, string? frontendBaseUrl = null,
-            string? contactEmail = null)
+            string baseUrl, string frontendBaseUrl, string contactEmail,
+            string? specialRequests = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
-            // Use provided baseUrl or fallback to localhost for development
-            var apiBaseUrl = baseUrl ?? "http://localhost:5221";
-            var frontendUrl = frontendBaseUrl ?? "http://localhost:3000";
+            var email = contactEmail;
+            var apiBaseUrl = baseUrl;
+            var frontendUrl = frontendBaseUrl;
 
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
@@ -241,9 +240,10 @@ public static partial class EmailTemplates
 
         public static string GetTextBody(Guid reservationId, string customerName, string customerEmail, string customerPhone,
             DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string tableNumber,
-            string? specialRequests = null, string? contactEmail = null)
+            string contactEmail,
+            string? specialRequests = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"

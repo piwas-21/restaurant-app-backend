@@ -9,9 +9,9 @@ public static partial class EmailTemplates
     {
         public static string Subject => "Reservation Update - Rumi Restaurant";
 
-        public static string GetHtmlBody(string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string? contactEmail = null)
+        public static string GetHtmlBody(string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
 
             return $@"
@@ -66,9 +66,9 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string? contactEmail = null)
+        public static string GetTextBody(string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
 
             return $@"Rumi Restaurant - Reservation Update

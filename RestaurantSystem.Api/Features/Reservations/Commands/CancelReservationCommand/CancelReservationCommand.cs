@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -13,15 +15,18 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly EmailSettings _emailSettings;
     private readonly ILogger<CancelReservationCommandHandler> _logger;
 
     public CancelReservationCommandHandler(
         ApplicationDbContext context,
         IEmailService emailService,
+        IOptions<EmailSettings> emailSettings,
         ILogger<CancelReservationCommandHandler> logger)
     {
         _context = context;
         _emailService = emailService;
+        _emailSettings = emailSettings.Value;
         _logger = logger;
     }
 
@@ -60,13 +65,15 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
                         reservation.CustomerName,
                         reservation.ReservationDate,
                         reservation.StartTime,
-                        reservation.NumberOfGuests
+                        reservation.NumberOfGuests,
+                        _emailSettings.AdminEmail
                     ),
                     Common.Templates.EmailTemplates.ReservationRejected.GetTextBody(
                         reservation.CustomerName,
                         reservation.ReservationDate,
                         reservation.StartTime,
-                        reservation.NumberOfGuests
+                        reservation.NumberOfGuests,
+                        _emailSettings.AdminEmail
                     ));
 
                 _logger.LogInformation("Rejection email sent for reservation {ReservationId}", reservation.Id);

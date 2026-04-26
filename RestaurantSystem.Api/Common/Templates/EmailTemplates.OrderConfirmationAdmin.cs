@@ -11,13 +11,12 @@ public static partial class EmailTemplates
 
         public static string GetHtmlBody(string orderNumber, string customerName, string customerEmail, string customerPhone,
             string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
-            string? specialInstructions = null, string? deliveryAddress = null, string? baseUrl = null, string? frontendBaseUrl = null,
-            string? contactEmail = null)
+            string baseUrl, string frontendBaseUrl, string contactEmail,
+            string? specialInstructions = null, string? deliveryAddress = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
-            // Use provided baseUrl or fallback to localhost for development
-            var apiBaseUrl = baseUrl ?? "http://localhost:5221";
-            var frontendUrl = frontendBaseUrl ?? "http://localhost:3000";
+            var email = contactEmail;
+            var apiBaseUrl = baseUrl;
+            var frontendUrl = frontendBaseUrl;
             var itemsSection = string.Join("", items.Select(item =>
                 $@"<tr>
                     <td style='padding: 12px; border-bottom: 1px solid #e5e7eb;'>{item.name}</td>
@@ -290,9 +289,10 @@ public static partial class EmailTemplates
 
         public static string GetTextBody(string orderNumber, string customerName, string customerEmail, string customerPhone,
             string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
-            string? specialInstructions = null, string? deliveryAddress = null, string? contactEmail = null)
+            string contactEmail,
+            string? specialInstructions = null, string? deliveryAddress = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var itemsSection = string.Join("\n", items.Select(item =>
                 $"{item.name} x{item.quantity} = CHF {item.price:F2}"));
 

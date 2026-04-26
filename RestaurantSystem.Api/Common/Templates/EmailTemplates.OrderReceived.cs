@@ -10,10 +10,10 @@ public static partial class EmailTemplates
         public static string Subject => "Order Received - Rumi Restaurant";
 
         public static string GetHtmlBody(string customerName, string orderNumber, string orderType, decimal total,
-            IEnumerable<(string name, int quantity, decimal price)> items, string? specialInstructions = null,
-            string? deliveryAddress = null, string? contactEmail = null)
+            IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
+            string? specialInstructions = null, string? deliveryAddress = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var itemsSection = string.Join("", items.Select(item =>
                 $@"<tr>
                     <td style='padding: 10px; border-bottom: 1px solid #eee;'>{item.name}</td>
@@ -120,10 +120,10 @@ public static partial class EmailTemplates
         }
 
         public static string GetTextBody(string customerName, string orderNumber, string orderType, decimal total,
-            IEnumerable<(string name, int quantity, decimal price)> items, string? specialInstructions = null,
-            string? deliveryAddress = null, string? contactEmail = null)
+            IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
+            string? specialInstructions = null, string? deliveryAddress = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var itemsSection = string.Join("\n", items.Select(item =>
                 $"{item.name} x{item.quantity} = CHF {item.price:F2}"));
 

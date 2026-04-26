@@ -9,9 +9,9 @@ public static partial class EmailTemplates
     {
         public static string Subject => "Order Confirmed - Rumi Restaurant";
 
-        public static string GetHtmlBody(string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string? contactEmail = null)
+        public static string GetHtmlBody(string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string contactEmail)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var orderTypeEmoji = orderType switch
             {
                 "DineIn" => "🍽️ Dine In",
@@ -71,9 +71,9 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string? contactEmail = null)
+        public static string GetTextBody(string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string contactEmail)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var orderTypeText = orderType switch
             {
                 "DineIn" => "Dine In",

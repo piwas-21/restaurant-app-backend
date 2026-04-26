@@ -126,9 +126,10 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                         reservation.EndTime,
                         reservation.NumberOfGuests,
                         table.TableNumber,
-                        reservation.SpecialRequests,
                         baseUrl,
-                        frontendUrl
+                        frontendUrl,
+                        _emailSettings.AdminEmail,
+                        reservation.SpecialRequests
                     ),
                     Common.Templates.EmailTemplates.ReservationAdminNotification.GetTextBody(
                         reservation.Id,
@@ -140,6 +141,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                         reservation.EndTime,
                         reservation.NumberOfGuests,
                         table.TableNumber,
+                        _emailSettings.AdminEmail,
                         reservation.SpecialRequests
                     ));
 

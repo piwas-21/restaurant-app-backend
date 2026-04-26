@@ -10,10 +10,10 @@ public static partial class EmailTemplates
         public static string Subject => "Reservation Confirmation - Rumi Restaurant";
 
         public static string GetHtmlBody(string customerName, string tableNumber, DateTime reservationDate,
-            TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string? specialRequests = null,
-            string? contactEmail = null)
+            TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
+            string? specialRequests = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"<div class='info-box'>
@@ -76,10 +76,10 @@ public static partial class EmailTemplates
         }
 
         public static string GetTextBody(string customerName, string tableNumber, DateTime reservationDate,
-            TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string? specialRequests = null,
-            string? contactEmail = null)
+            TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
+            string? specialRequests = null)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"

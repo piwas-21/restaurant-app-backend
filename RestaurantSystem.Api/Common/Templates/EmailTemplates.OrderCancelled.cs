@@ -9,9 +9,9 @@ public static partial class EmailTemplates
     {
         public static string Subject => "Order Cancelled - Rumi Restaurant";
 
-        public static string GetHtmlBody(string customerName, string orderNumber, string cancellationReason, string? contactEmail = null)
+        public static string GetHtmlBody(string customerName, string orderNumber, string cancellationReason, string contactEmail)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             return $@"
 <!DOCTYPE html>
 <html>
@@ -64,9 +64,9 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(string customerName, string orderNumber, string cancellationReason, string? contactEmail = null)
+        public static string GetTextBody(string customerName, string orderNumber, string cancellationReason, string contactEmail)
         {
-            var email = contactEmail ?? "rumigeneve@gmail.com";
+            var email = contactEmail;
             return $@"Rumi Restaurant - Order Cancelled
 
 Dear {customerName},

@@ -67,14 +67,21 @@ public class EmailSettings
     public int TimeoutMs { get; set; } = 30000;
 
     /// <summary>
-    /// Base URL for the frontend application (used in email links)
+    /// Base URL for the frontend application (used in email links).
+    /// Required: must be configured per environment (no default — emails would otherwise
+    /// silently link to localhost in production).
     /// </summary>
-    public string FrontendBaseUrl { get; set; } = "http://localhost:3000";
+    [Required]
+    [Url]
+    public string FrontendBaseUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Base URL for the backend API (used in email action links)
+    /// Base URL for the backend API (used in email action links).
+    /// Required: see FrontendBaseUrl note.
     /// </summary>
-    public string BackendBaseUrl { get; set; } = "http://localhost:5221";
+    [Required]
+    [Url]
+    public string BackendBaseUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// Whether emails are enabled (useful for development/testing)
