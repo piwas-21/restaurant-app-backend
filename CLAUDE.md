@@ -240,7 +240,7 @@ Never commit:
 **Intentionally-tracked env files (do NOT delete; do NOT add secrets to):**
 - `.env.example` — template that `scripts/dev-secrets.sh` copies into `.env.local`
 - `.env.production` — public deploy-time defaults for the production build. Only `NEXT_PUBLIC_*` values, **never** secrets. Whitelisted in `.gitignore` via `!.env.production`. If you need to add a runtime secret to production, that's a K8s/ArgoCD config change, not a code change to this file.
-- `.env` — currently tracked but contains shared dev/test credentials; pending rotation + migration to `.env.local` per the security tracker issue (see `.gitleaksignore` and the open security issue).
+- `.env` — currently tracked but contains shared dev/test credentials; pending rotation + migration to `.env.local`. Tracked work: [issue #2](https://gitlab.com/restaurant-app3282120/frontend/-/issues/2). Until that lands: do not add new credentials here; do not delete the file (devs depend on it for local setup).
 
 ---
 

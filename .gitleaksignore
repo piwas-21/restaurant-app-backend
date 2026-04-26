@@ -1,7 +1,16 @@
 # GitLeaks ignore file
-# Ignore documentation files that previously contained example credentials (now redacted)
-# The credentials in commit 61e3296 have been redacted in commit eb884f9
-# These credentials should be rotated by DevOps as they were exposed in git history
+#
+# Historical credential exposures in git history. Tracked for rotation +
+# cleanup decision in:
+#   https://gitlab.com/restaurant-app3282120/frontend/-/issues/2
+#   (security: rotate exposed credentials + migrate tracked .env to .env.local)
+#
+# These rows do NOT excuse the exposure — they only prevent gitleaks from
+# re-failing on the same fingerprints while rotation is pending. When issue #2
+# closes (credentials rotated, .env migrated to .env.local), DELETE these
+# rows; they should not outlive the rotation.
 
+# Commit 61e3296 contained two credentials in INFOMANIAK-DNS-UPDATE-GUIDE.md.
+# Redacted in commit eb884f9; rotation pending per issue #2.
 61e32969e16d22f50accd320cab6b14b548a1bb6:INFOMANIAK-DNS-UPDATE-GUIDE.md:aws-access-token:66
 61e32969e16d22f50accd320cab6b14b548a1bb6:INFOMANIAK-DNS-UPDATE-GUIDE.md:generic-api-key:67
