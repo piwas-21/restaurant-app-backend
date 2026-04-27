@@ -34,6 +34,16 @@ prettier_check:
     script:
         - npm run format:check
 
+# Sprint 2.5 quality gate: tsc --noEmit.
+# Whole-project type-check; catches cross-file type breakage.
+typecheck:
+    image: node:22-alpine
+    stage: test
+    before_script:
+        - npm install
+    script:
+        - npm run typecheck
+
 npm_test:
     image: node:18-bullseye
     stage: test

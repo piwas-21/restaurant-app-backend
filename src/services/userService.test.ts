@@ -1,5 +1,6 @@
 import { apiClient } from '@/utils/apiClient';
 import * as userService from './userService';
+import { UserRole } from '@/types/user';
 
 // Mock the apiClient
 jest.mock('@/utils/apiClient');
@@ -51,7 +52,7 @@ describe('userService', () => {
         email: 'jane.doe@example.com',
         password: 'Password123!',
         confirmPassword: 'Password123!',
-        role: 'Server',
+        role: UserRole.Server,
       };
       const result = await userService.registerStaff(staffData);
 
@@ -69,7 +70,7 @@ describe('userService', () => {
         email: 'jane.doe@example.com',
         password: 'Password123!',
         confirmPassword: 'Password123!',
-        role: 'Server',
+        role: UserRole.Server,
       };
       const result = await userService.registerStaff(staffData);
 

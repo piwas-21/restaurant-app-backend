@@ -6,7 +6,7 @@
 
 import * as orderServiceModule from './orderService';
 import { apiClient } from '@/utils/apiClient';
-import type { CreateOrderCommand, OrderDto, UpdateOrderStatusCommand } from '@/types/order';
+import type { CreateOrderCommand, OrderDto, OrderStatus, UpdateOrderStatusCommand } from '@/types/order';
 
 // Mock the apiClient
 jest.mock('@/utils/apiClient');
@@ -184,7 +184,7 @@ describe('OrderService', () => {
     it('should update order status successfully', async () => {
       const orderId = 'order-123';
       const command: UpdateOrderStatusCommand = {
-        status: 'Confirmed',
+        newStatus: 'Confirmed' as OrderStatus,
       };
 
       const mockOrder = createMockOrder({ status: 'Confirmed' });
@@ -201,7 +201,9 @@ describe('OrderService', () => {
       const error = new Error('Invalid status transition');
       mockApiClient.put.mockRejectedValue(error);
 
-      await expect(orderServiceModule.updateOrderStatus('order-123', { status: 'Invalid' as any })).rejects.toThrow(
+      await expect(
+        orderServiceModule.updateOrderStatus('order-123', { newStatus: 'Invalid' as OrderStatus }),
+      ).rejects.toThrow(
         'Invalid status transition',
       );
     });

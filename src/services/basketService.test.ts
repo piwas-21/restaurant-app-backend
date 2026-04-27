@@ -22,6 +22,7 @@ describe('BasketService', () => {
     discount: 0,
     tax: 0,
     deliveryFee: 0,
+    customerDiscount: 0,
     total: 0,
     totalItems: 0,
     ...overrides,
