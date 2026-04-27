@@ -109,6 +109,9 @@ export default function ProductCustomization({ product, isOpen, onClose, onConfi
     }
 
     fetchDetails();
+    // Re-fetch only when the product identity changes; full `product` ref
+    // changes on every render of the parent and would re-fetch needlessly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, product?.id]);
 
   // Get name in current language

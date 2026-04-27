@@ -178,7 +178,7 @@ export function useServerOrders(): UseServerOrdersReturn {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
 
         try {
-          const data = JSON.parse(event.data);
+          const _data = JSON.parse(event.data);
           setIsConnected(true);
           setConnectionState('connected');
           setError(null);
@@ -407,6 +407,11 @@ export function useServerOrders(): UseServerOrdersReturn {
       stopPrimaryPolling();
       cleanupSSE();
     };
+    // SSE/polling lifecycle — mount-once. Adding the deps the rule wants
+    // (cleanupSSE, connectToSSE, refreshOrders, refreshTables,
+    // startPrimaryPolling, stopPrimaryPolling) would tear down and
+    // re-establish the live connection on every function-ref change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**

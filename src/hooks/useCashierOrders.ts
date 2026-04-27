@@ -186,7 +186,7 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
         }
 
         try {
-          const data = JSON.parse(event.data);
+          const _data = JSON.parse(event.data);
           setIsConnected(true);
           setConnectionState('connected');
           setError(null);
@@ -509,13 +509,20 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
         pollingTimeoutRef.current = null;
       }
     };
-  }, []); // Empty dependency array - only run on mount/unmount
+    // SSE/polling lifecycle — mount-once. Adding the deps the rule wants
+    // (cleanupSSE, connectToSSE, refreshOrders, startPrimaryPolling,
+    // stopPrimaryPolling) would tear down and re-establish the live
+    // connection on every re-render that produces new function refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Re-fetch when the active date range changes (after the initial mount).
    * Drops cached orders so the previous window doesn't bleed into the new one.
    */
   const isFirstRangeEffectRef = useRef(true);
+  const startDateMs = dateRange?.startDate?.getTime();
+  const endDateMs = dateRange?.endDate?.getTime();
   useEffect(() => {
     if (isFirstRangeEffectRef.current) {
       isFirstRangeEffectRef.current = false;
@@ -525,7 +532,7 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
     setIsLoading(true);
     lastPolledAtRef.current = null;
     refreshOrders();
-  }, [dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime(), refreshOrders]);
+  }, [startDateMs, endDateMs, refreshOrders]);
 
   /**
    * Update order status

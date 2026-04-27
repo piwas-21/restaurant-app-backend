@@ -10,7 +10,7 @@ interface FeedbackFormProps {
   onSubmitSuccess: () => void;
 }
 
-const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) => {
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId: _dishId, onSubmitSuccess }) => {
   const { t } = useTranslation();
   const [rating, setRating] = useState(0); // Actual selected rating
   const [hoverRating, setHoverRating] = useState(0); // Rating based on hover

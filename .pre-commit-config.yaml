@@ -5,8 +5,7 @@
 #
 # Sprint 1: hygiene + secret scanning.
 # Sprint 2:   prettier --check.
-# Sprint 2.5: tsc --noEmit (this file). eslint --max-warnings=0 deferred
-#             to remaining Sprint 2.5 MRs — 200+ pre-existing warnings.
+# Sprint 2.5: tsc --noEmit, eslint --max-warnings=0.
 # See docs/QUALITY-SECURITY-PLAN.md.
 
 repos:
@@ -67,3 +66,10 @@ repos:
         language: system
         pass_filenames: false
         files: \.(ts|tsx)$
+
+      - id: eslint
+        name: eslint (--max-warnings=0)
+        entry: npm run lint --silent
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx|js|mjs|cjs)$

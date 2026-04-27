@@ -15,7 +15,7 @@ import { apiClient } from '@/utils/apiClient';
  */
 export async function sendOrderConfirmationEmails(orderId: string): Promise<void> {
   try {
-    const response = await apiClient.post<{ data: string }>(
+    await apiClient.post<{ data: string }>(
       `/api/Orders/${orderId}/send-confirmation-email`,
       {},
       { requireAuth: false },

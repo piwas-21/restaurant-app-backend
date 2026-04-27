@@ -44,6 +44,16 @@ typecheck:
     script:
         - npm run typecheck
 
+# Sprint 2.5 quality gate: eslint --max-warnings=0.
+# Fails the pipeline on any lint warning.
+eslint:
+    image: node:22-alpine
+    stage: test
+    before_script:
+        - npm install
+    script:
+        - npm run lint
+
 npm_test:
     image: node:22-alpine
     stage: test

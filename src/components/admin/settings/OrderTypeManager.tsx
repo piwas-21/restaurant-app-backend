@@ -21,6 +21,9 @@ export default function OrderTypeManager() {
 
   useEffect(() => {
     fetchConfigurations();
+    // Mount-only initial fetch; fetchConfigurations is a stable closure
+    // over component state — including it in deps would not change behaviour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchConfigurations = async () => {

@@ -10,7 +10,7 @@ interface AverageRatingProps {
   initialRatingData?: { average: number; count: number };
 }
 
-const AverageRating: React.FC<AverageRatingProps> = ({ dishId, initialRatingData }) => {
+const AverageRating: React.FC<AverageRatingProps> = ({ dishId: _dishId, initialRatingData }) => {
   const { t } = useTranslation();
   // In a real app, you might fetch this data or receive it as props after calculation
   const ratingData = initialRatingData;

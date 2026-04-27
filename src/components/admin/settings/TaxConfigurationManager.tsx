@@ -39,6 +39,8 @@ export default function TaxConfigurationManager() {
 
   useEffect(() => {
     fetchTaxConfigs();
+    // Mount-only initial fetch; see OrderTypeManager comment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchTaxConfigs = async () => {

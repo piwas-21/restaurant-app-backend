@@ -72,7 +72,7 @@ export default function CustomizationModal({ isOpen, onClose, product, onAddToCa
     });
 
     return total * quantity;
-  }, [product, selectedVariationId, selectedIngredients, selectedSideItems, quantity]);
+  }, [product, selectedVariationId, selectedIngredients, selectedSideItems, quantity, ingredientQuantities]);
 
   // Reset state and initialize defaults when modal opens/closes
   useEffect(() => {

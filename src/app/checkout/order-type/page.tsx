@@ -206,7 +206,7 @@ export default function OrderTypePage() {
             country: country.trim(),
             deliveryInstructions: additionalInfo.trim(),
           });
-        } catch (error) {
+        } catch {
           setSavingAddress(false);
           setAddressError(t('failed_to_save_address', 'Failed to save address. Please try again.'));
           return;

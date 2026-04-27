@@ -84,6 +84,10 @@ export default function ReservationsPage() {
       setBookedTableIds([]);
       setCapacityWarning('');
     }
+    // Effect responds to slot/time changes; selectedDate gate is a pre-condition
+    // (the parent effect re-fetches slots when the date changes). Including
+    // updateTableAvailability would re-bind on every render of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTime, availableTimeSlots]);
 
   const loadAllTables = async () => {

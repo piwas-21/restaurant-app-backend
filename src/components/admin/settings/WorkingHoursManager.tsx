@@ -23,6 +23,8 @@ export default function WorkingHoursManager() {
   useEffect(() => {
     loadWorkingHours();
     checkIsOpen();
+    // Mount-only initial fetch; see OrderTypeManager comment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadWorkingHours = async () => {

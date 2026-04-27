@@ -88,7 +88,12 @@ export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') 
     // We want to reset page to 1 when tab OR category changes
     setCurrentPage(1);
     fetchProducts(1);
-  }, [activeTab, selectedCategoryId]); // Added selectedCategoryId dependency
+    // fetchProducts closes over component state and is recreated each render;
+    // adding it to deps would cause an infinite re-fetch loop. The intent is
+    // to fetch when the tab or category filter changes — which the listed
+    // deps already cover.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedCategoryId]);
 
   const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const categoryId = event.target.value;

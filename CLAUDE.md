@@ -177,10 +177,10 @@ Grep for the component / hook / type you're adding or modifying. List every call
 | **Pre-commit** (blocking on `git commit`) | `pre-commit` hooks | Every commit | trailing-whitespace, EOF, large files, secret scan, no-commit-to-protected | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
 | **CI-enforced (blocking)** | `prettier --check` | MR pipeline (`prettier_check` job) **and** pre-commit when staged file matches `^src/.*\.(ts\|tsx\|css\|json\|md)$` | Source is prettier-clean | `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
 | **CI-enforced (blocking)** | `tsc --noEmit` | MR pipeline (`typecheck` job) **and** pre-commit when any `.ts`/`.tsx` is staged | Whole-project typecheck passes | `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
-| **Sprint 1 — manual** (devs run before commit; not yet automated) | `npm run lint` | Manual | ESLint passes | `eslint.config.mjs` |
+| **CI-enforced (blocking)** | `eslint --max-warnings=0` | MR pipeline (`eslint` job) **and** pre-commit when any `.ts`/`.tsx`/`.js`/`.mjs`/`.cjs` is staged | Zero lint warnings (allow-list configured per rule, see `eslint.config.mjs`) | `.gitlab-ci.yml`, `.pre-commit-config.yaml`, `eslint.config.mjs` |
 | **Sprint 1 — manual** (devs run before commit; not yet automated) | `npm run build` | Manual | Next.js build succeeds | `next.config.ts` |
 
-**`prettier --check` and `tsc --noEmit` automated as of Sprint 2 / 2.5**. `eslint --max-warnings=0` deferred — there are 200+ pre-existing lint warnings (unused vars, console statements, exhaustive-deps, raw `<img>`) that need clearing before that gate can flip blocking. Tracked as remaining Sprint 2.5 work in [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md). SAST quality gate (SonarCloud) lands in Sprint 3.
+**`prettier --check`, `tsc --noEmit`, and `eslint --max-warnings=0` all automated and blocking as of Sprint 2 / 2.5**. SAST quality gate (SonarCloud) lands in Sprint 3.
 
 ### Setup for a new developer
 ```bash
