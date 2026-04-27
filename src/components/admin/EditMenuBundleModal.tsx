@@ -128,7 +128,6 @@ const EditMenuBundleModal: React.FC<EditProductModalProps> = ({ isOpen, onClose,
   }, [menuDefinition, setValue]);
 
   const onSubmit = async (data: EditMenuBundleFormData) => {
-    console.log('EditMenuBundleModal onSubmit called', data);
     try {
       // Attach menu definition, removing temporary IDs
       const cleanedSections = menuDefinition.sections.map((s) => {
@@ -169,7 +168,6 @@ const EditMenuBundleModal: React.FC<EditProductModalProps> = ({ isOpen, onClose,
         delete (data as any).menuDefinition.id;
       }
 
-      console.log('Calling submitEditProductForm with', data);
       await submitEditProductForm({
         data: data as any, // Cast to any to bypass strict EditFormData check
         product,
@@ -184,8 +182,6 @@ const EditMenuBundleModal: React.FC<EditProductModalProps> = ({ isOpen, onClose,
       console.error('Error in onSubmit:', e);
     }
   };
-
-  console.log('Form Errors:', errors);
 
   if (!isOpen) return null;
 

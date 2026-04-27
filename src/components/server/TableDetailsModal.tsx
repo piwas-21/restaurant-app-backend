@@ -151,10 +151,6 @@ export default function TableDetailsModal({
                       const result = await completeAllTableOrders(table.tableNumber);
 
                       if (result.totalProcessed > 0) {
-                        console.log(
-                          `Processed ${result.totalProcessed} orders for table ${table.tableNumber}: ` +
-                            `${result.completedCount} completed, ${result.cancelledCount} cancelled`,
-                        );
                       }
 
                       onTableStatusChanged();

@@ -32,7 +32,6 @@ export const fidelityPointsService = {
     } catch (error) {
       // Don't log auth errors - they're expected for non-authenticated users during checkout
       if (error instanceof Error && !error.message.toLowerCase().includes('auth')) {
-        // eslint-disable-next-line no-console
         console.error('Error loading fidelity points balance:', error);
       }
       throw error;
@@ -73,7 +72,6 @@ export const fidelityPointsService = {
     } catch (error) {
       // Don't log auth errors
       if (error instanceof Error && !error.message.toLowerCase().includes('auth')) {
-        // eslint-disable-next-line no-console
         console.error('Error calculating fidelity discount:', error);
       }
       throw error;

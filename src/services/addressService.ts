@@ -92,7 +92,6 @@ export async function getMyAddresses(): Promise<AddressDto[]> {
     // Don't log auth errors - they're expected for non-authenticated users during checkout
     // Only log unexpected errors
     if (error instanceof Error && !error.message.toLowerCase().includes('auth')) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching addresses:', error);
     }
     throw error;
@@ -115,7 +114,6 @@ export async function getAddressById(id: string): Promise<AddressDto> {
 
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching address:', error);
     throw error;
   }
@@ -137,7 +135,6 @@ export async function createAddress(command: CreateAddressCommand): Promise<Addr
 
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error creating address:', error);
     throw error;
   }
@@ -162,7 +159,6 @@ export async function updateAddress(id: string, command: UpdateAddressCommand): 
 
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error updating address:', error);
     throw error;
   }
@@ -177,7 +173,6 @@ export async function deleteAddress(id: string): Promise<void> {
   try {
     await apiClient.delete<ApiResponse<string>>(`/api/Addresses/${id}`, { requireAuth: true });
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error deleting address:', error);
     throw error;
   }
@@ -192,7 +187,6 @@ export async function setDefaultAddress(id: string): Promise<void> {
   try {
     await apiClient.post<ApiResponse<string>>(`/api/Addresses/${id}/set-default`, {}, { requireAuth: true });
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error setting default address:', error);
     throw error;
   }

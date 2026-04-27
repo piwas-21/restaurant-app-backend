@@ -60,7 +60,6 @@ export default function FidelityPointsCheckout({ orderSubtotal, onPointsRedempti
           onPointsRedemption(pointsToRedeem, discountAmount);
         }
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('Error calculating discount:', err);
       }
     }

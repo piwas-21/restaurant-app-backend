@@ -90,7 +90,6 @@ export async function registerCustomer(formData: CustomerRegistrationPayload) {
       if (data.data?.refreshToken) localStorage.setItem('refresh_token', data.data.refreshToken);
     } catch (e) {
       // localStorage may be unavailable; ignore and let caller proceed
-      // eslint-disable-next-line no-console
       console.warn('Could not persist tokens to localStorage', e);
     }
   }

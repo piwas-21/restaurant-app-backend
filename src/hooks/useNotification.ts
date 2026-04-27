@@ -33,7 +33,6 @@ export function useNotification() {
   // Initialize AudioContext on first user interaction
   const initializeAudio = useCallback(() => {
     if (audioContextRef.current) {
-      console.log('🔊 AudioContext already exists, state:', audioContextRef.current.state);
       return;
     }
 
@@ -42,12 +41,10 @@ export function useNotification() {
       audioContextRef.current = new AudioContextClass();
 
       const state = audioContextRef.current.state;
-      console.log('🔊 AudioContext created, state:', state);
 
       if (state === 'running') {
         setAudioReady(true);
         setAudioBlockedByPolicy(false);
-        console.log('✅ Audio is ready to play');
       } else if (state === 'suspended') {
         setAudioBlockedByPolicy(true);
         console.warn('⚠️ AudioContext is suspended - user interaction required');
@@ -63,21 +60,17 @@ export function useNotification() {
   // Resume audio context (requires user gesture on Firefox)
   const resumeAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
-      console.log('🔊 No AudioContext to resume, initializing...');
       initializeAudio();
       return;
     }
 
     try {
       if (audioContextRef.current.state === 'suspended') {
-        console.log('🔊 Attempting to resume suspended AudioContext...');
         await audioContextRef.current.resume();
-        console.log('✅ AudioContext resumed, state:', audioContextRef.current.state);
         setAudioReady(true);
         setAudioBlockedByPolicy(false);
         hasUserInteractedRef.current = true;
       } else {
-        console.log('🔊 AudioContext state:', audioContextRef.current.state);
         setAudioReady(audioContextRef.current.state === 'running');
       }
     } catch (error) {
@@ -103,7 +96,6 @@ export function useNotification() {
   useEffect(() => {
     if (audioEnabled && !audioContextRef.current) {
       requestAnimationFrame(() => {
-        console.log('🔊 Auto-initializing audio context...');
         initializeAudio();
       });
     }
@@ -113,7 +105,6 @@ export function useNotification() {
   useEffect(() => {
     const handleUserInteraction = () => {
       if (!hasUserInteractedRef.current) {
-        console.log('👆 User interaction detected, attempting to enable audio...');
         hasUserInteractedRef.current = true;
         resumeAudioContext();
       }
@@ -136,10 +127,8 @@ export function useNotification() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && audioContextRef.current) {
         const state = audioContextRef.current.state;
-        console.log('👁️ Tab visible, AudioContext state:', state);
 
         if (state === 'suspended' && hasUserInteractedRef.current) {
-          console.log('🔊 Attempting to resume audio after visibility change...');
           audioContextRef.current
             .resume()
             .then(() => {
@@ -168,7 +157,6 @@ export function useNotification() {
     } else {
       const newEnabled = !audioEnabled;
       setAudioEnabled(newEnabled);
-      console.log(`🔊 Audio ${newEnabled ? 'enabled' : 'disabled'}`);
 
       if (newEnabled && audioContextRef.current.state === 'suspended') {
         await resumeAudioContext();
@@ -468,7 +456,6 @@ export function useNotification() {
   const changeSoundType = useCallback((newType: NotificationSoundType) => {
     setSoundType(newType);
     localStorage.setItem('cashier_notification_sound', newType);
-    console.log('🔊 Notification sound changed to:', newType);
   }, []);
 
   // Toggle repeat until mouse moves
@@ -476,7 +463,6 @@ export function useNotification() {
     const newValue = !repeatUntilMouseMoves;
     setRepeatUntilMouseMoves(newValue);
     localStorage.setItem('cashier_repeat_sound', newValue.toString());
-    console.log('🔁 Repeat sound until mouse moves:', newValue);
   }, [repeatUntilMouseMoves]);
 
   return {

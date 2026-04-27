@@ -181,7 +181,6 @@ export const submitProductForm = async ({
           message?: string;
         };
         if (!imageResponse.success) {
-          // eslint-disable-next-line no-console
           console.error('Image upload failed:', imageResponse.message);
         }
       }

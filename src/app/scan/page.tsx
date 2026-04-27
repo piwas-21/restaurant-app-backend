@@ -62,7 +62,6 @@ function ScanPageContent() {
       } catch (err) {
         // Log error for debugging
         if (process.env.NODE_ENV === 'development') {
-          // eslint-disable-next-line no-console
           console.error('Error validating QR code:', err);
         }
         setError(t('qr_code_validation_error'));

@@ -23,7 +23,6 @@ export default function FidelityPointsSection() {
         const data = await fidelityPointsService.getBalance();
         setBalance(data);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('Error loading fidelity points:', err);
         setError(t('error_loading_points', 'Failed to load fidelity points'));
       } finally {
@@ -41,7 +40,6 @@ export default function FidelityPointsSection() {
       const data = await fidelityPointsService.getBalance();
       setBalance(data);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error loading fidelity points:', err);
       setError(t('error_loading_points', 'Failed to load fidelity points'));
     } finally {

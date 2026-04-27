@@ -65,7 +65,6 @@ export function useSession(autoCreate: boolean = true): UseSessionReturn {
         const expiry = getSessionExpiryDate();
         setExpiryDate(expiry);
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Error initializing session:', error);
       } finally {
         setIsLoading(false);
@@ -84,7 +83,6 @@ export function useSession(autoCreate: boolean = true): UseSessionReturn {
       const expiry = getSessionExpiryDate();
       setExpiryDate(expiry);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error refreshing session:', error);
     }
   };
@@ -98,7 +96,6 @@ export function useSession(autoCreate: boolean = true): UseSessionReturn {
       setSessionId(null);
       setExpiryDate(null);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error clearing session:', error);
     }
   };
@@ -117,7 +114,6 @@ export function useSession(autoCreate: boolean = true): UseSessionReturn {
 
       return id;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error ensuring session:', error);
       throw error;
     }

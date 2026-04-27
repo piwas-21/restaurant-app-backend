@@ -64,7 +64,6 @@ export function getSessionId(): string | null {
     // Session expired or doesn't exist
     return null;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error reading session ID from localStorage:', error);
     return null;
   }
@@ -88,7 +87,6 @@ export function createSessionId(): string {
 
     return sessionId;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error creating session ID:', error);
     throw new Error('Failed to create session ID');
   }
@@ -119,7 +117,6 @@ export function clearSessionId(): void {
     localStorage.removeItem(SESSION_ID_KEY);
     localStorage.removeItem(SESSION_EXPIRY_KEY);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error clearing session ID:', error);
   }
 }
@@ -138,7 +135,6 @@ export function refreshSessionExpiry(): void {
     const newExpiryDate = getSessionExpiry();
     localStorage.setItem(SESSION_EXPIRY_KEY, newExpiryDate);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error refreshing session expiry:', error);
   }
 }

@@ -54,7 +54,6 @@ export default function AccountPage() {
           phoneNumber: userData.phoneNumber || '',
         });
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Failed to load profile:', error);
       }
     };
@@ -104,7 +103,6 @@ export default function AccountPage() {
       await updateProfile(command);
       setProfileSuccess(t('changes_saved_success', 'Your information has been updated!'));
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to update profile:', error);
       setProfileErrors({
         form: error.message || t('profile_update_error', 'Failed to update profile. Please try again.'),
@@ -216,7 +214,6 @@ export default function AccountPage() {
       setPasswordStrength(0);
       setPasswordStrengthText('');
     } catch (error: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to change password:', error);
       setPasswordErrors({
         form: error.message || t('password_change_error', 'Failed to change password. Please try again.'),

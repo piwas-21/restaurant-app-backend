@@ -85,7 +85,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
       if (isMountedRef.current) {
         if (modifiedSince && result.items && result.items.length > 0) {
           // Incremental update: merge new/updated orders
-          console.log(`📦 Polling: Found ${result.items.length} new/updated orders`);
           setOrders((prev) => {
             const newOrders = [...prev];
             for (const order of result.items) {
@@ -120,7 +119,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
    */
   const cleanupSSE = useCallback(() => {
     if (eventSourceRef.current) {
-      console.log('🔌 SSE: Closing connection');
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
@@ -139,14 +137,12 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
    */
   const connectToSSE = useCallback(() => {
     if (!isMountedRef.current) {
-      console.log('⚠️ SSE: Component unmounted, skipping connection');
       return;
     }
 
     // Prevent rapid reconnections
     const now = Date.now();
     if (now - lastReconnectTimeRef.current < MIN_RECONNECT_INTERVAL_MS) {
-      console.log('⚠️ SSE: Too soon for reconnection, scheduling...');
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) connectToSSE();
@@ -157,7 +153,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
 
     // Already connected or connecting
     if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED) {
-      console.log('⚠️ SSE: Already connected or connecting, skipping');
       return;
     }
 
@@ -180,10 +175,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
         url += `?token=${encodeURIComponent(authToken)}`;
       }
 
-      console.log(
-        `🔌 SSE: Connecting [${connectionId}] attempt ${reconnectAttemptRef.current + 1}/${maxReconnectAttempts}`,
-      );
-
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 
@@ -191,13 +182,11 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
       eventSource.addEventListener('connected', (event) => {
         // Check if this is still the active connection
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) {
-          console.log(`⚠️ SSE: Stale connection event [${connectionId}], ignoring`);
           return;
         }
 
         try {
           const data = JSON.parse(event.data);
-          console.log(`✅ SSE: Connected [${connectionId}] clientId:`, data.clientId);
           setIsConnected(true);
           setConnectionState('connected');
           setError(null);
@@ -217,7 +206,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
         const eventTime = new Date();
         setLastEventTime(eventTime);
         lastEventTimeRef.current = eventTime;
-        console.log('💓 SSE: Heartbeat received at', eventTime.toISOString());
       });
 
       // Handle order events
@@ -226,11 +214,9 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
 
         try {
           const data = JSON.parse(event.data);
-          console.log('📦 SSE: order-created:', data.order?.orderNumber || data.orderNumber);
           setOrders((prev) => {
             const newOrder = data.order || data;
             if (prev.some((o) => o.id === newOrder.id)) {
-              console.log('📦 SSE: Order already exists, skipping duplicate');
               return prev;
             }
             return [newOrder, ...prev];
@@ -250,7 +236,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
-          console.log('📝 SSE: order-status-changed:', orderId, '→', data.order?.status);
           setOrders((prev) =>
             prev.map((order) => (order.id === orderId ? data.order || { ...order, ...data } : order)),
           );
@@ -319,7 +304,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
       // Handle connection errors
       eventSource.onerror = () => {
         if (connectionIdRef.current !== connectionId) {
-          console.log(`⚠️ SSE: Stale error event [${connectionId}], ignoring`);
           return;
         }
 
@@ -413,8 +397,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
   const startPrimaryPolling = useCallback(() => {
     if (primaryPollingIntervalRef.current) return; // Already running
 
-    console.log('🔄 Starting PRIMARY polling (every 5s)');
-
     primaryPollingIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
 
@@ -440,15 +422,12 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isMountedRef.current) {
-        console.log('👁️ Tab became visible, checking connection...');
-
         // Refresh orders immediately
         refreshOrders();
 
         // Check if SSE needs reconnection
         const eventSource = eventSourceRef.current;
         if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
-          console.log('🔄 SSE: Connection lost while hidden, reconnecting...');
           reconnectAttemptRef.current = 0;
           connectToSSE();
         } else {
@@ -457,7 +436,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
           if (lastEvent) {
             const silenceMs = Date.now() - lastEvent.getTime();
             if (silenceMs > MAX_SILENCE_MS) {
-              console.log(`🔄 SSE: Silent for ${Math.round(silenceMs / 1000)}s while hidden, reconnecting...`);
               reconnectAttemptRef.current = 0;
               connectToSSE();
             }
@@ -476,7 +454,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
   useEffect(() => {
     const handleOnline = () => {
       if (!isMountedRef.current) return;
-      console.log('🌐 Network: Back online, reconnecting SSE...');
       reconnectAttemptRef.current = 0;
       connectToSSE();
       refreshOrders();
@@ -484,7 +461,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
 
     const handleOffline = () => {
       if (!isMountedRef.current) return;
-      console.log('🌐 Network: Went offline');
       setIsConnected(false);
       setConnectionState('disconnected');
       setError('Network connection lost');
@@ -502,7 +478,6 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
    * Initialize polling (primary) and SSE (enhancement) connections
    */
   useEffect(() => {
-    console.log('🔌 Initializing cashier orders hook...');
     isMountedRef.current = true;
 
     // Initial full fetch
@@ -519,13 +494,11 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
     // Delay slightly to ensure component is fully mounted
     const sseTimeout = setTimeout(() => {
       if (isMountedRef.current) {
-        console.log('🔌 Attempting SSE connection (enhancement)...');
         connectToSSE();
       }
     }, 500);
 
     return () => {
-      console.log('🔌 Cleaning up cashier orders hook...');
       isMountedRef.current = false;
       clearTimeout(pollingStartTimeout);
       clearTimeout(sseTimeout);

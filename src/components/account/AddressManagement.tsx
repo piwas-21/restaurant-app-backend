@@ -33,7 +33,6 @@ export default function AddressManagement() {
       setAddresses(data);
       setError('');
     } catch (err: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to load addresses:', err);
       setError(t('address_load_error', 'Failed to load addresses. Please try again.'));
     } finally {
@@ -69,7 +68,6 @@ export default function AddressManagement() {
       await loadAddresses();
       setDeleteConfirmModal({ show: false, addressId: null });
     } catch (err: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to delete address:', err);
       setError(t('address_delete_error', 'Failed to delete address. Please try again.'));
       setDeleteConfirmModal({ show: false, addressId: null });
@@ -81,7 +79,6 @@ export default function AddressManagement() {
       await setDefaultAddress(addressId);
       await loadAddresses();
     } catch (err: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to set default address:', err);
       setError(t('address_set_default_error', 'Failed to set default address. Please try again.'));
     }
@@ -99,7 +96,6 @@ export default function AddressManagement() {
       setEditingAddress(null);
       setError('');
     } catch (err: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to save address:', err);
       throw err; // Let the form handle the error
     }
@@ -290,7 +286,6 @@ function AddressFormModal({ address, onSave, onCancel }: AddressFormModalProps) 
       const command = address ? { ...formData, id: address.id } : formData;
       await onSave(command);
     } catch (err: any) {
-      // eslint-disable-next-line no-console
       console.error('Failed to save:', err);
       setErrors({ form: err.message || t('address_save_error', 'Failed to save address. Please try again.') });
     } finally {

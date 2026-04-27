@@ -41,7 +41,6 @@ export async function createOrder(command: CreateOrderCommand): Promise<OrderDto
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error creating order:', error);
     throw error;
   }
@@ -76,7 +75,6 @@ export async function getMyOrders(filters?: Partial<OrderQueryFilters>): Promise
 
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching my orders:', error);
     throw error;
   }
@@ -111,7 +109,6 @@ export async function getOrders(filters?: OrderQueryFilters): Promise<PagedResul
 
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching orders:', error);
     throw error;
   }
@@ -131,7 +128,6 @@ export async function getOrderById(orderId: string): Promise<OrderDto> {
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching order:', error);
     throw error;
   }
@@ -154,7 +150,6 @@ export async function updateOrderStatus(orderId: string, command: UpdateOrderSta
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error updating order status:', error);
     throw error;
   }
@@ -177,7 +172,6 @@ export async function cancelOrder(orderId: string, command: CancelOrderCommand):
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error cancelling order:', error);
     throw error;
   }
@@ -196,7 +190,6 @@ export async function deleteOrder(orderId: string): Promise<void> {
       throw new Error(response.message || 'Failed to delete order');
     }
   } catch (error: any) {
-    // eslint-disable-next-line no-console
     console.error('Error deleting order:', error);
     throw error;
   }
@@ -219,7 +212,6 @@ export async function toggleFocusOrder(orderId: string, command: ToggleFocusOrde
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error toggling focus order:', error);
     throw error;
   }
@@ -250,7 +242,6 @@ export async function getFocusOrders(filters?: FocusOrdersQueryFilters): Promise
 
     return response.data || [];
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching focus orders:', error);
     throw error;
   }
@@ -273,7 +264,6 @@ export async function addPaymentToOrder(orderId: string, command: AddPaymentToOr
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error adding payment:', error);
     throw error;
   }
@@ -303,7 +293,6 @@ export async function refundPayment(
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error refunding payment:', error);
     throw error;
   }
@@ -330,7 +319,6 @@ export async function getZReport(date?: string): Promise<ZReportDto> {
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching Z-Report:', error);
     throw error;
   }

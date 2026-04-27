@@ -111,7 +111,6 @@ export default function CustomerDiscountForm({ discount, onClose, onSuccess }: C
             setSearchResults([]);
           }
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error('Error searching users:', error);
           setSearchResults([]);
           enqueueSnackbar(t('failed_search_users', 'Failed to search users'), { variant: 'error' });

@@ -75,17 +75,9 @@ export default function ReviewPage() {
   // Auto-show modal when order is confirmed
   useEffect(() => {
     if (confirmedOrder) {
-      // eslint-disable-next-line no-console
-      console.log('Order confirmed, showing modal:', confirmedOrder);
       setShowConfirmationModal(true);
     }
   }, [confirmedOrder]);
-
-  // Debug modal state
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('Modal state changed:', { showConfirmationModal, confirmedOrder, isLoggedIn });
-  }, [showConfirmationModal, confirmedOrder, isLoggedIn]);
 
   // Handler for points redemption
   const handlePointsRedemption = (points: number, discountAmount: number) => {
@@ -123,7 +115,6 @@ export default function ReviewPage() {
           setTaxAmount(0);
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.warn('Failed to fetch tax configuration:', error);
         // Fall back to basket tax value if available
         setTaxConfig(null);
@@ -285,9 +276,6 @@ export default function ReviewPage() {
       // Submit order
       const createdOrder = await createOrder(orderCommand);
 
-      // eslint-disable-next-line no-console
-      console.log('Order created successfully:', { id: createdOrder.id, orderNumber: createdOrder.orderNumber });
-
       // Store order info for modal (capture email before clearing checkout state)
       setConfirmedOrder({
         id: createdOrder.id,
@@ -295,22 +283,14 @@ export default function ReviewPage() {
         customerEmail: checkoutState.customerInfo?.email || '',
       });
 
-      // eslint-disable-next-line no-console
-      console.log('Setting confirmed order state');
-
       // Clear cart and checkout state
       await clearCart();
       clearCheckout();
 
       // Send confirmation emails to both customer and admin (fire and forget)
       try {
-        // eslint-disable-next-line no-console
-        console.log('Sending confirmation emails for order:', createdOrder.id);
         await sendOrderConfirmationEmails(createdOrder.id);
-        // eslint-disable-next-line no-console
-        console.log('Confirmation emails sent');
       } catch (emailError) {
-        // eslint-disable-next-line no-console
         console.warn('Failed to send confirmation emails:', emailError);
         // Don't fail the order due to email issues
       }
@@ -323,7 +303,6 @@ export default function ReviewPage() {
 
       // Modal will automatically show via useEffect watching confirmedOrder
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error placing order:', error);
 
       // Get translated error message

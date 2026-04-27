@@ -66,7 +66,6 @@ export default function TableSelector({ selectedTable, onTableSelect, disabled }
       }
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
-        // eslint-disable-next-line no-console
         console.error('Error fetching tables:', err);
       }
       setError(t('error_loading_tables', 'Error loading tables. Please try again.'));

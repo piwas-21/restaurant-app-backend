@@ -15,19 +15,12 @@ import { apiClient } from '@/utils/apiClient';
  */
 export async function sendOrderConfirmationEmails(orderId: string): Promise<void> {
   try {
-    // eslint-disable-next-line no-console
-    console.log('Sending order confirmation emails for order:', orderId);
-
     const response = await apiClient.post<{ data: string }>(
       `/api/Orders/${orderId}/send-confirmation-email`,
       {},
       { requireAuth: false },
     );
-
-    // eslint-disable-next-line no-console
-    console.log('Order confirmation emails sent successfully:', response);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error sending order confirmation emails:', error);
     // Don't throw - email sending should not block the order process
   }

@@ -112,7 +112,6 @@ export default function AdminReservationsManagementPage() {
       const tablesResult = await reservationService.getTables();
       setTables(tablesResult);
     } catch (err: any) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching data:', err);
       setError(t('failed_to_load_reservations', 'Failed to load reservations'));
       enqueueSnackbar(t('failed_to_load_reservations', 'Failed to load reservations'), {
@@ -282,7 +281,6 @@ export default function AdminReservationsManagementPage() {
             await reservationService.confirmReservation(id);
             successCount++;
           } catch (err) {
-            // eslint-disable-next-line no-console
             console.error(`Failed to confirm reservation ${id}:`, err);
           }
         }
@@ -317,7 +315,6 @@ export default function AdminReservationsManagementPage() {
             await reservationService.cancelReservation(id);
             successCount++;
           } catch (err) {
-            // eslint-disable-next-line no-console
             console.error(`Failed to cancel reservation ${id}:`, err);
           }
         }
@@ -349,7 +346,6 @@ export default function AdminReservationsManagementPage() {
             await reservationService.deleteReservation(id);
             successCount++;
           } catch (err) {
-            // eslint-disable-next-line no-console
             console.error(`Failed to delete reservation ${id}:`, err);
           }
         }
