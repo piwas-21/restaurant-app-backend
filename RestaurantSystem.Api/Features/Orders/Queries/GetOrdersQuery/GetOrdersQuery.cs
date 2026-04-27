@@ -11,6 +11,32 @@ using System.Linq.Expressions;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 
+/// <summary>
+/// Query orders with optional filters + pagination.
+/// </summary>
+/// <param name="Status">Comma-separated <see cref="OrderStatus"/> values (e.g. "Pending,Confirmed"). Unknown tokens ignored.</param>
+/// <param name="PaymentStatus">Single <see cref="PaymentStatus"/> name.</param>
+/// <param name="OrderType">Single <see cref="OrderType"/> name (DineIn/Takeaway/Delivery).</param>
+/// <param name="StartDate">
+/// Lower bound on <c>Order.OrderDate</c>, **inclusive** (<c>OrderDate &gt;= StartDate</c>).
+/// Interpreted as UTC: <c>OrderDate</c> is stored in UTC; this value is compared verbatim with no
+/// timezone conversion. Callers are responsible for building UTC instants from any local context.
+/// Example — cashier "today's orders" in browser local time:
+/// <code>
+/// const start = new Date(); start.setHours(0, 0, 0, 0);
+/// const end   = new Date(); end.setHours(24, 0, 0, 0);
+/// fetch(`/api/orders?startDate=${start.toISOString()}&amp;endDate=${end.toISOString()}`);
+/// </code>
+/// </param>
+/// <param name="EndDate">Upper bound on <c>Order.OrderDate</c>, **inclusive** (<c>OrderDate &lt;= EndDate</c>). Same UTC semantics as <see cref="StartDate"/>.</param>
+/// <param name="UserId">Limit to orders owned by this user. Non-staff callers are auto-restricted to their own user-id regardless of this parameter.</param>
+/// <param name="Search">Case-insensitive substring match on order number, customer name, email, or phone.</param>
+/// <param name="IsFocusOrder">Filter on the cashier "focus" flag.</param>
+/// <param name="ModifiedSince">Returns orders created or updated after this UTC timestamp. Used for efficient polling.</param>
+/// <param name="OrderBy">Sort key: OrderDate (default), OrderNumber, Total, Status, PaymentStatus, CustomerName.</param>
+/// <param name="Descending">Sort descending (default true).</param>
+/// <param name="Page">1-based page index.</param>
+/// <param name="PageSize">Rows per page.</param>
 public record GetOrdersQuery(
     string? Status,
     string? PaymentStatus,

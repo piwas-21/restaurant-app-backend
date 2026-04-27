@@ -9,7 +9,7 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 {
     public const string UserId = "cd6c41d9-97e1-4fb4-9bee-ab6a9b460471";
     public const string UserName = "test@example.com";
-    public const string AdminUserId = "admin-user-id";
+    public const string AdminUserId = "11111111-1111-1111-1111-111111111111";
     public const string AdminUserName = "admin@example.com";
 
     public TestAuthHandler(IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -25,7 +25,7 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
             new(ClaimTypes.NameIdentifier, UserId),
             new(ClaimTypes.Name, UserName),
             new(ClaimTypes.Email, UserName),
-            new("Role", "Customer")
+            new(ClaimTypes.Role, "Customer")
         };
 
         // Check if admin header is present
@@ -36,7 +36,7 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
                 new(ClaimTypes.NameIdentifier, AdminUserId),
                 new(ClaimTypes.Name, AdminUserName),
                 new(ClaimTypes.Email, AdminUserName),
-                new("Role", "Admin")
+                new(ClaimTypes.Role, "Admin")
             };
         }
 
