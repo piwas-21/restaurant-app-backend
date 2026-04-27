@@ -129,6 +129,8 @@ export default function MenuPage() {
 
       enqueueSnackbar(t('item_added_to_cart_toast', { itemName: bundleName }), {
         variant: 'success',
+        autoHideDuration: 2000,
+        anchorOrigin: { vertical: 'top', horizontal: 'center' },
       });
 
       // Trigger cart animation

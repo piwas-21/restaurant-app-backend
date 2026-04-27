@@ -81,6 +81,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
       });
       enqueueSnackbar(t("item_added_to_cart_toast", { itemName }), {
         variant: "success",
+        autoHideDuration: 2000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
       });
     } catch (error) {
       console.error('Error fetching product details:', error);
@@ -110,6 +112,8 @@ const MenuItem: React.FC<MenuItemProps> = ({
       setShowCustomization(false);
       enqueueSnackbar(t("item_added_to_cart_toast", { itemName }), {
         variant: "success",
+        autoHideDuration: 2000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
       });
     } catch {
       enqueueSnackbar(t("error_adding_to_cart", "Failed to add item to cart"), {

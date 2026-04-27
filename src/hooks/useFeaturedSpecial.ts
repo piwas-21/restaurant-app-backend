@@ -55,6 +55,7 @@ export function useFeaturedSpecial() {
       enqueueSnackbar(t('item_added_to_cart', 'Item added to cart'), {
         variant: 'success',
         autoHideDuration: 2000,
+        anchorOrigin: { vertical: 'top', horizontal: 'center' },
       });
     } catch {
       enqueueSnackbar(t('error_adding_to_cart', 'Error adding item to cart'), {
@@ -83,6 +84,7 @@ export function useFeaturedSpecial() {
       enqueueSnackbar(t('item_added_to_cart', 'Item added to cart'), {
         variant: 'success',
         autoHideDuration: 2000,
+        anchorOrigin: { vertical: 'top', horizontal: 'center' },
       });
     } catch {
       enqueueSnackbar(t('error_adding_to_cart', 'Error adding item to cart'), {
