@@ -43,7 +43,6 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ dishId, onSubmitSuccess }) 
       return;
     }
 
-    console.log('Submitting feedback:', { dishId, rating, comment, name });
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
 
     setIsSubmitting(false);

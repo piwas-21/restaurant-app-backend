@@ -25,7 +25,6 @@ export async function getBasket(): Promise<BasketDto | null> {
     const response = await apiClient.get<BasketDtoApiResponse>('/api/Basket');
     return response.data || null;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching basket:', error);
     throw error;
   }
@@ -40,7 +39,6 @@ export async function getBasketSummary(): Promise<BasketSummaryDto | null> {
     const response = await apiClient.get<BasketSummaryDtoApiResponse>('/api/Basket/summary');
     return response.data || null;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching basket summary:', error);
     throw error;
   }
@@ -60,7 +58,6 @@ export async function addItemToBasket(item: AddToBasketDto): Promise<BasketDto> 
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error adding item to basket:', error);
     throw error;
   }
@@ -81,7 +78,6 @@ export async function updateBasketItem(basketItemId: string, updates: UpdateBask
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error updating basket item:', error);
     throw error;
   }
@@ -101,7 +97,6 @@ export async function removeItemFromBasket(basketItemId: string): Promise<Basket
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error removing item from basket:', error);
     throw error;
   }
@@ -121,7 +116,6 @@ export async function clearBasket(): Promise<BasketDto> {
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error clearing basket:', error);
     throw error;
   }
@@ -142,7 +136,6 @@ export async function applyPromoCode(promoCode: string): Promise<BasketDto> {
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error applying promo code:', error);
     throw error;
   }
@@ -161,7 +154,6 @@ export async function removePromoCode(): Promise<BasketDto> {
     }
     return response.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error removing promo code:', error);
     throw error;
   }

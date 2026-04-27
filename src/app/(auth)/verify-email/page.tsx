@@ -53,7 +53,6 @@ function VerifyEmailContent() {
         const response = await verifyEmail({ email, token });
 
         // Debug log
-        console.log('Email verification response:', response);
 
         if (response.succeeded || response.success) {
           setStatus('success');

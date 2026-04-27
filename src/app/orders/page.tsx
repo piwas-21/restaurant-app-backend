@@ -56,7 +56,6 @@ export default function OrdersPage() {
 
       setOrders(sortedOrders);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching orders:', err);
       setError(t('failed_to_load_orders', 'Failed to load orders'));
       enqueueSnackbar(t('failed_to_load_orders', 'Failed to load orders'), {
@@ -107,7 +106,6 @@ export default function OrdersPage() {
       // Navigate to cart
       router.push('/cart');
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error reordering:', err);
       enqueueSnackbar(t('failed_to_reorder', 'Failed to add items to cart'), {
         variant: 'error',

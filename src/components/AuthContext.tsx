@@ -43,7 +43,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setUser(JSON.parse(storedUser));
             } else {
               // Token refresh failed - clear auth state
-              console.log('Session expired. Please login again.');
               localStorage.removeItem('auth_token');
               localStorage.removeItem('refresh_token');
               localStorage.removeItem('user');
@@ -51,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           } catch {
             // Token validation/refresh failed - clear auth state
-            console.log('Session validation failed. Please login again.');
             localStorage.removeItem('auth_token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');

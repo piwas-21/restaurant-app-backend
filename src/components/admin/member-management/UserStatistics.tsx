@@ -18,17 +18,13 @@ const UserStatistics: React.FC = () => {
       setLoading(true);
       setError(null);
       const response = await getUserStatistics();
-      // eslint-disable-next-line no-console
-      console.log('Statistics response:', response);
       if (response.success && response.data) {
         setStats(response.data);
       } else {
-        // eslint-disable-next-line no-console
         console.error('Failed response:', response);
         setError(t('failed_to_load_stats', 'Failed to load statistics'));
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching user statistics:', err);
       setError(t('error_loading_stats', 'Error loading statistics'));
     } finally {

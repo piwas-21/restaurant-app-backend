@@ -81,7 +81,6 @@ const MemberManagementPage = () => {
       // Refresh statistics
       setStatsKey((prev) => prev + 1);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error updating user:', error);
       setResultModalMessage(t('error_updating_user', 'Error updating user'));
       setIsResultModalSuccess(false);

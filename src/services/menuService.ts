@@ -119,9 +119,7 @@ export const updateMenuBundle = async (id: string, menuData: any) => {
 export const getMenuBundles = async (page: number = 1, pageSize: number = 10, includeUnavailable: boolean = true) => {
   try {
     const url = `${MENUS_API_URL}?page=${page}&pageSize=${pageSize}&includeUnavailable=${includeUnavailable}`;
-    console.log('[menuService] getMenuBundles calling:', url);
     const result = await apiClient.get(url);
-    console.log('[menuService] getMenuBundles result:', result);
     return result;
   } catch (error) {
     console.error('Get Menu Bundles Failed:', error);

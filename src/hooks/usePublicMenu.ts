@@ -40,7 +40,6 @@ export function usePublicMenu() {
           setCategories([]);
         }
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error('Failed to load categories', e);
         setCategories([]);
       }
@@ -107,7 +106,6 @@ export function usePublicMenu() {
         const filtered = mapped.filter((i) => i.isActive !== false && i.isAvailable !== false);
         setItems(filtered);
       } catch (e: any) {
-        // eslint-disable-next-line no-console
         console.error('Failed to fetch products', e);
         setError(e?.message || 'Failed to fetch products');
         setItems([]);
@@ -159,7 +157,6 @@ export function usePublicMenu() {
         const filtered = mapped.filter((b) => b.isActive !== false && b.isAvailable !== false);
         setMenuBundles(filtered);
       } catch (e: any) {
-        // eslint-disable-next-line no-console
         console.error('Failed to fetch menu bundles', e);
         setError(e?.message || 'Failed to fetch menu bundles');
         setMenuBundles([]);

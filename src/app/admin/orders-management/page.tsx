@@ -217,7 +217,6 @@ export default function AdminOrdersPage() {
 
       setOrders(filteredOrders);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching orders:', err);
       setError(t('failed_to_load_orders', 'Failed to load orders'));
       enqueueSnackbar(t('failed_to_load_orders', 'Failed to load orders'), {

@@ -36,7 +36,10 @@ const eslintConfig = [
       // Other helpful rules to disable during development
       "no-unused-vars": "off", // Turn off base rule as it can conflict with @typescript-eslint/no-unused-vars
       "no-unused-expressions": "off",
-      "no-console": "warn"
+      // Permit console.warn/error (legitimate production signals) but flag
+      // console.log as noise. console.debug/info follow the same rationale
+      // as .log — they're typically dev-time scaffolding and shouldn't ship.
+      "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
 ];

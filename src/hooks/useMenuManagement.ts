@@ -31,14 +31,10 @@ export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') 
         let response: any;
         if (activeTab === 'menus') {
           // Use dedicated endpoint for menu bundles (category-free)
-          console.log('[useMenuManagement] Calling getMenuBundles API');
           response = await getMenuBundles(page, pageSize);
-          console.log('[useMenuManagement] getMenuBundles response:', response);
         } else {
           // Use generic products endpoint (backend now excludes menus by default)
-          console.log('[useMenuManagement] Calling getProducts API');
           response = await getProducts(page, pageSize, selectedCategoryId);
-          console.log('[useMenuManagement] getProducts response:', response);
         }
 
         // Only update state if we're still on the same tab (check against ref)
@@ -52,12 +48,6 @@ export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') 
             setError(response.message || 'Failed to fetch items');
           }
         } else {
-          console.log(
-            '[useMenuManagement] Ignoring stale response from',
-            requestTab,
-            'tab, current tab is',
-            activeTabRef.current,
-          );
         }
       } catch {
         if (requestTab === activeTabRef.current) {

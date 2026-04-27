@@ -148,55 +148,40 @@ export default function OrderTypePage() {
   };
 
   const validateDeliveryAddress = (): boolean => {
-    console.log('Validating delivery address:', { street, city, postalCode });
     if (!street.trim()) {
       setAddressError(t('street_required', 'Street address is required'));
-      console.log('Validation failed: street is empty');
       return false;
     }
     if (!city.trim()) {
       setAddressError(t('city_required', 'City is required'));
-      console.log('Validation failed: city is empty');
       return false;
     }
     if (!postalCode.trim()) {
       setAddressError(t('postal_code_required', 'Postal code is required'));
-      console.log('Validation failed: postal code is empty');
       return false;
     }
     // Allow various postal code formats: 4 digits (CH), alphanumeric (NL, DE, etc.)
     if (!/^[A-Z0-9\s\-]{2,10}$/i.test(postalCode.trim())) {
       setAddressError(t('postal_code_invalid', 'Please enter a valid postal code'));
-      console.log('Validation failed: invalid postal code format');
       return false;
     }
     setAddressError('');
-    console.log('Validation passed');
     return true;
   };
 
   const handleContinue = async () => {
-    // eslint-disable-next-line no-console
-    console.log('handleContinue clicked', { selectedType, showNewAddressForm, isLoggedIn, saveThisAddress });
-
     if (!selectedType) {
-      // eslint-disable-next-line no-console
-      console.log('No selectedType, returning');
       return;
     }
 
     // Validate based on order type
     if (selectedType === OrderType.DineIn) {
-      // eslint-disable-next-line no-console
-      console.log('Processing DineIn order');
       if (!validateTableSelection()) {
         return;
       }
       setTableNumber(tableNum);
       setDeliveryAddress({ street: '', city: '', postalCode: '', country: '' });
     } else if (selectedType === OrderType.Delivery) {
-      // eslint-disable-next-line no-console
-      console.log('Processing Delivery order');
       if (!validateDeliveryAddress()) {
         return;
       }
@@ -211,8 +196,6 @@ export default function OrderTypePage() {
 
       // Save address if user checked the checkbox and is logged in
       if (saveThisAddress && isLoggedIn) {
-        // eslint-disable-next-line no-console
-        console.log('Saving address...');
         setSavingAddress(true);
         try {
           await createAddress({
@@ -223,11 +206,7 @@ export default function OrderTypePage() {
             country: country.trim(),
             deliveryInstructions: additionalInfo.trim(),
           });
-          // eslint-disable-next-line no-console
-          console.log('Address saved successfully');
         } catch (error) {
-          // eslint-disable-next-line no-console
-          console.log('Error saving address:', error);
           setSavingAddress(false);
           setAddressError(t('failed_to_save_address', 'Failed to save address. Please try again.'));
           return;
@@ -236,15 +215,11 @@ export default function OrderTypePage() {
       }
     } else {
       // Takeaway - clear both
-      // eslint-disable-next-line no-console
-      console.log('Processing Takeaway order');
       setTableNumber('');
       setDeliveryAddress({ street: '', city: '', postalCode: '', country: '' });
     }
 
     // Save order type
-    // eslint-disable-next-line no-console
-    console.log('Setting order type and navigating...');
     setOrderType(selectedType);
 
     // Navigate to customer info page

@@ -32,7 +32,6 @@ export async function getCurrentUser(): Promise<UserDto> {
     // Don't log auth errors - they're expected for non-authenticated users during checkout
     // Only log unexpected errors
     if (error instanceof Error && !error.message.toLowerCase().includes('auth')) {
-      // eslint-disable-next-line no-console
       console.error('Error fetching user profile:', error);
     }
     throw error;
@@ -52,7 +51,6 @@ export async function updateProfile(command: UpdateUserProfileCommand): Promise<
 
     return json.data;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error updating profile:', error);
     throw error;
   }

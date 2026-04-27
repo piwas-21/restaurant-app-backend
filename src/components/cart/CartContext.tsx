@@ -221,7 +221,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
-      // eslint-disable-next-line no-console
       console.error('Error syncing basket:', error);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
@@ -260,7 +259,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       const errorMessage = getErrorMessage(error);
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
-      // eslint-disable-next-line no-console
       console.error('Error adding item to basket:', error);
       throw error; // Re-throw for component-level error handling
     } finally {
@@ -305,7 +303,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       // For other errors, rollback and show error
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
-      // eslint-disable-next-line no-console
       console.error('Error updating basket item:', error);
       throw error;
     } finally {
@@ -348,7 +345,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       // For other errors, rollback and show error
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
-      // eslint-disable-next-line no-console
       console.error('Error removing basket item:', error);
       throw error;
     } finally {
@@ -374,7 +370,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       const errorMessage = getErrorMessage(error);
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
-      // eslint-disable-next-line no-console
       console.error('Error clearing basket:', error);
       throw error;
     } finally {
@@ -400,7 +395,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       const errorMessage = getErrorMessage(error);
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
-      // eslint-disable-next-line no-console
       console.error('Error applying promo code:', error);
       throw error;
     } finally {
@@ -426,7 +420,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       const errorMessage = getErrorMessage(error);
       dispatch({ type: 'SET_ERROR', payload: { error: errorMessage } });
       dispatch({ type: 'ROLLBACK', payload: { previousState } });
-      // eslint-disable-next-line no-console
       console.error('Error removing promo code:', error);
       throw error;
     } finally {

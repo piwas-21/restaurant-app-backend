@@ -80,7 +80,6 @@ const loadCheckoutState = (): CheckoutState => {
       return JSON.parse(stored);
     }
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Failed to load checkout state:', error);
   }
   return initialState;
@@ -95,7 +94,6 @@ const saveCheckoutState = (state: CheckoutState) => {
   try {
     localStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Failed to save checkout state:', error);
   }
 };

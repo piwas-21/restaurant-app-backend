@@ -35,7 +35,6 @@ export default function PointsHistoryModal({ isOpen, onClose }: PointsHistoryMod
       // Check if there are more pages
       setHasMore(data.length === pageSize);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Error loading points history:', err);
       setError(t('error_loading_history', 'Failed to load points history'));
     } finally {

@@ -68,7 +68,6 @@ export function useServerOrders(): UseServerOrdersReturn {
       if (isMountedRef.current) {
         if (modifiedSince && result.items && result.items.length > 0) {
           // Incremental update: merge new/updated orders
-          console.log(`📦 Server: Found ${result.items.length} new/updated orders`);
           setOrders((prev) => {
             const newOrders = [...prev];
             for (const order of result.items) {
@@ -118,7 +117,6 @@ export function useServerOrders(): UseServerOrdersReturn {
    */
   const cleanupSSE = useCallback(() => {
     if (eventSourceRef.current) {
-      console.log('🔌 Server SSE: Closing connection');
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
@@ -172,8 +170,6 @@ export function useServerOrders(): UseServerOrdersReturn {
         url += `?token=${encodeURIComponent(authToken)}`;
       }
 
-      console.log(`🔌 Server SSE: Connecting [${connectionId}]`);
-
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 
@@ -183,7 +179,6 @@ export function useServerOrders(): UseServerOrdersReturn {
 
         try {
           const data = JSON.parse(event.data);
-          console.log(`✅ Server SSE: Connected [${connectionId}] clientId:`, data.clientId);
           setIsConnected(true);
           setConnectionState('connected');
           setError(null);
@@ -215,7 +210,6 @@ export function useServerOrders(): UseServerOrdersReturn {
 
           // Only add dine-in orders
           if (newOrder.type === 'DineIn') {
-            console.log('📦 Server SSE: New dine-in order:', newOrder.orderNumber);
             setOrders((prev) => {
               if (prev.some((o) => o.id === newOrder.id)) {
                 return prev;
@@ -241,7 +235,6 @@ export function useServerOrders(): UseServerOrdersReturn {
         try {
           const data = JSON.parse(event.data);
           const orderId = data.orderId || data.order?.id;
-          console.log('📝 Server SSE: Order status changed:', orderId, '→', data.order?.status);
           setOrders((prev) =>
             prev.map((order) => (order.id === orderId ? data.order || { ...order, ...data } : order)),
           );
@@ -343,8 +336,6 @@ export function useServerOrders(): UseServerOrdersReturn {
   const startPrimaryPolling = useCallback(() => {
     if (primaryPollingIntervalRef.current) return;
 
-    console.log('🔄 Server: Starting polling (every 5s)');
-
     primaryPollingIntervalRef.current = setInterval(() => {
       if (!isMountedRef.current) return;
 
@@ -370,7 +361,6 @@ export function useServerOrders(): UseServerOrdersReturn {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isMountedRef.current) {
-        console.log('👁️ Server: Tab visible, refreshing...');
         refreshOrders();
         refreshTables();
 
@@ -390,7 +380,6 @@ export function useServerOrders(): UseServerOrdersReturn {
    * Initialize connections
    */
   useEffect(() => {
-    console.log('🔌 Server: Initializing...');
     isMountedRef.current = true;
 
     // Initial fetch
@@ -412,7 +401,6 @@ export function useServerOrders(): UseServerOrdersReturn {
     }, 500);
 
     return () => {
-      console.log('🔌 Server: Cleaning up...');
       isMountedRef.current = false;
       clearTimeout(pollingStartTimeout);
       clearTimeout(sseTimeout);

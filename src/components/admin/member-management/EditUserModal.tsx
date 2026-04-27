@@ -105,7 +105,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, user, onClose, on
       await onSave(updateData);
       onClose();
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error updating user:', error);
     } finally {
       setIsSubmitting(false);

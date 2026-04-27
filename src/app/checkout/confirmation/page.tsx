@@ -63,7 +63,6 @@ function ConfirmationContent() {
         const orderData = await getOrderById(orderId);
         setOrder(orderData);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('Error fetching order:', err);
         setError(t('failed_to_load_order', 'Failed to load order details'));
       } finally {

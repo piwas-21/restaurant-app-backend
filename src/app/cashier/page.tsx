@@ -224,20 +224,11 @@ export default function CashierPage() {
 
     if (newOrders.length === 0) return;
 
-    console.log(`🆕 Detected ${newOrders.length} new order(s)`);
-
     const ordersForModal: string[] = [];
 
     newOrders.forEach((order) => {
       // Mark as seen immediately to prevent duplicates
       seenOrderIdsRef.current.add(order.id);
-
-      console.log('🆕 New order:', {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        type: order.type,
-        status: order.status,
-      });
 
       // Notify (this triggers sound)
       notifyNewOrder(order.orderNumber || order.id, order.customerName || '');
@@ -308,7 +299,6 @@ export default function CashierPage() {
   useEffect(() => {
     if (pendingOrderQueue.length > 0 && !showQuickConfirmModal) {
       const nextOrderId = pendingOrderQueue[0];
-      console.log('📋 Showing modal for queued order:', nextOrderId);
       setPendingOrderForConfirm(nextOrderId);
       setShowQuickConfirmModal(true);
       setPendingOrderQueue((prev) => prev.slice(1));
