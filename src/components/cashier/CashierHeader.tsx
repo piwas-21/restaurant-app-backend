@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, QrCode /*Printer, Settings*/ } from 'lucide-react';
+import { RefreshCw, QrCode, FileBarChart /*Printer, Settings*/ } from 'lucide-react';
 import { NotificationSoundType } from '@/hooks/useNotification';
 import SoundSelector from './SoundSelector';
 import styles from './CashierHeader.module.css';
@@ -18,6 +18,7 @@ interface CashierHeaderProps {
   onTestSound: (type: NotificationSoundType) => void;
   onToggleRepeat: () => void;
   onOpenQRScanner: () => void;
+  onOpenZReport?: () => void;
   onOpenDiagnostics?: () => void; // NEW: Open diagnostic panel
   // autoPrintEnabled?: boolean;
   // onToggleAutoPrint?: () => void;
@@ -37,6 +38,7 @@ export default function CashierHeader({
   onTestSound,
   onToggleRepeat,
   onOpenQRScanner,
+  onOpenZReport,
   onOpenDiagnostics
 }: CashierHeaderProps) {
   const { t } = useTranslation();
@@ -168,6 +170,18 @@ export default function CashierHeader({
           <Settings size={16} />
           Print Settings
         </button> */}
+
+        {/* Z-Report Button */}
+        {onOpenZReport && (
+          <button
+            className={styles.button}
+            onClick={onOpenZReport}
+            title={t('cashier.zreport.title') || 'Z-Report'}
+          >
+            <FileBarChart size={16} />
+            {t('cashier.zreport.title') || 'Z-Report'}
+          </button>
+        )}
 
         {/* Refresh Button */}
         <button

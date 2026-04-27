@@ -4,16 +4,9 @@
  */
 import { OrderDto, OrderItemDto } from '@/types/order';
 import { THERMAL_BASE_STYLES } from './baseStyles';
+import { formatCurrency } from '../currency';
 
 type TranslationFunction = (key: string, fallback: string) => string;
-
-// Currency formatter
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('de-CH', {
-    style: 'currency',
-    currency: 'CHF',
-  }).format(amount);
-};
 
 // Escape HTML
 const escapeHtml = (text: string): string => {
