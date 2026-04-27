@@ -2,7 +2,6 @@
 
 import { Inter } from 'next/font/google';
 import { useTranslation } from 'react-i18next';
-import i18n from '../i18n';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useEffect, useState, CSSProperties } from 'react';
 import Link from 'next/link';
@@ -31,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '@/components/cart/CartContext';
 
-const inter = Inter({ subsets: ['latin'] });
+const _inter = Inter({ subsets: ['latin'] });
 
 export default function AppInternalLayout({ children }: { children: React.ReactNode }) {
   const [isClient, setIsClient] = useState(false);
@@ -39,14 +38,14 @@ export default function AppInternalLayout({ children }: { children: React.ReactN
   const { user, isLoading } = useAuth();
   const { state: cartState } = useCart();
   const pathname = usePathname();
-  const router = useRouter();
+  const _router = useRouter();
   const isHomePage = pathname === '/';
   const isAdminPage = pathname.startsWith('/admin');
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminSidebarOpen, setAdminSidebarOpen] = useState(false);
   const headerHeight = '80px';
-  const sidebarWidth = '250px';
+  const _sidebarWidth = '250px';
 
   // Calculate total cart items
   const cartItemCount = cartState.items.reduce((total, item) => total + item.quantity, 0);

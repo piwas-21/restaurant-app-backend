@@ -135,7 +135,7 @@ export function exportOrdersToCSV(orders: OrderDto[], t?: TranslationFunction): 
  * Generate order receipt text (for print or PDF)
  */
 export function generateOrderReceipt(order: OrderDto, t?: TranslationFunction): string {
-  const translate = t || ((key: string, fallback: string) => fallback);
+  const _translate = t || ((key: string, fallback: string) => fallback);
   const lines: string[] = [];
 
   lines.push('RUMI RESTAURANT');

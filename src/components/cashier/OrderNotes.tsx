@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OrderDto } from '@/types/order';
-import { MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { MessageSquare, Plus } from 'lucide-react';
 
 interface OrderNotesProps {
   order: OrderDto | null;

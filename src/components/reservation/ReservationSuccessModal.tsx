@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle } from 'lucide-react'; // Added import
 import { useAuth } from '@/components/AuthContext'; // Added import
 import styles from './ReservationSuccessModal.module.css';
 

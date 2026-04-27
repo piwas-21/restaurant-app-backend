@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { OrderDto, OrderPaymentDto } from '@/types/order';
+import { OrderDto } from '@/types/order';
 import { X } from 'lucide-react';
 import { getPaymentMethodLabel } from '@/utils/paymentMethodDisplay';
 

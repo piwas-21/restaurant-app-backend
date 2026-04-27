@@ -203,9 +203,7 @@ describe('OrderService', () => {
 
       await expect(
         orderServiceModule.updateOrderStatus('order-123', { newStatus: 'Invalid' as OrderStatus }),
-      ).rejects.toThrow(
-        'Invalid status transition',
-      );
+      ).rejects.toThrow('Invalid status transition');
     });
   });
 

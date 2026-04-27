@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/components/AuthContext';
 import { reservationService } from '@/services/reservationService';
-import { ReservationFormData, TimeSlotDto, TableDto, AvailableTimeSlotsDto } from '@/types/reservation';
+import { ReservationFormData, AvailableTimeSlotsDto } from '@/types/reservation';
 import styles from './ReservationWizard.module.css';
 
 type WizardStep = 'guests' | 'date' | 'time' | 'table' | 'details' | 'summary';

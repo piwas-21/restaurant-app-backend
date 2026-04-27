@@ -16,7 +16,6 @@ import {
   CalendarCheck,
   MapPin,
   BarChart3,
-  DollarSign,
   Settings,
   UserCog,
   LayoutDashboard,

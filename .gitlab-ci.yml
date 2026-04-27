@@ -14,7 +14,7 @@ stages:
 
 # create_cache:
 #     stage: cache
-#     image: node:18-bullseye
+#     image: node:22-alpine
 #     script:
 #         - npm install
 #     cache:
@@ -45,7 +45,7 @@ typecheck:
         - npm run typecheck
 
 npm_test:
-    image: node:18-bullseye
+    image: node:22-alpine
     stage: test
     # cache:
     #     key: "$CI_COMMIT_REF_SLUG"
@@ -58,7 +58,7 @@ npm_test:
         - npm test
 
 npm_audit:
-    image: node:18-bullseye
+    image: node:22-alpine
     stage: test
     before_script:
         - npm install
@@ -106,7 +106,7 @@ semgrep:
 
 retire:
   stage: test
-  image: node:18-bullseye
+  image: node:22-alpine
   # cache:
   #     key: "$CI_COMMIT_REF_SLUG"
   #     paths:

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getCashierOrders,
-  getOrderById,
   updateOrderStatus,
   addPaymentToOrder,
   refundPayment,
@@ -212,7 +211,7 @@ export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrders
       });
 
       // Handle heartbeat events
-      eventSource.addEventListener('heartbeat', (event) => {
+      eventSource.addEventListener('heartbeat', (_event) => {
         if (connectionIdRef.current !== connectionId || !isMountedRef.current) return;
 
         const eventTime = new Date();

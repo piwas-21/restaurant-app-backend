@@ -12,7 +12,7 @@ interface ServerHeaderProps {
 }
 
 export default function ServerHeader({
-  isConnected,
+  isConnected: _isConnected,
   connectionState,
   lastEventTime,
   error,

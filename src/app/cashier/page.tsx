@@ -8,8 +8,6 @@ import { useNotification } from '@/hooks/useNotification';
 import CashierHeader from '@/components/cashier/CashierHeader';
 import OrderTypeNav from '@/components/cashier/OrderTypeNav';
 import CashierMainContent from '@/components/cashier/CashierMainContent';
-import OrderList from '@/components/cashier/OrderList';
-import OrderDetails from '@/components/cashier/OrderDetails';
 import StatusUpdateDialog from '@/components/cashier/StatusUpdateDialog';
 import PaymentDialog from '@/components/cashier/PaymentDialog';
 import RefundDialog from '@/components/cashier/RefundDialog';
@@ -142,7 +140,7 @@ export default function CashierPage() {
   }, []);
 
   // Toggle auto-print enabled/disabled
-  const toggleAutoPrint = () => {
+  const _toggleAutoPrint = () => {
     const newSettings = {
       ...autoPrintSettings,
       enabled: !autoPrintSettings.enabled,
@@ -607,7 +605,7 @@ export default function CashierPage() {
       <QRScannerDialog
         isOpen={showQRScannerDialog}
         onClose={() => setShowQRScannerDialog(false)}
-        onApplyDiscount={(result: QRCodeValidationResult) => {
+        onApplyDiscount={(_result: QRCodeValidationResult) => {
           showSuccess(t('cashier.discount_info_loaded') || 'Discount information loaded');
         }}
       />

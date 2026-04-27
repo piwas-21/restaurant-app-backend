@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OrderDto } from '@/types/order';
-import styles from '@/app/styles/CashierPage.module.css';
 import { X } from 'lucide-react';
 
 interface StatusUpdateDialogProps {

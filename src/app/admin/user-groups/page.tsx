@@ -12,13 +12,7 @@ import QRCodeModal from '@/components/admin/user-groups/QRCodeModal';
 import ConfirmationModal from '@/components/common/ConfirmationModal';
 import ResultModal from '@/components/common/ResultModal';
 import { UserGroupDto, CreateUserGroupDto, UpdateUserGroupDto } from '@/types/userGroupTypes';
-import {
-  getUserGroups,
-  createUserGroup,
-  updateUserGroup,
-  deleteUserGroup,
-  createGroupDiscount,
-} from '@/services/userGroupService';
+import { getUserGroups, createUserGroup, updateUserGroup, deleteUserGroup } from '@/services/userGroupService';
 
 const UserGroupsPage = () => {
   const { t } = useTranslation();
@@ -26,7 +20,7 @@ const UserGroupsPage = () => {
 
   const [groups, setGroups] = useState<UserGroupDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

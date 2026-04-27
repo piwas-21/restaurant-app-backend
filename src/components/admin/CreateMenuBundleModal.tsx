@@ -6,10 +6,8 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import modalStyles from '@/app/styles/RegisterStaffModal.module.css';
-import { getCategories } from '@/services/categoryService';
-
 // Import separated components and utilities
-import { CreateProductModalProps, productTypes } from './product/types';
+import { CreateProductModalProps } from './product/types';
 import { createMenuBundleSchema, MenuBundleFormData } from './product/schemas';
 import { MultilingualContent } from './product/MultilingualContent';
 import { submitProductForm } from './product/productFormUtils';

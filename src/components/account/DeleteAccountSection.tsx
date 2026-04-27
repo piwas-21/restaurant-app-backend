@@ -27,7 +27,7 @@ export default function DeleteAccountSection() {
       } else {
         setErrorMessage(response.message || t('delete_account_request_failed', 'Failed to request account deletion.'));
       }
-    } catch (error) {
+    } catch {
       setErrorMessage(t('unexpected_error', 'An unexpected error occurred.'));
     } finally {
       setIsDeleting(false);

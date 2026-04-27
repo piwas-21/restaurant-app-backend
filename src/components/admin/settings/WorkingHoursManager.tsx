@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { workingHoursService } from '@/services/workingHoursService';
 import { WorkingHoursDto, UpdateWorkingHoursDto, dayNameToNumber } from '@/types/workingHours';
 import { enqueueSnackbar } from 'notistack';
@@ -43,7 +43,7 @@ export default function WorkingHoursManager() {
       });
 
       setWorkingHours(sorted);
-    } catch (error) {
+    } catch {
       enqueueSnackbar(t('failed_to_load_working_hours', 'Failed to load working hours'), {
         variant: 'error',
       });
@@ -56,7 +56,7 @@ export default function WorkingHoursManager() {
     try {
       const open = await workingHoursService.isOpenNow();
       setIsOpen(open);
-    } catch (error) {
+    } catch {
       // Silently fail
     }
   };
@@ -139,7 +139,7 @@ export default function WorkingHoursManager() {
       // Reload to get fresh data and check if open status changed
       await loadWorkingHours();
       await checkIsOpen();
-    } catch (error) {
+    } catch {
       enqueueSnackbar(t('failed_to_update_working_hours', 'Failed to update working hours'), {
         variant: 'error',
       });

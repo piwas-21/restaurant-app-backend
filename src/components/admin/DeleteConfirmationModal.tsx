@@ -30,7 +30,7 @@ export default function DeleteConfirmationModal({ order, onClose, onConfirm }: D
     try {
       await onConfirm();
       onClose();
-    } catch (error) {
+    } catch {
       setIsDeleting(false);
     }
   };

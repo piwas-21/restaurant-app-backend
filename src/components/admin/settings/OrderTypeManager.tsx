@@ -28,7 +28,7 @@ export default function OrderTypeManager() {
       setLoading(true);
       const data = await orderTypeConfigurationService.getAll();
       setConfigurations(data);
-    } catch (err) {
+    } catch {
       enqueueSnackbar(t('failed_to_load_configurations', 'Failed to load order type configurations'), {
         variant: 'error',
       });
@@ -81,7 +81,7 @@ export default function OrderTypeManager() {
       enqueueSnackbar(t('order_type_updated_successfully', 'Order type updated successfully'), {
         variant: 'success',
       });
-    } catch (err) {
+    } catch {
       enqueueSnackbar(t('failed_to_update_order_type', 'Failed to update order type'), {
         variant: 'error',
       });

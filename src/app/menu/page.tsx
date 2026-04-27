@@ -105,7 +105,7 @@ export default function MenuPage() {
         [];
 
       // Use provided totalPrice or bundle base price
-      const price = totalPrice || bundle.basePrice;
+      const _price = totalPrice || bundle.basePrice;
 
       await addItem({
         productId: bundle.id,

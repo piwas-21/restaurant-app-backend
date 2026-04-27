@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/components/AuthContext';
 import { getOrders } from '@/services/orderService';
-import { addItemToBasket } from '@/services/basketService';
 import { useCart } from '@/components/cart/CartContext';
 import { OrderDto, OrderStatus } from '@/types/order';
 import { useSnackbar } from 'notistack';
@@ -20,7 +19,6 @@ import {
   RefreshCw,
   Loader2,
   AlertCircle,
-  CheckCircle,
   Receipt,
   Store,
   Truck,

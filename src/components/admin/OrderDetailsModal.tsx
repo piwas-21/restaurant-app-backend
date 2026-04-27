@@ -83,7 +83,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
 
       setShowConfirmDelayModal(false);
       setShowSuccessModal(true);
-    } catch (err) {
+    } catch {
       setError(t('failed_to_confirm_order', 'Failed to confirm order. Please try again.'));
     } finally {
       setIsConfirming(false);
@@ -115,7 +115,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
       }
       setShowCancelModal(false);
       setShowCancelSuccessModal(true);
-    } catch (err) {
+    } catch {
       setError(t('failed_to_cancel_order', 'Failed to cancel order. Please try again.'));
     } finally {
       setIsCancelling(false);
@@ -144,7 +144,7 @@ export default function OrderDetailsModal({ order, onClose, onOrderUpdated }: Or
       setShowRefundModal(false);
       alert(t('payment_refunded_successfully', 'Payment refunded successfully'));
       onClose();
-    } catch (err) {
+    } catch {
       setError(t('failed_to_process_refund', 'Failed to process refund. Please try again.'));
     } finally {
       setIsRefunding(false);

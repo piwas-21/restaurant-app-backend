@@ -64,7 +64,7 @@ export function exportReservationsToCSV(reservations: ReservationDto[], filename
 /**
  * Export reservations to PDF format
  */
-export function exportReservationsToPDF(reservations: ReservationDto[], filename = 'reservations'): void {
+export function exportReservationsToPDF(reservations: ReservationDto[], _filename = 'reservations'): void {
   if (reservations.length === 0) {
     alert('No reservations to export');
     return;

@@ -287,7 +287,7 @@ export default function AdminOrdersPage() {
       setShowDeleteModal(false);
       setSelectedOrder(null);
       fetchOrders();
-    } catch (error) {
+    } catch {
       enqueueSnackbar(t('order_delete_failed', 'Failed to delete order'), {
         variant: 'error',
         anchorOrigin: { vertical: 'bottom', horizontal: 'right' },

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './MenuBundleDetails.module.css';
-import detailsStyles from '@/app/styles/DetailsPage.module.css';
 import ProductInformation from '@/components/admin/product-details/ProductInformation';
 import MultilingualContentEditor from '@/components/admin/product-details/MultilingualContentEditor';
 import MenuScheduleEditor from '@/components/admin/menu-editor/MenuScheduleEditor';

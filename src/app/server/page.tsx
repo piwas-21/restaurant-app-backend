@@ -4,7 +4,6 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useServerOrders } from '@/hooks/useServerOrders';
 import { ServerHeader, TableGridView, ActiveOrdersPanel, TableDetailsModal, TakeOrderModal } from '@/components/server';
-import { ServerTableDto } from '@/services/serverService';
 import styles from '../styles/ServerPage.module.css';
 
 export default function ServerPage() {

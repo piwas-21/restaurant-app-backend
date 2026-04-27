@@ -43,7 +43,7 @@ function ConfirmationContent() {
       try {
         const config = await adminTaxConfigurationService.getActiveTaxConfiguration();
         setTaxConfig(config);
-      } catch (error) {
+      } catch {
         // Silently fail - fallback to default tax label
       }
     };

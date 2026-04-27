@@ -3,12 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Wifi,
-  WifiOff,
   Volume2,
-  VolumeX,
   RefreshCw,
-  Play,
   Unlock,
   Info,
   X,
@@ -45,7 +41,7 @@ interface CashierDiagnosticsProps {
 }
 
 export default function CashierDiagnostics({
-  sseConnected,
+  sseConnected: _sseConnected,
   sseConnectionState,
   sseLastEventTime,
   sseError,
@@ -120,7 +116,7 @@ export default function CashierDiagnostics({
     return '';
   };
 
-  const formatDuration = (duration: string) => {
+  const _formatDuration = (duration: string) => {
     // Duration comes as "HH:MM:SS.sssssss" format
     if (!duration) return 'Unknown';
     const match = duration.match(/^(\d+):(\d+):(\d+)/);

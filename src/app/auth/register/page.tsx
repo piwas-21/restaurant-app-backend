@@ -14,7 +14,7 @@ import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
-  const { login } = useAuth();
+  const { login: _login } = useAuth();
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
   const firstNameInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
+  const _router = useRouter();
 
   useEffect(() => {
     firstNameInputRef.current?.focus();
@@ -84,7 +84,7 @@ export default function RegisterPage() {
         const apiErrors = Array.isArray(response?.errors) ? response.errors.join(', ') : '';
         setGeneralError(apiErrors || response?.message || t('failed_to_register', 'Failed to register.'));
       }
-    } catch (err) {
+    } catch {
       setGeneralError(t('unexpected_error', 'An unexpected error occurred.'));
     }
   };
@@ -102,7 +102,7 @@ export default function RegisterPage() {
       } else {
         setResendMessage(t('resend_failed', 'Failed to resend email. Please try again later.'));
       }
-    } catch (error) {
+    } catch {
       setResendMessage(t('resend_error', 'An error occurred. Please try again.'));
     } finally {
       setResendLoading(false);

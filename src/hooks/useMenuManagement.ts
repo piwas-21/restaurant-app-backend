@@ -7,7 +7,7 @@ import { getCategories } from '@/services/categoryService';
 import { Product, Category } from '@/app/admin/menu-management/interfaces';
 
 export const useMenuManagement = (activeTab: 'products' | 'menus' = 'products') => {
-  const router = useRouter();
+  const _router = useRouter();
   const searchParams = useSearchParams();
   const initialCategoryId = searchParams.get('categoryId');
   const activeTabRef = useRef(activeTab);

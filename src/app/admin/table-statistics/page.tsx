@@ -66,7 +66,7 @@ function TableStatisticsPage() {
   const outdoorTables = tables.filter((t) => t.isOutdoor).length;
   const totalCapacity = tables.reduce((sum, t) => sum + t.maxGuests, 0);
   const activeCapacity = tables.filter((t) => t.isActive).reduce((sum, t) => sum + t.maxGuests, 0);
-  const averageCapacity = totalTables > 0 ? Math.round(totalCapacity / totalTables) : 0;
+  const _averageCapacity = totalTables > 0 ? Math.round(totalCapacity / totalTables) : 0;
 
   // Table shapes breakdown
   const circularTables = tables.filter((t) => t.shape === 'circle').length;
@@ -114,7 +114,7 @@ function TableStatisticsPage() {
   // Find most and least popular tables
   const sortedByReservations = [...tableReservationStats].sort((a, b) => b.totalReservations - a.totalReservations);
   const mostPopularTables = sortedByReservations.slice(0, 5);
-  const leastPopularTables = sortedByReservations
+  const _leastPopularTables = sortedByReservations
     .filter((t) => t.totalReservations > 0)
     .slice(-5)
     .reverse();

@@ -39,7 +39,7 @@ export default function FidelityPointsCheckout({ orderSubtotal, onPointsRedempti
       const maxPointsBasedOnOrder = orderSubtotal * 100; // 100 points = $1
       const maxPoints = Math.min(balanceData.currentPoints, maxPointsBasedOnOrder);
       setMaxRedeemablePoints(maxPoints);
-    } catch (err) {
+    } catch {
       // Silently handle errors (e.g., non-authenticated users)
       // Don't log auth errors to avoid console noise during checkout for non-logged-in users
     } finally {

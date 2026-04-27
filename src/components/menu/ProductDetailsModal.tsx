@@ -85,7 +85,7 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
   if (!isOpen || !item) return null;
 
   // Use detailed product data if available, otherwise fallback to menu item data
-  const productData = detailedProduct || item;
+  const _productData = detailedProduct || item;
   const title = detailedProduct
     ? detailedProduct.content?.[currentLanguage]?.name || detailedProduct.content?.en?.name || detailedProduct.name
     : item.content?.[currentLanguage]?.name || item.content?.en?.name || item.name;
@@ -126,7 +126,7 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
   const optionalIngredients = getOptionalIngredients();
 
   // Handler for ingredient toggle
-  const toggleIngredient = (ingredientId: string) => {
+  const _toggleIngredient = (ingredientId: string) => {
     const newSelected = new Set(selectedIngredients);
     if (newSelected.has(ingredientId)) {
       newSelected.delete(ingredientId);
@@ -137,7 +137,7 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
   };
 
   // Handler for side item toggle
-  const toggleSideItem = (sideItemId: string, checked: boolean) => {
+  const _toggleSideItem = (sideItemId: string, checked: boolean) => {
     const newSelected = new Map(selectedSideItems);
     if (checked) {
       newSelected.set(sideItemId, 1);
@@ -148,7 +148,7 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
   };
 
   // Handler for side item quantity change
-  const updateSideItemQuantity = (sideItemId: string, quantity: number) => {
+  const _updateSideItemQuantity = (sideItemId: string, quantity: number) => {
     const newSelected = new Map(selectedSideItems);
     if (quantity > 0) {
       newSelected.set(sideItemId, quantity);
@@ -184,8 +184,8 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
     return total;
   };
 
-  const totalPrice = calculateTotalPrice();
-  const hasCustomizations =
+  const _totalPrice = calculateTotalPrice();
+  const _hasCustomizations =
     optionalIngredients.length > 0 ||
     (detailedProduct?.suggestedSideItems && detailedProduct.suggestedSideItems.length > 0);
 
@@ -202,7 +202,7 @@ export default function ProductDetailsModal({ isOpen, item, onClose }: Props) {
         productName={title}
         basePrice={price}
         menuDefinition={detailedProduct.menuDefinition!}
-        onAddToBasket={async (selectedOptions, totalPrice) => {
+        onAddToBasket={async (selectedOptions, _totalPrice) => {
           try {
             await addItemToBasket({
               productId: detailedProduct.id,

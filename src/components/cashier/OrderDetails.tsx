@@ -6,7 +6,6 @@ import {
   Clock,
   MapPin,
   User,
-  Phone,
   ShoppingBag,
   CreditCard,
   Printer,
@@ -41,7 +40,7 @@ export default function OrderDetails({
   onCancel,
   onToggleFocus,
   onQuickConfirm,
-  isLoading = false,
+  isLoading: _isLoading = false,
 }: OrderDetailsProps) {
   const { t } = useTranslation();
   const [isUpdating, setIsUpdating] = useState(false);

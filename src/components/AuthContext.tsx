@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               localStorage.removeItem('user');
               setUser(null);
             }
-          } catch (error) {
+          } catch {
             // Token validation/refresh failed - clear auth state
             console.log('Session validation failed. Please login again.');
             localStorage.removeItem('auth_token');

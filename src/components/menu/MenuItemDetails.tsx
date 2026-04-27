@@ -28,14 +28,14 @@ type Props = {
 export default function MenuItemDetails({
   id,
   title,
-  description,
-  ingredients,
+  description: _description,
+  ingredients: _ingredients,
   allergens,
   price,
   dietaryTags,
   t,
   onTitleClick,
-  initialRatingData,
+  initialRatingData: _initialRatingData,
 }: Props) {
   const titleProps = onTitleClick
     ? {

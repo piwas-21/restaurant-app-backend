@@ -58,7 +58,7 @@ export async function refreshToken() {
       localStorage.setItem('refresh_token', data.data.refreshToken);
     }
     return data;
-  } catch (error) {
+  } catch {
     // Network error or other failure
     return { success: false, message: 'Failed to refresh token' };
   }

@@ -16,11 +16,11 @@ type Props = {
 
 export default function MenuItemActions({
   onAdd,
-  onFeedback,
+  onFeedback: _onFeedback,
   addLabel,
   addAria,
-  feedbackLabel,
-  feedbackAria,
+  feedbackLabel: _feedbackLabel,
+  feedbackAria: _feedbackAria,
   onDetails,
   detailsLabel,
 }: Props) {

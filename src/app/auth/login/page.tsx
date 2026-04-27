@@ -39,7 +39,7 @@ export default function LoginPage() {
       } else {
         setResendMessage(t('resend_failed', 'Failed to resend email. Please try again later.'));
       }
-    } catch (error) {
+    } catch {
       setResendMessage(t('resend_error', 'An error occurred. Please try again.'));
     } finally {
       setResendLoading(false);

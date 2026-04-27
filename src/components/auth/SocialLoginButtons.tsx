@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/components/ThemeContext';
 import { useAuth } from '@/components/AuthContext';
-import { googleLogin, appleLogin } from '@/services/authService';
+import { googleLogin } from '@/services/authService';
 import toast from 'react-hot-toast';
 import styles from './SocialLoginButtons.module.css';
 

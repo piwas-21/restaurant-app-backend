@@ -1,6 +1,6 @@
 import { UseFormSetError, UseFormReset } from 'react-hook-form';
 import { FormData, EditFormData } from './schemas';
-import { createProduct, createMenuBundle, updateMenuBundle } from '@/services/menuService';
+import { createProduct, createMenuBundle } from '@/services/menuService';
 import { updateProduct, uploadBulkProductImages } from '@/services/productService';
 import { createGlobalIngredient, searchGlobalIngredients } from '@/services/globalIngredientService';
 

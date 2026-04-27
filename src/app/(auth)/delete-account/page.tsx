@@ -45,7 +45,7 @@ function DeleteAccountContent() {
         setStatus('error');
         setErrorMessage(response.message || t('deletion_failed', 'Failed to delete account.'));
       }
-    } catch (error) {
+    } catch {
       setStatus('error');
       setErrorMessage(t('unexpected_error', 'An unexpected error occurred.'));
     }
