@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCashierOrders } from '@/hooks/useCashierOrders';
+import { startOfTodayLocal, endOfTodayLocal } from '@/utils/dateRange';
 import { useNotification } from '@/hooks/useNotification';
 import CashierHeader from '@/components/cashier/CashierHeader';
 import OrderTypeNav from '@/components/cashier/OrderTypeNav';
@@ -27,8 +28,32 @@ import { exportKitchenItemsToPDF, exportOrderToPDF } from '@/utils/pdfExportUtil
 import { AutoPrintSettings, DEFAULT_AUTO_PRINT_SETTINGS } from '@/types/cashier';
 import styles from '@/app/styles/CashierPage.module.css';
 
+const TODAY_ONLY_STORAGE_KEY = 'cashier:todayOnly';
+const POPUP_GRACE_WINDOW_MS = 5000;
+
 export default function CashierPage() {
   const { t } = useTranslation();
+
+  // Default the cashier view to today's orders only. The cashier can flip
+  // to "All time" via the toolbar; choice persists across reloads.
+  // SSR-safe: localStorage is read in an effect, not at render time.
+  const [todayOnly, setTodayOnly] = useState<boolean>(true);
+  useEffect(() => {
+    const stored = window.localStorage.getItem(TODAY_ONLY_STORAGE_KEY);
+    if (stored !== null) setTodayOnly(stored === 'true');
+  }, []);
+  useEffect(() => {
+    window.localStorage.setItem(TODAY_ONLY_STORAGE_KEY, String(todayOnly));
+  }, [todayOnly]);
+
+  // Recompute the "today" window each time the toggle flips so polling
+  // continues to use the same instants (avoids midnight drift mid-shift —
+  // the cashier crossing midnight is called out as out-of-scope in
+  // BUGS-IMPROVEMENTS-PLAN §A3 and tracked under B2 admin shift cutover).
+  const dateRange = useMemo(
+    () => (todayOnly ? { startDate: startOfTodayLocal(), endDate: endOfTodayLocal() } : undefined),
+    [todayOnly]
+  );
 
   // Orders hook
   const {
@@ -44,7 +69,7 @@ export default function CashierPage() {
     refundPayment,
     cancelOrder,
     toggleFocusOrder,
-  } = useCashierOrders();
+  } = useCashierOrders(dateRange);
 
   // Notifications hook
   const {
@@ -97,6 +122,10 @@ export default function CashierPage() {
   // Use ID-based tracking instead of position-based
   const seenOrderIdsRef = useRef<Set<string>>(new Set());
   const previousOrderStatusesRef = useRef<Map<string, string>>(new Map());
+  // Grace-window: any order arriving within POPUP_GRACE_WINDOW_MS of mount
+  // is silently marked as "seen" so the popup queue doesn't fire for
+  // pre-existing orders during the initial REST → SSE handover.
+  const mountedAtRef = useRef<number>(Date.now());
   const isInitialLoadRef = useRef(true);
 
   // Load auto-print settings from local storage
@@ -182,12 +211,15 @@ export default function CashierPage() {
 
   // Notify on new orders using ID-based tracking
   useEffect(() => {
-    // Skip notification on initial load - just mark all orders as seen
-    if (isInitialLoadRef.current) {
-      isInitialLoadRef.current = false;
+    // Within the grace window after mount, silently mark every order as seen.
+    // Covers: initial REST fetch, React Strict Mode double-invoke, and the
+    // SSE re-emit of orders that were already in the REST result.
+    if (Date.now() - mountedAtRef.current < POPUP_GRACE_WINDOW_MS) {
       orders.forEach(order => seenOrderIdsRef.current.add(order.id));
+      isInitialLoadRef.current = false;
       return;
     }
+    isInitialLoadRef.current = false;
 
     // Find truly new orders using ID-based tracking
     const newOrders = orders.filter(order => !seenOrderIdsRef.current.has(order.id));
@@ -492,6 +524,18 @@ export default function CashierPage() {
         activeFilter={orderTypeFilter}
         onFilterChange={setOrderTypeFilter}
       />
+
+      {/* Date-range toggle: defaults to today; cashier can flip to all-time */}
+      <div className={styles.dateRangeToolbar}>
+        <label>
+          <input
+            type="checkbox"
+            checked={todayOnly}
+            onChange={(e) => setTodayOnly(e.target.checked)}
+          />
+          {' '}{t('cashier.show_todays_orders_only')}
+        </label>
+      </div>
 
       {/* Main Content */}
       <CashierMainContent

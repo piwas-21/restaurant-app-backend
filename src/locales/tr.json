@@ -1500,7 +1500,8 @@
       "loading": "Rapor yükleniyor...",
       "error": "Z-Raporu yüklenemedi",
       "retry": "Tekrar dene"
-    }
+    },
+    "show_todays_orders_only": "Sadece bugünün siparişlerini göster"
   },
   "cashier.completed": "Tamamlandı",
   "cashier.unpaid": "Ödenmemiş",

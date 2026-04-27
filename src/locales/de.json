@@ -2032,7 +2032,8 @@
       "loading": "Bericht wird geladen...",
       "error": "Z-Bericht konnte nicht geladen werden",
       "retry": "Erneut versuchen"
-    }
+    },
+    "show_todays_orders_only": "Nur heutige Bestellungen anzeigen"
   },
   "restaurant_closed_on_date": "Das Restaurant ist am {{day}}, {{date}} geschlossen. Bitte wählen Sie ein anderes Datum.",
   "selected_tables_not_available": "Die ausgewählten Tische {{tables}} sind für dieses Zeitfenster nicht mehr verfügbar. Bitte wählen Sie andere Tische oder eine andere Uhrzeit.",

@@ -2024,7 +2024,8 @@
       "loading": "正在加载报表...",
       "error": "Z报表加载失败",
       "retry": "重试"
-    }
+    },
+    "show_todays_orders_only": "仅显示今日订单"
   },
   "restaurant_closed_on_date": "餐厅在 {{day}}，{{date}} 关闭。请选择其他日期。",
   "selected_tables_not_available": "所选桌位 {{tables}} 在该时间段已不可用。请选择其他桌位或时间。",

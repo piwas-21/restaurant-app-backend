@@ -1200,7 +1200,8 @@
       "loading": "Loading report...",
       "error": "Failed to load Z-Report",
       "retry": "Retry"
-    }
+    },
+    "show_todays_orders_only": "Show today's orders only"
   },
   "update": "Update",
   "select_your_table": "Select your Table",

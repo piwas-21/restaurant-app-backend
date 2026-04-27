@@ -2024,7 +2024,8 @@
       "loading": "Caricamento rapporto...",
       "error": "Impossibile caricare il rapporto Z",
       "retry": "Riprova"
-    }
+    },
+    "show_todays_orders_only": "Mostra solo gli ordini di oggi"
   },
   "restaurant_closed_on_date": "Il ristorante è chiuso il {{day}}, {{date}}. Seleziona un'altra data.",
   "selected_tables_not_available": "Il/i tavolo/i selezionato/i {{tables}} non è/sono più disponibile/i per questa fascia oraria. Seleziona tavoli o orari diversi.",

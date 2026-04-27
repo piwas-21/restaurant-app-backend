@@ -12,6 +12,11 @@ import {
 } from '@/services/cashierService';
 import { OrderDto } from '@/types/order';
 
+export interface CashierDateRange {
+  startDate?: Date;
+  endDate?: Date;
+}
+
 interface UseCashierOrdersReturn {
   orders: OrderDto[];
   isConnected: boolean;
@@ -41,7 +46,10 @@ const MAX_SILENCE_MS = 35000;
 // Minimum time between SSE reconnection attempts
 const MIN_RECONNECT_INTERVAL_MS = 2000;
 
-export function useCashierOrders(): UseCashierOrdersReturn {
+export function useCashierOrders(dateRange?: CashierDateRange): UseCashierOrdersReturn {
+  const dateRangeRef = useRef<CashierDateRange | undefined>(dateRange);
+  dateRangeRef.current = dateRange;
+
   const [orders, setOrders] = useState<OrderDto[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,8 +79,15 @@ export function useCashierOrders(): UseCashierOrdersReturn {
 
     try {
       setError(null);
-      // Use modifiedSince parameter for efficient polling
-      const result = await getCashierOrders(modifiedSince ? { modifiedSince } : undefined);
+      const range = dateRangeRef.current;
+      const filters = {
+        ...(modifiedSince ? { modifiedSince } : {}),
+        ...(range?.startDate ? { startDate: range.startDate } : {}),
+        ...(range?.endDate ? { endDate: range.endDate } : {}),
+      };
+      const result = await getCashierOrders(
+        Object.keys(filters).length > 0 ? filters : undefined
+      );
       if (isMountedRef.current) {
         if (modifiedSince && result.items && result.items.length > 0) {
           // Incremental update: merge new/updated orders
@@ -535,6 +550,22 @@ export function useCashierOrders(): UseCashierOrdersReturn {
       }
     };
   }, []); // Empty dependency array - only run on mount/unmount
+
+  /**
+   * Re-fetch when the active date range changes (after the initial mount).
+   * Drops cached orders so the previous window doesn't bleed into the new one.
+   */
+  const isFirstRangeEffectRef = useRef(true);
+  useEffect(() => {
+    if (isFirstRangeEffectRef.current) {
+      isFirstRangeEffectRef.current = false;
+      return;
+    }
+    setOrders([]);
+    setIsLoading(true);
+    lastPolledAtRef.current = null;
+    refreshOrders();
+  }, [dateRange?.startDate?.getTime(), dateRange?.endDate?.getTime(), refreshOrders]);
 
   /**
    * Update order status
