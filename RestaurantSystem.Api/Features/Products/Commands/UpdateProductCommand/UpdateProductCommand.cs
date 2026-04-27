@@ -131,7 +131,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         }
 
 
-        if(command.Content.Any())
+        if (command.Content.Any())
         {
             _context.ProductDescriptions.RemoveRange(product.Descriptions);
         }
@@ -222,18 +222,18 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 {
                     foreach (var (languageCode, content) in variationDto.Content)
                     {
-                         if (string.IsNullOrWhiteSpace(content.Name)) continue;
+                        if (string.IsNullOrWhiteSpace(content.Name)) continue;
 
-                         var description = new ProductVariationDescription
-                         {
-                             ProductVariation = variation,
-                             LanguageCode = languageCode,
-                             Name = content.Name,
-                             Description = content.Description,
-                             CreatedAt = DateTime.UtcNow,
-                             CreatedBy = _currentUserService.GetAuditIdentifier()
-                         };
-                         await _context.ProductVariationDescriptions.AddAsync(description, cancellationToken);
+                        var description = new ProductVariationDescription
+                        {
+                            ProductVariation = variation,
+                            LanguageCode = languageCode,
+                            Name = content.Name,
+                            Description = content.Description,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = _currentUserService.GetAuditIdentifier()
+                        };
+                        await _context.ProductVariationDescriptions.AddAsync(description, cancellationToken);
                     }
                 }
             }
@@ -256,7 +256,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = _currentUserService.GetAuditIdentifier()
                 };
-                await _context.ProductSideItems.AddAsync(productSideItem,cancellationToken);
+                await _context.ProductSideItems.AddAsync(productSideItem, cancellationToken);
             }
         }
 
@@ -305,88 +305,88 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 }
             }
 
-        // Update Menu Definition
-        if (command.Type == ProductType.Menu && command.MenuDefinition != null)
-        {
-            var menuDef = await _context.MenuDefinitions
-                .Include(m => m.Sections)
-                    .ThenInclude(s => s.Items)
-                .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
-
-            if (menuDef == null)
+            // Update Menu Definition
+            if (command.Type == ProductType.Menu && command.MenuDefinition != null)
             {
-                // Create new if not exists
-                menuDef = new MenuDefinition
+                var menuDef = await _context.MenuDefinitions
+                    .Include(m => m.Sections)
+                        .ThenInclude(s => s.Items)
+                    .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
+
+                if (menuDef == null)
                 {
-                    ProductId = product.Id,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-                _context.MenuDefinitions.Add(menuDef);
-            }
-
-            // Update properties
-            menuDef.IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable;
-            menuDef.StartTime = command.MenuDefinition.StartTime;
-            menuDef.EndTime = command.MenuDefinition.EndTime;
-            menuDef.AvailableMonday = command.MenuDefinition.AvailableMonday;
-            menuDef.AvailableTuesday = command.MenuDefinition.AvailableTuesday;
-            menuDef.AvailableWednesday = command.MenuDefinition.AvailableWednesday;
-            menuDef.AvailableThursday = command.MenuDefinition.AvailableThursday;
-            menuDef.AvailableFriday = command.MenuDefinition.AvailableFriday;
-            menuDef.AvailableSaturday = command.MenuDefinition.AvailableSaturday;
-            menuDef.AvailableSunday = command.MenuDefinition.AvailableSunday;
-            menuDef.UpdatedAt = DateTime.UtcNow;
-            menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-            // Update sections
-            if (command.MenuDefinition.Sections != null)
-            {
-                // Remove existing sections (simplest approach for now, can be optimized)
-                _context.MenuSections.RemoveRange(menuDef.Sections);
-
-                foreach (var sectionDto in command.MenuDefinition.Sections)
-                {
-                    var section = new MenuSection
+                    // Create new if not exists
+                    menuDef = new MenuDefinition
                     {
-                        MenuDefinition = menuDef,
-                        Name = sectionDto.Name,
-                        Description = sectionDto.Description,
-                        DisplayOrder = sectionDto.DisplayOrder,
-                        IsRequired = sectionDto.IsRequired,
-                        MinSelection = sectionDto.MinSelection,
-                        MaxSelection = sectionDto.MaxSelection,
+                        ProductId = product.Id,
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
+                    _context.MenuDefinitions.Add(menuDef);
+                }
 
-                    _context.MenuSections.Add(section);
+                // Update properties
+                menuDef.IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable;
+                menuDef.StartTime = command.MenuDefinition.StartTime;
+                menuDef.EndTime = command.MenuDefinition.EndTime;
+                menuDef.AvailableMonday = command.MenuDefinition.AvailableMonday;
+                menuDef.AvailableTuesday = command.MenuDefinition.AvailableTuesday;
+                menuDef.AvailableWednesday = command.MenuDefinition.AvailableWednesday;
+                menuDef.AvailableThursday = command.MenuDefinition.AvailableThursday;
+                menuDef.AvailableFriday = command.MenuDefinition.AvailableFriday;
+                menuDef.AvailableSaturday = command.MenuDefinition.AvailableSaturday;
+                menuDef.AvailableSunday = command.MenuDefinition.AvailableSunday;
+                menuDef.UpdatedAt = DateTime.UtcNow;
+                menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-                    if (sectionDto.Items != null)
+                // Update sections
+                if (command.MenuDefinition.Sections != null)
+                {
+                    // Remove existing sections (simplest approach for now, can be optimized)
+                    _context.MenuSections.RemoveRange(menuDef.Sections);
+
+                    foreach (var sectionDto in command.MenuDefinition.Sections)
                     {
-                        foreach (var itemDto in sectionDto.Items)
+                        var section = new MenuSection
                         {
-                            var item = new MenuSectionItem
+                            MenuDefinition = menuDef,
+                            Name = sectionDto.Name,
+                            Description = sectionDto.Description,
+                            DisplayOrder = sectionDto.DisplayOrder,
+                            IsRequired = sectionDto.IsRequired,
+                            MinSelection = sectionDto.MinSelection,
+                            MaxSelection = sectionDto.MaxSelection,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = _currentUserService.GetAuditIdentifier()
+                        };
+
+                        _context.MenuSections.Add(section);
+
+                        if (sectionDto.Items != null)
+                        {
+                            foreach (var itemDto in sectionDto.Items)
                             {
-                                MenuSection = section,
-                                ProductId = itemDto.ProductId,
-                                AdditionalPrice = itemDto.AdditionalPrice,
-                                DisplayOrder = itemDto.DisplayOrder,
-                                IsDefault = itemDto.IsDefault,
-                                CreatedAt = DateTime.UtcNow,
-                                CreatedBy = _currentUserService.GetAuditIdentifier()
-                            };
-                            _context.MenuSectionItems.Add(item);
+                                var item = new MenuSectionItem
+                                {
+                                    MenuSection = section,
+                                    ProductId = itemDto.ProductId,
+                                    AdditionalPrice = itemDto.AdditionalPrice,
+                                    DisplayOrder = itemDto.DisplayOrder,
+                                    IsDefault = itemDto.IsDefault,
+                                    CreatedAt = DateTime.UtcNow,
+                                    CreatedBy = _currentUserService.GetAuditIdentifier()
+                                };
+                                _context.MenuSectionItems.Add(item);
+                            }
                         }
                     }
                 }
             }
-        }
-        else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
-        {
-            // If type changed from Menu to something else, remove definition
-            _context.MenuDefinitions.Remove(product.MenuDefinition);
-        }
+            else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
+            {
+                // If type changed from Menu to something else, remove definition
+                _context.MenuDefinitions.Remove(product.MenuDefinition);
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -412,7 +412,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
         return result;
     }
-    }
+}
 
 
 public record UpdateProductVariationDto(

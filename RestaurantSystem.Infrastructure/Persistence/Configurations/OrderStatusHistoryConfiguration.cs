@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 public class OrderStatusHistoryConfiguration : IEntityTypeConfiguration<OrderStatusHistory>
 {
     public void Configure(EntityTypeBuilder<OrderStatusHistory> builder)

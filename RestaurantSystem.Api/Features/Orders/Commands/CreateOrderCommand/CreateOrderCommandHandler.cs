@@ -319,18 +319,18 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             // Add initial status history
             // Add order status history
-        var statusHistory = new OrderStatusHistory
-        {
-            FromStatus = OrderStatus.Pending,
-            ToStatus = order.Status,
-            Notes = command.Type == OrderType.DineIn ? "Order created and auto-confirmed (Dine-in)" : "Order created",
-            ChangedAt = DateTime.UtcNow,
-            ChangedBy = _currentUserService.GetAuditIdentifier(),
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = _currentUserService.GetAuditIdentifier()
-        };
+            var statusHistory = new OrderStatusHistory
+            {
+                FromStatus = OrderStatus.Pending,
+                ToStatus = order.Status,
+                Notes = command.Type == OrderType.DineIn ? "Order created and auto-confirmed (Dine-in)" : "Order created",
+                ChangedAt = DateTime.UtcNow,
+                ChangedBy = _currentUserService.GetAuditIdentifier(),
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = _currentUserService.GetAuditIdentifier()
+            };
 
-        order.StatusHistory.Add(statusHistory);
+            order.StatusHistory.Add(statusHistory);
 
             // Calculate estimated delivery time
             if (command.Type == OrderType.Delivery)

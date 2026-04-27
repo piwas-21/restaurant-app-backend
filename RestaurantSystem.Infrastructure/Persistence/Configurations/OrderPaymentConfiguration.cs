@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 public class OrderPaymentConfiguration : IEntityTypeConfiguration<OrderPayment>
 {
     public void Configure(EntityTypeBuilder<OrderPayment> builder)

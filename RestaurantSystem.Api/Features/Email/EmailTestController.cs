@@ -10,7 +10,7 @@ namespace RestaurantSystem.Api.Features.Email;
 
 [ApiController]
 [Route("api/[controller]")]
-public class EmailTestController :ControllerBase
+public class EmailTestController : ControllerBase
 {
     private readonly IEmailService _emailService;
     private readonly IWebHostEnvironment _environment;

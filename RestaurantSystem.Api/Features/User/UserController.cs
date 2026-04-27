@@ -19,6 +19,7 @@ using RestaurantSystem.Api.Features.User.Queries.GetUsersQuery;
 using RestaurantSystem.Api.Features.User.Queries.GetUserStatisticsQuery;
 
 namespace RestaurantSystem.Api.Features.User;
+
 [Route("api/[controller]")]
 [ApiController]
 public class UserController : ControllerBase

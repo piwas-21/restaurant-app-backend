@@ -3,8 +3,9 @@
 # Update hooks:   pre-commit autoupdate
 # Run manually:   pre-commit run --all-files
 #
-# Sprint 1 scope: hygiene + secret scanning only.
-# Sprint 2 will add format/lint/build gates (see docs/QUALITY-SECURITY-PLAN.md).
+# Sprint 1 scope: hygiene + secret scanning.
+# Sprint 2: format gate via `dotnet format --verify-no-changes`.
+# See docs/QUALITY-SECURITY-PLAN.md.
 
 repos:
   # ── General hygiene ──────────────────────────────────────────────────
@@ -39,3 +40,16 @@ repos:
         # appear in those paths. Prefer regenerating the baseline:
         #   detect-secrets scan --baseline .secrets.baseline
         args: ["--baseline", ".secrets.baseline"]
+
+  # ── Sprint 2: format gate ────────────────────────────────────────────
+  # Verifies the solution is `dotnet format`-clean. To fix violations run
+  # `dotnet format RestaurantSystem.sln` and re-stage. Runs only when a
+  # .cs / .csproj / .sln file is in the commit.
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format (verify-no-changes)
+        entry: dotnet format RestaurantSystem.sln --verify-no-changes --verbosity minimal
+        language: system
+        pass_filenames: false
+        files: \.(cs|csproj|sln)$

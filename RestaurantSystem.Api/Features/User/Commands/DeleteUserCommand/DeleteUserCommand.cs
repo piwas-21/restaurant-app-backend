@@ -64,7 +64,7 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
                     .Where(r => r.CustomerId == command.UserId)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(r => r.CustomerId, (Guid?)null), cancellationToken);
 
-                 // Unlink Customer Discount Rules from Orders
+                // Unlink Customer Discount Rules from Orders
                 var userDiscountRuleIds = await _context.CustomerDiscountRules
                     .Where(r => r.UserId == command.UserId)
                     .Select(r => r.Id)
@@ -102,7 +102,7 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
         {
             if (user.IsDeleted)
             {
-                 return ApiResponse<string>.Failure("User is already deleted");
+                return ApiResponse<string>.Failure("User is already deleted");
             }
 
             // Soft delete for customers

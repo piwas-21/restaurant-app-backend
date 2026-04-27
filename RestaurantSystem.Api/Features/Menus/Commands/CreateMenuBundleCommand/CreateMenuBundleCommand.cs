@@ -215,14 +215,14 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             // we should duplicate it or make it public/shared.
             // For now, I'll duplicate the relevant parts for Menu Bundle.
 
-             var createdProduct = await _context.Products
-                .Include(p => p.ProductCategories)
-                    .ThenInclude(pc => pc.Category)
-                .Include(p => p.MenuDefinition)
-                    .ThenInclude(md => md!.Sections)
-                        .ThenInclude(s => s.Items)
-                            .ThenInclude(i => i.Product)
-                .FirstAsync(p => p.Id == product.Id, cancellationToken);
+            var createdProduct = await _context.Products
+               .Include(p => p.ProductCategories)
+                   .ThenInclude(pc => pc.Category)
+               .Include(p => p.MenuDefinition)
+                   .ThenInclude(md => md!.Sections)
+                       .ThenInclude(s => s.Items)
+                           .ThenInclude(i => i.Product)
+               .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
             var productDto = MapToProductDto(createdProduct);
 

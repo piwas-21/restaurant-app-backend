@@ -6,6 +6,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
+
 public class DatabaseFixture : IAsyncLifetime
 {
     private PostgreSqlContainer _postgres = null!;

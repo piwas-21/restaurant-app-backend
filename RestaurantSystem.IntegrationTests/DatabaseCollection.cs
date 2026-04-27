@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests;
+
 [CollectionDefinition("Database")]
 public class DatabaseCollection : ICollectionFixture<DatabaseFixture>
 {

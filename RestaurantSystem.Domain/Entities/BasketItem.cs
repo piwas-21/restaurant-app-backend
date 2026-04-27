@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class BasketItem : Entity
 {
     public Guid BasketId { get; set; }

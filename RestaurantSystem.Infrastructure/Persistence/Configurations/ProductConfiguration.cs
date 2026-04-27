@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 public class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
     public void Configure(EntityTypeBuilder<Product> builder)
@@ -53,7 +54,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         // Configure other relationships (optional, if needed)
         builder.HasMany(p => p.Images)
-            .WithOne(p=>p.Product)
+            .WithOne(p => p.Product)
             .HasForeignKey("ProductId")
             .OnDelete(DeleteBehavior.Cascade);
 
@@ -62,7 +63,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey("ProductId");
 
         builder.HasMany(p => p.Variations)
-            .WithOne(p=>p.Product)
+            .WithOne(p => p.Product)
             .HasForeignKey("ProductId");
 
         builder.HasMany(p => p.MenuProducts)

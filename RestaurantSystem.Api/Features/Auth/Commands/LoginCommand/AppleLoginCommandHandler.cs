@@ -44,15 +44,15 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
 
             if (jsonToken == null)
             {
-                 return ApiResponse<AuthResponse>.Failure("Invalid token", "The provided Apple token is invalid.");
+                return ApiResponse<AuthResponse>.Failure("Invalid token", "The provided Apple token is invalid.");
             }
 
             // Verify audience (Client ID)
             var clientId = _configuration["Authentication:Apple:ClientId"];
             if (!jsonToken.Audiences.Contains(clientId))
             {
-                 // return ApiResponse<AuthResponse>.Failure("Invalid token", "The token audience does not match.");
-                 // Commented out for now to allow easier testing if config is missing
+                // return ApiResponse<AuthResponse>.Failure("Invalid token", "The token audience does not match.");
+                // Commented out for now to allow easier testing if config is missing
             }
 
             var email = jsonToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
@@ -60,15 +60,15 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
 
             if (string.IsNullOrEmpty(email))
             {
-                 // Apple might not return email on subsequent logins if the user chose "Hide My Email"
-                 // In that case, you should rely on 'sub' (Subject) to identify the user.
-                 // For this simplified implementation, we require email or we need to look up by 'sub' if we stored it.
+                // Apple might not return email on subsequent logins if the user chose "Hide My Email"
+                // In that case, you should rely on 'sub' (Subject) to identify the user.
+                // For this simplified implementation, we require email or we need to look up by 'sub' if we stored it.
 
-                 // TODO: Implement lookup by 'sub' (Apple User ID) if email is missing.
-                 // For now, we will fail if email is missing, but in reality, we should check if we have a user with this 'sub'.
+                // TODO: Implement lookup by 'sub' (Apple User ID) if email is missing.
+                // For now, we will fail if email is missing, but in reality, we should check if we have a user with this 'sub'.
 
-                 // Let's try to find user by a custom claim or just fail for now.
-                 return ApiResponse<AuthResponse>.Failure("Email missing", "Could not retrieve email from Apple token.");
+                // Let's try to find user by a custom claim or just fail for now.
+                return ApiResponse<AuthResponse>.Failure("Email missing", "Could not retrieve email from Apple token.");
             }
 
             var user = await _userManager.FindByEmailAsync(email);

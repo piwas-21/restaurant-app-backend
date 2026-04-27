@@ -115,7 +115,7 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
                            cancellationToken: cancellationToken);
 
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         _logger.LogError(ex.Message, ex);
                         throw;

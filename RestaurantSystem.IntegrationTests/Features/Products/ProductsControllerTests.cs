@@ -5,6 +5,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
 
 namespace RestaurantSystem.IntegrationTests.Features.Products;
+
 public class ProductsControllerTests : IntegrationTestBase
 {
     public ProductsControllerTests(DatabaseFixture databaseFixture) : base(databaseFixture)

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
+
 [Collection("Database")]
 public abstract class IntegrationTestBase : IAsyncLifetime
 {

@@ -2,6 +2,7 @@
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class OrderPayment : Entity
 {
     public Guid OrderId { get; set; }

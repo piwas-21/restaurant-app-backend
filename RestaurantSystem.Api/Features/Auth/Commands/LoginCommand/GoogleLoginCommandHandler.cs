@@ -101,7 +101,7 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
         }
         catch (InvalidJwtException)
         {
-             return ApiResponse<AuthResponse>.Failure("Invalid token", "The provided Google token is invalid.");
+            return ApiResponse<AuthResponse>.Failure("Invalid token", "The provided Google token is invalid.");
         }
         catch (Exception ex)
         {

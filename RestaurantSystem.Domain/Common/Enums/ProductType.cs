@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Serialization;
 namespace RestaurantSystem.Domain.Common.Enums;
+
 public enum ProductType
 {
     [EnumMember(Value = "mainItem")]

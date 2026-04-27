@@ -15,7 +15,7 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
     private readonly IEmailService _emailService;
 
 
-    public ForgotPasswordCommandHandler(UserManager<ApplicationUser> userManager, ILogger<ForgotPasswordCommandHandler> logger,IEmailService emailService)
+    public ForgotPasswordCommandHandler(UserManager<ApplicationUser> userManager, ILogger<ForgotPasswordCommandHandler> logger, IEmailService emailService)
     {
         _userManager = userManager;
         _logger = logger;

@@ -10,6 +10,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Common;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
+
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;

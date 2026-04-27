@@ -70,7 +70,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             Allergens = product.Allergens,
             DisplayOrder = product.DisplayOrder,
             DetailedIngredients = product.DetailedIngredients
-                .Select(di => {
+                .Select(di =>
+                {
                     // Start with global translations if available
                     var content = new Dictionary<string, ProductIngredientContentDto>();
 
@@ -165,7 +166,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         )
                 })
                 .ToList(),
-                SuggestedSideItems = product.SuggestedSideItems
+            SuggestedSideItems = product.SuggestedSideItems
                 .Where(si => si.SideItemProduct != null) // Add this
                 .OrderBy(si => si.DisplayOrder)
                 .Select(si => new SideItemDto

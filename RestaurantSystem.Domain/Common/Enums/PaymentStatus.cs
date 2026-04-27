@@ -1,4 +1,5 @@
 ﻿namespace RestaurantSystem.Domain.Common.Enums;
+
 public enum PaymentStatus
 {
     Pending = 1,

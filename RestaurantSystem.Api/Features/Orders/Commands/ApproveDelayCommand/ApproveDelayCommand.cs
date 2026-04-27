@@ -91,7 +91,7 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
 
         if (!order.EstimatedDeliveryTime.HasValue)
         {
-             order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(30);
+            order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(30);
         }
 
         await _context.SaveChangesAsync(cancellationToken);

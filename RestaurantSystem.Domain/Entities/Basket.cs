@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class Basket : SoftDeleteEntity
 {
     public Guid? UserId { get; set; }

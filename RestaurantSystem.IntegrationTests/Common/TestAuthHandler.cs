@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 
 namespace RestaurantSystem.IntegrationTests.Common;
+
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     public const string UserId = "cd6c41d9-97e1-4fb4-9bee-ab6a9b460471";

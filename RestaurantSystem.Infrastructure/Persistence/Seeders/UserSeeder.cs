@@ -53,7 +53,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Seeders
             }
             else
             {
-                 logger.LogInformation($"Admin user '{adminEmail}' already exists.");
+                logger.LogInformation($"Admin user '{adminEmail}' already exists.");
             }
         }
     }

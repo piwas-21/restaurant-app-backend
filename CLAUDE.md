@@ -178,6 +178,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 | Gate | When | What | Blocking? | Source of truth |
 |---|---|---|---|---|
 | `dotnet build RestaurantSystem.sln` | Pre-commit (manual now) | 0 errors | yes (manual) | `dotnet build` |
+| `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** MR pipeline (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
 | Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
 | GitLab SAST | MR pipeline | Auto-injected analyzers | yes | `.gitlab-ci.yml` |
 | Gitleaks | MR pipeline | No leaked credentials (allowlist via `.gitleaks.toml`) | yes | [.gitleaks.toml](.gitleaks.toml) |
@@ -185,7 +186,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 Trivy is non-blocking today — it surfaces findings without failing the pipeline. Sprint 4 of [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) flips it to `exit-code: 1` for CRITICAL/HIGH.
 
-Format / lint / coverage gates land in Sprint 2. SAST quality gate + new-code coverage land in Sprint 3.
+Lint (analyzer warnings-as-errors) + coverage gates land in Sprint 3. SAST quality gate + new-code coverage land in Sprint 3.
 
 ### Setup for a new developer
 ```bash

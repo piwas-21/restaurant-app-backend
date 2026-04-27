@@ -2,6 +2,7 @@
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class Order : SoftDeleteEntity
 {
     public string OrderNumber { get; set; } = null!;

@@ -21,6 +21,7 @@ using RestaurantSystem.Api.Features.Products.Commands.SetFeaturedSpecialCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UnsetFeaturedSpecialCommand;
 
 namespace RestaurantSystem.Api.Features.Products;
+
 [ApiController]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase

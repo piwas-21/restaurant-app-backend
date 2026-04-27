@@ -1,9 +1,10 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class Menu : SoftDeleteEntity
 {
-    public string Name { get; set; }= string.Empty;
+    public string Name { get; set; } = string.Empty;
     public DateOnly Date { get; set; }
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;

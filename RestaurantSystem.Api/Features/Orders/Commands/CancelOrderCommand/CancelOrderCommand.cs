@@ -97,7 +97,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var orderDto = await _mappingService.MapToOrderDtoAsync(order,cancellationToken);
+        var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
 
         // Send cancellation email to customer
         if (!string.IsNullOrEmpty(order.CustomerEmail))

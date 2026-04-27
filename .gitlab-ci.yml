@@ -11,6 +11,15 @@ stages:
 
 # gitleaks is detecting hardcoded secrets in app source code
 
+# Sprint 2 quality gate: `dotnet format --verify-no-changes`.
+# Fails the pipeline if any file in the solution has formatting drift.
+# Fix: run `dotnet format RestaurantSystem.sln` locally and re-push.
+dotnet_format:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - dotnet format RestaurantSystem.sln --verify-no-changes --verbosity minimal
+
 gitleaks:
   stage: test
   image:

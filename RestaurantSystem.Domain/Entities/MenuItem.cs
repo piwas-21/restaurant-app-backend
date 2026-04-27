@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class MenuItem : Entity
 {
     public bool IsAvailable { get; set; } = true;

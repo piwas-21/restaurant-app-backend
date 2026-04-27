@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace RestaurantSystem.Domain.Common.Interfaces;
+
 public interface IExcludeFromGlobalFilter
 {
 }

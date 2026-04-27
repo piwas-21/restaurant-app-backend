@@ -4,6 +4,7 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.IntegrationTests.Common;
+
 public static class TestDataSeeder
 {
     public static async Task SeedBasicDataAsync(ApplicationDbContext context)

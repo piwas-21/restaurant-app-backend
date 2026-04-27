@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.DeleteProductCommand;
+
 public record DeleteProductCommand(Guid Id) : ICommand<ApiResponse<string>>;
 public class DeleteProductCommandHandler : ICommandHandler<DeleteProductCommand, ApiResponse<string>>
 {

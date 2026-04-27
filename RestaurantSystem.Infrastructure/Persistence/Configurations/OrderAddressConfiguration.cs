@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 public class OrderAddressConfiguration : IEntityTypeConfiguration<OrderAddress>
 {
     public void Configure(EntityTypeBuilder<OrderAddress> builder)
