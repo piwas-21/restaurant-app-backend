@@ -22,7 +22,6 @@ interface MenuContentProps {
   totalPages: number;
   totalCount: number;
   onPageChange: (page: number) => void;
-  onImageClick: (item: MenuItem, imageIndex?: number) => void;
   getFallbackImage: (menuItem: MenuItem) => void;
   currentLanguage: LanguageCode;
   onAddBundleToCart: (bundle: MenuBundleItem) => void;
@@ -42,7 +41,6 @@ export default function MenuContent({
   totalPages,
   totalCount,
   onPageChange,
-  onImageClick,
   getFallbackImage,
   currentLanguage,
   onAddBundleToCart,
@@ -125,7 +123,6 @@ export default function MenuContent({
             ) : (
               <MenuList
                 items={currentMenuItems}
-                onImageClick={onImageClick}
                 onFeedbackSuccess={() => {}}
                 getFallbackImage={getFallbackImage}
               />

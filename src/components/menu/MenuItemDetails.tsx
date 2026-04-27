@@ -15,13 +15,35 @@ type Props = {
   price: number;
   dietaryTags: string[];
   t: (key: string, defaultValue?: any) => string;
+  /**
+   * Optional handler for clicking the item title. When provided, the title
+   * becomes a button (clickable + keyboard-focusable). Lets the parent route
+   * the click without resorting to a card-wide onClick that bubbles up from
+   * action buttons inside `MenuItemActions`.
+   */
+  onTitleClick?: () => void;
   initialRatingData?: RatingData;
 };
 
-export default function MenuItemDetails({ id, title, description, ingredients, allergens, price, dietaryTags, t, initialRatingData }: Props) {
+export default function MenuItemDetails({ id, title, description, ingredients, allergens, price, dietaryTags, t, onTitleClick, initialRatingData }: Props) {
+  const titleProps = onTitleClick
+    ? {
+        role: "button",
+        tabIndex: 0,
+        onClick: onTitleClick,
+        onKeyDown: (e: React.KeyboardEvent<HTMLHeadingElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onTitleClick();
+          }
+        },
+        style: { cursor: "pointer" as const },
+      }
+    : {};
+
   return (
     <>
-      <h3 id={`item-name-${id}`} className={styles.itemTitle}>{title}</h3>
+      <h3 id={`item-name-${id}`} className={styles.itemTitle} {...titleProps}>{title}</h3>
       {/* <p className={`${styles.itemDescription} ${styles.clamp2}`}>{(description || '').trim().length > 0 ? description : ' '}</p> */}
       {/* {(() => {
         const text = (ingredients || '').trim();

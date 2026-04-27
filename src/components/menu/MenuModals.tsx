@@ -1,23 +1,9 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
-import type { LanguageCode } from '@/components/LanguageSwitcher';
-import type { MenuItem } from '@/types/menu';
-import ImageModal from '@/components/menu/ImageModal';
 import ProductDetailsModal from '@/components/menu/ProductDetailsModal';
 import CustomizationModal from '@/components/menu/CustomizationModal';
 import type { FeaturedSpecial, ProductCustomization } from '@/types/menu';
-import { setFallbackImage } from '@/utils/imageHelpers';
 
 interface MenuModalsProps {
-  // Image Modal
-  enlargedImageItem: MenuItem | null;
-  currentImageIndex: number;
-  currentEnlargedGalleryImages: Array<{ url: string; alt: string }>;
-  onCloseEnlargedImage: () => void;
-  onNextImage: () => void;
-  onPrevImage: () => void;
-  currentLanguage: LanguageCode;
-
   // Featured Special Modals
   featuredSpecial: FeaturedSpecial | null;
   showFeaturedDetails: boolean;
@@ -28,13 +14,6 @@ interface MenuModalsProps {
 }
 
 export default function MenuModals({
-  enlargedImageItem,
-  currentImageIndex,
-  currentEnlargedGalleryImages,
-  onCloseEnlargedImage,
-  onNextImage,
-  onPrevImage,
-  currentLanguage,
   featuredSpecial,
   showFeaturedDetails,
   showFeaturedCustomization,
@@ -42,31 +21,8 @@ export default function MenuModals({
   onCloseFeaturedCustomization,
   onFeaturedCustomizationConfirm,
 }: MenuModalsProps) {
-  const { t } = useTranslation();
-
   return (
     <>
-      {/* Image Gallery Modal */}
-      {enlargedImageItem && currentEnlargedGalleryImages.length > 0 && (
-        <ImageModal
-          isOpen={true}
-          images={currentEnlargedGalleryImages}
-          currentIndex={currentImageIndex}
-          onClose={onCloseEnlargedImage}
-          onNext={onNextImage}
-          onPrev={onPrevImage}
-          altBase={
-            enlargedImageItem.content?.[currentLanguage]?.name ||
-            enlargedImageItem.content?.en?.name ||
-            enlargedImageItem.id
-          }
-          onImageError={() => setFallbackImage(enlargedImageItem)}
-          previousLabel={t("previous_image_button_label")}
-          nextLabel={t("next_image_button_label")}
-          closeLabel={t("close_image_modal_button", "Close image modal")}
-        />
-      )}
-
       {/* Featured Special Details Modal */}
       {showFeaturedDetails && featuredSpecial && (
         <ProductDetailsModal
@@ -111,7 +67,7 @@ export default function MenuModals({
             isSpecial: true,
             content: {},
             images: featuredSpecial.images || (featuredSpecial.imageUrl ? [{ url: featuredSpecial.imageUrl, alt: featuredSpecial.name }] : []),
-            variations: featuredSpecial.variations || [], // Ensure these variations have their content property populated if available in FeaturedSpecial
+            variations: featuredSpecial.variations || [],
             suggestedSideItems: featuredSpecial.suggestedSideItems || [],
             categories: [],
           }}

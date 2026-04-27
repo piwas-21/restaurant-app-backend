@@ -9,14 +9,12 @@ import { useTranslation } from "react-i18next";
 
 interface MenuListProps {
   items: MenuItemType[];
-  onImageClick: (item: MenuItemType, imageIndex?: number) => void;
   onFeedbackSuccess: (dishId: string) => void;
   getFallbackImage: (item: MenuItemType) => void;
 }
 
 const MenuList: React.FC<MenuListProps> = ({
   items,
-  onImageClick,
   onFeedbackSuccess,
   getFallbackImage,
 }) => {
@@ -29,7 +27,6 @@ const MenuList: React.FC<MenuListProps> = ({
         <MenuItem
           key={`${item.id}-${currentLanguage}`}
           item={item}
-          onImageClick={onImageClick}
           onFeedbackSuccess={onFeedbackSuccess}
           getFallbackImage={getFallbackImage}
         />

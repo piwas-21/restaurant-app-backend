@@ -17,14 +17,12 @@ import styles from "./MenuItem.module.css";
 
 interface MenuItemProps {
   item: MenuItemType;
-  onImageClick: (item: MenuItemType, imageIndex?: number) => void;
   onFeedbackSuccess: (dishId: string) => void;
   getFallbackImage: (item: MenuItemType) => void;
 }
 
 const MenuItem: React.FC<MenuItemProps> = ({
   item,
-  onImageClick,
   onFeedbackSuccess,
   getFallbackImage,
 }) => {
@@ -162,15 +160,13 @@ const MenuItem: React.FC<MenuItemProps> = ({
       className={styles.menuItem}
       role="listitem"
       aria-labelledby={`item-name-${item.id}`}
-      onClick={() => setShowDetails(true)}
-      style={{ cursor: 'pointer' }}
     >
       <MenuItemImage
         imageUrl={item.image}
         alt={mainImageAlt}
         imageCount={item.images?.length}
         countLabel={t("images_count_label")}
-        onClick={() => onImageClick(item, 0)}
+        onClick={() => setShowDetails(true)}
         onError={() => getFallbackImage(item)}
       />
       <div className={styles.contentWrapper}>
@@ -183,6 +179,7 @@ const MenuItem: React.FC<MenuItemProps> = ({
           price={numericPrice}
           dietaryTags={item.dietaryTags}
           t={t}
+          onTitleClick={() => setShowDetails(true)}
           initialRatingData={{ average: 0, count: 0 }}
         />
         <div className={styles.priceActionsRow}>
