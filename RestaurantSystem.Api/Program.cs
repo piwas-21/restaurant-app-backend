@@ -310,15 +310,17 @@ app.UseValidationExceptionHandling();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health check endpoint for Kubernetes liveness/readiness probes
+// Health check endpoint for Kubernetes liveness/readiness probes.
+// .NET 10's Microsoft.AspNetCore.OpenApi (wired via AddOpenApi/MapOpenApi
+// above) auto-discovers minimal-API endpoints, so no per-endpoint
+// .WithOpenApi() call is needed — that API was deprecated (ASPDEPR002).
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "healthy",
     timestamp = DateTime.UtcNow,
     service = "restaurant-system-api"
 }))
-.WithName("HealthCheck")
-.WithOpenApi();
+.WithName("HealthCheck");
 
 app.MapGet("/api/health", () => Results.Ok(new
 {
@@ -326,8 +328,7 @@ app.MapGet("/api/health", () => Results.Ok(new
     timestamp = DateTime.UtcNow,
     service = "restaurant-system-api"
 }))
-.WithName("ApiHealthCheck")
-.WithOpenApi();
+.WithName("ApiHealthCheck");
 
 app.MapControllers();
 
