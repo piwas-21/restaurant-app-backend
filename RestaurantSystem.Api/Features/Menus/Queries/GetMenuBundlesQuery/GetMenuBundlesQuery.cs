@@ -22,16 +22,16 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
     {
         var queryable = _context.Products
             .Include(p => p.MenuDefinition)
-                .ThenInclude(md => md.Sections)
+                .ThenInclude(md => md!.Sections)
                     .ThenInclude(s => s.Items)
                         .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p.DetailedIngredients)
+                            .ThenInclude(p => p!.DetailedIngredients)
                                 .ThenInclude(di => di.Descriptions)
             .Include(p => p.MenuDefinition)
-                .ThenInclude(md => md.Sections)
+                .ThenInclude(md => md!.Sections)
                     .ThenInclude(s => s.Items)
                         .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p.SuggestedSideItems)
+                            .ThenInclude(p => p!.SuggestedSideItems)
                                 .ThenInclude(si => si.SideItemProduct)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
@@ -45,7 +45,7 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
             var currentTime = now.TimeOfDay;
 
             queryable = queryable.Where(p =>
-                p.MenuDefinition.IsAlwaysAvailable || // Include if always available
+                p.MenuDefinition!.IsAlwaysAvailable || // Include if always available
                 (
                     // Check if available on current day
                     (currentDayOfWeek == DayOfWeek.Monday && p.MenuDefinition.AvailableMonday) ||

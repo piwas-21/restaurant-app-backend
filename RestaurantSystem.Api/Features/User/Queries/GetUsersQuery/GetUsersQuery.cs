@@ -46,7 +46,7 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
             userQuery = userQuery.Where(u =>
                 u.FirstName.ToLower().Contains(searchLower) ||
                 u.LastName.ToLower().Contains(searchLower) ||
-                u.Email.ToLower().Contains(searchLower) ||
+                (u.Email ?? string.Empty).ToLower().Contains(searchLower) ||
                 (u.FirstName + " " + u.LastName).ToLower().Contains(searchLower));
         }
 

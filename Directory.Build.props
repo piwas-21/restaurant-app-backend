@@ -19,18 +19,13 @@
       applied to staging/prod (CLAUDE.md §9), so renaming is not an
       option. The warning surfaces nothing actionable here.
 
-    Transitional exclusions (Sprint 3, follow-up MRs to clear):
-    - CS8600/CS8601/CS8602/CS8604: nullable-reference warnings — 16
-      sites flagged at gate-flip time, each needs careful per-site
-      null-handling review. Tracked as a follow-up issue.
-    These exclusions should be removed once the follow-up MRs land.
+    No transitional exclusions remaining as of Sprint 3 cleanup.
   -->
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsNotAsErrors>
       NU1901;NU1902;NU1903;NU1904;
-      CS8981;
-      CS8600;CS8601;CS8602;CS8604
+      CS8981
     </WarningsNotAsErrors>
   </PropertyGroup>
 

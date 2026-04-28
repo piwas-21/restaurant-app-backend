@@ -84,7 +84,7 @@ public class CustomerDiscountsController : ControllerBase
             {
                 Id = d.Id,
                 UserId = d.UserId,
-                UserEmail = email,
+                UserEmail = email ?? string.Empty,
                 UserName = $"{firstName} {lastName}".Trim(),
                 Name = d.Name,
                 DiscountType = d.DiscountType.ToString(),

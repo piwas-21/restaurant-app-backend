@@ -71,7 +71,7 @@ public class GetReservationsQueryHandler : IQueryHandler<GetReservationsQuery, A
                     CustomerId = r.CustomerId,
                     CustomerName = r.CustomerName,
                     CustomerEmail = r.CustomerEmail,
-                    CustomerPhone = r.CustomerPhone,
+                    CustomerPhone = r.CustomerPhone ?? string.Empty,
                     TableId = r.TableId,
                     TableNumber = r.Table.TableNumber,
                     ReservationDate = r.ReservationDate,

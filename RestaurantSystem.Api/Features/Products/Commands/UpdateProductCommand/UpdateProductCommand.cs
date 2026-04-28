@@ -171,7 +171,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
             foreach (var variationDto in command.Variations)
             {
-                ProductVariation variation;
+                ProductVariation? variation;
 
                 if (variationDto.Id.HasValue)
                 {

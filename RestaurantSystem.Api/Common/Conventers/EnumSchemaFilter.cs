@@ -14,7 +14,7 @@ public class EnumSchemaFilter : ISchemaFilter
     {
         if (context.Type.IsEnum && schema is OpenApiSchema openApiSchema)
         {
-            openApiSchema.Enum.Clear();
+            openApiSchema.Enum?.Clear();
             openApiSchema.Type = JsonSchemaType.String;
             openApiSchema.Format = null;
 

@@ -186,7 +186,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 Trivy is non-blocking today — it surfaces findings without failing the pipeline. Sprint 4 of [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) flips it to `exit-code: 1` for CRITICAL/HIGH.
 
-Analyzer warnings-as-errors gate landed in Sprint 3 via `TreatWarningsAsErrors` in [Directory.Build.props](Directory.Build.props). Some warning categories are transitionally excluded (CS8600/01/02/04 nullable-ref + ASPDEPR002) — see file comments and follow-up issues. Coverage gates and SAST quality gate (SonarCloud) land later in Sprint 3.
+Analyzer warnings-as-errors gate fully blocking as of Sprint 3 via `TreatWarningsAsErrors` in [Directory.Build.props](Directory.Build.props). Only NuGet vulnerability advisories (NU1901–NU1904, dep-upgrade track) and EF migration class names (CS8981) remain excluded. Coverage gates and SAST quality gate (SonarCloud) land later in Sprint 3.
 
 ### Setup for a new developer
 ```bash
