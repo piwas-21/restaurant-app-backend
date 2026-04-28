@@ -2,11 +2,14 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
+using System.Threading.RateLimiting;
 using RestaurantSystem.Api.BackgroundServices;
 using RestaurantSystem.Api.Services;
 using RestaurantSystem.Api.Common.Conventers;
@@ -167,7 +170,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = jwtOptions?.TokenValidationParameters ?? new TokenValidationParameters();
 
@@ -222,6 +225,49 @@ builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("Pr
 
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
+
+// Trust the K8s nginx-ingress X-Forwarded-For header so rate limiter partitions by real client IP
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // 5 attempts per 15 minutes per IP — covers login + refresh-token
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(15),
+            QueueLimit = 0
+        }));
+
+    // 3 attempts per hour per IP — forgot-password
+    options.AddPolicy("forgot-password", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 3,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0
+        }));
+
+    // 10 registrations per hour per IP
+    options.AddPolicy("register", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0
+        }));
+});
 
 builder.Services.AddInfrastructureRegistration();
 
@@ -303,9 +349,21 @@ app.UseSwaggerUI(c =>
 
 app.UseExceptionHandling();
 
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
 
 app.UseCors("AllowAll");
+
+app.UseForwardedHeaders();
+app.UseRateLimiter();
+
+app.UseMiddleware<SessionMiddleware>();
 
 app.UseValidationExceptionHandling();
 

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
@@ -48,6 +49,7 @@ public class UserController : ControllerBase
     /// </summary>
     [HttpPost("register/customer")]
     [AllowAnonymous]
+    [EnableRateLimiting("register")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RegisterCustomer([FromBody] RegisterCustomerCommand command)
     {
         var result = await _mediator.SendCommand(command);

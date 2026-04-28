@@ -40,7 +40,7 @@ public class S3FileStorageService : IFileStorageService
             Key = key,
             InputStream = stream,
             ContentType = contentType,
-            CannedACL = S3CannedACL.PublicRead, // Make files publicly readable
+            CannedACL = S3CannedACL.NoACL,
             Metadata =
                 {
                     ["uploaded-at"] = DateTime.UtcNow.ToString("O"),
