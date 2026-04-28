@@ -20,6 +20,15 @@ dotnet_format:
   script:
     - dotnet format RestaurantSystem.sln --verify-no-changes --verbosity minimal
 
+# Sprint 3 quality gate: TreatWarningsAsErrors via Directory.Build.props.
+# Build must complete with zero errors and zero non-excluded warnings.
+# Excluded warning categories live in Directory.Build.props.
+dotnet_build_strict:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - dotnet build RestaurantSystem.sln --nologo --verbosity minimal
+
 gitleaks:
   stage: test
   image:
