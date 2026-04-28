@@ -9,24 +9,39 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
 public class DatabaseFixture : IAsyncLifetime
 {
-    private PostgreSqlContainer _postgres = null!;
+    /// <summary>
+    /// When set, the fixture connects to this Postgres instead of starting a
+    /// Testcontainers container. Used in CI where dind is unreliable on the
+    /// docker+machine executor — the pipeline declares a postgres service
+    /// and exports its URL into this variable. Locally, leave unset and
+    /// Testcontainers spins up its own.
+    /// </summary>
+    private const string ExternalConnectionEnv = "INTEGRATION_TESTS_DB_CONNECTION";
+
+    private PostgreSqlContainer? _postgres;
     private Respawner _respawner = null!;
 
     public string ConnectionString { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        // Create and start PostgreSQL container
-        _postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
-            .WithDatabase("restaurant_test")
-            .WithUsername("test")
-            .WithPassword("test")
-            .Build();
+        var external = Environment.GetEnvironmentVariable(ExternalConnectionEnv);
+        if (!string.IsNullOrWhiteSpace(external))
+        {
+            ConnectionString = external;
+        }
+        else
+        {
+            _postgres = new PostgreSqlBuilder()
+                .WithImage("postgres:16-alpine")
+                .WithDatabase("restaurant_test")
+                .WithUsername("test")
+                .WithPassword("test")
+                .Build();
 
-        await _postgres.StartAsync();
-
-        ConnectionString = _postgres.GetConnectionString();
+            await _postgres.StartAsync();
+            ConnectionString = _postgres.GetConnectionString();
+        }
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(ConnectionString);
         dataSourceBuilder.EnableDynamicJson(); // 👈 this line is required
@@ -76,7 +91,7 @@ public class DatabaseFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (_postgres != null)
+        if (_postgres is not null)
         {
             await _postgres.DisposeAsync();
         }

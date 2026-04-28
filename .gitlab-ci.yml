@@ -36,23 +36,41 @@ dotnet_build_strict:
 dotnet_test:
   stage: test
   image: mcr.microsoft.com/dotnet/sdk:10.0
+  # Postgres-as-service instead of dind+Testcontainers. We tried four
+  # variants of the dind setup; the gitlab.com docker+machine executor
+  # made dind reachable for curl probes but unreachable for the dotnet
+  # test process within the same shell. DatabaseFixture honours the
+  # INTEGRATION_TESTS_DB_CONNECTION env var when set and bypasses
+  # Testcontainers; locally the var is unset and Testcontainers still
+  # spins up its own Postgres for fast iteration.
   services:
-    - name: docker:24-dind
-      alias: docker
+    - name: postgres:16-alpine
+      alias: postgres
   variables:
-    DOCKER_HOST: "tcp://docker:2375"
-    DOCKER_TLS_CERTDIR: ""
-    TESTCONTAINERS_HOST_OVERRIDE: "docker"
-    TESTCONTAINERS_RYUK_DISABLED: "true"
+    POSTGRES_DB: restaurant_test
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    INTEGRATION_TESTS_DB_CONNECTION: "Host=postgres;Port=5432;Database=restaurant_test;Username=test;Password=test"
   script:
     - dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj
       --nologo --verbosity minimal
       --logger "junit;LogFileName=test-results.xml"
       --results-directory $CI_PROJECT_DIR/test-results
+      -p:CollectCoverage=true
+      -p:CoverletOutputFormat=cobertura
+      -p:CoverletOutput=$CI_PROJECT_DIR/test-results/coverage.cobertura.xml
+      -p:Exclude='[*]*.Migrations.*'
+      -p:Threshold=17%2c9%2c15
+      -p:ThresholdType=line%2cbranch%2cmethod
+      -p:ThresholdStat=total
+  coverage: '/^\|\s+Total\s+\|\s+(\d+(?:\.\d+)?)%/'
   artifacts:
     when: always
     reports:
       junit: test-results/*.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: test-results/coverage.cobertura.xml
     paths:
       - test-results/
     expire_in: 1 week
