@@ -32,9 +32,6 @@ const eslintConfig = [
 
       // Next.js specific rules
       "@next/next/no-img-element": "warn",
-      // The rule's LCP-bandwidth concern doesn't apply to admin-only views,
-      // and proper migration to <Image> needs images.remotePatterns config
-      // for CMS-backed URLs — tracked separately. See follow-up issue.
 
       // Other helpful rules to disable during development
       "no-unused-vars": "off", // Turn off base rule as it can conflict with @typescript-eslint/no-unused-vars
@@ -43,15 +40,6 @@ const eslintConfig = [
       // console.log as noise. console.debug/info follow the same rationale
       // as .log — they're typically dev-time scaffolding and shouldn't ship.
       "no-console": ["warn", { allow: ["warn", "error"] }],
-    },
-  },
-  {
-    // Admin surfaces are internal tooling, not customer-facing LCP
-    // critical paths. Disable no-img-element here until the proper
-    // next/image migration lands (CMS images + remotePatterns config).
-    files: ["src/components/admin/**/*.{ts,tsx}", "src/app/admin/**/*.{ts,tsx}"],
-    rules: {
-      "@next/next/no-img-element": "off",
     },
   },
 ];

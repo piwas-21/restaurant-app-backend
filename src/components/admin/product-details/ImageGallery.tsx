@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { ProductImage } from '@/app/admin/menu-management/interfaces';
 import detailsStyles from '@/app/styles/DetailsPage.module.css';
 import ImageActions from './ImageActions';
@@ -117,19 +118,25 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images = [], productName, o
           {imageList.length > 0 && (
             <>
               <div className={detailsStyles.primaryImageContainer}>
-                <img
-                  src={selectedImage?.url}
-                  alt={selectedImage?.altText || productName}
-                  className={detailsStyles.primaryImage}
-                />
+                {selectedImage?.url && (
+                  <Image
+                    src={selectedImage.url}
+                    alt={selectedImage.altText || productName}
+                    className={detailsStyles.primaryImage}
+                    width={1200}
+                    height={800}
+                  />
+                )}
               </div>
               <div className={detailsStyles.thumbnailContainer}>
                 {imageList.map((img, index) => (
-                  <img
+                  <Image
                     key={index}
                     src={img.url}
                     alt={img.altText}
                     className={`${detailsStyles.thumbnail} ${selectedImage?.url === img.url ? detailsStyles.active : ''}`}
+                    width={160}
+                    height={80}
                     onClick={() => setSelectedImage(img)}
                   />
                 ))}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { getProductById } from '@/services/menuService';
 import AllergenDisplay from '@/components/common/AllergenDisplay';
 import styles from './MenuBundleDetails.module.css';
@@ -74,7 +75,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ item }) => {
 
       <div className={styles.productCardContent}>
         {primaryImage && (
-          <img src={primaryImage.url} alt={primaryImage.altText || product.name} className={styles.productImage} />
+          <Image
+            src={primaryImage.url}
+            alt={primaryImage.altText || product.name}
+            className={styles.productImage}
+            width={200}
+            height={200}
+          />
         )}
 
         <div className={styles.productInfo}>

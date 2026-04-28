@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useTranslation } from 'react-i18next';
 import styles from './MenuBundleDetails.module.css';
 import ProductInformation from '@/components/admin/product-details/ProductInformation';
@@ -131,20 +132,26 @@ const MenuBundleDetails: React.FC<MenuBundleDetailsProps> = ({ product, onUpdate
       {hasImages && (
         <div className={styles.imageCarouselSection}>
           <div className={styles.imageCarousel}>
-            <img
-              src={selectedImage?.url}
-              alt={selectedImage?.altText || product.name}
-              className={styles.carouselImage}
-            />
+            {selectedImage?.url && (
+              <Image
+                src={selectedImage.url}
+                alt={selectedImage.altText || product.name}
+                className={styles.carouselImage}
+                width={1200}
+                height={800}
+              />
+            )}
           </div>
           {images.length > 1 && (
             <div className={styles.carouselThumbnails}>
               {images.map((img, idx) => (
-                <img
+                <Image
                   key={idx}
                   src={img.url}
                   alt={img.altText || `${product.name} ${idx + 1}`}
                   className={`${styles.carouselThumbnail} ${idx === selectedImageIndex ? styles.active : ''}`}
+                  width={160}
+                  height={160}
                   onClick={() => setSelectedImageIndex(idx)}
                 />
               ))}
