@@ -92,6 +92,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("reset-password")]
     [AllowAnonymous]
+    [EnableRateLimiting("forgot-password")]
     public async Task<ActionResult<ApiResponse<string>>> ResetPassword([FromBody] ResetPasswordCommand command)
     {
         var result = await _mediator.SendCommand(command);

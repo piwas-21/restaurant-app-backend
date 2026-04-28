@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -225,6 +226,14 @@ builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("Pr
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
+// Trust the K8s nginx-ingress X-Forwarded-For header so rate limiter partitions by real client IP
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -340,19 +349,7 @@ app.UseSwaggerUI(c =>
 
 app.UseExceptionHandling();
 
-app.Use(async (context, next) =>
-{
-    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
-    context.Response.Headers.Append("X-Frame-Options", "DENY");
-    context.Response.Headers.Append("X-XSS-Protection", "0");
-    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-    context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-    if (!context.Request.Path.StartsWithSegments("/api/swagger"))
-    {
-        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'");
-    }
-    await next();
-});
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -363,6 +360,7 @@ app.UseHttpsRedirection();
 
 app.UseCors("AllowAll");
 
+app.UseForwardedHeaders();
 app.UseRateLimiter();
 
 app.UseMiddleware<SessionMiddleware>();
