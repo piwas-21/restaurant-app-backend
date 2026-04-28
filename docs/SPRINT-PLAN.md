@@ -47,10 +47,10 @@
 | S7 | **Protect test-broadcast** - add `[RequireAdmin]` to `POST events/test-broadcast` | HIGH | `Features/Orders/EventsController.cs` |
 | S8 | **Environment-specific RequireHttpsMetadata** - `!builder.Environment.IsDevelopment()` | HIGH | `Program.cs` (line 170) |
 | S9 | **Remove token logging** - delete `LogInformation("Password reset token...")` | HIGH | `Features/Auth/Commands/ForgotPasswordCommand/` |
-| S10 | **Add missing validators** - create FluentValidation validators for all commands currently missing them (~15 commands) | HIGH | Multiple `Validator.cs` files to create |
-| S11 | **Add SSE connection limits** - max 10 connections per IP in `SseClientManager` | HIGH | `Features/Orders/Services/OrderEventService.cs` |
-| S12 | **Hash refresh tokens** - store hash in DB instead of plaintext | HIGH | `Features/Auth/`, `Domain/Entities/ApplicationUser.cs` |
-| S13 | **Invalidate tokens on password change** - clear refresh token when password changes | HIGH | `Features/Auth/Commands/ChangePasswordCommand/` |
+| S10 | ~~**Add missing validators** - create FluentValidation validators for all commands currently missing them (~15 commands)~~ ✅ Done (MR !22) | HIGH | Multiple `Validator.cs` files to create |
+| S11 | ~~**Add SSE connection limits** - max 10 connections per IP in `SseClientManager`~~ ✅ Done (MR !22) | HIGH | `Features/Orders/Services/OrderEventService.cs` |
+| S12 | ~~**Hash refresh tokens** - store hash in DB instead of plaintext~~ ✅ Done (MR !22) | HIGH | `Features/Auth/`, `Domain/Entities/ApplicationUser.cs` |
+| S13 | ~~**Invalidate tokens on password change** - clear refresh token when password changes~~ ✅ Done (MR !22) | HIGH | `Features/Auth/Commands/ChangePasswordCommand/` |
 
 ### Security Tests (alongside fixes)
 
