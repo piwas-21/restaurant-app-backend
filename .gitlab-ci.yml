@@ -29,6 +29,34 @@ dotnet_build_strict:
   script:
     - dotnet build RestaurantSystem.sln --nologo --verbosity minimal
 
+# Sprint 3 quality gate: integration test suite.
+# DatabaseFixture spins up Postgres via Testcontainers — needs Docker
+# access at runtime. We expose Docker via the dind service; Testcontainers
+# .NET talks to the API via DOCKER_HOST (no docker CLI install needed).
+dotnet_test:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  services:
+    - name: docker:24-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    TESTCONTAINERS_HOST_OVERRIDE: "docker"
+    TESTCONTAINERS_RYUK_DISABLED: "true"
+  script:
+    - dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj
+      --nologo --verbosity minimal
+      --logger "junit;LogFileName=test-results.xml"
+      --results-directory $CI_PROJECT_DIR/test-results
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/*.xml
+    paths:
+      - test-results/
+    expire_in: 1 week
+
 gitleaks:
   stage: test
   image:

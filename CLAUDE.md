@@ -178,6 +178,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 | Gate | When | What | Blocking? | Source of truth |
 |---|---|---|---|---|
 | `dotnet build RestaurantSystem.sln` (warnings as errors) | Pre-commit (when .cs/.csproj/.sln/.props/.targets staged) **and** MR pipeline (`dotnet_build_strict` job) | 0 errors, 0 non-excluded warnings | yes | [Directory.Build.props](Directory.Build.props), `.gitlab-ci.yml` |
+| `dotnet test RestaurantSystem.IntegrationTests` | MR pipeline (`dotnet_test` job, dind service for Testcontainers) | All non-skipped tests pass | yes | `.gitlab-ci.yml` |
 | `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** MR pipeline (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
 | Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
 | GitLab SAST | MR pipeline | Auto-injected analyzers | yes | `.gitlab-ci.yml` |
