@@ -126,6 +126,8 @@ builder.Services.AddRateLimiter(options =>
 
 **Sprint:** Sprint 1.5 (immediate)
 
+**Follow-up chore:** `app.UseForwardedHeaders()` is currently placed after `UseHttpsRedirection` and `UseCors`. Move it before both so the forwarded proto is available for redirect decisions (no practical impact today since TLS terminates at ingress, but canonical ordering). Also: `KnownIPNetworks.Clear()` means direct pod access could spoof `X-Forwarded-For` to evade rate limits — acceptable while K8s network policies block direct access, but document if network policies change.
+
 ---
 
 ### C5. Unvalidated X-Session-Id Header
