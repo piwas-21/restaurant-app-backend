@@ -2160,5 +2160,7 @@
   "phone_save_failed": "Error al guardar el teléfono",
   "phone_delete_confirm": "¿Eliminar este número?",
   "phone_delete_success": "Teléfono eliminado",
-  "phone_delete_failed": "Error al eliminar"
+  "phone_delete_failed": "Error al eliminar",
+  "home_contact_title": "Contáctenos",
+  "whatsapp_default_message": "Hola, me gustaría reservar una mesa"
 }

@@ -2157,5 +2157,7 @@
   "phone_save_failed": "فشل حفظ الهاتف",
   "phone_delete_confirm": "حذف رقم الهاتف هذا؟",
   "phone_delete_success": "تم حذف الهاتف",
-  "phone_delete_failed": "فشل الحذف"
+  "phone_delete_failed": "فشل الحذف",
+  "home_contact_title": "تواصل معنا",
+  "whatsapp_default_message": "مرحبًا، أود حجز طاولة"
 }

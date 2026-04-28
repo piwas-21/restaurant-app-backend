@@ -2166,5 +2166,7 @@
   "phone_save_failed": "Telefonnummer konnte nicht gespeichert werden",
   "phone_delete_confirm": "Diese Telefonnummer löschen?",
   "phone_delete_success": "Telefonnummer gelöscht",
-  "phone_delete_failed": "Löschen fehlgeschlagen"
+  "phone_delete_failed": "Löschen fehlgeschlagen",
+  "home_contact_title": "Kontakt",
+  "whatsapp_default_message": "Hallo, ich möchte einen Tisch reservieren"
 }

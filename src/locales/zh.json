@@ -2158,5 +2158,7 @@
   "phone_save_failed": "保存电话失败",
   "phone_delete_confirm": "删除此电话号码？",
   "phone_delete_success": "电话已删除",
-  "phone_delete_failed": "删除失败"
+  "phone_delete_failed": "删除失败",
+  "home_contact_title": "联系我们",
+  "whatsapp_default_message": "您好，我想预订一桌"
 }

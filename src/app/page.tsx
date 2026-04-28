@@ -9,6 +9,7 @@ import { UtensilsCrossed, CalendarCheck } from 'lucide-react';
 import { workingHoursService } from '@/services/workingHoursService';
 import { WorkingHoursDto } from '@/types/workingHours';
 import { useRestaurantInfo } from '@/hooks/useRestaurantInfo';
+import ContactIcons from '@/components/home/ContactIcons';
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
@@ -187,6 +188,8 @@ export default function HomePage() {
               : "RUMI is more than just a restaurant; it's a place where Turkish culinary traditions are celebrated with a modern twist. Our chefs use the freshest ingredients to bring you an unforgettable dining experience."}
           </p>
         </section>
+
+        {info && info.phoneNumbers.some((p) => p.isActive) && <ContactIcons phones={info.phoneNumbers} />}
 
         <section className={styles.openingHoursSection} aria-labelledby="hours-heading">
           <h2 id="hours-heading">{isClient ? t('home_opening_hours_title') : 'Opening Hours'}</h2>

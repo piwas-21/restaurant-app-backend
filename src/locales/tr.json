@@ -2153,5 +2153,7 @@
   "phone_save_failed": "Telefon kaydedilemedi",
   "phone_delete_confirm": "Bu telefon numarasını sil?",
   "phone_delete_success": "Telefon silindi",
-  "phone_delete_failed": "Silinemedi"
+  "phone_delete_failed": "Silinemedi",
+  "home_contact_title": "Bize ulaşın",
+  "whatsapp_default_message": "Merhaba, rezervasyon yapmak istiyorum"
 }

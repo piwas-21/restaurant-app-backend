@@ -244,6 +244,15 @@
   }
 }
 
+@media (max-width: 640px) {
+  /* Reserve space below the fold so the fixed-bottom ContactIcons bar
+     (see components/home/ContactIcons.module.css) doesn't cover the
+     last block (footer / cookie link). */
+  .homeContainer {
+    padding-bottom: 5rem;
+  }
+}
+
 @media (max-width: 480px) {
   .heroTitle {
     font-size: 2rem;

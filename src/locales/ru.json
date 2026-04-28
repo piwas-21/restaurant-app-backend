@@ -2098,5 +2098,7 @@
   "phone_save_failed": "Не удалось сохранить",
   "phone_delete_confirm": "Удалить этот номер?",
   "phone_delete_success": "Номер удалён",
-  "phone_delete_failed": "Не удалось удалить"
+  "phone_delete_failed": "Не удалось удалить",
+  "home_contact_title": "Связаться с нами",
+  "whatsapp_default_message": "Здравствуйте, я хотел бы забронировать столик"
 }

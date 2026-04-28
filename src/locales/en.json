@@ -2153,5 +2153,7 @@
   "phone_save_failed": "Failed to save phone",
   "phone_delete_confirm": "Delete this phone number?",
   "phone_delete_success": "Phone deleted",
-  "phone_delete_failed": "Failed to delete"
+  "phone_delete_failed": "Failed to delete",
+  "home_contact_title": "Get in touch",
+  "whatsapp_default_message": "Hello, I would like to make a reservation"
 }

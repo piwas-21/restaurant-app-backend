@@ -2158,5 +2158,7 @@
   "phone_save_failed": "Échec de l'enregistrement",
   "phone_delete_confirm": "Supprimer ce numéro ?",
   "phone_delete_success": "Numéro supprimé",
-  "phone_delete_failed": "Échec de la suppression"
+  "phone_delete_failed": "Échec de la suppression",
+  "home_contact_title": "Nous contacter",
+  "whatsapp_default_message": "Bonjour, je voudrais réserver une table"
 }

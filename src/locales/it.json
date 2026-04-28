@@ -2158,5 +2158,7 @@
   "phone_save_failed": "Salvataggio telefono fallito",
   "phone_delete_confirm": "Eliminare questo numero?",
   "phone_delete_success": "Telefono eliminato",
-  "phone_delete_failed": "Eliminazione fallita"
+  "phone_delete_failed": "Eliminazione fallita",
+  "home_contact_title": "Contattaci",
+  "whatsapp_default_message": "Salve, vorrei prenotare un tavolo"
 }
