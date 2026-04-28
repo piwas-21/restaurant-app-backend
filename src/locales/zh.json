@@ -2168,5 +2168,8 @@
   "no_active_orders_title": "没有进行中的订单",
   "no_past_orders_title": "没有历史订单",
   "last_updated": "已更新",
-  "load_more": "加载更多"
+  "load_more": "加载更多",
+  "items_added_to_cart": "商品已加入购物车",
+  "failed_to_reorder": "无法将商品加入购物车",
+  "authenticating": "正在验证身份..."
 }

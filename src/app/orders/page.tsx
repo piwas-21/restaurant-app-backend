@@ -58,7 +58,7 @@ export default function OrdersPage() {
           });
         }
       }
-      enqueueSnackbar(t('items_added_to_cart', `${order.items.length} items added to cart`), {
+      enqueueSnackbar(t('items_added_to_cart', 'Items added to cart'), {
         variant: 'success',
         anchorOrigin: { vertical: 'bottom', horizontal: 'right' },
       });
@@ -151,7 +151,7 @@ export default function OrdersPage() {
             </p>
             {activeTab === 'active' && (
               <button onClick={() => router.push('/menu')} className={styles.browseButton}>
-                {t('browse_menu', 'Browse Menu')}
+                {t('cart_browse_menu_button', 'Browse Menu')}
               </button>
             )}
           </div>

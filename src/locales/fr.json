@@ -2168,5 +2168,8 @@
   "no_active_orders_title": "Aucune commande en cours",
   "no_past_orders_title": "Aucune commande passée",
   "last_updated": "Mis à jour",
-  "load_more": "Charger plus"
+  "load_more": "Charger plus",
+  "items_added_to_cart": "Articles ajoutés au panier",
+  "failed_to_reorder": "Impossible d'ajouter les articles au panier",
+  "authenticating": "Authentification..."
 }

@@ -2168,5 +2168,8 @@
   "no_active_orders_title": "Nessun ordine attivo",
   "no_past_orders_title": "Nessun ordine passato",
   "last_updated": "Aggiornato",
-  "load_more": "Carica altri"
+  "load_more": "Carica altri",
+  "items_added_to_cart": "Articoli aggiunti al carrello",
+  "failed_to_reorder": "Impossibile aggiungere articoli al carrello",
+  "authenticating": "Autenticazione in corso..."
 }

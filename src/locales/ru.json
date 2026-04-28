@@ -2108,5 +2108,8 @@
   "no_active_orders_title": "Нет активных заказов",
   "no_past_orders_title": "Нет прошлых заказов",
   "last_updated": "Обновлено",
-  "load_more": "Загрузить ещё"
+  "load_more": "Загрузить ещё",
+  "items_added_to_cart": "Товары добавлены в корзину",
+  "failed_to_reorder": "Не удалось добавить товары в корзину",
+  "authenticating": "Аутентификация..."
 }

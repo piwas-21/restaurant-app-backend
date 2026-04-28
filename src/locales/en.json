@@ -2163,5 +2163,8 @@
   "no_active_orders_title": "No Active Orders",
   "no_past_orders_title": "No Past Orders",
   "last_updated": "Updated",
-  "load_more": "Load more"
+  "load_more": "Load more",
+  "items_added_to_cart": "Items added to cart",
+  "failed_to_reorder": "Failed to add items to cart",
+  "authenticating": "Authenticating..."
 }

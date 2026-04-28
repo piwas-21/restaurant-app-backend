@@ -56,8 +56,10 @@ export default function OrderCard({ order, isExpanded, onToggleExpand, isReorder
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'Pending': return t('order_status_pending', 'Pending');
+      case 'PendingApproval': return t('order_status_pending_approval', 'Pending Approval');
       case 'Confirmed': return t('order_status_confirmed', 'Confirmed');
       case 'Preparing': return t('order_status_preparing', 'Preparing');
+      case 'In Progress': return t('order_status_in_progress', 'In Progress');
       case 'Ready': return t('order_status_ready', 'Ready');
       case 'InTransit': return t('order_status_in_transit', 'In Transit');
       case 'Delivered': return t('order_status_delivered', 'Delivered');
@@ -156,7 +158,7 @@ export default function OrderCard({ order, isExpanded, onToggleExpand, isReorder
                 <div key={item.id} className={styles.orderItem}>
                   {item.productImageUrl && (
                     <div className={styles.itemImage}>
-                      <Image src={item.productImageUrl} alt={item.productName || ''} width={50} height={50} style={{ objectFit: 'cover' }} />
+                      <Image src={item.productImageUrl} alt={item.productName || ''} width={50} height={50} className={styles.itemImg} />
                     </div>
                   )}
                   <div className={styles.itemDetails}>

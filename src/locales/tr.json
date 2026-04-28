@@ -2163,5 +2163,8 @@
   "no_active_orders_title": "Aktif Sipariş Yok",
   "no_past_orders_title": "Geçmiş Sipariş Yok",
   "last_updated": "Güncellendi",
-  "load_more": "Daha fazla yükle"
+  "load_more": "Daha fazla yükle",
+  "items_added_to_cart": "Ürünler sepete eklendi",
+  "failed_to_reorder": "Ürünler sepete eklenemedi",
+  "authenticating": "Kimlik doğrulanıyor..."
 }

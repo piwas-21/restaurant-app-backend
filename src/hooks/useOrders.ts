@@ -53,7 +53,9 @@ export function useOrders() {
         .filter((o) => (PAST_STATUSES as string[]).includes(o.status))
         .sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
       setPastOrders((prev) => (append ? [...prev, ...pageItems] : pageItems));
-      setPastHasMore(result.hasNextPage);
+      // If the filtered page is empty there is nothing more to show regardless
+      // of what the backend says about hasNextPage (which reflects unfiltered totals).
+      setPastHasMore(result.hasNextPage && pageItems.length > 0);
     } catch {
       // silently fail on pagination
     } finally {

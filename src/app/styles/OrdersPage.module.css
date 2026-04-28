@@ -540,6 +540,10 @@
   background-color: var(--border-color);
 }
 
+.itemImg {
+  object-fit: cover;
+}
+
 .itemDetails {
   display: flex;
   flex-direction: column;

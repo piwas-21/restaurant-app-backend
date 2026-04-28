@@ -2167,5 +2167,8 @@
   "no_active_orders_title": "لا توجد طلبات نشطة",
   "no_past_orders_title": "لا توجد طلبات سابقة",
   "last_updated": "محدَّث",
-  "load_more": "تحميل المزيد"
+  "load_more": "تحميل المزيد",
+  "items_added_to_cart": "تمت إضافة العناصر إلى السلة",
+  "failed_to_reorder": "فشل إضافة العناصر إلى السلة",
+  "authenticating": "جارٍ المصادقة..."
 }

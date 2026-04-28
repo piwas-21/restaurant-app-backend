@@ -2176,5 +2176,8 @@
   "no_active_orders_title": "Keine aktiven Bestellungen",
   "no_past_orders_title": "Keine vergangenen Bestellungen",
   "last_updated": "Aktualisiert",
-  "load_more": "Mehr laden"
+  "load_more": "Mehr laden",
+  "items_added_to_cart": "Artikel zum Warenkorb hinzugefügt",
+  "failed_to_reorder": "Artikel konnten nicht zum Warenkorb hinzugefügt werden",
+  "authenticating": "Authentifizierung..."
 }
