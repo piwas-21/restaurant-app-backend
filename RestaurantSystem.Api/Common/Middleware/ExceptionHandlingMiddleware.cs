@@ -68,6 +68,16 @@ public class ExceptionHandlingMiddleware
                 message = exception.Message;
                 break;
 
+            case BadRequestException:
+                statusCode = HttpStatusCode.BadRequest;
+                message = exception.Message;
+                break;
+
+            case NotFoundException:
+                statusCode = HttpStatusCode.NotFound;
+                message = exception.Message;
+                break;
+
             case ArgumentException:
                 statusCode = HttpStatusCode.BadRequest;
                 message = exception.Message;

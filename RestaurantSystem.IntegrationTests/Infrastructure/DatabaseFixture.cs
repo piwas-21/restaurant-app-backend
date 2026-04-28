@@ -20,6 +20,10 @@ public class DatabaseFixture : IAsyncLifetime
 
     private PostgreSqlContainer? _postgres;
     private Respawner _respawner = null!;
+    // Shared DataSource (one connection pool for the whole test run). Without
+    // this, CreateContext() built a fresh DataSource per call and each got its
+    // own pool — once enough tests ran, Postgres hit max_connections (53300).
+    private NpgsqlDataSource _dataSource = null!;
 
     public string ConnectionString { get; private set; } = null!;
 
@@ -44,14 +48,12 @@ public class DatabaseFixture : IAsyncLifetime
         }
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(ConnectionString);
-        dataSourceBuilder.EnableDynamicJson(); // 👈 this line is required
-        var dataSource = dataSourceBuilder.Build();
-
-
+        dataSourceBuilder.EnableDynamicJson();
+        _dataSource = dataSourceBuilder.Build();
 
         // Run migrations
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(dataSource)
+            .UseNpgsql(_dataSource)
             .Options;
 
         using var context = new ApplicationDbContext(options);
@@ -78,12 +80,8 @@ public class DatabaseFixture : IAsyncLifetime
 
     public ApplicationDbContext CreateContext()
     {
-        var dataSourceBuilder = new NpgsqlDataSourceBuilder(ConnectionString);
-        dataSourceBuilder.EnableDynamicJson();
-        var dataSource = dataSourceBuilder.Build();
-
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(dataSource)
+            .UseNpgsql(_dataSource)
             .Options;
 
         return new ApplicationDbContext(options);
@@ -98,6 +96,10 @@ public class DatabaseFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        if (_dataSource is not null)
+        {
+            await _dataSource.DisposeAsync();
+        }
         if (_postgres is not null)
         {
             await _postgres.DisposeAsync();

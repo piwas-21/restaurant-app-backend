@@ -43,10 +43,21 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 options.UseNpgsql(dataSource);
             });
 
-            // Replace authentication with test authentication
+            // Replace authentication with test authentication. Program.cs set
+            // DefaultAuthenticateScheme/DefaultChallengeScheme to JwtBearer;
+            // AddAuthentication("Test") only sets DefaultScheme, so we must
+            // PostConfigure to override the Authenticate/Challenge defaults
+            // — otherwise [RequireAdmin] still falls through to JwtBearer
+            // and rejects the test request as unauthenticated.
             services.AddAuthentication("Test")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                     "Test", options => { });
+            services.PostConfigure<AuthenticationOptions>(options =>
+            {
+                options.DefaultAuthenticateScheme = "Test";
+                options.DefaultChallengeScheme = "Test";
+                options.DefaultForbidScheme = "Test";
+            });
 
             services.AddAuthorization(options =>
             {
