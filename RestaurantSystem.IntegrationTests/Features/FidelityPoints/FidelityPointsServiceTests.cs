@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
@@ -27,12 +28,16 @@ public class FidelityPointsServiceTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        await _fixture.ResetDatabaseAsync();
+
         _context = _fixture.CreateContext();
         _ruleServiceMock = new Mock<IPointEarningRuleService>();
         _currentUserServiceMock = new Mock<ICurrentUserService>();
         _testUserId = Guid.NewGuid();
 
         _currentUserServiceMock.Setup(x => x.UserId).Returns(_testUserId);
+        // Default-interface methods aren't invoked by Moq; stub explicitly.
+        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(_testUserId.ToString());
 
         _service = new FidelityPointsService(
             _context,
@@ -40,12 +45,24 @@ public class FidelityPointsServiceTests : IAsyncLifetime
             _ruleServiceMock.Object
         );
 
-        await Task.CompletedTask;
+        await TestUserSeeder.SeedUserAsync(_context, _testUserId);
     }
 
     public async Task DisposeAsync()
     {
         await _context.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Seeds a minimal Order and returns its id. Required because
+    /// FidelityPointsTransaction.OrderId has a FK constraint to orders, even
+    /// though the column is nullable on the entity.
+    /// </summary>
+    private async Task<Guid> SeedOrderAsync(Guid? userId = null)
+    {
+        var orderId = Guid.NewGuid();
+        await TestOrderSeeder.SeedOrderAsync(_context, orderId, userId);
+        return orderId;
     }
 
     [Fact]
@@ -99,8 +116,8 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task AwardPointsAsync_CreatesTransactionAndUpdatesBalance()
     {
         // Arrange
-        var userId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
+        var userId = _testUserId;
+        var orderId = await SeedOrderAsync(userId);
         var points = 100;
         var orderTotal = 50m;
 
@@ -128,9 +145,9 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task AwardPointsAsync_MultipleAwards_AccumulatesBalance()
     {
         // Arrange
-        var userId = Guid.NewGuid();
-        var orderId1 = Guid.NewGuid();
-        var orderId2 = Guid.NewGuid();
+        var userId = _testUserId;
+        var orderId1 = await SeedOrderAsync(userId);
+        var orderId2 = await SeedOrderAsync(userId);
         var points1 = 100;
         var points2 = 50;
 
@@ -151,13 +168,13 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task RedeemPointsAsync_WithSufficientPoints_Success()
     {
         // Arrange
-        var userId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
+        var userId = _testUserId;
+        var orderId = await SeedOrderAsync(userId);
         var availablePoints = 200;
         var pointsToRedeem = 100;
 
         // First award points
-        await _service.AwardPointsAsync(userId, Guid.NewGuid(), availablePoints, 100m);
+        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), availablePoints, 100m);
 
         // Act
         var result = await _service.RedeemPointsAsync(userId, orderId, pointsToRedeem);
@@ -181,16 +198,16 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task RedeemPointsAsync_WithInsufficientPoints_ThrowsException()
     {
         // Arrange
-        var userId = Guid.NewGuid();
-        var orderId = Guid.NewGuid();
+        var userId = _testUserId;
+        var orderId = await SeedOrderAsync(userId);
         var availablePoints = 50;
         var pointsToRedeem = 100;
 
         // First award points
-        await _service.AwardPointsAsync(userId, Guid.NewGuid(), availablePoints, 25m);
+        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), availablePoints, 25m);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        // Act & Assert — service surfaces insufficient-points as BadRequestException
+        await Assert.ThrowsAsync<RestaurantSystem.Api.Common.Exceptions.BadRequestException>(
             () => _service.RedeemPointsAsync(userId, orderId, pointsToRedeem)
         );
     }
@@ -199,10 +216,10 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task GetUserBalanceAsync_ReturnsCorrectBalance()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = _testUserId;
         var points = 150;
 
-        await _service.AwardPointsAsync(userId, Guid.NewGuid(), points, 75m);
+        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), points, 75m);
 
         // Act
         var balance = await _service.GetUserBalanceAsync(userId);
@@ -217,13 +234,13 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task GetPointsHistoryAsync_ReturnsTransactionsOrderedByDate()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = _testUserId;
 
-        await _service.AwardPointsAsync(userId, Guid.NewGuid(), 100, 50m);
+        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), 100, 50m);
         await Task.Delay(100); // Ensure different timestamps
-        await _service.AwardPointsAsync(userId, Guid.NewGuid(), 50, 25m);
+        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), 50, 25m);
         await Task.Delay(100);
-        await _service.RedeemPointsAsync(userId, Guid.NewGuid(), 30);
+        await _service.RedeemPointsAsync(userId, await SeedOrderAsync(userId), 30);
 
         // Act
         var history = await _service.GetPointsHistoryAsync(userId);
@@ -238,7 +255,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task AdjustPointsAsync_CreatesAdjustmentTransaction()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = _testUserId;
         var adjustmentPoints = 50;
         var reason = "Promotional bonus";
 
@@ -257,11 +274,11 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     public async Task AdjustPointsAsync_NegativeAdjustment_CannotGoBelowZero()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = _testUserId;
         var initialPoints = 30;
         var negativeAdjustment = -50;
 
-        await _service.AwardPointsAsync(userId, Guid.NewGuid(), initialPoints, 15m);
+        await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), initialPoints, 15m);
 
         // Act
         await _service.AdjustPointsAsync(userId, negativeAdjustment, "Correction");
@@ -305,16 +322,18 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     [Fact]
     public async Task GetSystemAnalyticsAsync_ReturnsCorrectStatistics()
     {
-        // Arrange
+        // Arrange — seed two distinct users (FK constraints on orders + transactions)
         var user1 = Guid.NewGuid();
         var user2 = Guid.NewGuid();
+        await TestUserSeeder.SeedUserAsync(_context, user1);
+        await TestUserSeeder.SeedUserAsync(_context, user2);
 
         // User 1: Earn 200, redeem 50
-        await _service.AwardPointsAsync(user1, Guid.NewGuid(), 200, 100m);
-        await _service.RedeemPointsAsync(user1, Guid.NewGuid(), 50);
+        await _service.AwardPointsAsync(user1, await SeedOrderAsync(user1), 200, 100m);
+        await _service.RedeemPointsAsync(user1, await SeedOrderAsync(user1), 50);
 
         // User 2: Earn 300
-        await _service.AwardPointsAsync(user2, Guid.NewGuid(), 300, 150m);
+        await _service.AwardPointsAsync(user2, await SeedOrderAsync(user2), 300, 150m);
 
         // Act
         var analytics = await _service.GetSystemAnalyticsAsync();
