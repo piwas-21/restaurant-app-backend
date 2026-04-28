@@ -65,7 +65,7 @@ public class UpdateUserProfileCommandHandler : ICommandHandler<UpdateUserProfile
         }
 
         user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = currentUserId.ToString();
+        user.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         // Save changes
         var result = await _userManager.UpdateAsync(user);
