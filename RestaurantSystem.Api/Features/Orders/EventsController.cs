@@ -23,16 +23,18 @@ public class EventsController : ControllerBase
     /// </summary>
     [HttpGet("kitchen")]
     [Produces("text/event-stream")]
+    [Authorize(Roles = "Admin,KitchenStaff,Server")]
     public async Task KitchenEvents(CancellationToken cancellationToken)
     {
         await SetupSseConnection(OrderEventService.ClientType.Kitchen, cancellationToken);
     }
 
     /// <summary>
-    /// Subscribe to kitchen order events
+    /// Subscribe to stock update events
     /// </summary>
     [HttpGet("stock")]
     [Produces("text/event-stream")]
+    [Authorize]
     public async Task StockEvents(CancellationToken cancellationToken)
     {
         await SetupSseConnection(OrderEventService.ClientType.Stock, cancellationToken);
@@ -43,6 +45,7 @@ public class EventsController : ControllerBase
     /// </summary>
     [HttpGet("service")]
     [Produces("text/event-stream")]
+    [Authorize]
     public async Task ServiceEvents(CancellationToken cancellationToken)
     {
         await SetupSseConnection(OrderEventService.ClientType.Service, cancellationToken);
@@ -63,6 +66,7 @@ public class EventsController : ControllerBase
     /// Get diagnostic info about connected clients
     /// </summary>
     [HttpGet("diagnostics")]
+    [RequireAdmin]
     public IActionResult GetDiagnostics()
     {
         var stats = _orderEventService.GetClientStatistics();
@@ -73,6 +77,7 @@ public class EventsController : ControllerBase
     /// Send a test event to all connected clients (for debugging SSE connections)
     /// </summary>
     [HttpPost("test-broadcast")]
+    [RequireAdmin]
     public async Task<IActionResult> TestBroadcast([FromQuery] string clientType = "Kitchen")
     {
         var testOrder = new RestaurantSystem.Api.Features.Orders.Dtos.OrderDto

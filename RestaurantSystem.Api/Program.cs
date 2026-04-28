@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
+using System.Threading.RateLimiting;
 using RestaurantSystem.Api.BackgroundServices;
 using RestaurantSystem.Api.Services;
 using RestaurantSystem.Api.Common.Conventers;
@@ -167,7 +169,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = jwtOptions?.TokenValidationParameters ?? new TokenValidationParameters();
 
@@ -222,6 +224,41 @@ builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("Pr
 
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // 5 attempts per 15 minutes per IP — covers login + refresh-token
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(15),
+            QueueLimit = 0
+        }));
+
+    // 3 attempts per hour per IP — forgot-password
+    options.AddPolicy("forgot-password", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 3,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0
+        }));
+
+    // 10 registrations per hour per IP
+    options.AddPolicy("register", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0
+        }));
+});
 
 builder.Services.AddInfrastructureRegistration();
 
@@ -303,9 +340,32 @@ app.UseSwaggerUI(c =>
 
 app.UseExceptionHandling();
 
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-XSS-Protection", "0");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    if (!context.Request.Path.StartsWithSegments("/api/swagger"))
+    {
+        context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'");
+    }
+    await next();
+});
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseHttpsRedirection();
 
 app.UseCors("AllowAll");
+
+app.UseRateLimiter();
+
+app.UseMiddleware<SessionMiddleware>();
 
 app.UseValidationExceptionHandling();
 

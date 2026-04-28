@@ -36,12 +36,6 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-
-        // TODO: In a real application, send this token via email
-        // For demo purposes, we'll log it (DO NOT DO THIS IN PRODUCTION)
-        _logger.LogInformation("Password reset token for {Email}: {Token}", command.Email, token);
-
-        // TODO: Replace this with actual email sending
         await _emailService.SendPasswordResetEmailAsync(user, token);
 
         return ApiResponse<string>.SuccessWithData(
