@@ -24,13 +24,16 @@ public class PointEarningRuleServiceTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        await _fixture.ResetDatabaseAsync();
+
         _context = _fixture.CreateContext();
         _currentUserServiceMock = new Mock<ICurrentUserService>();
-        _currentUserServiceMock.Setup(x => x.UserId).Returns(Guid.NewGuid());
+        var testUserId = Guid.NewGuid();
+        _currentUserServiceMock.Setup(x => x.UserId).Returns(testUserId);
+        // Default-interface methods aren't invoked by Moq; stub explicitly.
+        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(testUserId.ToString());
 
         _service = new PointEarningRuleService(_context, _currentUserServiceMock.Object);
-
-        await Task.CompletedTask;
     }
 
     public async Task DisposeAsync()

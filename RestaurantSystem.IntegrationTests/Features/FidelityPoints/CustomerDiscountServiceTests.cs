@@ -5,6 +5,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Domain.Entities;
 using Moq;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
@@ -25,14 +26,21 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Reset DB so each test starts clean — the fixture is shared across
+        // tests in [Collection("Database")] but DB state is not implicitly
+        // isolated by xunit.
+        await _fixture.ResetDatabaseAsync();
+
         _context = _fixture.CreateContext();
         _currentUserServiceMock = new Mock<ICurrentUserService>();
         _testUserId = Guid.NewGuid();
         _currentUserServiceMock.Setup(x => x.UserId).Returns(_testUserId);
+        // Default-interface methods aren't invoked by Moq; stub explicitly.
+        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(_testUserId.ToString());
 
         _service = new CustomerDiscountService(_context, _currentUserServiceMock.Object);
 
-        await Task.CompletedTask;
+        await TestUserSeeder.SeedUserAsync(_context, _testUserId);
     }
 
     public async Task DisposeAsync()
@@ -44,7 +52,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
     public async Task GetActiveDiscountsForUserAsync_ReturnsOnlyActiveDiscounts()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = _testUserId;
         var now = DateTime.UtcNow;
 
         var activeDiscount = new CustomerDiscountRule
@@ -88,7 +96,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
     public async Task FindBestApplicableDiscountAsync_ReturnsHighestDiscount()
     {
         // Arrange
-        var userId = Guid.NewGuid();
+        var userId = _testUserId;
         var orderAmount = 100m;
 
         var discount1 = new CustomerDiscountRule
@@ -139,7 +147,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Percentage Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = discountValue,
@@ -167,7 +175,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Fixed Discount",
             DiscountType = DiscountType.FixedAmount,
             DiscountValue = fixedDiscount,
@@ -190,7 +198,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Test Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -218,7 +226,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "New Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 15m,
@@ -244,7 +252,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Original",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -277,7 +285,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "To Delete",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -306,7 +314,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Valid Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -334,7 +342,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Expired Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -359,7 +367,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Min Order Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -383,7 +391,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var discount = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Limited Discount",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -410,7 +418,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var active1 = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Active 1",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 10m,
@@ -424,7 +432,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var active2 = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Active 2",
             DiscountType = DiscountType.FixedAmount,
             DiscountValue = 5m,
@@ -436,7 +444,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var inactive = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Inactive",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 15m,
@@ -448,7 +456,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
         var expired = new CustomerDiscountRule
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = _testUserId,
             Name = "Expired",
             DiscountType = DiscountType.Percentage,
             DiscountValue = 20m,
