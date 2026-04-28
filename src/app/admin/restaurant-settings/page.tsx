@@ -6,6 +6,7 @@ import styles from './RestaurantSettingsPage.module.css';
 import WorkingHoursManager from '@/components/admin/settings/WorkingHoursManager';
 import OrderTypeManager from '@/components/admin/settings/OrderTypeManager';
 import TaxConfigurationManager from '@/components/admin/settings/TaxConfigurationManager';
+import GeneralSettingsTab from '@/components/admin/restaurant-settings/GeneralSettingsTab';
 
 type TabType = 'hours' | 'order-types' | 'tax' | 'general';
 
@@ -48,14 +49,7 @@ export default function RestaurantSettingsPage() {
         {activeTab === 'hours' && <WorkingHoursManager />}
         {activeTab === 'order-types' && <OrderTypeManager />}
         {activeTab === 'tax' && <TaxConfigurationManager />}
-        {activeTab === 'general' && (
-          <div className={styles.comingSoon}>
-            <p>{t('coming_soon', 'Coming Soon')}</p>
-            <p className={styles.comingSoonDesc}>
-              {t('general_settings_desc', 'General restaurant settings will be available here')}
-            </p>
-          </div>
-        )}
+        {activeTab === 'general' && <GeneralSettingsTab />}
       </div>
     </div>
   );

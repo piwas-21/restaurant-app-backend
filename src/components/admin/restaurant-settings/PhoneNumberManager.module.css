@@ -1,0 +1,159 @@
+.fieldset {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.fieldset legend {
+  padding: 0 0.5rem;
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.empty {
+  padding: 0.5rem 0;
+  color: var(--text-secondary-color);
+  font-style: italic;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--secondary-color);
+  border-radius: 4px;
+}
+
+.number {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.label {
+  color: var(--text-secondary-color);
+  font-size: 0.875rem;
+}
+
+.tag {
+  padding: 0.125rem 0.5rem;
+  background: var(--success-color);
+  color: var(--button-text-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.tagInactive {
+  padding: 0.125rem 0.5rem;
+  background: var(--border-color);
+  color: var(--text-secondary-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.rowActions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rowActions button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-color);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.rowActions .danger {
+  color: var(--error-color);
+  border-color: var(--error-border);
+}
+
+.addBtn {
+  padding: 0.5rem 1rem;
+  background: var(--primary-color);
+  color: var(--button-text-color);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.formCard {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field span {
+  font-size: 0.875rem;
+  color: var(--text-secondary-color);
+}
+
+.field input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-color);
+  color: var(--text-color);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.error {
+  color: var(--error-color);
+  font-size: 0.8125rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actions button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.actions button:first-child {
+  background: var(--primary-color);
+  color: var(--button-text-color);
+  border-color: var(--primary-color);
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
