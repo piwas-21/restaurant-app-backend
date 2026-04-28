@@ -51,6 +51,13 @@ public record ResetPasswordCommand(string Email, string Token, string NewPasswor
 
 **Sprint:** Sprint 1.5 (immediate)
 
+**Ops follow-up (code done, bucket not yet):** New uploads are now private (`NoACL`). Existing objects still carry `PublicRead`. Run a one-time remediation to close existing exposure:
+```bash
+# Apply bucket-level Block Public Access (recommended — overrides all object ACLs)
+aws s3api put-public-access-block --bucket <bucket-name> \
+  --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+```
+
 ---
 
 ### C3. Missing Security Headers
