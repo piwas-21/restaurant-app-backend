@@ -5,6 +5,9 @@
 #
 # Sprint 1 scope: hygiene + secret scanning.
 # Sprint 2: format gate via `dotnet format --verify-no-changes`.
+# Sprint 3: TreatWarningsAsErrors via Directory.Build.props (verified by
+#          `dotnet build`). Some warning categories are transitionally
+#          excluded — see Directory.Build.props for the list.
 # See docs/QUALITY-SECURITY-PLAN.md.
 
 repos:
@@ -53,3 +56,17 @@ repos:
         language: system
         pass_filenames: false
         files: \.(cs|csproj|sln)$
+
+  # ── Sprint 3: warnings-as-errors gate ────────────────────────────────
+  # `dotnet build` honours TreatWarningsAsErrors from Directory.Build.props.
+  # Whole-solution build; pass_filenames=false because the property
+  # applies project-wide and a single staged file's compilation isn't
+  # sufficient.
+  - repo: local
+    hooks:
+      - id: dotnet-build-strict
+        name: dotnet build (warnings as errors)
+        entry: dotnet build RestaurantSystem.sln --nologo --verbosity minimal
+        language: system
+        pass_filenames: false
+        files: \.(cs|csproj|sln|props|targets)$

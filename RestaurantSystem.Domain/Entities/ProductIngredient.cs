@@ -15,8 +15,6 @@ public class ProductIngredient : Entity
     public bool IsIncludedInBasePrice { get; set; } = false; // If true, price is included in base and deducted when deselected
     public bool IsActive { get; set; } = true; // Is this ingredient currently available?
     public int DisplayOrder { get; set; } = 0; // Order in which to display ingredients
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public Guid? GlobalIngredientId { get; set; } // Optional link to global ingredient definition
 

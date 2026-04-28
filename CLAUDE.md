@@ -177,7 +177,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 | Gate | When | What | Blocking? | Source of truth |
 |---|---|---|---|---|
-| `dotnet build RestaurantSystem.sln` | Pre-commit (manual now) | 0 errors | yes (manual) | `dotnet build` |
+| `dotnet build RestaurantSystem.sln` (warnings as errors) | Pre-commit (when .cs/.csproj/.sln/.props/.targets staged) **and** MR pipeline (`dotnet_build_strict` job) | 0 errors, 0 non-excluded warnings | yes | [Directory.Build.props](Directory.Build.props), `.gitlab-ci.yml` |
 | `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** MR pipeline (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
 | Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
 | GitLab SAST | MR pipeline | Auto-injected analyzers | yes | `.gitlab-ci.yml` |
@@ -186,7 +186,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 Trivy is non-blocking today — it surfaces findings without failing the pipeline. Sprint 4 of [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) flips it to `exit-code: 1` for CRITICAL/HIGH.
 
-Lint (analyzer warnings-as-errors) + coverage gates land in Sprint 3. SAST quality gate + new-code coverage land in Sprint 3.
+Analyzer warnings-as-errors gate landed in Sprint 3 via `TreatWarningsAsErrors` in [Directory.Build.props](Directory.Build.props). Some warning categories are transitionally excluded (CS8600/01/02/04 nullable-ref + ASPDEPR002) — see file comments and follow-up issues. Coverage gates and SAST quality gate (SonarCloud) land later in Sprint 3.
 
 ### Setup for a new developer
 ```bash

@@ -13,7 +13,6 @@ public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, A
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetCategoryByIdQueryHandler> _logger;
-    private readonly IConfiguration _configuration;
     private readonly string _baseUrl;
 
 
