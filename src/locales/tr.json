@@ -2155,5 +2155,13 @@
   "phone_delete_success": "Telefon silindi",
   "phone_delete_failed": "Silinemedi",
   "home_contact_title": "Bize ulaşın",
-  "whatsapp_default_message": "Merhaba, rezervasyon yapmak istiyorum"
+  "whatsapp_default_message": "Merhaba, rezervasyon yapmak istiyorum",
+  "tab_active_orders": "Aktif",
+  "tab_past_orders": "Geçmiş",
+  "no_active_orders_cta": "Bir sipariş ver, burada görünecek",
+  "no_past_orders_message": "Tamamlanan siparişlerin burada görünecek",
+  "no_active_orders_title": "Aktif Sipariş Yok",
+  "no_past_orders_title": "Geçmiş Sipariş Yok",
+  "last_updated": "Güncellendi",
+  "load_more": "Daha fazla yükle"
 }

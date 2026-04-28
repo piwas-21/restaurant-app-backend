@@ -2159,5 +2159,13 @@
   "phone_delete_success": "تم حذف الهاتف",
   "phone_delete_failed": "فشل الحذف",
   "home_contact_title": "تواصل معنا",
-  "whatsapp_default_message": "مرحبًا، أود حجز طاولة"
+  "whatsapp_default_message": "مرحبًا، أود حجز طاولة",
+  "tab_active_orders": "النشطة",
+  "tab_past_orders": "السابقة",
+  "no_active_orders_cta": "قم بتقديم طلب وسيظهر هنا",
+  "no_past_orders_message": "ستظهر طلباتك المكتملة هنا",
+  "no_active_orders_title": "لا توجد طلبات نشطة",
+  "no_past_orders_title": "لا توجد طلبات سابقة",
+  "last_updated": "محدَّث",
+  "load_more": "تحميل المزيد"
 }

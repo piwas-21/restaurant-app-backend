@@ -2160,5 +2160,13 @@
   "phone_delete_success": "电话已删除",
   "phone_delete_failed": "删除失败",
   "home_contact_title": "联系我们",
-  "whatsapp_default_message": "您好，我想预订一桌"
+  "whatsapp_default_message": "您好，我想预订一桌",
+  "tab_active_orders": "进行中",
+  "tab_past_orders": "历史",
+  "no_active_orders_cta": "下单后将在此显示",
+  "no_past_orders_message": "您已完成的订单将显示在此",
+  "no_active_orders_title": "没有进行中的订单",
+  "no_past_orders_title": "没有历史订单",
+  "last_updated": "已更新",
+  "load_more": "加载更多"
 }

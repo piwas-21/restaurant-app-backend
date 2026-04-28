@@ -2160,5 +2160,13 @@
   "phone_delete_success": "Telefono eliminato",
   "phone_delete_failed": "Eliminazione fallita",
   "home_contact_title": "Contattaci",
-  "whatsapp_default_message": "Salve, vorrei prenotare un tavolo"
+  "whatsapp_default_message": "Salve, vorrei prenotare un tavolo",
+  "tab_active_orders": "Attivi",
+  "tab_past_orders": "Passati",
+  "no_active_orders_cta": "Effettua un ordine e apparirà qui",
+  "no_past_orders_message": "I tuoi ordini completati appariranno qui",
+  "no_active_orders_title": "Nessun ordine attivo",
+  "no_past_orders_title": "Nessun ordine passato",
+  "last_updated": "Aggiornato",
+  "load_more": "Carica altri"
 }

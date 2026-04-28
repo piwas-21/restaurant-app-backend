@@ -2168,5 +2168,13 @@
   "phone_delete_success": "Telefonnummer gelöscht",
   "phone_delete_failed": "Löschen fehlgeschlagen",
   "home_contact_title": "Kontakt",
-  "whatsapp_default_message": "Hallo, ich möchte einen Tisch reservieren"
+  "whatsapp_default_message": "Hallo, ich möchte einen Tisch reservieren",
+  "tab_active_orders": "Aktiv",
+  "tab_past_orders": "Vergangen",
+  "no_active_orders_cta": "Gib eine Bestellung auf und sie erscheint hier",
+  "no_past_orders_message": "Deine abgeschlossenen Bestellungen erscheinen hier",
+  "no_active_orders_title": "Keine aktiven Bestellungen",
+  "no_past_orders_title": "Keine vergangenen Bestellungen",
+  "last_updated": "Aktualisiert",
+  "load_more": "Mehr laden"
 }

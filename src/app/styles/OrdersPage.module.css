@@ -74,58 +74,64 @@
 }
 
 /* Filters */
-.filters {
+/* Tabs */
+.tabs {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background: var(--card-background);
-  padding: 1.25rem 1.5rem;
-  border-radius: 12px;
+  gap: 0.25rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0;
 }
 
-.filterGroup {
-  display: flex;
+.tab {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  flex: 1;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  border-radius: 0;
 }
 
-.filterGroup svg {
+.tab:hover {
   color: var(--primary-color);
 }
 
-.filterGroup label {
-  font-size: 0.9375rem;
-  font-weight: 600;
+.tabActive {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.tabBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--primary-color);
+  color: var(--button-text-color);
+}
+
+.lastUpdated {
+  margin-left: auto;
+  font-size: 0.8rem;
   color: var(--text-color);
+  opacity: 0.6;
 }
 
-.filterSelect {
-  padding: 0.625rem 1rem;
-  font-size: 0.9375rem;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  background-color: var(--background-color);
-  color: var(--text-color);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  min-width: 180px;
-}
-
-.filterSelect:hover {
-  border-color: var(--primary-color);
-}
-
-.filterSelect:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.1);
-}
-
+/* Keep orderCount for backwards-compat but hide it — no longer rendered */
 .orderCount {
   font-size: 0.875rem;
   font-weight: 600;
@@ -248,6 +254,38 @@
 
 .browseButton:active {
   transform: translateY(0);
+}
+
+/* Load More (past tab) */
+.loadMoreWrapper {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+
+.loadMoreButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border: 2px solid var(--primary-color);
+  border-radius: 8px;
+  background: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.loadMoreButton:hover:not(:disabled) {
+  background: var(--primary-color);
+  color: var(--button-text-color);
+}
+
+.loadMoreButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Orders List */
@@ -705,25 +743,19 @@
     justify-content: center;
   }
 
-  .filters {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .filterGroup {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
+  .tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
   }
 
-  .filterSelect {
-    min-width: auto;
-    width: 100%;
-  }
-
-  .orderCount {
-    text-align: center;
+  .lastUpdated {
+    display: none;
   }
 
   .title {

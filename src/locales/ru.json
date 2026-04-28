@@ -2100,5 +2100,13 @@
   "phone_delete_success": "Номер удалён",
   "phone_delete_failed": "Не удалось удалить",
   "home_contact_title": "Связаться с нами",
-  "whatsapp_default_message": "Здравствуйте, я хотел бы забронировать столик"
+  "whatsapp_default_message": "Здравствуйте, я хотел бы забронировать столик",
+  "tab_active_orders": "Активные",
+  "tab_past_orders": "Прошлые",
+  "no_active_orders_cta": "Сделайте заказ и он появится здесь",
+  "no_past_orders_message": "Завершённые заказы будут отображаться здесь",
+  "no_active_orders_title": "Нет активных заказов",
+  "no_past_orders_title": "Нет прошлых заказов",
+  "last_updated": "Обновлено",
+  "load_more": "Загрузить ещё"
 }

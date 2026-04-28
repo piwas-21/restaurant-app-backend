@@ -2155,5 +2155,13 @@
   "phone_delete_success": "Phone deleted",
   "phone_delete_failed": "Failed to delete",
   "home_contact_title": "Get in touch",
-  "whatsapp_default_message": "Hello, I would like to make a reservation"
+  "whatsapp_default_message": "Hello, I would like to make a reservation",
+  "tab_active_orders": "Active",
+  "tab_past_orders": "Past",
+  "no_active_orders_cta": "Place an order and it will appear here",
+  "no_past_orders_message": "Your completed orders will appear here",
+  "no_active_orders_title": "No Active Orders",
+  "no_past_orders_title": "No Past Orders",
+  "last_updated": "Updated",
+  "load_more": "Load more"
 }

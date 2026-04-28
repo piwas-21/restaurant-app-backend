@@ -2160,5 +2160,13 @@
   "phone_delete_success": "Numéro supprimé",
   "phone_delete_failed": "Échec de la suppression",
   "home_contact_title": "Nous contacter",
-  "whatsapp_default_message": "Bonjour, je voudrais réserver une table"
+  "whatsapp_default_message": "Bonjour, je voudrais réserver une table",
+  "tab_active_orders": "En cours",
+  "tab_past_orders": "Passées",
+  "no_active_orders_cta": "Passez une commande et elle apparaîtra ici",
+  "no_past_orders_message": "Vos commandes terminées apparaîtront ici",
+  "no_active_orders_title": "Aucune commande en cours",
+  "no_past_orders_title": "Aucune commande passée",
+  "last_updated": "Mis à jour",
+  "load_more": "Charger plus"
 }

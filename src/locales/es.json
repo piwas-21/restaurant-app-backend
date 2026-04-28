@@ -2162,5 +2162,13 @@
   "phone_delete_success": "Teléfono eliminado",
   "phone_delete_failed": "Error al eliminar",
   "home_contact_title": "Contáctenos",
-  "whatsapp_default_message": "Hola, me gustaría reservar una mesa"
+  "whatsapp_default_message": "Hola, me gustaría reservar una mesa",
+  "tab_active_orders": "Activos",
+  "tab_past_orders": "Pasados",
+  "no_active_orders_cta": "Realiza un pedido y aparecerá aquí",
+  "no_past_orders_message": "Tus pedidos completados aparecerán aquí",
+  "no_active_orders_title": "No hay pedidos activos",
+  "no_past_orders_title": "No hay pedidos anteriores",
+  "last_updated": "Actualizado",
+  "load_more": "Cargar más"
 }
