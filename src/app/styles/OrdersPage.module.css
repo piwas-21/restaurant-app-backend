@@ -382,40 +382,6 @@
   gap: 0.75rem;
 }
 
-.statusBadge {
-  padding: 0.5rem 1rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-
-.statusPending {
-  background-color: #fef5e7;
-  color: #d68910;
-}
-
-.statusPreparing {
-  background-color: #ebf8ff;
-  color: #2c5282;
-}
-
-.statusReady {
-  background-color: #e9f7ef;
-  color: #1e7e34;
-}
-
-.statusCompleted {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.statusCancelled {
-  background-color: #f8d7da;
-  color: #721c24;
-}
 
 .expandButton {
   display: flex;
@@ -642,7 +608,7 @@
 }
 
 .priceRow.discount {
-  color: #38a169;
+  color: var(--success-color);
   font-weight: 600;
 }
 
@@ -707,14 +673,14 @@
 }
 
 .reorderButton {
-  color: white;
-  background-color: #38a169;
+  color: var(--button-text-color);
+  background-color: var(--success-color);
 }
 
 .reorderButton:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(56, 161, 105, 0.3);
-  background-color: #2f855a;
+  background-color: var(--success-color-dark);
 }
 
 .reorderButton:disabled {
@@ -817,36 +783,4 @@
     font-size: 1rem;
   }
 
-  .statusBadge {
-    font-size: 0.75rem;
-    padding: 0.375rem 0.75rem;
-  }
-}
-
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .statusPending {
-    background-color: rgba(214, 137, 16, 0.2);
-    color: #ffc966;
-  }
-
-  .statusPreparing {
-    background-color: rgba(44, 82, 130, 0.2);
-    color: #90cdf4;
-  }
-
-  .statusReady {
-    background-color: rgba(30, 126, 52, 0.2);
-    color: #68d391;
-  }
-
-  .statusCompleted {
-    background-color: rgba(21, 87, 36, 0.2);
-    color: #9ae6b4;
-  }
-
-  .statusCancelled {
-    background-color: rgba(114, 28, 36, 0.2);
-    color: #fc8181;
-  }
 }

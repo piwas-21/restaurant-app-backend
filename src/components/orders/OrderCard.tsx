@@ -20,6 +20,7 @@ import {
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { formatPrice, formatDate } from './orderFormatters';
+import StatusBadge, { StatusBadgeTone } from '@/components/design-system/StatusBadge';
 import styles from '@/app/styles/OrdersPage.module.css';
 
 interface OrderCardProps {
@@ -66,14 +67,14 @@ export default function OrderCard({ order, isExpanded, onToggleExpand, isReorder
     }
   };
 
-  const getStatusClass = (status: string) => {
+  const getStatusTone = (status: string): StatusBadgeTone => {
     switch (status) {
-      case 'Pending': case 'Confirmed': return styles.statusPending;
-      case 'Preparing': return styles.statusPreparing;
-      case 'Ready': case 'InTransit': return styles.statusReady;
-      case 'Delivered': case 'Completed': return styles.statusCompleted;
-      case 'Cancelled': return styles.statusCancelled;
-      default: return '';
+      case 'Pending': case 'Confirmed': case 'PendingApproval': return 'warning';
+      case 'Preparing': case 'In Progress': return 'info';
+      case 'Ready': case 'InTransit': return 'success';
+      case 'Delivered': case 'Completed': return 'neutral';
+      case 'Cancelled': return 'danger';
+      default: return 'neutral';
     }
   };
 
@@ -98,9 +99,9 @@ export default function OrderCard({ order, isExpanded, onToggleExpand, isReorder
           </div>
         </div>
         <div className={styles.orderActions}>
-          <span className={`${styles.statusBadge} ${getStatusClass(order.status)}`}>
+          <StatusBadge tone={getStatusTone(order.status)}>
             {getStatusLabel(order.status)}
-          </span>
+          </StatusBadge>
           <button
             onClick={() => onToggleExpand(order.id)}
             className={styles.expandButton}
