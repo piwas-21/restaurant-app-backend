@@ -65,7 +65,14 @@ public class DatabaseFixture : IAsyncLifetime
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = new[] { "public" },
-            TablesToIgnore = new Table[] { "__EFMigrationsHistory" }
+            TablesToIgnore = new Table[]
+            {
+                "__EFMigrationsHistory",
+                // Singleton seeded by the AddRestaurantInfo migration —
+                // ignore so per-test reset doesn't wipe it.
+                "RestaurantInfo",
+                "RestaurantPhoneNumbers",
+            }
         });
     }
 

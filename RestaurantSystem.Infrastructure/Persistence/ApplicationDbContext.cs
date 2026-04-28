@@ -70,6 +70,10 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Working Hours
         public DbSet<WorkingHours> WorkingHours { get; set; }
 
+        // Restaurant identity + contact details (singleton row)
+        public DbSet<RestaurantInfo> RestaurantInfo { get; set; }
+        public DbSet<RestaurantPhoneNumber> RestaurantPhoneNumbers { get; set; }
+
         // User Groups & Discounts
         public DbSet<UserGroup> UserGroups { get; set; }
         public DbSet<GroupMembership> GroupMemberships { get; set; }
