@@ -80,6 +80,7 @@
 | 2.1 | Create `HtmlResponseBuilder` service | `Common/Services/HtmlResponseBuilder.cs`, `IHtmlResponseBuilder.cs` | ~80 |
 | 2.2 | Create `PrinterFeedQuery` + handler | `Features/Orders/Queries/PrinterFeedQuery/` | ~60 |
 | 2.3 | Extract `PrinterFeedController.cs` | `Features/Orders/PrinterFeedController.cs` | ~60 |
+| — | `tryEvent` endpoint (in `OrdersController`) — **intentionally excluded** from 2.3 (it's an SSE stock-broadcast trigger, not a printer-feed concern; moving it to `PrinterFeedController` would change its URL with no benefit). Audit + extract during the Sprint 3 SSE decomposition track. Tracked in [issue #11](https://gitlab.com/restaurant-app3282120/backend/-/issues/11) (also flags the unauthenticated POST as a security gap to fix on the way out). | (defer to Sprint 3) | -- |
 | 2.4 | Extract `OrderEmailController.cs` | `Features/Orders/OrderEmailController.cs` | ~80 |
 | 2.5 | Extract `OrderQuickActionsController.cs` | `Features/Orders/OrderQuickActionsController.cs` | ~100 |
 | 2.6 | Slim down `OrdersController.cs` to core CRUD | (modify existing) | ~120 |
