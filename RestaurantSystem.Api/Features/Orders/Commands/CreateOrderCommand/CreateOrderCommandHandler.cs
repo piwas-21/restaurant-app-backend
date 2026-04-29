@@ -25,6 +25,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderEventService _orderEventService;
     private readonly IOrderMappingService _mappingService;
     private readonly IOrderAddressFactory _addressFactory;
+    private readonly IOrderItemFactory _itemFactory;
     private readonly IFidelityPointsService _fidelityPointsService;
     private readonly ICustomerDiscountService _customerDiscountService;
     private readonly ITaxConfigurationService _taxConfigurationService;
@@ -37,6 +38,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
         IOrderAddressFactory addressFactory,
+        IOrderItemFactory itemFactory,
         IFidelityPointsService fidelityPointsService,
         ICustomerDiscountService customerDiscountService,
         ITaxConfigurationService taxConfigurationService,
@@ -49,6 +51,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _orderEventService = orderEventService;
         _mappingService = mappingService;
         _addressFactory = addressFactory;
+        _itemFactory = itemFactory;
         _fidelityPointsService = fidelityPointsService;
         _customerDiscountService = customerDiscountService;
         _taxConfigurationService = taxConfigurationService;
@@ -116,43 +119,10 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             // Process order items and calculate totals
             foreach (var itemDto in command.Items)
             {
-
-                if (itemDto.MenuId.HasValue)
+                var error = await _itemFactory.AddItemAsync(order, itemDto, cancellationToken);
+                if (error != null)
                 {
-                    var menu = await _context.Menus
-                        .Include(p => p.MenuItems)
-                        .FirstOrDefaultAsync(p => p.Id == itemDto.MenuId && !p.IsDeleted, cancellationToken);
-
-                    if (menu == null)
-                    {
-                        return ApiResponse<OrderDto>.Failure($"Menu {itemDto.MenuId} not found");
-                    }
-
-                    decimal unitPrice = menu.BasePrice;
-                    string? variationName = null;
-
-                    var orderItem = new OrderItem
-                    {
-                        ProductId = itemDto.ProductId,
-                        ProductVariationId = itemDto.ProductVariationId,
-                        MenuId = itemDto.MenuId,
-                        ProductName = menu.Name,
-                        VariationName = variationName,
-                        Quantity = itemDto.Quantity,
-                        UnitPrice = unitPrice,
-                        ItemTotal = (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice,
-                        SpecialInstructions = itemDto.SpecialInstructions,
-                        IngredientQuantitiesJson = itemDto.IngredientQuantities != null ? JsonSerializer.Serialize(itemDto.IngredientQuantities) : null,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-
-
-                    order.Items.Add(orderItem);
-                }
-                else if (itemDto.ProductId.HasValue)
-                {
-                    await CreateOrderItemRecursive(order, itemDto, null, cancellationToken);
+                    return ApiResponse<OrderDto>.Failure(error);
                 }
             }
 
@@ -555,91 +525,5 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private decimal CalculateDeliveryFee()
     {
         return 5.00m; // Fixed delivery fee, could be dynamic based on distance
-    }
-
-
-    private async Task CreateOrderItemRecursive(Order order, CreateOrderItemDto itemDto, OrderItem? parentItem, CancellationToken cancellationToken)
-    {
-        var product = await _context.Products
-            .Include(p => p.Variations)
-            .FirstOrDefaultAsync(p => p.Id == itemDto.ProductId && !p.IsDeleted, cancellationToken);
-
-        if (product == null)
-        {
-            throw new NotFoundException($"Product {itemDto.ProductId} not found");
-        }
-
-        decimal unitPrice;
-        string? variationName = null;
-
-        if (itemDto.UnitPrice > 0)
-        {
-            unitPrice = itemDto.UnitPrice;
-            if (itemDto.ProductVariationId.HasValue)
-            {
-                var variation = product.Variations.FirstOrDefault(v => v.Id == itemDto.ProductVariationId.Value && !v.IsDeleted);
-                variationName = variation?.Name;
-            }
-        }
-        else
-        {
-            unitPrice = product.BasePrice;
-            if (itemDto.ProductVariationId.HasValue)
-            {
-                var variation = product.Variations.FirstOrDefault(v => v.Id == itemDto.ProductVariationId.Value && !v.IsDeleted);
-                if (variation != null)
-                {
-                    unitPrice += variation.PriceModifier;
-                    variationName = variation.Name;
-                }
-            }
-        }
-
-        var orderItem = new OrderItem
-        {
-            ProductId = itemDto.ProductId,
-            ProductVariationId = itemDto.ProductVariationId,
-            MenuId = itemDto.MenuId,
-            ProductName = product.Name,
-            VariationName = variationName,
-            Quantity = itemDto.Quantity,
-            UnitPrice = unitPrice,
-            ItemTotal = (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice,
-            SpecialInstructions = itemDto.SpecialInstructions,
-            IngredientQuantitiesJson = itemDto.IngredientQuantities != null ? JsonSerializer.Serialize(itemDto.IngredientQuantities) : null,
-            ParentOrderItem = parentItem,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = _currentUserService.GetAuditIdentifier()
-        };
-
-        order.Items.Add(orderItem);
-
-        // Only add to subtotal if it's a root item (children are included in parent price usually, or handled separately)
-        // If child items have price 0, it doesn't matter. If they have price, we should check logic.
-        // For Menu bundles, parent has full price, children have 0 or extra price.
-        // If children have extra price, it should be added to order total.
-        // However, in our Basket logic, we summed everything up.
-        // Let's assume ItemTotal is correct for each item.
-        // If parentItem is null, it's a root item.
-        // If parentItem is NOT null, it's a child.
-        // We should add ALL ItemTotals to the order subtotal?
-        // Yes, because BasketItem.ItemTotal for child items represents the EXTRA cost (e.g. +$2 for large drink).
-        // And Parent BasketItem.ItemTotal represents base price.
-        // So summing all ItemTotals is correct.
-
-        // Wait, I need to pass subTotal back or update it.
-        // Since I can't pass ref easily in async, I'll assume the caller calculates subTotal by summing order.Items.ItemTotal at the end?
-        // No, the caller loop does `subTotal += orderItem.ItemTotal`.
-        // I should probably return the created item or add to a list.
-        // The method adds to `order.Items`.
-        // I should update the caller to calculate subTotal AFTER all items are added.
-
-        if (itemDto.ChildItems != null)
-        {
-            foreach (var childDto in itemDto.ChildItems)
-            {
-                await CreateOrderItemRecursive(order, childDto, orderItem, cancellationToken);
-            }
-        }
     }
 }
