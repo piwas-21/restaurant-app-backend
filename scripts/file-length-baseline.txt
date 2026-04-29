@@ -37,7 +37,6 @@ RestaurantSystem.Api/Features/Orders/Queries/GetOrdersQuery/GetOrdersQuery.cs
 RestaurantSystem.Api/Features/Orders/OrderQuickActionsController.cs
 RestaurantSystem.Api/Features/Orders/Dtos/ZReportDto.cs
 RestaurantSystem.Api/Features/Orders/Dtos/OrderDto.cs
-RestaurantSystem.Api/Features/Orders/OrdersController.cs
 RestaurantSystem.Api/Features/Orders/Commands/CreateOrderCommand/CreateOrderCommandValidator.cs
 RestaurantSystem.Api/Features/Orders/Commands/CreateOrderCommand/CreateOrderCommandHandler.cs
 RestaurantSystem.Api/Features/Orders/Commands/AddPaymentToOrderCommand/AddPaymentToOrderCommand.cs
