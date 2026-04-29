@@ -7,50 +7,69 @@ variables:
 
 
 stages:
-    # - cache
+    - prepare
     - test
     - build
     - deploy_pipeline
 
-# create_cache:
-#     stage: cache
-#     image: node:22-alpine
-#     script:
-#         - npm install
-#     cache:
-#         key: "$CI_COMMIT_REF_SLUG"
-#         paths:
-#             - node_modules/
-#         policy: push
+# install_deps populates a node_modules cache once per pipeline so the 5
+# test-stage jobs that need it (prettier_check, typecheck, eslint,
+# npm_test, npm_audit) don't each re-run `npm install`. Saves ~2-3 min
+# per pipeline once the cache is warm. Cache key is package-lock.json
+# so it stays valid across pipelines until a dependency change.
+install_deps:
+    stage: prepare
+    image: node:22-alpine
+    cache:
+        key:
+            files:
+                - package-lock.json
+        paths:
+            - node_modules/
+        policy: pull-push
+    script:
+        - npm ci --prefer-offline --no-audit
+
+# Reusable template: jobs that need node_modules pull the cache and skip
+# their own `npm install` if the cache hit. On a cache miss (rare —
+# typically only after a dependency change before install_deps caught up),
+# fall back to `npm ci` so the job is still self-sufficient.
+.use_npm_cache:
+    cache:
+        key:
+            files:
+                - package-lock.json
+        paths:
+            - node_modules/
+        policy: pull
+    before_script:
+        - test -d node_modules || npm ci --prefer-offline --no-audit
 
 # Sprint 2 quality gate: prettier --check.
 # Fails the pipeline if any tracked source file has formatting drift.
 # Fix: `npm run format` locally and re-push.
 prettier_check:
+    extends: .use_npm_cache
     image: node:22-alpine
     stage: test
-    before_script:
-        - npm install
     script:
         - npm run format:check
 
 # Sprint 2.5 quality gate: tsc --noEmit.
 # Whole-project type-check; catches cross-file type breakage.
 typecheck:
+    extends: .use_npm_cache
     image: node:22-alpine
     stage: test
-    before_script:
-        - npm install
     script:
         - npm run typecheck
 
 # Sprint 2.5 quality gate: eslint --max-warnings=0.
 # Fails the pipeline on any lint warning.
 eslint:
+    extends: .use_npm_cache
     image: node:22-alpine
     stage: test
-    before_script:
-        - npm install
     script:
         - npm run lint
 
@@ -65,23 +84,16 @@ file_length:
         - bash scripts/check-file-length.sh --all
 
 npm_test:
+    extends: .use_npm_cache
     image: node:22-alpine
     stage: test
-    # cache:
-    #     key: "$CI_COMMIT_REF_SLUG"
-    #     paths:
-    #         - node_modules/
-    #     policy: pull
-    before_script:
-        - npm install
     script:
         - npm test
 
 npm_audit:
+    extends: .use_npm_cache
     image: node:22-alpine
     stage: test
-    before_script:
-        - npm install
     script:
         - npm audit --audit-level=high
         - npm audit --json > audit-report.json || true
