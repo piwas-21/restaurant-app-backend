@@ -24,6 +24,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly ILogger<CreateOrderCommandHandler> _logger;
     private readonly IOrderEventService _orderEventService;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderAddressFactory _addressFactory;
     private readonly IFidelityPointsService _fidelityPointsService;
     private readonly ICustomerDiscountService _customerDiscountService;
     private readonly ITaxConfigurationService _taxConfigurationService;
@@ -35,6 +36,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         ICurrentUserService currentUserService,
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
+        IOrderAddressFactory addressFactory,
         IFidelityPointsService fidelityPointsService,
         ICustomerDiscountService customerDiscountService,
         ITaxConfigurationService taxConfigurationService,
@@ -46,6 +48,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _currentUserService = currentUserService;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
+        _addressFactory = addressFactory;
         _fidelityPointsService = fidelityPointsService;
         _customerDiscountService = customerDiscountService;
         _taxConfigurationService = taxConfigurationService;
@@ -96,7 +99,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             if (command.Type == OrderType.Delivery)
             {
-                var orderAddress = await CreateOrderAddress(command.DeliveryAddress, order.Id, userId, cancellationToken);
+                var orderAddress = await _addressFactory.CreateAsync(command.DeliveryAddress, order.Id, userId, cancellationToken);
 
                 if (orderAddress == null)
                 {
@@ -554,95 +557,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         return 5.00m; // Fixed delivery fee, could be dynamic based on distance
     }
 
-    private async Task<OrderAddress?> CreateOrderAddress(
-       CreateOrderDeliveryAddressDto? addressDto,
-       Guid orderId,
-       Guid? userId,
-       CancellationToken cancellationToken)
-    {
-        // Case 1: Use saved address ID
-        if (addressDto?.UseAddressId != null)
-        {
-            var savedAddress = await _context.UserAddresses
-                .FirstOrDefaultAsync(a => a.Id == addressDto.UseAddressId && !a.IsDeleted, cancellationToken);
-
-            if (savedAddress != null)
-            {
-                return new OrderAddress
-                {
-                    OrderId = orderId,
-                    UserAddressId = savedAddress.Id,
-                    Label = savedAddress.Label,
-                    AddressLine1 = savedAddress.AddressLine1,
-                    AddressLine2 = savedAddress.AddressLine2,
-                    City = savedAddress.City,
-                    State = savedAddress.State,
-                    PostalCode = savedAddress.PostalCode,
-                    Country = savedAddress.Country,
-                    Phone = savedAddress.Phone,
-                    Latitude = savedAddress.Latitude,
-                    Longitude = savedAddress.Longitude,
-                    DeliveryInstructions = savedAddress.DeliveryInstructions,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-            }
-        }
-
-        // Case 2: Use provided address details
-        if (addressDto != null && !string.IsNullOrEmpty(addressDto.AddressLine1))
-        {
-            return new OrderAddress
-            {
-                OrderId = orderId,
-                Label = addressDto.Label ?? "Delivery Address",
-                AddressLine1 = addressDto.AddressLine1,
-                AddressLine2 = addressDto.AddressLine2,
-                City = addressDto.City!,
-                State = addressDto.State,
-                PostalCode = addressDto.PostalCode!,
-                Country = addressDto.Country!,
-                Phone = addressDto.Phone,
-                Latitude = addressDto.Latitude,
-                Longitude = addressDto.Longitude,
-                DeliveryInstructions = addressDto.DeliveryInstructions,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier()
-            };
-        }
-
-        // Case 3: Use customer's default address if no address provided
-        if (userId.HasValue)
-        {
-            var defaultAddress = await _context.UserAddresses
-                .FirstOrDefaultAsync(a => a.UserId == userId && a.IsDefault && !a.IsDeleted, cancellationToken);
-
-            if (defaultAddress != null)
-            {
-                _logger.LogInformation("Using customer's default address for order");
-                return new OrderAddress
-                {
-                    OrderId = orderId,
-                    UserAddressId = defaultAddress.Id,
-                    Label = defaultAddress.Label,
-                    AddressLine1 = defaultAddress.AddressLine1,
-                    AddressLine2 = defaultAddress.AddressLine2,
-                    City = defaultAddress.City,
-                    State = defaultAddress.State,
-                    PostalCode = defaultAddress.PostalCode,
-                    Country = defaultAddress.Country,
-                    Phone = defaultAddress.Phone,
-                    Latitude = defaultAddress.Latitude,
-                    Longitude = defaultAddress.Longitude,
-                    DeliveryInstructions = defaultAddress.DeliveryInstructions,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-            }
-        }
-
-        return null;
-    }
 
     private async Task CreateOrderItemRecursive(Order order, CreateOrderItemDto itemDto, OrderItem? parentItem, CancellationToken cancellationToken)
     {
