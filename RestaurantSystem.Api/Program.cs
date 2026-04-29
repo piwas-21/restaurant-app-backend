@@ -358,9 +358,10 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseForwardedHeaders();
+
 app.UseCors("AllowAll");
 
-app.UseForwardedHeaders();
 app.UseRateLimiter();
 
 app.UseMiddleware<SessionMiddleware>();

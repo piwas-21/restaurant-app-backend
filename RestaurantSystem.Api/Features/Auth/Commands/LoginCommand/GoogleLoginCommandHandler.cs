@@ -72,9 +72,9 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
             }
 
             var token = _tokenService.GenerateAccessToken(user);
-            var refreshToken = _tokenService.GenerateRefreshToken();
+            var rawRefreshToken = _tokenService.GenerateRefreshToken();
 
-            user.RefreshToken = refreshToken;
+            user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _userManager.UpdateAsync(user);
 
@@ -90,7 +90,7 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
             return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
             {
                 AccessToken = token,
-                RefreshToken = refreshToken,
+                RefreshToken = rawRefreshToken,
                 Email = user.Email!,
                 FirstName = user.FirstName,
                 LastName = user.LastName,

@@ -1,4 +1,5 @@
-﻿using RestaurantSystem.Api.Abstraction.Messaging;
+﻿using FluentValidation;
+using RestaurantSystem.Api.Abstraction.Messaging;
 
 namespace RestaurantSystem.Api.Common
 {
@@ -14,6 +15,10 @@ namespace RestaurantSystem.Api.Common
         public async Task<TResult> SendCommand<TCommand, TResult>(TCommand command, CancellationToken cancellationToken = default)
        where TCommand : ICommand<TResult>
         {
+            var validator = _serviceProvider.GetService<IValidator<TCommand>>();
+            if (validator != null)
+                await validator.ValidateAndThrowAsync(command, cancellationToken);
+
             var handlerType = typeof(ICommandHandler<TCommand, TResult>);
             var handler = _serviceProvider.GetService(handlerType) as ICommandHandler<TCommand, TResult>;
 
@@ -26,6 +31,16 @@ namespace RestaurantSystem.Api.Common
         public async Task<TResult> SendCommand<TResult>(ICommand<TResult> command, CancellationToken cancellationToken = default)
         {
             var commandType = command.GetType();
+
+            var validatorType = typeof(IValidator<>).MakeGenericType(commandType);
+            if (_serviceProvider.GetService(validatorType) is IValidator validator)
+            {
+                var context = new ValidationContext<object>(command);
+                var result = await validator.ValidateAsync(context, cancellationToken);
+                if (!result.IsValid)
+                    throw new ValidationException(result.Errors);
+            }
+
             var handlerType = typeof(ICommandHandler<,>).MakeGenericType(commandType, typeof(TResult));
             dynamic handler = _serviceProvider.GetService(handlerType)!;
 

@@ -108,11 +108,13 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
 
         await _userManager.UpdateAsync(existingUser);
 
-        // Generate tokens
-        var token = _tokenService.GenerateAccessToken(existingUser);
+        // Rotate tokens so the caller gets a fresh, usable pair
+        var accessToken = _tokenService.GenerateAccessToken(existingUser);
+        var rawRefreshToken = _tokenService.GenerateRefreshToken();
+        existingUser.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
         existingUser.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        await _userManager.UpdateAsync(existingUser);
 
-        // Return response
         var authResponse = new AuthResponse
         {
             UserId = existingUser.Id,
@@ -120,8 +122,8 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
             LastName = existingUser.LastName,
             Email = existingUser.Email!,
             Role = existingUser.Role,
-            AccessToken = token,
-            RefreshToken = existingUser.RefreshToken,
+            AccessToken = accessToken,
+            RefreshToken = rawRefreshToken,
             Expiration = _tokenService.GetAccessTokenExpiration()
         };
 
