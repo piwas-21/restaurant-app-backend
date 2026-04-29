@@ -5,15 +5,12 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
-using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using System.Text.Json;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 
@@ -26,9 +23,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderMappingService _mappingService;
     private readonly IOrderAddressFactory _addressFactory;
     private readonly IOrderItemFactory _itemFactory;
+    private readonly IOrderPricingService _pricingService;
     private readonly IFidelityPointsService _fidelityPointsService;
-    private readonly ICustomerDiscountService _customerDiscountService;
-    private readonly ITaxConfigurationService _taxConfigurationService;
     private readonly IEmailService _emailService;
     private readonly EmailSettings _emailSettings;
 
@@ -39,9 +35,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderMappingService mappingService,
         IOrderAddressFactory addressFactory,
         IOrderItemFactory itemFactory,
+        IOrderPricingService pricingService,
         IFidelityPointsService fidelityPointsService,
-        ICustomerDiscountService customerDiscountService,
-        ITaxConfigurationService taxConfigurationService,
         IEmailService emailService,
         IOptions<EmailSettings> emailSettings,
         ILogger<CreateOrderCommandHandler> logger)
@@ -52,9 +47,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _mappingService = mappingService;
         _addressFactory = addressFactory;
         _itemFactory = itemFactory;
+        _pricingService = pricingService;
         _fidelityPointsService = fidelityPointsService;
-        _customerDiscountService = customerDiscountService;
-        _taxConfigurationService = taxConfigurationService;
         _emailService = emailService;
         _emailSettings = emailSettings.Value;
         _logger = logger;
@@ -126,86 +120,12 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 }
             }
 
-            // Calculate subTotal from all added items
-            decimal subTotal = order.Items.Sum(i => i.ItemTotal);
-
-            // itemsTotal = sum of all item prices (what customer pays for items)
-            decimal itemsTotal = subTotal;
-
-            // If basket values are provided, use them directly to ensure consistency
-            // Otherwise, calculate them as before
-            if (command.BasketSubTotal.HasValue && command.BasketTax.HasValue &&
-                command.BasketTotal.HasValue)
-            {
-                // Use pre-calculated basket values
-                order.SubTotal = command.BasketSubTotal.Value;
-                order.Tax = command.BasketTax.Value;
-                order.Discount = command.BasketDiscount ?? 0;
-                order.CustomerDiscountAmount = command.BasketCustomerDiscount ?? 0;
-
-                _logger.LogInformation("Using pre-calculated basket values for order: SubTotal={SubTotal}, Tax={Tax}, Discount={Discount}, CustomerDiscount={CustomerDiscount}",
-                    order.SubTotal, order.Tax, order.Discount, order.CustomerDiscountAmount);
-            }
-            else
-            {
-                // Calculate values as before (legacy path)
-                // REFACTORED TAX FLOW: Tax is extracted from item prices for display only
-                // It does NOT affect the final customer payment
-                // Example: Product 16.90 → Tax extracted 0.44 → SubTotal shown 16.46 → Customer pays 16.90
-
-                // Calculate tax on items total - this is for display/bills only
-                order.Tax = await CalculateTax(itemsTotal, command.Type, cancellationToken);
-
-                // SubTotal = items total minus the extracted tax (for display purposes)
-                order.SubTotal = itemsTotal - order.Tax;
-
-                // DeliveryFee is added to final price
-                order.DeliveryFee = command.Type == OrderType.Delivery ? CalculateDeliveryFee() : 0;
-
-                // Apply user discount (calculated on items total, before tax extraction)
-                if (command.HasUserLimitDiscount && itemsTotal >= command.UserLimitAmount)
-                {
-                    var user = await _context.Users.FindAsync(userId);
-                    if (user != null && user.IsDiscountActive)
-                    {
-                        order.DiscountPercentage = user.DiscountPercentage;
-                        // Discount applies to items total (before tax extraction)
-                        order.Discount = itemsTotal * (user.DiscountPercentage / 100);
-                    }
-                }
-
-                // Apply customer-specific discount if available
-                if (userId.HasValue)
-                {
-                    var customerDiscount = await _customerDiscountService.FindBestApplicableDiscountAsync(
-                        userId.Value,
-                        itemsTotal,
-                        cancellationToken);
-
-                    if (customerDiscount != null)
-                    {
-                        // Discount calculated on items total (before tax extraction)
-                        var discountAmount = _customerDiscountService.CalculateDiscountAmount(customerDiscount, itemsTotal);
-                        order.CustomerDiscountAmount = discountAmount;
-
-                        // Only apply usage tracking for individual customer discounts, not group discounts
-                        // Group discounts are mapped with temporary IDs that don't exist in CustomerDiscountRules
-                        var isIndividualDiscount = await _context.CustomerDiscountRules
-                            .AnyAsync(d => d.Id == customerDiscount.Id, cancellationToken);
-
-                        if (isIndividualDiscount)
-                        {
-                            // Only set the FK reference for individual discounts to avoid constraint violation
-                            order.CustomerDiscountRuleId = customerDiscount.Id;
-                            await _customerDiscountService.ApplyDiscountAsync(customerDiscount.Id, cancellationToken);
-                        }
-
-                        _logger.LogInformation("Applied customer discount {DiscountName} of ${Amount} to order",
-                            customerDiscount.Name, discountAmount);
-                    }
-                }
-            }
-            // Handle fidelity points redemption moved to after order save to prevent FK violation
+            // Aggregate item totals and apply pricing (tax, discounts, total).
+            // FidelityPointsDiscount is 0 here; redemption (after SaveChangesAsync)
+            // updates it separately and the persisted Total is not recomputed —
+            // pre-existing behaviour, preserved verbatim.
+            var itemsTotal = order.Items.Sum(i => i.ItemTotal);
+            await _pricingService.ApplyAsync(order, itemsTotal, command, userId, cancellationToken);
 
             // Calculate fidelity points to earn for this order
             if (userId.HasValue)
@@ -214,25 +134,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 order.FidelityPointsEarned = pointsToEarn;
 
                 _logger.LogInformation("Order will earn {Points} fidelity points", pointsToEarn);
-            }
-
-            // Calculate total - use basket total if provided, otherwise calculate
-            if (command.BasketTotal.HasValue)
-            {
-                // Use pre-calculated basket total
-                order.Total = command.BasketTotal.Value;
-                _logger.LogInformation("Using pre-calculated basket total: {Total}", order.Total);
-            }
-            else
-            {
-                // Calculate total: Items + DeliveryFee - Discounts - FidelityDiscount
-                // NOTE: Tax is NOT added to total - it's extracted from items and shown for display only
-                var totalBeforeFidelity = itemsTotal + order.DeliveryFee - order.Discount - order.CustomerDiscountAmount;
-
-                // Calculate total and apply special rounding for discounted customers
-                var calculatedTotal = totalBeforeFidelity - order.FidelityPointsDiscount;
-                bool hasActiveDiscount = PriceRoundingUtility.HasActiveDiscount(order.CustomerDiscountAmount + order.Discount);
-                order.Total = PriceRoundingUtility.ApplySpecialRounding(calculatedTotal, hasActiveDiscount);
             }
 
             // Process payments
@@ -515,15 +416,5 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         }
 
         return $"{date}{sequence:D4}";
-    }
-
-    private async Task<decimal> CalculateTax(decimal subTotal, OrderType orderType, CancellationToken cancellationToken)
-    {
-        return await _taxConfigurationService.CalculateTaxByOrderTypeAsync(subTotal, orderType, cancellationToken);
-    }
-
-    private decimal CalculateDeliveryFee()
-    {
-        return 5.00m; // Fixed delivery fee, could be dynamic based on distance
     }
 }
