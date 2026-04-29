@@ -183,7 +183,7 @@ Grep for the component / hook / type you're adding or modifying. List every call
 | **CI-enforced (blocking)** | njsscan | MR pipeline | Static security scan for JS | `.gitlab-ci.yml` |
 | **CI-enforced (blocking)** | semgrep | MR pipeline | SAST | `.gitlab-ci.yml` |
 | **CI-enforced (blocking)** | retire.js | MR pipeline | Outdated-dep CVE scan (replaced by OSV-Scanner in Sprint 4) | `.gitlab-ci.yml` |
-| **CI-enforced** (non-blocking, `allow_failure: true`) | Trivy image scan | After build | Reports CRITICAL/HIGH CVEs (flipped to blocking in Sprint 4) | `.gitlab-ci.yml` |
+| **CI-enforced (blocking)** | Trivy image scan | MR pipeline (`trivy` job, after `build_image`) | Zero HIGH/CRITICAL CVEs in the built image. False-positive exclusions live in `.trivyignore` with written justification. | `.gitlab-ci.yml`, `.trivyignore` |
 | **Pre-commit** (blocking on `git commit`) | `pre-commit` hooks | Every commit | trailing-whitespace, EOF, large files, secret scan, no-commit-to-protected | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
 | **CI-enforced (blocking)** | `prettier --check` | MR pipeline (`prettier_check` job) **and** pre-commit when staged file matches `^src/.*\.(ts\|tsx\|css\|json\|md)$` | Source is prettier-clean | `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
 | **CI-enforced (blocking)** | `tsc --noEmit` | MR pipeline (`typecheck` job) **and** pre-commit when any `.ts`/`.tsx` is staged | Whole-project typecheck passes | `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
