@@ -18,45 +18,53 @@ export default function ContactIcons({ phones }: ContactIconsProps) {
 
   if (activePhones.length === 0) return null;
 
-  // wa.me requires the international number without the leading `+` and
-  // with no separators. Stored numbers are E.164 (`+41227863333`), so a
-  // single strip is enough; we don't try to normalise locally-formatted
-  // numbers because backend validation already rejects those.
   const waPath = (e164: string) => e164.replace(/^\+/, '').replace(/\D/g, '');
   const waMessage = encodeURIComponent(t('whatsapp_default_message', 'Hello, I would like to make a reservation'));
 
+  const phoneNumbers = activePhones;
+  const whatsappNumbers = activePhones.filter((p) => p.whatsAppEnabled);
+
   return (
-    <nav className={styles.contactIcons} aria-label={t('home_contact_title', 'Get in touch')}>
-      <h2 className={styles.heading}>{t('home_contact_title', 'Get in touch')}</h2>
-      <ul className={styles.list}>
-        {activePhones.map((p) => (
-          <li key={p.id} className={styles.item}>
-            {p.label && <span className={styles.label}>{p.label}</span>}
-            <div className={styles.actions}>
+    <div className={styles.fab} aria-label={t('home_contact_title', 'Get in touch')}>
+      {whatsappNumbers.length > 0 && (
+        <div className={styles.fabItem}>
+          <div className={styles.numberList}>
+            {whatsappNumbers.map((p) => (
               <a
-                href={`tel:${p.number}`}
-                className={styles.btn}
-                aria-label={`${t('phone_label', 'Phone')}: ${p.number}`}
+                key={p.id}
+                href={`https://wa.me/${waPath(p.number)}?text=${waMessage}`}
+                className={styles.numberChip}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`WhatsApp: ${p.number}`}
               >
-                <Phone size={20} aria-hidden="true" />
-                <span>{p.number}</span>
+                {p.number}
               </a>
-              {p.whatsAppEnabled && (
-                <a
-                  href={`https://wa.me/${waPath(p.number)}?text=${waMessage}`}
-                  className={styles.btnWhatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`WhatsApp: ${p.number}`}
-                >
-                  <MessageCircle size={20} aria-hidden="true" />
-                  <span>WhatsApp</span>
-                </a>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </nav>
+            ))}
+          </div>
+          <button className={`${styles.fabBtn} ${styles.fabBtnWhatsapp}`} aria-label="WhatsApp" tabIndex={-1}>
+            <MessageCircle size={22} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      <div className={styles.fabItem}>
+        <div className={styles.numberList}>
+          {phoneNumbers.map((p) => (
+            <a
+              key={p.id}
+              href={`tel:${p.number}`}
+              className={styles.numberChip}
+              aria-label={`${t('phone_label', 'Phone')}: ${p.number}`}
+            >
+              {p.number}
+            </a>
+          ))}
+        </div>
+        <button className={`${styles.fabBtn} ${styles.fabBtnPhone}`} aria-label={t('phone_label', 'Phone')} tabIndex={-1}>
+          <Phone size={22} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   );
 }
