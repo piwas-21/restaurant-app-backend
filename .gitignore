@@ -41,6 +41,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Bare .env is excluded — never commit local credentials. See CLAUDE.md §9.
+.env
+
 # Keep these files in git
 !.env.example
 !.env.production
