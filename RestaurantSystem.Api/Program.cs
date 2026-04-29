@@ -331,6 +331,9 @@ builder.Services.AddScoped<IWorkingHoursService, WorkingHoursService>();
 
 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
 builder.Services.AddScoped<IUserGroupService, UserGroupService>();
+// HTML page builder for email-link landing endpoints (Sprint 2 task 2.1).
+// Pure string composition — singleton lifetime is appropriate.
+builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
 builder.Services.AddHostedService<BasketCleanupService>();
