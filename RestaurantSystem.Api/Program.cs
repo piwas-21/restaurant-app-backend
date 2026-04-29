@@ -321,6 +321,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
+builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
 builder.Services.AddScoped<ICustomerDiscountService, CustomerDiscountService>();
