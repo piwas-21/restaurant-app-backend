@@ -188,4 +188,8 @@ trivy:
   script:
     - docker pull $IMAGE_NAME:$IMAGE_TAG
     - trivy image --severity HIGH,CRITICAL --ignorefile .trivyignore --exit-code 1 $IMAGE_NAME:$IMAGE_TAG
-  allow_failure: true
+  # Trivy is blocking as of 2026-04-29: image hardened in commit 5236dd5
+  # (Node 22-alpine + npm CLI removed from runner) brought HIGH/CRITICAL
+  # CVEs to zero. New CVEs will block — fix the underlying package, bump
+  # the base image, or add a CVE-specific entry to .trivyignore with
+  # written justification.
