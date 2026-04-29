@@ -35,11 +35,15 @@ public class PrinterFeedController : ControllerBase
     /// </summary>
     [HttpGet]
     [ApiKeyAuthFilter]
-    public async Task<ActionResult<object>> Get([FromQuery] DateTime? modifiedSince)
+    public async Task<ActionResult<object>> Get(
+        [FromQuery] DateTime? modifiedSince,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var orderDtos = await _mediator.SendQuery(new PrinterFeedQuery(modifiedSince));
+            var orderDtos = await _mediator.SendQuery(
+                new PrinterFeedQuery(modifiedSince),
+                cancellationToken);
 
             return Ok(new
             {
@@ -49,7 +53,7 @@ public class PrinterFeedController : ControllerBase
                     items = orderDtos,
                     totalCount = orderDtos.Count,
                     page = 1,
-                    pageSize = 50
+                    pageSize = PrinterFeedQuery.MaxOrdersPerPoll
                 }
             });
         }
