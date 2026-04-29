@@ -34,6 +34,7 @@ RestaurantSystem.Api/Features/Menus/Dtos/MenuBundleDto.cs
 RestaurantSystem.Api/Features/Menus/Commands/CreateMenuBundleCommand/CreateMenuBundleCommand.cs
 RestaurantSystem.Api/Features/Menus/Commands/UpdateMenuBundleCommand/UpdateMenuBundleCommand.cs
 RestaurantSystem.Api/Features/Orders/Queries/GetOrdersQuery/GetOrdersQuery.cs
+RestaurantSystem.Api/Features/Orders/OrderQuickActionsController.cs
 RestaurantSystem.Api/Features/Orders/Dtos/ZReportDto.cs
 RestaurantSystem.Api/Features/Orders/Dtos/OrderDto.cs
 RestaurantSystem.Api/Features/Orders/OrdersController.cs
