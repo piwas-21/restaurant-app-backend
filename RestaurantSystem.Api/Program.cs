@@ -99,6 +99,9 @@ builder.Services.AddSwaggerGen(c =>
             new List<string>()
         }
     });
+
+    // Avoid schema ID collisions when two DTOs share the same class name across namespaces
+    c.CustomSchemaIds(t => t.FullName!.Replace("+", "."));
 });
 
 //builder.Services.AddStackExchangeRedisCache(options =>
