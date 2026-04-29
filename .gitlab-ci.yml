@@ -131,6 +131,13 @@ build_image:
     # endpoint isn't reachable). When/if we migrate to a Linux VM runner,
     # we can flip back to DinD for stronger isolation; the security profile
     # of socket-mount and `privileged = true` is similar.
+    variables:
+        # Force the docker CLI to talk to the mounted host socket. Some
+        # `docker:24` image revisions default DOCKER_HOST to tcp://docker:2375
+        # (a leftover assumption that a `docker:N-dind` service is attached);
+        # without this override the CLI tries to resolve hostname `docker`
+        # via the runner's resolver and fails.
+        DOCKER_HOST: unix:///var/run/docker.sock
     before_script:
         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     script:
@@ -148,6 +155,8 @@ trivy:
     - if: $CI_COMMIT_BRANCH == "main"
   image: docker:24
   # Same socket-mount rationale as build_image — see note there.
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
   before_script:
     - apk add --no-cache curl
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
