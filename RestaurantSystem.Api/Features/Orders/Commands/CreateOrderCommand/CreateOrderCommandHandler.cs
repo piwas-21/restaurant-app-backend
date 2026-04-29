@@ -1,6 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
@@ -25,8 +23,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderItemFactory _itemFactory;
     private readonly IOrderPricingService _pricingService;
     private readonly IFidelityPointsService _fidelityPointsService;
-    private readonly IEmailService _emailService;
-    private readonly EmailSettings _emailSettings;
+    private readonly IOrderNotificationService _notifications;
 
     public CreateOrderCommandHandler(
         ApplicationDbContext context,
@@ -37,8 +34,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderItemFactory itemFactory,
         IOrderPricingService pricingService,
         IFidelityPointsService fidelityPointsService,
-        IEmailService emailService,
-        IOptions<EmailSettings> emailSettings,
+        IOrderNotificationService notifications,
         ILogger<CreateOrderCommandHandler> logger)
     {
         _context = context;
@@ -49,8 +45,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _itemFactory = itemFactory;
         _pricingService = pricingService;
         _fidelityPointsService = fidelityPointsService;
-        _emailService = emailService;
-        _emailSettings = emailSettings.Value;
+        _notifications = notifications;
         _logger = logger;
     }
 
@@ -299,28 +294,12 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 }
             }
 
-            // Send order-confirmed email for Dine-in orders (auto-confirmed)
-            // For other order types, email sending is handled by the /send-confirmation-email endpoint
-            if (command.Type == OrderType.DineIn && !string.IsNullOrEmpty(order.CustomerEmail))
+            // Auto-confirmed orders (Dine-in) send the confirmed-email synchronously here.
+            // Other order types defer to the /send-confirmation-email endpoint.
+            if (command.Type == OrderType.DineIn)
             {
-                try
-                {
-                    await _emailService.SendOrderConfirmedEmailAsync(
-                        order.CustomerEmail,
-                        order.CustomerName ?? "Valued Customer",
-                        order.OrderNumber,
-                        order.Type.ToString(),
-                        estimatedPreparationMinutes: 15); // Default 15 minutes for dine-in
-
-                    _logger.LogInformation("Sent order-confirmed email for Dine-in order {OrderNumber} to {Email}",
-                        order.OrderNumber, order.CustomerEmail);
-                }
-                catch (Exception emailEx)
-                {
-                    // Don't fail the order creation if email fails
-                    _logger.LogError(emailEx, "Failed to send order-confirmed email for Dine-in order {OrderNumber}",
-                        order.OrderNumber);
-                }
+                await _notifications.SendOrderConfirmedAsync(
+                    order, OrderNotificationService.DefaultDineInPreparationMinutes, cancellationToken);
             }
 
             // Reserve table for dine-in orders

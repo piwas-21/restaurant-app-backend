@@ -324,6 +324,7 @@ builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();
+builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
 builder.Services.AddScoped<ICustomerDiscountService, CustomerDiscountService>();
