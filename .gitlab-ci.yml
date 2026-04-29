@@ -105,9 +105,24 @@ include:
 
 
 # Docker Image building
+#
+# build_image + trivy run only on push to develop or main — not on every MR
+# pipeline. The image is the deploy artefact; rebuilding it for every WIP
+# commit on a feature branch burns shared-runner minutes for no deploy
+# benefit (MR-tagged images are never pulled by ArgoCD). The test stage
+# above (dotnet_format / dotnet_build_strict / dotnet_test / file_length /
+# gitleaks / sast) still runs on every MR pipeline; what we skip is the
+# Dockerfile build and image scan.
+#
+# If a Dockerfile change needs MR-pipeline verification, push it to
+# develop directly via a chore MR with the file in scope; the develop
+# push triggers the build_image + trivy jobs.
 
 build_image:
     stage: build
+    rules:
+        - if: $CI_COMMIT_BRANCH == "develop"
+        - if: $CI_COMMIT_BRANCH == "main"
     image: docker:24
     services:
     - docker:24-dind
@@ -118,11 +133,14 @@ build_image:
         - docker push $IMAGE_NAME:$IMAGE_TAG
 
 # Docker Image Scanning for security vulnerabilities and misconfigurations
-# Trivy tool is used
+# Trivy tool is used.
 
 trivy:
   stage: build
   needs: ["build_image"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_BRANCH == "main"
   image: docker:24
   services:
     - docker:24-dind
