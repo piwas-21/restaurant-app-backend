@@ -1,0 +1,50 @@
+# Backend file-length baseline.
+# Files listed here exceed the CLAUDE.md §4 limit and are tracked
+# for refactor (see docs/SPRINT-PLAN.md). The file-length checker
+# (scripts/check-file-length.sh) skips these so existing debt
+# doesn't block new MRs; new violations still block.
+#
+# Regenerate after a refactor lands:
+#   bash scripts/check-file-length.sh --regen-baseline
+# Inspect for ratchet opportunities:
+#   bash scripts/check-file-length.sh --all
+RestaurantSystem.Api/Settings/EmailSettings.cs
+RestaurantSystem.Api/Settings/JwtSettings.cs
+RestaurantSystem.Api/Features/Settings/TaxConfigurationController.cs
+RestaurantSystem.Api/Features/Basket/BasketController.cs
+RestaurantSystem.Api/Features/Basket/Services/BasketService.cs
+RestaurantSystem.Api/Features/Products/ProductsController.cs
+RestaurantSystem.Api/Features/Products/Queries/GetProductByIdQuery/GetProductByIdQuery.cs
+RestaurantSystem.Api/Features/Products/Commands/UpdateProductCommand/UpdateProductCommand.cs
+RestaurantSystem.Api/Features/Products/Commands/CreateProductCommand/CreateProductCommandValidator.cs
+RestaurantSystem.Api/Features/Products/Commands/CreateProductCommand/CreateProductCommand.cs
+RestaurantSystem.Api/Features/FidelityPoints/Controllers/FidelityPointsController.cs
+RestaurantSystem.Api/Features/FidelityPoints/Controllers/PointRulesController.cs
+RestaurantSystem.Api/Features/FidelityPoints/Controllers/CustomerDiscountsController.cs
+RestaurantSystem.Api/Features/FidelityPoints/Services/FidelityPointsService.cs
+RestaurantSystem.Api/Features/FidelityPoints/Services/CustomerDiscountService.cs
+RestaurantSystem.Api/Features/Auth/AuthController.cs
+RestaurantSystem.Api/Features/Reservations/ReservationsController.cs
+RestaurantSystem.Api/Features/Reservations/TablesController.cs
+RestaurantSystem.Api/Features/User/UserController.cs
+RestaurantSystem.Api/Features/User/Dtos/UserDto.cs
+RestaurantSystem.Api/Features/Groups/Dtos/UserGroupDtos.cs
+RestaurantSystem.Api/Features/Groups/Services/UserGroupService.cs
+RestaurantSystem.Api/Features/Menus/Dtos/MenuBundleDto.cs
+RestaurantSystem.Api/Features/Menus/Commands/CreateMenuBundleCommand/CreateMenuBundleCommand.cs
+RestaurantSystem.Api/Features/Menus/Commands/UpdateMenuBundleCommand/UpdateMenuBundleCommand.cs
+RestaurantSystem.Api/Features/Orders/Queries/GetOrdersQuery/GetOrdersQuery.cs
+RestaurantSystem.Api/Features/Orders/Dtos/ZReportDto.cs
+RestaurantSystem.Api/Features/Orders/Dtos/OrderDto.cs
+RestaurantSystem.Api/Features/Orders/OrdersController.cs
+RestaurantSystem.Api/Features/Orders/Commands/CreateOrderCommand/CreateOrderCommandValidator.cs
+RestaurantSystem.Api/Features/Orders/Commands/CreateOrderCommand/CreateOrderCommandHandler.cs
+RestaurantSystem.Api/Features/Orders/Commands/AddPaymentToOrderCommand/AddPaymentToOrderCommand.cs
+RestaurantSystem.Api/Features/Orders/EventsController.cs
+RestaurantSystem.Api/Features/Orders/Services/OrderMappingService.cs
+RestaurantSystem.Api/Features/Orders/Services/OrderEventService.cs
+RestaurantSystem.Api/Features/GlobalIngredients/GlobalIngredientsController.cs
+RestaurantSystem.Api/Features/Categories/CategoriesController.cs
+RestaurantSystem.Api/Features/Email/EmailTestController.cs
+RestaurantSystem.Api/Common/Services/EmailService.cs
+RestaurantSystem.Api/Common/Validation/StrongPasswordValidator.cs

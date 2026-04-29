@@ -105,7 +105,7 @@ All soft-delete-aware entities use `IsDeleted` with a global query filter in `Ap
 
 ## §4 — File length limits
 
-Enforced by reviewer; will be enforced by `scripts/check-quality.sh` once Sprint 2 lands.
+Enforced by [scripts/check-file-length.sh](scripts/check-file-length.sh) (pre-commit + CI `file_length` job, blocking).
 
 | File type | Max LOC | Action if exceeded |
 |---|---|---|
@@ -115,9 +115,17 @@ Enforced by reviewer; will be enforced by `scripts/check-quality.sh` once Sprint
 | Entity (Domain) | 100 | Decompose; the model is doing too much |
 | DTO / Record | 60 | Split into focused DTOs |
 | Validator | 60 | Split per command if multi-aspect |
-| Configuration class | 50 | Group related settings into separate classes |
+| Configuration class (`*Settings.cs`) | 50 | Group related settings into separate classes |
 
-Known exceptions are documented inline in each file with a comment block (`// FILE_LENGTH_EXEMPT: <reason>`).
+**Existing oversized files** are baselined in [scripts/file-length-baseline.txt](scripts/file-length-baseline.txt) (set at the current honest floor; ratchet down as the refactor track lands). New violations block the gate.
+
+**Per-file opt-out** (rare; needs reviewer sign-off): add `// FILE_LENGTH_EXEMPT: <reason>` within the first 5 lines of the file.
+
+**After a refactor lands** that brings a baselined file under its limit:
+```bash
+bash scripts/check-file-length.sh --regen-baseline
+```
+Commit the updated `scripts/file-length-baseline.txt` in the same MR.
 
 ---
 
@@ -181,6 +189,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 | `dotnet test RestaurantSystem.IntegrationTests` | MR pipeline (`dotnet_test` job, dind service for Testcontainers) | All non-skipped tests pass | yes | `.gitlab-ci.yml` |
 | Coverage threshold (coverlet, line ≥ 17% / branch ≥ 9% / method ≥ 15%, migrations excluded) | MR pipeline (same `dotnet_test` job) | No regression below the current floor | yes | `.gitlab-ci.yml` |
 | `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** MR pipeline (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
+| File-length gate | Pre-commit (per-file when .cs staged) **and** MR pipeline (`file_length` job) | LOC ≤ §4 limit OR file is in `scripts/file-length-baseline.txt` | yes | [scripts/check-file-length.sh](scripts/check-file-length.sh), [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
 | Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
 | GitLab SAST | MR pipeline | Auto-injected analyzers | yes | `.gitlab-ci.yml` |
 | Gitleaks | MR pipeline | No leaked credentials (allowlist via `.gitleaks.toml`) | yes | [.gitleaks.toml](.gitleaks.toml) |

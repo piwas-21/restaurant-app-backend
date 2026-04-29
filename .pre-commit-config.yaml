@@ -57,6 +57,20 @@ repos:
         pass_filenames: false
         files: \.(cs|csproj|sln)$
 
+  # ── Sprint 2: file-length gate ───────────────────────────────────────
+  # Enforces the per-file LOC limits from CLAUDE.md §4. Existing oversized
+  # files are grandfathered in scripts/file-length-baseline.txt; new
+  # violations block. See scripts/check-file-length.sh for limits + opt-out.
+  # Per-file mode: pre-commit passes the staged paths; the script checks
+  # only those.
+  - repo: local
+    hooks:
+      - id: file-length
+        name: file-length (CLAUDE.md §4 limits)
+        entry: bash scripts/check-file-length.sh
+        language: system
+        files: \.cs$
+
   # ── Sprint 3: warnings-as-errors gate ────────────────────────────────
   # `dotnet build` honours TreatWarningsAsErrors from Directory.Build.props.
   # Whole-solution build; pass_filenames=false because the property
