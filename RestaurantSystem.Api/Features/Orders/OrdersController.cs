@@ -32,16 +32,14 @@ namespace RestaurantSystem.Api.Features.Orders;
 public class OrdersController : ControllerBase
 {
     private readonly CustomMediator _mediator;
-    private readonly IOrderEventService _orderEventService;
     private readonly IEmailService _emailService;
     private readonly ILogger<OrdersController> _logger;
     private readonly EmailSettings _emailSettings;
 
-    public OrdersController(CustomMediator mediator, IOrderEventService orderEventService,
+    public OrdersController(CustomMediator mediator,
         IEmailService emailService, ILogger<OrdersController> logger, IOptions<EmailSettings> emailSettings)
     {
         _mediator = mediator;
-        _orderEventService = orderEventService;
         _emailService = emailService;
         _logger = logger;
         _emailSettings = emailSettings.Value;
@@ -145,18 +143,6 @@ public class OrdersController : ControllerBase
             });
         }
     }
-
-    /// <summary>
-    /// Get all orders with optional filters
-    /// </summary>
-    [HttpPost("tryEvent")]
-    public async Task<ActionResult> GetStocks(
-        [FromQuery] string message)
-    {
-        await _orderEventService.NotifyStockUpdate(message);
-        return Ok(message);
-    }
-
 
     /// <summary>
     /// Get order by ID
