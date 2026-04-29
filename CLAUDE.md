@@ -93,19 +93,29 @@ See [ADR-005](docs/adr/ADR-005-design-system-primitives.md).
 
 ## §4 — File length limits
 
-Enforced by reviewer; will be enforced by `scripts/check-quality.mjs` once Sprint 2 lands.
+Enforced by [scripts/check-file-length.sh](scripts/check-file-length.sh) (pre-commit + CI `file_length` job, blocking).
 
 | File type | Max LOC | Action if exceeded |
 |---|---|---|
-| Page component (`app/**/page.tsx`) | 200 | Move logic into a custom hook in `src/hooks/` |
-| UI component (`*.tsx`) | 250 | Extract sub-components into the same folder |
-| Modal component | 200 | Split form / preview / actions into sub-components |
-| Custom hook | 200 | Split by concern (data-fetching vs derived state vs side-effects) |
-| Service file | 200 | Split by resource (one service per backend feature) |
-| Type / interface file | 150 | Split by domain |
-| CSS Module | 200 | Extract sub-component CSS |
+| Page component (`src/app/**/page.tsx`) | 200 | Move logic into a custom hook in `src/hooks/` |
+| Modal component (`*Modal.tsx`) | 200 | Split form / preview / actions into sub-components |
+| UI component (other `*.tsx` in `src/`) | 250 | Extract sub-components into the same folder |
+| Custom hook (`src/hooks/use*.ts`) | 200 | Split by concern (data-fetching vs derived state vs side-effects) |
+| Service file (`src/services/**`, `src/lib/**`) | 200 | Split by resource (one service per backend feature) |
+| Type / interface file (`src/types/**`) | 150 | Split by domain |
+| CSS Module (`*.module.css`) | 200 | Extract sub-component CSS |
 
-Known exceptions get a top-of-file comment: `// FILE_LENGTH_EXEMPT: <reason>`.
+Excluded: tests (`*.test.{ts,tsx}`, `*.spec.{ts,tsx}`), Storybook stories (`*.stories.tsx`), Playwright snapshots.
+
+**Existing oversized files** are baselined in [scripts/file-length-baseline.txt](scripts/file-length-baseline.txt) (153 entries — set at the current honest floor; ratchet down as the refactor track lands). New violations block the gate.
+
+**Per-file opt-out** (rare; needs reviewer sign-off): add `// FILE_LENGTH_EXEMPT: <reason>` within the first 5 lines of the file.
+
+**After a refactor lands** that brings a baselined file under its limit:
+```bash
+bash scripts/check-file-length.sh --regen-baseline
+```
+Commit the updated `scripts/file-length-baseline.txt` in the same MR.
 
 ---
 
@@ -178,6 +188,7 @@ Grep for the component / hook / type you're adding or modifying. List every call
 | **CI-enforced (blocking)** | `prettier --check` | MR pipeline (`prettier_check` job) **and** pre-commit when staged file matches `^src/.*\.(ts\|tsx\|css\|json\|md)$` | Source is prettier-clean | `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
 | **CI-enforced (blocking)** | `tsc --noEmit` | MR pipeline (`typecheck` job) **and** pre-commit when any `.ts`/`.tsx` is staged | Whole-project typecheck passes | `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
 | **CI-enforced (blocking)** | `eslint --max-warnings=0` | MR pipeline (`eslint` job) **and** pre-commit when any `.ts`/`.tsx`/`.js`/`.mjs`/`.cjs` is staged | Zero lint warnings (allow-list configured per rule, see `eslint.config.mjs`) | `.gitlab-ci.yml`, `.pre-commit-config.yaml`, `eslint.config.mjs` |
+| **CI-enforced (blocking)** | File-length gate | MR pipeline (`file_length` job) **and** pre-commit (per-file when `.ts`/`.tsx`/`.module.css` is staged) | LOC ≤ §4 limit OR file is in `scripts/file-length-baseline.txt` | [scripts/check-file-length.sh](scripts/check-file-length.sh), `.gitlab-ci.yml`, `.pre-commit-config.yaml` |
 | **Sprint 1 — manual** (devs run before commit; not yet automated) | `npm run build` | Manual | Next.js build succeeds | `next.config.ts` |
 
 **`prettier --check`, `tsc --noEmit`, and `eslint --max-warnings=0` all automated and blocking as of Sprint 2 / 2.5**. SAST quality gate (SonarCloud) lands in Sprint 3.

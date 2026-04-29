@@ -54,6 +54,16 @@ eslint:
     script:
         - npm run lint
 
+# Sprint 2 quality gate: file-length check.
+# Enforces the per-file LOC limits from CLAUDE.md §4. Existing oversized
+# files are grandfathered via scripts/file-length-baseline.txt; new
+# violations block. Pure bash — no Node SDK needed.
+file_length:
+    image: bash:5
+    stage: test
+    script:
+        - bash scripts/check-file-length.sh --all
+
 npm_test:
     image: node:22-alpine
     stage: test
