@@ -3,7 +3,6 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -24,7 +23,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly IOrderTableReservationService _tableReservation;
-    private readonly IFidelityPointsService _fidelityPointsService;
+    private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderNotificationService _notifications;
 
     public CreateOrderCommandHandler(
@@ -37,7 +36,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderPricingService pricingService,
         IOrderPaymentBuilder paymentBuilder,
         IOrderTableReservationService tableReservation,
-        IFidelityPointsService fidelityPointsService,
+        IOrderFidelityCoordinator fidelity,
         IOrderNotificationService notifications,
         ILogger<CreateOrderCommandHandler> logger)
     {
@@ -50,7 +49,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _pricingService = pricingService;
         _paymentBuilder = paymentBuilder;
         _tableReservation = tableReservation;
-        _fidelityPointsService = fidelityPointsService;
+        _fidelity = fidelity;
         _notifications = notifications;
         _logger = logger;
     }
@@ -128,14 +127,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             var itemsTotal = order.Items.Sum(i => i.ItemTotal);
             await _pricingService.ApplyAsync(order, itemsTotal, command, userId, cancellationToken);
 
-            // Calculate fidelity points to earn for this order
-            if (userId.HasValue)
-            {
-                var pointsToEarn = await _fidelityPointsService.CalculatePointsForOrderAsync(itemsTotal, cancellationToken);
-                order.FidelityPointsEarned = pointsToEarn;
-
-                _logger.LogInformation("Order will earn {Points} fidelity points", pointsToEarn);
-            }
+            await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, userId, cancellationToken);
 
             _paymentBuilder.AddPayments(order, command.Payments);
             _paymentBuilder.UpdatePaymentSummary(order);
@@ -163,60 +155,15 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Handle fidelity points redemption (moved here to prevent FK violation)
-            // Now that the order is saved, we can safely create the transaction referencing it
-            if (userId.HasValue && command.PointsToRedeem.HasValue && command.PointsToRedeem.Value > 0)
-            {
-                try
-                {
-                    var (pointsTransaction, discountAmount) = await _fidelityPointsService.RedeemPointsAsync(
-                        userId.Value,
-                        order.Id, // Order now exists in DB
-                        command.PointsToRedeem.Value,
-                        cancellationToken);
+            // Redemption must happen after SaveChangesAsync — the redemption
+            // transaction has a FK to the order, which doesn't exist in the
+            // DB until the save above.
+            await _fidelity.RedeemAsync(order, command.PointsToRedeem, userId, cancellationToken);
 
-                    order.FidelityPointsRedeemed = command.PointsToRedeem.Value;
-                    order.FidelityPointsDiscount = discountAmount;
-
-                    _logger.LogInformation("Redeemed {Points} fidelity points for ${Discount} discount on order {OrderNumber}",
-                        command.PointsToRedeem.Value, discountAmount, order.OrderNumber);
-
-                    // Save the updates to the order
-                    await _context.SaveChangesAsync(cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to redeem fidelity points for order {OrderNumber}", order.OrderNumber);
-                    // Don't fail the order creation, just log the error
-                    // The user can contact support to resolve
-                }
-            }
-
-            // Award fidelity points after successful order creation
-            // Award fidelity points after successful order creation ONLY if payment is completed
-            // For pending payments (e.g. Cash), points will be awarded when payment is completed
-            if (userId.HasValue && order.FidelityPointsEarned > 0 &&
-               (order.PaymentStatus == PaymentStatus.Completed || order.PaymentStatus == PaymentStatus.Overpaid))
-            {
-                try
-                {
-                    await _fidelityPointsService.AwardPointsAsync(
-                        userId.Value,
-                        order.Id,
-                        order.FidelityPointsEarned,
-                        order.SubTotal,
-                        cancellationToken);
-
-                    _logger.LogInformation("Awarded {Points} fidelity points to user {UserId} for order {OrderNumber}",
-                        order.FidelityPointsEarned, userId, order.OrderNumber);
-                }
-                catch (Exception ex)
-                {
-                    // Log error but don't fail the order
-                    _logger.LogError(ex, "Failed to award fidelity points for order {OrderNumber}, but order was created successfully",
-                        order.OrderNumber);
-                }
-            }
+            // Cash payments stay Pending; points are awarded at
+            // payment-completion time, not order-creation time. The
+            // coordinator gates on PaymentStatus internally.
+            await _fidelity.AwardEarnedPointsAsync(order, userId, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
 

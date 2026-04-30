@@ -327,6 +327,7 @@ builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();
 builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
 builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationService>();
+builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
 builder.Services.AddScoped<ICustomerDiscountService, CustomerDiscountService>();
