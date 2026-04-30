@@ -57,16 +57,15 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
         try
         {
-            // Generate order number
             var orderNumber = await GenerateOrderNumber(cancellationToken);
-
             var userId = command.UserId ?? _currentUserService.UserId;
+            var auditId = _currentUserService.GetAuditIdentifier();
+            var now = DateTime.UtcNow;
 
-            // Create order
             var order = new Order
             {
                 OrderNumber = orderNumber,
-                UserId = command.UserId ?? _currentUserService.UserId,
+                UserId = userId,
                 CustomerName = command.CustomerName,
                 CustomerEmail = command.CustomerEmail,
                 CustomerPhone = command.CustomerPhone,
@@ -78,36 +77,31 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 IsFocusOrder = command.IsFocusOrder,
                 Priority = command.Priority,
                 FocusReason = command.FocusReason,
-                FocusedAt = command.IsFocusOrder ? DateTime.UtcNow : null,
-                FocusedBy = command.IsFocusOrder ? _currentUserService.UserId?.ToString() : null,
+                FocusedAt = command.IsFocusOrder ? now : null,
+                FocusedBy = command.IsFocusOrder ? userId?.ToString() : null,
                 Notes = command.Notes,
-                OrderDate = DateTime.UtcNow,
+                OrderDate = now,
                 Tip = command.Tip,
-                // Auto-confirm Dine-in orders, keep others as Pending
+                // Auto-confirm Dine-in orders, keep others as Pending.
                 Status = command.Type == OrderType.DineIn ? OrderStatus.Confirmed : OrderStatus.Pending,
                 PaymentStatus = PaymentStatus.Pending,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier()
+                EstimatedDeliveryTime = command.Type == OrderType.Delivery ? now.AddMinutes(45) : null,
+                CreatedAt = now,
+                CreatedBy = auditId,
             };
-
 
             if (command.Type == OrderType.Delivery)
             {
                 var orderAddress = await _addressFactory.CreateAsync(command.DeliveryAddress, order.Id, userId, cancellationToken);
-
                 if (orderAddress == null)
                 {
                     return ApiResponse<OrderDto>.Failure("Delivery address is required for delivery orders");
                 }
-
                 order.DeliveryAddress = orderAddress;
             }
 
-
-
             _context.Orders.Add(order);
 
-            // Process order items and calculate totals
             foreach (var itemDto in command.Items)
             {
                 var error = await _itemFactory.AddItemAsync(order, itemDto, cancellationToken);
@@ -129,26 +123,16 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             _paymentBuilder.AddPayments(order, command.Payments);
             _paymentBuilder.UpdatePaymentSummary(order);
 
-            // Add initial status history
-            // Add order status history
-            var statusHistory = new OrderStatusHistory
+            order.StatusHistory.Add(new OrderStatusHistory
             {
                 FromStatus = OrderStatus.Pending,
                 ToStatus = order.Status,
                 Notes = command.Type == OrderType.DineIn ? "Order created and auto-confirmed (Dine-in)" : "Order created",
-                ChangedAt = DateTime.UtcNow,
-                ChangedBy = _currentUserService.GetAuditIdentifier(),
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier()
-            };
-
-            order.StatusHistory.Add(statusHistory);
-
-            // Calculate estimated delivery time
-            if (command.Type == OrderType.Delivery)
-            {
-                order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(45); // Example: 45 minutes
-            }
+                ChangedAt = now,
+                ChangedBy = auditId,
+                CreatedAt = now,
+                CreatedBy = auditId,
+            });
 
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -164,17 +148,13 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             await transaction.CommitAsync(cancellationToken);
 
-            // Map to DTO
             var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
 
-            // Best-effort SSE broadcasts. The notification service swallows
-            // failures internally so order creation never fails because a
-            // client couldn't be reached.
             await _notifications.NotifyOrderCreatedAsync(orderDto);
             await _notifications.NotifyFocusOrderUpdateAsync(orderDto);
 
-            // Auto-confirmed orders (Dine-in) send the confirmed-email synchronously here.
-            // Other order types defer to the /send-confirmation-email endpoint.
+            // Dine-in auto-confirms, so the confirmed-email goes synchronously.
+            // Takeaway/Delivery defer to the /send-confirmation-email endpoint.
             if (command.Type == OrderType.DineIn)
             {
                 await _notifications.SendOrderConfirmedAsync(
@@ -182,8 +162,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             }
 
             await _tableReservation.ReserveForDineInAsync(order, cancellationToken);
-            // NOTE: For Takeaway and Delivery orders, email sending has been moved to the explicit /send-confirmation-email endpoint
-            // This prevents duplicate emails and gives the frontend control over when emails are sent
 
             _logger.LogInformation("Order {OrderNumber} created successfully by user {UserId}",
                 order.OrderNumber, _currentUserService.UserId);
