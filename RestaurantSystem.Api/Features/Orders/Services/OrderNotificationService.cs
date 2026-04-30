@@ -16,17 +16,20 @@ public class OrderNotificationService : IOrderNotificationService
     private const int DineInDefaultPrepMinutes = 15;
 
     private readonly IEmailService _emailService;
+    private readonly IOrderEventService _orderEventService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<OrderNotificationService> _logger;
 
     public OrderNotificationService(
         IEmailService emailService,
+        IOrderEventService orderEventService,
         IServiceScopeFactory scopeFactory,
         IOptions<EmailSettings> emailSettings,
         ILogger<OrderNotificationService> logger)
     {
         _emailService = emailService;
+        _orderEventService = orderEventService;
         _scopeFactory = scopeFactory;
         _emailSettings = emailSettings.Value;
         _logger = logger;
@@ -109,6 +112,40 @@ public class OrderNotificationService : IOrderNotificationService
                 logger.LogError(ex, "Failed to send admin notification email for order {OrderNumber}", orderNumber);
             }
         });
+    }
+
+    public async Task NotifyOrderCreatedAsync(OrderDto order)
+    {
+        try
+        {
+            _logger.LogInformation("Attempting to notify clients of order creation: {OrderNumber}", order.OrderNumber);
+            await _orderEventService.NotifyOrderCreated(order);
+            _logger.LogInformation("Successfully notified clients of order creation: {OrderNumber}", order.OrderNumber);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex, "Failed to notify clients of order creation for {OrderNumber}, but order was created successfully",
+                order.OrderNumber);
+        }
+    }
+
+    public async Task NotifyFocusOrderUpdateAsync(OrderDto order)
+    {
+        if (!order.IsFocusOrder)
+        {
+            return;
+        }
+
+        try
+        {
+            await _orderEventService.NotifyFocusOrderUpdate(order);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex, "Failed to notify clients of focus order update for {OrderNumber}", order.OrderNumber);
+        }
     }
 
     private static List<(string name, int quantity, decimal price)> ComposeEmailItems(OrderDto order) =>

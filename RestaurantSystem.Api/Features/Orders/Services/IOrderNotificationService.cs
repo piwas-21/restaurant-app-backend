@@ -4,14 +4,15 @@ using RestaurantSystem.Domain.Entities;
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
 /// <summary>
-/// Order-related email notifications. Wraps <c>IEmailService</c> with
-/// the per-order composition logic (items, delivery address, fallback
-/// names) that previously lived inline in <c>OrderEmailController</c>
-/// and <c>CreateOrderCommandHandler</c>.
+/// Order-related notifications: email + SSE. Wraps <c>IEmailService</c>
+/// and <c>IOrderEventService</c> so the per-order composition logic
+/// (email items, delivery address, fallback names) and the boilerplate
+/// best-effort try/catch + logging live in one place.
 ///
-/// Extracted in Sprint 2 task 2.10. Also closes
+/// Extracted in Sprint 2 task 2.10 (email surface) and task 2.11 slice 4
+/// (SSE surface). Closes
 /// <see href="https://gitlab.com/restaurant-app3282120/backend/-/issues/13">#13</see>:
-/// the admin fire-and-forget path now resolves a fresh DI scope so it
+/// the admin fire-and-forget path resolves a fresh DI scope so it
 /// outlives the request-scope's <c>IEmailService</c>.
 /// </summary>
 public interface IOrderNotificationService
@@ -31,4 +32,18 @@ public interface IOrderNotificationService
     /// logged inside the lambda.
     /// </summary>
     Task SendOrderConfirmationAsync(OrderDto order);
+
+    /// <summary>
+    /// Best-effort SSE broadcast of an order-created event. Wraps
+    /// <c>IOrderEventService.NotifyOrderCreated</c> with try/catch +
+    /// attempt/success/failure logging — failures never propagate.
+    /// </summary>
+    Task NotifyOrderCreatedAsync(OrderDto order);
+
+    /// <summary>
+    /// Best-effort SSE broadcast of a focus-order-updated event. No-op
+    /// if the order is not a focus order (internal guard). Failures
+    /// logged and swallowed.
+    /// </summary>
+    Task NotifyFocusOrderUpdateAsync(OrderDto order);
 }
