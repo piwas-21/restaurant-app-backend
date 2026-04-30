@@ -22,6 +22,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderAddressFactory _addressFactory;
     private readonly IOrderItemFactory _itemFactory;
     private readonly IOrderPricingService _pricingService;
+    private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly IFidelityPointsService _fidelityPointsService;
     private readonly IOrderNotificationService _notifications;
 
@@ -33,6 +34,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderAddressFactory addressFactory,
         IOrderItemFactory itemFactory,
         IOrderPricingService pricingService,
+        IOrderPaymentBuilder paymentBuilder,
         IFidelityPointsService fidelityPointsService,
         IOrderNotificationService notifications,
         ILogger<CreateOrderCommandHandler> logger)
@@ -44,6 +46,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _addressFactory = addressFactory;
         _itemFactory = itemFactory;
         _pricingService = pricingService;
+        _paymentBuilder = paymentBuilder;
         _fidelityPointsService = fidelityPointsService;
         _notifications = notifications;
         _logger = logger;
@@ -131,60 +134,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 _logger.LogInformation("Order will earn {Points} fidelity points", pointsToEarn);
             }
 
-            // Process payments
-            foreach (var paymentDto in command.Payments)
-            {
-                var payment = new OrderPayment
-                {
-                    PaymentMethod = paymentDto.PaymentMethod,
-                    Amount = paymentDto.Amount,
-                    Status = PaymentStatus.Pending,
-                    TransactionId = paymentDto.TransactionId,
-                    ReferenceNumber = paymentDto.ReferenceNumber,
-                    CardLastFourDigits = paymentDto.CardLastFourDigits,
-                    CardType = paymentDto.CardType,
-                    PaymentGateway = paymentDto.PaymentGateway,
-                    PaymentNotes = paymentDto.PaymentNotes,
-                    PaymentDate = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-
-                // Only mark non-Cash payments as completed immediately
-                // Cash payments remain Pending until explicitly completed via AddPaymentToOrder
-                if (payment.PaymentMethod != PaymentMethod.Cash)
-                {
-                    payment.Status = PaymentStatus.Completed;
-                    // Here you would integrate with payment gateways
-                }
-
-                order.Payments.Add(payment);
-            }
-
-            // Calculate totalPaid from only completed payments
-            // Cash payments created with Pending status should not count until explicitly completed
-            decimal totalPaid = order.Payments.Where(p => p.Status == PaymentStatus.Completed).Sum(p => p.Amount);
-
-            // Update payment summary
-            order.TotalPaid = totalPaid;
-            order.RemainingAmount = order.Total - totalPaid;
-
-            // Update payment status with tolerance for floating point precision in financial calculations
-            // Use 0.01 (1 cent) as tolerance to handle rounding errors
-            const decimal tolerance = 0.01m;
-            if (order.RemainingAmount <= tolerance)
-            {
-                // If remaining is within tolerance of zero or negative, it's fully paid or overpaid
-                order.PaymentStatus = order.RemainingAmount < -tolerance ? PaymentStatus.Overpaid : PaymentStatus.Completed;
-            }
-            else if (totalPaid > 0)
-            {
-                order.PaymentStatus = PaymentStatus.PartiallyPaid;
-            }
-            else
-            {
-                order.PaymentStatus = PaymentStatus.Pending;
-            }
+            _paymentBuilder.AddPayments(order, command.Payments);
+            _paymentBuilder.UpdatePaymentSummary(order);
 
             // Add initial status history
             // Add order status history
