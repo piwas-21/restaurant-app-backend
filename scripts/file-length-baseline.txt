@@ -24,7 +24,6 @@ RestaurantSystem.Api/Features/FidelityPoints/Controllers/CustomerDiscountsContro
 RestaurantSystem.Api/Features/FidelityPoints/Services/FidelityPointsService.cs
 RestaurantSystem.Api/Features/FidelityPoints/Services/CustomerDiscountService.cs
 RestaurantSystem.Api/Features/Auth/AuthController.cs
-RestaurantSystem.Api/Features/Reservations/ReservationsController.cs
 RestaurantSystem.Api/Features/Reservations/TablesController.cs
 RestaurantSystem.Api/Features/User/UserController.cs
 RestaurantSystem.Api/Features/User/Dtos/UserDto.cs
@@ -42,7 +41,6 @@ RestaurantSystem.Api/Features/Orders/Commands/AddPaymentToOrderCommand/AddPaymen
 RestaurantSystem.Api/Features/Orders/EventsController.cs
 RestaurantSystem.Api/Features/Orders/Services/OrderMappingService.cs
 RestaurantSystem.Api/Features/Orders/Services/OrderEventService.cs
-RestaurantSystem.Api/Features/GlobalIngredients/GlobalIngredientsController.cs
 RestaurantSystem.Api/Features/Categories/CategoriesController.cs
 RestaurantSystem.Api/Features/Email/EmailTestController.cs
 RestaurantSystem.Api/Common/Services/EmailService.cs
