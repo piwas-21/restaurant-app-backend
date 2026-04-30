@@ -23,6 +23,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderItemFactory _itemFactory;
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
+    private readonly IOrderTableReservationService _tableReservation;
     private readonly IFidelityPointsService _fidelityPointsService;
     private readonly IOrderNotificationService _notifications;
 
@@ -35,6 +36,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderItemFactory itemFactory,
         IOrderPricingService pricingService,
         IOrderPaymentBuilder paymentBuilder,
+        IOrderTableReservationService tableReservation,
         IFidelityPointsService fidelityPointsService,
         IOrderNotificationService notifications,
         ILogger<CreateOrderCommandHandler> logger)
@@ -47,6 +49,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _itemFactory = itemFactory;
         _pricingService = pricingService;
         _paymentBuilder = paymentBuilder;
+        _tableReservation = tableReservation;
         _fidelityPointsService = fidelityPointsService;
         _notifications = notifications;
         _logger = logger;
@@ -253,64 +256,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                     order, OrderNotificationService.DefaultDineInPreparationMinutes, cancellationToken);
             }
 
-            // Reserve table for dine-in orders
-            if (order.Type == OrderType.DineIn && order.TableNumber.HasValue)
-            {
-                try
-                {
-                    var tableNumber = order.TableNumber.Value.ToString();
-
-                    // Find table by number
-                    var table = await _context.Tables
-                        .FirstOrDefaultAsync(t => t.TableNumber == tableNumber && t.IsActive, cancellationToken);
-
-                    if (table != null)
-                    {
-                        // Check if table is already reserved
-                        var now = DateTime.UtcNow;
-                        var existingReservation = await _context.TableReservations
-                            .FirstOrDefaultAsync(r =>
-                                r.TableId == table.Id &&
-                                r.IsActive &&
-                                r.ReservedUntil > now,
-                                cancellationToken);
-
-                        if (existingReservation == null)
-                        {
-                            var reservation = new TableReservation
-                            {
-                                TableId = table.Id,
-                                TableNumber = tableNumber,
-                                OrderId = order.Id,
-                                ReservedAt = now,
-                                ReservedUntil = now.AddHours(2), // 2 hour default
-                                IsActive = true,
-                                CreatedBy = _currentUserService.GetAuditIdentifier()
-                            };
-
-                            _context.TableReservations.Add(reservation);
-                            await _context.SaveChangesAsync(cancellationToken);
-
-                            _logger.LogInformation(
-                                "Table {TableNumber} reserved for order {OrderNumber} until {ReservedUntil}",
-                                tableNumber, order.OrderNumber, reservation.ReservedUntil);
-                        }
-                        else
-                        {
-                            _logger.LogWarning(
-                                "Table {TableNumber} is already reserved until {ReservedUntil}",
-                                tableNumber, existingReservation.ReservedUntil);
-                        }
-                    }
-                }
-                catch (Exception reservationEx)
-                {
-                    _logger.LogError(reservationEx,
-                        "Failed to create table reservation for order {OrderNumber}",
-                        order.OrderNumber);
-                    // Don't fail the order creation if reservation fails
-                }
-            }
+            await _tableReservation.ReserveForDineInAsync(order, cancellationToken);
             // NOTE: For Takeaway and Delivery orders, email sending has been moved to the explicit /send-confirmation-email endpoint
             // This prevents duplicate emails and gives the frontend control over when emails are sent
 
