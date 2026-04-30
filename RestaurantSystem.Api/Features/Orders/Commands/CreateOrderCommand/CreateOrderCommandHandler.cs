@@ -16,7 +16,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateOrderCommandHandler> _logger;
-    private readonly IOrderEventService _orderEventService;
     private readonly IOrderMappingService _mappingService;
     private readonly IOrderAddressFactory _addressFactory;
     private readonly IOrderItemFactory _itemFactory;
@@ -29,7 +28,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     public CreateOrderCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        IOrderEventService orderEventService,
         IOrderMappingService mappingService,
         IOrderAddressFactory addressFactory,
         IOrderItemFactory itemFactory,
@@ -42,7 +40,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     {
         _context = context;
         _currentUserService = currentUserService;
-        _orderEventService = orderEventService;
         _mappingService = mappingService;
         _addressFactory = addressFactory;
         _itemFactory = itemFactory;
@@ -170,30 +167,11 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             // Map to DTO
             var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
 
-            // Notify clients via SSE - wrap in try-catch to ensure order creation succeeds even if notification fails
-            try
-            {
-                _logger.LogInformation("Attempting to notify clients of order creation: {OrderNumber}", order.OrderNumber);
-                await _orderEventService.NotifyOrderCreated(orderDto);
-                _logger.LogInformation("Successfully notified clients of order creation: {OrderNumber}", order.OrderNumber);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to notify clients of order creation for {OrderNumber}, but order was created successfully",
-                    order.OrderNumber);
-            }
-
-            if (order.IsFocusOrder)
-            {
-                try
-                {
-                    await _orderEventService.NotifyFocusOrderUpdate(orderDto);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to notify clients of focus order update for {OrderNumber}", order.OrderNumber);
-                }
-            }
+            // Best-effort SSE broadcasts. The notification service swallows
+            // failures internally so order creation never fails because a
+            // client couldn't be reached.
+            await _notifications.NotifyOrderCreatedAsync(orderDto);
+            await _notifications.NotifyFocusOrderUpdateAsync(orderDto);
 
             // Auto-confirmed orders (Dine-in) send the confirmed-email synchronously here.
             // Other order types defer to the /send-confirmation-email endpoint.
