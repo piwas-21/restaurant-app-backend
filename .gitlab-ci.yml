@@ -119,14 +119,19 @@ include:
 # push triggers the build_image + trivy jobs.
 
 .shell_runner_docker_login: &shell_runner_docker_login
-    # Per-job DOCKER_CONFIG isolates the keychain entry for registry.gitlab.com.
-    # Without this, concurrent backend+frontend pipelines on the same host
-    # race each other's `docker login` for that single keychain key (only the
-    # last writer wins; the loser pulls with another project's job-token and
-    # gets 401). The DOCKER_CONFIG dir has no credsStore, so creds land in a
-    # plain config.json scoped to this job.
+    # Per-job DOCKER_CONFIG to keep concurrent backend + frontend pipelines
+    # from racing each other's registry.gitlab.com credential. The dir alone
+    # is not enough on macOS — `docker login` against an empty DOCKER_CONFIG
+    # auto-injects `credsStore: "osxkeychain"`, routing the credential
+    # through the shared system keychain (one entry per registry, last
+    # writer wins, the loser pushes with the wrong token and 401s on
+    # `gitlab.com/jwt/auth`). Pre-seeding an explicit empty config.json
+    # opts out of credsStore inheritance, so the credential lands in
+    # `$DOCKER_CONFIG/config.json` (`auths.<reg>.auth = <base64>`) scoped
+    # to this job alone.
     - export DOCKER_CONFIG="$CI_PROJECT_DIR/.docker-$CI_JOB_ID"
     - mkdir -p "$DOCKER_CONFIG"
+    - echo '{}' > "$DOCKER_CONFIG/config.json"
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
 build_image:
