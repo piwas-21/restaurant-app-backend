@@ -257,8 +257,13 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 // appsettings.json (production defaults) overlaid by appsettings.Development.json
 // (much higher dev limits so the Playwright E2E suite runs repeatedly
 // without bouncing the API). See Settings/RateLimiterSettings.cs.
-var rateLimiter = builder.Configuration.GetSection("RateLimiter").Get<RateLimiterSettings>()
-    ?? new RateLimiterSettings();
+// Register IOptions<RateLimiterSettings> for DI consistency with the sibling
+// settings (JwtSettings, EmailSettings, …). Not consumed by a handler today,
+// but matches the pattern and keeps the [Range] annotations available to a
+// future ValidateDataAnnotations() pipeline.
+var rateLimiterSection = builder.Configuration.GetSection("RateLimiter");
+builder.Services.Configure<RateLimiterSettings>(rateLimiterSection);
+var rateLimiter = rateLimiterSection.Get<RateLimiterSettings>() ?? new RateLimiterSettings();
 
 builder.Services.AddRateLimiter(options =>
 {
