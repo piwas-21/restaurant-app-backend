@@ -50,7 +50,12 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Configuration.SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddJsonFile("app-secrets.json", optional: true, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    // Re-add env vars LAST so they override the JSON files we just appended
+    // (the default builder added env vars before our JSON sources, so without
+    // this they'd be shadowed). Lets us point at Mailpit / a different DB
+    // for E2E without touching app-secrets.json.
+    .AddEnvironmentVariables();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -248,37 +253,44 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+// Rate-limit policy values come from the RateLimiter section of
+// appsettings.json (production defaults) overlaid by appsettings.Development.json
+// (much higher dev limits so the Playwright E2E suite runs repeatedly
+// without bouncing the API). See Settings/RateLimiterSettings.cs.
+var rateLimiter = builder.Configuration.GetSection("RateLimiter").Get<RateLimiterSettings>()
+    ?? new RateLimiterSettings();
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // 5 attempts per 15 minutes per IP — covers login + refresh-token
+    // /api/Auth/login + refresh-token
     options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
-            Window = TimeSpan.FromMinutes(15),
+            PermitLimit = rateLimiter.AuthPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.AuthWindowMinutes),
             QueueLimit = 0
         }));
 
-    // 3 attempts per hour per IP — forgot-password
+    // /api/Auth/forgot-password + reset-password
     options.AddPolicy("forgot-password", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 3,
-            Window = TimeSpan.FromHours(1),
+            PermitLimit = rateLimiter.ForgotPasswordPermitLimit,
+            Window = TimeSpan.FromHours(rateLimiter.ForgotPasswordWindowHours),
             QueueLimit = 0
         }));
 
-    // 10 registrations per hour per IP
+    // /api/User/register/customer
     options.AddPolicy("register", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 10,
-            Window = TimeSpan.FromHours(1),
+            PermitLimit = rateLimiter.RegisterPermitLimit,
+            Window = TimeSpan.FromHours(rateLimiter.RegisterWindowHours),
             QueueLimit = 0
         }));
 });

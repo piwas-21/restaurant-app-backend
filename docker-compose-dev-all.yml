@@ -50,6 +50,20 @@ services:
       - redis-data-dev:/data
     command: redis-server --appendonly yes
 
+  # SMTP catcher for local dev + E2E. Test code reads sent emails via the
+  # HTTP API at :8025; the backend points at :1025 when EmailSettings__SmtpHost
+  # is overridden. Used by the Playwright auth tests for the verify-email-link
+  # flow (see frontend/e2e/helpers/mailpit.ts).
+  mailpit:
+    image: axllent/mailpit:v1.29.7
+    container_name: restaurant-mailpit-dev
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # HTTP API + UI
+    networks:
+      - restaurant-network-dev
+    restart: unless-stopped
+
 networks:
   restaurant-network-dev:
     driver: bridge
