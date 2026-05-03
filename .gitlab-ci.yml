@@ -150,7 +150,25 @@ build_image:
         - *shell_runner_docker_login
     script:
         - docker build -t $IMAGE_NAME:$IMAGE_TAG .
-        - docker push $IMAGE_NAME:$IMAGE_TAG
+        # Push with retry: when a concurrent frontend pipeline `docker login`s
+        # to the same registry, our pending JWT-exchange can race the macOS
+        # keychain and 401 on `gitlab.com/jwt/auth` even though our own
+        # `docker login` succeeded (see develop pipeline #324, 2026-05-03).
+        # Re-`docker login` + retry up to 3 times with backoff — the second
+        # login refreshes the credential and the next push lands clean.
+        - |
+            for attempt in 1 2 3; do
+                if docker push "$IMAGE_NAME:$IMAGE_TAG"; then
+                    break
+                fi
+                if [ "$attempt" -eq 3 ]; then
+                    echo "docker push failed after 3 attempts" >&2
+                    exit 1
+                fi
+                echo "docker push attempt $attempt failed, refreshing login and retrying..." >&2
+                sleep $((attempt * 5))
+                docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+            done
 
 # Docker Image Scanning for security vulnerabilities and misconfigurations
 # Trivy tool is used.
