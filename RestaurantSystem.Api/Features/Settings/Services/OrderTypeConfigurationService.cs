@@ -27,6 +27,8 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
 
     public async Task<List<OrderTypeConfigurationDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
+        await EnsureAllOrderTypesExistAsync(cancellationToken);
+
         var configurations = await _context.OrderTypeConfigurations
             .OrderBy(c => c.DisplayOrder)
             .ToListAsync(cancellationToken);
@@ -37,6 +39,35 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
             IsEnabled = c.IsEnabled,
             DisplayOrder = c.DisplayOrder
         }).ToList();
+    }
+
+    private async Task EnsureAllOrderTypesExistAsync(CancellationToken cancellationToken)
+    {
+        var existing = await _context.OrderTypeConfigurations
+            .Select(c => c.OrderType)
+            .ToListAsync(cancellationToken);
+
+        var allTypes = Enum.GetValues<OrderType>();
+        var missing = allTypes.Except(existing).ToList();
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        foreach (var type in missing)
+        {
+            _context.OrderTypeConfigurations.Add(new OrderTypeConfiguration
+            {
+                OrderType = type,
+                IsEnabled = true,
+                DisplayOrder = (int)type,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = auditIdentifier
+            });
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<List<OrderType>> GetEnabledOrderTypesAsync(CancellationToken cancellationToken = default)
