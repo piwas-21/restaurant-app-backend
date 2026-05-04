@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Api.Features.User.Commands.RegisterUserCommand;
 using RestaurantSystem.Api.Features.User.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -19,9 +18,9 @@ public record GetUsersQuery(
 public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<PagedResult<UserDto>>>
 {
     private readonly ApplicationDbContext _context;
-    private readonly ILogger<RegisterUserCommandHandler> _logger;
+    private readonly ILogger<GetProductsQueryHandler> _logger;
 
-    public GetProductsQueryHandler(ApplicationDbContext context, ILogger<RegisterUserCommandHandler> logger)
+    public GetProductsQueryHandler(ApplicationDbContext context, ILogger<GetProductsQueryHandler> logger)
     {
         _context = context;
         _logger = logger;
@@ -29,7 +28,7 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
 
     public async Task<ApiResponse<PagedResult<UserDto>>> Handle(GetUsersQuery query, CancellationToken cancellationToken)
     {
-        var userQuery = _context.Users.AsQueryable();
+        var userQuery = _context.Users.IgnoreQueryFilters().AsQueryable();
 
         if (query.Role != null)
         {
@@ -44,7 +43,11 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var searchLower = query.Search.ToLower();
-            userQuery = userQuery.Where(u => u.FirstName.ToLower().Contains(searchLower));
+            userQuery = userQuery.Where(u =>
+                u.FirstName.ToLower().Contains(searchLower) ||
+                u.LastName.ToLower().Contains(searchLower) ||
+                (u.Email ?? string.Empty).ToLower().Contains(searchLower) ||
+                (u.FirstName + " " + u.LastName).ToLower().Contains(searchLower));
         }
 
         // Get total count
@@ -56,10 +59,21 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
             .Take(query.PageSize)
             .Select(u => new UserDto
             {
+                Id = u.Id,
                 Email = u.Email ?? string.Empty,
                 FirstName = u.FirstName,
                 LastName = u.LastName,
-                Role = u.Role
+                PhoneNumber = u.PhoneNumber,
+                Role = u.Role.ToString(),
+                IsEmailConfirmed = u.EmailConfirmed,
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt,
+                IsDeleted = u.IsDeleted,
+                DeletedAt = u.DeletedAt,
+                Metadata = u.Metadata ?? new Dictionary<string, string>(),
+                OrderLimitAmount = u.OrderLimitAmount,
+                DiscountPercentage = u.DiscountPercentage,
+                IsDiscountActive = u.IsDiscountActive
             }).ToListAsync(cancellationToken);
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);
@@ -72,10 +86,10 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
                 totalPages
             );
 
-        _logger.LogInformation("Retrieved {ProductCount} products (page {Page} of {TotalPages})",
+        _logger.LogInformation("Retrieved {UserCount} users (page {Page} of {TotalPages})",
             users.Count, query.Page, totalPages);
 
         return ApiResponse<PagedResult<UserDto>>.SuccessWithData(result,
-            $"Retrieved {users.Count} products");
+            $"Retrieved {users.Count} users");
     }
 }

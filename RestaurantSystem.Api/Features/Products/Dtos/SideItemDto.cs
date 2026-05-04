@@ -9,4 +9,6 @@ public record SideItemDto
     public string? ImageUrl { get; init; }
     public bool IsRequired { get; init; }
     public int DisplayOrder { get; init; }
+    public List<ProductImageDto> Images { get; init; } = [];
+
 }

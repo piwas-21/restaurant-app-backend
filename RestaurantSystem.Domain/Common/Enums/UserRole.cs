@@ -1,5 +1,4 @@
-﻿
-namespace RestaurantSystem.Domain.Common.Enums
+﻿namespace RestaurantSystem.Domain.Common.Enums
 {
     public enum UserRole
     {

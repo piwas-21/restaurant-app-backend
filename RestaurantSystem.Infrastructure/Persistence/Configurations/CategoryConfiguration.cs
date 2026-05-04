@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 internal class CategoryConfiguration
 {
 }

@@ -1,11 +1,13 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class ProductDescription : Entity
 {
-    public string Name { get; set; }
-    public string Lang { get; set; }
-    public string Description { get; set; }
+    public required string Name { get; set; }
+    public required string Lang { get; set; }
+    public required string Description { get; set; }
+
     // Foreign key
     public Guid ProductId { get; set; }
 

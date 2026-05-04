@@ -9,11 +9,17 @@ namespace RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
 
 public record AddToBasketCommand(
     string SessionId,
-    Guid? ProductId,
+    Guid ProductId,
     Guid? ProductVariationId,
     Guid? MenuId,
     int Quantity,
-    string? SpecialInstructions
+    string? SpecialInstructions,
+    List<Guid>? SelectedIngredients,
+    List<Guid>? ExcludedIngredients,
+    List<Guid>? AddedIngredients,
+    Dictionary<Guid, int>? IngredientQuantities,
+    List<SelectedSideItemDto>? SelectedSideItems,
+    List<SelectedMenuOptionDto>? SelectedMenuOptions
 ) : ICommand<ApiResponse<BasketDto>>;
 
 
@@ -44,6 +50,12 @@ public class AddToBasketCommandHandler : ICommandHandler<AddToBasketCommand, Api
                 MenuId = command.MenuId,
                 Quantity = command.Quantity,
                 SpecialInstructions = command.SpecialInstructions,
+                SelectedIngredients = command.SelectedIngredients,
+                ExcludedIngredients = command.ExcludedIngredients,
+                AddedIngredients = command.AddedIngredients,
+                IngredientQuantities = command.IngredientQuantities,
+                SelectedSideItems = command.SelectedSideItems,
+                SelectedMenuOptions = command.SelectedMenuOptions
             };
 
             var basket = await _basketService.AddItemToBasketAsync(

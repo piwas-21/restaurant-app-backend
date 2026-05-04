@@ -7,7 +7,6 @@ using RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Model;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 
@@ -16,18 +15,21 @@ public record UpdateProductCommand(
     string Name,
     string? Description,
     decimal BasePrice,
-    string? ImageUrl,
     bool IsActive,
     bool IsAvailable,
+    bool IsSpecial,
     int PreparationTimeMinutes,
     ProductType Type,
-    List<string> Ingredients,
-    List<string> Allergens,
+    KitchenType KitchenType,
+    List<string>? Ingredients,
+    List<string>? Allergens,
     int DisplayOrder,
     List<Guid> CategoryIds,
     Guid? PrimaryCategoryId,
     List<UpdateProductVariationDto>? Variations,
     List<Guid>? SuggestedSideItemIds,
+    List<ProductIngredientDto>? DetailedIngredients,
+    MenuDefinitionDto? MenuDefinition,
     ProductDescriptionsDto Content
 ) : ICommand<ApiResponse<ProductDto>>;
 
@@ -36,6 +38,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UpdateProductCommandHandler> _logger;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<GetProductByIdQueryHandler> _getProductlogger;
 
 
@@ -43,15 +46,15 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
         ILogger<UpdateProductCommandHandler> logger,
-        ILogger<GetProductByIdQueryHandler> getProductlogger
-
-
+        ILogger<GetProductByIdQueryHandler> getProductlogger,
+        IConfiguration configuration
         )
     {
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
         _getProductlogger = getProductlogger;
+        _configuration = configuration;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -59,8 +62,12 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         var product = await _context.Products
             .Include(p => p.ProductCategories)
             .Include(p => p.Variations)
+                .ThenInclude(v => v.Descriptions)
             .Include(p => p.SuggestedSideItems)
-            .FirstOrDefaultAsync(p => p.Id == command.Id, cancellationToken);
+            .Include(p => p.DetailedIngredients)
+                .ThenInclude(di => di.Descriptions)
+            .Include(p => p.MenuDefinition)
+            .FirstOrDefaultAsync(p => p.Id == command.Id && !p.IsDeleted, cancellationToken);
 
         if (product == null)
         {
@@ -83,17 +90,15 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         product.BasePrice = command.BasePrice;
         product.IsActive = command.IsActive;
         product.IsAvailable = command.IsAvailable;
+        product.IsSpecial = command.IsSpecial;
         product.PreparationTimeMinutes = command.PreparationTimeMinutes;
         product.Type = command.Type;
-        product.Ingredients = command.Ingredients.Any()
-            ? System.Text.Json.JsonSerializer.Serialize(command.Ingredients)
-            : null;
-        product.Allergens = command.Allergens.Any()
-            ? System.Text.Json.JsonSerializer.Serialize(command.Allergens)
-            : null;
+        product.KitchenType = command.KitchenType;
+        product.Ingredients = command.Ingredients;
+        product.Allergens = command.Allergens;
         product.DisplayOrder = command.DisplayOrder;
         product.UpdatedAt = DateTime.UtcNow;
-        product.UpdatedBy = _currentUserService.UserId?.ToString() ?? "System";
+        product.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         // Update categories
         _context.ProductCategories.RemoveRange(product.ProductCategories);
@@ -108,21 +113,38 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 IsPrimary = categoryId == command.PrimaryCategoryId,
                 DisplayOrder = displayOrder++,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                CreatedBy = _currentUserService.GetAuditIdentifier()
             };
             _context.ProductCategories.Add(productCategory);
         }
 
-        _context.ProductDescriptions.RemoveRange(product.Descriptions);
+
+        var languageCodes = command.Content.Select(x => x.Key).ToList();
+        var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateLanguageCodes.Any())
+        {
+            return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
+        }
+
+
+        if (command.Content.Any())
+        {
+            _context.ProductDescriptions.RemoveRange(product.Descriptions);
+        }
 
         foreach (var key in command.Content.Keys)
         {
+
             var content = command.Content[key];
             var productDescription = new ProductDescription()
             {
-                UpdatedBy = _currentUserService.UserId?.ToString() ?? "System",
+                UpdatedBy = _currentUserService.GetAuditIdentifier(),
                 UpdatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.UserId?.ToString() ?? "System",
+                CreatedBy = _currentUserService.GetAuditIdentifier(),
                 CreatedAt = DateTime.UtcNow,
                 Description = content.Description,
                 Lang = key,
@@ -130,52 +152,90 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 Product = product,
                 ProductId = product.Id
             };
-            _context.ProductDescriptions.Add(productDescription);
-            product.Descriptions.Add(productDescription);
+            await _context.ProductDescriptions.AddAsync(productDescription);
         }
 
         // Update variations
         if (command.Variations != null)
         {
-            // Handle existing variations
-            foreach (var variation in product.Variations)
+            var incomingVariationIds = command.Variations
+                .Where(v => v.Id.HasValue)
+                .Select(v => v.Id!.Value)
+                .ToList();
+
+            // Remove variations not in the incoming list
+            var variationsToRemove = product.Variations
+                .Where(v => !incomingVariationIds.Contains(v.Id))
+                .ToList();
+            _context.ProductVariations.RemoveRange(variationsToRemove);
+
+            foreach (var variationDto in command.Variations)
             {
-                var updateDto = command.Variations.FirstOrDefault(v => v.Id == variation.Id);
-                if (updateDto != null)
+                ProductVariation? variation;
+
+                if (variationDto.Id.HasValue)
                 {
-                    variation.Name = updateDto.Name;
-                    variation.Description = updateDto.Description;
-                    variation.PriceModifier = updateDto.PriceModifier;
-                    variation.IsActive = updateDto.IsActive;
-                    variation.DisplayOrder = updateDto.DisplayOrder;
+                    // Update existing variation
+                    variation = product.Variations.FirstOrDefault(v => v.Id == variationDto.Id.Value);
+                    if (variation == null)
+                    {
+                        // Variation ID was provided but not found, skip or log error
+                        _logger.LogWarning("Variation with ID {VariationId} not found for product {ProductId}",
+                            variationDto.Id.Value, product.Id);
+                        continue;
+                    }
+
+                    // Update properties
+                    variation.Name = variationDto.Name;
+                    variation.Description = variationDto.Description;
+                    variation.PriceModifier = variationDto.PriceModifier;
+                    variation.IsActive = variationDto.IsActive;
+                    variation.DisplayOrder = variationDto.DisplayOrder;
                     variation.UpdatedAt = DateTime.UtcNow;
-                    variation.UpdatedBy = _currentUserService.UserId?.ToString() ?? "System";
+                    variation.UpdatedBy = _currentUserService.GetAuditIdentifier();
+
+                    // Remove and recreate descriptions for existing variations
+                    var existingDescriptions = await _context.ProductVariationDescriptions
+                        .Where(d => d.ProductVariationId == variation.Id)
+                        .ToListAsync(cancellationToken);
+                    _context.ProductVariationDescriptions.RemoveRange(existingDescriptions);
                 }
                 else
                 {
-                    // Mark as deleted if not in update list
-                    variation.IsDeleted = true;
-                    variation.DeletedAt = DateTime.UtcNow;
-                    variation.DeletedBy = _currentUserService.UserId?.ToString() ?? "System";
+                    // Create new variation
+                    variation = new ProductVariation
+                    {
+                        ProductId = product.Id,
+                        Name = variationDto.Name,
+                        Description = variationDto.Description,
+                        PriceModifier = variationDto.PriceModifier,
+                        IsActive = variationDto.IsActive,
+                        DisplayOrder = variationDto.DisplayOrder,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = _currentUserService.GetAuditIdentifier()
+                    };
+                    await _context.ProductVariations.AddAsync(variation, cancellationToken);
                 }
-            }
 
-            // Add new variations
-            var newVariations = command.Variations.Where(v => v.Id == null || v.Id == Guid.Empty);
-            foreach (var newVariation in newVariations)
-            {
-                var variation = new ProductVariation
+                // Add variation descriptions
+                if (variationDto.Content != null)
                 {
-                    ProductId = product.Id,
-                    Name = newVariation.Name,
-                    Description = newVariation.Description,
-                    PriceModifier = newVariation.PriceModifier,
-                    IsActive = newVariation.IsActive,
-                    DisplayOrder = newVariation.DisplayOrder,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
-                };
-                _context.ProductVariations.Add(variation);
+                    foreach (var (languageCode, content) in variationDto.Content)
+                    {
+                        if (string.IsNullOrWhiteSpace(content.Name)) continue;
+
+                        var description = new ProductVariationDescription
+                        {
+                            ProductVariation = variation,
+                            LanguageCode = languageCode,
+                            Name = content.Name,
+                            Description = content.Description,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = _currentUserService.GetAuditIdentifier()
+                        };
+                        await _context.ProductVariationDescriptions.AddAsync(description, cancellationToken);
+                    }
+                }
             }
         }
 
@@ -194,9 +254,138 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     IsRequired = false,
                     DisplayOrder = sideItemDisplayOrder++,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                    CreatedBy = _currentUserService.GetAuditIdentifier()
                 };
-                _context.ProductSideItems.Add(productSideItem);
+                await _context.ProductSideItems.AddAsync(productSideItem, cancellationToken);
+            }
+        }
+
+        // Update detailed ingredients
+        if (command.DetailedIngredients != null)
+        {
+            // Remove existing ingredients and their descriptions
+            var existingIngredients = product.DetailedIngredients.ToList();
+            _context.ProductIngredients.RemoveRange(existingIngredients);
+
+            // Add new ingredients
+            foreach (var ingredientDto in command.DetailedIngredients)
+            {
+                var ingredient = new ProductIngredient
+                {
+                    ProductId = product.Id,
+                    Name = ingredientDto.Name,
+                    IsOptional = ingredientDto.IsOptional,
+                    Price = ingredientDto.Price,
+                    IsIncludedInBasePrice = ingredientDto.IsIncludedInBasePrice,
+                    IsActive = ingredientDto.IsActive,
+                    DisplayOrder = ingredientDto.DisplayOrder,
+                    MaxQuantity = ingredientDto.MaxQuantity,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = _currentUserService.GetAuditIdentifier()
+                };
+
+                await _context.ProductIngredients.AddAsync(ingredient, cancellationToken);
+
+                // Add ingredient descriptions
+                if (ingredientDto.Content != null)
+                {
+                    foreach (var (languageCode, content) in ingredientDto.Content)
+                    {
+                        var description = new ProductIngredientDescription
+                        {
+                            ProductIngredient = ingredient,
+                            LanguageCode = languageCode,
+                            Name = content.Name,
+                            Description = content.Description,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = _currentUserService.GetAuditIdentifier()
+                        };
+                        await _context.ProductIngredientDescriptions.AddAsync(description, cancellationToken);
+                    }
+                }
+            }
+
+            // Update Menu Definition
+            if (command.Type == ProductType.Menu && command.MenuDefinition != null)
+            {
+                var menuDef = await _context.MenuDefinitions
+                    .Include(m => m.Sections)
+                        .ThenInclude(s => s.Items)
+                    .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
+
+                if (menuDef == null)
+                {
+                    // Create new if not exists
+                    menuDef = new MenuDefinition
+                    {
+                        ProductId = product.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = _currentUserService.GetAuditIdentifier()
+                    };
+                    _context.MenuDefinitions.Add(menuDef);
+                }
+
+                // Update properties
+                menuDef.IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable;
+                menuDef.StartTime = command.MenuDefinition.StartTime;
+                menuDef.EndTime = command.MenuDefinition.EndTime;
+                menuDef.AvailableMonday = command.MenuDefinition.AvailableMonday;
+                menuDef.AvailableTuesday = command.MenuDefinition.AvailableTuesday;
+                menuDef.AvailableWednesday = command.MenuDefinition.AvailableWednesday;
+                menuDef.AvailableThursday = command.MenuDefinition.AvailableThursday;
+                menuDef.AvailableFriday = command.MenuDefinition.AvailableFriday;
+                menuDef.AvailableSaturday = command.MenuDefinition.AvailableSaturday;
+                menuDef.AvailableSunday = command.MenuDefinition.AvailableSunday;
+                menuDef.UpdatedAt = DateTime.UtcNow;
+                menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
+
+                // Update sections
+                if (command.MenuDefinition.Sections != null)
+                {
+                    // Remove existing sections (simplest approach for now, can be optimized)
+                    _context.MenuSections.RemoveRange(menuDef.Sections);
+
+                    foreach (var sectionDto in command.MenuDefinition.Sections)
+                    {
+                        var section = new MenuSection
+                        {
+                            MenuDefinition = menuDef,
+                            Name = sectionDto.Name,
+                            Description = sectionDto.Description,
+                            DisplayOrder = sectionDto.DisplayOrder,
+                            IsRequired = sectionDto.IsRequired,
+                            MinSelection = sectionDto.MinSelection,
+                            MaxSelection = sectionDto.MaxSelection,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = _currentUserService.GetAuditIdentifier()
+                        };
+
+                        _context.MenuSections.Add(section);
+
+                        if (sectionDto.Items != null)
+                        {
+                            foreach (var itemDto in sectionDto.Items)
+                            {
+                                var item = new MenuSectionItem
+                                {
+                                    MenuSection = section,
+                                    ProductId = itemDto.ProductId,
+                                    AdditionalPrice = itemDto.AdditionalPrice,
+                                    DisplayOrder = itemDto.DisplayOrder,
+                                    IsDefault = itemDto.IsDefault,
+                                    CreatedAt = DateTime.UtcNow,
+                                    CreatedBy = _currentUserService.GetAuditIdentifier()
+                                };
+                                _context.MenuSectionItems.Add(item);
+                            }
+                        }
+                    }
+                }
+            }
+            else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
+            {
+                // If type changed from Menu to something else, remove definition
+                _context.MenuDefinitions.Remove(product.MenuDefinition);
             }
         }
 
@@ -209,9 +398,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             .Include(p => p.Variations.Where(v => !v.IsDeleted))
             .Include(p => p.SuggestedSideItems)
                 .ThenInclude(si => si.SideItemProduct)
+            .Include(p => p.MenuDefinition)
+                .ThenInclude(md => md!.Sections)
+                    .ThenInclude(s => s.Items)
+                        .ThenInclude(i => i.Product)
             .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
-        var handler = new GetProductByIdQueryHandler(_context, _getProductlogger);
+        var handler = new GetProductByIdQueryHandler(_context, _getProductlogger, _configuration);
         var result = await handler.Handle(new GetProductByIdQuery(product.Id), cancellationToken);
 
         _logger.LogInformation("Product {ProductId} updated successfully by user {UserId}",
@@ -220,3 +413,14 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         return result;
     }
 }
+
+
+public record UpdateProductVariationDto(
+    Guid? Id,
+    string Name,
+    string? Description,
+    decimal PriceModifier,
+    bool IsActive,
+    int DisplayOrder,
+    Dictionary<string, ProductVariationContentDto>? Content
+);

@@ -10,6 +10,9 @@ public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordComm
             .NotEmpty().WithMessage("Email is required")
             .EmailAddress().WithMessage("Email must be a valid email address");
 
+        RuleFor(x => x.Token)
+            .NotEmpty().WithMessage("Reset token is required");
+
         RuleFor(x => x.NewPassword)
             .NotEmpty().WithMessage("New password is required")
             .MinimumLength(8).WithMessage("Password must be at least 8 characters long")

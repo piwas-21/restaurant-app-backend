@@ -13,11 +13,15 @@ public class GetProductImagesQueryHandler : IQueryHandler<GetProductImagesQuery,
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetProductImagesQueryHandler> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly string _baseUrl;
 
-    public GetProductImagesQueryHandler(ApplicationDbContext context, ILogger<GetProductImagesQueryHandler> logger)
+    public GetProductImagesQueryHandler(ApplicationDbContext context, ILogger<GetProductImagesQueryHandler> logger, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
+        _baseUrl = configuration["AWS:S3:BaseUrl"]!;
+        _configuration = configuration;
     }
 
     public async Task<ApiResponse<List<ProductImageDto>>> Handle(GetProductImagesQuery query, CancellationToken cancellationToken)
@@ -33,7 +37,8 @@ public class GetProductImagesQueryHandler : IQueryHandler<GetProductImagesQuery,
 
         var images = product.Images.Select(i => new ProductImageDto
         {
-            Url = i.Url,
+            Id = i.Id,
+            Url = _baseUrl + "/" + i.Url,
             AltText = i.AltText,
             IsPrimary = i.IsPrimary,
             SortOrder = i.SortOrder,

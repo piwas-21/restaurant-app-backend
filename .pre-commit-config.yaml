@@ -1,0 +1,86 @@
+# RUMI Backend — pre-commit configuration
+# Install:        pre-commit install && pre-commit install --hook-type pre-push
+# Update hooks:   pre-commit autoupdate
+# Run manually:   pre-commit run --all-files
+#
+# Sprint 1 scope: hygiene + secret scanning.
+# Sprint 2: format gate via `dotnet format --verify-no-changes`.
+# Sprint 3: TreatWarningsAsErrors via Directory.Build.props (verified by
+#          `dotnet build`). Some warning categories are transitionally
+#          excluded — see Directory.Build.props for the list.
+# See docs/QUALITY-SECURITY-PLAN.md.
+
+repos:
+  # ── General hygiene ──────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(svg|patch)$
+      - id: end-of-file-fixer
+        exclude: \.(svg|patch)$
+      - id: check-yaml
+        # GitLab CI uses YAML extensions that the default parser rejects
+        args: ["--unsafe"]
+      - id: check-json
+        # Skip files that legitimately hold credentials placeholders
+        exclude: "(secrets|credentials|service-account|app-secrets)\\.json"
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: no-commit-to-branch
+        # `master` included defensively in case of accidental rename / fork.
+        args: ["--branch", "main", "--branch", "develop", "--branch", "master"]
+
+  # ── Secret scanning ──────────────────────────────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        # Single source of truth for known false positives is .secrets.baseline.
+        # Don't add path excludes here — they hide rows the baseline already
+        # captures, leaving the team without visibility when new "secrets"
+        # appear in those paths. Prefer regenerating the baseline:
+        #   detect-secrets scan --baseline .secrets.baseline
+        args: ["--baseline", ".secrets.baseline"]
+
+  # ── Sprint 2: format gate ────────────────────────────────────────────
+  # Verifies the solution is `dotnet format`-clean. To fix violations run
+  # `dotnet format RestaurantSystem.sln` and re-stage. Runs only when a
+  # .cs / .csproj / .sln file is in the commit.
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format (verify-no-changes)
+        entry: dotnet format RestaurantSystem.sln --verify-no-changes --verbosity minimal
+        language: system
+        pass_filenames: false
+        files: \.(cs|csproj|sln)$
+
+  # ── Sprint 2: file-length gate ───────────────────────────────────────
+  # Enforces the per-file LOC limits from CLAUDE.md §4. Existing oversized
+  # files are grandfathered in scripts/file-length-baseline.txt; new
+  # violations block. See scripts/check-file-length.sh for limits + opt-out.
+  # Per-file mode: pre-commit passes the staged paths; the script checks
+  # only those.
+  - repo: local
+    hooks:
+      - id: file-length
+        name: file-length (CLAUDE.md §4 limits)
+        entry: bash scripts/check-file-length.sh
+        language: system
+        files: \.cs$
+
+  # ── Sprint 3: warnings-as-errors gate ────────────────────────────────
+  # `dotnet build` honours TreatWarningsAsErrors from Directory.Build.props.
+  # Whole-solution build; pass_filenames=false because the property
+  # applies project-wide and a single staged file's compilation isn't
+  # sufficient.
+  - repo: local
+    hooks:
+      - id: dotnet-build-strict
+        name: dotnet build (warnings as errors)
+        entry: dotnet build RestaurantSystem.sln --nologo --verbosity minimal
+        language: system
+        pass_filenames: false
+        files: \.(cs|csproj|sln|props|targets)$

@@ -50,6 +50,13 @@ public class EmailSettings
     public string FromName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Admin email address for notifications
+    /// </summary>
+    [Required]
+    [EmailAddress]
+    public string AdminEmail { get; set; } = string.Empty;
+
+    /// <summary>
     /// Whether to use authentication
     /// </summary>
     public bool UseAuthentication { get; set; } = true;
@@ -60,9 +67,21 @@ public class EmailSettings
     public int TimeoutMs { get; set; } = 30000;
 
     /// <summary>
-    /// Base URL for the frontend application (used in email links)
+    /// Base URL for the frontend application (used in email links).
+    /// Required: must be configured per environment (no default — emails would otherwise
+    /// silently link to localhost in production).
     /// </summary>
-    public string FrontendBaseUrl { get; set; } = "http://localhost:3000";
+    [Required]
+    [Url]
+    public string FrontendBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Base URL for the backend API (used in email action links).
+    /// Required: see FrontendBaseUrl note.
+    /// </summary>
+    [Required]
+    [Url]
+    public string BackendBaseUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// Whether emails are enabled (useful for development/testing)

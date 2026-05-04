@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using System.Text.Json;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations
@@ -43,6 +43,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Configurations
             builder.HasIndex(u => new { u.NormalizedEmail, u.IsDeleted })
                 .IsUnique()
                 .HasFilter("\"is_deleted\" = false");
+
+            builder.Property(r => r.OrderLimitAmount)
+            .HasColumnType("decimal(10,2)");
+
+            builder.Property(r => r.DiscountPercentage)
+                .HasColumnType("decimal(5,2)");
+
+
         }
     }
 }

@@ -2,7 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.SendEmailVerificationCommand;
 

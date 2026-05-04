@@ -1,4 +1,5 @@
-﻿using RestaurantSystem.Domain.Common.Enums;
+﻿using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
@@ -12,10 +13,14 @@ public record ProductDto
     public string? ImageUrl { get; init; } // Primary image URL for backward compatibility
     public bool IsActive { get; init; }
     public bool IsAvailable { get; init; }
+
+    public bool IsSpecial { get; init; } // Is this a special menu (e.g., holiday menu)
     public int PreparationTimeMinutes { get; init; }
     public ProductType Type { get; init; }
-    public List<string> Ingredients { get; init; } = [];
-    public List<string> Allergens { get; init; } = [];
+    public KitchenType KitchenType { get; init; } // Front or Back kitchen designation
+    public List<string>? Ingredients { get; init; } = [];
+    public List<ProductIngredientDto>? DetailedIngredients { get; init; } = [];
+    public List<string>? Allergens { get; init; } = [];
     public int DisplayOrder { get; init; }
     public ProductDescriptionsDto Content { get; set; } = new();
 
@@ -24,6 +29,6 @@ public record ProductDto
     public CategoryDto? PrimaryCategory { get; init; }
     public List<ProductVariationDto> Variations { get; init; } = [];
     public List<SideItemDto> SuggestedSideItems { get; init; } = [];
+    public MenuDefinitionDto? MenuDefinition { get; init; }
 
 }
-

@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.CreateProductCommand;
 
@@ -16,16 +17,12 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
         RuleFor(x => x.BasePrice)
             .GreaterThan(0).WithMessage("Base price must be greater than 0");
 
-        RuleFor(x => x.ImageUrl)
-            .MaximumLength(500).WithMessage("Image URL cannot exceed 500 characters")
-            .Must(BeAValidUrl).When(x => !string.IsNullOrEmpty(x.ImageUrl))
-            .WithMessage("Image URL must be a valid URL");
-
         RuleFor(x => x.PreparationTimeMinutes)
             .GreaterThanOrEqualTo(0).WithMessage("Preparation time cannot be negative");
 
         RuleFor(x => x.Type)
-            .IsInEnum().WithMessage("Invalid product type");
+            .IsInEnum().WithMessage("Invalid product type")
+            .NotEqual(ProductType.Menu).WithMessage("Use CreateMenuBundle API for creating menus");
 
         RuleFor(x => x.DisplayOrder)
             .GreaterThanOrEqualTo(0).WithMessage("Display order cannot be negative");

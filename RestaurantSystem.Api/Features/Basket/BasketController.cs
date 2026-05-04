@@ -80,7 +80,13 @@ public class BasketController : ControllerBase
             request.ProductVariationId,
             request.MenuId,
             request.Quantity,
-            request.SpecialInstructions);
+            request.SpecialInstructions,
+            request.SelectedIngredients,
+            request.ExcludedIngredients,
+            request.AddedIngredients,
+            request.IngredientQuantities,
+            request.SelectedSideItems,
+            request.SelectedMenuOptions);
 
         var result = await _mediator.SendCommand(command);
         return Ok(result);

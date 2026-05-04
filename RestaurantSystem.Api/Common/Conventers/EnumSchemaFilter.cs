@@ -1,7 +1,7 @@
-﻿using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+﻿using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Runtime.Serialization;
+using System.Text.Json.Nodes;
 
 namespace RestaurantSystem.Api.Common.Conventers;
 
@@ -10,15 +10,15 @@ namespace RestaurantSystem.Api.Common.Conventers;
 /// </summary>
 public class EnumSchemaFilter : ISchemaFilter
 {
-    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
-        if (context.Type.IsEnum)
+        if (context.Type.IsEnum && schema is OpenApiSchema openApiSchema)
         {
-            schema.Enum.Clear();
-            schema.Type = "string";
-            schema.Format = null;
+            openApiSchema.Enum?.Clear();
+            openApiSchema.Type = JsonSchemaType.String;
+            openApiSchema.Format = null;
 
-            var enumValues = new List<IOpenApiAny>();
+            var enumValues = new List<JsonNode>();
 
             foreach (var enumValue in Enum.GetValues(context.Type))
             {
@@ -27,10 +27,10 @@ public class EnumSchemaFilter : ISchemaFilter
                     .Cast<EnumMemberAttribute>().FirstOrDefault();
 
                 var value = enumMemberAttribute?.Value ?? enumValue.ToString()!;
-                enumValues.Add(new OpenApiString(value));
+                enumValues.Add(JsonValue.Create(value));
             }
 
-            schema.Enum = enumValues;
+            openApiSchema.Enum = enumValues;
         }
     }
 }

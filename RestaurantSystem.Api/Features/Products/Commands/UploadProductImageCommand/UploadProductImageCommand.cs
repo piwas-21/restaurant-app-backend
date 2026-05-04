@@ -100,7 +100,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
                 {
                     img.IsPrimary = false;
                     img.UpdatedAt = DateTime.UtcNow;
-                    img.UpdatedBy = _currentUserService.UserId?.ToString() ?? "System";
+                    img.UpdatedBy = _currentUserService.GetAuditIdentifier();
                 }
             }
 
@@ -113,7 +113,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
                 IsPrimary = command.IsPrimary || !product.Images.Any(i => !i.IsDeleted),
                 SortOrder = command.SortOrder ?? product.Images.Count(i => !i.IsDeleted),
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                CreatedBy = _currentUserService.GetAuditIdentifier()
             };
 
             _context.ProductImages.Add(productImage);

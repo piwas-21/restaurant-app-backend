@@ -2,7 +2,7 @@
 using Microsoft.IdentityModel.Tokens;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Settings;
-using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Entities;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -49,6 +49,12 @@ namespace RestaurantSystem.Api.Common.Services
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
+        }
+
+        public string HashRefreshToken(string token)
+        {
+            var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+            return Convert.ToBase64String(bytes);
         }
 
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)

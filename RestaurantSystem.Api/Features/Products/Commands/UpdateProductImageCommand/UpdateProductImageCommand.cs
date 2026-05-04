@@ -65,7 +65,7 @@ public class UpdateProductImageCommandHandler : ICommandHandler<UpdateProductIma
             {
                 img.IsPrimary = false;
                 img.UpdatedAt = DateTime.UtcNow;
-                img.UpdatedBy = _currentUserService.UserId?.ToString() ?? "System";
+                img.UpdatedBy = _currentUserService.GetAuditIdentifier();
             }
 
             image.IsPrimary = true;
@@ -76,7 +76,7 @@ public class UpdateProductImageCommandHandler : ICommandHandler<UpdateProductIma
         }
 
         image.UpdatedAt = DateTime.UtcNow;
-        image.UpdatedBy = _currentUserService.UserId?.ToString() ?? "System";
+        image.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         await _context.SaveChangesAsync(cancellationToken);
 
