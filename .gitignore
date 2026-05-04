@@ -378,3 +378,6 @@ MigrationBackup/
 FodyWeavers.xsd
 /RestaurantSystem.Api/app-secrets.Development.json
 /RestaurantSystem.Api/app-secrets.json
+
+# Claude Code per-repo settings (machine-local).
+.claude/
