@@ -1,0 +1,93 @@
+name: CI
+
+# Ported from .gitlab-ci.yml as part of the GitLab → GitHub migration.
+# Out-of-scope here: build_image / trivy — those reintroduce when the
+# new deploy strategy lands. Image-pushing does NOT happen here today.
+#
+# Security: this workflow uses no untrusted-input expressions
+# (PR title/body/branch/commit) in run: commands. All inputs are
+# either secrets.GITHUB_TOKEN or static literals.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet_format:
+    name: dotnet format --verify-no-changes
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: dotnet format RestaurantSystem.sln --verify-no-changes --no-restore --severity warn
+
+  file_length:
+    name: file-length (CLAUDE.md §4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-file-length.sh --all
+
+  dotnet_build_strict:
+    name: dotnet build (warnings as errors)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: dotnet build RestaurantSystem.sln --nologo --verbosity minimal /p:TreatWarningsAsErrors=true
+
+  dotnet_test:
+    name: dotnet test (integration)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: restaurant_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      INTEGRATION_TESTS_DB_CONNECTION: "Host=postgres;Port=5432;Database=restaurant_test;Username=test;Password=test"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration tests
+        run: |
+          dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj \
+            --nologo --verbosity minimal \
+            --logger "junit;LogFileName=test-results.xml" \
+            --results-directory test-results \
+            -p:CollectCoverage=true \
+            -p:CoverletOutputFormat=cobertura \
+            -p:CoverletOutput=test-results/coverage.cobertura.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results/
+
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

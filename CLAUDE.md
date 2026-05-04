@@ -9,7 +9,7 @@
 
 - **Stack**: .NET 10, EF Core 10, PostgreSQL, custom CQRS mediator (`CustomMediator` — **NOT MediatR**)
 - **Architecture**: Clean Architecture (API → Domain → Infrastructure) + CQRS + feature folders
-- **Hosted on**: GitLab — https://gitlab.com/restaurant-app3282120/backend
+- **Hosted on**: GitHub — https://github.com/piwas-21/restaurant-app-backend
 - **Production**: deployed from `main` (currently `develop` until cutover); test environment from `develop`
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
@@ -185,15 +185,15 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 | Gate | When | What | Blocking? | Source of truth |
 |---|---|---|---|---|
-| `dotnet build RestaurantSystem.sln` (warnings as errors) | Pre-commit (when .cs/.csproj/.sln/.props/.targets staged) **and** MR pipeline (`dotnet_build_strict` job) | 0 errors, 0 non-excluded warnings | yes | [Directory.Build.props](Directory.Build.props), `.gitlab-ci.yml` |
-| `dotnet test RestaurantSystem.IntegrationTests` | MR pipeline (`dotnet_test` job, dind service for Testcontainers) | All non-skipped tests pass | yes | `.gitlab-ci.yml` |
-| Coverage threshold (coverlet, line ≥ 17% / branch ≥ 9% / method ≥ 15%, migrations excluded) | MR pipeline (same `dotnet_test` job) | No regression below the current floor | yes | `.gitlab-ci.yml` |
-| `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** MR pipeline (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
-| File-length gate | Pre-commit (per-file when .cs staged) **and** MR pipeline (`file_length` job) | LOC ≤ §4 limit OR file is in `scripts/file-length-baseline.txt` | yes | [scripts/check-file-length.sh](scripts/check-file-length.sh), [.pre-commit-config.yaml](.pre-commit-config.yaml), `.gitlab-ci.yml` |
+| `dotnet build RestaurantSystem.sln` (warnings as errors) | Pre-commit (when .cs/.csproj/.sln/.props/.targets staged) **and** CI workflow (`dotnet_build_strict` job) | 0 errors, 0 non-excluded warnings | yes | [Directory.Build.props](Directory.Build.props), `.github/workflows/ci.yml` |
+| `dotnet test RestaurantSystem.IntegrationTests` | CI workflow (`dotnet_test` job, dind service for Testcontainers) | All non-skipped tests pass | yes | `.github/workflows/ci.yml` |
+| Coverage threshold (coverlet, line ≥ 17% / branch ≥ 9% / method ≥ 15%, migrations excluded) | CI workflow (same `dotnet_test` job) | No regression below the current floor | yes | `.github/workflows/ci.yml` |
+| `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** CI workflow (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.github/workflows/ci.yml` |
+| File-length gate | Pre-commit (per-file when .cs staged) **and** CI workflow (`file_length` job) | LOC ≤ §4 limit OR file is in `scripts/file-length-baseline.txt` | yes | [scripts/check-file-length.sh](scripts/check-file-length.sh), [.pre-commit-config.yaml](.pre-commit-config.yaml), `.github/workflows/ci.yml` |
 | Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
-| GitLab SAST | MR pipeline | Auto-injected analyzers | yes | `.gitlab-ci.yml` |
-| Gitleaks | MR pipeline | No leaked credentials (allowlist via `.gitleaks.toml`) | yes | [.gitleaks.toml](.gitleaks.toml) |
-| Trivy image scan | After build | Reports CRITICAL/HIGH CVEs | **no** (currently `allow_failure: true`) | `.gitlab-ci.yml` |
+| CodeQL (SAST) | CI workflow | Auto-injected analyzers | yes | `.github/workflows/ci.yml` |
+| Gitleaks | CI workflow | No leaked credentials (allowlist via `.gitleaks.toml`) | yes | [.gitleaks.toml](.gitleaks.toml) |
+| Trivy image scan | After build | Reports CRITICAL/HIGH CVEs | **no** (currently `allow_failure: true`) | `.github/workflows/ci.yml` |
 
 Trivy is non-blocking today — it surfaces findings without failing the pipeline. Sprint 4 of [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) flips it to `exit-code: 1` for CRITICAL/HIGH.
 
@@ -221,7 +221,7 @@ main                    ← production (currently develop; cutover pending)
 ```
 
 - **Never push to `main` or `develop` directly** — pre-commit hook blocks this.
-- Branch off **`develop`**. Open MR to `develop`. After merge to `develop` and test-env validation, `develop` is promoted to `main` for prod.
+- Branch off **`develop`**. Open PR to `develop`. After merge to `develop` and test-env validation, `develop` is promoted to `main` for prod.
 - One issue = one branch. Delete branch after merge (auto via `--remove-source-branch`).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
@@ -243,7 +243,7 @@ Body should explain **why**, not what (the diff shows what).
 
 ### Merge requests
 
-Every MR uses [.gitlab/merge_request_templates/Default.md](.gitlab/merge_request_templates/Default.md). Required sections:
+Every PR uses [.github/pull_request_template.md](.github/pull_request_template.md). Required sections:
 - Summary
 - Sprint task / issue link
 - Acceptance criteria coverage table
@@ -295,4 +295,4 @@ Never commit:
 2. `git status` → only intentional changes staged.
 3. Commit with `type(scope):` format.
 4. Push to feature branch.
-5. Open MR via `glab mr create` (or GitLab UI) — fill in the template fully, including acceptance-criteria coverage table.
+5. Open PR via `gh pr create` (or GitHub UI) — fill in the template fully, including acceptance-criteria coverage table.
