@@ -381,3 +381,6 @@ FodyWeavers.xsd
 
 # Claude Code per-repo settings (machine-local).
 .claude/
+
+# Local environment overrides — never commit (legacy GitLab CI registry vars).
+.env
