@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="coverlet.collector" Version="6.0.2" />
+		<!-- coverlet.msbuild lets us pass /p:Threshold=NN to fail the build
+		     below a coverage floor; coverlet.collector does data collection
+		     only. Both are needed because each runs in a different mode. -->
+		<PackageReference Include="coverlet.msbuild" Version="6.0.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+		<PackageReference Include="xunit" Version="2.9.3" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.1" />
+		<PackageReference Include="Testcontainers.PostgreSql" Version="4.9.0" />
+		<PackageReference Include="FluentAssertions" Version="7.0.0" />
+		<PackageReference Include="Respawn" Version="6.2.1" />
+		<PackageReference Include="Moq" Version="4.20.70" />
+		<!-- JUnit logger so GitLab's reports.junit can parse the test results. -->
+		<PackageReference Include="JunitXml.TestLogger" Version="6.1.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Xunit" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\RestaurantSystem.Api\RestaurantSystem.Api.csproj" />
+		<ProjectReference Include="..\RestaurantSystem.Infrastructure\RestaurantSystem.Infrastructure.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="appsettings.Test.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+</Project>

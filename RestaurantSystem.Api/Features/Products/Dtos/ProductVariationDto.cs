@@ -9,4 +9,11 @@ public record ProductVariationDto
     public decimal FinalPrice { get; init; }
     public bool IsActive { get; init; }
     public int DisplayOrder { get; init; }
+    public Dictionary<string, ProductVariationContentDto>? Content { get; init; }
+}
+
+public record ProductVariationContentDto
+{
+    public string Name { get; init; } = null!;
+    public string? Description { get; init; }
 }

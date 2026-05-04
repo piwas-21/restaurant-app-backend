@@ -40,7 +40,7 @@ public class DeleteProductImageCommandHandler : ICommandHandler<DeleteProductIma
         // Soft delete the image
         image.IsDeleted = true;
         image.DeletedAt = DateTime.UtcNow;
-        image.DeletedBy = _currentUserService.UserId?.ToString() ?? "System";
+        image.DeletedBy = _currentUserService.GetAuditIdentifier();
 
         // If this was the primary image, set another as primary
         if (image.IsPrimary)
@@ -54,7 +54,7 @@ public class DeleteProductImageCommandHandler : ICommandHandler<DeleteProductIma
             {
                 nextImage.IsPrimary = true;
                 nextImage.UpdatedAt = DateTime.UtcNow;
-                nextImage.UpdatedBy = _currentUserService.UserId?.ToString() ?? "System";
+                nextImage.UpdatedBy = _currentUserService.GetAuditIdentifier();
             }
         }
 

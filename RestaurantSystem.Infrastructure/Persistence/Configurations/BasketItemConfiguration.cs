@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 public class BasketItemConfiguration : IEntityTypeConfiguration<BasketItem>
 {
     public void Configure(EntityTypeBuilder<BasketItem> builder)
@@ -20,6 +21,19 @@ public class BasketItemConfiguration : IEntityTypeConfiguration<BasketItem>
 
         builder.Property(bi => bi.SpecialInstructions)
             .HasMaxLength(500);
+
+        // Customization fields stored as JSON
+        builder.Property(bi => bi.SelectedIngredients)
+            .HasColumnType("jsonb");
+
+        builder.Property(bi => bi.ExcludedIngredients)
+            .HasColumnType("jsonb");
+
+        builder.Property(bi => bi.AddedIngredients)
+            .HasColumnType("jsonb");
+
+        builder.Property(bi => bi.CustomizationPrice)
+            .HasColumnType("decimal(10,2)");
 
         builder.HasIndex(bi => bi.BasketId);
         builder.HasIndex(bi => new { bi.BasketId, bi.ProductId, bi.ProductVariationId });

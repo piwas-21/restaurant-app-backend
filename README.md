@@ -1,93 +1,104 @@
-# backend
+# RUMI Backend
 
+Restaurant management system backend — REST API, CQRS, EF Core, PostgreSQL.
 
+> **For agents:** read [CLAUDE.md](CLAUDE.md) first; it auto-loads in Claude Code sessions and lists the rules every change must follow.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Stack
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- **.NET 10** (Web API)
+- **EF Core 10** + PostgreSQL
+- **Custom CQRS mediator** ([CustomMediator.cs](RestaurantSystem.Api/Common/CustomMediator.cs)) — NOT MediatR. See [ADR-001](docs/adr/ADR-001-custom-cqrs-mediator.md).
+- **JWT Bearer auth** with role-based authorization (Customer / Cashier / Admin). See [ADR-003](docs/adr/ADR-003-jwt-scope-and-claims.md).
+- **Soft-delete** via global query filter. See [ADR-002](docs/adr/ADR-002-soft-delete-strategy.md).
+- **xUnit** integration tests
+- Hosted on GitLab; CI runs gitleaks, GitLab SAST, and Trivy image scan per `.gitlab-ci.yml`.
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Repository layout
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/restaurant-app3282120/backend.git
-git branch -M main
-git push -uf origin main
+RestaurantSystem.Api/             # Controllers, CQRS handlers, Features
+├── Abstraction/Messaging/        # ICommand, IQuery, IHandler interfaces
+├── BackgroundServices/           # Cleanup workers (data-loss class — handle with care)
+├── Common/                       # Shared infra: CustomMediator, exceptions, services
+├── Features/                     # One folder per feature (Orders, Reservations, etc.)
+└── Settings/                     # IOptions<T> POCOs (Email, Jwt, Cors, ...)
+RestaurantSystem.Domain/          # Pure domain entities + enums (no EF, no ASP.NET)
+RestaurantSystem.Infrastructure/  # EF Core, persistence, migrations
+RestaurantSystem.IntegrationTests/  # xUnit integration tests
+docs/                             # SPRINT-PLAN, ADRs, security audit, dev guidelines
+scripts/                          # Local dev orchestration
+.gitlab/                          # MR templates, CI templates
 ```
 
-## Integrate with your tools
+## Quick start (new clone)
 
-- [ ] [Set up project integrations](https://gitlab.com/restaurant-app3282120/backend/-/settings/integrations)
+```bash
+# 1. Install pre-commit hooks (one-time)
+bash scripts/setup_hooks.sh
 
-## Collaborate with your team
+# 2. Bootstrap local secrets file (one-time)
+bash scripts/dev-secrets.sh
+# then edit RestaurantSystem.Api/app-secrets.json with real local values
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+# 3. Bring up the dev stack (postgres + redis + api)
+bash scripts/dev-up.sh
 
-## Test and Deploy
+# Tear down
+bash scripts/dev-down.sh
+```
 
-Use the built-in continuous integration in GitLab.
+`dev-up.sh --reset` nukes the postgres data volume for a clean slate. `dev-up.sh --no-run` brings up the DB without starting the API (useful when you want to attach a debugger from your IDE).
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## Branch strategy
 
-***
+```
+main          ← production deployment (currently develop; cutover pending)
+└── develop   ← test environment (auto-deployed)
+     ├── feature/<x>
+     ├── fix/<x>
+     ├── chore/<x>
+     └── docs/<x>
+```
 
-# Editing this README
+Pre-commit hook blocks direct commits to `main` and `develop`. Branch off `develop`, open MR to `develop` using the [default MR template](.gitlab/merge_request_templates/Default.md). After test-env validation, `develop` is promoted to `main` for production.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Branch protection (GitLab)
 
-## Suggestions for a good README
+Configured in **Settings → Repository → Protected Branches**:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+| Branch | Allowed to push | Allowed to merge | Force push |
+|---|---|---|---|
+| `main` | No one | Maintainers | Disabled |
+| `develop` | No one | Maintainers + Developers | Disabled |
 
-## Name
-Choose a self-explaining name for your project.
+All MRs require the pipeline to pass before merge.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Configuration
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+| Setting | Source | Notes |
+|---|---|---|
+| Connection strings | `app-secrets.json` (gitignored) | `dev-secrets.sh` bootstraps from template |
+| `EmailSettings` | `app-secrets.json` + `appsettings.<Env>.json` | `FrontendBaseUrl`, `BackendBaseUrl` are `[Required] [Url]` — no localhost defaults |
+| `JwtSettings` | `app-secrets.json` | Secret must be ≥ 32 bytes |
+| `CorsSettings:AllowedOrigins` | `appsettings.<Env>.json` | App throws on startup in non-Dev if empty |
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## Pull requests
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Every MR uses [.gitlab/merge_request_templates/Default.md](.gitlab/merge_request_templates/Default.md). It auto-loads when you create an MR via the GitLab UI or `glab mr create`.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+Required sections: summary, sprint-task link, acceptance-criteria coverage, schema/contract verification (for DB/DTO changes), standard checklist, test plan, deploy notes.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## Documentation
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+| File | Purpose |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) | Agent rules — auto-loaded |
+| [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) | 8-sprint refactoring plan |
+| [docs/DEVELOPMENT-GUIDELINES.md](docs/DEVELOPMENT-GUIDELINES.md) | Coding conventions |
+| [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) | Security findings + status |
+| [docs/TEST-COVERAGE-PLAN.md](docs/TEST-COVERAGE-PLAN.md) | Test strategy |
+| [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) | CI / quality / security gate plan |
+| [docs/adr/](docs/adr/) | Architecture Decision Records |

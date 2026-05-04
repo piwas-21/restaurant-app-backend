@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
+
 public class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
     public void Configure(EntityTypeBuilder<Product> builder)
@@ -24,16 +25,18 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasMaxLength(2048);
 
         builder.Property(p => p.Ingredients)
-            .HasColumnType("jsonb");
+            .HasColumnType("jsonb")
+            .HasConversion<List<string>>(); ;
 
         builder.Property(p => p.Allergens)
-            .HasColumnType("jsonb");
+            .HasColumnType("jsonb")
+            .HasConversion<List<string>>();
 
         builder.Property(p => p.IsActive)
             .HasDefaultValue(true);
 
-        builder.Property(p => p.IsAvailable)
-            .HasDefaultValue(true);
+        builder.Property(p => p.IsSpecial)
+            .HasDefaultValue(false);
 
         builder.Property(p => p.PreparationTimeMinutes)
             .IsRequired();
@@ -49,15 +52,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(si => si.MainProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Configure navigation: Product is used as a side item (Side -> Main)
-        builder.HasMany(p => p.SideItemProducts)
-            .WithOne(si => si.SideItemProduct)
-            .HasForeignKey(si => si.SideItemProductId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // Configure other relationships (optional, if needed)
         builder.HasMany(p => p.Images)
-            .WithOne(p=>p.Product)
+            .WithOne(p => p.Product)
             .HasForeignKey("ProductId")
             .OnDelete(DeleteBehavior.Cascade);
 
@@ -66,12 +63,18 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey("ProductId");
 
         builder.HasMany(p => p.Variations)
-            .WithOne(p=>p.Product)
+            .WithOne(p => p.Product)
             .HasForeignKey("ProductId");
 
         builder.HasMany(p => p.MenuProducts)
             .WithOne(p => p.Product)
             .HasForeignKey("ProductId");
+
+        builder.HasMany(p => p.Descriptions)
+            .WithOne(pd => pd.Product)
+            .HasForeignKey(pd => pd.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
 
     }
 }

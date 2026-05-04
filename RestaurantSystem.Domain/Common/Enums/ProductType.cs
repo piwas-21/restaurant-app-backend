@@ -1,28 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿using System.Runtime.Serialization;
 namespace RestaurantSystem.Domain.Common.Enums;
+
 public enum ProductType
 {
-    [EnumMember(Value = "main_item")]
+    [EnumMember(Value = "mainItem")]
     MainItem = 0,
 
-    [EnumMember(Value = "side_item")]
-    SideItem = 1,
-
     [EnumMember(Value = "beverage")]
-    Beverage = 2,
+    Beverage = 1,
 
     [EnumMember(Value = "dessert")]
-    Dessert = 3,
+    Dessert = 2,
 
     [EnumMember(Value = "sauce")]
-    Sauce = 4,
+    Sauce = 3,
 
-    [EnumMember(Value = "add_on")]
-    AddOn = 5
+    [EnumMember(Value = "addOn")]
+    AddOn = 4,
+
+    [EnumMember(Value = "menu")]
+    Menu = 5
 }

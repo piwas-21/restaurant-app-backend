@@ -4,12 +4,13 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Email;
 
 [ApiController]
 [Route("api/[controller]")]
-public class EmailTestController :ControllerBase
+public class EmailTestController : ControllerBase
 {
     private readonly IEmailService _emailService;
     private readonly IWebHostEnvironment _environment;

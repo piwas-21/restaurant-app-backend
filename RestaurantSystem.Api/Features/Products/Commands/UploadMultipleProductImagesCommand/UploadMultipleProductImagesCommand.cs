@@ -115,28 +115,31 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
                            cancellationToken: cancellationToken);
 
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        _logger.LogError(ex.Message, ex);
                         throw;
-
                     }
 
                     // Create image record
+                    var imageId = Guid.NewGuid();
                     var productImage = new ProductImage
                     {
+                        Id = imageId,
                         ProductId = command.ProductId,
                         Url = imageUrl,
                         AltText = product.Name,
                         IsPrimary = !hasPrimaryImage && i == 0, // First image becomes primary if none exists
                         SortOrder = ++currentMaxSortOrder,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                        CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
 
                     _context.ProductImages.Add(productImage);
 
                     uploadedImages.Add(new ProductImageDto
                     {
+                        Id = imageId,
                         Url = _baseUrl + "/" + productImage.Url,
                         AltText = productImage.AltText,
                         IsPrimary = productImage.IsPrimary,
@@ -192,4 +195,3 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
             $"Successfully uploaded {uploadedImages.Count} images");
     }
 }
-

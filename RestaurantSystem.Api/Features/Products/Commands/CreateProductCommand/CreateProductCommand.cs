@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -13,18 +14,21 @@ public record CreateProductCommand(
     string Name,
     string? Description,
     decimal BasePrice,
-    string? ImageUrl,
     bool IsActive,
     bool IsAvailable,
+    bool IsSpecial,
     int PreparationTimeMinutes,
     ProductType Type,
-    List<string> Ingredients,
-    List<string> Allergens,
+    KitchenType KitchenType,
+    List<string>? Ingredients,
+    List<string>? Allergens,
     int DisplayOrder,
     List<Guid> CategoryIds,
     Guid? PrimaryCategoryId,
     List<CreateProductVariationDto>? Variations,
     List<Guid>? SuggestedSideItemIds,
+    List<ProductIngredientDto>? DetailedIngredients,
+
     ProductDescriptionsDto Content
 ) : ICommand<ApiResponse<ProductDto>>;
 
@@ -33,7 +37,8 @@ public record CreateProductVariationDto(
     string? Description,
     decimal PriceModifier,
     bool IsActive,
-    int DisplayOrder
+    int DisplayOrder,
+    Dictionary<string, ProductVariationContentDto>? Content
 );
 
 public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand, ApiResponse<ProductDto>>
@@ -57,8 +62,8 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
         try
         {
             var categories = await _context.Categories
-       .Where(c => command.CategoryIds.Contains(c.Id))
-       .ToListAsync(cancellationToken);
+               .Where(c => command.CategoryIds.Contains(c.Id))
+               .ToListAsync(cancellationToken);
 
             // Validate primary category
             if (command.PrimaryCategoryId.HasValue && !command.CategoryIds.Contains(command.PrimaryCategoryId.Value))
@@ -69,7 +74,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
             if (command.SuggestedSideItemIds?.Any() == true)
             {
                 var sideItemsExist = await _context.Products
-                    .Where(p => command.SuggestedSideItemIds.Contains(p.Id) && p.Type == ProductType.SideItem)
+                    .Where(p => command.SuggestedSideItemIds.Contains(p.Id))
                     .CountAsync(cancellationToken) == command.SuggestedSideItemIds.Count;
 
                 if (!sideItemsExist)
@@ -85,18 +90,16 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 Description = command.Description,
                 BasePrice = command.BasePrice,
                 IsActive = command.IsActive,
+                IsSpecial = command.IsSpecial,
                 IsAvailable = command.IsAvailable,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,
                 Type = command.Type,
-                Ingredients = command.Ingredients.Any()
-                  ? System.Text.Json.JsonSerializer.Serialize(command.Ingredients)
-                  : null,
-                Allergens = command.Allergens.Any()
-                  ? System.Text.Json.JsonSerializer.Serialize(command.Allergens)
-                  : null,
+                KitchenType = command.KitchenType,
+                Ingredients = command.Ingredients,
+                Allergens = command.Allergens,
                 DisplayOrder = command.DisplayOrder,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                CreatedBy = _currentUserService.GetAuditIdentifier()
             };
 
             _context.Products.Add(product);
@@ -111,29 +114,32 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     IsPrimary = categoryId == command.PrimaryCategoryId,
                     DisplayOrder = displayOrder++,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                    CreatedBy = _currentUserService.GetAuditIdentifier()
                 };
                 _context.ProductCategories.Add(productCategory);
                 product.ProductCategories.Add(productCategory);
             }
 
+            var languageCodes = command.Content.Select(x => x.Key).ToList();
+            var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateLanguageCodes.Any())
+            {
+                return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
+            }
+
             foreach (var (languageCode, description) in command.Content)
             {
-
-                var isAny = await _context.ProductDescriptions.AnyAsync(x => string.Equals(languageCode, x.Lang));
-
-                if (isAny)
-                {
-                    return ApiResponse<ProductDto>.Failure($"language {languageCode} used more than one");
-                }
-
                 var productDescription = new ProductDescription
                 {
                     Lang = languageCode,
                     Name = description.Name,
                     Description = description.Description,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                    CreatedBy = _currentUserService.GetAuditIdentifier()
                 };
                 _context.ProductDescriptions.Add(productDescription);
                 product.Descriptions.Add(productDescription);
@@ -151,10 +157,30 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         IsActive = variationDto.IsActive,
                         DisplayOrder = variationDto.DisplayOrder,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                        CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
                     _context.ProductVariations.Add(variation);
                     product.Variations.Add(variation);
+
+                    if (variationDto.Content != null)
+                    {
+                        foreach (var (languageCode, content) in variationDto.Content)
+                        {
+                            if (string.IsNullOrWhiteSpace(content.Name)) continue;
+
+                            var description = new ProductVariationDescription
+                            {
+                                ProductVariation = variation,
+                                LanguageCode = languageCode,
+                                Name = content.Name,
+                                Description = content.Description,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedBy = _currentUserService.GetAuditIdentifier()
+                            };
+                            _context.ProductVariationDescriptions.Add(description);
+                            variation.Descriptions.Add(description);
+                        }
+                    }
                 }
             }
 
@@ -170,11 +196,61 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         IsRequired = false,
                         DisplayOrder = sideItemDisplayOrder++,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.UserId?.ToString() ?? "System"
+                        CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
                     _context.ProductSideItems.Add(productSideItem);
                     product.SuggestedSideItems.Add(productSideItem);
                 }
+            }
+
+            // Add detailed ingredients
+            if (command.DetailedIngredients?.Any() == true)
+            {
+                foreach (var ingredientDto in command.DetailedIngredients)
+                {
+                    var ingredient = new ProductIngredient
+                    {
+                        ProductId = product.Id,
+                        Name = ingredientDto.Name,
+                        IsOptional = ingredientDto.IsOptional,
+                        Price = ingredientDto.Price,
+                        IsIncludedInBasePrice = ingredientDto.IsIncludedInBasePrice,
+                        IsActive = ingredientDto.IsActive,
+                        DisplayOrder = ingredientDto.DisplayOrder,
+                        MaxQuantity = ingredientDto.MaxQuantity,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = _currentUserService.GetAuditIdentifier()
+                    };
+
+                    _context.ProductIngredients.Add(ingredient);
+                    product.DetailedIngredients.Add(ingredient);
+
+                    // Add ingredient descriptions (only non-empty ones)
+                    if (ingredientDto.Content != null)
+                    {
+                        foreach (var (languageCode, content) in ingredientDto.Content)
+                        {
+                            // Skip empty content entries
+                            if (string.IsNullOrWhiteSpace(content.Name) && string.IsNullOrWhiteSpace(content.Description))
+                            {
+                                continue;
+                            }
+
+                            var description = new ProductIngredientDescription
+                            {
+                                ProductIngredient = ingredient,
+                                LanguageCode = languageCode,
+                                Name = content.Name,
+                                Description = content.Description,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedBy = _currentUserService.GetAuditIdentifier()
+                            };
+                            _context.ProductIngredientDescriptions.Add(description);
+                            ingredient.Descriptions.Add(description);
+                        }
+                    }
+                }
+
             }
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -185,8 +261,15 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 .Include(p => p.ProductCategories)
                     .ThenInclude(pc => pc.Category)
                 .Include(p => p.Variations)
+                    .ThenInclude(v => v.Descriptions)
                 .Include(p => p.SuggestedSideItems)
                     .ThenInclude(si => si.SideItemProduct)
+                .Include(p => p.DetailedIngredients)
+                    .ThenInclude(di => di.Descriptions)
+                .Include(p => p.MenuDefinition)
+                    .ThenInclude(md => md!.Sections)
+                        .ThenInclude(s => s.Items)
+                            .ThenInclude(i => i.Product)
                 .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
             var productDto = MapToProductDto(createdProduct);
@@ -199,11 +282,17 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            // Only rollback if the transaction is still active
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+                // Transaction already completed or disposed, ignore rollback error
+            }
             throw;
         }
-
-       
     }
 
     private static ProductDto MapToProductDto(Product product)
@@ -218,13 +307,32 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
             IsAvailable = product.IsAvailable,
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = product.Type,
-            Ingredients = string.IsNullOrEmpty(product.Ingredients)
-                ? new List<string>()
-                : System.Text.Json.JsonSerializer.Deserialize<List<string>>(product.Ingredients) ?? new List<string>(),
-            Allergens = string.IsNullOrEmpty(product.Allergens)
-                ? new List<string>()
-                : System.Text.Json.JsonSerializer.Deserialize<List<string>>(product.Allergens) ?? new List<string>(),
+            KitchenType = product.KitchenType,
+            Ingredients = product.Ingredients,
+            Allergens = product.Allergens,
             DisplayOrder = product.DisplayOrder,
+            DetailedIngredients = product.DetailedIngredients.Select(di => new ProductIngredientDto
+            {
+                Id = di.Id,
+                Name = di.Name,
+                IsOptional = di.IsOptional,
+                Price = di.Price,
+                IsIncludedInBasePrice = di.IsIncludedInBasePrice,
+                IsActive = di.IsActive,
+                DisplayOrder = di.DisplayOrder,
+                MaxQuantity = di.MaxQuantity,
+                Content = di.Descriptions
+                    .GroupBy(d => d.LanguageCode)
+                    .Select(g => g.First()) // Take first if duplicates exist
+                    .ToDictionary(
+                        d => d.LanguageCode,
+                        d => new ProductIngredientContentDto
+                        {
+                            Name = d.Name,
+                            Description = d.Description
+                        }
+                    )
+            }).ToList(),
             Categories = product.ProductCategories.Select(pc => new ProductCategoryDto
             {
                 CategoryId = pc.CategoryId,
@@ -252,7 +360,18 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 PriceModifier = v.PriceModifier,
                 FinalPrice = product.BasePrice + v.PriceModifier,
                 IsActive = v.IsActive,
-                DisplayOrder = v.DisplayOrder
+                DisplayOrder = v.DisplayOrder,
+                Content = v.Descriptions
+                    .GroupBy(d => d.LanguageCode)
+                    .Select(g => g.First())
+                    .ToDictionary(
+                        d => d.LanguageCode,
+                        d => new ProductVariationContentDto
+                        {
+                            Name = d.Name,
+                            Description = d.Description
+                        }
+                    )
             }).ToList(),
             SuggestedSideItems = product.SuggestedSideItems.Select(si => new SideItemDto
             {
@@ -263,6 +382,39 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 IsRequired = si.IsRequired,
                 DisplayOrder = si.DisplayOrder
             }).ToList(),
+            MenuDefinition = product.MenuDefinition != null ? new MenuDefinitionDto
+            {
+                Id = product.MenuDefinition.Id,
+                IsAlwaysAvailable = product.MenuDefinition.IsAlwaysAvailable,
+                StartTime = product.MenuDefinition.StartTime,
+                EndTime = product.MenuDefinition.EndTime,
+                AvailableMonday = product.MenuDefinition.AvailableMonday,
+                AvailableTuesday = product.MenuDefinition.AvailableTuesday,
+                AvailableWednesday = product.MenuDefinition.AvailableWednesday,
+                AvailableThursday = product.MenuDefinition.AvailableThursday,
+                AvailableFriday = product.MenuDefinition.AvailableFriday,
+                AvailableSaturday = product.MenuDefinition.AvailableSaturday,
+                AvailableSunday = product.MenuDefinition.AvailableSunday,
+                Sections = product.MenuDefinition.Sections.Select(s => new MenuSectionDto
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Description = s.Description,
+                    DisplayOrder = s.DisplayOrder,
+                    IsRequired = s.IsRequired,
+                    MinSelection = s.MinSelection,
+                    MaxSelection = s.MaxSelection,
+                    Items = s.Items.Select(i => new MenuSectionItemDto
+                    {
+                        Id = i.Id,
+                        ProductId = i.ProductId,
+                        ProductName = i.Product?.Name,
+                        AdditionalPrice = i.AdditionalPrice,
+                        DisplayOrder = i.DisplayOrder,
+                        IsDefault = i.IsDefault
+                    }).OrderBy(i => i.DisplayOrder).ToList()
+                }).OrderBy(s => s.DisplayOrder).ToList()
+            } : null,
             Content = new()
         };
 

@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class ProductSideItem : Entity
 {
     public bool IsRequired { get; set; } = false;

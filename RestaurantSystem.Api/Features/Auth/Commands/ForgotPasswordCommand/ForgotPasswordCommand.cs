@@ -2,7 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ForgotPasswordCommand;
 
@@ -15,7 +15,7 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
     private readonly IEmailService _emailService;
 
 
-    public ForgotPasswordCommandHandler(UserManager<ApplicationUser> userManager, ILogger<ForgotPasswordCommandHandler> logger,IEmailService emailService)
+    public ForgotPasswordCommandHandler(UserManager<ApplicationUser> userManager, ILogger<ForgotPasswordCommandHandler> logger, IEmailService emailService)
     {
         _userManager = userManager;
         _logger = logger;
@@ -36,12 +36,6 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-
-        // TODO: In a real application, send this token via email
-        // For demo purposes, we'll log it (DO NOT DO THIS IN PRODUCTION)
-        _logger.LogInformation("Password reset token for {Email}: {Token}", command.Email, token);
-
-        // TODO: Replace this with actual email sending
         await _emailService.SendPasswordResetEmailAsync(user, token);
 
         return ApiResponse<string>.SuccessWithData(
@@ -51,4 +45,3 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
 
     }
 }
-

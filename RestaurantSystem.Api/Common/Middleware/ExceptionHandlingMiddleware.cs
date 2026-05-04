@@ -65,7 +65,17 @@ public class ExceptionHandlingMiddleware
 
             case UnauthorizedAccessException:
                 statusCode = HttpStatusCode.Unauthorized;
-                message = "You are not authorized to access this resource";
+                message = exception.Message;
+                break;
+
+            case BadRequestException:
+                statusCode = HttpStatusCode.BadRequest;
+                message = exception.Message;
+                break;
+
+            case NotFoundException:
+                statusCode = HttpStatusCode.NotFound;
+                message = exception.Message;
                 break;
 
             case ArgumentException:
@@ -106,4 +116,3 @@ public static class ExceptionHandlingMiddlewareExtensions
         return builder.UseMiddleware<ExceptionHandlingMiddleware>();
     }
 }
-

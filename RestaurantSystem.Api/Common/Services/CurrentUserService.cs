@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Common;
 using System.Security.Claims;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Domain.Entities;
 
 
 namespace RestaurantSystem.Api.Common.Services

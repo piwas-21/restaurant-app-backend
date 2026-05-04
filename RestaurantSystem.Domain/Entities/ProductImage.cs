@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class ProductImage : SoftDeleteEntity
 {
     public string Url { get; set; } = null!;

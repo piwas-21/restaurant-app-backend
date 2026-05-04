@@ -1,7 +1,9 @@
 services:
   restaurantsystem-api:
-    image: ${CI_REGISTRY_IMAGE}:${CI_PIPELINE_IID}
-    container_name: restaurant-api-dev
+    build:
+      context: .
+      dockerfile: RestaurantSystem.Api/Dockerfile
+    container_name: restaurant-api-devs
     ports:
       - "5221:8080"
       - "7000:8081"
@@ -61,5 +63,4 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data_dev:
-  redis_data:
+  postgres-data-dev:

@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class ProductVariation : SoftDeleteEntity
 {
     public string Name { get; set; } = null!; // e.g., "Small", "Medium", "Large"
@@ -14,4 +15,5 @@ public class ProductVariation : SoftDeleteEntity
 
     // Navigation properties
     public virtual Product Product { get; set; } = null!;
+    public virtual ICollection<ProductVariationDescription> Descriptions { get; set; } = [];
 }

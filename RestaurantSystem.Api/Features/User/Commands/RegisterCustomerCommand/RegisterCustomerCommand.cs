@@ -4,7 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.User.Commands.RegisterCustomerCommand;
 
@@ -70,10 +70,13 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         newUser.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
         await _userManager.UpdateAsync(newUser);
 
-        // Send welcome email
+        // Generate email verification token
+        var verificationToken = await _userManager.GenerateEmailConfirmationTokenAsync(newUser);
+
+        // Send verification email
         try
         {
-            await _emailService.SendWelcomeEmailAsync(newUser);
+            await _emailService.SendEmailVerificationAsync(newUser, verificationToken);
         }
         catch (Exception ex)
         {

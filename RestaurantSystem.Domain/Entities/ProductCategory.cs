@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
 
 namespace RestaurantSystem.Domain.Entities;
+
 public class ProductCategory : Entity
 {
     public bool IsPrimary { get; set; } = false; // One category can be marked as primary

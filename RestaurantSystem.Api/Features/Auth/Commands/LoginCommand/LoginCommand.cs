@@ -3,7 +3,8 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
-using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Api.Features.Auth.Handlers;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.LoginCommand;
 
@@ -15,12 +16,21 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IConfiguration _configuration;
     private readonly ITokenService _tokenService;
+    private readonly LoginEventHandler _loginEventHandler;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public LoginCommandHandler(UserManager<ApplicationUser> userManager, IConfiguration configuration,ITokenService tokenService)
+    public LoginCommandHandler(
+        UserManager<ApplicationUser> userManager,
+        IConfiguration configuration,
+        ITokenService tokenService,
+        LoginEventHandler loginEventHandler,
+        IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
         _configuration = configuration;
         _tokenService = tokenService;
+        _loginEventHandler = loginEventHandler;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<ApiResponse<AuthResponse>> Handle(LoginCommand command, CancellationToken cancellationToken)
@@ -30,7 +40,7 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
 
         if (user == null || user.IsDeleted)
         {
-            throw new Exception("Invalid credentials");
+            throw new UnauthorizedAccessException("Invalid credentials");
         }
 
         // Verify password
@@ -38,14 +48,30 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
 
         if (!isPasswordValid)
         {
-            throw new Exception("Invalid credentials");
+            throw new UnauthorizedAccessException("Invalid credentials");
         }
 
-        // Generate tokens
+        // Check if email is confirmed (only for customers)
+        if (!user.EmailConfirmed && user.Role == Domain.Common.Enums.UserRole.Customer)
+        {
+            return ApiResponse<AuthResponse>.Failure(
+                "Please verify your email address before logging in. Check your inbox for the verification link.",
+                "Email verification required");
+        }
+
+        // Generate tokens — store hash of refresh token, return raw value to client
         var token = _tokenService.GenerateAccessToken(user);
-        user.RefreshToken = _tokenService.GenerateRefreshToken();
+        var rawRefreshToken = _tokenService.GenerateRefreshToken();
+        user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
         user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
         await _userManager.UpdateAsync(user);
+
+        // Merge anonymous basket if session ID exists
+        var sessionId = _httpContextAccessor.HttpContext?.Request.Headers["X-Session-Id"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            await _loginEventHandler.HandleUserLogin(user.Id, sessionId);
+        }
 
         var authResponse = new AuthResponse
         {
@@ -55,11 +81,19 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
             Email = user.Email!,
             Role = user.Role,
             AccessToken = token,
-            RefreshToken = user.RefreshToken,
+            RefreshToken = rawRefreshToken,
             Expiration = _tokenService.GetAccessTokenExpiration()
         };
 
-        return ApiResponse<AuthResponse>.SuccessWithData(authResponse, "User logged in successfully");
+        var message = "User logged in successfully";
+        if (user.DeletionScheduledAt.HasValue)
+        {
+            user.DeletionScheduledAt = null;
+            await _userManager.UpdateAsync(user);
+            message = "User logged in successfully. Account deletion request cancelled.";
+        }
+
+        return ApiResponse<AuthResponse>.SuccessWithData(authResponse, message);
 
     }
 }
