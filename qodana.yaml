@@ -1,0 +1,25 @@
+# Qodana Community for .NET — see docs/plans-equivalent (workspace plan TBD).
+# Spike: evaluate per-PR static analysis as a free alternative to SonarQube.
+#
+# Image is the COMMUNITY linter (qodana-cdnet) — free, no Cloud token
+# required, commercial use allowed, unlimited private repos. Currently
+# EAP (Early Access) — first signal worth watching during the spike.
+#
+# Profile `qodana.starter` is the recommended default that avoids
+# overwhelming new adopters with style noise. Tighten later.
+
+version: "1.0"
+linter: jetbrains/qodana-cdnet:2026.1-eap
+
+profile:
+  name: qodana.starter
+
+dotnet:
+  solution: RestaurantSystem.sln
+
+# Keep the failure threshold lenient during the spike so we observe
+# the baseline without blocking PRs. Re-tighten once we know what
+# Qodana actually flags on this codebase.
+failureConditions:
+  severityThresholds:
+    any: 1000

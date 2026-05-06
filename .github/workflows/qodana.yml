@@ -1,0 +1,55 @@
+name: Qodana
+
+# Spike: per-PR static analysis via Qodana Community for .NET. Free
+# alternative to SonarQube (Community Edition only analyzes main on
+# private repos; doesn't fit our per-PR need). Currently EAP image,
+# so treat as observability for now — not a blocking gate.
+#
+# Security: this workflow uses no untrusted-input expressions; only
+# static literals + secrets.GITHUB_TOKEN. Action is SHA-pinned per
+# our hardening policy.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: qodana-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # so the action can post a summary comment on PRs
+
+jobs:
+  qodana:
+    name: Qodana (cdnet — Community for .NET)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Non-blocking during the spike. Once the baseline is understood
+    # and we know the false-positive rate on this codebase, flip to
+    # blocking by removing this line and tightening qodana.yaml's
+    # failureConditions.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Qodana wants full history to compute baseline diffs.
+          fetch-depth: 0
+      - name: Qodana scan
+        uses: JetBrains/qodana-action@d7b5ec2fbec32197ef447c450e00589ed5f34fd5 # v2026.1
+        with:
+          # Skip the Cloud token requirement; the Community .NET linter
+          # works token-less. Skip SARIF upload to GitHub Code Scanning
+          # too — that needs Advanced Security on private repos, which
+          # we don't have on the free tier.
+          upload-result: false
+          use-caches: true
+          post-pr-comment: ${{ github.event_name == 'pull_request' }}
+          # Args list (one per line). The image + linter id are already
+          # set via qodana.yaml; --no-statistics keeps the spike fully
+          # offline.
+          args: |
+            --no-statistics
