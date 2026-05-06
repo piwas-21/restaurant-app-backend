@@ -1,15 +1,20 @@
-# Qodana Community for .NET — see docs/plans-equivalent (workspace plan TBD).
-# Spike: evaluate per-PR static analysis as a free alternative to SonarQube.
+# Qodana for .NET — full linter (stable, non-EAP), free under
+# Qodana Cloud's Community plan (private repos + commercial use OK).
 #
-# Image is the COMMUNITY linter (qodana-cdnet) — free, no Cloud token
-# required, commercial use allowed, unlimited private repos. Currently
-# EAP (Early Access) — first signal worth watching during the spike.
+# Why the full linter, not Community for .NET (qodana-cdnet):
+# the Community image has been EAP-only for 2+ years; the bundled
+# ReSharper C++ RC expires every ~2 months and bricks the image
+# until a refresh ships. The full `qodana-dotnet` image has stable,
+# non-EAP releases — safer for production CI.
+#
+# Token: stored as the QODANA_TOKEN GitHub Actions secret. Required
+# by this linter; free under Qodana Cloud Community plan.
 #
 # Profile `qodana.starter` is the recommended default that avoids
 # overwhelming new adopters with style noise. Tighten later.
 
 version: "1.0"
-linter: jetbrains/qodana-cdnet:2026.1-eap
+linter: jetbrains/qodana-dotnet:2026.1
 
 profile:
   name: qodana.starter

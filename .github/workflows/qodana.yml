@@ -1,13 +1,19 @@
 name: Qodana
 
-# Spike: per-PR static analysis via Qodana Community for .NET. Free
-# alternative to SonarQube (Community Edition only analyzes main on
-# private repos; doesn't fit our per-PR need). Currently EAP image,
-# so treat as observability for now — not a blocking gate.
+# Spike: per-PR static analysis via Qodana for .NET. Free alternative
+# to SonarQube (Community Edition only analyzes main on private repos;
+# doesn't fit our per-PR need).
 #
-# Security: this workflow uses no untrusted-input expressions; only
-# static literals + secrets.GITHUB_TOKEN. Action is SHA-pinned per
-# our hardening policy.
+# Using the stable `jetbrains/qodana-dotnet:2026.1` image (configured
+# via qodana.yaml) instead of the Community .NET linter — the Community
+# image has been EAP-only for 2+ years and its bundled ReSharper C++
+# RC expires every ~2 months. Stable image + Cloud token is the
+# pragmatic path; token is free under Qodana Cloud's Community plan.
+#
+# Security: this workflow uses no untrusted-input expressions in run:
+# commands; only static literals + secrets.QODANA_TOKEN +
+# secrets.GITHUB_TOKEN + github.event_name (string-typed, safe).
+# Action is SHA-pinned per our hardening policy.
 
 on:
   push:
@@ -25,7 +31,7 @@ permissions:
 
 jobs:
   qodana:
-    name: Qodana (cdnet — Community for .NET)
+    name: Qodana (.NET)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Non-blocking during the spike. Once the baseline is understood
@@ -40,16 +46,13 @@ jobs:
           fetch-depth: 0
       - name: Qodana scan
         uses: JetBrains/qodana-action@d7b5ec2fbec32197ef447c450e00589ed5f34fd5 # v2026.1
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
         with:
-          # Skip the Cloud token requirement; the Community .NET linter
-          # works token-less. Skip SARIF upload to GitHub Code Scanning
-          # too — that needs Advanced Security on private repos, which
-          # we don't have on the free tier.
+          # Skip SARIF upload to GitHub Code Scanning — that needs
+          # Advanced Security on private repos, which we don't have
+          # on the free tier. Results still flow to Qodana Cloud
+          # (paired with QODANA_TOKEN) and as a PR comment.
           upload-result: false
           use-caches: true
           post-pr-comment: ${{ github.event_name == 'pull_request' }}
-          # Args list (one per line). The image + linter id are already
-          # set via qodana.yaml; --no-statistics keeps the spike fully
-          # offline.
-          args: |
-            --no-statistics
