@@ -18,7 +18,10 @@ profile:
 dotnet:
   solution: RestaurantSystem.sln
 
-baseline: qodana.sarif.json
+# Note: the baseline is wired via the workflow's `args: --baseline,...`
+# input, not here — `baseline` is a CLI/action parameter, not a
+# qodana.yaml config key (Qodana 2026.1 rejects it with "Unexpected
+# keys in qodana.yaml").
 
 exclude:
   - name: UnusedAutoPropertyAccessor.Global

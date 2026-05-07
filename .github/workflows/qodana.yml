@@ -65,3 +65,7 @@ jobs:
           upload-result: false
           use-caches: true
           post-pr-comment: ${{ github.event_name == 'pull_request' }}
+          # Baseline lives in-repo at qodana.sarif.json — only NEW
+          # findings beyond the baseline fail the build. Passed as
+          # CLI args because `baseline` is not a qodana.yaml key.
+          args: --baseline,qodana.sarif.json
