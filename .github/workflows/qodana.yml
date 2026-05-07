@@ -10,6 +10,12 @@ name: Qodana
 # RC expires every ~2 months. Stable image + Cloud token is the
 # pragmatic path; token is free under Qodana Cloud's Community plan.
 #
+# Triggers:
+#   - PR against main/develop  → diff-only "PR mode" scan
+#   - push to main/develop     → full-repo scan
+#   - workflow_dispatch        → manual full-repo scan (useful for
+#                                baseline / on-demand audits)
+#
 # Security: this workflow uses no untrusted-input expressions in run:
 # commands; only static literals + secrets.QODANA_TOKEN +
 # secrets.GITHUB_TOKEN + github.event_name (string-typed, safe).
@@ -20,6 +26,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 concurrency:
   group: qodana-${{ github.ref }}
@@ -27,7 +34,8 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write   # so the action can post a summary comment on PRs
+  pull-requests: write   # PR comment summary
+  checks: write          # GitHub Checks API; the action otherwise truncates output to 10/level
 
 jobs:
   qodana:
