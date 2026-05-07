@@ -1,0 +1,32 @@
+# Qodana for .NET — full linter (stable, non-EAP), free under
+# Qodana Cloud's Community plan (private repos + commercial use OK).
+#
+# Adoption notes (chore/qodana-adopt):
+#   - Baseline of 320 findings committed as qodana.sarif.json. New
+#     PRs are graded against that baseline; only new problems block.
+#   - UnusedAutoPropertyAccessor.{Global,Local} disabled outright —
+#     ~684 hits on DTO records that EF/the mediator instantiate via
+#     reflection. Qodana can't see those callsites; the noise drowns
+#     real findings.
+
+version: "1.0"
+linter: jetbrains/qodana-dotnet:2026.1
+
+profile:
+  name: qodana.starter
+
+dotnet:
+  solution: RestaurantSystem.sln
+
+baseline: qodana.sarif.json
+
+exclude:
+  - name: UnusedAutoPropertyAccessor.Global
+  - name: UnusedAutoPropertyAccessor.Local
+
+# Block on any NEW finding (anything not in the baseline). Existing
+# baselined items remain reported but don't fail the build — drive
+# them down over time.
+failureConditions:
+  severityThresholds:
+    any: 0

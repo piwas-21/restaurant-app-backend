@@ -1,0 +1,67 @@
+name: Qodana
+
+# Per-PR static analysis via Qodana for .NET. Free alternative to
+# SonarQube (Community Edition only analyzes main on private repos;
+# doesn't fit our per-PR need).
+#
+# Using the stable `jetbrains/qodana-dotnet:2026.1` image (configured
+# via qodana.yaml) instead of the Community .NET linter — the Community
+# image has been EAP-only for 2+ years and its bundled ReSharper C++
+# RC expires every ~2 months. Stable image + Cloud token is the
+# pragmatic path; token is free under Qodana Cloud's Community plan.
+#
+# Triggers:
+#   - PR against main/develop  → diff-only "PR mode" scan
+#   - push to main/develop     → full-repo scan
+#   - workflow_dispatch        → manual full-repo scan (re-baseline,
+#                                on-demand audits)
+#
+# Baseline: qodana.sarif.json at repo root holds the 320 known
+# findings at adoption time. Only NEW problems fail the build.
+# To refresh after a real cleanup pass, rerun the workflow_dispatch
+# scan, download the resulting SARIF from Qodana Cloud, and commit
+# it as qodana.sarif.json in a separate chore PR.
+#
+# Security: this workflow uses no untrusted-input expressions in run:
+# commands; only static literals + secrets.QODANA_TOKEN +
+# secrets.GITHUB_TOKEN + github.event_name (string-typed, safe).
+# Action is SHA-pinned per our hardening policy.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: qodana-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # PR comment summary
+  checks: write          # GitHub Checks API; the action otherwise truncates output to 10/level
+
+jobs:
+  qodana:
+    name: Qodana (.NET)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Qodana wants full history to compute baseline diffs.
+          fetch-depth: 0
+      - name: Qodana scan
+        uses: JetBrains/qodana-action@d7b5ec2fbec32197ef447c450e00589ed5f34fd5 # v2026.1
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        with:
+          # Skip SARIF upload to GitHub Code Scanning — that needs
+          # Advanced Security on private repos, which we don't have
+          # on the free tier. Results still flow to Qodana Cloud
+          # (paired with QODANA_TOKEN) and as a PR comment.
+          upload-result: false
+          use-caches: true
+          post-pr-comment: ${{ github.event_name == 'pull_request' }}
