@@ -3,10 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
-using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using System.Linq.Expressions;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrderByIdQuery;
 

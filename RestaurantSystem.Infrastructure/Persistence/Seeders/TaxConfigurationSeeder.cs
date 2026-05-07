@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Entities;
-using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Seeders;
 

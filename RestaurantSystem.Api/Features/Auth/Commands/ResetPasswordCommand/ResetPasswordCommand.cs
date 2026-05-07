@@ -3,7 +3,6 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Entities;
-using System.Text;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ResetPasswordCommand;
 

@@ -1,5 +1,4 @@
 ﻿using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Infrastructure.Persistence.Migrations;
 
 namespace RestaurantSystem.Api.Common.Services.Interfaces;
 
