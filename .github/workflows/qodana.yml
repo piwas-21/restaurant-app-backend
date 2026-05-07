@@ -64,3 +64,14 @@ jobs:
           upload-result: false
           use-caches: true
           post-pr-comment: ${{ github.event_name == 'pull_request' }}
+
+      # Spike-only: upload the SARIF as a GHA artifact so we can pull
+      # it down and commit it as the baseline file when adopting Qodana.
+      # This step is removed in the eventual adopt PR.
+      - name: Upload SARIF (for baselining)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qodana-sarif
+          path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+          if-no-files-found: warn
