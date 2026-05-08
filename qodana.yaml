@@ -8,6 +8,15 @@
 #     ~684 hits on DTO records that EF/the mediator instantiate via
 #     reflection. Qodana can't see those callsites; the noise drowns
 #     real findings.
+#   - CSharpWarnings__CS8981 scoped to the Migrations directory
+#     only — fires on EF-Core-generated migration class names
+#     (lower-case ASCII only). Migrations are immutable once
+#     applied to staging/prod (CLAUDE.md §9), so renaming is not
+#     an option. Already in Directory.Build.props
+#     `WarningsNotAsErrors`. Path-scoping (instead of a global
+#     name exclusion) keeps the rule active for application code,
+#     so a hand-written class with a lowercase-only name still
+#     gets flagged.
 #   - UnusedTypeParameter disabled — fires on the marker interfaces
 #     `ICommand<TResult>` and `IQuery<TResult>` because `TResult`
 #     isn't used inside the interface body. It's load-bearing
@@ -32,6 +41,9 @@ dotnet:
 exclude:
   - name: UnusedAutoPropertyAccessor.Global
   - name: UnusedAutoPropertyAccessor.Local
+  - name: CSharpWarnings__CS8981
+    paths:
+      - RestaurantSystem.Infrastructure/Persistence/Migrations
   - name: UnusedTypeParameter
 
 # Block on any NEW finding (anything not in the baseline). Existing

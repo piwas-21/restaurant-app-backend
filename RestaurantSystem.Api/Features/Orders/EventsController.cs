@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 
 namespace RestaurantSystem.Api.Features.Orders;
@@ -80,7 +81,7 @@ public class EventsController : ControllerBase
     [RequireAdmin]
     public async Task<IActionResult> TestBroadcast([FromQuery] string clientType = "Kitchen")
     {
-        var testOrder = new RestaurantSystem.Api.Features.Orders.Dtos.OrderDto
+        var testOrder = new OrderDto
         {
             Id = Guid.NewGuid(),
             OrderNumber = "TEST-" + DateTime.UtcNow.ToString("HHmmss"),
@@ -100,7 +101,7 @@ public class EventsController : ControllerBase
         return Ok(new
         {
             message = "Test event sent",
-            testOrder = testOrder,
+            testOrder,
             connectedClients = stats
         });
     }

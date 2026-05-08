@@ -13,16 +13,13 @@ public class GetUserAddressesQueryHandler : IQueryHandler<GetUserAddressesQuery,
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
-    private readonly ILogger<GetUserAddressesQueryHandler> _logger;
 
     public GetUserAddressesQueryHandler(
         ApplicationDbContext context,
-        ICurrentUserService currentUserService,
-        ILogger<GetUserAddressesQueryHandler> logger)
+        ICurrentUserService currentUserService)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _logger = logger;
     }
 
     public async Task<ApiResponse<List<AddressDto>>> Handle(GetUserAddressesQuery query, CancellationToken cancellationToken)

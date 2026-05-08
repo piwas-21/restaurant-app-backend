@@ -58,7 +58,7 @@ namespace RestaurantSystem.Api.Settings
         /// Gets or sets the clock skew to allow for server time differences.
         /// Default is 0 minutes for stricter validation.
         /// </summary>
-        public int ClockSkewMinutes { get; set; } = 0;
+        public int ClockSkewMinutes { get; set; }
 
         /// <summary>
         /// Gets or sets whether to validate the token lifetime.

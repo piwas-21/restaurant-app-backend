@@ -207,7 +207,6 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
 
         // Verify Order Items
         var orderProductItem = createdOrder.Items.FirstOrDefault(i => i.ProductId == _testProduct.Id);
-        var orderMenuItem = createdOrder.Items.FirstOrDefault(i => i.ProductId != _testProduct.Id); // Menu items will have product IDs from the menu
 
         orderProductItem.Should().NotBeNull();
         orderProductItem!.Quantity.Should().Be(2);

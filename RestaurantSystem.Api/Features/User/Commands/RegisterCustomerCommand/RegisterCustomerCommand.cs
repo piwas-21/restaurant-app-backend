@@ -92,7 +92,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
             UserId = newUser.Id,
             FirstName = newUser.FirstName,
             LastName = newUser.LastName,
-            Email = newUser.Email!,
+            Email = newUser.Email,
             Role = newUser.Role,
             AccessToken = token,
             RefreshToken = newUser.RefreshToken,

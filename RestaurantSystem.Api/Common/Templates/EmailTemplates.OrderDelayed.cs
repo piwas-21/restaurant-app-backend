@@ -11,7 +11,6 @@ public static partial class EmailTemplates
 
         public static string GetHtmlBody(string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
         {
-            var email = contactEmail;
             return $@"
 <!DOCTYPE html>
 <html>

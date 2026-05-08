@@ -16,16 +16,13 @@ public class EmailService : IEmailService
 {
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<EmailService> _logger;
-    private readonly IWebHostEnvironment _environment;
 
     public EmailService(
         IOptions<EmailSettings> emailSettings,
-        ILogger<EmailService> logger,
-        IWebHostEnvironment environment)
+        ILogger<EmailService> logger)
     {
         _emailSettings = emailSettings.Value;
         _logger = logger;
-        _environment = environment;
     }
 
     public async Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken, string? resetUrl = null)

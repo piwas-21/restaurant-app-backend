@@ -20,7 +20,7 @@ public class OrderItem : Entity
 
     // Navigation properties
     public virtual Order Order { get; set; } = null!;
-    public virtual Product? Product { get; set; } = null!;
+    public virtual Product? Product { get; set; }
     public virtual ProductVariation? ProductVariation { get; set; }
     public virtual Menu? Menu { get; set; }
     public virtual OrderItem? ParentOrderItem { get; set; }

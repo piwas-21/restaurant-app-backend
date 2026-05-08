@@ -78,13 +78,6 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
         try
         {
-            if (command.CategoryIds?.Any() == true)
-            {
-                var categories = await _context.Categories
-                   .Where(c => command.CategoryIds.Contains(c.Id))
-                   .ToListAsync(cancellationToken);
-            }
-
             var product = new Product
             {
                 Id = Guid.NewGuid(),
