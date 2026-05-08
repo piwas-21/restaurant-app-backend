@@ -42,7 +42,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     .ThenInclude(gi => gi!.Translations)
             .Include(p => p.SuggestedSideItems) // Add soft delete filter here
                 .ThenInclude(si => si.SideItemProduct)
-                    .ThenInclude(product => product!.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
+                    .ThenInclude(product => product.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
             .Include(p => p.MenuDefinition)
                 .ThenInclude(md => md!.Sections)
                     .ThenInclude(s => s.Items)

@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.Auth.Handlers;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.LoginCommand;
@@ -58,7 +59,7 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
                     FirstName = payload.GivenName,
                     LastName = payload.FamilyName,
                     EmailConfirmed = true, // Google emails are verified
-                    Role = RestaurantSystem.Domain.Common.Enums.UserRole.Customer,
+                    Role = UserRole.Customer,
                     CreatedBy = "GoogleAuth",
                     RefreshToken = string.Empty, // Will be set later
                     CreatedAt = DateTime.UtcNow
