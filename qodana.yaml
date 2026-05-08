@@ -17,6 +17,15 @@
 #     name exclusion) keeps the rule active for application code,
 #     so a hand-written class with a lowercase-only name still
 #     gets flagged.
+#   - NotAccessedPositionalProperty.Global disabled — fires on record
+#     positional properties that are never read in C# code, but our
+#     DTOs (PagedResult, BasketItemDto, RestaurantInfoDto, etc.) are
+#     consumed by the Next.js frontend over HTTP/JSON. Same blind-spot
+#     as UnusedAutoPropertyAccessor: Qodana doesn't follow JSON
+#     ser/deser into the frontend repo. Verified each flagged property
+#     IS consumed in frontend/src/types/*.ts and components — removing
+#     would break the wire format. Confirmed via frontend grep on
+#     2026-05-08.
 
 version: "1.0"
 linter: jetbrains/qodana-dotnet:2026.1
@@ -38,6 +47,7 @@ exclude:
   - name: CSharpWarnings__CS8981
     paths:
       - RestaurantSystem.Infrastructure/Persistence/Migrations
+  - name: NotAccessedPositionalProperty.Global
 
 # Block on any NEW finding (anything not in the baseline). Existing
 # baselined items remain reported but don't fail the build — drive
