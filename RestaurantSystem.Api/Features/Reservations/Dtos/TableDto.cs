@@ -12,7 +12,7 @@ public record TableDto
     public decimal Width { get; set; }
     public decimal Height { get; set; }
     public string Shape { get; set; } = "circle";
-    public int Rotation { get; set; } = 0;
+    public int Rotation { get; set; }
     public string? Notes { get; set; }
     public string? QRCodeData { get; set; }
     public DateTime? QRCodeGeneratedAt { get; set; }

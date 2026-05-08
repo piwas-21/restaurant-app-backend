@@ -4,7 +4,7 @@ namespace RestaurantSystem.Domain.Entities;
 
 public class ProductCategory : Entity
 {
-    public bool IsPrimary { get; set; } = false; // One category can be marked as primary
+    public bool IsPrimary { get; set; } // One category can be marked as primary
     public int DisplayOrder { get; set; }
 
     // Foreign Keys
