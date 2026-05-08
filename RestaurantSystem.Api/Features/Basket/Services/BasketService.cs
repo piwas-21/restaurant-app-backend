@@ -23,7 +23,6 @@ public class BasketService : IBasketService
     private readonly ILogger<BasketService> _logger;
 
     private const string BASKET_CACHE_KEY_PREFIX = "basket:";
-    private const int BASKET_CACHE_EXPIRY_MINUTES = 30;
 
     public BasketService(
        ApplicationDbContext context,
@@ -968,17 +967,6 @@ public class BasketService : IBasketService
             return $"{BASKET_CACHE_KEY_PREFIX}user:{userId}";
 
         return $"{BASKET_CACHE_KEY_PREFIX}session:{sessionId}";
-    }
-
-    private async Task CacheBasketAsync(string cacheKey, BasketDto basket)
-    {
-        var options = new DistributedCacheEntryOptions
-        {
-            SlidingExpiration = TimeSpan.FromMinutes(BASKET_CACHE_EXPIRY_MINUTES)
-        };
-
-        var json = JsonSerializer.Serialize(basket);
-        await _cache.SetStringAsync(cacheKey, json, options);
     }
 
     private async Task InvalidateBasketCacheAsync(string? sessionId, Guid? userId)

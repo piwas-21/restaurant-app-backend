@@ -26,6 +26,12 @@
 #     IS consumed in frontend/src/types/*.ts and components — removing
 #     would break the wire format. Confirmed via frontend grep on
 #     2026-05-08.
+#   - UnusedTypeParameter disabled — fires on the marker interfaces
+#     `ICommand<TResult>` and `IQuery<TResult>` because `TResult`
+#     isn't used inside the interface body. It's load-bearing
+#     elsewhere: the custom mediator (CLAUDE.md §3) extracts
+#     `TResult` from the closed generic via reflection at dispatch
+#     time. Removing it would break the mediator entirely.
 
 version: "1.0"
 linter: jetbrains/qodana-dotnet:2026.1
@@ -48,6 +54,7 @@ exclude:
     paths:
       - RestaurantSystem.Infrastructure/Persistence/Migrations
   - name: NotAccessedPositionalProperty.Global
+  - name: UnusedTypeParameter
 
 # Block on any NEW finding (anything not in the baseline). Existing
 # baselined items remain reported but don't fail the build — drive

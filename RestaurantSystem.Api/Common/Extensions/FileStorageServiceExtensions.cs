@@ -21,13 +21,13 @@ public static class FileStorageServiceExtensions
                 break;
             case "local":
             default:
-                services.AddLocalFileStorage(configuration);
+                services.AddLocalFileStorage();
                 break;
         }
         return services;
     }
 
-    private static IServiceCollection AddS3FileStorage(this IServiceCollection services, IConfiguration configuration)
+    private static void AddS3FileStorage(this IServiceCollection services, IConfiguration configuration)
     {
         var awsSettings = configuration.GetSection(AWSSettings.SectionName).Get<AWSSettings>();
         if (awsSettings == null)
@@ -36,7 +36,7 @@ public static class FileStorageServiceExtensions
         services.Configure<AWSSettings>(configuration.GetSection(AWSSettings.SectionName));
 
         // Register AWS S3 client
-        services.AddSingleton<IAmazonS3>(provider =>
+        services.AddSingleton<IAmazonS3>(_ =>
         {
             var config = new AmazonS3Config
             {
@@ -47,12 +47,10 @@ public static class FileStorageServiceExtensions
         });
 
         services.AddScoped<IFileStorageService, S3FileStorageService>();
-        return services;
     }
 
-    private static IServiceCollection AddLocalFileStorage(this IServiceCollection services, IConfiguration configuration)
+    private static void AddLocalFileStorage(this IServiceCollection services)
     {
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
-        return services;
     }
 }
