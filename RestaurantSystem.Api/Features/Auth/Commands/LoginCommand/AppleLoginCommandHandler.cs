@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.Auth.Handlers;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using System.IdentityModel.Tokens.Jwt;
 
@@ -81,7 +82,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
                     FirstName = request.FirstName ?? "Apple",
                     LastName = request.LastName ?? "User",
                     EmailConfirmed = true,
-                    Role = RestaurantSystem.Domain.Common.Enums.UserRole.Customer,
+                    Role = UserRole.Customer,
                     CreatedBy = "AppleAuth",
                     RefreshToken = string.Empty, // Will be set later
                     CreatedAt = DateTime.UtcNow
