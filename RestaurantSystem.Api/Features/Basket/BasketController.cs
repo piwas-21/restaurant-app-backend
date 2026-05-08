@@ -18,12 +18,10 @@ namespace RestaurantSystem.Api.Features.Basket;
 public class BasketController : ControllerBase
 {
     private readonly CustomMediator _mediator;
-    private readonly ILogger<BasketController> _logger;
 
-    public BasketController(CustomMediator mediator, ILogger<BasketController> logger)
+    public BasketController(CustomMediator mediator)
     {
         _mediator = mediator;
-        _logger = logger;
     }
 
     /// <summary>

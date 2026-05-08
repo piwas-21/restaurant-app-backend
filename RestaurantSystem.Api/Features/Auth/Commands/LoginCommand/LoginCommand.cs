@@ -14,20 +14,17 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
 {
 
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IConfiguration _configuration;
     private readonly ITokenService _tokenService;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public LoginCommandHandler(
         UserManager<ApplicationUser> userManager,
-        IConfiguration configuration,
         ITokenService tokenService,
         LoginEventHandler loginEventHandler,
         IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
-        _configuration = configuration;
         _tokenService = tokenService;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;

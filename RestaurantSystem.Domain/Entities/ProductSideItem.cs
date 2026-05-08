@@ -4,7 +4,7 @@ namespace RestaurantSystem.Domain.Entities;
 
 public class ProductSideItem : Entity
 {
-    public bool IsRequired { get; set; } = false;
+    public bool IsRequired { get; set; }
     public int DisplayOrder { get; set; }
 
     // Foreign Keys

@@ -6,7 +6,6 @@ using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
-using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -19,24 +18,18 @@ public class BasketService : IBasketService
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ICustomerDiscountService _customerDiscountService;
-    private readonly ITaxConfigurationService _taxConfigurationService;
     private readonly ILogger<BasketService> _logger;
-    private readonly IConfiguration _configuration;
 
     public BasketService(
        ApplicationDbContext context,
        ICurrentUserService currentUserService,
        ICustomerDiscountService customerDiscountService,
-       ITaxConfigurationService taxConfigurationService,
-       ILogger<BasketService> logger,
-       IConfiguration configuration)
+       ILogger<BasketService> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _customerDiscountService = customerDiscountService;
-        _taxConfigurationService = taxConfigurationService;
         _logger = logger;
-        _configuration = configuration;
     }
 
     public async Task<BasketDto?> GetBasketAsync(string sessionId, Guid? userId = null)
@@ -934,5 +927,4 @@ public class BasketService : IBasketService
             Items = rootItems
         };
     }
-
 }

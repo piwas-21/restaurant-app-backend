@@ -31,7 +31,6 @@ using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
-using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -94,7 +93,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer"
     });
 
-    c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
+    c.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecuritySchemeReference("Bearer"),
@@ -164,9 +163,6 @@ if (jwtOptions != null)
 {
     jwtOptions.Validate();
 }
-
-var secret = jwtSettings["Secret"];
-var key = Encoding.UTF8.GetBytes(secret!);
 
 builder.Services.AddAuthentication(options =>
 {

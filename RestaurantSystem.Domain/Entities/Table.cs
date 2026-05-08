@@ -7,7 +7,7 @@ public class Table : Entity
     public string TableNumber { get; set; } = string.Empty;
     public int MaxGuests { get; set; }
     public bool IsActive { get; set; } = true;
-    public bool IsOutdoor { get; set; } = false;
+    public bool IsOutdoor { get; set; }
 
     // Position for visual layout (in pixels or percentage)
     public decimal PositionX { get; set; }
@@ -19,7 +19,7 @@ public class Table : Entity
     public string Shape { get; set; } = "circle";
 
     // Rotation angle in degrees (0-360)
-    public int Rotation { get; set; } = 0;
+    public int Rotation { get; set; }
 
     // Admin notes/comments for this table (visible to customers)
     public string? Notes { get; set; }

@@ -7,7 +7,7 @@ public class MenuSectionItem : Entity
     public Guid MenuSectionId { get; set; }
     public Guid ProductId { get; set; }
 
-    public decimal AdditionalPrice { get; set; } = 0; // Extra cost for this option
+    public decimal AdditionalPrice { get; set; } // Extra cost for this option
     public int DisplayOrder { get; set; }
     public bool IsDefault { get; set; }
 
