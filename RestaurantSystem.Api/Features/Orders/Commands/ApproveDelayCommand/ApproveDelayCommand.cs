@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -17,20 +16,17 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
     private readonly ApplicationDbContext _context;
     private readonly IOrderEventService _orderEventService;
     private readonly IOrderMappingService _mappingService;
-    private readonly IEmailService _emailService;
     private readonly ILogger<ApproveDelayCommandHandler> _logger;
 
     public ApproveDelayCommandHandler(
         ApplicationDbContext context,
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
-        IEmailService emailService,
         ILogger<ApproveDelayCommandHandler> logger)
     {
         _context = context;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
-        _emailService = emailService;
         _logger = logger;
     }
 

@@ -13,16 +13,13 @@ public class GetAddressByIdQueryHandler : IQueryHandler<GetAddressByIdQuery, Api
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
-    private readonly ILogger<GetAddressByIdQueryHandler> _logger;
 
     public GetAddressByIdQueryHandler(
         ApplicationDbContext context,
-        ICurrentUserService currentUserService,
-        ILogger<GetAddressByIdQueryHandler> logger)
+        ICurrentUserService currentUserService)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _logger = logger;
     }
 
     public async Task<ApiResponse<AddressDto>> Handle(GetAddressByIdQuery query, CancellationToken cancellationToken)

@@ -12,18 +12,15 @@ public record DeleteUserCommand(Guid UserId, bool Permanent = false) : ICommand<
 public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiResponse<string>>
 {
     private readonly ApplicationDbContext _context;
-    private readonly IFileStorageService _fileStorageService;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<DeleteUserCommandHandler> _logger;
 
     public DeleteUserCommandHandler(
         ApplicationDbContext context,
-        IFileStorageService fileStorageService,
         ICurrentUserService currentUserService,
         ILogger<DeleteUserCommandHandler> logger)
     {
         _context = context;
-        _fileStorageService = fileStorageService;
         _currentUserService = currentUserService;
         _logger = logger;
     }

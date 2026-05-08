@@ -9,13 +9,11 @@ public class S3FileStorageService : IFileStorageService
 {
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
-    private readonly string _baseUrl;
 
     public S3FileStorageService(IAmazonS3 s3Client, IConfiguration configuration)
     {
         _s3Client = s3Client;
         _bucketName = configuration["AWS:S3:BucketName"]!;
-        _baseUrl = configuration["AWS:S3:BaseUrl"]!; // e.g., "https://your-bucket.s3.amazonaws.com"
     }
 
     public async Task<string> UploadFileAsync(IFormFile file, string folder, string? fileName = null, CancellationToken cancellationToken = default)
