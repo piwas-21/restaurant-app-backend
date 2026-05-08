@@ -36,8 +36,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RestaurantSystem.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
 builder.Services.AddApiRegistration();
 
 // Configure Kestrel for long-lived SSE connections
@@ -109,26 +112,35 @@ builder.Services.AddSwaggerGen(c =>
     c.CustomSchemaIds(t => t.FullName!.Replace("+", "."));
 });
 
-//builder.Services.AddStackExchangeRedisCache(options =>
-//{
-//    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-//    options.InstanceName = "RestaurantSystem";
-//});
 
-builder.Services.AddDistributedMemoryCache();
+builder.AddRedisDistributedCache("redis");
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.EnableDynamicJson();
-var dataSource = dataSourceBuilder.Build();
+//var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+//var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+//dataSourceBuilder.EnableDynamicJson();
+//var dataSource = dataSourceBuilder.Build();
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        dataSource,
-        npgsqlOptions => npgsqlOptions
-            .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
-            .CommandTimeout(30)
-    ));
+//builder.Services.AddDbContext<ApplicationDbContext>(options =>
+//    options.UseNpgsql(
+//        dataSource,
+//        npgsqlOptions => npgsqlOptions
+//            .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
+//            .CommandTimeout(30)
+//    ));
+
+
+builder.AddNpgsqlDataSource("restaurantdb", configureDataSourceBuilder: dataSourceBuilder =>
+{
+    dataSourceBuilder.EnableDynamicJson();
+});
+
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+{
+    var dataSource = serviceProvider.GetRequiredService<NpgsqlDataSource>();
+    options.UseNpgsql(dataSource, npgsqlOptions => npgsqlOptions
+        .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
+        .CommandTimeout(30));
+});
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(opt =>
 {
@@ -315,19 +327,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        if (builder.Environment.IsDevelopment())
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        }
-        else
-        {
-            policy.WithOrigins(corsOrigins!)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
+        var origins = corsOrigins ?? ["http://localhost:3000"];
+        policy.SetIsOriginAllowed(_ => true)
+                     .AllowAnyMethod()
+                     .AllowAnyHeader()
+                     .AllowCredentials();
     });
 });
 
@@ -370,6 +374,8 @@ builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<Or
 
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
