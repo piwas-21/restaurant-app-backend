@@ -25,6 +25,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# Create keys directory and chown to the non-root user (APP_UID is 64198 in .NET 10 images)
+RUN mkdir -p /app/keys && chown -R $APP_UID:$APP_UID /app/keys
+
 USER $APP_UID
 
 ENV ASPNETCORE_URLS=http://+:8080
