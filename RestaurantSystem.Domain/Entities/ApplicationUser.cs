@@ -30,7 +30,7 @@ namespace RestaurantSystem.Domain.Entities
 
         public decimal OrderLimitAmount { get; set; } // Order amount threshold
         public decimal DiscountPercentage { get; set; } // Percentage to apply when threshold is met
-        public bool IsDiscountActive { get; set; } = false;
+        public bool IsDiscountActive { get; set; }
 
         public DateTime? DeletionScheduledAt { get; set; }
 

@@ -11,8 +11,8 @@ public class Product : SoftDeleteEntity
     public string? ImageUrl { get; init; } // Primary image URL for backward compatibility
     public bool IsActive { get; set; } = true;
     public bool IsAvailable { get; set; } = true;
-    public bool IsSpecial { get; set; } = false; // Is this a special menu (e.g., holiday menu)
-    public bool IsFeaturedSpecial { get; set; } = false; // Is this the featured/highlighted special of the day
+    public bool IsSpecial { get; set; } // Is this a special menu (e.g., holiday menu)
+    public bool IsFeaturedSpecial { get; set; } // Is this the featured/highlighted special of the day
     public DateTime? FeaturedDate { get; set; } // Date when this was set as featured
     public int PreparationTimeMinutes { get; set; }
     public ProductType Type { get; set; } = ProductType.MainItem;

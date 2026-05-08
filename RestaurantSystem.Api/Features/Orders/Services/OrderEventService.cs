@@ -673,12 +673,12 @@ public class OrderEventService : IOrderEventService, IDisposable
 
         // Error tracking
         public List<ClientError> Errors { get; } = new List<ClientError>();
-        public int SuccessfulSends { get; set; } = 0;
-        public int FailedSends { get; set; } = 0;
+        public int SuccessfulSends { get; set; }
+        public int FailedSends { get; set; }
         public DateTime? LastEventSentAt { get; set; }
         public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
 
-        private bool _disposed = false;
+        private bool _disposed;
 
         public void Dispose()
         {
