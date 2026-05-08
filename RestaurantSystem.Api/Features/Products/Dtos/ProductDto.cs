@@ -1,6 +1,5 @@
 ﻿using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 

@@ -1,5 +1,4 @@
-﻿using RestaurantSystem.Domain.Common.Enums;
-
+﻿
 namespace RestaurantSystem.Api.Features.User.Dtos;
 
 public class UserDto

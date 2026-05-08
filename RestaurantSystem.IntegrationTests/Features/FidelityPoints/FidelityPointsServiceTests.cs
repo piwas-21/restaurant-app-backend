@@ -1,5 +1,4 @@
 using Moq;
-using Xunit;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.FidelityPoints.Services;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;

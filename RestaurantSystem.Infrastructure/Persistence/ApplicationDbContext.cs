@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
-using RestaurantSystem.Infrastructure.Persistence.Configurations;
 using System.Linq.Expressions;
 using System.Reflection;
 
