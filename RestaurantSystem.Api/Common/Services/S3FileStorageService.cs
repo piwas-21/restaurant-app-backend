@@ -24,7 +24,6 @@ public class S3FileStorageService : IFileStorageService
             throw new ArgumentException("File is empty", nameof(file));
 
         fileName ??= GenerateUniqueFileName(file.FileName);
-        var key = $"{folder.Trim('/')}/{fileName}";
 
         using var stream = file.OpenReadStream();
         return await UploadFileAsync(stream, folder, fileName, file.ContentType, cancellationToken);
@@ -50,7 +49,7 @@ public class S3FileStorageService : IFileStorageService
 
         try
         {
-            var response = await _s3Client.PutObjectAsync(request, cancellationToken);
+            await _s3Client.PutObjectAsync(request, cancellationToken);
             return $"{key}";
         }
         catch (Exception ex)

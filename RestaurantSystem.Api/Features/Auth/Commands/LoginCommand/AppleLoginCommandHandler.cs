@@ -56,7 +56,6 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
             }
 
             var email = jsonToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-            var sub = jsonToken.Subject;
 
             if (string.IsNullOrEmpty(email))
             {
@@ -108,8 +107,6 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
             {
                 await _loginEventHandler.HandleUserLogin(user.Id, sessionId);
             }
-
-            var roles = await _userManager.GetRolesAsync(user);
 
             return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
             {

@@ -171,7 +171,6 @@ namespace RestaurantSystem.Api.Common.Validation
         private bool HasSequentialCharacters(string password)
         {
             // Implementation details...
-            string[] sequences = { "abcdefghijklmnopqrstuvwxyz", "1234567890" /* etc... */ };
             // Check implementation...
             return false;
         }

@@ -85,8 +85,6 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
                 await _loginEventHandler.HandleUserLogin(user.Id, sessionId);
             }
 
-            var roles = await _userManager.GetRolesAsync(user);
-
             return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
             {
                 AccessToken = token,
