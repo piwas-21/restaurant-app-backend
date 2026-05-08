@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
@@ -10,7 +12,7 @@ COPY ["RestaurantSystem.Infrastructure/RestaurantSystem.Infrastructure.csproj", 
 
 RUN dotnet restore "RestaurantSystem.Api/RestaurantSystem.Api.csproj"
 
-# Copy source and publish
+# Copy everything else and publish
 COPY . .
 RUN dotnet publish "RestaurantSystem.Api/RestaurantSystem.Api.csproj" \
     -c $BUILD_CONFIGURATION \
@@ -21,7 +23,7 @@ RUN dotnet publish "RestaurantSystem.Api/RestaurantSystem.Api.csproj" \
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 USER $APP_UID
 
