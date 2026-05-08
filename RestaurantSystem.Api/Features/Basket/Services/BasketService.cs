@@ -26,7 +26,6 @@ public class BasketService : IBasketService
     private readonly IConfiguration _configuration;
 
     private const string BASKET_CACHE_KEY_PREFIX = "basket:";
-    private const int BASKET_CACHE_EXPIRY_MINUTES = 30;
 
     public BasketService(
        ApplicationDbContext context,
