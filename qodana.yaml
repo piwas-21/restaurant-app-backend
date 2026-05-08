@@ -8,6 +8,12 @@
 #     ~684 hits on DTO records that EF/the mediator instantiate via
 #     reflection. Qodana can't see those callsites; the noise drowns
 #     real findings.
+#   - UnusedTypeParameter disabled — fires on the marker interfaces
+#     `ICommand<TResult>` and `IQuery<TResult>` because `TResult`
+#     isn't used inside the interface body. It's load-bearing
+#     elsewhere: the custom mediator (CLAUDE.md §3) extracts
+#     `TResult` from the closed generic via reflection at dispatch
+#     time. Removing it would break the mediator entirely.
 
 version: "1.0"
 linter: jetbrains/qodana-dotnet:2026.1
@@ -26,6 +32,7 @@ dotnet:
 exclude:
   - name: UnusedAutoPropertyAccessor.Global
   - name: UnusedAutoPropertyAccessor.Local
+  - name: UnusedTypeParameter
 
 # Block on any NEW finding (anything not in the baseline). Existing
 # baselined items remain reported but don't fail the build — drive

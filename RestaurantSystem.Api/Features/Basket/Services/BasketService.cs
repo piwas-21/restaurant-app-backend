@@ -977,17 +977,6 @@ public class BasketService : IBasketService
         return $"{BASKET_CACHE_KEY_PREFIX}session:{sessionId}";
     }
 
-    private async Task CacheBasketAsync(string cacheKey, BasketDto basket)
-    {
-        var options = new DistributedCacheEntryOptions
-        {
-            SlidingExpiration = TimeSpan.FromMinutes(BASKET_CACHE_EXPIRY_MINUTES)
-        };
-
-        var json = JsonSerializer.Serialize(basket);
-        await _cache.SetStringAsync(cacheKey, json, options);
-    }
-
     private async Task InvalidateBasketCacheAsync(string? sessionId, Guid? userId)
     {
         var cacheKey = GetCacheKey(sessionId, userId);

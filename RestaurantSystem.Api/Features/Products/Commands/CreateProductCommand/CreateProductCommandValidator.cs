@@ -53,13 +53,4 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             .Must(x => x == null || x.Distinct().Count() == x.Count)
             .WithMessage("Duplicate side items are not allowed");
     }
-
-    private bool BeAValidUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            return true;
-
-        return Uri.TryCreate(url, UriKind.Absolute, out var result)
-            && (result.Scheme == Uri.UriSchemeHttp || result.Scheme == Uri.UriSchemeHttps);
-    }
 }
