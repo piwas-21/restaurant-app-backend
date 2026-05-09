@@ -32,6 +32,15 @@
 #     elsewhere: the custom mediator (CLAUDE.md §3) extracts
 #     `TResult` from the closed generic via reflection at dispatch
 #     time. Removing it would break the mediator entirely.
+#   - CollectionNeverQueried.Global disabled — fires on collection
+#     properties (Dictionary, List) that aren't read in C# code,
+#     but our DTOs (MenuBundleDto.Content, ProductDto.Content,
+#     ProductSummaryDto.Content for i18n; CompleteAllTableOrdersResult
+#     .ProcessedOrderNumbers as a return list) are populated server-
+#     side and serialized to the Next.js frontend. Same blind-spot
+#     as NotAccessedPositionalProperty.Global. Verified each
+#     flagged collection IS consumed in frontend code (e.g.
+#     bundle.content?.[currentLanguage], processedOrderNumbers).
 
 version: "1.0"
 linter: jetbrains/qodana-dotnet:2026.1
@@ -55,6 +64,7 @@ exclude:
       - RestaurantSystem.Infrastructure/Persistence/Migrations
   - name: NotAccessedPositionalProperty.Global
   - name: UnusedTypeParameter
+  - name: CollectionNeverQueried.Global
 
 # Block on any NEW finding (anything not in the baseline). Existing
 # baselined items remain reported but don't fail the build — drive
