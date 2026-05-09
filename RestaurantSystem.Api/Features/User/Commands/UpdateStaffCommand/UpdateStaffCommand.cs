@@ -26,7 +26,6 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IEmailService _emailService;
     private readonly ILogger<UpdateStaffCommandHandler> _logger;
 
     public UpdateStaffCommandHandler(
@@ -34,14 +33,12 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         ApplicationDbContext context,
         ITokenService tokenService,
         ICurrentUserService currentUserService,
-        IEmailService emailService,
         ILogger<UpdateStaffCommandHandler> logger)
     {
         _userManager = userManager;
         _context = context;
         _tokenService = tokenService;
         _currentUserService = currentUserService;
-        _emailService = emailService;
         _logger = logger;
     }
 

@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -13,7 +12,6 @@ public class GetProductImagesQueryHandler : IQueryHandler<GetProductImagesQuery,
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetProductImagesQueryHandler> _logger;
-    private readonly IConfiguration _configuration;
     private readonly string _baseUrl;
 
     public GetProductImagesQueryHandler(ApplicationDbContext context, ILogger<GetProductImagesQueryHandler> logger, IConfiguration configuration)
@@ -21,7 +19,6 @@ public class GetProductImagesQueryHandler : IQueryHandler<GetProductImagesQuery,
         _context = context;
         _logger = logger;
         _baseUrl = configuration["AWS:S3:BaseUrl"]!;
-        _configuration = configuration;
     }
 
     public async Task<ApiResponse<List<ProductImageDto>>> Handle(GetProductImagesQuery query, CancellationToken cancellationToken)

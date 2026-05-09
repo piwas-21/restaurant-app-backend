@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;

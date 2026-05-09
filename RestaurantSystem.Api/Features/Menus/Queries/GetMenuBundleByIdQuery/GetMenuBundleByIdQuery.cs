@@ -5,7 +5,6 @@ using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using Microsoft.Extensions.Configuration;
 
 namespace RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundleByIdQuery;
 

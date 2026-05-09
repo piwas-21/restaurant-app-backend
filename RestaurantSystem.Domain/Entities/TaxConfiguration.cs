@@ -1,5 +1,4 @@
 using RestaurantSystem.Domain.Common.Base;
-using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 

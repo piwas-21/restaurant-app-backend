@@ -8,6 +8,6 @@ public class WorkingHours : Entity
     public TimeSpan OpenTime { get; set; }
     public TimeSpan CloseTime { get; set; }
     public bool IsActive { get; set; } = true;
-    public bool IsClosed { get; set; } = false; // For special closed days
+    public bool IsClosed { get; set; } // For special closed days
     public string? Notes { get; set; }
 }

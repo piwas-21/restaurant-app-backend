@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -73,7 +72,7 @@ public class OrderNotificationService : IOrderNotificationService
             order.CustomerEmail ?? FallbackCustomerEmail,
             order.CustomerName ?? FallbackCustomerName,
             order.OrderNumber,
-            order.Type.ToString(),
+            order.Type,
             order.Total,
             items,
             order.Notes,
@@ -101,7 +100,7 @@ public class OrderNotificationService : IOrderNotificationService
                     order.CustomerName ?? FallbackCustomerName,
                     order.CustomerEmail ?? FallbackCustomerEmail,
                     order.CustomerPhone ?? FallbackPhone,
-                    order.Type.ToString(),
+                    order.Type,
                     order.Total,
                     items,
                     order.Notes,

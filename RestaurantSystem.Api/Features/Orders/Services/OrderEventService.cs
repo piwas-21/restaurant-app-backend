@@ -620,7 +620,7 @@ public class OrderEventService : IOrderEventService, IDisposable
         {
             totalEventsInBuffer = _eventReplayBuffer.Count,
             validEvents = validEvents.Count,
-            expiredEvents = expiredEvents,
+            expiredEvents,
             maxBufferSize = MaxReplayBufferSize,
             bufferTimeoutSeconds = ReplayBufferTimeoutSeconds,
             oldestEventAge = _eventReplayBuffer.Any()
@@ -650,7 +650,7 @@ public class OrderEventService : IOrderEventService, IDisposable
             totalFailedSends = _clients.Values.Sum(c => c.FailedSends),
             clientDetails = clientsByType,
             recentErrors = allErrors.Take(20).ToList(), // Last 20 errors across all clients
-            recentLogs = recentLogs, // Last 50 log entries
+            recentLogs, // Last 50 log entries
             replayBuffer = replayBufferStats, // Replay buffer statistics
             timestamp = DateTime.UtcNow
         };
@@ -673,12 +673,12 @@ public class OrderEventService : IOrderEventService, IDisposable
 
         // Error tracking
         public List<ClientError> Errors { get; } = new List<ClientError>();
-        public int SuccessfulSends { get; set; } = 0;
-        public int FailedSends { get; set; } = 0;
+        public int SuccessfulSends { get; set; }
+        public int FailedSends { get; set; }
         public DateTime? LastEventSentAt { get; set; }
         public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
 
-        private bool _disposed = false;
+        private bool _disposed;
 
         public void Dispose()
         {

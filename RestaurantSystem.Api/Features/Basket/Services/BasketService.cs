@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Utilities;
@@ -7,7 +6,6 @@ using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
-using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -18,32 +16,20 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 public class BasketService : IBasketService
 {
     private readonly ApplicationDbContext _context;
-    private readonly IDistributedCache _cache;
     private readonly ICurrentUserService _currentUserService;
     private readonly ICustomerDiscountService _customerDiscountService;
-    private readonly ITaxConfigurationService _taxConfigurationService;
     private readonly ILogger<BasketService> _logger;
-    private readonly IConfiguration _configuration;
-
-    private const string BASKET_CACHE_KEY_PREFIX = "basket:";
-    private const int BASKET_CACHE_EXPIRY_MINUTES = 30;
 
     public BasketService(
        ApplicationDbContext context,
-       IDistributedCache cache,
        ICurrentUserService currentUserService,
        ICustomerDiscountService customerDiscountService,
-       ITaxConfigurationService taxConfigurationService,
-       ILogger<BasketService> logger,
-       IConfiguration configuration)
+       ILogger<BasketService> logger)
     {
         _context = context;
-        _cache = cache;
         _currentUserService = currentUserService;
         _customerDiscountService = customerDiscountService;
-        _taxConfigurationService = taxConfigurationService;
         _logger = logger;
-        _configuration = configuration;
     }
 
     public async Task<BasketDto?> GetBasketAsync(string sessionId, Guid? userId = null)
@@ -266,7 +252,6 @@ public class BasketService : IBasketService
 
                 await _context.SaveChangesAsync();
                 await RecalculateBasketTotalsAsync(basket.Id);
-                await InvalidateBasketCacheAsync(sessionId, userId);
                 return await GetBasketAsync(sessionId, userId) ?? throw new BadRequestException("Failed to retrieve basket");
             }
 
@@ -468,9 +453,6 @@ public class BasketService : IBasketService
         await _context.SaveChangesAsync();
         await RecalculateBasketTotalsAsync(basket.Id);
 
-        // Invalidate cache
-        await InvalidateBasketCacheAsync(sessionId, userId);
-
         return await GetBasketAsync(sessionId, userId) ?? throw new BadRequestException("Failed to retrieve basket");
     }
 
@@ -498,9 +480,6 @@ public class BasketService : IBasketService
 
         await _context.SaveChangesAsync();
         await RecalculateBasketTotalsAsync(basketItem.BasketId);
-
-        // Invalidate cache
-        await InvalidateBasketCacheAsync(sessionId, userId);
 
         return await GetBasketAsync(sessionId, userId) ?? throw new BadRequestException("Failed to retrieve basket");
     }
@@ -536,12 +515,8 @@ public class BasketService : IBasketService
         await _context.SaveChangesAsync();
         await RecalculateBasketTotalsAsync(basketId);
 
-        // Invalidate cache
-        await InvalidateBasketCacheAsync(sessionId, userId);
-
         return await GetBasketAsync(sessionId, userId) ?? throw new BadRequestException("Failed to retrieve basket");
     }
-
 
     public async Task<BasketDto> ClearBasketAsync(string sessionId)
     {
@@ -567,9 +542,6 @@ public class BasketService : IBasketService
 
         await _context.SaveChangesAsync();
 
-        // Invalidate cache
-        await InvalidateBasketCacheAsync(sessionId, basket.UserId);
-
         return await MapToBasketDtoAsync(basket);
     }
 
@@ -594,9 +566,6 @@ public class BasketService : IBasketService
 
         await _context.SaveChangesAsync();
         await RecalculateBasketTotalsAsync(basket.Id);
-
-        // Invalidate cache
-        await InvalidateBasketCacheAsync(sessionId, basket.UserId);
 
         return await GetBasketAsync(sessionId, basket.UserId) ?? throw new BadRequestException("Failed to retrieve basket");
     }
@@ -634,10 +603,6 @@ public class BasketService : IBasketService
             anonymousBasket.UpdatedAt = DateTime.UtcNow;
             anonymousBasket.UpdatedBy = userId.ToString();
             await _context.SaveChangesAsync();
-
-            // Invalidate cache
-            await InvalidateBasketCacheAsync(sessionId, null);
-            await InvalidateBasketCacheAsync(sessionId, userId);
 
             return await MapToBasketDtoAsync(anonymousBasket);
         }
@@ -677,10 +642,6 @@ public class BasketService : IBasketService
 
         await _context.SaveChangesAsync();
         await RecalculateBasketTotalsAsync(userBasket.Id);
-
-        // Invalidate cache
-        await InvalidateBasketCacheAsync(sessionId, null);
-        await InvalidateBasketCacheAsync(sessionId, userId);
 
         return await GetBasketAsync(sessionId, userId) ?? throw new BadRequestException("Failed to retrieve basket");
     }
@@ -749,8 +710,6 @@ public class BasketService : IBasketService
 
         await _context.SaveChangesAsync();
 
-        // Invalidate cache after recalculating totals
-        await InvalidateBasketCacheAsync(basket.SessionId, basket.UserId);
     }
 
     private async Task<Domain.Entities.Basket> GetOrCreateBasketAsync(string? sessionId, Guid? userId)
@@ -967,30 +926,5 @@ public class BasketService : IBasketService
             Notes = basket.Notes,
             Items = rootItems
         };
-    }
-
-    private string GetCacheKey(string? sessionId, Guid? userId)
-    {
-        if (userId.HasValue && userId.Value != Guid.Empty)
-            return $"{BASKET_CACHE_KEY_PREFIX}user:{userId}";
-
-        return $"{BASKET_CACHE_KEY_PREFIX}session:{sessionId}";
-    }
-
-    private async Task CacheBasketAsync(string cacheKey, BasketDto basket)
-    {
-        var options = new DistributedCacheEntryOptions
-        {
-            SlidingExpiration = TimeSpan.FromMinutes(BASKET_CACHE_EXPIRY_MINUTES)
-        };
-
-        var json = JsonSerializer.Serialize(basket);
-        await _cache.SetStringAsync(cacheKey, json, options);
-    }
-
-    private async Task InvalidateBasketCacheAsync(string? sessionId, Guid? userId)
-    {
-        var cacheKey = GetCacheKey(sessionId, userId);
-        await _cache.RemoveAsync(cacheKey);
     }
 }
