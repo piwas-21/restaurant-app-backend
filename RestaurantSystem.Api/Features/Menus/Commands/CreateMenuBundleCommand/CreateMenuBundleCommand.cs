@@ -226,7 +226,13 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
         }
         catch
         {
-            try { await transaction.RollbackAsync(cancellationToken); } catch { }
+            try { await transaction.RollbackAsync(cancellationToken); }
+            catch (Exception rollbackEx)
+            {
+                // The original exception is the actionable one and is rethrown
+                // below; rollback failure here is logged but mustn't shadow it.
+                _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle create");
+            }
             throw;
         }
     }

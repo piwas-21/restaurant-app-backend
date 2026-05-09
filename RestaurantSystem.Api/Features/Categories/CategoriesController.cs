@@ -175,7 +175,7 @@ public class CategoriesController : ControllerBase
     /// <summary>
     /// Reorder categories display order
     /// </summary>
-    /// <param name="request">List of category IDs with new display orders</param>
+    /// <param name="command">List of category IDs with new display orders</param>
     /// <returns>Success message</returns>
     [HttpPut("reorder")]
     [RequireAdmin]
