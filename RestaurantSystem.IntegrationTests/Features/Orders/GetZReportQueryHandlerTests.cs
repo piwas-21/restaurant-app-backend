@@ -173,6 +173,14 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
 
         var report = await RunHandlerAsync();
 
+        // Order-level totals must reflect the parent's total only — child has
+        // ItemTotal = 0 in this seed but more importantly, top-level
+        // GrossSales/NetSales come from Order.SubTotal/Total, not from
+        // summed items, so they're unaffected by item filtering.
+        report.TotalTransactions.Should().Be(1);
+        report.GrossSales.Should().Be(25m);
+        report.NetSales.Should().Be(25m);
+
         report.SalesByProductType.Should().ContainSingle(
             "the child bundle item must not produce a Sauce row");
         report.SalesByProductType[0].ProductType.Should().Be(nameof(ProductType.MainItem));
@@ -275,6 +283,9 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
 
         var report = await RunHandlerAsync();
 
+        // All 15 orders processed; the cap applies to TopSellingItems only.
+        report.TotalTransactions.Should().Be(15);
+
         report.TopSellingItems.Should().HaveCount(10, "TopItemsCount const = 10");
         report.TopSellingItems.Select(t => t.ProductName)
             .Should().BeEquivalentTo(
@@ -310,6 +321,10 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
         }
 
         var report = await RunHandlerAsync();
+
+        // All 7 orders processed; precision check is meaningful only if every
+        // record is summed.
+        report.TotalTransactions.Should().Be(count);
 
         report.GrossSales.Should().Be(expected);
         report.NetSales.Should().Be(expected);
