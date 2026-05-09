@@ -69,13 +69,3 @@ jobs:
           # findings beyond the baseline fail the build. Passed as
           # CLI args because `baseline` is not a qodana.yaml key.
           args: --baseline,qodana.sarif.json
-      # Temporary one-shot upload step to extract the fresh SARIF
-      # for the baseline-refresh PR (#39). REMOVE before merging.
-      - name: Upload SARIF artifact (one-shot for baseline refresh)
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: qodana-sarif
-          path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
-          if-no-files-found: warn
-          retention-days: 7
