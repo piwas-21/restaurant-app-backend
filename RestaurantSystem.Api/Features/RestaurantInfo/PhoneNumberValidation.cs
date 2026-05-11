@@ -8,7 +8,7 @@ namespace RestaurantSystem.Api.Features.RestaurantInfo;
 /// Note: this lives as a static helper because FluentValidation isn't
 /// wired into <c>CustomMediator</c> today (registered in DI but never
 /// invoked — see backend issue #9). When that pipeline lands, this
-/// can move to an FV rule. Until then, handlers call <see cref="EnsureValid"/>
+/// can move to an FV rule. Until then, handlers call <see cref="IsValid"/>
 /// up-front and throw <c>BadRequestException</c> on a malformed input.
 /// </summary>
 internal static class PhoneNumberValidation

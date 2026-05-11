@@ -12,7 +12,7 @@ namespace RestaurantSystem.Api.Features.RestaurantInfo.Queries.GetRestaurantInfo
 /// its phone numbers (active + inactive — clients filter as needed).
 /// Public endpoint.
 /// </summary>
-public record GetRestaurantInfoQuery() : IQuery<ApiResponse<RestaurantInfoDto>>;
+public record GetRestaurantInfoQuery : IQuery<ApiResponse<RestaurantInfoDto>>;
 
 public class GetRestaurantInfoQueryHandler
     : IQueryHandler<GetRestaurantInfoQuery, ApiResponse<RestaurantInfoDto>>

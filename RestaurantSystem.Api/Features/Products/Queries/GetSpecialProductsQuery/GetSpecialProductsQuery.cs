@@ -18,7 +18,6 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetSpecialProductsQueryHandler> _logger;
-    private readonly string _baseUrl;
     private readonly IConfiguration _configuration;
 
     public GetSpecialProductsQueryHandler(
@@ -29,13 +28,13 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
         _context = context;
         _logger = logger;
         _configuration = configuration;
-        _baseUrl = _configuration["AWS:S3:BaseUrl"]!;
     }
 
     public async Task<ApiResponse<PagedResult<SpecialProductDto>>> Handle(
         GetSpecialProductsQuery query,
         CancellationToken cancellationToken)
     {
+        var baseUrl = _configuration["AWS:S3:BaseUrl"]!;
         // Query all products where IsSpecial = true
         var specialProductsQuery = _context.Products
             .Include(p => p.Images)
@@ -63,7 +62,7 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
             BasePrice = p.BasePrice,
             ImageUrl = p.Images
                 .Where(img => img.IsPrimary)
-                .Select(img => _baseUrl + "/" + img.Url)
+                .Select(img => baseUrl + "/" + img.Url)
                 .FirstOrDefault() ?? p.ImageUrl,
             IsActive = p.IsActive,
             IsAvailable = p.IsAvailable,

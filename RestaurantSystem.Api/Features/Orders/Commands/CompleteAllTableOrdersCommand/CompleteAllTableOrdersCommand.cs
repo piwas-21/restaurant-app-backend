@@ -14,6 +14,7 @@ public class CompleteAllTableOrdersResult
     public int CompletedCount { get; set; }
     public int CancelledCount { get; set; }
     public int TotalProcessed { get; set; }
+    // ReSharper disable once CollectionNeverQueried.Global — serialized to JSON in API response
     public List<string> ProcessedOrderNumbers { get; set; } = new();
 }
 

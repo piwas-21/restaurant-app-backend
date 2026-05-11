@@ -16,6 +16,7 @@ public class MenuBundleDto
     public string Type { get; set; } = "menu";
     public int DisplayOrder { get; set; }
     public MenuDefinitionDto? MenuDefinition { get; set; }
+    // ReSharper disable once CollectionNeverQueried.Global — serialized to JSON in API response
     public Dictionary<string, MenuBundleContentDto> Content { get; set; } = new();
     public List<RestaurantSystem.Api.Features.Products.Dtos.ProductImageDto> Images { get; set; } = new();
 }

@@ -13,7 +13,6 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetProductByIdQueryHandler> _logger;
-    private readonly string _baseUrl;
     private readonly IConfiguration _configuration;
 
     public GetProductByIdQueryHandler(ApplicationDbContext context, ILogger<GetProductByIdQueryHandler> logger, IConfiguration configuration)
@@ -21,11 +20,11 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
         _context = context;
         _logger = logger;
         _configuration = configuration;
-        _baseUrl = _configuration["AWS:S3:BaseUrl"]!;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)
     {
+        var baseUrl = _configuration["AWS:S3:BaseUrl"]!;
         var product = await _context.Products
             .IgnoreQueryFilters() // This will load ALL products, including soft-deleted ones
             .AsSplitQuery()
@@ -114,7 +113,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             Images = product.Images.Select(i => new ProductImageDto
             {
                 Id = i.Id,
-                Url = _baseUrl + "/" + i.Url,
+                Url = baseUrl + "/" + i.Url,
                 AltText = i.AltText,
                 IsPrimary = i.IsPrimary,
                 SortOrder = i.SortOrder,
@@ -181,7 +180,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         .Select(i => new ProductImageDto
                         {
                             Id = i.Id,
-                            Url = _baseUrl + "/" + i.Url,
+                            Url = baseUrl + "/" + i.Url,
                             AltText = i.AltText,
                             IsPrimary = i.IsPrimary,
                             SortOrder = i.SortOrder,

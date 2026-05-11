@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace RestaurantSystem.Api.Common.Validation
 {
-    // <summary>
+    /// <summary>
     /// Custom password validator that implements strong password requirements.
     /// </summary>
     public class StrongPasswordValidator<TUser> : IPasswordValidator<TUser> where TUser : class

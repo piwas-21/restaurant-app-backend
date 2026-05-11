@@ -269,7 +269,17 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
         }
         catch
         {
-            try { await transaction.RollbackAsync(cancellationToken); } catch { }
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (Exception rollbackEx)
+            {
+                // swallow:secondary-rollback-failure — we are already in an outer catch
+                // about to rethrow the original exception; surfacing the rollback failure
+                // here would mask the real cause. Log it instead.
+                _logger.LogError(rollbackEx, "Transaction rollback failed during menu bundle update");
+            }
             throw;
         }
     }

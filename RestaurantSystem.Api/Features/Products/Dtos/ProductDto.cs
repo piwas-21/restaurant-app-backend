@@ -21,6 +21,7 @@ public record ProductDto
     public List<ProductIngredientDto>? DetailedIngredients { get; init; } = [];
     public List<string>? Allergens { get; init; } = [];
     public int DisplayOrder { get; init; }
+    // ReSharper disable once CollectionNeverQueried.Global — serialized to JSON in API response
     public ProductDescriptionsDto Content { get; set; } = new();
 
     public List<ProductImageDto> Images { get; init; } = [];

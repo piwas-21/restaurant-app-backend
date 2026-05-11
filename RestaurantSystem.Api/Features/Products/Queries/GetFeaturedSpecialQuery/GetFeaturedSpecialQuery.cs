@@ -9,13 +9,12 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetFeaturedSpecialQuery
 /// <summary>
 /// Query to get the currently featured special product
 /// </summary>
-public record GetFeaturedSpecialQuery() : IQuery<ApiResponse<FeaturedSpecialDto?>>;
+public record GetFeaturedSpecialQuery : IQuery<ApiResponse<FeaturedSpecialDto?>>;
 
 public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQuery, ApiResponse<FeaturedSpecialDto?>>
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetFeaturedSpecialQueryHandler> _logger;
-    private readonly string _baseUrl;
     private readonly IConfiguration _configuration;
 
     public GetFeaturedSpecialQueryHandler(
@@ -26,13 +25,13 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
         _context = context;
         _logger = logger;
         _configuration = configuration;
-        _baseUrl = _configuration["AWS:S3:BaseUrl"]!;
     }
 
     public async Task<ApiResponse<FeaturedSpecialDto?>> Handle(
         GetFeaturedSpecialQuery query,
         CancellationToken cancellationToken)
     {
+        var baseUrl = _configuration["AWS:S3:BaseUrl"]!;
         // Get the product where IsFeaturedSpecial = true
         var featuredProduct = await _context.Products
             .Include(p => p.Images)
@@ -60,7 +59,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
             BasePrice = featuredProduct.BasePrice,
             ImageUrl = featuredProduct.Images
                 .Where(img => img.IsPrimary)
-                .Select(img => _baseUrl + "/" + img.Url)
+                .Select(img => baseUrl + "/" + img.Url)
                 .FirstOrDefault() ?? featuredProduct.ImageUrl,
             FeaturedDate = featuredProduct.FeaturedDate ?? DateTime.UtcNow,
             PreparationTimeMinutes = featuredProduct.PreparationTimeMinutes,
@@ -69,7 +68,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
             Images = featuredProduct.Images.Select(img => new ProductImageDto
             {
                 Id = img.Id,
-                Url = _baseUrl + "/" + img.Url,
+                Url = baseUrl + "/" + img.Url,
                 IsPrimary = img.IsPrimary,
                 SortOrder = img.SortOrder,
                 AltText = img.AltText
@@ -97,14 +96,14 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     Price = si.SideItemProduct.BasePrice,
                     ImageUrl = si.SideItemProduct.Images
                         .Where(img => img.IsPrimary)
-                        .Select(img => _baseUrl + "/" + img.Url)
+                        .Select(img => baseUrl + "/" + img.Url)
                         .FirstOrDefault() ?? si.SideItemProduct.ImageUrl,
                     IsRequired = si.IsRequired,
                     DisplayOrder = si.DisplayOrder,
                     Images = si.SideItemProduct.Images.Select(img => new ProductImageDto
                     {
                         Id = img.Id,
-                        Url = _baseUrl + "/" + img.Url,
+                        Url = baseUrl + "/" + img.Url,
                         IsPrimary = img.IsPrimary,
                         SortOrder = img.SortOrder,
                         AltText = img.AltText
