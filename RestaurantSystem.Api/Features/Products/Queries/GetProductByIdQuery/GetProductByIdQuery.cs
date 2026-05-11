@@ -24,7 +24,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
 
     public async Task<ApiResponse<ProductDto>> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)
     {
-        var baseUrl = _configuration["AWS:S3:BaseUrl"]!;
+        var baseUrl = _configuration["AWS:S3:BaseUrl"]
+            ?? throw new InvalidOperationException("AWS:S3:BaseUrl is not configured.");
         var product = await _context.Products
             .IgnoreQueryFilters() // This will load ALL products, including soft-deleted ones
             .AsSplitQuery()

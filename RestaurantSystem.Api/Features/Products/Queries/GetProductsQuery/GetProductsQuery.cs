@@ -34,7 +34,8 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
 
     public async Task<ApiResponse<PagedResult<ProductSummaryDto>>> Handle(GetProductsQuery query, CancellationToken cancellationToken)
     {
-        var baseUrl = _configuration["AWS:S3:BaseUrl"]!;
+        var baseUrl = _configuration["AWS:S3:BaseUrl"]
+            ?? throw new InvalidOperationException("AWS:S3:BaseUrl is not configured.");
         var productsQuery = _context.Products
             .Include(p => p.Images)
             .Include(p => p.Descriptions)

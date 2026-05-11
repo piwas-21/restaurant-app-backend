@@ -31,7 +31,8 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
         GetFeaturedSpecialQuery query,
         CancellationToken cancellationToken)
     {
-        var baseUrl = _configuration["AWS:S3:BaseUrl"]!;
+        var baseUrl = _configuration["AWS:S3:BaseUrl"]
+            ?? throw new InvalidOperationException("AWS:S3:BaseUrl is not configured.");
         // Get the product where IsFeaturedSpecial = true
         var featuredProduct = await _context.Products
             .Include(p => p.Images)

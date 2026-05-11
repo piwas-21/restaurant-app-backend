@@ -235,7 +235,9 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 // swallow:secondary-rollback-failure — we are already in an outer catch
                 // about to rethrow the original exception; surfacing the rollback failure
                 // here would mask the real cause. Log it instead.
-                _logger.LogError(rollbackEx, "Transaction rollback failed during menu bundle create");
+                _logger.LogError(rollbackEx,
+                    "Transaction rollback failed during menu bundle create (name: {BundleName}); original error will still be thrown",
+                    command.Name);
             }
             throw;
         }
