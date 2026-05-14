@@ -1,9 +1,4 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -11,7 +6,7 @@ public class ProductImage : SoftDeleteEntity
 {
     public string Url { get; set; } = null!;
     public string? AltText { get; set; }
-    public bool IsPrimary { get; set; } = false;
+    public bool IsPrimary { get; set; }
     public int SortOrder { get; set; }
 
     // Foreign key

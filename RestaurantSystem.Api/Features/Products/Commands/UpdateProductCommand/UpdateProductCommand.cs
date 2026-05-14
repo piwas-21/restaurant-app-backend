@@ -391,19 +391,6 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Reload for response
-        var updatedProduct = await _context.Products
-            .Include(p => p.ProductCategories)
-                .ThenInclude(pc => pc.Category)
-            .Include(p => p.Variations.Where(v => !v.IsDeleted))
-            .Include(p => p.SuggestedSideItems)
-                .ThenInclude(si => si.SideItemProduct)
-            .Include(p => p.MenuDefinition)
-                .ThenInclude(md => md!.Sections)
-                    .ThenInclude(s => s.Items)
-                        .ThenInclude(i => i.Product)
-            .FirstAsync(p => p.Id == product.Id, cancellationToken);
-
         var handler = new GetProductByIdQueryHandler(_context, _getProductlogger, _configuration);
         var result = await handler.Handle(new GetProductByIdQuery(product.Id), cancellationToken);
 

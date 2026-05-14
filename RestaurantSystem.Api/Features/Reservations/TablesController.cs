@@ -19,12 +19,10 @@ namespace RestaurantSystem.Api.Features.Reservations;
 public class TablesController : ControllerBase
 {
     private readonly CustomMediator _mediator;
-    private readonly ILogger<TablesController> _logger;
 
-    public TablesController(CustomMediator mediator, ILogger<TablesController> logger)
+    public TablesController(CustomMediator mediator)
     {
         _mediator = mediator;
-        _logger = logger;
     }
 
     /// <summary>

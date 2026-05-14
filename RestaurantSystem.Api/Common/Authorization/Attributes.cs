@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using RestaurantSystem.Domain.Common.Enums;
-using System.Data;
 
 namespace RestaurantSystem.Api.Common.Authorization;
 

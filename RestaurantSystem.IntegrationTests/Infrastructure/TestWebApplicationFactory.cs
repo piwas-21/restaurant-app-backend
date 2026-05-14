@@ -51,7 +51,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             // and rejects the test request as unauthenticated.
             services.AddAuthentication("Test")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                    "Test", options => { });
+                    "Test", _ => { });
             services.PostConfigure<AuthenticationOptions>(options =>
             {
                 options.DefaultAuthenticateScheme = "Test";

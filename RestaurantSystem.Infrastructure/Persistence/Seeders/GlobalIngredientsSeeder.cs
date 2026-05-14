@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using RestaurantSystem.Domain.Entities;
-using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Seeders;
 

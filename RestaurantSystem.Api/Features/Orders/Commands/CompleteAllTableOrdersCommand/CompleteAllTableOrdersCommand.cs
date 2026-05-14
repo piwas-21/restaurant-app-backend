@@ -50,7 +50,7 @@ public class CompleteAllTableOrdersCommandHandler : ICommandHandler<CompleteAllT
                 .Include(o => o.Items)
                 .Include(o => o.StatusHistory)
                 .Where(o => !o.IsDeleted
-                    && o.Type == Domain.Common.Enums.OrderType.DineIn
+                    && o.Type == OrderType.DineIn
                     && o.TableNumber == tableNumberInt
                     && o.Status != OrderStatus.Completed
                     && o.Status != OrderStatus.Cancelled)

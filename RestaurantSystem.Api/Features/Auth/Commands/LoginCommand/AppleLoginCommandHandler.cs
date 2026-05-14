@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.Auth.Handlers;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using System.IdentityModel.Tokens.Jwt;
 
@@ -56,7 +57,6 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
             }
 
             var email = jsonToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-            var sub = jsonToken.Subject;
 
             if (string.IsNullOrEmpty(email))
             {
@@ -82,7 +82,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
                     FirstName = request.FirstName ?? "Apple",
                     LastName = request.LastName ?? "User",
                     EmailConfirmed = true,
-                    Role = RestaurantSystem.Domain.Common.Enums.UserRole.Customer,
+                    Role = UserRole.Customer,
                     CreatedBy = "AppleAuth",
                     RefreshToken = string.Empty, // Will be set later
                     CreatedAt = DateTime.UtcNow
@@ -108,8 +108,6 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
             {
                 await _loginEventHandler.HandleUserLogin(user.Id, sessionId);
             }
-
-            var roles = await _userManager.GetRolesAsync(user);
 
             return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
             {

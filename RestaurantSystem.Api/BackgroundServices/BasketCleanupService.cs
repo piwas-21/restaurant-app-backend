@@ -1,6 +1,5 @@
 ﻿
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.BackgroundServices;

@@ -18,16 +18,16 @@ public class BasketItem : Entity
     public List<Guid>? ExcludedIngredients { get; set; } // IDs of default ingredients to exclude
     public List<Guid>? AddedIngredients { get; set; } // IDs of optional ingredients added
     public string? IngredientQuantitiesJson { get; set; } // JSON: { ingredientId: quantity }
-    public decimal CustomizationPrice { get; set; } = 0; // Additional price from customizations
+    public decimal CustomizationPrice { get; set; } // Additional price from customizations
 
     // Selected side items (stored as JSON: {id, quantity} pairs)
     public string? SelectedSideItemsJson { get; set; }
 
     // Navigation properties
     public virtual Basket Basket { get; set; } = null!;
-    public virtual Product? Product { get; set; } = null!;
-    public virtual ProductVariation? ProductVariation { get; set; } = null;
-    public virtual Menu? Menu { get; set; } = null!;
+    public virtual Product? Product { get; set; }
+    public virtual ProductVariation? ProductVariation { get; set; }
+    public virtual Menu? Menu { get; set; }
 
     public Guid? ParentBasketItemId { get; set; }
     public virtual BasketItem? ParentBasketItem { get; set; }

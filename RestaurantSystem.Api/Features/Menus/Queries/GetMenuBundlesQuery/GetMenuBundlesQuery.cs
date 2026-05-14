@@ -2,10 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Menus.Dtos;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using Microsoft.Extensions.Configuration;
 
 namespace RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundlesQuery;
 
@@ -25,13 +23,13 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
                 .ThenInclude(md => md!.Sections)
                     .ThenInclude(s => s.Items)
                         .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p!.DetailedIngredients)
+                            .ThenInclude(p => p.DetailedIngredients)
                                 .ThenInclude(di => di.Descriptions)
             .Include(p => p.MenuDefinition)
                 .ThenInclude(md => md!.Sections)
                     .ThenInclude(s => s.Items)
                         .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p!.SuggestedSideItems)
+                            .ThenInclude(p => p.SuggestedSideItems)
                                 .ThenInclude(si => si.SideItemProduct)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)

@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using RestaurantSystem.Api.Features.Orders.Dtos;
+﻿using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
