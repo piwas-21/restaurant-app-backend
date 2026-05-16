@@ -118,44 +118,30 @@ include:
 # develop directly via a chore MR with the file in scope; the develop
 # push triggers the build_image + trivy jobs.
 
-.shell_runner_docker_login: &shell_runner_docker_login
-    # Per-job DOCKER_CONFIG to keep concurrent backend + frontend pipelines
-    # from racing each other's registry.gitlab.com credential. The dir alone
-    # is not enough on macOS — `docker login` against an empty DOCKER_CONFIG
-    # auto-injects `credsStore: "osxkeychain"`, routing the credential
-    # through the shared system keychain (one entry per registry, last
-    # writer wins, the loser pushes with the wrong token and 401s on
-    # `gitlab.com/jwt/auth`). Pre-seeding an explicit empty config.json
-    # opts out of credsStore inheritance, so the credential lands in
-    # `$DOCKER_CONFIG/config.json` (`auths.<reg>.auth = <base64>`) scoped
-    # to this job alone.
-    - export DOCKER_CONFIG="$CI_PROJECT_DIR/.docker-$CI_JOB_ID"
-    - mkdir -p "$DOCKER_CONFIG"
-    - echo '{}' > "$DOCKER_CONFIG/config.json"
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-
 build_image:
     stage: build
     rules:
         - if: $CI_COMMIT_BRANCH == "develop"
         - if: $CI_COMMIT_BRANCH == "main"
-    # Runs on the laptop's shell-executor runner — uses the host's Docker
-    # Desktop daemon and `trivy` CLI directly, no DinD. DinD via Docker
-    # Desktop on macOS was unreachable from runner-spawned containers
-    # (see commit history + docs/runbooks/self-hosted-gitlab-runner.md);
-    # the shell executor sidesteps the API/socket gymnastics entirely.
+    # Runs on GitLab.com SaaS shared runners with Docker-in-Docker.
+    # Previously routed to a laptop shell-executor runner (commit 428fbb7,
+    # 2026-04-30), which pinned the only build host to a developer's Mac:
+    # DevOps could not reach those builds and pipelines depended on Docker
+    # Desktop being awake. Reverted to the shared-runner + DinD setup that
+    # ran successfully before that change (commit a0c3feb).
     tags:
-        - rumi-laptop-shell
+        - saas-linux-medium-amd64
+    image: docker:24
+    services:
+        - docker:24-dind
     before_script:
-        - *shell_runner_docker_login
+        - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     script:
         - docker build -t $IMAGE_NAME:$IMAGE_TAG .
-        # Push with retry: when a concurrent frontend pipeline `docker login`s
-        # to the same registry, our pending JWT-exchange can race the macOS
-        # keychain and 401 on `gitlab.com/jwt/auth` even though our own
-        # `docker login` succeeded (see develop pipeline #324, 2026-05-03).
-        # Re-`docker login` + retry up to 3 times with backoff — the second
-        # login refreshes the credential and the next push lands clean.
+        # Push with retry for transient registry blips (e.g. JWT auth
+        # exchange races on gitlab.com). Re-`docker login` + retry up to
+        # 3 times with backoff; the refreshed credential lets the next
+        # push land clean.
         - |
             for attempt in 1 2 3; do
                 if docker push "$IMAGE_NAME:$IMAGE_TAG"; then
@@ -179,11 +165,17 @@ trivy:
   rules:
     - if: $CI_COMMIT_BRANCH == "develop"
     - if: $CI_COMMIT_BRANCH == "main"
-  # Same shell-executor runner as build_image — uses host trivy CLI.
+  # Same shared-runner + DinD setup as build_image; trivy CLI is fetched
+  # at job start since the docker:24 image doesn't ship it.
   tags:
-    - rumi-laptop-shell
+    - saas-linux-medium-amd64
+  image: docker:24
+  services:
+    - docker:24-dind
   before_script:
-    - *shell_runner_docker_login
+    - apk add --no-cache curl
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - docker pull $IMAGE_NAME:$IMAGE_TAG
     - trivy image -f json -o trivy.json --severity HIGH,CRITICAL --exit-code 1 $IMAGE_NAME:$IMAGE_TAG
