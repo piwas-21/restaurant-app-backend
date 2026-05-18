@@ -222,7 +222,7 @@ main                    ← production (currently develop; cutover pending)
 
 - **Never push to `main` or `develop` directly** — pre-commit hook blocks this.
 - Branch off **`develop`**. Open PR to `develop`. After merge to `develop` and test-env validation, `develop` is promoted to `main` for prod.
-- One issue = one branch. Delete branch after merge (auto via `--remove-source-branch`).
+- One issue = one branch. Delete branch after merge (via `gh pr merge --delete-branch`, or enable "Automatically delete head branches" in the repo's General settings).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
 ### Commit messages
