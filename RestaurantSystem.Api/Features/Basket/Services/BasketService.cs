@@ -524,25 +524,30 @@ public class BasketService : IBasketService
         if (basket == null)
             throw new NotFoundException("Basket not found");
 
-        // Remove all items
-        var items = await _context.BasketItems
-            .Where(bi => bi.BasketId == basket.Id)
-            .ToListAsync();
+        // GetBasketFromDatabase loads with AsNoTracking, so scalar mutations on
+        // that detached instance don't persist and child-row deletes via the
+        // change tracker don't auto-clear its in-memory .Items collection.
+        // Re-fetch with tracking so the totals reset actually hits the DB and
+        // EF synchronises the navigation. Without this, the response DTO came
+        // back with items: [...] but Total: 0 — the exact symptom of the bug
+        // where the basket UI kept showing items with TOTAL CHF 0.00 after
+        // order placement.
+        var trackedBasket = await _context.Baskets
+            .Include(b => b.Items)
+            .FirstAsync(b => b.Id == basket.Id);
 
-        foreach (var item in items)
-        {
-            _context.BasketItems.Remove(item);
-        }
+        _context.BasketItems.RemoveRange(trackedBasket.Items);
+        trackedBasket.Items.Clear();
 
-        basket.SubTotal = 0;
-        basket.Tax = 0;
-        basket.Total = 0;
-        basket.UpdatedAt = DateTime.UtcNow;
-        basket.UpdatedBy = _currentUserService.GetAuditIdentifier();
+        trackedBasket.SubTotal = 0;
+        trackedBasket.Tax = 0;
+        trackedBasket.Total = 0;
+        trackedBasket.UpdatedAt = DateTime.UtcNow;
+        trackedBasket.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         await _context.SaveChangesAsync();
 
-        return await MapToBasketDtoAsync(basket);
+        return await MapToBasketDtoAsync(trackedBasket);
     }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
