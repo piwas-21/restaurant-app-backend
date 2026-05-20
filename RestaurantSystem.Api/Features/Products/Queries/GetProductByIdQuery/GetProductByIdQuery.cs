@@ -14,14 +14,12 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetProductByIdQueryHandler> _logger;
     private readonly string _baseUrl;
-    private readonly IConfiguration _configuration;
 
     public GetProductByIdQueryHandler(ApplicationDbContext context, ILogger<GetProductByIdQueryHandler> logger, IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
-        _configuration = configuration;
-        _baseUrl = _configuration["AWS:S3:BaseUrl"]!;
+        _baseUrl = configuration["AWS:S3:BaseUrl"]!;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)

@@ -5,11 +5,13 @@ namespace RestaurantSystem.Api.Features.RestaurantInfo;
 /// <summary>
 /// E.164 phone number validation for the restaurant-info commands.
 ///
-/// Note: this lives as a static helper because FluentValidation isn't
-/// wired into <c>CustomMediator</c> today (registered in DI but never
-/// invoked — see backend issue #9). When that pipeline lands, this
-/// can move to an FV rule. Until then, handlers call <see cref="EnsureValid"/>
-/// up-front and throw <c>BadRequestException</c> on a malformed input.
+/// FluentValidation is wired (<c>CustomMediator</c> resolves
+/// <c>IValidator&lt;TCommand&gt;</c> and runs it on every dispatch).
+/// This static helper exists so the regex can be shared across
+/// multiple commands without duplicating it in each FV validator.
+/// Today it's called directly from <c>AddPhoneNumberCommand</c> and
+/// <c>UpdatePhoneNumberCommand</c> handlers via <see cref="IsValid"/>;
+/// they throw <c>BadRequestException</c> when it returns false.
 /// </summary>
 internal static class PhoneNumberValidation
 {

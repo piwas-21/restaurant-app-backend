@@ -8,7 +8,7 @@ namespace RestaurantSystem.Api.Features.Products.Commands.UnsetFeaturedSpecialCo
 /// <summary>
 /// Command to remove the currently featured special
 /// </summary>
-public record UnsetFeaturedSpecialCommand() : ICommand<ApiResponse<string>>;
+public record UnsetFeaturedSpecialCommand : ICommand<ApiResponse<string>>;
 
 public class UnsetFeaturedSpecialCommandHandler : ICommandHandler<UnsetFeaturedSpecialCommand, ApiResponse<string>>
 {

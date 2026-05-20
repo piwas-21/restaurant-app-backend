@@ -9,14 +9,13 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetFeaturedSpecialQuery
 /// <summary>
 /// Query to get the currently featured special product
 /// </summary>
-public record GetFeaturedSpecialQuery() : IQuery<ApiResponse<FeaturedSpecialDto?>>;
+public record GetFeaturedSpecialQuery : IQuery<ApiResponse<FeaturedSpecialDto?>>;
 
 public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQuery, ApiResponse<FeaturedSpecialDto?>>
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetFeaturedSpecialQueryHandler> _logger;
     private readonly string _baseUrl;
-    private readonly IConfiguration _configuration;
 
     public GetFeaturedSpecialQueryHandler(
         ApplicationDbContext context,
@@ -25,8 +24,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
     {
         _context = context;
         _logger = logger;
-        _configuration = configuration;
-        _baseUrl = _configuration["AWS:S3:BaseUrl"]!;
+        _baseUrl = configuration["AWS:S3:BaseUrl"]!;
     }
 
     public async Task<ApiResponse<FeaturedSpecialDto?>> Handle(

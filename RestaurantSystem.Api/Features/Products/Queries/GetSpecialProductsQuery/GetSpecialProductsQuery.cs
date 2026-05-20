@@ -19,7 +19,6 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetSpecialProductsQueryHandler> _logger;
     private readonly string _baseUrl;
-    private readonly IConfiguration _configuration;
 
     public GetSpecialProductsQueryHandler(
         ApplicationDbContext context,
@@ -28,8 +27,7 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
     {
         _context = context;
         _logger = logger;
-        _configuration = configuration;
-        _baseUrl = _configuration["AWS:S3:BaseUrl"]!;
+        _baseUrl = configuration["AWS:S3:BaseUrl"]!;
     }
 
     public async Task<ApiResponse<PagedResult<SpecialProductDto>>> Handle(

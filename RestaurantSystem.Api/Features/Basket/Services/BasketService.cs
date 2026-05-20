@@ -520,23 +520,53 @@ public class BasketService : IBasketService
 
     public async Task<BasketDto> ClearBasketAsync(string sessionId)
     {
-        var basket = await GetBasketFromDatabase(sessionId, _currentUserService.UserId);
+        // Load the basket with tracking + only the .Items navigation. We can't
+        // reuse GetBasketFromDatabase here for two reasons:
+        // (1) it loads with AsNoTracking, so scalar mutations don't persist
+        //     and child-row deletes via the change tracker don't auto-clear
+        //     the in-memory .Items collection (without this, the DTO came
+        //     back with items: [...] and Total: 0 — the bug we're fixing);
+        // (2) it eager-loads Products / ProductVariations / Menus / etc.
+        //     that ClearBasketAsync immediately discards.
+        // Filter semantics mirror GetBasketFromDatabase: logged-in users are
+        // matched by UserId only; anonymous users by SessionId with no user.
+        var userId = _currentUserService.UserId;
+        IQueryable<Domain.Entities.Basket> query = _context.Baskets
+            .Include(b => b.Items)
+            .Where(b => !b.IsDeleted);
+
+        if (userId.HasValue && userId.Value != Guid.Empty)
+        {
+            query = query.Where(b => b.UserId == userId.Value);
+        }
+        else if (!string.IsNullOrEmpty(sessionId))
+        {
+            query = query.Where(b => b.SessionId == sessionId && (b.UserId == null || b.UserId == Guid.Empty));
+        }
+        else
+        {
+            throw new NotFoundException("Basket not found");
+        }
+
+        var basket = await query.FirstOrDefaultAsync();
         if (basket == null)
             throw new NotFoundException("Basket not found");
 
-        // Remove all items
-        var items = await _context.BasketItems
-            .Where(bi => bi.BasketId == basket.Id)
-            .ToListAsync();
+        _context.BasketItems.RemoveRange(basket.Items);
+        basket.Items.Clear();
 
-        foreach (var item in items)
-        {
-            _context.BasketItems.Remove(item);
-        }
-
+        // Reset every basket-level field that contributes to totals or that a
+        // returning customer would expect to be wiped. Leaving Discount /
+        // PromoCode / CustomerDiscount / DeliveryFee / Notes in place would
+        // silently re-apply to whatever the customer adds next.
         basket.SubTotal = 0;
         basket.Tax = 0;
         basket.Total = 0;
+        basket.Discount = 0;
+        basket.CustomerDiscount = 0;
+        basket.DeliveryFee = 0;
+        basket.PromoCode = null;
+        basket.Notes = null;
         basket.UpdatedAt = DateTime.UtcNow;
         basket.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
