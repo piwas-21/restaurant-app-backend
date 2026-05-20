@@ -111,20 +111,6 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.AddRedisDistributedCache("redis");
 
-//var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-//var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-//dataSourceBuilder.EnableDynamicJson();
-//var dataSource = dataSourceBuilder.Build();
-
-//builder.Services.AddDbContext<ApplicationDbContext>(options =>
-//    options.UseNpgsql(
-//        dataSource,
-//        npgsqlOptions => npgsqlOptions
-//            .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
-//            .CommandTimeout(30)
-//    ));
-
-
 builder.AddNpgsqlDataSource("restaurantdb", configureDataSourceBuilder: dataSourceBuilder =>
 {
     dataSourceBuilder.EnableDynamicJson();
