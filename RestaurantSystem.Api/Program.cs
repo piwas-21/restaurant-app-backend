@@ -31,6 +31,7 @@ using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.ServiceDefaults;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -309,7 +310,7 @@ builder.Services.AddInfrastructureRegistration();
 // CORS: Use configured origins in production, allow all in development.
 // Fail-safe: refuse to start in non-Development if CorsSettings:AllowedOrigins is missing/empty —
 // silent fallback to AllowAnyOrigin in production would be a misconfiguration disguised as a working deploy.
-var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>();
+var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3000"]; 
 if (!builder.Environment.IsDevelopment() && (corsOrigins == null || corsOrigins.Length == 0))
 {
     throw new InvalidOperationException(
@@ -319,11 +320,19 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        var origins = corsOrigins ?? ["http://localhost:3000"];
-        policy.SetIsOriginAllowed(_ => true)
-                     .AllowAnyMethod()
-                     .AllowAnyHeader()
-                     .AllowCredentials();
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins!)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
     });
 });
 

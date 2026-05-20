@@ -1,77 +1,32 @@
 {
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:17271;http://localhost:15271",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:17271;http://localhost:15271",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
+        "ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL": "https://localhost:21031",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:20000"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:15271",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:15271",
+        "ASPIRE_ALLOW_UNSECURED_TRANSPORT": "true",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://localhost:19144",
+        "ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL": "http://localhost:19145",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://localhost:20000"
+      }
     }
-  },
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=restaurantdb;Username=postgres;Password=postgres123",
-    "Redis": "localhost:6379"
-  },
-  "BasketSettings": {
-    "SessionExpiryDays": 7,
-    "CacheExpiryMinutes": 30,
-    "MaxItemsPerBasket": 100,
-    "MaxQuantityPerItem": 100,
-    "EnableAutoMergeOnLogin": true,
-    "TaxRate": 0.08,
-    "DefaultDeliveryFee": 5.00
-  },
-  "JwtSettings": {
-    "Secret": "YourSuperSecretKeyHereMakeItLongAndSecure_AT_LEAST_32_CHARS",
-    "Issuer": "RestaurantSystem",
-    "Audience": "RestaurantSystemClient",
-    "ExpiryMinutes": 60,
-    "RefreshTokenExpiryDays": 7,
-    "RequireHttpsMetadata": true,
-    "SaveToken": true,
-    "ClockSkewMinutes": 0,
-    "ValidateLifetime": true,
-    "ValidateIssuer": true,
-    "ValidateAudience": true,
-    "ValidateIssuerSigningKey": true
-  },
-  "EmailSettings": {
-    "SmtpHost": "smtp.gmail.com",
-    "SmtpPort": 587,
-    "EnableSsl": true,
-    "Username": "muslumgezgin@gmail.com",
-    "Password": "tkryxwffxxokmsro",
-    "FromEmail": "muslumgezgin@gmail.com",
-    "FromName": "RumiRestaurant",
-    "UseAuthentication": true,
-    "TimeoutMs": 30000,
-    "FrontendBaseUrl": "http://localhost:3000",
-    "EmailsEnabled": true,
-    "LogEmailsOnly": false,
-    "MaxRetryAttempts": 3,
-    "RetryDelayMs": 1000
-  },
-  "FileStorage": {
-    "Provider": "Local",
-    "MaxFileSizeBytes": 5242880,
-    "AllowedExtensions": [ ".jpg", ".jpeg", ".png", ".gif", ".webp" ],
-    "AllowedMimeTypes": [ "image/jpeg", "image/png", "image/gif", "image/webp" ]
-  },
-  "AWS": {
-    "AccessKey": "your-aws-access-key",
-    "SecretKey": "your-aws-secret-key",
-    "Region": "us-east-1",
-    "S3": {
-      "BucketName": "restaurant-system-images",
-      "BaseUrl": "https://restaurant-system-images.s3.amazonaws.com"
-    }
-  },
-  "Azure": {
-    "Storage": {
-      "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=yourstorageaccount;AccountKey=yourkey==;EndpointSuffix=core.windows.net",
-      "ContainerName": "restaurant-images",
-      "BaseUrl": "https://yourstorageaccount.blob.core.windows.net/restaurant-images"
-    }
-  },
-  "LocalStorage": {
-    "BaseUrl": "https://localhost:5001/uploads"
-  },
-  "AllowedHosts": "*"
+  }
 }

@@ -21,7 +21,6 @@ var certPath = Path.Combine(
 builder.AddJavaScriptApp("frontend", "../../restaurant-app-frontend", runScriptName: "dev")
        .WithReference(api)
        .WithEnvironment("NEXT_PUBLIC_API_URL", api.GetEndpoint("http"))
-       .WithEnvironment("NODE_TLS_REJECT_UNAUTHORIZED", "0")
        .WithEnvironment("NODE_EXTRA_CA_CERTS", certPath)               // trust .NET dev cert
        .WaitFor(api)
        .WithHttpEndpoint(port:3000,env: "PORT")
