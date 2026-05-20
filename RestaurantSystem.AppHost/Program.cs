@@ -23,7 +23,7 @@ builder.AddJavaScriptApp("frontend", "../../restaurant-app-frontend", runScriptN
        .WithEnvironment("NEXT_PUBLIC_API_URL", api.GetEndpoint("http"))
        .WithEnvironment("NODE_EXTRA_CA_CERTS", certPath)               // trust .NET dev cert
        .WaitFor(api)
-       .WithHttpEndpoint(port:3000,env: "PORT")
+       .WithHttpEndpoint(port: 3000, env: "PORT")
        .WithExternalHttpEndpoints()
        .PublishAsDockerFile();
 
