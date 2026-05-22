@@ -27,24 +27,18 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Test");
 
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:restaurantdb"] = _connectionString,
-                // Stub so AddRedisDistributedCache doesn't throw on host build.
-                // We swap to in-memory cache below; this just satisfies validation.
-                ["ConnectionStrings:redis"] = "localhost:6379",
-            });
-        });
+        // Set BEFORE Program.cs runs. Program.cs calls .AddEnvironmentVariables()
+        // last in its config chain, so these win over everything.
+        Environment.SetEnvironmentVariable("ConnectionStrings__restaurantdb", _connectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", "localhost:6379");
 
         builder.ConfigureTestServices(services =>
         {
-            // Replace Redis cache with in-memory for tests.
+            // Redis swap
             services.RemoveAll<IDistributedCache>();
             services.AddDistributedMemoryCache();
 
-            // Test auth.
+            // Auth overrides
             services.AddAuthentication("Test")
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", _ => { });
 
