@@ -9,6 +9,7 @@ WORKDIR /src
 COPY ["RestaurantSystem.Api/RestaurantSystem.Api.csproj", "RestaurantSystem.Api/"]
 COPY ["RestaurantSystem.Domain/RestaurantSystem.Domain.csproj", "RestaurantSystem.Domain/"]
 COPY ["RestaurantSystem.Infrastructure/RestaurantSystem.Infrastructure.csproj", "RestaurantSystem.Infrastructure/"]
+COPY ["RestaurantSystem.ServiceDefaults/RestaurantSystem.ServiceDefaults.csproj", "RestaurantSystem.ServiceDefaults/"]
 
 RUN dotnet restore "RestaurantSystem.Api/RestaurantSystem.Api.csproj"
 

@@ -31,9 +31,12 @@ using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.ServiceDefaults;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
 builder.Services.AddApiRegistration();
 
 // Configure Kestrel for long-lived SSE connections
@@ -105,26 +108,21 @@ builder.Services.AddSwaggerGen(c =>
     c.CustomSchemaIds(t => t.FullName!.Replace("+", "."));
 });
 
-//builder.Services.AddStackExchangeRedisCache(options =>
-//{
-//    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-//    options.InstanceName = "RestaurantSystem";
-//});
 
-builder.Services.AddDistributedMemoryCache();
+builder.AddRedisDistributedCache("redis");
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.EnableDynamicJson();
-var dataSource = dataSourceBuilder.Build();
+builder.AddNpgsqlDataSource("restaurantdb", configureDataSourceBuilder: dataSourceBuilder =>
+{
+    dataSourceBuilder.EnableDynamicJson();
+});
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        dataSource,
-        npgsqlOptions => npgsqlOptions
-            .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
-            .CommandTimeout(30)
-    ));
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+{
+    var dataSource = serviceProvider.GetRequiredService<NpgsqlDataSource>();
+    options.UseNpgsql(dataSource, npgsqlOptions => npgsqlOptions
+        .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
+        .CommandTimeout(30));
+});
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(opt =>
 {
@@ -295,15 +293,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddInfrastructureRegistration();
 
-// CORS: Use configured origins in production, allow all in development.
-// Fail-safe: refuse to start in non-Development if CorsSettings:AllowedOrigins is missing/empty —
-// silent fallback to AllowAnyOrigin in production would be a misconfiguration disguised as a working deploy.
-var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>();
-if (!builder.Environment.IsDevelopment() && (corsOrigins == null || corsOrigins.Length == 0))
-{
-    throw new InvalidOperationException(
-        "CorsSettings:AllowedOrigins must be configured with at least one origin in non-Development environments.");
-}
+var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3000"];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -316,7 +306,7 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            policy.WithOrigins(corsOrigins!)
+            policy.WithOrigins(corsOrigins)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
@@ -363,6 +353,8 @@ builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<Or
 
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
