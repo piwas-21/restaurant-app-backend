@@ -297,7 +297,7 @@ builder.Services.AddInfrastructureRegistration();
 // Fail-safe: refuse to start in non-Development if CorsSettings:AllowedOrigins is missing/empty —
 // silent fallback to AllowAnyOrigin in production would be a misconfiguration disguised as a working deploy.
 var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3000"];
-if (!builder.Environment.IsDevelopment() && (corsOrigins == null || corsOrigins.Length == 0))
+if (!builder.Environment.IsDevelopment())
 {
     throw new InvalidOperationException(
         "CorsSettings:AllowedOrigins must be configured with at least one origin in non-Development environments.");
@@ -314,7 +314,7 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            policy.WithOrigins(corsOrigins!)
+            policy.WithOrigins(corsOrigins)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
