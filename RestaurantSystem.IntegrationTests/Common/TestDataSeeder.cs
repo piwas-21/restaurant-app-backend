@@ -9,19 +9,28 @@ public static class TestDataSeeder
 {
     public static async Task SeedBasicDataAsync(ApplicationDbContext context)
     {
-        // Check if data already exists
-        if (await context.Products.AnyAsync())
-        {
-            return;
-        }
-
         // Seed the test users referenced by TestAuthHandler. The handler
         // synthesizes a Customer principal on every request (with the admin
         // override surfaced via X-Test-Admin), so any code path that reads
         // ICurrentUserService.UserId — Basket creation, Order creation —
         // sees these IDs even when the test "stayed anonymous". Without
         // these rows, FK constraints on Baskets/Orders → AspNetUsers fail.
-        await SeedTestUsersAsync(context);
+        //
+        // Guarded by its own AnyAsync check (NOT bundled into the Products
+        // guard below) so that a partial-seed state — products present,
+        // users missing — still gets the users seeded. Otherwise the FK
+        // violations this seeding is meant to prevent would silently come
+        // back the moment any test left products around without users.
+        if (!await context.Users.AnyAsync())
+        {
+            await SeedTestUsersAsync(context);
+        }
+
+        // Check if catalog data already exists; if so, skip the rest.
+        if (await context.Products.AnyAsync())
+        {
+            return;
+        }
 
         // Seed categories
         var categories = new List<Category>

@@ -254,6 +254,12 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
                     Quantity = 1,
                     UnitPrice = ExpectedMenuUnitPrice,
                     SpecialInstructions = "No ice in drink",
+                    // Realistic shape: the frontend converts basket → order
+                    // DTO and carries each child's per-section additional
+                    // price as UnitPrice (matches BasketService's basket-side
+                    // storage). The assertion below pins the resulting items
+                    // total — see the note next to it about the latent
+                    // OrderItemFactory double-count behavior.
                     ChildItems = new List<CreateOrderItemDto>
                     {
                         new()
@@ -323,7 +329,35 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         orderColaChild!.ProductName.Should().Be("Test Cola");
 
         // Verify Order Totals
+        //
+        // itemsTotal sums ItemTotal across every OrderItem row (parents +
+        // children). Pinning the exact sum so this assertion fails loudly
+        // if pricing logic ever shifts under us, instead of the original
+        // BeGreaterThan(0) that would pass for almost any non-broken impl.
+        //
+        // Latent bug acknowledged: BasketService.AddItemToBasketAsync sets
+        // ItemTotal = 0 for child basket items (line 230-231) precisely to
+        // avoid double-counting the menu price, but OrderItemFactory
+        // computes ItemTotal = UnitPrice * Quantity for every row including
+        // children (Services/OrderItemFactory.cs:100). The two paths
+        // disagree, and the children's UnitPrice contributions get added
+        // on top of ExpectedMenuUnitPrice already held by the parent —
+        // hence MainAdditional + DrinkAdditional show up twice in the sum.
+        // This only matters when CreateOrderCommand is dispatched WITHOUT
+        // command.BasketSubTotal (the legacy compute path in
+        // OrderPricingService); the normal frontend-driven flow sets
+        // BasketSubTotal and bypasses itemsTotal entirely. Test pins the
+        // current behavior; follow-up tracked in #54 should align
+        // OrderItemFactory with the BasketService convention (child
+        // ItemTotal = 0).
+        var expectedItemsTotal =
+            (_testProduct.BasePrice * 2) // standalone pizza
+            + ExpectedMenuUnitPrice      // menu parent
+            + MainAdditional             // child pizza option (latent extra)
+            + DrinkAdditional;           // child cola option (latent extra)
+        createdOrder.Items.Sum(i => i.ItemTotal).Should().Be(expectedItemsTotal);
         createdOrder.SubTotal.Should().BeGreaterThan(0);
+        createdOrder.SubTotal.Should().BeLessOrEqualTo(expectedItemsTotal);
         createdOrder.Total.Should().BeGreaterThan(0);
         createdOrder.Payments.Should().HaveCount(1);
         createdOrder.Payments.First().PaymentMethod.Should().Be(PaymentMethod.Cash.ToString());
