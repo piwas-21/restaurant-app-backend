@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -116,7 +117,7 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
                 Images = p.Images.Select(s => new ProductImageDto
                 {
                     Id = s.Id,
-                    Url = _baseUrl + "/" + s.Url,
+                    Url = UrlJoin.Join(_baseUrl, s.Url),
                     IsPrimary = s.IsPrimary,
                     SortOrder = s.SortOrder,
                     AltText = s.AltText

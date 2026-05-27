@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -61,7 +62,7 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
             BasePrice = p.BasePrice,
             ImageUrl = p.Images
                 .Where(img => img.IsPrimary)
-                .Select(img => _baseUrl + "/" + img.Url)
+                .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? p.ImageUrl,
             IsActive = p.IsActive,
             IsAvailable = p.IsAvailable,

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -58,7 +59,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
             BasePrice = featuredProduct.BasePrice,
             ImageUrl = featuredProduct.Images
                 .Where(img => img.IsPrimary)
-                .Select(img => _baseUrl + "/" + img.Url)
+                .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? featuredProduct.ImageUrl,
             FeaturedDate = featuredProduct.FeaturedDate ?? DateTime.UtcNow,
             PreparationTimeMinutes = featuredProduct.PreparationTimeMinutes,
@@ -67,7 +68,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
             Images = featuredProduct.Images.Select(img => new ProductImageDto
             {
                 Id = img.Id,
-                Url = _baseUrl + "/" + img.Url,
+                Url = UrlJoin.Join(_baseUrl, img.Url),
                 IsPrimary = img.IsPrimary,
                 SortOrder = img.SortOrder,
                 AltText = img.AltText
@@ -95,14 +96,14 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     Price = si.SideItemProduct.BasePrice,
                     ImageUrl = si.SideItemProduct.Images
                         .Where(img => img.IsPrimary)
-                        .Select(img => _baseUrl + "/" + img.Url)
+                        .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                         .FirstOrDefault() ?? si.SideItemProduct.ImageUrl,
                     IsRequired = si.IsRequired,
                     DisplayOrder = si.DisplayOrder,
                     Images = si.SideItemProduct.Images.Select(img => new ProductImageDto
                     {
                         Id = img.Id,
-                        Url = _baseUrl + "/" + img.Url,
+                        Url = UrlJoin.Join(_baseUrl, img.Url),
                         IsPrimary = img.IsPrimary,
                         SortOrder = img.SortOrder,
                         AltText = img.AltText
