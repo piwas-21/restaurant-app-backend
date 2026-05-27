@@ -3,7 +3,6 @@ using FluentValidation;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Behaviors;
 using RestaurantSystem.Api.Common.Exceptions;
-using Xunit;
 
 namespace RestaurantSystem.IntegrationTests.Common.Behaviors;
 

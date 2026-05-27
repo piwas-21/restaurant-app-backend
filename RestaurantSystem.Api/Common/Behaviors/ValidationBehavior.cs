@@ -14,11 +14,13 @@ namespace RestaurantSystem.Api.Common.Behaviors
     public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
         where TRequest : notnull
     {
-        private readonly IEnumerable<IValidator<TRequest>> _validators;
+        private readonly IValidator<TRequest>[] _validators;
 
         public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators)
         {
-            _validators = validators;
+            // Materialize once so we can do O(1) length checks and avoid
+            // multiple enumeration of the DI-provided IEnumerable.
+            _validators = validators as IValidator<TRequest>[] ?? validators.ToArray();
         }
 
         public async Task<TResponse> Handle(
@@ -26,12 +28,30 @@ namespace RestaurantSystem.Api.Common.Behaviors
             RequestHandlerDelegate<TResponse> next,
             CancellationToken cancellationToken)
         {
-            if (!_validators.Any())
+            // Fast path: no validators registered for this request type.
+            if (_validators.Length == 0)
             {
                 return await next();
             }
 
             var context = new ValidationContext<TRequest>(request);
+
+            // Fast path: a single validator avoids Task.WhenAll, LINQ Select,
+            // and the extra task allocations the multi-validator path needs.
+            if (_validators.Length == 1)
+            {
+                var result = await _validators[0].ValidateAsync(context, cancellationToken);
+                if (!result.IsValid)
+                {
+                    var singleMessage = string.Join(
+                        "; ",
+                        result.Errors.Where(f => f is not null).Select(f => f.ErrorMessage));
+                    throw new BadRequestException(singleMessage);
+                }
+
+                return await next();
+            }
+
             var results = await Task.WhenAll(
                 _validators.Select(v => v.ValidateAsync(context, cancellationToken)));
 

@@ -20,7 +20,7 @@ namespace RestaurantSystem.Api.Common
             if (handler == null)
                 throw new Exception($"No command handler registered for {typeof(TCommand).Name}");
 
-            return InvokePipeline<TCommand, TResult>(
+            return InvokePipeline(
                 command,
                 () => handler.Handle(command, cancellationToken),
                 cancellationToken);
@@ -35,7 +35,7 @@ namespace RestaurantSystem.Api.Common
             if (handler == null)
                 throw new Exception($"No command handler registered for {commandType.Name}");
 
-            return InvokePipelineNonGeneric<TResult>(
+            return InvokePipelineNonGeneric(
                 command,
                 commandType,
                 () => (Task<TResult>)handler.Handle((dynamic)command, cancellationToken),
@@ -58,7 +58,7 @@ namespace RestaurantSystem.Api.Common
             if (handler == null)
                 throw new Exception($"No query handler registered for {typeof(TQuery).Name}");
 
-            return InvokePipeline<TQuery, TResult>(
+            return InvokePipeline(
                 query,
                 () => handler.Handle(query, cancellationToken),
                 cancellationToken);
@@ -74,7 +74,7 @@ namespace RestaurantSystem.Api.Common
             if (handler == null)
                 throw new Exception($"No query handler registered for {queryType.Name}");
 
-            return InvokePipelineNonGeneric<TResult>(
+            return InvokePipelineNonGeneric(
                 query,
                 queryType,
                 () => (Task<TResult>)handler.Handle((dynamic)query, cancellationToken),
@@ -123,7 +123,7 @@ namespace RestaurantSystem.Api.Common
             {
                 var next = pipeline;
                 var handleMethod = behaviorInterface.GetMethod(nameof(IPipelineBehavior<object, TResult>.Handle))!;
-                pipeline = () => (Task<TResult>)handleMethod.Invoke(behavior, new object[] { request, next, cancellationToken })!;
+                pipeline = () => (Task<TResult>)handleMethod.Invoke(behavior, [request, next, cancellationToken])!;
             }
 
             return pipeline();
