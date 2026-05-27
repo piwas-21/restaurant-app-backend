@@ -1,0 +1,8 @@
+[
+  {
+    "Id": "Microsoft.VisualStudio.Azure.Containers.Tools.Targets",
+    "Version": "*",
+    "License": "MIT",
+    "Comment": "Microsoft Docker tooling package — embeds license file inline so nuget-license can't auto-classify; documented as MIT on the package homepage."
+  }
+]

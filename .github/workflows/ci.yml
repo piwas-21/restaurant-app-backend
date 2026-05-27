@@ -194,6 +194,7 @@ jobs:
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.json \
             --licenseurl-to-license-mappings LICENSES.urlmap.json \
+            --override-package-information LICENSES.overrides.json \
             -o JsonPretty
 
   osv_scanner:
