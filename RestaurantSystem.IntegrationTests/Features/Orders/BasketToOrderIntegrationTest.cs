@@ -332,29 +332,20 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         //
         // itemsTotal sums ItemTotal across every OrderItem row (parents +
         // children). Pinning the exact sum so this assertion fails loudly
-        // if pricing logic ever shifts under us, instead of the original
-        // BeGreaterThan(0) that would pass for almost any non-broken impl.
+        // if pricing logic ever shifts under us.
         //
-        // Latent bug acknowledged: BasketService.AddItemToBasketAsync sets
-        // ItemTotal = 0 for child basket items (line 230-231) precisely to
-        // avoid double-counting the menu price, but OrderItemFactory
-        // computes ItemTotal = UnitPrice * Quantity for every row including
-        // children (Services/OrderItemFactory.cs:100). The two paths
-        // disagree, and the children's UnitPrice contributions get added
-        // on top of ExpectedMenuUnitPrice already held by the parent —
-        // hence MainAdditional + DrinkAdditional show up twice in the sum.
-        // This only matters when CreateOrderCommand is dispatched WITHOUT
-        // command.BasketSubTotal (the legacy compute path in
-        // OrderPricingService); the normal frontend-driven flow sets
-        // BasketSubTotal and bypasses itemsTotal entirely. Test pins the
-        // current behavior; follow-up tracked in #54 should align
-        // OrderItemFactory with the BasketService convention (child
-        // ItemTotal = 0).
+        // Per issue #54 (now fixed): OrderItemFactory aligns with
+        // BasketService.AddItemToBasketAsync (BasketService.cs:230-231) —
+        // child OrderItem rows carry UnitPrice for display but
+        // ItemTotal = 0, because the parent menu OrderItem's ItemTotal
+        // already includes the full combo price (ExpectedMenuUnitPrice
+        // rolls up MainAdditional + DrinkAdditional via the frontend's
+        // basket-to-order mapping). Summing children's UnitPrice on top
+        // would double-count those terms — only the standalone pizza and
+        // the menu parent contribute.
         var expectedItemsTotal =
-            (_testProduct.BasePrice * 2) // standalone pizza
-            + ExpectedMenuUnitPrice      // menu parent
-            + MainAdditional             // child pizza option (latent extra)
-            + DrinkAdditional;           // child cola option (latent extra)
+            (_testProduct.BasePrice * 2) // standalone pizza (qty 2)
+            + ExpectedMenuUnitPrice;     // menu parent (children contribute 0)
         createdOrder.Items.Sum(i => i.ItemTotal).Should().Be(expectedItemsTotal);
         createdOrder.SubTotal.Should().BeGreaterThan(0);
         createdOrder.SubTotal.Should().BeLessOrEqualTo(expectedItemsTotal);
@@ -376,6 +367,27 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         orderInDb!.Items.Should().HaveCount(4);
         orderInDb.Payments.Should().HaveCount(1);
         orderInDb.OrderNumber.Should().Be(createdOrder.OrderNumber);
+
+        // Issue #54 acceptance: every row with ParentOrderItemId != null
+        // must have ItemTotal == 0, mirroring BasketService's child-zero
+        // convention. Asserted against the DB row (the DTO doesn't carry
+        // ParentOrderItemId, and ProductId alone isn't a reliable
+        // discriminator since menu-option children can reference the same
+        // Product as a standalone item — pizzaOption.ProductId ==
+        // _testProduct.Id in this fixture).
+        orderInDb.Items
+            .Where(i => i.ParentOrderItemId != null)
+            .Should().HaveCount(2);
+        orderInDb.Items
+            .Where(i => i.ParentOrderItemId != null)
+            .Select(i => i.ItemTotal)
+            .Should().OnlyContain(t => t == 0m);
+        // Parent menu row carries the full combo ItemTotal; children
+        // carry UnitPrice (for display) but contribute 0 to the sum.
+        orderInDb.Items
+            .Where(i => i.ParentOrderItemId != null)
+            .Select(i => i.UnitPrice)
+            .Should().BeEquivalentTo(new[] { MainAdditional, DrinkAdditional });
     }
 
     // FluentValidation now runs in the CustomMediator pipeline via

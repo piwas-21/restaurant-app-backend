@@ -88,6 +88,17 @@ public class OrderItemFactory : IOrderItemFactory
 
         var (unitPrice, variationName) = ResolvePricing(itemDto, product);
 
+        // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-231):
+        // child rows carry UnitPrice for display but ItemTotal = 0, because the
+        // parent's ItemTotal already includes the rolled-up combo price.
+        // Without this, any caller that goes through OrderPricingService's
+        // legacy compute path (no command.BasketSubTotal — e.g. admin tooling,
+        // bulk import, refunds-as-new-orders) double-counts every child's
+        // UnitPrice on top of the parent. See issue #54.
+        var itemTotal = parentItem != null
+            ? 0m
+            : (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice;
+
         var orderItem = new OrderItem
         {
             ProductId = itemDto.ProductId,
@@ -97,7 +108,7 @@ public class OrderItemFactory : IOrderItemFactory
             VariationName = variationName,
             Quantity = itemDto.Quantity,
             UnitPrice = unitPrice,
-            ItemTotal = (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice,
+            ItemTotal = itemTotal,
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
             ParentOrderItem = parentItem,
