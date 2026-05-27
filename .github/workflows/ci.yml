@@ -192,15 +192,17 @@ jobs:
         run: |
           # Ignored packages: build-time-only Microsoft tooling that
           # ships its license as an embedded file the tool can't classify.
-          # The exclude list is reviewable in LICENSES.ignored.txt
-          # (one package ID per line, comments + blanks stripped here).
-          ignored=$(grep -vE '^\s*(#|$)' LICENSES.ignored.txt | paste -sd, -)
-          echo "Ignored packages: $ignored"
+          # The repo-tracked LICENSES.ignored.txt is human-reviewable
+          # (one package ID per line + `#` comments); nuget-license
+          # expects a flat list (no comments), so strip them here.
+          grep -vE '^\s*(#|$)' LICENSES.ignored.txt > /tmp/ignored-packages.txt
+          echo "Ignored packages:"
+          cat /tmp/ignored-packages.txt
           nuget-license \
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.json \
             --licenseurl-to-license-mappings LICENSES.urlmap.json \
-            --ignored-packages "$ignored" \
+            --ignored-packages /tmp/ignored-packages.txt \
             -o JsonPretty
 
   osv_scanner:
