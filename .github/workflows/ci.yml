@@ -186,10 +186,14 @@ jobs:
         # JsonPretty output makes the failure reviewable (Table format
         # embeds the full license body of any non-SPDX package and
         # blows the log out to >1MB on a single line).
+        # --licenseurl-to-license-mappings maps non-SPDX license URLs
+        # (older Microsoft.AspNetCore packages declare their license as
+        # a raw GitHub URL rather than SPDX) to the actual SPDX type.
         run: |
           nuget-license \
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.json \
+            --licenseurl-to-license-mappings LICENSES.urlmap.json \
             -o JsonPretty
 
   osv_scanner:
