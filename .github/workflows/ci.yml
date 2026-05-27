@@ -171,16 +171,21 @@ jobs:
         run: dotnet tool install --tool-path /usr/local/bin nuget-license --version 4.0.0
       - name: Restore NuGet packages
         run: dotnet restore RestaurantSystem.sln --verbosity minimal
-      - name: Build allowlist file (strip comments/blanks)
+      - name: Build allowlist (strip comments, emit JSON array)
+        # nuget-license v4 expects the --allowed-license-types file as
+        # a JSON array. The repo-tracked LICENSES.allowlist is kept in
+        # the human-friendly one-per-line + `#` comments format; convert
+        # to JSON here so the tracked file stays reviewable.
         run: |
-          grep -vE '^\s*(#|$)' LICENSES.allowlist > /tmp/licenses-allowed.txt
+          grep -vE '^\s*(#|$)' LICENSES.allowlist \
+            | jq -R . | jq -s . > /tmp/licenses-allowed.json
           echo "Allowed license types:"
-          cat /tmp/licenses-allowed.txt
+          cat /tmp/licenses-allowed.json
       - name: Scan licenses
         run: |
           nuget-license \
             -i RestaurantSystem.sln \
-            -a /tmp/licenses-allowed.txt \
+            -a /tmp/licenses-allowed.json \
             -o Table
 
   osv_scanner:
