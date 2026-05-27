@@ -378,13 +378,10 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         orderInDb.OrderNumber.Should().Be(createdOrder.OrderNumber);
     }
 
-    // Skipped: codifies the correct contract (empty orders should fail)
-    // but the FluentValidation pipeline isn't wired into CustomMediator —
-    // AddValidatorsFromAssembly registers validators but nothing invokes
-    // them, so even uncommenting the Items.NotEmpty rule in
-    // CreateOrderCommandValidator has no effect. Wiring validation into
-    // the mediator is its own architectural change tracked as a follow-up.
-    [Fact(Skip = "FluentValidation not wired into CustomMediator pipeline; see follow-up issue")]
+    // FluentValidation now runs in the CustomMediator pipeline via
+    // ValidationBehavior<TRequest, TResponse>. Empty-items orders are
+    // rejected by CreateOrderCommandValidator → BadRequestException → 400.
+    [Fact]
     public async Task Should_Handle_Empty_Basket_When_Creating_Order()
     {
         // Arrange - Work in anonymous mode
@@ -410,18 +407,8 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
 
         var response = await PostAsJsonAsync("/api/orders", createOrderRequest);
 
-        // Assert - Should fail or return appropriate error
-        // The actual behavior depends on your validation logic
-        if (response.StatusCode == HttpStatusCode.OK)
-        {
-            var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);
-            result!.Success.Should().BeFalse();
-            result.Message.Should().NotBeNullOrEmpty();
-        }
-        else
-        {
-            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        }
+        // Assert - Validation behavior rejects empty orders with HTTP 400.
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
