@@ -31,9 +31,12 @@ using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.ServiceDefaults;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
 builder.Services.AddApiRegistration();
 
 // Configure Kestrel for long-lived SSE connections
@@ -105,26 +108,21 @@ builder.Services.AddSwaggerGen(c =>
     c.CustomSchemaIds(t => t.FullName!.Replace("+", "."));
 });
 
-//builder.Services.AddStackExchangeRedisCache(options =>
-//{
-//    options.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-//    options.InstanceName = "RestaurantSystem";
-//});
 
-builder.Services.AddDistributedMemoryCache();
+builder.AddRedisDistributedCache("redis");
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-dataSourceBuilder.EnableDynamicJson();
-var dataSource = dataSourceBuilder.Build();
+builder.AddNpgsqlDataSource("restaurantdb", configureDataSourceBuilder: dataSourceBuilder =>
+{
+    dataSourceBuilder.EnableDynamicJson();
+});
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(
-        dataSource,
-        npgsqlOptions => npgsqlOptions
-            .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
-            .CommandTimeout(30)
-    ));
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+{
+    var dataSource = serviceProvider.GetRequiredService<NpgsqlDataSource>();
+    options.UseNpgsql(dataSource, npgsqlOptions => npgsqlOptions
+        .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)
+        .CommandTimeout(30));
+});
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(opt =>
 {
@@ -330,6 +328,7 @@ builder.Services.AddCors(options =>
         }
         else
         {
+            // Non-null in the non-Development branch — the fail-safe above throws otherwise.
             policy.WithOrigins(corsOrigins!)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
@@ -378,6 +377,8 @@ builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<Or
 
 var app = builder.Build();
 
+app.MapDefaultEndpoints();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -418,17 +419,9 @@ app.UseValidationExceptionHandling();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health check endpoint for Kubernetes liveness/readiness probes.
-// .NET 10's Microsoft.AspNetCore.OpenApi (wired via AddOpenApi/MapOpenApi
-// above) auto-discovers minimal-API endpoints, so no per-endpoint
-// .WithOpenApi() call is needed — that API was deprecated (ASPDEPR002).
-app.MapGet("/health", () => Results.Ok(new
-{
-    status = "healthy",
-    timestamp = DateTime.UtcNow,
-    service = "restaurant-system-api"
-}))
-.WithName("HealthCheck");
+// /health is mapped by app.MapDefaultEndpoints() above (Aspire ServiceDefaults
+// → MapHealthChecks("/health")). Re-mapping it here would throw AmbiguousMatchException
+// at runtime. Kubernetes liveness/readiness probes hit the same /health path.
 
 app.MapGet("/api/health", () => Results.Ok(new
 {

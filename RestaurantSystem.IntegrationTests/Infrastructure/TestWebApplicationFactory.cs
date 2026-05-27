@@ -3,10 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
-using RestaurantSystem.Infrastructure.Persistence;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RestaurantSystem.IntegrationTests.Common;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
@@ -22,36 +21,29 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Test");
+
+        // restaurantdb: inject per-instance via UseSetting (NOT
+        // Environment.SetEnvironmentVariable — that's process-wide and
+        // xUnit parallel test runs would race on the shared variable).
+        // The connection string is dynamic per testcontainer instance.
+        builder.UseSetting("ConnectionStrings:restaurantdb", _connectionString);
+        // redis: the placeholder value lives in appsettings.Test.json
+        // (ConnectionStrings:redis). Aspire's AddRedisDistributedCache needs a
+        // non-empty value at startup, but the connection itself is never made —
+        // the IDistributedCache registration is replaced below with the in-memory
+        // implementation before any test code runs.
+
         builder.ConfigureTestServices(services =>
         {
-            // Remove the existing DbContext registration
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-            if (descriptor != null)
-            {
-                services.Remove(descriptor);
-            }
+            // Redis swap
+            services.RemoveAll<IDistributedCache>();
+            services.AddDistributedMemoryCache();
 
-            // Setup database
-            var dataSourceBuilder = new NpgsqlDataSourceBuilder(_connectionString);
-            dataSourceBuilder.EnableDynamicJson();
-            var dataSource = dataSourceBuilder.Build();
-
-            // Add DbContext using the test container
-            services.AddDbContext<ApplicationDbContext>(options =>
-            {
-                options.UseNpgsql(dataSource);
-            });
-
-            // Replace authentication with test authentication. Program.cs set
-            // DefaultAuthenticateScheme/DefaultChallengeScheme to JwtBearer;
-            // AddAuthentication("Test") only sets DefaultScheme, so we must
-            // PostConfigure to override the Authenticate/Challenge defaults
-            // — otherwise [RequireAdmin] still falls through to JwtBearer
-            // and rejects the test request as unauthenticated.
+            // Auth overrides
             services.AddAuthentication("Test")
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                    "Test", _ => { });
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", _ => { });
+
             services.PostConfigure<AuthenticationOptions>(options =>
             {
                 options.DefaultAuthenticateScheme = "Test";
@@ -65,14 +57,6 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     .RequireAuthenticatedUser()
                     .Build();
             });
-
-            // Ensure database is created and migrated
-            var sp = services.BuildServiceProvider();
-            using var scope = sp.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            db.Database.Migrate();
         });
-
-        builder.UseEnvironment("Test");
     }
 }
