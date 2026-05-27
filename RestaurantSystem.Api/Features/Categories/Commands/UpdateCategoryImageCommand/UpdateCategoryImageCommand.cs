@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -101,7 +102,7 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
                 Id = category.Id,
                 Name = category.Name,
                 Description = category.Description,
-                ImageUrl = _configuration["AWS:S3:BaseUrl"] + "/" + category.ImageUrl,
+                ImageUrl = UrlJoin.Join(_configuration["AWS:S3:BaseUrl"], category.ImageUrl),
                 IsActive = category.IsActive,
                 DisplayOrder = category.DisplayOrder,
                 ProductCount = category.ProductCategories.Count(pc => !pc.Product.IsDeleted && pc.Product.IsActive),

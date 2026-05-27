@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -121,7 +122,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
 
             var responseDto = new ProductImageDto
             {
-                Url = _baseUrl + "/" + productImage.Url,
+                Url = UrlJoin.Join(_baseUrl, productImage.Url),
                 AltText = productImage.AltText,
                 IsPrimary = productImage.IsPrimary,
                 SortOrder = productImage.SortOrder,
