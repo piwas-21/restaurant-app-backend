@@ -419,17 +419,9 @@ app.UseValidationExceptionHandling();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health check endpoint for Kubernetes liveness/readiness probes.
-// .NET 10's Microsoft.AspNetCore.OpenApi (wired via AddOpenApi/MapOpenApi
-// above) auto-discovers minimal-API endpoints, so no per-endpoint
-// .WithOpenApi() call is needed — that API was deprecated (ASPDEPR002).
-app.MapGet("/health", () => Results.Ok(new
-{
-    status = "healthy",
-    timestamp = DateTime.UtcNow,
-    service = "restaurant-system-api"
-}))
-.WithName("HealthCheck");
+// /health is mapped by app.MapDefaultEndpoints() above (Aspire ServiceDefaults
+// → MapHealthChecks("/health")). Re-mapping it here would throw AmbiguousMatchException
+// at runtime. Kubernetes liveness/readiness probes hit the same /health path.
 
 app.MapGet("/api/health", () => Results.Ok(new
 {
