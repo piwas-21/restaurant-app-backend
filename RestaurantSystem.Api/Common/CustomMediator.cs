@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using RestaurantSystem.Api.Abstraction.Messaging;
 
 namespace RestaurantSystem.Api.Common
@@ -123,7 +125,29 @@ namespace RestaurantSystem.Api.Common
             {
                 var next = pipeline;
                 var handleMethod = behaviorInterface.GetMethod(nameof(IPipelineBehavior<object, TResult>.Handle))!;
-                pipeline = () => (Task<TResult>)handleMethod.Invoke(behavior, [request, next, cancellationToken])!;
+                pipeline = () =>
+                {
+                    // MethodInfo.Invoke wraps any synchronous exception from the
+                    // behavior (e.g. ValidationBehavior throwing
+                    // BadRequestException before returning a Task) in
+                    // TargetInvocationException. That defeats the global
+                    // ExceptionHandlingMiddleware's type-based mapping
+                    // (BadRequestException → 400, NotFoundException → 404),
+                    // so we unwrap and re-throw the original exception while
+                    // preserving its stack trace. PR #67 review.
+                    try
+                    {
+                        return (Task<TResult>)handleMethod.Invoke(behavior, [request, next, cancellationToken])!;
+                    }
+                    catch (TargetInvocationException ex) when (ex.InnerException is not null)
+                    {
+                        // Static Throw is [DoesNotReturn]-annotated so the
+                        // compiler knows control doesn't return — no need
+                        // for a redundant `throw;` below.
+                        ExceptionDispatchInfo.Throw(ex.InnerException);
+                        return null!; // unreachable
+                    }
+                };
             }
 
             return pipeline();

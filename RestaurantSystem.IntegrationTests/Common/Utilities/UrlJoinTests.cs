@@ -70,4 +70,15 @@ public class UrlJoinTests
     {
         UrlJoin.Join("", "").Should().Be(string.Empty);
     }
+
+    // PR #67 review regression guard. When the stored path is already an
+    // absolute URL (e.g. a CDN-hosted image), Join must return it as-is —
+    // prepending baseUrl would corrupt it.
+    [Theory]
+    [InlineData("https://s3.example.com", "https://cdn.example.com/img.png", "https://cdn.example.com/img.png")]
+    [InlineData("https://s3.example.com", "http://placeholder.com/x.jpg", "http://placeholder.com/x.jpg")]
+    public void Join_AbsoluteUrlPath_ReturnsPathUnchanged(string baseUrl, string path, string expected)
+    {
+        UrlJoin.Join(baseUrl, path).Should().Be(expected);
+    }
 }

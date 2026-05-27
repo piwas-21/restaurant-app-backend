@@ -33,6 +33,18 @@ public static class UrlJoin
             return string.Empty;
         }
 
+        // If path is already an absolute http(s) URL (e.g. a CDN-hosted image
+        // stored directly in the DB), return it as-is — prepending baseUrl
+        // would corrupt it. StartsWith is allocation-free; Uri.TryCreate
+        // would allocate a Uri per call (hot path: mapping product/menu
+        // lists). Naturally limited to http(s) — leading-slash relative
+        // paths fall through to the trim+join branch below.
+        if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return path;
+        }
+
         if (string.IsNullOrEmpty(baseUrl))
         {
             return path.TrimStart('/');
