@@ -146,6 +146,40 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
 
+  license_compliance:
+    name: license-compliance (transitive NuGet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Mirrors trivy_fs / gitleaks: SHA-pinned checkout, capped timeout,
+    # concurrency cancellation (inherited from top-level `concurrency`).
+    #
+    # Fails the build if any restored NuGet package (direct OR transitive)
+    # carries a license outside the allowlist at repo-root
+    # `LICENSES.allowlist`.
+    #
+    # To add a license: see the header in `LICENSES.allowlist`. Adding a
+    # license is intentionally a code change so the diff is auditable.
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install nuget-license (pinned)
+        run: dotnet tool install --global nuget-license --version 4.0.0
+      - name: Restore NuGet packages
+        run: dotnet restore RestaurantSystem.sln --verbosity minimal
+      - name: Build allowlist file (strip comments/blanks)
+        run: |
+          grep -vE '^\s*(#|$)' LICENSES.allowlist > /tmp/licenses-allowed.txt
+          echo "Allowed license types:"
+          cat /tmp/licenses-allowed.txt
+      - name: Scan licenses
+        run: |
+          export PATH="$PATH:/root/.dotnet/tools"
+          nuget-license \
+            -i RestaurantSystem.sln \
+            -a /tmp/licenses-allowed.txt \
+            -o Table
+
   osv_scanner:
     name: OSV-Scanner (dependency CVEs)
     runs-on: ubuntu-latest
