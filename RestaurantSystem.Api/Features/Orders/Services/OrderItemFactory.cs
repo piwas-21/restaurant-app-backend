@@ -111,7 +111,18 @@ public class OrderItemFactory : IOrderItemFactory
             itemTotal = 0m;
             if (itemDto.CustomizationPrice != 0m)
             {
-                parentItem.ItemTotal += itemDto.CustomizationPrice;
+                // Walk up to the top-level root: every intermediate parent's
+                // ItemTotal must stay 0 (BasketService convention — see
+                // OrderItemFactoryTests.cs grandchild test). At grandchild
+                // depth, rolling into the immediate parent would silently
+                // drop the customization because the next level zeros it.
+                // PR #67 review.
+                var root = parentItem;
+                while (root.ParentOrderItem != null)
+                {
+                    root = root.ParentOrderItem;
+                }
+                root.ItemTotal += itemDto.CustomizationPrice;
             }
         }
         else

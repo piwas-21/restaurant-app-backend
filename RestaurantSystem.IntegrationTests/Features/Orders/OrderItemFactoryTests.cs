@@ -270,6 +270,73 @@ public class OrderItemFactoryTests : IAsyncLifetime
         order.Items.Sum(i => i.ItemTotal).Should().Be(parentRolledUpPrice + childCustomization);
     }
 
+    [Fact]
+    public async Task AddItemAsync_GrandchildWithCustomizationPrice_IsRolledUpIntoRoot_NotImmediateParent()
+    {
+        // Arrange — PR #67 review regression guard.
+        // At grandchild depth, the immediate parent's ItemTotal must stay 0
+        // (BasketService convention). If a grandchild's CustomizationPrice is
+        // rolled into its immediate parent (the child), the next level
+        // silently drops it. The fix walks up to the root and accumulates
+        // CustomizationPrice there so items-sum equals the rolled-up root
+        // total + the grandchild's customization.
+        var rootProduct = await SeedProductAsync("Family Meal", basePrice: 30.00m);
+        var midProduct = await SeedProductAsync("Combo Plate", basePrice: 12.00m);
+        var leafProduct = await SeedProductAsync("Build-Your-Own Pizza", basePrice: 10.00m);
+        const decimal rootRolledUpPrice = 40.00m;
+        const decimal grandchildCustomization = 3.25m; // e.g. extra cheese + olives
+
+        var order = new Order { OrderNumber = "T-6", CreatedBy = "test" };
+        var dto = new CreateOrderItemDto
+        {
+            ProductId = rootProduct.Id,
+            Quantity = 1,
+            UnitPrice = rootRolledUpPrice,
+            ChildItems = new List<CreateOrderItemDto>
+            {
+                new()
+                {
+                    ProductId = midProduct.Id,
+                    Quantity = 1,
+                    UnitPrice = 8.00m,
+                    ChildItems = new List<CreateOrderItemDto>
+                    {
+                        new()
+                        {
+                            ProductId = leafProduct.Id,
+                            Quantity = 1,
+                            UnitPrice = 2.00m,
+                            CustomizationPrice = grandchildCustomization
+                        }
+                    }
+                }
+            }
+        };
+
+        // Act
+        await _factory.AddItemAsync(order, dto, CancellationToken.None);
+
+        // Assert
+        order.Items.Should().HaveCount(3);
+
+        var root = order.Items.Single(i => i.ProductId == rootProduct.Id);
+        var mid = order.Items.Single(i => i.ProductId == midProduct.Id);
+        var leaf = order.Items.Single(i => i.ProductId == leafProduct.Id);
+
+        root.ParentOrderItem.Should().BeNull();
+        mid.ParentOrderItem.Should().BeSameAs(root);
+        leaf.ParentOrderItem.Should().BeSameAs(mid);
+
+        // Root absorbs the grandchild's CustomizationPrice — not the mid parent.
+        root.ItemTotal.Should().Be(rootRolledUpPrice + grandchildCustomization);
+        mid.ItemTotal.Should().Be(0m);
+        leaf.ItemTotal.Should().Be(0m);
+
+        // Items-sum equals the rolled-up root total plus the customization —
+        // nothing dropped, nothing double-counted.
+        order.Items.Sum(i => i.ItemTotal).Should().Be(rootRolledUpPrice + grandchildCustomization);
+    }
+
     private async Task<Product> SeedProductAsync(string name, decimal basePrice)
     {
         var product = new Product

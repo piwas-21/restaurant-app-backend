@@ -33,6 +33,17 @@ public static class UrlJoin
             return string.Empty;
         }
 
+        // If path is already an absolute http(s) URL (e.g. a CDN-hosted image
+        // stored directly in the DB), return it as-is — prepending baseUrl
+        // would corrupt it. Scheme-restricted so leading-slash relative paths
+        // (which Uri.TryCreate parses as file:// on Unix) still hit the
+        // normal trim+join branch below. PR #67 review.
+        if (Uri.TryCreate(path, UriKind.Absolute, out var parsed)
+            && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps))
+        {
+            return path;
+        }
+
         if (string.IsNullOrEmpty(baseUrl))
         {
             return path.TrimStart('/');
