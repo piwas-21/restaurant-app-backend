@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Api.Common.Behaviors;
 using RestaurantSystem.Domain.Common.Enums;
 using System.Reflection;
 
@@ -62,6 +63,11 @@ namespace RestaurantSystem.Api.Common.Extensions
 
             // Register all query handlers
             RegisterQueryHandlers(services, assemblies);
+
+            // Register pipeline behaviors (order = execution order).
+            // ValidationBehavior runs FluentValidation on every dispatched
+            // command/query before its handler executes.
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
             return services;
         }
