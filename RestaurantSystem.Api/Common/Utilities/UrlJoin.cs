@@ -35,11 +35,12 @@ public static class UrlJoin
 
         // If path is already an absolute http(s) URL (e.g. a CDN-hosted image
         // stored directly in the DB), return it as-is — prepending baseUrl
-        // would corrupt it. Scheme-restricted so leading-slash relative paths
-        // (which Uri.TryCreate parses as file:// on Unix) still hit the
-        // normal trim+join branch below. PR #67 review.
-        if (Uri.TryCreate(path, UriKind.Absolute, out var parsed)
-            && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps))
+        // would corrupt it. StartsWith is allocation-free; Uri.TryCreate
+        // would allocate a Uri per call (hot path: mapping product/menu
+        // lists). Naturally limited to http(s) — leading-slash relative
+        // paths fall through to the trim+join branch below.
+        if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             return path;
         }

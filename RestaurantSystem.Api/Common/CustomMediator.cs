@@ -141,8 +141,11 @@ namespace RestaurantSystem.Api.Common
                     }
                     catch (TargetInvocationException ex) when (ex.InnerException is not null)
                     {
-                        ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-                        throw; // unreachable — keeps the compiler happy.
+                        // Static Throw is [DoesNotReturn]-annotated so the
+                        // compiler knows control doesn't return — no need
+                        // for a redundant `throw;` below.
+                        ExceptionDispatchInfo.Throw(ex.InnerException);
+                        return null!; // unreachable
                     }
                 };
             }
