@@ -26,7 +26,11 @@ public class SendConfirmationEmailAuthTests : IntegrationTestBase
     [Fact]
     public async Task SendConfirmationEmail_AnonymousCaller_IsNotChallengedForAuth()
     {
-        AuthenticateAsUser(); // clears the X-Test-Admin header; sends no Authorization either
+        // Guarantee a no-auth request: clear the admin escape hatch AND any
+        // Authorization header. We don't want a stray bearer to mask a
+        // regression where the endpoint silently demands credentials.
+        Client.DefaultRequestHeaders.Remove("X-Test-Admin");
+        Client.DefaultRequestHeaders.Authorization = null;
 
         var unknownOrderId = Guid.NewGuid();
 
@@ -41,32 +45,37 @@ public class SendConfirmationEmailAuthTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// The per-IP rate limit ("confirmation-email" policy, 5/15min in
-    /// production defaults loaded from appsettings.json) MUST be enforced.
+    /// The per-IP rate limit ("confirmation-email" policy) MUST be enforced.
     /// Removing [EnableRateLimiting("confirmation-email")] would re-open the
-    /// SMTP-cost abuse surface ADR-004 mitigates.
+    /// SMTP-cost abuse surface ADR-004 mitigates. appsettings.Test.json pins
+    /// ConfirmationEmailPermitLimit=3 so this assertion is environment-
+    /// independent (Development's prod-eclipsing 1000 limit would otherwise
+    /// mask any regression).
     /// </summary>
     [Fact]
     public async Task SendConfirmationEmail_ExceedingPolicy_Returns429()
     {
-        AuthenticateAsUser();
+        Client.DefaultRequestHeaders.Remove("X-Test-Admin");
+        Client.DefaultRequestHeaders.Authorization = null;
         var unknownOrderId = Guid.NewGuid();
 
-        // Production default is 5 permits / 15 min / IP. Burst past it from
-        // the same loopback client to trip the partitioned limiter.
-        HttpResponseMessage? lastResponse = null;
-        for (var i = 0; i < 10; i++)
+        // Test config sets the permit limit to 3. Burst slightly past it from
+        // the same loopback client (single partition) and assert at least one
+        // response is 429.
+        var sawThrottle = false;
+        for (var i = 0; i < 5; i++)
         {
-            lastResponse = await Client.PostAsync(
+            var response = await Client.PostAsync(
                 $"/api/orders/{unknownOrderId}/send-confirmation-email",
                 content: null);
-            if (lastResponse.StatusCode == HttpStatusCode.TooManyRequests)
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                return; // policy enforced — test passes
+                sawThrottle = true;
+                break;
             }
         }
 
-        lastResponse!.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
+        sawThrottle.Should().BeTrue(
             "the \"confirmation-email\" rate-limit policy must block bursts past the configured permit limit");
     }
 }
