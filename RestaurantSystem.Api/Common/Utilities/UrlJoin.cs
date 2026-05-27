@@ -18,7 +18,9 @@ public static class UrlJoin
     /// <list type="bullet">
     ///   <item>Trailing '/' on <paramref name="baseUrl"/> is trimmed.</item>
     ///   <item>Leading '/' on <paramref name="path"/> is trimmed.</item>
-    ///   <item>If <paramref name="path"/> is null or empty, the trimmed base is returned.</item>
+    ///   <item>If <paramref name="path"/> is null or empty, <see cref="string.Empty"/> is returned —
+    ///         the bucket root is never a valid image URL, so callers can rely on
+    ///         <c>?? fallback</c> chains to kick in.</item>
     ///   <item>If <paramref name="baseUrl"/> is null or empty, the trimmed path is returned.</item>
     /// </list>
     /// Query strings and fragments are preserved as-is — no slash is inserted before '?' or '#'
@@ -26,14 +28,14 @@ public static class UrlJoin
     /// </remarks>
     public static string Join(string? baseUrl, string? path)
     {
-        if (string.IsNullOrEmpty(baseUrl))
-        {
-            return path?.TrimStart('/') ?? string.Empty;
-        }
-
         if (string.IsNullOrEmpty(path))
         {
-            return baseUrl.TrimEnd('/');
+            return string.Empty;
+        }
+
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            return path.TrimStart('/');
         }
 
         return $"{baseUrl.TrimEnd('/')}/{path.TrimStart('/')}";

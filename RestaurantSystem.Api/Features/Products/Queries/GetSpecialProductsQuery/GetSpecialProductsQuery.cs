@@ -61,7 +61,7 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
             Description = p.Description,
             BasePrice = p.BasePrice,
             ImageUrl = p.Images
-                .Where(img => img.IsPrimary)
+                .Where(img => img.IsPrimary && !string.IsNullOrEmpty(img.Url))
                 .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? p.ImageUrl,
             IsActive = p.IsActive,

@@ -34,15 +34,17 @@ public class UrlJoinTests
     }
 
     [Fact]
-    public void Join_EmptyPath_ReturnsTrimmedBase()
+    public void Join_EmptyPath_ReturnsEmpty()
     {
-        UrlJoin.Join("https://s3.example.com/", "").Should().Be("https://s3.example.com");
+        // The bucket root is never a valid image URL — returning empty lets the
+        // caller's `?? fallback` chain trigger (e.g. ProductDto.ImageUrl).
+        UrlJoin.Join("https://s3.example.com/", "").Should().Be(string.Empty);
     }
 
     [Fact]
-    public void Join_NullPath_ReturnsTrimmedBase()
+    public void Join_NullPath_ReturnsEmpty()
     {
-        UrlJoin.Join("https://s3.example.com/", null).Should().Be("https://s3.example.com");
+        UrlJoin.Join("https://s3.example.com/", null).Should().Be(string.Empty);
     }
 
     [Fact]

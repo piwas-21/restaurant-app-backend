@@ -58,7 +58,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
             Description = featuredProduct.Description,
             BasePrice = featuredProduct.BasePrice,
             ImageUrl = featuredProduct.Images
-                .Where(img => img.IsPrimary)
+                .Where(img => img.IsPrimary && !string.IsNullOrEmpty(img.Url))
                 .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? featuredProduct.ImageUrl,
             FeaturedDate = featuredProduct.FeaturedDate ?? DateTime.UtcNow,
@@ -95,7 +95,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     Description = si.SideItemProduct.Description,
                     Price = si.SideItemProduct.BasePrice,
                     ImageUrl = si.SideItemProduct.Images
-                        .Where(img => img.IsPrimary)
+                        .Where(img => img.IsPrimary && !string.IsNullOrEmpty(img.Url))
                         .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                         .FirstOrDefault() ?? si.SideItemProduct.ImageUrl,
                     IsRequired = si.IsRequired,
