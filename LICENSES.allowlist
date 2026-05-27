@@ -1,0 +1,32 @@
+# LICENSES.allowlist
+#
+# Allowed open-source license types for NuGet transitive dependencies.
+# Enforced by the `license-compliance` CI job in `.github/workflows/ci.yml`
+# (uses `nuget-license --allowed-license-types`).
+#
+# Format: one SPDX license identifier per line, sorted alphabetically.
+# Blank lines and `#`-prefixed comments are ignored — comments must be
+# stripped before passing this file to the tool (see the CI job).
+#
+# How to add a license:
+#   1. Confirm the license is permissive enough for our SaaS distribution
+#      model (no strong copyleft; no field-of-use restrictions).
+#   2. Cross-check with legal if in doubt (anything not on this list
+#      already required a one-time decision).
+#   3. Add the SPDX identifier in alphabetical order with a one-line
+#      comment explaining which package introduced the need.
+#   4. The same PR must include the dependency upgrade or addition that
+#      pulled in the new license — never expand the allowlist
+#      speculatively.
+#
+# Baseline rationale (initial set): standard .NET 10 + EF Core 10 + AWS
+# SDK + JWT stack. Microsoft and .NET Foundation packages ship under
+# MIT; older Microsoft packages occasionally surface MS-PL. AWS SDK is
+# Apache-2.0. Npgsql is PostgreSQL license. A handful of utility
+# libraries (Newtonsoft.Json forks, etc.) use BSD-3-Clause.
+Apache-2.0
+BSD-2-Clause
+BSD-3-Clause
+MIT
+MS-PL
+PostgreSQL

@@ -146,6 +146,67 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
 
+  license_compliance:
+    name: license-compliance (transitive NuGet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Mirrors trivy_fs / gitleaks: SHA-pinned checkout, capped timeout,
+    # concurrency cancellation (inherited from top-level `concurrency`).
+    #
+    # Fails the build if any restored NuGet package (direct OR transitive)
+    # carries a license outside the allowlist at repo-root
+    # `LICENSES.allowlist`.
+    #
+    # To add a license: see the header in `LICENSES.allowlist`. Adding a
+    # license is intentionally a code change so the diff is auditable.
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install nuget-license (pinned)
+        # Install to /usr/local/bin (on PATH by default) — `--global`
+        # would land it under ~/.dotnet/tools which isn't on PATH inside
+        # this container, and per-step `export PATH=` doesn't carry to
+        # subsequent `run:` blocks.
+        run: dotnet tool install --tool-path /usr/local/bin nuget-license --version 4.0.0
+      - name: Restore NuGet packages
+        run: dotnet restore RestaurantSystem.sln --verbosity minimal
+      - name: Build allowlist (strip comments, emit JSON array)
+        # nuget-license v4 expects the --allowed-license-types file as
+        # a JSON array. The repo-tracked LICENSES.allowlist is kept in
+        # the human-friendly one-per-line + `#` comments format; convert
+        # to JSON here so the tracked file stays reviewable. Using awk
+        # (always present) instead of jq (not in the .NET SDK image).
+        run: |
+          awk 'BEGIN{printf "["} /^[^#]/ && NF {printf "%s\"%s\"", sep, $0; sep=","} END{printf "]\n"}' \
+            LICENSES.allowlist > /tmp/licenses-allowed.json
+          echo "Allowed license types:"
+          cat /tmp/licenses-allowed.json
+      - name: Scan licenses
+        # JsonPretty output makes the failure reviewable (Table format
+        # embeds the full license body of any non-SPDX package and
+        # blows the log out to >1MB on a single line).
+        # --licenseurl-to-license-mappings maps non-SPDX license URLs
+        # (older Microsoft.AspNetCore packages declare their license as
+        # a raw GitHub URL rather than SPDX) to the actual SPDX type.
+        run: |
+          # Ignored packages: build-time-only Microsoft tooling that
+          # ships its license as an embedded file the tool can't classify.
+          # The repo-tracked LICENSES.ignored.txt is human-reviewable
+          # (one package ID per line + `#` comments); nuget-license
+          # expects a JSON array file (same shape as the allowlist), so
+          # strip comments + convert to JSON here.
+          awk 'BEGIN{printf "["} /^[^#]/ && NF {printf "%s\"%s\"", sep, $0; sep=","} END{printf "]\n"}' \
+            LICENSES.ignored.txt > /tmp/ignored-packages.json
+          echo "Ignored packages:"
+          cat /tmp/ignored-packages.json
+          nuget-license \
+            -i RestaurantSystem.sln \
+            -a /tmp/licenses-allowed.json \
+            --licenseurl-to-license-mappings LICENSES.urlmap.json \
+            --ignored-packages /tmp/ignored-packages.json \
+            -o JsonPretty
+
   osv_scanner:
     name: OSV-Scanner (dependency CVEs)
     runs-on: ubuntu-latest
