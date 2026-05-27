@@ -175,10 +175,11 @@ jobs:
         # nuget-license v4 expects the --allowed-license-types file as
         # a JSON array. The repo-tracked LICENSES.allowlist is kept in
         # the human-friendly one-per-line + `#` comments format; convert
-        # to JSON here so the tracked file stays reviewable.
+        # to JSON here so the tracked file stays reviewable. Using awk
+        # (always present) instead of jq (not in the .NET SDK image).
         run: |
-          grep -vE '^\s*(#|$)' LICENSES.allowlist \
-            | jq -R . | jq -s . > /tmp/licenses-allowed.json
+          awk 'BEGIN{printf "["} /^[^#]/ && NF {printf "%s\"%s\"", sep, $0; sep=","} END{printf "]\n"}' \
+            LICENSES.allowlist > /tmp/licenses-allowed.json
           echo "Allowed license types:"
           cat /tmp/licenses-allowed.json
       - name: Scan licenses
