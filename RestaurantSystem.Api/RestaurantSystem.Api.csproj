@@ -10,6 +10,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Aspire.Npgsql" Version="13.2.4" />
+		<PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.2.4" />
+		<PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.2.4" />
 		<PackageReference Include="AWSSDK.S3" Version="4.0.1.3" />
 		<PackageReference Include="FluentValidation" Version="12.0.0" />
 		<PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
@@ -27,7 +30,7 @@
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.5" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 		<PackageReference Include="QRCoder" Version="1.7.0" />
@@ -37,6 +40,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\RestaurantSystem.Domain\RestaurantSystem.Domain.csproj" />
 		<ProjectReference Include="..\RestaurantSystem.Infrastructure\RestaurantSystem.Infrastructure.csproj" />
+		<ProjectReference Include="..\RestaurantSystem.ServiceDefaults\RestaurantSystem.ServiceDefaults.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
