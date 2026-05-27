@@ -164,7 +164,11 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install nuget-license (pinned)
-        run: dotnet tool install --global nuget-license --version 4.0.0
+        # Install to /usr/local/bin (on PATH by default) — `--global`
+        # would land it under ~/.dotnet/tools which isn't on PATH inside
+        # this container, and per-step `export PATH=` doesn't carry to
+        # subsequent `run:` blocks.
+        run: dotnet tool install --tool-path /usr/local/bin nuget-license --version 4.0.0
       - name: Restore NuGet packages
         run: dotnet restore RestaurantSystem.sln --verbosity minimal
       - name: Build allowlist file (strip comments/blanks)
@@ -174,7 +178,6 @@ jobs:
           cat /tmp/licenses-allowed.txt
       - name: Scan licenses
         run: |
-          export PATH="$PATH:/root/.dotnet/tools"
           nuget-license \
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.txt \
