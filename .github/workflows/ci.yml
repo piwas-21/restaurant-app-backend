@@ -194,15 +194,17 @@ jobs:
           # ships its license as an embedded file the tool can't classify.
           # The repo-tracked LICENSES.ignored.txt is human-reviewable
           # (one package ID per line + `#` comments); nuget-license
-          # expects a flat list (no comments), so strip them here.
-          grep -vE '^\s*(#|$)' LICENSES.ignored.txt > /tmp/ignored-packages.txt
+          # expects a JSON array file (same shape as the allowlist), so
+          # strip comments + convert to JSON here.
+          awk 'BEGIN{printf "["} /^[^#]/ && NF {printf "%s\"%s\"", sep, $0; sep=","} END{printf "]\n"}' \
+            LICENSES.ignored.txt > /tmp/ignored-packages.json
           echo "Ignored packages:"
-          cat /tmp/ignored-packages.txt
+          cat /tmp/ignored-packages.json
           nuget-license \
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.json \
             --licenseurl-to-license-mappings LICENSES.urlmap.json \
-            --ignored-packages /tmp/ignored-packages.txt \
+            --ignored-packages /tmp/ignored-packages.json \
             -o JsonPretty
 
   osv_scanner:
