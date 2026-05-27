@@ -88,16 +88,36 @@ public class OrderItemFactory : IOrderItemFactory
 
         var (unitPrice, variationName) = ResolvePricing(itemDto, product);
 
-        // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-231):
+        // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-245):
         // child rows carry UnitPrice for display but ItemTotal = 0, because the
         // parent's ItemTotal already includes the rolled-up combo price.
         // Without this, any caller that goes through OrderPricingService's
         // legacy compute path (no command.BasketSubTotal — e.g. admin tooling,
         // bulk import, refunds-as-new-orders) double-counts every child's
         // UnitPrice on top of the parent. See issue #54.
-        var itemTotal = parentItem != null
-            ? 0m
-            : (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice;
+        //
+        // A child's CustomizationPrice (e.g. extra toppings on a child pizza
+        // option) is NOT pre-rolled into the parent's UnitPrice by all callers.
+        // BasketService rolls it up by adding to the parent's ItemTotal/UnitPrice
+        // (BasketService.cs:215, 243-245). OrderItem has no CustomizationPrice
+        // column, so we add the child's CustomizationPrice contribution
+        // directly to the parent's ItemTotal here. (DTO contract: per
+        // CreateOrderItemDto.cs:11, CustomizationPrice is already "total for all
+        // quantities", so no extra Quantity multiplier — consistent with the
+        // top-level branch below and the menu path on line 61.)
+        decimal itemTotal;
+        if (parentItem != null)
+        {
+            itemTotal = 0m;
+            if (itemDto.CustomizationPrice != 0m)
+            {
+                parentItem.ItemTotal += itemDto.CustomizationPrice;
+            }
+        }
+        else
+        {
+            itemTotal = (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice;
+        }
 
         var orderItem = new OrderItem
         {

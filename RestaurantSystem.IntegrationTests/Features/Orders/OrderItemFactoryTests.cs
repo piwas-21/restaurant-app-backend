@@ -218,6 +218,58 @@ public class OrderItemFactoryTests : IAsyncLifetime
         order.Items.Sum(i => i.ItemTotal).Should().Be(rootRolledUpPrice);
     }
 
+    [Fact]
+    public async Task AddItemAsync_ChildWithCustomizationPrice_IsRolledUpIntoParentItemTotal()
+    {
+        // Arrange — regression guard for PR #59 gemini review.
+        // BasketService (Features/Basket/Services/BasketService.cs:215, 243-245)
+        // adds each child's customization price into the parent's rolled-up
+        // total. OrderItem has no CustomizationPrice column, so OrderItemFactory
+        // must add the child's CustomizationPrice directly onto the parent's
+        // ItemTotal — otherwise child customization (e.g. extra toppings on a
+        // child pizza option) is silently dropped.
+        var parentProduct = await SeedProductAsync("Lunch Combo", basePrice: 15.00m);
+        var childProduct = await SeedProductAsync("Build-Your-Own Pizza", basePrice: 10.00m);
+        const decimal parentRolledUpPrice = 17.50m; // BasePrice + child additional
+        const decimal childCustomization = 2.75m;   // e.g. extra cheese + olives
+
+        var order = new Order { OrderNumber = "T-5", CreatedBy = "test" };
+        var dto = new CreateOrderItemDto
+        {
+            ProductId = parentProduct.Id,
+            Quantity = 1,
+            UnitPrice = parentRolledUpPrice,
+            ChildItems = new List<CreateOrderItemDto>
+            {
+                new()
+                {
+                    ProductId = childProduct.Id,
+                    Quantity = 1,
+                    UnitPrice = 2.50m,
+                    CustomizationPrice = childCustomization
+                }
+            }
+        };
+
+        // Act
+        await _factory.AddItemAsync(order, dto, CancellationToken.None);
+
+        // Assert
+        order.Items.Should().HaveCount(2);
+        var parent = order.Items.Single(i => i.ParentOrderItem == null);
+        var child = order.Items.Single(i => i.ParentOrderItem != null);
+
+        // Child row stays zeroed (BasketService convention, no double-count).
+        child.ItemTotal.Should().Be(0m);
+
+        // Parent absorbs the child's customization price.
+        parent.ItemTotal.Should().Be(parentRolledUpPrice + childCustomization);
+
+        // Items-sum equals exactly the rolled-up parent total (including
+        // customization) — no double-count, no dropped customization.
+        order.Items.Sum(i => i.ItemTotal).Should().Be(parentRolledUpPrice + childCustomization);
+    }
+
     private async Task<Product> SeedProductAsync(string name, decimal basePrice)
     {
         var product = new Product
