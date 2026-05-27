@@ -10,7 +10,7 @@ namespace RestaurantSystem.IntegrationTests.Common;
 /// <summary>
 /// PR #67 review regression guard. The non-generic dispatch path
 /// (<see cref="CustomMediator.SendCommand{TResult}(ICommand{TResult}, CancellationToken)"/>)
-/// invokes pipeline behaviors via <see cref="MethodInfo.Invoke"/>, which
+/// invokes pipeline behaviors via <c>MethodInfo.Invoke</c>, which
 /// wraps any synchronous exception in <see cref="TargetInvocationException"/>.
 /// Without an unwrap, <see cref="BadRequestException"/> / <see cref="NotFoundException"/>
 /// reach the global exception middleware as TargetInvocationException and map
@@ -29,7 +29,7 @@ public class CustomMediatorExceptionUnwrapTests
     /// <summary>
     /// Behavior that throws synchronously before returning a Task — this is
     /// the exact shape of <c>ValidationBehavior</c> when validation fails.
-    /// Throwing synchronously triggers <see cref="MethodInfo.Invoke"/>'s
+    /// Throwing synchronously triggers <c>MethodInfo.Invoke</c>'s
     /// TargetInvocationException wrapping.
     /// </summary>
     public class ThrowingBehavior : IPipelineBehavior<TestCommand, string>
