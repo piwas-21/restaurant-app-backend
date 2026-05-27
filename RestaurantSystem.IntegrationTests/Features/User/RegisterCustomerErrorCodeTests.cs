@@ -5,7 +5,6 @@ using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.User.Commands.RegisterCustomerCommand;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
-using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
 using System.Text.Json;

@@ -40,7 +40,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         var existingUser = await _userManager.FindByEmailAsync(command.Email);
         if (existingUser != null)
         {
-            return ApiResponse<AuthResponse>.Failure(
+            return ApiResponse<AuthResponse>.FailureWithCode(
                 "User with this email already exists",
                 ErrorCodes.EmailAlreadyExists,
                 "Registration failed");

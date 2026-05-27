@@ -65,7 +65,13 @@ namespace RestaurantSystem.Api.Common.Models
         // Error response carrying a machine-readable ErrorCode alongside the
         // human-readable message/error. Keeps Errors populated so older
         // clients that read only `errors[]` continue to work.
-        public static ApiResponse<T> Failure(string error, string errorCode, string message = "Operation failed")
+        //
+        // NOTE: Deliberately named FailureWithCode (not an overload of Failure)
+        // to avoid a C# overload-resolution hazard — Failure("err", "CODE")
+        // would otherwise bind to the 2-arg Failure(error, message) overload
+        // (since all-defaulted params win when arg counts match), silently
+        // dropping the error code into the message slot.
+        public static ApiResponse<T> FailureWithCode(string error, string errorCode, string message = "Operation failed")
         {
             return new ApiResponse<T>
             {
