@@ -1,0 +1,13 @@
+# Packages excluded from the license-compliance scan.
+# One package ID per line. `#` comments and blank lines ignored by CI
+# (collapsed to a comma-separated list passed to nuget-license).
+#
+# Each exclusion must be justified — never exclude a runtime/production
+# dependency. Build-time MSBuild .targets packages are acceptable when
+# the tool can't auto-classify their embedded license file.
+
+# Microsoft Docker tooling — build-time only (Visual Studio Container
+# Tools .targets package). Embeds license file inline rather than
+# declaring an SPDX identifier; nuget-license reports "Unable to
+# determine license". The package is MIT per the NuGet listing.
+Microsoft.VisualStudio.Azure.Containers.Tools.Targets
