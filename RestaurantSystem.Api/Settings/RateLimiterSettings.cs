@@ -35,5 +35,20 @@ namespace RestaurantSystem.Api.Settings
         /// <summary>Window length for the register policy.</summary>
         [Range(1, int.MaxValue)]
         public int RegisterWindowHours { get; set; } = 1;
+
+        /// <summary>
+        /// Permits per ConfirmationEmailWindowMinutes for
+        /// /api/orders/{orderId}/send-confirmation-email, per IP.
+        /// The endpoint is intentionally [AllowAnonymous] to support guest
+        /// checkout (see ADR-004). Per-IP throttling caps the cost of an
+        /// attacker who has scraped order IDs from receipts/URLs and tries to
+        /// flood SMTP.
+        /// </summary>
+        [Range(1, int.MaxValue)]
+        public int ConfirmationEmailPermitLimit { get; set; } = 5;
+
+        /// <summary>Window length for the confirmation-email policy.</summary>
+        [Range(1, int.MaxValue)]
+        public int ConfirmationEmailWindowMinutes { get; set; } = 15;
     }
 }

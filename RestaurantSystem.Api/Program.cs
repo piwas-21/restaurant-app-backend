@@ -291,6 +291,20 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromHours(rateLimiter.RegisterWindowHours),
             QueueLimit = 0
         }));
+
+    // /api/orders/{orderId}/send-confirmation-email
+    // Endpoint is [AllowAnonymous] to support guest checkout (see ADR-004).
+    // Per-IP throttling caps the abuse surface for an attacker that has
+    // scraped order IDs from receipts/URLs and tries to spam customers or
+    // inflate SMTP cost via the admin-notification email.
+    options.AddPolicy("confirmation-email", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.ConfirmationEmailPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.ConfirmationEmailWindowMinutes),
+            QueueLimit = 0
+        }));
 });
 
 builder.Services.AddInfrastructureRegistration();
