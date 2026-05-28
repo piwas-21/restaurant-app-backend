@@ -170,8 +170,10 @@ namespace RestaurantSystem.Api.Common.Validation
 
         private bool HasSequentialCharacters(string password)
         {
-            // Implementation details...
-            // Check implementation...
+            // Stub implementation: parameter retained for the planned check
+            // (sequence detection across alphabet/digit runs) without changing
+            // the call site.
+            _ = password;
             return false;
         }
     }
