@@ -88,7 +88,11 @@ jobs:
             --results-directory test-results \
             -p:CollectCoverage=true \
             -p:CoverletOutputFormat=cobertura \
-            -p:CoverletOutput=test-results/coverage.cobertura.xml
+            -p:CoverletOutput=test-results/coverage.cobertura.xml \
+            -p:Exclude='[*]*.Migrations.*' \
+            -p:Threshold=17%2c9%2c15 \
+            -p:ThresholdType=line%2cbranch%2cmethod \
+            -p:ThresholdStat=total
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
