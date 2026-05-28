@@ -26,7 +26,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.Ingredients)
             .HasColumnType("jsonb")
-            .HasConversion<List<string>>(); ;
+            .HasConversion<List<string>>();
 
         builder.Property(p => p.Allergens)
             .HasColumnType("jsonb")

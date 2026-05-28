@@ -555,7 +555,6 @@ public class OrderEventService : IOrderEventService, IDisposable
             "Pending" or "PendingApproval" => new List<ClientType> { ClientType.Kitchen, ClientType.Service },
             "Confirmed" or "Preparing" => new List<ClientType> { ClientType.Kitchen, ClientType.Service },
             "Ready" => new List<ClientType> { ClientType.Kitchen, ClientType.Service },
-            "OutForDelivery" or "Completed" or "Cancelled" => new List<ClientType> { ClientType.All },
             _ => new List<ClientType> { ClientType.All }
         };
     }

@@ -19,7 +19,6 @@ public static class FileStorageServiceExtensions
             case "s3":
                 services.AddS3FileStorage(configuration);
                 break;
-            case "local":
             default:
                 services.AddLocalFileStorage();
                 break;
