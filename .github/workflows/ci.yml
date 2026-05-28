@@ -159,16 +159,21 @@ jobs:
     #
     # To add a license: see the header in `LICENSES.allowlist`. Adding a
     # license is intentionally a code change so the diff is auditable.
-    container:
-      image: mcr.microsoft.com/dotnet/sdk:10.0
+    # Runs on the host runner with actions/setup-dotnet rather than the
+    # mcr.microsoft.com/dotnet/sdk:10.0 container image — Microsoft's MCR
+    # CDN intermittently WAF-blocks the docker pull ("The request is
+    # blocked", Ref A/B/C error codes), turning this into a flaky check.
+    # setup-dotnet pulls from a stable CDN endpoint without the same issue.
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
       - name: Install nuget-license (pinned)
-        # Install to /usr/local/bin (on PATH by default) — `--global`
-        # would land it under ~/.dotnet/tools which isn't on PATH inside
-        # this container, and per-step `export PATH=` doesn't carry to
-        # subsequent `run:` blocks.
-        run: dotnet tool install --tool-path /usr/local/bin nuget-license --version 4.0.0
+        # actions/setup-dotnet adds ~/.dotnet/tools to PATH automatically,
+        # so --global lands the binary somewhere subsequent steps can find.
+        run: dotnet tool install --global nuget-license --version 4.0.0
       - name: Restore NuGet packages
         run: dotnet restore RestaurantSystem.sln --verbosity minimal
       - name: Build allowlist (strip comments, emit JSON array)
