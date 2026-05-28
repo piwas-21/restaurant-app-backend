@@ -13,6 +13,7 @@ Index of ADRs for the RUMI Backend. New ADRs are numbered sequentially with no g
 | [001](ADR-001-custom-cqrs-mediator.md) | Custom CQRS mediator (vs MediatR) | Accepted | 2026-04-26 | architecture, mediator |
 | [002](ADR-002-soft-delete-strategy.md) | Soft-delete via global query filter | Accepted | 2026-04-26 | data, ef-core |
 | [003](ADR-003-jwt-scope-and-claims.md) | JWT scope and claim shape | Accepted | 2026-04-26 | auth, security |
+| [004](ADR-004-anonymous-order-confirmation-email.md) | Anonymous access on send-confirmation-email | Accepted | 2026-05-27 | auth, security, orders, rate-limit |
 
 ## Conventions
 

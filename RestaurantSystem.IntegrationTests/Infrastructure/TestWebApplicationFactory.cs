@@ -23,10 +23,16 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Test");
 
-        // Set BEFORE Program.cs runs. Program.cs calls .AddEnvironmentVariables()
-        // last in its config chain, so these win over everything.
-        Environment.SetEnvironmentVariable("ConnectionStrings__restaurantdb", _connectionString);
-        Environment.SetEnvironmentVariable("ConnectionStrings__redis", "localhost:6379");
+        // restaurantdb: inject per-instance via UseSetting (NOT
+        // Environment.SetEnvironmentVariable — that's process-wide and
+        // xUnit parallel test runs would race on the shared variable).
+        // The connection string is dynamic per testcontainer instance.
+        builder.UseSetting("ConnectionStrings:restaurantdb", _connectionString);
+        // redis: the placeholder value lives in appsettings.Test.json
+        // (ConnectionStrings:redis). Aspire's AddRedisDistributedCache needs a
+        // non-empty value at startup, but the connection itself is never made —
+        // the IDistributedCache registration is replaced below with the in-memory
+        // implementation before any test code runs.
 
         builder.ConfigureTestServices(services =>
         {

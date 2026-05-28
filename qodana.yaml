@@ -5,7 +5,8 @@
 #   - Baseline lives in qodana.sarif.json; new PRs are graded against
 #     it and only NEW findings beyond the baseline fail the build.
 #     Originally 320 findings at adoption; refreshed periodically as
-#     burndown PRs reduce the count (most recent refresh: 138).
+#     burndown PRs reduce the count (most recent refresh: 138;
+#     targeted stale-entry removal: 121).
 #   - UnusedAutoPropertyAccessor.{Global,Local} disabled outright —
 #     ~684 hits on DTO records that EF/the mediator instantiate via
 #     reflection. Qodana can't see those callsites; the noise drowns

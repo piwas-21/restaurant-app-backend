@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -177,7 +178,7 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
             Images = product.Images.Select(i => new RestaurantSystem.Api.Features.Products.Dtos.ProductImageDto
             {
                 Id = i.Id,
-                Url = _baseUrl + "/" + i.Url,
+                Url = UrlJoin.Join(_baseUrl, i.Url),
                 AltText = i.AltText,
                 IsPrimary = i.IsPrimary,
                 SortOrder = i.SortOrder

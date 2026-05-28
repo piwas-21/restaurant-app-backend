@@ -289,11 +289,33 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromHours(rateLimiter.RegisterWindowHours),
             QueueLimit = 0
         }));
+
+    // /api/orders/{orderId}/send-confirmation-email
+    // Endpoint is [AllowAnonymous] to support guest checkout (see ADR-004).
+    // Per-IP throttling caps the abuse surface for an attacker that has
+    // scraped order IDs from receipts/URLs and tries to spam customers or
+    // inflate SMTP cost via the admin-notification email.
+    options.AddPolicy("confirmation-email", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.ConfirmationEmailPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.ConfirmationEmailWindowMinutes),
+            QueueLimit = 0
+        }));
 });
 
 builder.Services.AddInfrastructureRegistration();
 
-var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? ["http://localhost:3000"];
+// CORS: Use configured origins in production, allow all in development.
+// Fail-safe: refuse to start in non-Development if CorsSettings:AllowedOrigins is missing/empty —
+// silent fallback to AllowAnyOrigin in production would be a misconfiguration disguised as a working deploy.
+var corsOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>();
+if (!builder.Environment.IsDevelopment() && (corsOrigins == null || corsOrigins.Length == 0))
+{
+    throw new InvalidOperationException(
+        "CorsSettings:AllowedOrigins must be configured with at least one origin in non-Development environments.");
+}
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -306,7 +328,8 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            policy.WithOrigins(corsOrigins)
+            // Non-null in the non-Development branch — the fail-safe above throws otherwise.
+            policy.WithOrigins(corsOrigins!)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();
@@ -396,17 +419,9 @@ app.UseValidationExceptionHandling();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Health check endpoint for Kubernetes liveness/readiness probes.
-// .NET 10's Microsoft.AspNetCore.OpenApi (wired via AddOpenApi/MapOpenApi
-// above) auto-discovers minimal-API endpoints, so no per-endpoint
-// .WithOpenApi() call is needed — that API was deprecated (ASPDEPR002).
-app.MapGet("/health", () => Results.Ok(new
-{
-    status = "healthy",
-    timestamp = DateTime.UtcNow,
-    service = "restaurant-system-api"
-}))
-.WithName("HealthCheck");
+// /health is mapped by app.MapDefaultEndpoints() above (Aspire ServiceDefaults
+// → MapHealthChecks("/health")). Re-mapping it here would throw AmbiguousMatchException
+// at runtime. Kubernetes liveness/readiness probes hit the same /health path.
 
 app.MapGet("/api/health", () => Results.Ok(new
 {
