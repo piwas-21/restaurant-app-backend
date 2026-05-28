@@ -93,10 +93,11 @@ public class OrderPricingService : IOrderPricingService
             return;
         }
 
-        // Match the original handler's signature (FindAsync without explicit
-        // CancellationToken — EF Core treats the single-arg overload as
-        // primary-key lookup against the change tracker first).
-        var user = await _context.Users.FindAsync(userId);
+        // FindAsync checks the change tracker first for a primary-key match
+        // regardless of overload, so passing the CancellationToken alongside
+        // the key array preserves the original lookup semantics while letting
+        // callers cancel.
+        var user = await _context.Users.FindAsync(new object?[] { userId }, ct);
         if (user == null || !user.IsDiscountActive)
         {
             return;

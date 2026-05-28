@@ -541,16 +541,6 @@ Thank you for being a valued member!";
             try
             {
                 using var client = CreateSmtpClient();
-                using var message = new MailMessage
-                {
-                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
-                    Subject = subject,
-                    IsBodyHtml = true,
-                    BodyEncoding = Encoding.UTF8,
-                    SubjectEncoding = Encoding.UTF8
-                };
-
-                message.To.Add(new MailAddress(to));
 
                 var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
 
@@ -561,7 +551,16 @@ Thank you for being a valued member!";
                 };
                 htmlView.LinkedResources.Add(imageResource);
 
-                message.AlternateViews.Add(htmlView);
+                using var message = new MailMessage
+                {
+                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
+                    Subject = subject,
+                    IsBodyHtml = true,
+                    BodyEncoding = Encoding.UTF8,
+                    SubjectEncoding = Encoding.UTF8,
+                    To = { new MailAddress(to) },
+                    AlternateViews = { htmlView }
+                };
 
                 if (!string.IsNullOrEmpty(textBody))
                 {
