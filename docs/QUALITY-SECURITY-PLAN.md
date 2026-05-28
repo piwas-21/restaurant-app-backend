@@ -183,15 +183,35 @@ default:
   interruptible: true
 ```
 
-## 5. Weekly scheduled pipeline (`.gitlab-ci.weekly.yml` via include)
+## 5. Weekly scheduled audit (`.github/workflows/security-audit.yml`)
 
-Cron: `0 6 * * 1`. Jobs:
+**Implemented** (issue #15) — runs on GitHub Actions, `schedule: '0 6 * * 1'` (Mondays 06:00 UTC) + `workflow_dispatch` (manual). `permissions: contents: read`, concurrency-guarded, per-job timeouts, all actions SHA-pinned (same pins as `ci.yml` where reused). It re-runs the security scanners on the **full tree** independent of PR activity, so vulnerabilities in untouched code and newly-disclosed CVEs in pinned dependencies surface even when no PR touches them.
+
+| Job | Tool | Scope | Failure Condition |
+|---|---|---|---|
+| `osv_scanner` | OSV-Scanner (`google/osv-scanner-action`) | full tree (`--recursive .`) | known CVE |
+| `trivy_fs` | Trivy fs (`aquasecurity/trivy-action`) | full tree | HIGH/CRITICAL (fixed) |
+| `nuget_vuln_audit` | `dotnet list package --vulnerable --include-transitive` | transitive dependencies | HIGH/CRITICAL advisory |
+| `license_compliance` | `nuget-license` v4.0.0 + `LICENSES.*` | project refs | disallowed license |
+
+What's **new** vs the per-PR gates in `ci.yml`:
+- **`nuget_vuln_audit`** — surfaces the NU1901–NU1904 advisories that `Directory.Build.props` downgrades from build errors on per-PR builds (so they don't block unrelated PRs). `dotnet list package --vulnerable` exits 0 even with findings, so the job captures the output, writes it to the Job Summary, and fails explicitly on High/Critical (reports Low/Moderate without failing).
+- **Full-tree** OSV scan (the per-PR scan may be diff-scoped).
+
+How failures surface: a red ❌ on the Actions tab is the alert. Each job writes a Job Summary with the finding; triage and patch on the dependency-upgrade track, or document an accepted-risk suppression. Failure is intentional signal — nothing auto-merges and no automation opens issues (keeps permissions minimal, no `issues: write` injection surface).
+
+Deferred (not yet ported from the original GitLab sketch below): TruffleHog full-history, `dotnet list package --outdated` artifact, sensitive-file audit, `trivy config` over Dockerfiles/k8s manifests.
+
+<details><summary>Original GitLab sketch (superseded)</summary>
+
+`.gitlab-ci.weekly.yml` via include — cron `0 6 * * 1`:
 - TruffleHog full history (`--results=verified,unknown`)
 - OSV-Scanner JSON, retain 30 days
 - `dotnet list package --outdated` → artifact
 - License audit: `dotnet-project-licenses --include-transitive --forbidden-license GPL-2.0-only --forbidden-license AGPL-3.0`
 - Sensitive-file audit (mirrors DeelMarkt's `infra-security` job)
-- `trivy config` over `Dockerfile`, `docker-compose*.yml`, and the [rumi-argocd-gitops](../../rumi-argocd-gitops/) k8s manifests
+- `trivy config` over `Dockerfile`, `docker-compose*.yml`, and the `rumi-argocd-gitops` k8s manifests
+</details>
 
 ## 6. SonarCloud config (`backend/sonar-project.properties`)
 
