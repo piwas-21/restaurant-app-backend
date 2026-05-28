@@ -93,11 +93,20 @@ public class OrderPricingService : IOrderPricingService
             return;
         }
 
+        // Guest/anonymous orders have no userId — there's no user-limit
+        // discount to apply. Mirrors ApplyCustomerDiscountAsync's null guard
+        // and avoids passing a null key into FindAsync (which throws
+        // ArgumentNullException on the keyValues-array overload).
+        if (!userId.HasValue)
+        {
+            return;
+        }
+
         // FindAsync checks the change tracker first for a primary-key match
         // regardless of overload, so passing the CancellationToken alongside
         // the key array preserves the original lookup semantics while letting
         // callers cancel.
-        var user = await _context.Users.FindAsync(new object?[] { userId }, ct);
+        var user = await _context.Users.FindAsync(new object?[] { userId.Value }, ct);
         if (user == null || !user.IsDiscountActive)
         {
             return;

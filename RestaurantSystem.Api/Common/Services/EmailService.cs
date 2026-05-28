@@ -542,9 +542,16 @@ Thank you for being a valued member!";
             {
                 using var client = CreateSmtpClient();
 
-                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
+                // Build MailAddress instances FIRST: their ctors throw
+                // FormatException on invalid input. Doing this before any
+                // IDisposable is allocated avoids leaking htmlView/stream/
+                // message when the address is malformed.
+                var fromAddress = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName);
+                var toAddress = new MailAddress(to);
 
                 using var stream = new MemoryStream(imageData);
+                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
+
                 var imageResource = new LinkedResource(stream, "image/png")
                 {
                     ContentId = contentId
@@ -553,14 +560,14 @@ Thank you for being a valued member!";
 
                 using var message = new MailMessage
                 {
-                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
+                    From = fromAddress,
                     Subject = subject,
                     IsBodyHtml = true,
                     BodyEncoding = Encoding.UTF8,
                     SubjectEncoding = Encoding.UTF8,
-                    To = { new MailAddress(to) },
-                    AlternateViews = { htmlView }
                 };
+                message.To.Add(toAddress);
+                message.AlternateViews.Add(htmlView);
 
                 if (!string.IsNullOrEmpty(textBody))
                 {
