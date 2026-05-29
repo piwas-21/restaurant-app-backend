@@ -1,4 +1,5 @@
 ﻿using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Models;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
@@ -653,93 +654,5 @@ public class OrderEventService : IOrderEventService, IDisposable
             replayBuffer = replayBufferStats, // Replay buffer statistics
             timestamp = DateTime.UtcNow
         };
-    }
-
-    public class SseClient : IDisposable
-    {
-        public string ClientId { get; set; } = null!;
-        public HttpResponse Response { get; set; } = null!;
-        public ClientType ClientType { get; set; }
-        public DateTime ConnectedAt { get; set; }
-        public string IpAddress { get; set; } = null!;
-        public string? Country { get; set; }
-
-        // Synchronization for concurrent writes (heartbeats vs events)
-        public SemaphoreSlim WriteLock { get; } = new SemaphoreSlim(1, 1);
-
-        // Cancellation token to signal when client should disconnect
-        public CancellationTokenSource DisconnectCts { get; } = new CancellationTokenSource();
-
-        // Error tracking
-        public List<ClientError> Errors { get; } = new List<ClientError>();
-        public int SuccessfulSends { get; set; }
-        public int FailedSends { get; set; }
-        public DateTime? LastEventSentAt { get; set; }
-        public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
-
-        private bool _disposed;
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                DisconnectCts?.Cancel();
-                DisconnectCts?.Dispose();
-                WriteLock?.Dispose();
-                _disposed = true;
-            }
-        }
-    }
-
-    public class ClientError
-    {
-        public DateTime Timestamp { get; set; }
-        public string ErrorType { get; set; } = null!;
-        public string Message { get; set; } = null!;
-        public string? EventType { get; set; }
-    }
-
-    public class LogEntry
-    {
-        public DateTime Timestamp { get; set; }
-        public string Level { get; set; } = null!;
-        public string Message { get; set; } = null!;
-        public string? EventType { get; set; }
-        public string? ClientId { get; set; }
-    }
-
-    public class OrderEvent
-    {
-        public string EventType { get; set; } = null!;
-        public OrderDto Order { get; set; } = null!;
-        public string? PreviousStatus { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public class StockEvent
-    {
-        public string EventType { get; set; } = null!;
-        public string? PreviousStatus { get; set; }
-        public DateTime Timestamp { get; set; }
-    }
-
-    public enum ClientType
-    {
-        Kitchen,
-        Service,
-        Manager,
-        Stock,
-        All
-    }
-
-    /// <summary>
-    /// Represents an event stored for replay to newly connecting clients
-    /// </summary>
-    public class ReplayableEvent
-    {
-        public byte[] EventBytes { get; set; } = null!;
-        public string EventType { get; set; } = null!;
-        public ClientType TargetClientType { get; set; }
-        public DateTime Timestamp { get; set; }
     }
 }
