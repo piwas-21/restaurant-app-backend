@@ -202,4 +202,105 @@ public class BasketPricingServiceTests
         // before manual discount / delivery fee are applied.
         _discount.Verify(d => d.FindBestApplicableDiscountAsync(userId, 40.00m, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    // ---- CalculateIngredientCustomizationPrice ----
+
+    private static ProductIngredient Ing(
+        Guid id, decimal price, bool optional = true, bool includedInBase = false,
+        int maxQty = 1, bool active = true) =>
+        new()
+        {
+            Id = id,
+            Price = price,
+            IsOptional = optional,
+            IsIncludedInBasePrice = includedInBase,
+            MaxQuantity = maxQty,
+            IsActive = active,
+            CreatedBy = "test",
+        };
+
+    [Fact]
+    public void Customization_NullIngredients_ReturnsZero() =>
+        Assert.Equal(0m, CreateSut().CalculateIngredientCustomizationPrice(null, null, null));
+
+    [Fact]
+    public void Customization_RegularOptional_AddsWhenSelected()
+    {
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 1.50m) };
+        // selected, default qty 1 -> +1.50
+        Assert.Equal(1.50m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, null));
+        // not selected -> 0
+        Assert.Equal(0m, CreateSut().CalculateIngredientCustomizationPrice(ings, new List<Guid>(), null));
+    }
+
+    [Fact]
+    public void Customization_RegularOptional_MultipliesByQuantity()
+    {
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 2.00m, maxQty: 5) };
+        var qty = new Dictionary<Guid, int> { [id] = 3 };
+        Assert.Equal(6.00m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, qty));
+    }
+
+    [Fact]
+    public void Customization_IncludedInBase_DeselectDeducts()
+    {
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 1.20m, includedInBase: true) };
+        // deselected -> -1.20
+        Assert.Equal(-1.20m, CreateSut().CalculateIngredientCustomizationPrice(ings, new List<Guid>(), null));
+        // selected qty 1 -> no change
+        Assert.Equal(0m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, null));
+    }
+
+    [Fact]
+    public void Customization_IncludedInBase_ExtraQuantityAddsBeyondFreeOne()
+    {
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 1.00m, includedInBase: true, maxQty: 5) };
+        var qty = new Dictionary<Guid, int> { [id] = 3 };
+        // selected qty 3 -> +price*(3-1) = +2.00
+        Assert.Equal(2.00m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, qty));
+    }
+
+    [Fact]
+    public void Customization_QuantityClampedToMax()
+    {
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 1.00m, maxQty: 2) };
+        var qty = new Dictionary<Guid, int> { [id] = 99 };
+        // clamped to 2 -> +2.00 (not +99)
+        Assert.Equal(2.00m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, qty));
+    }
+
+    [Fact]
+    public void Customization_NullSelected_TreatsAllAsDeselected()
+    {
+        // null selectedIngredientIds must behave like "nothing selected":
+        // included-in-base -> deducted; regular optional -> no charge.
+        var included = Ing(Guid.NewGuid(), 1.00m, includedInBase: true);
+        var regular = Ing(Guid.NewGuid(), 2.00m);
+        Assert.Equal(-1.00m, CreateSut().CalculateIngredientCustomizationPrice(new[] { included, regular }, null, null));
+    }
+
+    [Fact]
+    public void Customization_NegativeQuantity_ClampsToZero()
+    {
+        // Security: a tampered payload with a negative quantity must not reduce
+        // the price — it clamps to 0 (contributes nothing).
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 1.50m, maxQty: 5) };
+        var qty = new Dictionary<Guid, int> { [id] = -5 };
+        Assert.Equal(0m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, qty));
+    }
+
+    [Fact]
+    public void Customization_IgnoresNonOptionalAndInactive()
+    {
+        var nonOptional = Ing(Guid.NewGuid(), 5m, optional: false);
+        var inactive = Ing(Guid.NewGuid(), 5m, optional: true, active: false);
+        var ids = new[] { nonOptional.Id, inactive.Id };
+        Assert.Equal(0m, CreateSut().CalculateIngredientCustomizationPrice(new[] { nonOptional, inactive }, ids, null));
+    }
 }
