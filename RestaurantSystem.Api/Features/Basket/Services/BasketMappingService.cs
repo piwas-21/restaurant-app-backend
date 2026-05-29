@@ -134,7 +134,9 @@ public class BasketMappingService : IBasketMappingService
                 ProductImageUrl = item.Product?.ImageUrl ?? string.Empty,
                 ProductVariationId = item.ProductVariationId,
                 VariationName = item.ProductVariation?.Name,
-                VariationContent = item.ProductVariation?.Descriptions?.ToDictionary(
+                // Descriptions is a non-nullable collection (initialised to []),
+                // so only the ProductVariation qualifier needs the null-conditional.
+                VariationContent = item.ProductVariation?.Descriptions.ToDictionary(
                     d => d.LanguageCode,
                     d => new BasketItemVariationContentDto(d.Name, d.Description)
                 ),
