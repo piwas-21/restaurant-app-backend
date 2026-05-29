@@ -12,11 +12,9 @@ RestaurantSystem.Api/Settings/EmailSettings.cs
 RestaurantSystem.Api/Settings/JwtSettings.cs
 RestaurantSystem.Api/Features/Settings/TaxConfigurationController.cs
 RestaurantSystem.Api/Features/Basket/BasketController.cs
-RestaurantSystem.Api/Features/Basket/Services/BasketService.cs
 RestaurantSystem.Api/Features/Products/ProductsController.cs
 RestaurantSystem.Api/Features/Products/Queries/GetProductByIdQuery/GetProductByIdQuery.cs
 RestaurantSystem.Api/Features/Products/Commands/UpdateProductCommand/UpdateProductCommand.cs
-RestaurantSystem.Api/Features/Products/Commands/CreateProductCommand/CreateProductCommandValidator.cs
 RestaurantSystem.Api/Features/Products/Commands/CreateProductCommand/CreateProductCommand.cs
 RestaurantSystem.Api/Features/FidelityPoints/Controllers/FidelityPointsController.cs
 RestaurantSystem.Api/Features/FidelityPoints/Controllers/PointRulesController.cs
@@ -36,7 +34,6 @@ RestaurantSystem.Api/Features/Orders/Queries/GetOrdersQuery/GetOrdersQuery.cs
 RestaurantSystem.Api/Features/Orders/OrderQuickActionsController.cs
 RestaurantSystem.Api/Features/Orders/Dtos/ZReportDto.cs
 RestaurantSystem.Api/Features/Orders/Dtos/OrderDto.cs
-RestaurantSystem.Api/Features/Orders/Commands/CreateOrderCommand/CreateOrderCommandValidator.cs
 RestaurantSystem.Api/Features/Orders/Commands/AddPaymentToOrderCommand/AddPaymentToOrderCommand.cs
 RestaurantSystem.Api/Features/Orders/EventsController.cs
 RestaurantSystem.Api/Features/Orders/Services/OrderMappingService.cs
