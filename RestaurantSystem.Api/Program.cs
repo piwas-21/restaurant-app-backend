@@ -343,6 +343,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
+builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();

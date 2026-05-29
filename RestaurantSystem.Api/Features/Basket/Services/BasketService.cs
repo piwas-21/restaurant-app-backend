@@ -4,7 +4,6 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
-using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -16,21 +15,21 @@ public class BasketService : IBasketService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
-    private readonly ICustomerDiscountService _customerDiscountService;
     private readonly IBasketPricingService _basketPricingService;
+    private readonly IBasketMappingService _basketMappingService;
     private readonly ILogger<BasketService> _logger;
 
     public BasketService(
        ApplicationDbContext context,
        ICurrentUserService currentUserService,
-       ICustomerDiscountService customerDiscountService,
        IBasketPricingService basketPricingService,
+       IBasketMappingService basketMappingService,
        ILogger<BasketService> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _customerDiscountService = customerDiscountService;
         _basketPricingService = basketPricingService;
+        _basketMappingService = basketMappingService;
         _logger = logger;
     }
 
@@ -46,7 +45,7 @@ public class BasketService : IBasketService
         if (basket == null)
             return null;
 
-        var basketDto = await MapToBasketDtoAsync(basket);
+        var basketDto = await _basketMappingService.MapAsync(basket);
 
         return basketDto;
     }
@@ -574,7 +573,7 @@ public class BasketService : IBasketService
 
         await _context.SaveChangesAsync();
 
-        return await MapToBasketDtoAsync(basket);
+        return await _basketMappingService.MapAsync(basket);
     }
 
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -624,8 +623,8 @@ public class BasketService : IBasketService
         if (anonymousBasket == null)
         {
             return userBasket != null
-                ? await MapToBasketDtoAsync(userBasket)
-                : await MapToBasketDtoAsync(await GetOrCreateBasketAsync(sessionId, userId));
+                ? await _basketMappingService.MapAsync(userBasket)
+                : await _basketMappingService.MapAsync(await GetOrCreateBasketAsync(sessionId, userId));
         }
 
         if (userBasket == null)
@@ -636,7 +635,7 @@ public class BasketService : IBasketService
             anonymousBasket.UpdatedBy = userId.ToString();
             await _context.SaveChangesAsync();
 
-            return await MapToBasketDtoAsync(anonymousBasket);
+            return await _basketMappingService.MapAsync(anonymousBasket);
         }
 
         // Merge anonymous items into user basket
@@ -755,161 +754,4 @@ public class BasketService : IBasketService
         return await query.FirstOrDefaultAsync();
     }
 
-    private async Task<BasketDto> MapToBasketDtoAsync(Domain.Entities.Basket basket)
-    {
-        // Calculate customer discount if user is logged in
-        decimal customerDiscountAmount = 0;
-        string? customerDiscountName = null;
-
-        if (basket.UserId.HasValue && basket.UserId.Value != Guid.Empty)
-        {
-            var customerDiscount = await _customerDiscountService.FindBestApplicableDiscountAsync(
-                basket.UserId.Value,
-                basket.SubTotal
-            );
-
-            if (customerDiscount != null)
-            {
-                customerDiscountAmount = _customerDiscountService.CalculateDiscountAmount(customerDiscount, basket.SubTotal);
-                customerDiscountName = customerDiscount.Name;
-            }
-        }
-
-        var allItems = (await Task.WhenAll(basket.Items.Select(async item =>
-        {
-            // Get ingredient names from product's detailed ingredients
-            var productIngredients = item.Product?.DetailedIngredients ?? new List<ProductIngredient>();
-
-            var selectedNames = item.SelectedIngredients?
-                .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
-                .ToList();
-
-            var excludedNames = item.ExcludedIngredients?
-                .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
-                .ToList();
-
-            var addedNames = item.AddedIngredients?
-                .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
-                .ToList();
-
-            // Deserialize and fetch side items details
-            List<BasketSideItemDto>? selectedSideItems = null;
-            if (!string.IsNullOrEmpty(item.SelectedSideItemsJson))
-            {
-                try
-                {
-                    var selectedSides = JsonSerializer.Deserialize<List<SelectedSideItemDto>>(item.SelectedSideItemsJson);
-                    if (selectedSides != null && selectedSides.Count > 0)
-                    {
-                        var sideItemIds = selectedSides.Select(s => s.Id).ToList();
-                        var sideItems = await _context.Products
-                            .Where(p => sideItemIds.Contains(p.Id))
-                            .ToListAsync();
-
-                        selectedSideItems = selectedSides.Select(selectedSide =>
-                        {
-                            var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
-                            if (sideItem != null)
-                            {
-                                return new BasketSideItemDto
-                                {
-                                    Id = sideItem.Id,
-                                    Name = sideItem.Name,
-                                    Description = sideItem.Description,
-                                    Price = sideItem.BasePrice,
-                                    ImageUrl = sideItem.ImageUrl,
-                                    Quantity = selectedSide.Quantity,
-                                    SubTotal = sideItem.BasePrice * selectedSide.Quantity
-                                };
-                            }
-                            return null;
-                        }).Where(s => s != null).ToList()!;
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize side items JSON for basket item {BasketItemId}", item.Id);
-                }
-            }
-
-            // Deserialize ingredient quantities
-            Dictionary<Guid, int>? ingredientQuantities = null;
-            if (!string.IsNullOrEmpty(item.IngredientQuantitiesJson))
-            {
-                try
-                {
-                    ingredientQuantities = JsonSerializer.Deserialize<Dictionary<Guid, int>>(item.IngredientQuantitiesJson);
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize ingredient quantities JSON for basket item {BasketItemId}", item.Id);
-                }
-            }
-
-            return new BasketItemDto
-            {
-                Id = item.Id,
-                ProductId = item.ProductId,
-                ProductName = item.Product != null ? item.Product.Name : item.Menu?.Name ?? string.Empty,
-                MenuId = item.MenuId,
-                ProductDescription = item.Product != null ? item.Product.Description : item.Menu?.Description ?? string.Empty,
-                ProductImageUrl = item.Product?.ImageUrl ?? string.Empty,
-                ProductVariationId = item.ProductVariationId,
-                VariationName = item.ProductVariation?.Name,
-                VariationContent = item.ProductVariation?.Descriptions?.ToDictionary(
-                    d => d.LanguageCode,
-                    d => new BasketItemVariationContentDto(d.Name, d.Description)
-                ),
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                ItemTotal = item.ItemTotal,
-                SpecialInstructions = item.SpecialInstructions,
-                SelectedIngredients = item.SelectedIngredients,
-                ExcludedIngredients = item.ExcludedIngredients,
-                AddedIngredients = item.AddedIngredients,
-                IngredientQuantities = ingredientQuantities,
-                CustomizationPrice = item.CustomizationPrice,
-                SelectedIngredientNames = selectedNames,
-                ExcludedIngredientNames = excludedNames,
-                AddedIngredientNames = addedNames,
-                SelectedSideItems = selectedSideItems,
-                ChildItems = item.ChildBasketItems.Select(child => new BasketItemDto
-                {
-                    Id = child.Id,
-                    ProductId = child.ProductId,
-                    ProductName = child.Product?.Name,
-                    Quantity = child.Quantity,
-                    UnitPrice = child.UnitPrice,
-                    ItemTotal = child.ItemTotal,
-                    CustomizationPrice = child.CustomizationPrice,
-                    // Map other properties if needed, but for menu options these are usually minimal
-                }).ToList()
-            };
-        }))).ToList();
-
-        // Filter out child items from the top-level list, as they are now nested under their parents
-        // We only want items that do NOT have a parent to be at the top level
-        var rootItems = allItems.Where(i =>
-            !basket.Items.Any(bi => bi.Id == i.Id && bi.ParentBasketItemId.HasValue)
-        ).ToList();
-
-        return new BasketDto
-        {
-            Id = basket.Id,
-            UserId = basket.UserId != Guid.Empty ? basket.UserId : null,
-            SessionId = basket.SessionId,
-            SubTotal = basket.SubTotal,
-            Tax = basket.Tax,
-            DeliveryFee = basket.DeliveryFee,
-            Discount = basket.Discount,
-            CustomerDiscount = customerDiscountAmount,
-            CustomerDiscountName = customerDiscountName,
-            Total = basket.Total,
-            PromoCode = basket.PromoCode,
-            TotalItems = basket.Items.Where(i => i.ParentBasketItemId == null).Sum(i => i.Quantity), // Count only root items? Or all? Usually root items (bundles) count as 1
-            ExpiresAt = basket.ExpiresAt,
-            Notes = basket.Notes,
-            Items = rootItems
-        };
-    }
 }
