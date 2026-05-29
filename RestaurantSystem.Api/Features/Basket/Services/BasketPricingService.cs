@@ -90,7 +90,8 @@ public class BasketPricingService : IBasketPricingService
             return 0;
         }
 
-        var selected = selectedIngredientIds ?? new List<Guid>();
+        // HashSet for O(1) membership checks inside the loop.
+        var selected = selectedIngredientIds != null ? new HashSet<Guid>(selectedIngredientIds) : new HashSet<Guid>();
         decimal customizationPrice = 0;
 
         foreach (var ingredient in detailedIngredients.Where(i => i.IsOptional && i.IsActive))
@@ -103,8 +104,14 @@ public class BasketPricingService : IBasketPricingService
                 quantity = qty;
             }
 
-            // Clamp to the ingredient's max quantity
-            if (quantity > ingredient.MaxQuantity)
+            // Clamp to [0, MaxQuantity]. The lower bound matters for security:
+            // IngredientQuantities is client-supplied, and a negative value would
+            // otherwise reduce the customization price (a price-tampering vector).
+            if (quantity < 0)
+            {
+                quantity = 0;
+            }
+            else if (quantity > ingredient.MaxQuantity)
             {
                 quantity = ingredient.MaxQuantity;
             }

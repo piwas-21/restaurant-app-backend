@@ -285,6 +285,17 @@ public class BasketPricingServiceTests
     }
 
     [Fact]
+    public void Customization_NegativeQuantity_ClampsToZero()
+    {
+        // Security: a tampered payload with a negative quantity must not reduce
+        // the price — it clamps to 0 (contributes nothing).
+        var id = Guid.NewGuid();
+        var ings = new[] { Ing(id, 1.50m, maxQty: 5) };
+        var qty = new Dictionary<Guid, int> { [id] = -5 };
+        Assert.Equal(0m, CreateSut().CalculateIngredientCustomizationPrice(ings, new[] { id }, qty));
+    }
+
+    [Fact]
     public void Customization_IgnoresNonOptionalAndInactive()
     {
         var nonOptional = Ing(Guid.NewGuid(), 5m, optional: false);
