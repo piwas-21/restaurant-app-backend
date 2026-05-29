@@ -18,17 +18,20 @@ public class BasketService : IBasketService
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ICustomerDiscountService _customerDiscountService;
+    private readonly IBasketPricingService _basketPricingService;
     private readonly ILogger<BasketService> _logger;
 
     public BasketService(
        ApplicationDbContext context,
        ICurrentUserService currentUserService,
        ICustomerDiscountService customerDiscountService,
+       IBasketPricingService basketPricingService,
        ILogger<BasketService> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _customerDiscountService = customerDiscountService;
+        _basketPricingService = basketPricingService;
         _logger = logger;
     }
 
@@ -685,61 +688,14 @@ public class BasketService : IBasketService
         if (basket == null)
             return;
 
-        decimal subTotal = 0;
-
-        foreach (var item in basket.Items)
-        {
-            var itemTotal = item.ItemTotal;
-            subTotal += itemTotal;
-        }
-
-        basket.SubTotal = subTotal;
-
-        // Calculate customer discount if user is logged in
-        decimal customerDiscountAmount = 0;
-        bool hasDiscount = false;
-
-        if (basket.UserId.HasValue && basket.UserId.Value != Guid.Empty)
-        {
-            var customerDiscount = await _customerDiscountService.FindBestApplicableDiscountAsync(
-                basket.UserId.Value,
-                subTotal
-            );
-
-            if (customerDiscount != null)
-            {
-                customerDiscountAmount = _customerDiscountService.CalculateDiscountAmount(customerDiscount, subTotal);
-                hasDiscount = PriceRoundingUtility.HasActiveDiscount(customerDiscountAmount);
-
-                _logger.LogInformation(
-                    "Applied customer discount '{DiscountName}' (ID: {DiscountId}) to basket {BasketId}: {DiscountAmount:C}",
-                    customerDiscount.Name,
-                    customerDiscount.Id,
-                    basket.Id,
-                    customerDiscountAmount
-                );
-            }
-        }
-
-        // Store the customer discount in the basket
-        basket.CustomerDiscount = customerDiscountAmount;
-
-        // Tax will be calculated later during order creation when order type is known
-        // This is important for Swiss tax compliance (different rates for Dine-In vs Takeaway/Delivery)
-        basket.Tax = 0;
-
-        // Calculate total before rounding (without tax since order type is not yet known)
-        decimal amountAfterDiscount = basket.SubTotal - customerDiscountAmount - basket.Discount;
-        decimal calculatedTotal = amountAfterDiscount + basket.DeliveryFee;
-
-        // Apply special rounding for discounted customers
-        basket.Total = PriceRoundingUtility.ApplySpecialRounding(calculatedTotal, hasDiscount);
+        // Pricing (sub-total, customer discount, tax, total) is computed by the
+        // dedicated BasketPricingService; persistence stays here.
+        await _basketPricingService.ApplyTotalsAsync(basket);
 
         basket.UpdatedAt = DateTime.UtcNow;
         basket.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         await _context.SaveChangesAsync();
-
     }
 
     private async Task<Domain.Entities.Basket> GetOrCreateBasketAsync(string? sessionId, Guid? userId)
