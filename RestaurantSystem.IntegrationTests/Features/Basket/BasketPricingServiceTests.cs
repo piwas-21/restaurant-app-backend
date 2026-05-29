@@ -44,6 +44,12 @@ public class BasketPricingServiceTests
                  .ReturnsAsync((CustomerDiscountRule?)null);
 
     [Fact]
+    public async Task NullBasket_Throws()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => CreateSut().ApplyTotalsAsync(null!));
+    }
+
+    [Fact]
     public async Task EmptyBasket_AllTotalsZero()
     {
         var basket = NewBasket();

@@ -26,6 +26,8 @@ public class BasketPricingService : IBasketPricingService
 
     public async Task ApplyTotalsAsync(DomainBasket basket, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(basket);
+
         decimal subTotal = 0;
 
         foreach (var item in basket.Items)
