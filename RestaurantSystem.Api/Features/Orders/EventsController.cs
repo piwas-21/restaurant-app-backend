@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RestaurantSystem.Api.Features.Orders.Models;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -27,7 +28,7 @@ public class EventsController : ControllerBase
     [Authorize(Roles = "Admin,KitchenStaff,Server")]
     public async Task KitchenEvents(CancellationToken cancellationToken)
     {
-        await SetupSseConnection(OrderEventService.ClientType.Kitchen, cancellationToken);
+        await SetupSseConnection(ClientType.Kitchen, cancellationToken);
     }
 
     /// <summary>
@@ -38,7 +39,7 @@ public class EventsController : ControllerBase
     [Authorize]
     public async Task StockEvents(CancellationToken cancellationToken)
     {
-        await SetupSseConnection(OrderEventService.ClientType.Stock, cancellationToken);
+        await SetupSseConnection(ClientType.Stock, cancellationToken);
     }
 
     /// <summary>
@@ -49,7 +50,7 @@ public class EventsController : ControllerBase
     [Authorize]
     public async Task ServiceEvents(CancellationToken cancellationToken)
     {
-        await SetupSseConnection(OrderEventService.ClientType.Service, cancellationToken);
+        await SetupSseConnection(ClientType.Service, cancellationToken);
     }
 
     /// <summary>
@@ -60,7 +61,7 @@ public class EventsController : ControllerBase
     [RequireAdmin]
     public async Task AllEvents(CancellationToken cancellationToken)
     {
-        await SetupSseConnection(OrderEventService.ClientType.Manager, cancellationToken);
+        await SetupSseConnection(ClientType.Manager, cancellationToken);
     }
 
     /// <summary>
@@ -106,7 +107,7 @@ public class EventsController : ControllerBase
         });
     }
 
-    private async Task SetupSseConnection(OrderEventService.ClientType clientType, CancellationToken cancellationToken)
+    private async Task SetupSseConnection(ClientType clientType, CancellationToken cancellationToken)
     {
         var clientId = Guid.NewGuid().ToString();
 
@@ -131,7 +132,7 @@ public class EventsController : ControllerBase
         // Get country from IP (placeholder - integrate with GeoIP service if needed)
         string? country = GetCountryFromIp(ipAddress);
 
-        var client = new OrderEventService.SseClient
+        var client = new SseClient
         {
             ClientId = clientId,
             Response = Response,
