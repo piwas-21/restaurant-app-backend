@@ -379,6 +379,8 @@ builder.Services.AddHostedService<TableReservationCleanupService>();
 builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();
 builder.Services.AddSingleton<ISseClientWriter, SseClientWriter>();
 builder.Services.AddSingleton<ISseEventReplayService, SseEventReplayService>();
+builder.Services.AddSingleton<ISseClientManager, SseClientManager>();
+builder.Services.AddSingleton<ISseBroadcastService, SseBroadcastService>();
 builder.Services.AddSingleton<OrderEventService>();
 builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<OrderEventService>());
 

@@ -1,114 +1,48 @@
-﻿using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Models;
-using System.Collections.Concurrent;
-using System.Text;
-using System.Text.Json;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
-public class OrderEventService : IOrderEventService, IDisposable
+/// <summary>
+/// Facade over the SSE subsystem (Sprint 3 decomposition, task 3.11). Composes the
+/// per-responsibility services — <see cref="ISseClientManager"/> (connections + stats),
+/// <see cref="ISseBroadcastService"/> (fan-out), and <see cref="ISseEventReplayService"/>
+/// (reconnect replay) — behind the existing <see cref="IOrderEventService"/> surface so
+/// controllers and command handlers are unaffected. This class now only orchestrates the
+/// per-notification logging and client routing; the mechanics live in the services above.
+/// </summary>
+public class OrderEventService : IOrderEventService
 {
-    private readonly ConcurrentDictionary<string, SseClient> _clients = new();
     private readonly ILogger<OrderEventService> _logger;
     private readonly ISseActivityLog _activityLog;
+    private readonly ISseClientManager _clientManager;
+    private readonly ISseBroadcastService _broadcast;
     private readonly ISseEventReplayService _replay;
-    private readonly ISseClientWriter _clientWriter;
-    private const int MaxConnectionsPerIp = 10;
-    private readonly Timer _cleanupTimer;
-
-    // Consider a client stale if no activity for 3 minutes (should receive heartbeats every 10 seconds)
-    private static readonly TimeSpan StaleClientTimeout = TimeSpan.FromMinutes(3);
 
     public OrderEventService(
         ILogger<OrderEventService> logger,
         ISseActivityLog activityLog,
-        ISseEventReplayService replay,
-        ISseClientWriter clientWriter)
+        ISseClientManager clientManager,
+        ISseBroadcastService broadcast,
+        ISseEventReplayService replay)
     {
         _logger = logger;
         _activityLog = activityLog;
+        _clientManager = clientManager;
+        _broadcast = broadcast;
         _replay = replay;
-        _clientWriter = clientWriter;
-
-        // Run cleanup every 30 seconds for faster stale client detection
-        _cleanupTimer = new Timer(CleanupStaleClients, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
-    private void CleanupStaleClients(object? state)
-    {
-        var now = DateTime.UtcNow;
-        var staleClients = _clients.Values
-            .Where(c => now - c.LastActivityAt > StaleClientTimeout)
-            .ToList();
+    public bool TryAddClient(string clientId, SseClient client) => _clientManager.TryAddClient(clientId, client);
 
-        if (staleClients.Any())
-        {
-            _logger.LogWarning("Found {Count} stale clients (no activity for {Minutes} minutes), removing...",
-                staleClients.Count, StaleClientTimeout.TotalMinutes);
+    public void AddClient(string clientId, SseClient client) => _clientManager.AddClient(clientId, client);
 
-            foreach (var client in staleClients)
-            {
-                var msg = $"Removing stale client {client.ClientId} ({client.ClientType}) - no activity since {client.LastActivityAt}";
-                _logger.LogWarning(msg);
-                _activityLog.Add("Warning", msg, null, client.ClientId);
-                RemoveClient(client.ClientId);
-            }
-        }
-    }
+    public void RemoveClient(string clientId) => _clientManager.RemoveClient(clientId);
 
-    public void Dispose()
-    {
-        _cleanupTimer?.Dispose();
-        foreach (var client in _clients.Values)
-        {
-            client.Dispose();
-        }
-        _clients.Clear();
-    }
+    public object GetClientStatistics() => _clientManager.GetClientStatistics();
 
-    /// <summary>
-    /// Replays recent events to a newly connected client (delegated to the replay service).
-    /// </summary>
+    /// <summary>Replays recent events to a newly connected client (delegated to the replay service).</summary>
     public Task ReplayRecentEventsAsync(SseClient client) => _replay.ReplayRecentEventsAsync(client);
-
-    // Returns false if the IP has reached the per-IP connection limit.
-    public bool TryAddClient(string clientId, SseClient client)
-    {
-        var connectionsFromIp = _clients.Values.Count(c => c.IpAddress == client.IpAddress);
-        if (connectionsFromIp >= MaxConnectionsPerIp)
-        {
-            _logger.LogWarning("SSE connection limit reached for IP {IP} ({Count}/{Max})",
-                client.IpAddress, connectionsFromIp, MaxConnectionsPerIp);
-            return false;
-        }
-
-        _clients.TryAdd(clientId, client);
-        var clientsByType = _clients.Values.GroupBy(c => c.ClientType).ToDictionary(g => g.Key, g => g.Count());
-        var message = $"SSE client {clientId} ({client.ClientType}) connected from {client.IpAddress} ({client.Country ?? "Unknown"}). Total clients: {_clients.Count} (Kitchen: {clientsByType.GetValueOrDefault(ClientType.Kitchen, 0)}, Service: {clientsByType.GetValueOrDefault(ClientType.Service, 0)}, Manager: {clientsByType.GetValueOrDefault(ClientType.Manager, 0)}, Stock: {clientsByType.GetValueOrDefault(ClientType.Stock, 0)})";
-        _logger.LogInformation(message);
-        _activityLog.Add("Info", message, null, clientId);
-        return true;
-    }
-
-    public void AddClient(string clientId, SseClient client) => TryAddClient(clientId, client);
-
-    public void RemoveClient(string clientId)
-    {
-        if (_clients.TryRemove(clientId, out var removedClient))
-        {
-            // Dispose the semaphore to prevent memory leak
-            removedClient.WriteLock.Dispose();
-
-            var clientsByType = _clients.Values.GroupBy(c => c.ClientType).ToDictionary(g => g.Key, g => g.Count());
-            var message = $"SSE client {clientId} ({removedClient.ClientType}) disconnected. Total clients: {_clients.Count} (Kitchen: {clientsByType.GetValueOrDefault(ClientType.Kitchen, 0)}, Service: {clientsByType.GetValueOrDefault(ClientType.Service, 0)}, Manager: {clientsByType.GetValueOrDefault(ClientType.Manager, 0)}, Stock: {clientsByType.GetValueOrDefault(ClientType.Stock, 0)})";
-
-            _logger.LogInformation(message);
-            _activityLog.Add("Info", message, null, clientId);
-
-            // Dispose SemaphoreSlim to prevent memory leak
-            removedClient.Dispose();
-        }
-    }
 
     public async Task NotifyStockUpdate(string stock)
     {
@@ -119,7 +53,7 @@ public class OrderEventService : IOrderEventService, IDisposable
             Timestamp = DateTime.UtcNow
         };
         // Notify all staff about the updated order
-        await SendEventToClients(eventData, ClientType.All);
+        await _broadcast.SendEventToClients(eventData, ClientType.All, eventData.EventType);
     }
 
     public async Task NotifyOrderCreated(OrderDto order)
@@ -131,10 +65,11 @@ public class OrderEventService : IOrderEventService, IDisposable
             Timestamp = DateTime.UtcNow
         };
 
-        var kitchenClients = _clients.Values.Count(c => c.ClientType == ClientType.Kitchen);
-        var serviceClients = _clients.Values.Count(c => c.ClientType == ClientType.Service);
-        var managerClients = _clients.Values.Count(c => c.ClientType == ClientType.Manager);
-        var allClients = _clients.Count;
+        var clients = _clientManager.GetClients();
+        var kitchenClients = clients.Count(c => c.ClientType == ClientType.Kitchen);
+        var serviceClients = clients.Count(c => c.ClientType == ClientType.Service);
+        var managerClients = clients.Count(c => c.ClientType == ClientType.Manager);
+        var allClients = clients.Count;
 
         var msg1 = $"=== ORDER CREATED: {order.OrderNumber} (Status: {order.Status}, Type: {order.Type}) ===";
         var msg2 = $"Total connected clients: {allClients} (Kitchen: {kitchenClients}, Service: {serviceClients}, Manager: {managerClients})";
@@ -157,10 +92,10 @@ public class OrderEventService : IOrderEventService, IDisposable
         }
 
         // Notify kitchen staff of new orders
-        await SendEventToClients(eventData, ClientType.Kitchen);
+        await _broadcast.SendEventToClients(eventData, ClientType.Kitchen, eventData.EventType);
 
         // Also notify service staff (cashiers) of new orders
-        await SendEventToClients(eventData, ClientType.Service);
+        await _broadcast.SendEventToClients(eventData, ClientType.Service, eventData.EventType);
 
         var msg4 = $"=== Order creation notification process completed for order {order.OrderNumber} (check broadcast results above) ===";
         _logger.LogInformation(msg4);
@@ -191,7 +126,7 @@ public class OrderEventService : IOrderEventService, IDisposable
 
         foreach (var clientType in clientTypes)
         {
-            await SendEventToClients(eventData, clientType);
+            await _broadcast.SendEventToClients(eventData, clientType, eventData.EventType);
         }
 
         var msg3 = $"Status change notification completed for order {order.OrderNumber}";
@@ -209,7 +144,7 @@ public class OrderEventService : IOrderEventService, IDisposable
         };
 
         // Notify service staff that order is ready
-        await SendEventToClients(eventData, ClientType.Service);
+        await _broadcast.SendEventToClients(eventData, ClientType.Service, eventData.EventType);
 
         _logger.LogInformation("Notified service staff that order {OrderNumber} is ready", order.OrderNumber);
     }
@@ -224,7 +159,7 @@ public class OrderEventService : IOrderEventService, IDisposable
         };
 
         // Notify all staff that order is completed
-        await SendEventToClients(eventData, ClientType.All);
+        await _broadcast.SendEventToClients(eventData, ClientType.All, eventData.EventType);
 
         _logger.LogInformation("Notified all staff that order {OrderNumber} is completed", order.OrderNumber);
     }
@@ -239,124 +174,9 @@ public class OrderEventService : IOrderEventService, IDisposable
         };
 
         // Notify all relevant staff about focus order updates
-        await SendEventToClients(eventData, ClientType.All);
+        await _broadcast.SendEventToClients(eventData, ClientType.All, eventData.EventType);
 
         _logger.LogInformation("Notified staff about focus order update for {OrderNumber}", order.OrderNumber);
-    }
-
-    private async Task SendEventToClients(StockEvent eventData, ClientType targetClientType)
-    {
-        var json = JsonSerializer.Serialize(eventData, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-
-        var eventMessage = $"event: {eventData.EventType}\ndata: {json}\n\n";
-        var eventBytes = Encoding.UTF8.GetBytes(eventMessage);
-
-        // Create snapshot to avoid race conditions during iteration
-        var targetClients = _clients.Values.Where(c =>
-            targetClientType == ClientType.All || c.ClientType == targetClientType || c.ClientType == ClientType.Manager).ToList();
-
-        var broadcastMsg = $"Broadcasting event {eventData.EventType} to {targetClients.Count} {targetClientType} client(s): [{string.Join(", ", targetClients.Select(c => c.ClientId))}]";
-        _logger.LogInformation(broadcastMsg);
-        _activityLog.Add("Info", broadcastMsg, eventData.EventType);
-
-        if (targetClients.Count == 0)
-        {
-            var warnMsg = $"No clients to broadcast event {eventData.EventType} for type {targetClientType}";
-            _logger.LogWarning(warnMsg);
-            _activityLog.Add("Warning", warnMsg, eventData.EventType);
-
-            // Still store event for replay - clients that connect soon will receive it
-            _replay.StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
-            return;
-        }
-
-        // Store event for replay to newly connecting clients
-        _replay.StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
-
-        // Send to all clients in parallel, but track each individually
-        int successCount = 0;
-        int failureCount = 0;
-        var sendTasks = targetClients.Select(async client =>
-        {
-            try
-            {
-                await _clientWriter.SendAsync(client, eventBytes, eventData.EventType);
-                Interlocked.Increment(ref successCount);
-            }
-            catch (Exception ex)
-            {
-                Interlocked.Increment(ref failureCount);
-                var errorMsg = $"Unhandled exception in SendToClient for {client.ClientId}";
-                _logger.LogError(ex, errorMsg);
-                _activityLog.Add("Error", $"{errorMsg}: {ex.Message}", eventData.EventType, client.ClientId);
-            }
-        }).ToArray();
-
-        await Task.WhenAll(sendTasks);
-
-        var completeMsg = $"Event {eventData.EventType} broadcast completed: {successCount} succeeded, {failureCount} failed out of {targetClients.Count} clients";
-        _logger.LogInformation(completeMsg);
-        _activityLog.Add("Info", completeMsg, eventData.EventType);
-    }
-
-    private async Task SendEventToClients(OrderEvent eventData, ClientType targetClientType)
-    {
-        var json = JsonSerializer.Serialize(eventData, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-
-        var eventMessage = $"event: {eventData.EventType}\ndata: {json}\n\n";
-        var eventBytes = Encoding.UTF8.GetBytes(eventMessage);
-
-        var targetClients = _clients.Values.Where(c =>
-            targetClientType == ClientType.All || c.ClientType == targetClientType || c.ClientType == ClientType.Manager).ToList();
-
-        var broadcastMsg = $"Broadcasting event {eventData.EventType} to {targetClients.Count} {targetClientType} client(s): [{string.Join(", ", targetClients.Select(c => c.ClientId))}]";
-        _logger.LogInformation(broadcastMsg);
-        _activityLog.Add("Info", broadcastMsg, eventData.EventType);
-
-        if (targetClients.Count == 0)
-        {
-            var warnMsg = $"No clients to broadcast event {eventData.EventType} for type {targetClientType}";
-            _logger.LogWarning(warnMsg);
-            _activityLog.Add("Warning", warnMsg, eventData.EventType);
-
-            // Still store event for replay - clients that connect soon will receive it
-            _replay.StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
-            return;
-        }
-
-        // Store event for replay to newly connecting clients
-        _replay.StoreEventForReplay(eventBytes, eventData.EventType, targetClientType);
-
-        // Send to all clients in parallel, but track each individually
-        int successCount = 0;
-        int failureCount = 0;
-        var sendTasks = targetClients.Select(async client =>
-        {
-            try
-            {
-                await _clientWriter.SendAsync(client, eventBytes, eventData.EventType);
-                Interlocked.Increment(ref successCount);
-            }
-            catch (Exception ex)
-            {
-                Interlocked.Increment(ref failureCount);
-                var errorMsg = $"Unhandled exception in SendToClient for {client.ClientId}";
-                _logger.LogError(ex, errorMsg);
-                _activityLog.Add("Error", $"{errorMsg}: {ex.Message}", eventData.EventType, client.ClientId);
-            }
-        }).ToArray();
-
-        await Task.WhenAll(sendTasks);
-
-        var completeMsg = $"Event {eventData.EventType} broadcast completed: {successCount} succeeded, {failureCount} failed out of {targetClients.Count} clients";
-        _logger.LogInformation(completeMsg);
-        _activityLog.Add("Info", completeMsg, eventData.EventType);
     }
 
     private List<ClientType> GetClientTypesForStatus(string status)
@@ -369,75 +189,6 @@ public class OrderEventService : IOrderEventService, IDisposable
             "Confirmed" or "Preparing" => new List<ClientType> { ClientType.Kitchen, ClientType.Service },
             "Ready" => new List<ClientType> { ClientType.Kitchen, ClientType.Service },
             _ => new List<ClientType> { ClientType.All }
-        };
-    }
-
-    public object GetClientStatistics()
-    {
-        var clientsByType = _clients.Values.GroupBy(c => c.ClientType)
-            .ToDictionary(g => g.Key.ToString(), g => g.Select(c => new
-            {
-                clientId = c.ClientId,
-                ipAddress = c.IpAddress,
-                country = c.Country ?? "Unknown",
-                connectedAt = c.ConnectedAt,
-                connectedDuration = DateTime.UtcNow - c.ConnectedAt,
-                lastActivityAt = c.LastActivityAt,
-                timeSinceLastActivity = DateTime.UtcNow - c.LastActivityAt,
-                successfulSends = c.SuccessfulSends,
-                failedSends = c.FailedSends,
-                lastEventSentAt = c.LastEventSentAt,
-                errors = c.ErrorSnapshot().Select(e => new
-                {
-                    timestamp = e.Timestamp,
-                    errorType = e.ErrorType,
-                    message = e.Message,
-                    eventType = e.EventType
-                }).ToList(),
-                hasErrors = c.ErrorSnapshot().Any(),
-                errorCount = c.ErrorSnapshot().Count
-            }).ToList());
-
-        var allErrors = _clients.Values
-            .SelectMany(c => c.ErrorSnapshot().Select(e => new
-            {
-                clientId = c.ClientId,
-                clientType = c.ClientType.ToString(),
-                ipAddress = c.IpAddress,
-                country = c.Country ?? "Unknown",
-                timestamp = e.Timestamp,
-                errorType = e.ErrorType,
-                message = e.Message,
-                eventType = e.EventType
-            }))
-            .OrderByDescending(e => e.timestamp)
-            .ToList();
-
-        var recentLogs = _activityLog.Snapshot().OrderByDescending(l => l.Timestamp).Take(50).Select(l => new
-        {
-            timestamp = l.Timestamp,
-            level = l.Level,
-            message = l.Message,
-            eventType = l.EventType,
-            clientId = l.ClientId
-        }).ToList();
-
-        return new
-        {
-            totalClients = _clients.Count,
-            kitchenClients = _clients.Values.Count(c => c.ClientType == ClientType.Kitchen),
-            serviceClients = _clients.Values.Count(c => c.ClientType == ClientType.Service),
-            managerClients = _clients.Values.Count(c => c.ClientType == ClientType.Manager),
-            stockClients = _clients.Values.Count(c => c.ClientType == ClientType.Stock),
-            clientsWithErrors = _clients.Values.Count(c => c.ErrorSnapshot().Any()),
-            totalErrors = _clients.Values.Sum(c => c.ErrorSnapshot().Count),
-            totalSuccessfulSends = _clients.Values.Sum(c => c.SuccessfulSends),
-            totalFailedSends = _clients.Values.Sum(c => c.FailedSends),
-            clientDetails = clientsByType,
-            recentErrors = allErrors.Take(20).ToList(), // Last 20 errors across all clients
-            recentLogs, // Last 50 log entries
-            replayBuffer = _replay.GetBufferStatistics(), // Replay buffer statistics
-            timestamp = DateTime.UtcNow
         };
     }
 }

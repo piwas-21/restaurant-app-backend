@@ -37,7 +37,6 @@ RestaurantSystem.Api/Features/Orders/Dtos/OrderDto.cs
 RestaurantSystem.Api/Features/Orders/Commands/AddPaymentToOrderCommand/AddPaymentToOrderCommand.cs
 RestaurantSystem.Api/Features/Orders/EventsController.cs
 RestaurantSystem.Api/Features/Orders/Services/OrderMappingService.cs
-RestaurantSystem.Api/Features/Orders/Services/OrderEventService.cs
 RestaurantSystem.Api/Features/Categories/CategoriesController.cs
 RestaurantSystem.Api/Features/Email/EmailTestController.cs
 RestaurantSystem.Api/Common/Services/EmailService.cs
