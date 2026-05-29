@@ -40,15 +40,23 @@ public class BasketItemFactory : IBasketItemFactory
         decimal customizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
             product.DetailedIngredients, item.SelectedIngredients, item.IngredientQuantities);
 
-        // Calculate side items price
-        if (item.SelectedSideItems != null && item.SelectedSideItems.Count > 0)
+        // Calculate side items price. Drop non-positive quantities first: side-item
+        // quantities are client-supplied, and a negative quantity would otherwise
+        // reduce the price (a tampering vector). The filtered list also drives the
+        // JSON below, so a 0/negative side item never reaches the basket.
+        List<SelectedSideItemDto>? validSideItems = item.SelectedSideItems?
+            .Where(s => s.Quantity > 0)
+            .ToList();
+
+        if (validSideItems is { Count: > 0 })
         {
-            var sideItemIds = item.SelectedSideItems.Select(s => s.Id).ToList();
+            var sideItemIds = validSideItems.Select(s => s.Id).ToList();
             var sideItems = await _context.Products
+                .AsNoTracking()
                 .Where(p => sideItemIds.Contains(p.Id) && p.IsActive && p.IsAvailable)
                 .ToListAsync();
 
-            foreach (var selectedSide in item.SelectedSideItems)
+            foreach (var selectedSide in validSideItems)
             {
                 var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
                 if (sideItem != null)
@@ -60,9 +68,9 @@ public class BasketItemFactory : IBasketItemFactory
 
         // Serialize selected side items to JSON
         string? selectedSideItemsJson = null;
-        if (item.SelectedSideItems != null && item.SelectedSideItems.Count > 0)
+        if (validSideItems is { Count: > 0 })
         {
-            selectedSideItemsJson = JsonSerializer.Serialize(item.SelectedSideItems);
+            selectedSideItemsJson = JsonSerializer.Serialize(validSideItems);
         }
 
         // Serialize ingredient quantities to JSON
@@ -76,7 +84,9 @@ public class BasketItemFactory : IBasketItemFactory
         {
             // Build ingredientQuantities from selectedIngredients
             // This ensures kitchen prints can show "NO xxx" for deselected ingredients
-            var selectedIngredientIds = item.SelectedIngredients ?? new List<Guid>();
+            var selectedIngredientIds = item.SelectedIngredients != null
+                ? new HashSet<Guid>(item.SelectedIngredients)
+                : new HashSet<Guid>();
             var builtQuantities = new Dictionary<Guid, int>();
 
             foreach (var ingredient in product.DetailedIngredients.Where(i => i.IsActive))
