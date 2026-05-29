@@ -200,6 +200,14 @@ public class BasketItemFactory : IBasketItemFactory
             CreatedBy = auditIdentifier
         };
 
+        // Batch-load every selected option's child product (with ingredients) in one query
+        // instead of one round-trip per option (avoids N+1).
+        var childProductIds = selectedOptions.Select(o => o.ItemId).Distinct().ToList();
+        var childProducts = await _context.Products
+            .Include(p => p.DetailedIngredients)
+            .Where(p => childProductIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id);
+
         // Create Child Basket Items for selected options. They are attached to the parent's
         // ChildBasketItems navigation (rather than added to the context here) so the caller
         // persists the whole graph with a single Add — and nothing is saved if any child fails.
@@ -207,15 +215,14 @@ public class BasketItemFactory : IBasketItemFactory
 
         foreach (var option in selectedOptions)
         {
-            var section = product.MenuDefinition.Sections.First(s => s.Id == option.SectionId);
-            var sectionItem = section.Items.First(i => i.ProductId == option.ItemId);
+            // Safe lookups: a malformed SectionId/ItemId from the client yields a 400/404,
+            // not an unhandled InvalidOperationException (500).
+            var section = product.MenuDefinition.Sections.FirstOrDefault(s => s.Id == option.SectionId)
+                ?? throw new BadRequestException($"Invalid section '{option.SectionId}' for this menu");
+            var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == option.ItemId)
+                ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
 
-            // Load the child product with its ingredients to calculate customization price
-            var childProduct = await _context.Products
-                .Include(p => p.DetailedIngredients)
-                .FirstOrDefaultAsync(p => p.Id == option.ItemId);
-
-            if (childProduct == null)
+            if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");
 
             // Customization price for this child item (shared calc — see BasketPricingService).
