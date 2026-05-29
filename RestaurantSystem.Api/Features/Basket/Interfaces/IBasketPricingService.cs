@@ -1,3 +1,5 @@
+using RestaurantSystem.Domain.Entities;
+
 namespace RestaurantSystem.Api.Features.Basket.Interfaces;
 
 /// <summary>
@@ -24,7 +26,7 @@ public interface IBasketPricingService
     /// and regular-product add-to-basket paths.
     /// </summary>
     decimal CalculateIngredientCustomizationPrice(
-        IEnumerable<RestaurantSystem.Domain.Entities.ProductIngredient>? detailedIngredients,
+        IEnumerable<ProductIngredient>? detailedIngredients,
         IReadOnlyCollection<Guid>? selectedIngredientIds,
         IReadOnlyDictionary<Guid, int>? ingredientQuantities);
 }
