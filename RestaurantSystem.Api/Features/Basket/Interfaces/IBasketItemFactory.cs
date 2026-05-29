@@ -18,4 +18,15 @@ public interface IBasketItemFactory
     /// prices are resolved from the database.
     /// </summary>
     Task<BasketItem> BuildRegularItemAsync(Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId);
+
+    /// <summary>
+    /// Builds a menu (bundle) basket item: validates each section's required/min/max
+    /// selection rules, computes the base + section-option + child-ingredient
+    /// customisation price, and constructs the parent item with its child option items
+    /// attached via <see cref="BasketItem.ChildBasketItems"/>. The caller adds the returned
+    /// parent to the context — EF cascades the children, so nothing is persisted unless the
+    /// whole graph builds successfully. <paramref name="product"/> must have its
+    /// <c>MenuDefinition.Sections.Items.Product</c> graph eagerly loaded.
+    /// </summary>
+    Task<BasketItem> BuildMenuItemAsync(Product product, AddToBasketDto item, Guid basketId);
 }
