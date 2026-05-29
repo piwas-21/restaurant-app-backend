@@ -7,7 +7,6 @@ using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
-using System.Text.Json;
 
 namespace RestaurantSystem.Api.Features.Basket.Services;
 
@@ -18,22 +17,19 @@ public class BasketService : IBasketService
     private readonly IBasketPricingService _basketPricingService;
     private readonly IBasketMappingService _basketMappingService;
     private readonly IBasketItemFactory _basketItemFactory;
-    private readonly ILogger<BasketService> _logger;
 
     public BasketService(
        ApplicationDbContext context,
        ICurrentUserService currentUserService,
        IBasketPricingService basketPricingService,
        IBasketMappingService basketMappingService,
-       IBasketItemFactory basketItemFactory,
-       ILogger<BasketService> logger)
+       IBasketItemFactory basketItemFactory)
     {
         _context = context;
         _currentUserService = currentUserService;
         _basketPricingService = basketPricingService;
         _basketMappingService = basketMappingService;
         _basketItemFactory = basketItemFactory;
-        _logger = logger;
     }
 
     public async Task<BasketDto?> GetBasketAsync(string sessionId, Guid? userId = null)
@@ -84,130 +80,12 @@ public class BasketService : IBasketService
             if (product == null)
                 throw new NotFoundException("Product not found or unavailable");
 
-            // Handle Menu Type Product
+            // Handle Menu Type Product. The menu parent/child graph is built by the
+            // factory and added in one go — EF cascades the children from the parent.
             if (product.Type == ProductType.Menu)
             {
-                if (product.MenuDefinition == null)
-                    throw new NotFoundException("Menu definition not found");
-
-                // Calculate total price including options
-                decimal menuTotalPrice = product.BasePrice;
-                var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
-
-                // Validate required sections and calculate price
-                foreach (var section in product.MenuDefinition.Sections)
-                {
-                    var sectionSelections = selectedOptions.Where(o => o.SectionId == section.Id).ToList();
-
-                    // Count distinct items, not sum of quantities
-                    var distinctItemCount = sectionSelections.Count;
-
-                    // Log for debugging
-                    _logger.LogInformation(
-                        "Section '{SectionName}' validation: {ItemCount} items selected (min: {Min}, max: {Max})",
-                        section.Name, distinctItemCount, section.MinSelection, section.MaxSelection
-                    );
-
-                    if (section.IsRequired && distinctItemCount < section.MinSelection)
-                    {
-                        throw new BadRequestException($"Section '{section.Name}' requires at least {section.MinSelection} selection(s)");
-                    }
-
-                    if (distinctItemCount > section.MaxSelection)
-                    {
-                        throw new BadRequestException($"Section '{section.Name}' allows at most {section.MaxSelection} selection(s)");
-                    }
-
-                    foreach (var selection in sectionSelections)
-                    {
-                        // Validate individual selection
-                        if (selection.Quantity < 1)
-                        {
-                            throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
-                        }
-
-                        var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId);
-                        if (sectionItem == null)
-                            throw new NotFoundException($"Item not found in section '{section.Name}'");
-
-                        menuTotalPrice += sectionItem.AdditionalPrice * selection.Quantity;
-                    }
-                }
-
-                // Create Parent Basket Item
-                var basketItem = new BasketItem
-                {
-                    BasketId = basket.Id,
-                    ProductId = item.ProductId,
-                    Quantity = item.Quantity,
-                    UnitPrice = menuTotalPrice,
-                    ItemTotal = menuTotalPrice * item.Quantity,
-                    SpecialInstructions = item.SpecialInstructions,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-
-                _context.BasketItems.Add(basketItem);
-
-                // Create Child Basket Items for selected options
-                decimal totalCustomizationPrice = 0;
-                var childItemsToAdd = new List<BasketItem>();
-
-                foreach (var option in selectedOptions)
-                {
-                    var section = product.MenuDefinition.Sections.First(s => s.Id == option.SectionId);
-                    var sectionItem = section.Items.First(i => i.ProductId == option.ItemId);
-
-                    // Load the child product with its ingredients to calculate customization price
-                    var childProduct = await _context.Products
-                        .Include(p => p.DetailedIngredients)
-                        .FirstOrDefaultAsync(p => p.Id == option.ItemId);
-
-                    if (childProduct == null)
-                        throw new NotFoundException($"Child product not found: {option.ItemId}");
-
-                    // Customization price for this child item (shared calc — see BasketPricingService).
-                    decimal childCustomizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-                        childProduct.DetailedIngredients, option.SelectedIngredients, option.IngredientQuantities);
-
-                    // Add child customization price to total
-                    totalCustomizationPrice += childCustomizationPrice * option.Quantity;
-
-                    // Serialize ingredient quantities to JSON for child item
-                    string? ingredientQuantitiesJson = null;
-                    if (option.IngredientQuantities != null && option.IngredientQuantities.Count > 0)
-                    {
-                        ingredientQuantitiesJson = JsonSerializer.Serialize(option.IngredientQuantities);
-                    }
-
-                    var childItem = new BasketItem
-                    {
-                        BasketId = basket.Id,
-                        ProductId = option.ItemId, // The actual product ID of the option (e.g., Coke)
-                        ParentBasketItem = basketItem,
-                        Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
-                        UnitPrice = sectionItem.AdditionalPrice, // Section-level additional price
-                        ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
-                        CustomizationPrice = childCustomizationPrice, // Store customization price for this child
-                        SelectedIngredients = option.SelectedIngredients,
-                        ExcludedIngredients = option.ExcludedIngredients,
-                        IngredientQuantitiesJson = ingredientQuantitiesJson,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-                    childItemsToAdd.Add(childItem);
-                }
-
-                // Update parent item's price to include customization prices from children
-                basketItem.UnitPrice = menuTotalPrice + totalCustomizationPrice;
-                basketItem.ItemTotal = basketItem.UnitPrice * item.Quantity;
-                basketItem.CustomizationPrice = totalCustomizationPrice;
-
-                // Add all child items to context
-                foreach (var childItem in childItemsToAdd)
-                {
-                    _context.BasketItems.Add(childItem);
-                }
+                var menuItem = await _basketItemFactory.BuildMenuItemAsync(product, item, basket.Id);
+                _context.BasketItems.Add(menuItem);
 
                 await _context.SaveChangesAsync();
                 await RecalculateBasketTotalsAsync(basket.Id);
