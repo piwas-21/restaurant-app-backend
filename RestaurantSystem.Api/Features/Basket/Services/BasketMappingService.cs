@@ -53,7 +53,12 @@ public class BasketMappingService : IBasketMappingService
             }
         }
 
-        var allItems = (await Task.WhenAll(basket.Items.Select(async item =>
+        // Mapped sequentially (not Task.WhenAll): the per-item side-item lookup
+        // below queries the shared ApplicationDbContext, and EF Core forbids
+        // concurrent operations on one context instance — running these in
+        // parallel throws once two items carry side items.
+        var allItems = new List<BasketItemDto>();
+        foreach (var item in basket.Items)
         {
             // Get ingredient names from product's detailed ingredients
             var productIngredients = item.Product?.DetailedIngredients ?? new List<ProductIngredient>();
@@ -124,7 +129,7 @@ public class BasketMappingService : IBasketMappingService
                 }
             }
 
-            return new BasketItemDto
+            allItems.Add(new BasketItemDto
             {
                 Id = item.Id,
                 ProductId = item.ProductId,
@@ -164,8 +169,8 @@ public class BasketMappingService : IBasketMappingService
                     CustomizationPrice = child.CustomizationPrice,
                     // Map other properties if needed, but for menu options these are usually minimal
                 }).ToList()
-            };
-        }))).ToList();
+            });
+        }
 
         // Filter out child items from the top-level list, as they are now nested under their parents
         // We only want items that do NOT have a parent to be at the top level
