@@ -22,12 +22,39 @@ public class SseClient : IDisposable
     // Cancellation token to signal when client should disconnect
     public CancellationTokenSource DisconnectCts { get; } = new CancellationTokenSource();
 
-    // Error tracking
-    public List<ClientError> Errors { get; } = new List<ClientError>();
+    // Error tracking. The list is mutated by the writer and read by the statistics
+    // endpoint from different threads (OrderEventService is a singleton, broadcasts run
+    // concurrently), so all access is funnelled through the locked methods below — a plain
+    // List<T> is not thread-safe.
+    private const int MaxTrackedErrors = 10;
+    private readonly List<ClientError> _errors = new();
+
     public int SuccessfulSends { get; set; }
     public int FailedSends { get; set; }
     public DateTime? LastEventSentAt { get; set; }
     public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Records an error, keeping only the most recent <see cref="MaxTrackedErrors"/>.</summary>
+    public void RecordError(ClientError error)
+    {
+        lock (_errors)
+        {
+            _errors.Add(error);
+            if (_errors.Count > MaxTrackedErrors)
+            {
+                _errors.RemoveAt(0);
+            }
+        }
+    }
+
+    /// <summary>Returns a point-in-time copy of the tracked errors (safe to enumerate).</summary>
+    public IReadOnlyList<ClientError> ErrorSnapshot()
+    {
+        lock (_errors)
+        {
+            return _errors.ToList();
+        }
+    }
 
     private bool _disposed;
 

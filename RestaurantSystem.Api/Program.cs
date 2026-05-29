@@ -376,6 +376,9 @@ builder.Services.AddHostedService<AccountCleanupService>();
 builder.Services.AddHostedService<TableReservationCleanupService>();
 
 // Register OrderEventService as singleton - both interface and concrete type share same instance
+builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();
+builder.Services.AddSingleton<ISseClientWriter, SseClientWriter>();
+builder.Services.AddSingleton<ISseEventReplayService, SseEventReplayService>();
 builder.Services.AddSingleton<OrderEventService>();
 builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<OrderEventService>());
 
