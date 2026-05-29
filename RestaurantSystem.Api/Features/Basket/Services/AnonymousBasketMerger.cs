@@ -20,11 +20,12 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// full-graph <see cref="IBasketRepository.FindBasketAsync"/> load so the returned DTO carries
 /// the product/variation/menu graph the tracked Items-only load omits.
 ///
-/// Note (out of scope, tracked separately): when a duplicate item's quantity is merged into an
-/// existing user item, the now-redundant anonymous row is left under the soft-deleted anonymous
-/// basket rather than deleted. It is invisible (the basket is soft-deleted) and not double-counted,
-/// so it is harmless cruft; a bundle-aware merge that also prunes it is deferred because naive
-/// removal is unsafe against the parent/child BasketItem Restrict FK.
+/// When a duplicate's quantity is merged into an existing user item, the now-redundant anonymous
+/// row is hard-deleted — but ONLY for standalone leaf items. BasketItem is not soft-delete-aware,
+/// so a Remove is a real DELETE, and the self-referencing parent/child FK is Restrict; deleting a
+/// menu-bundle parent (or a child whose parent is being moved) would break that FK. Bundle
+/// duplicates are therefore left under the soft-deleted anonymous basket (invisible, not
+/// double-counted) pending the bundle-aware merge redesign tracked separately.
 /// </summary>
 public class AnonymousBasketMerger : IAnonymousBasketMerger
 {
@@ -73,7 +74,18 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
 
         // Merge anonymous items into the user basket. Both item sets are already loaded
         // (tracked) by the calls above, so the matching is in-memory — no per-item query.
-        foreach (var item in anonymousBasket.Items)
+        // Snapshot first: removing a merged duplicate (below) mutates anonymousBasket.Items
+        // via EF relationship fix-up, which would otherwise break the enumeration.
+        var anonymousItems = anonymousBasket.Items.ToList();
+
+        // Items that are menu-bundle parents within the anonymous basket (some other item
+        // points at them). Used to keep the duplicate-removal below to safe standalone leaves.
+        var parentItemIds = anonymousItems
+            .Where(i => i.ParentBasketItemId.HasValue)
+            .Select(i => i.ParentBasketItemId!.Value)
+            .ToHashSet();
+
+        foreach (var item in anonymousItems)
         {
             var existingItem = userBasket.Items.FirstOrDefault(bi =>
                 bi.ProductId == item.ProductId &&
@@ -85,6 +97,15 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
                 existingItem.ItemTotal = existingItem.Quantity * existingItem.UnitPrice;
                 existingItem.UpdatedAt = DateTime.UtcNow;
                 existingItem.UpdatedBy = _currentUserService.GetAuditIdentifier();
+
+                // The anonymous duplicate is now redundant. Hard-delete it ONLY when it is a
+                // standalone leaf (neither a bundle parent nor a child) — see the class summary
+                // for why bundle-entangled rows are left for the soft-deleted basket to carry.
+                bool isStandaloneLeaf = item.ParentBasketItemId == null && !parentItemIds.Contains(item.Id);
+                if (isStandaloneLeaf)
+                {
+                    _context.BasketItems.Remove(item);
+                }
             }
             else
             {

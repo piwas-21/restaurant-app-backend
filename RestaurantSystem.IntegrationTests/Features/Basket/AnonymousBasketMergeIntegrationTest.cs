@@ -105,4 +105,37 @@ public class AnonymousBasketMergeIntegrationTest : IntegrationTestBase
         var anon = await context.Baskets.FirstOrDefaultAsync(b => b.Id == anonBasketId);
         anon.Should().BeNull("the anonymous basket should be soft-deleted and hidden by the global filter after the merge");
     }
+
+    [Fact]
+    public async Task Merge_HardDeletesRedundantDuplicateLeafItem()
+    {
+        // User basket: pizza x1. Anonymous basket: pizza x2 (a standalone-leaf duplicate).
+        await AddItemAsync(null, _userId, _pizzaId, 1);
+        await AddItemAsync(_sessionId, null, _pizzaId, 2);
+
+        Guid anonDuplicateItemId;
+        using (var pre = Factory.Services.CreateScope())
+        {
+            var ctx = pre.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var anonBasketId = (await ctx.Baskets
+                .FirstAsync(b => b.SessionId == _sessionId && b.UserId == null)).Id;
+            anonDuplicateItemId = (await ctx.BasketItems
+                .FirstAsync(bi => bi.BasketId == anonBasketId && bi.ProductId == _pizzaId)).Id;
+        }
+
+        await MergeAsync();
+
+        using var verifyScope = Factory.Services.CreateScope();
+        var context = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // Quantity merged into the user item...
+        var userBasket = await context.Baskets.Include(b => b.Items)
+            .FirstAsync(b => b.UserId == _userId);
+        userBasket.Items.Should().ContainSingle(i => i.ProductId == _pizzaId && i.Quantity == 3);
+
+        // ...and the redundant anonymous leaf row is gone (hard-deleted — BasketItem is not
+        // soft-delete-aware, so it leaves no row behind, no orphan).
+        var leftover = await context.BasketItems.FirstOrDefaultAsync(bi => bi.Id == anonDuplicateItemId);
+        leftover.Should().BeNull("the merged duplicate leaf item should be hard-deleted, not orphaned");
+    }
 }
