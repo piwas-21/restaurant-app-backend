@@ -17,6 +17,7 @@ public class BasketService : IBasketService
     private readonly ICurrentUserService _currentUserService;
     private readonly IBasketPricingService _basketPricingService;
     private readonly IBasketMappingService _basketMappingService;
+    private readonly IBasketItemFactory _basketItemFactory;
     private readonly ILogger<BasketService> _logger;
 
     public BasketService(
@@ -24,12 +25,14 @@ public class BasketService : IBasketService
        ICurrentUserService currentUserService,
        IBasketPricingService basketPricingService,
        IBasketMappingService basketMappingService,
+       IBasketItemFactory basketItemFactory,
        ILogger<BasketService> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _basketPricingService = basketPricingService;
         _basketMappingService = basketMappingService;
+        _basketItemFactory = basketItemFactory;
         _logger = logger;
     }
 
@@ -259,95 +262,7 @@ public class BasketService : IBasketService
             }
             else
             {
-                // Calculate unit price
-                var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
-
-                // Customization price from optional-ingredient selections (shared calc — see BasketPricingService).
-                decimal customizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-                    product.DetailedIngredients, item.SelectedIngredients, item.IngredientQuantities);
-
-                // Calculate side items price
-                if (item.SelectedSideItems != null && item.SelectedSideItems.Count > 0)
-                {
-                    var sideItemIds = item.SelectedSideItems.Select(s => s.Id).ToList();
-                    var sideItems = await _context.Products
-                        .Where(p => sideItemIds.Contains(p.Id) && p.IsActive && p.IsAvailable)
-                        .ToListAsync();
-
-                    foreach (var selectedSide in item.SelectedSideItems)
-                    {
-                        var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
-                        if (sideItem != null)
-                        {
-                            customizationPrice += sideItem.BasePrice * selectedSide.Quantity;
-                        }
-                    }
-                }
-
-                // Serialize selected side items to JSON
-                string? selectedSideItemsJson = null;
-                if (item.SelectedSideItems != null && item.SelectedSideItems.Count > 0)
-                {
-                    selectedSideItemsJson = JsonSerializer.Serialize(item.SelectedSideItems);
-                }
-
-                // Serialize ingredient quantities to JSON
-                // Build from selectedIngredients if ingredientQuantities wasn't provided
-                string? ingredientQuantitiesJson = null;
-                if (item.IngredientQuantities != null && item.IngredientQuantities.Count > 0)
-                {
-                    ingredientQuantitiesJson = JsonSerializer.Serialize(item.IngredientQuantities);
-                }
-                else if (product.DetailedIngredients != null && product.DetailedIngredients.Any())
-                {
-                    // Build ingredientQuantities from selectedIngredients
-                    // This ensures kitchen prints can show "NO xxx" for deselected ingredients
-                    var selectedIngredientIds = item.SelectedIngredients ?? new List<Guid>();
-                    var builtQuantities = new Dictionary<Guid, int>();
-
-                    foreach (var ingredient in product.DetailedIngredients.Where(i => i.IsActive))
-                    {
-                        bool isSelected = selectedIngredientIds.Contains(ingredient.Id);
-
-                        if (isSelected)
-                        {
-                            // Selected ingredient: quantity 1 (or from ingredientQuantities if provided)
-                            builtQuantities[ingredient.Id] = 1;
-                        }
-                        else if (ingredient.IsOptional || ingredient.IsIncludedInBasePrice)
-                        {
-                            // Optional ingredient not selected: mark as deselected (quantity 0)
-                            builtQuantities[ingredient.Id] = 0;
-                        }
-                        // Non-optional ingredients that are not selected are implicitly included
-                    }
-
-                    if (builtQuantities.Count > 0)
-                    {
-                        ingredientQuantitiesJson = JsonSerializer.Serialize(builtQuantities);
-                    }
-                }
-
-                // Create new basket item
-                var basketItem = new BasketItem
-                {
-                    BasketId = basket.Id,
-                    ProductId = item.ProductId,
-                    ProductVariationId = item.ProductVariationId,
-                    Quantity = item.Quantity,
-                    UnitPrice = unitPrice,
-                    ItemTotal = (unitPrice + customizationPrice) * item.Quantity,
-                    SpecialInstructions = item.SpecialInstructions,
-                    SelectedIngredients = item.SelectedIngredients,
-                    ExcludedIngredients = item.ExcludedIngredients,
-                    AddedIngredients = item.AddedIngredients,
-                    IngredientQuantitiesJson = ingredientQuantitiesJson,
-                    CustomizationPrice = customizationPrice,
-                    SelectedSideItemsJson = selectedSideItemsJson,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-
+                var basketItem = await _basketItemFactory.BuildRegularItemAsync(product, variation, item, basket.Id);
                 _context.BasketItems.Add(basketItem);
             }
         }
