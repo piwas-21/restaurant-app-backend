@@ -14,22 +14,25 @@ public class BasketService : IBasketService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IBasketPricingService _basketPricingService;
     private readonly IBasketMappingService _basketMappingService;
     private readonly IBasketItemFactory _basketItemFactory;
+    private readonly IBasketRepository _basketRepository;
+    private readonly IAnonymousBasketMerger _anonymousBasketMerger;
 
     public BasketService(
        ApplicationDbContext context,
        ICurrentUserService currentUserService,
-       IBasketPricingService basketPricingService,
        IBasketMappingService basketMappingService,
-       IBasketItemFactory basketItemFactory)
+       IBasketItemFactory basketItemFactory,
+       IBasketRepository basketRepository,
+       IAnonymousBasketMerger anonymousBasketMerger)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _basketPricingService = basketPricingService;
         _basketMappingService = basketMappingService;
         _basketItemFactory = basketItemFactory;
+        _basketRepository = basketRepository;
+        _anonymousBasketMerger = anonymousBasketMerger;
     }
 
     public async Task<BasketDto?> GetBasketAsync(string sessionId, Guid? userId = null)
@@ -40,7 +43,7 @@ public class BasketService : IBasketService
         // caching provides minimal benefit but creates significant consistency issues.
 
         // Get fresh data from database
-        var basket = await GetBasketFromDatabase(sessionId, userId);
+        var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
         if (basket == null)
             return null;
 
@@ -57,7 +60,7 @@ public class BasketService : IBasketService
             throw new BadRequestException("Product or Menu should be provided");
         }
 
-        var basket = await GetOrCreateBasketAsync(sessionId, userId);
+        var basket = await _basketRepository.GetOrCreateBasketAsync(sessionId, userId);
 
         if (item.MenuId.HasValue && item.MenuId.Value != Guid.Empty)
         {
@@ -155,7 +158,7 @@ public class BasketService : IBasketService
     {
         // Get the user's basket first to ensure we're checking the right context
         var userId = _currentUserService.UserId;
-        var basket = await GetBasketFromDatabase(sessionId, userId);
+        var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
 
         if (basket == null)
             throw new NotFoundException("Basket not found");
@@ -183,7 +186,7 @@ public class BasketService : IBasketService
     {
         // Get the user's basket first to ensure we're checking the right context
         var userId = _currentUserService.UserId;
-        var basket = await GetBasketFromDatabase(sessionId, userId);
+        var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
 
         if (basket == null)
             throw new NotFoundException("Basket not found");
@@ -215,35 +218,12 @@ public class BasketService : IBasketService
 
     public async Task<BasketDto> ClearBasketAsync(string sessionId)
     {
-        // Load the basket with tracking + only the .Items navigation. We can't
-        // reuse GetBasketFromDatabase here for two reasons:
-        // (1) it loads with AsNoTracking, so scalar mutations don't persist
-        //     and child-row deletes via the change tracker don't auto-clear
-        //     the in-memory .Items collection (without this, the DTO came
-        //     back with items: [...] and Total: 0 — the bug we're fixing);
-        // (2) it eager-loads Products / ProductVariations / Menus / etc.
-        //     that ClearBasketAsync immediately discards.
-        // Filter semantics mirror GetBasketFromDatabase: logged-in users are
-        // matched by UserId only; anonymous users by SessionId with no user.
+        // Load WITH tracking + only the .Items navigation (see
+        // IBasketRepository.FindTrackedBasketWithItemsAsync): scalar mutations and
+        // child-row deletes below must persist, and the heavier product/menu includes
+        // that FindBasketAsync eager-loads would be discarded immediately here.
         var userId = _currentUserService.UserId;
-        IQueryable<Domain.Entities.Basket> query = _context.Baskets
-            .Include(b => b.Items)
-            .Where(b => !b.IsDeleted);
-
-        if (userId.HasValue && userId.Value != Guid.Empty)
-        {
-            query = query.Where(b => b.UserId == userId.Value);
-        }
-        else if (!string.IsNullOrEmpty(sessionId))
-        {
-            query = query.Where(b => b.SessionId == sessionId && (b.UserId == null || b.UserId == Guid.Empty));
-        }
-        else
-        {
-            throw new NotFoundException("Basket not found");
-        }
-
-        var basket = await query.FirstOrDefaultAsync();
+        var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
         if (basket == null)
             throw new NotFoundException("Basket not found");
 
@@ -280,7 +260,7 @@ public class BasketService : IBasketService
 
     public async Task<BasketDto> RemovePromoCodeAsync(string sessionId)
     {
-        var basket = await GetBasketFromDatabase(sessionId, _currentUserService.UserId);
+        var basket = await _basketRepository.FindBasketAsync(sessionId, _currentUserService.UserId);
         if (basket == null)
             throw new NotFoundException("Basket not found");
 
@@ -309,143 +289,9 @@ public class BasketService : IBasketService
         };
     }
 
-    public async Task<BasketDto> MergeAnonymousBasketAsync(string sessionId, Guid userId)
-    {
-        var anonymousBasket = await GetBasketFromDatabase(sessionId, null);
-        var userBasket = await GetBasketFromDatabase(null, userId);
+    public Task<BasketDto> MergeAnonymousBasketAsync(string sessionId, Guid userId)
+        => _anonymousBasketMerger.MergeAsync(sessionId, userId);
 
-        if (anonymousBasket == null)
-        {
-            return userBasket != null
-                ? await _basketMappingService.MapAsync(userBasket)
-                : await _basketMappingService.MapAsync(await GetOrCreateBasketAsync(sessionId, userId));
-        }
-
-        if (userBasket == null)
-        {
-            // Assign anonymous basket to user
-            anonymousBasket.UserId = userId;
-            anonymousBasket.UpdatedAt = DateTime.UtcNow;
-            anonymousBasket.UpdatedBy = userId.ToString();
-            await _context.SaveChangesAsync();
-
-            return await _basketMappingService.MapAsync(anonymousBasket);
-        }
-
-        // Merge anonymous items into user basket
-        var anonymousItems = await _context.BasketItems
-            .Where(bi => bi.BasketId == anonymousBasket.Id)
-            .ToListAsync();
-
-        foreach (var item in anonymousItems)
-        {
-            var existingItem = await _context.BasketItems
-                .FirstOrDefaultAsync(bi =>
-                    bi.BasketId == userBasket.Id &&
-                    bi.ProductId == item.ProductId &&
-                    bi.ProductVariationId == item.ProductVariationId);
-
-            if (existingItem != null)
-            {
-                existingItem.Quantity += item.Quantity;
-                existingItem.ItemTotal = existingItem.Quantity * existingItem.UnitPrice;
-                existingItem.UpdatedAt = DateTime.UtcNow;
-                existingItem.UpdatedBy = userId.ToString();
-            }
-            else
-            {
-                item.BasketId = userBasket.Id;
-                item.UpdatedAt = DateTime.UtcNow;
-                item.UpdatedBy = userId.ToString();
-            }
-        }
-
-        // Delete anonymous basket
-        anonymousBasket.IsDeleted = true;
-        anonymousBasket.DeletedAt = DateTime.UtcNow;
-        anonymousBasket.DeletedBy = userId.ToString();
-
-        await _context.SaveChangesAsync();
-        await RecalculateBasketTotalsAsync(userBasket.Id);
-
-        return await GetBasketAsync(sessionId, userId) ?? throw new BadRequestException("Failed to retrieve basket");
-    }
-
-    public async Task RecalculateBasketTotalsAsync(Guid basketId)
-    {
-        var basket = await _context.Baskets
-            .Include(b => b.Items)
-            .FirstOrDefaultAsync(b => b.Id == basketId);
-
-        if (basket == null)
-            return;
-
-        // Pricing (sub-total, customer discount, tax, total) is computed by the
-        // dedicated BasketPricingService; persistence stays here.
-        await _basketPricingService.ApplyTotalsAsync(basket);
-
-        basket.UpdatedAt = DateTime.UtcNow;
-        basket.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-        await _context.SaveChangesAsync();
-    }
-
-    private async Task<Domain.Entities.Basket> GetOrCreateBasketAsync(string? sessionId, Guid? userId)
-    {
-        var basket = await GetBasketFromDatabase(sessionId, userId);
-
-        if (basket == null)
-        {
-            basket = new Domain.Entities.Basket
-            {
-                UserId = userId,
-                SessionId = sessionId ?? Guid.NewGuid().ToString(),
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId?.ToString() ?? "System"
-            };
-
-            _context.Baskets.Add(basket);
-            await _context.SaveChangesAsync();
-        }
-
-        return basket;
-    }
-
-    private async Task<Domain.Entities.Basket?> GetBasketFromDatabase(string? sessionId, Guid? userId)
-    {
-        var query = _context.Baskets
-            .AsNoTracking() // Ensure fresh data without EF Core tracking interference
-            .AsSplitQuery() // Prevent cartesian explosion with multiple Includes
-            .Include(b => b.Items)
-                .ThenInclude(bi => bi.Product)
-                    .ThenInclude(p => p!.DetailedIngredients)
-            .Include(b => b.Items)
-                .ThenInclude(bi => bi.ProductVariation)
-                    .ThenInclude(pv => pv!.Descriptions)
-            .Include(b => b.Items)
-                .ThenInclude(bi => bi.Menu)
-                .ThenInclude(b => b!.MenuItems)
-            .Include(b => b.Items)
-                .ThenInclude(bi => bi.ChildBasketItems)
-                    .ThenInclude(c => c.Product)
-            .Include(b => b.Items)
-            .Where(b => !b.IsDeleted);
-
-        if (userId.HasValue && userId.Value != Guid.Empty)
-        {
-            query = query.Where(b => b.UserId == userId.Value);
-        }
-        else if (!string.IsNullOrEmpty(sessionId))
-        {
-            query = query.Where(b => b.SessionId == sessionId && (b.UserId == null || b.UserId == Guid.Empty));
-        }
-        else
-        {
-            return null;
-        }
-
-        return await query.FirstOrDefaultAsync();
-    }
-
+    public Task RecalculateBasketTotalsAsync(Guid basketId)
+        => _basketRepository.RecalculateTotalsAsync(basketId);
 }
