@@ -1,6 +1,7 @@
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Domain.Entities;
 using DomainBasket = RestaurantSystem.Domain.Entities.Basket;
 
 namespace RestaurantSystem.Api.Features.Basket.Services;
@@ -77,5 +78,62 @@ public class BasketPricingService : IBasketPricingService
 
         // Apply special rounding for discounted customers
         basket.Total = PriceRoundingUtility.ApplySpecialRounding(calculatedTotal, hasDiscount);
+    }
+
+    public decimal CalculateIngredientCustomizationPrice(
+        IEnumerable<ProductIngredient>? detailedIngredients,
+        IReadOnlyCollection<Guid>? selectedIngredientIds,
+        IReadOnlyDictionary<Guid, int>? ingredientQuantities)
+    {
+        if (detailedIngredients is null)
+        {
+            return 0;
+        }
+
+        var selected = selectedIngredientIds ?? new List<Guid>();
+        decimal customizationPrice = 0;
+
+        foreach (var ingredient in detailedIngredients.Where(i => i.IsOptional && i.IsActive))
+        {
+            bool isSelected = selected.Contains(ingredient.Id);
+            int quantity = 1;
+
+            if (ingredientQuantities != null && ingredientQuantities.TryGetValue(ingredient.Id, out var qty))
+            {
+                quantity = qty;
+            }
+
+            // Clamp to the ingredient's max quantity
+            if (quantity > ingredient.MaxQuantity)
+            {
+                quantity = ingredient.MaxQuantity;
+            }
+
+            if (ingredient.IsIncludedInBasePrice)
+            {
+                // Ingredient price is included in base price for 1 quantity
+                if (!isSelected)
+                {
+                    // Deselected: deduct the included quantity (1)
+                    customizationPrice -= ingredient.Price;
+                }
+                else if (quantity > 1)
+                {
+                    // Selected with more than 1: add extra quantities beyond the free one
+                    customizationPrice += ingredient.Price * (quantity - 1);
+                }
+                // quantity == 1: already in base price, no change
+            }
+            else
+            {
+                // Regular optional ingredient (not included in base) — add if selected
+                if (isSelected)
+                {
+                    customizationPrice += ingredient.Price * quantity;
+                }
+            }
+        }
+
+        return customizationPrice;
     }
 }

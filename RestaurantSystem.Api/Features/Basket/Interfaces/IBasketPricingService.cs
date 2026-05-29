@@ -14,4 +14,17 @@ public interface IBasketPricingService
     /// 0 — it's calculated at order creation when the order type (and thus the Swiss rate) is known.
     /// </summary>
     Task ApplyTotalsAsync(RestaurantSystem.Domain.Entities.Basket basket, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes the price delta from optional-ingredient customisations for a product.
+    /// For each optional, active ingredient: if it's included in the base price, a
+    /// deselection deducts its price and quantities above 1 add the extra units; if it's
+    /// not included, a selection adds <c>price × quantity</c>. Quantity is clamped to the
+    /// ingredient's <c>MaxQuantity</c>. Pure calculation (no I/O); shared by the menu-option
+    /// and regular-product add-to-basket paths.
+    /// </summary>
+    decimal CalculateIngredientCustomizationPrice(
+        IEnumerable<RestaurantSystem.Domain.Entities.ProductIngredient>? detailedIngredients,
+        IReadOnlyCollection<Guid>? selectedIngredientIds,
+        IReadOnlyDictionary<Guid, int>? ingredientQuantities);
 }
