@@ -52,6 +52,7 @@ public class BasketItemFactory : IBasketItemFactory
             .Where(s => s.Quantity > 0)
             .ToList();
 
+        string? selectedSideItemsJson = null;
         if (validSideItems is { Count: > 0 })
         {
             var sideItemIds = validSideItems.Select(s => s.Id).ToList();
@@ -68,12 +69,7 @@ public class BasketItemFactory : IBasketItemFactory
                     customizationPrice += sideItem.BasePrice * selectedSide.Quantity;
                 }
             }
-        }
 
-        // Serialize selected side items to JSON
-        string? selectedSideItemsJson = null;
-        if (validSideItems is { Count: > 0 })
-        {
             selectedSideItemsJson = JsonSerializer.Serialize(validSideItems);
         }
 

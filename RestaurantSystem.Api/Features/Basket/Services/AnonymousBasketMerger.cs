@@ -56,8 +56,11 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         {
             // Nothing to merge: return the user's basket (or a fresh one), mapped from the
             // full-graph load so the DTO carries product/variation/menu details.
+            // Pass null for sessionId so the created basket is keyed on userId only and
+            // does not inherit the anonymous session ID (which could cause future session
+            // lookups to incorrectly match this user's basket).
             return await MapByUserAsync(userId)
-                ?? await _basketMappingService.MapAsync(await _basketRepository.GetOrCreateBasketAsync(sessionId, userId));
+                ?? await _basketMappingService.MapAsync(await _basketRepository.GetOrCreateBasketAsync(null, userId));
         }
 
         if (userBasket == null)
@@ -85,23 +88,30 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
             .Select(i => i.ParentBasketItemId!.Value)
             .ToHashSet();
 
-        foreach (var item in anonymousItems)
+        // Only iterate root items (ParentBasketItemId == null). Child items of bundles must
+        // not be matched flatly — they share ProductIds with standalone items and would cause
+        // incorrect quantity merges. When a distinct root bundle is moved, its children are
+        // re-homed explicitly below.
+        foreach (var item in anonymousItems.Where(i => i.ParentBasketItemId == null))
         {
             var existingItem = userBasket.Items.FirstOrDefault(bi =>
+                bi.ParentBasketItemId == null &&
                 bi.ProductId == item.ProductId &&
                 bi.ProductVariationId == item.ProductVariationId);
 
             if (existingItem != null)
             {
                 existingItem.Quantity += item.Quantity;
-                existingItem.ItemTotal = existingItem.Quantity * existingItem.UnitPrice;
+                // ItemTotal must include CustomizationPrice — the factory sets
+                // ItemTotal = (unitPrice + customizationPrice) * quantity.
+                existingItem.ItemTotal = (existingItem.UnitPrice + existingItem.CustomizationPrice) * existingItem.Quantity;
                 existingItem.UpdatedAt = DateTime.UtcNow;
                 existingItem.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
                 // The anonymous duplicate is now redundant. Hard-delete it ONLY when it is a
-                // standalone leaf (neither a bundle parent nor a child) — see the class summary
-                // for why bundle-entangled rows are left for the soft-deleted basket to carry.
-                bool isStandaloneLeaf = item.ParentBasketItemId == null && !parentItemIds.Contains(item.Id);
+                // standalone leaf (not a bundle parent) — see the class summary for why
+                // bundle-entangled rows are left for the soft-deleted basket to carry.
+                bool isStandaloneLeaf = !parentItemIds.Contains(item.Id);
                 if (isStandaloneLeaf)
                 {
                     _context.BasketItems.Remove(item);
@@ -112,6 +122,16 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
                 item.BasketId = userBasket.Id;
                 item.UpdatedAt = DateTime.UtcNow;
                 item.UpdatedBy = _currentUserService.GetAuditIdentifier();
+
+                // Also move any child items belonging to this bundle — without this they
+                // would be left orphaned under the soft-deleted anonymous basket.
+                var children = anonymousItems.Where(c => c.ParentBasketItemId == item.Id);
+                foreach (var child in children)
+                {
+                    child.BasketId = userBasket.Id;
+                    child.UpdatedAt = DateTime.UtcNow;
+                    child.UpdatedBy = _currentUserService.GetAuditIdentifier();
+                }
             }
         }
 

@@ -90,7 +90,7 @@ public class BasketRepository : IBasketRepository
     {
         var basket = await _context.Baskets
             .Include(b => b.Items)
-            .FirstOrDefaultAsync(b => b.Id == basketId);
+            .FirstOrDefaultAsync(b => b.Id == basketId && !b.IsDeleted);
 
         if (basket == null)
             return;
