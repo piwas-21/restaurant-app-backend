@@ -47,6 +47,11 @@ public class SseClientWriter : ISseClientWriter
                 await client.Response.Body.WriteAsync(eventBytes, linkedCts.Token);
                 await client.Response.Body.FlushAsync(linkedCts.Token);
             }
+            catch (OperationCanceledException) when (client.DisconnectCts.Token.IsCancellationRequested)
+            {
+                _logger.LogDebug("Send cancelled for client {ClientId} due to client disconnection", client.ClientId);
+                return;
+            }
             finally
             {
                 client.WriteLock.Release();
