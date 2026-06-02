@@ -34,15 +34,18 @@ public class SseClientWriter : ISseClientWriter
             _logger.LogInformation(sendingMsg);
             _activityLog.Add("Info", sendingMsg, eventType, client.ClientId);
 
-            // Use timeout to prevent hanging on dead connections (5 seconds max per client)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            // Link the 5-second write timeout with the client's disconnect token so that
+            // a client disconnection aborts the write immediately rather than waiting the
+            // full 5 seconds for the timeout to fire.
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, client.DisconnectCts.Token);
 
             // Acquire lock to prevent concurrent writes (heartbeat vs event)
-            await client.WriteLock.WaitAsync(cts.Token);
+            await client.WriteLock.WaitAsync(linkedCts.Token);
             try
             {
-                await client.Response.Body.WriteAsync(eventBytes, cts.Token);
-                await client.Response.Body.FlushAsync(cts.Token);
+                await client.Response.Body.WriteAsync(eventBytes, linkedCts.Token);
+                await client.Response.Body.FlushAsync(linkedCts.Token);
             }
             finally
             {

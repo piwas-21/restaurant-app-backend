@@ -106,7 +106,7 @@ public class BasketMappingService : IBasketMappingService
                                 };
                             }
                             return null;
-                        }).Where(s => s != null).ToList()!;
+                        }).OfType<BasketSideItemDto>().ToList();
                     }
                 }
                 catch (JsonException ex)
@@ -172,11 +172,15 @@ public class BasketMappingService : IBasketMappingService
             });
         }
 
-        // Filter out child items from the top-level list, as they are now nested under their parents
-        // We only want items that do NOT have a parent to be at the top level
-        var rootItems = allItems.Where(i =>
-            !basket.Items.Any(bi => bi.Id == i.Id && bi.ParentBasketItemId.HasValue)
-        ).ToList();
+        // Build a HashSet of child item IDs (O(n)) so the root-item filter below is O(n)
+        // instead of O(n²). Items whose ID appears in this set are bundle children and must
+        // be excluded from the top-level list (they are already nested under ChildItems).
+        var childItemIds = basket.Items
+            .Where(bi => bi.ParentBasketItemId.HasValue)
+            .Select(bi => (Guid?)bi.Id)
+            .ToHashSet();
+
+        var rootItems = allItems.Where(i => !childItemIds.Contains(i.Id)).ToList();
 
         return new BasketDto
         {

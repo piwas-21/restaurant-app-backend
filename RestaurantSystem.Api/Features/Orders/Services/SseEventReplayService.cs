@@ -87,22 +87,28 @@ public class SseEventReplayService : ISseEventReplayService
         int successCount = 0;
         int failureCount = 0;
 
+        // SendAsync catches all exceptions internally and signals DisconnectCts on failure,
+        // so a try-catch here is dead code. Check the cancellation token instead to stop
+        // replaying immediately when the client disconnects mid-replay.
         foreach (var replayEvent in eventsToReplay)
         {
-            try
-            {
-                await _clientWriter.SendAsync(client, replayEvent.EventBytes, replayEvent.EventType);
-                successCount++;
-                _logger.LogDebug("Replayed event {EventType} to client {ClientId}",
-                    replayEvent.EventType, client.ClientId);
-            }
-            catch (Exception ex)
+            if (client.DisconnectCts.IsCancellationRequested)
             {
                 failureCount++;
-                _logger.LogWarning(ex, "Failed to replay event {EventType} to client {ClientId}",
-                    replayEvent.EventType, client.ClientId);
-                break; // Stop replaying if client has issues
+                break;
             }
+
+            await _clientWriter.SendAsync(client, replayEvent.EventBytes, replayEvent.EventType);
+
+            if (client.DisconnectCts.IsCancellationRequested)
+            {
+                failureCount++;
+                break;
+            }
+
+            successCount++;
+            _logger.LogDebug("Replayed event {EventType} to client {ClientId}",
+                replayEvent.EventType, client.ClientId);
         }
 
         var completionMsg = $"Replay completed for client {client.ClientId}: {successCount} succeeded, {failureCount} failed";
