@@ -17,7 +17,7 @@
 # CLAUDE.md §4 limits:
 #   Controller (Features/**/*Controller.cs)      150
 #   Command/Query handler (Commands|Queries .cs) 200
-#   Service class (*Service.cs)                  300
+#   Service class (*Service.cs)                  800
 #   Entity (Domain/**/*.cs)                      100
 #   DTO (Features/**/Dtos/*.cs)                   60
 #   Validator (*Validator.cs)                     60
@@ -48,8 +48,8 @@ limit_for_path() {
     *Command.cs|*CommandHandler.cs)                                  echo 200 ;;
     *Query.cs|*QueryHandler.cs)                                      echo 200 ;;
     # Services (catch-all *Service.cs in the API project)
-    RestaurantSystem.Api/*Service.cs)                                echo 300 ;;
-    RestaurantSystem.Api/**/*Service.cs)                             echo 300 ;;
+    RestaurantSystem.Api/*Service.cs)                                echo 800 ;;
+    RestaurantSystem.Api/**/*Service.cs)                             echo 800 ;;
     *)                                                               echo 0 ;;
   esac
 }

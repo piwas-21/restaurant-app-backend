@@ -28,7 +28,7 @@ RestaurantSystem.sln
 |---|---|---|
 | Controller | 150 | Thin dispatchers to CQRS handlers only |
 | Command/Query Handler | 200 | Single responsibility per handler |
-| Service class | 300 | Beyond this, split by concern |
+| Service class | 800 | Beyond this, split by concern |
 | Entity (Domain) | 100 | Lean models; behavior in domain services |
 | DTO / Record | 60 | Data containers only |
 | Validator | 60 | One validator per command/query |

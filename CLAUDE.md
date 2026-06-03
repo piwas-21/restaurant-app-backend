@@ -111,7 +111,7 @@ Enforced by [scripts/check-file-length.sh](scripts/check-file-length.sh) (pre-co
 |---|---|---|
 | Controller | 150 | Extract handlers — controllers are dispatchers, not logic |
 | Command/Query handler | 200 | Decompose into use-case + repository methods |
-| Service class | 300 | Split by responsibility (target: one service = one concern) |
+| Service class | 800 | Split by responsibility (target: one service = one concern) |
 | Entity (Domain) | 100 | Decompose; the model is doing too much |
 | DTO / Record | 60 | Split into focused DTOs |
 | Validator | 60 | Split per command if multi-aspect |

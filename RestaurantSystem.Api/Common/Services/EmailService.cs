@@ -558,16 +558,14 @@ Thank you for being a valued member!";
                 };
                 htmlView.LinkedResources.Add(imageResource);
 
-                using var message = new MailMessage
-                {
-                    From = fromAddress,
-                    Subject = subject,
-                    IsBodyHtml = true,
-                    BodyEncoding = Encoding.UTF8,
-                    SubjectEncoding = Encoding.UTF8,
-                };
-                message.To.Add(toAddress);
+                using var message = new MailMessage();
                 message.AlternateViews.Add(htmlView);
+                message.From = fromAddress;
+                message.Subject = subject;
+                message.IsBodyHtml = true;
+                message.BodyEncoding = Encoding.UTF8;
+                message.SubjectEncoding = Encoding.UTF8;
+                message.To.Add(toAddress);
 
                 if (!string.IsNullOrEmpty(textBody))
                 {
