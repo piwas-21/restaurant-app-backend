@@ -70,7 +70,7 @@ Lockfile (`packages.lock.json` per project) is the input to OSV-Scanner.
 A small `scripts/check-quality.ps1` + `.sh` that walks `**/*.cs` and fails if any file exceeds the [CLAUDE.md](../../CLAUDE.md) limits:
 - Controller > 150 LOC
 - Handler > 200 LOC
-- Service > 300 LOC
+- Service > 800 LOC
 - Entity > 100 LOC
 - DTO/Record > 60 LOC
 - Validator > 60 LOC

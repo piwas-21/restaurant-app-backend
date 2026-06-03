@@ -558,14 +558,12 @@ Thank you for being a valued member!";
                 };
                 htmlView.LinkedResources.Add(imageResource);
 
-                using var message = new MailMessage
-                {
-                    From = fromAddress,
-                    Subject = subject,
-                    IsBodyHtml = true,
-                    BodyEncoding = Encoding.UTF8,
-                    SubjectEncoding = Encoding.UTF8,
-                };
+                using var message = new MailMessage();
+                message.From = fromAddress;
+                message.Subject = subject;
+                message.IsBodyHtml = true;
+                message.BodyEncoding = Encoding.UTF8;
+                message.SubjectEncoding = Encoding.UTF8;
                 message.To.Add(toAddress);
                 message.AlternateViews.Add(htmlView);
 
