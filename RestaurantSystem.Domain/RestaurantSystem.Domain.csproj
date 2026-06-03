@@ -7,6 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.1" />
+    <!-- Domain stays EF-free (Clean Architecture). IdentityUser<TKey> lives in
+         the store-abstraction package; the EF Core identity stores
+         (IdentityDbContext etc.) belong to Infrastructure. -->
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.8" />
   </ItemGroup>
 </Project>

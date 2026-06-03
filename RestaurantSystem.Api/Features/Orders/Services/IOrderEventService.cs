@@ -1,11 +1,12 @@
 ﻿using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Models;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
 public interface IOrderEventService
 {
-    void AddClient(string clientId, OrderEventService.SseClient client);
-    bool TryAddClient(string clientId, OrderEventService.SseClient client);
+    void AddClient(string clientId, SseClient client);
+    bool TryAddClient(string clientId, SseClient client);
     void RemoveClient(string clientId);
 
     Task NotifyOrderCreated(OrderDto order);
@@ -21,5 +22,5 @@ public interface IOrderEventService
     /// <summary>
     /// Replays recent events (within 60 seconds) to a newly connected client
     /// </summary>
-    Task ReplayRecentEventsAsync(OrderEventService.SseClient client);
+    Task ReplayRecentEventsAsync(SseClient client);
 }

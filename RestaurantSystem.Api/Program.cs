@@ -342,6 +342,11 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
+builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
+builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
+builder.Services.AddScoped<IBasketRepository, BasketRepository>();
+builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
@@ -371,6 +376,11 @@ builder.Services.AddHostedService<AccountCleanupService>();
 builder.Services.AddHostedService<TableReservationCleanupService>();
 
 // Register OrderEventService as singleton - both interface and concrete type share same instance
+builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();
+builder.Services.AddSingleton<ISseClientWriter, SseClientWriter>();
+builder.Services.AddSingleton<ISseEventReplayService, SseEventReplayService>();
+builder.Services.AddSingleton<ISseClientManager, SseClientManager>();
+builder.Services.AddSingleton<ISseBroadcastService, SseBroadcastService>();
 builder.Services.AddSingleton<OrderEventService>();
 builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<OrderEventService>());
 

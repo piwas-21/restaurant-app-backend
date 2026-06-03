@@ -1,0 +1,160 @@
+# ============================================================================
+# Weekly Security Audit
+# ----------------------------------------------------------------------------
+# Cadence : Mondays 06:00 UTC (cron below) + manual via workflow_dispatch.
+# Purpose : Re-run the security scanners on the FULL tree on a schedule,
+#           independent of PR activity. The per-PR `ci.yml` only scans when a
+#           PR (or push to main/develop) lands, so:
+#             - vulnerabilities in code nobody has touched for weeks never get
+#               re-scanned, and
+#             - a CVE disclosed today against a dependency pinned months ago
+#               won't surface until someone happens to edit that area.
+#           This job closes that gap and additionally surfaces the NuGet audit
+#           advisories (NU1901-NU1904) that `Directory.Build.props` deliberately
+#           downgrades from build errors on per-PR runs (dep-upgrade track).
+#
+# Reading failures:
+#   A red X on the Actions tab means a scanner found something. Open the failed
+#   job and read its "Summary" (Job Summary) for the finding. Failure here is an
+#   ALERT, not a broken pipeline -- triage the CVE/advisory, then patch or
+#   document an accepted-risk suppression. The run is intentionally allowed to
+#   fail so the signal is visible; nothing is auto-merged off this workflow and
+#   no automation opens issues (keeps permissions minimal -- contents: read).
+#
+# Security: scheduled workflow -- no PR context, no untrusted-input expressions
+#           in any `run:` block. All actions are SHA-pinned (same pins as
+#           ci.yml where the action is reused).
+# ============================================================================
+name: Security Audit (weekly)
+
+on:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Dependency CVE scan (OSV) -- full tree. Same pinned action as ci.yml's
+  # osv_scanner job; here it runs full-tree (--recursive .) on a schedule.
+  # --------------------------------------------------------------------------
+  osv_scanner:
+    name: OSV-Scanner (full-tree dependency CVEs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: google/osv-scanner-action/osv-scanner-action@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v2.0.1
+        with:
+          scan-args: |-
+            --recursive .
+            --format=table
+
+  # --------------------------------------------------------------------------
+  # Filesystem vulnerability scan (Trivy) -- HIGH/CRITICAL, full tree.
+  # Same pinned action as ci.yml's trivy_fs; fails the run on fixed findings.
+  # --------------------------------------------------------------------------
+  trivy_fs:
+    name: Trivy filesystem (full-tree HIGH/CRITICAL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+  # --------------------------------------------------------------------------
+  # NuGet vulnerability audit -- NEW capability vs per-PR.
+  # `dotnet list package --vulnerable` exits 0 even when it finds advisories,
+  # so we capture the output and fail explicitly on High/Critical. This
+  # surfaces the NU1901-NU1904 advisories that Directory.Build.props downgrades
+  # from build errors on per-PR builds (so a transitive CVE can't silently rot).
+  # --------------------------------------------------------------------------
+  nuget_vuln_audit:
+    name: NuGet vulnerability audit (transitive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore NuGet packages
+        run: dotnet restore RestaurantSystem.sln --verbosity minimal
+      - name: Audit packages (High/Critical fails the run)
+        run: |
+          set -euo pipefail
+          echo "## NuGet vulnerability audit" >> "$GITHUB_STEP_SUMMARY"
+          # --vulnerable exits 0 even with findings, so capture and parse.
+          report="$(dotnet list RestaurantSystem.sln package --vulnerable --include-transitive 2>&1)"
+          {
+            echo '```'
+            echo "$report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Fail on High / Critical; report Low/Moderate without failing.
+          if echo "$report" | grep -Eiq '\b(High|Critical)\b'; then
+            echo "::error::High/Critical NuGet vulnerability found -- see job summary."
+            echo "**Result:** :x: High/Critical advisory present -- patch on the dep-upgrade track." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if echo "$report" | grep -qi 'has the following vulnerable packages'; then
+            echo "::warning::Low/Moderate NuGet advisories present (not failing)."
+            echo "**Result:** :warning: Only Low/Moderate advisories present." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "**Result:** :white_check_mark: No vulnerable packages." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # --------------------------------------------------------------------------
+  # License compliance -- cheap re-run, catches dependency-license drift.
+  # Mirrors ci.yml's license_compliance job exactly (nuget-license v4.0.0 +
+  # the repo-tracked LICENSES.* files), so a license added to a transitive dep
+  # between PRs is caught on schedule.
+  # --------------------------------------------------------------------------
+  license_compliance:
+    name: license-compliance (transitive NuGet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install nuget-license (pinned)
+        run: dotnet tool install --global nuget-license --version 4.0.0
+      - name: Restore NuGet packages
+        run: dotnet restore RestaurantSystem.sln --verbosity minimal
+      - name: Build allowlist (strip comments, emit JSON array)
+        run: |
+          awk 'BEGIN{printf "["} /^[^#]/ && NF {printf "%s\"%s\"", sep, $0; sep=","} END{printf "]\n"}' \
+            LICENSES.allowlist > /tmp/licenses-allowed.json
+          echo "Allowed license types:"
+          cat /tmp/licenses-allowed.json
+      - name: Scan licenses
+        run: |
+          awk 'BEGIN{printf "["} /^[^#]/ && NF {printf "%s\"%s\"", sep, $0; sep=","} END{printf "]\n"}' \
+            LICENSES.ignored.txt > /tmp/ignored-packages.json
+          echo "Ignored packages:"
+          cat /tmp/ignored-packages.json
+          nuget-license \
+            -i RestaurantSystem.sln \
+            -a /tmp/licenses-allowed.json \
+            --licenseurl-to-license-mappings LICENSES.urlmap.json \
+            --ignored-packages /tmp/ignored-packages.json \
+            -o JsonPretty

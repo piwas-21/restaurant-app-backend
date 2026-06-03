@@ -11,16 +11,22 @@ name: Qodana
 # pragmatic path; token is free under Qodana Cloud's Community plan.
 #
 # Triggers:
-#   - PR against main/develop  → diff-only "PR mode" scan
-#   - push to main/develop     → full-repo scan
-#   - workflow_dispatch        → manual full-repo scan (re-baseline,
-#                                on-demand audits)
+#   - PR against main/develop  → diff-only "PR mode" scan (vs baseline)
+#   - push to main/develop     → full-repo scan (vs baseline)
+#   - workflow_dispatch        → manual scan; on-demand audits, and the
+#                                re-baseline flow (see below)
 #
-# Baseline: qodana.sarif.json at repo root holds the 320 known
-# findings at adoption time. Only NEW problems fail the build.
-# To refresh after a real cleanup pass, rerun the workflow_dispatch
-# scan, download the resulting SARIF from Qodana Cloud, and commit
-# it as qodana.sarif.json in a separate chore PR.
+# Baseline: qodana.sarif.json at repo root holds the known findings.
+# Only NEW problems beyond the baseline fail the build.
+#
+# Re-baselining: run this workflow via the Actions tab (workflow_dispatch)
+# with the `rebaseline` input checked. That runs a FULL scan with no
+# baseline and a disabled fail-threshold, so the run stays green and the
+# produced SARIF captures ALL current findings. The SARIF is uploaded as
+# the `qodana-rebaseline-sarif` artifact — download it and commit it as
+# qodana.sarif.json in a separate chore PR. (Without this mode, a dispatch
+# run compares against the stale baseline, fails on failThreshold, and
+# emits no committable artifact — see issue #38.)
 #
 # Security: this workflow uses no untrusted-input expressions in run:
 # commands; only static literals + secrets.QODANA_TOKEN +
@@ -33,6 +39,11 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+    inputs:
+      rebaseline:
+        description: 'Re-baseline: full scan, no baseline, never fails; uploads fresh SARIF artifact to commit as qodana.sarif.json'
+        type: boolean
+        default: false
 
 concurrency:
   group: qodana-${{ github.ref }}
@@ -55,6 +66,12 @@ jobs:
           fetch-depth: 0
       - name: Qodana scan
         uses: JetBrains/qodana-action@d7b5ec2fbec32197ef447c450e00589ed5f34fd5 # v2026.1
+        # Re-baseline runs must stay green even though the full scan trips the
+        # quality gate (qodana.yaml severityThresholds.any: 0 is a separate
+        # gate from --fail-threshold, so the threshold alone can't be relied on).
+        # continue-on-error keeps the job green in re-baseline mode only; normal
+        # runs (false) still fail on new findings as before.
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && inputs.rebaseline }}
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
         with:
@@ -65,7 +82,19 @@ jobs:
           upload-result: false
           use-caches: true
           post-pr-comment: ${{ github.event_name == 'pull_request' }}
-          # Baseline lives in-repo at qodana.sarif.json — only NEW
-          # findings beyond the baseline fail the build. Passed as
-          # CLI args because `baseline` is not a qodana.yaml key.
-          args: --baseline,qodana.sarif.json
+          # Normal mode: compare against the in-repo baseline (qodana.sarif.json)
+          # so only NEW findings fail the build. Passed as CLI args because
+          # `baseline` is not a qodana.yaml key.
+          # Re-baseline mode (workflow_dispatch + rebaseline input): no baseline
+          # and a disabled fail-threshold, so a full scan records ALL findings
+          # and the run stays green; the resulting SARIF is uploaded below.
+          args: ${{ (github.event_name == 'workflow_dispatch' && inputs.rebaseline) && '--fail-threshold,1000000' || '--baseline,qodana.sarif.json' }}
+      - name: Upload fresh baseline SARIF (re-baseline mode only)
+        # !cancelled() so the SARIF is still captured even if the scan step
+        # reports failure (belt-and-suspenders alongside continue-on-error above).
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.rebaseline }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qodana-rebaseline-sarif
+          path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+          if-no-files-found: error

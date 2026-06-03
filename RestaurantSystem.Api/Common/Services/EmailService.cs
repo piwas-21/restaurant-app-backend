@@ -541,27 +541,31 @@ Thank you for being a valued member!";
             try
             {
                 using var client = CreateSmtpClient();
-                using var message = new MailMessage
-                {
-                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
-                    Subject = subject,
-                    IsBodyHtml = true,
-                    BodyEncoding = Encoding.UTF8,
-                    SubjectEncoding = Encoding.UTF8
-                };
 
-                message.To.Add(new MailAddress(to));
-
-                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
+                // Build MailAddress instances FIRST: their ctors throw
+                // FormatException on invalid input. Doing this before any
+                // IDisposable is allocated avoids leaking htmlView/stream/
+                // message when the address is malformed.
+                var fromAddress = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName);
+                var toAddress = new MailAddress(to);
 
                 using var stream = new MemoryStream(imageData);
+                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
+
                 var imageResource = new LinkedResource(stream, "image/png")
                 {
                     ContentId = contentId
                 };
                 htmlView.LinkedResources.Add(imageResource);
 
+                using var message = new MailMessage();
                 message.AlternateViews.Add(htmlView);
+                message.From = fromAddress;
+                message.Subject = subject;
+                message.IsBodyHtml = true;
+                message.BodyEncoding = Encoding.UTF8;
+                message.SubjectEncoding = Encoding.UTF8;
+                message.To.Add(toAddress);
 
                 if (!string.IsNullOrEmpty(textBody))
                 {
