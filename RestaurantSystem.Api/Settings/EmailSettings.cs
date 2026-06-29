@@ -133,6 +133,13 @@ public class EmailSettings
         if (string.IsNullOrEmpty(FromName))
             throw new InvalidOperationException("From Name must be configured");
 
+        // AdminEmail backs every admin-notification flow (new order, new reservation,
+        // cancellations). An empty value is silently accepted by config binding and then
+        // produces an empty `to` recipient — Resend rejects it (422) and the admin copy is
+        // dropped without any user-visible signal. Fail fast at startup instead.
+        if (string.IsNullOrEmpty(AdminEmail))
+            throw new InvalidOperationException("Admin Email must be configured");
+
         if (string.Equals(Provider, "Resend", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrEmpty(ResendApiKey))
