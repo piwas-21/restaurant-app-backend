@@ -31,8 +31,10 @@ public class ProductIngredientConfiguration : IEntityTypeConfiguration<ProductIn
         builder.Property(pi => pi.CreatedAt)
             .IsRequired();
 
-        builder.Property(pi => pi.UpdatedAt)
-            .IsRequired();
+        // UpdatedAt is nullable (set only on update), consistent with every other
+        // entity. It was erroneously marked .IsRequired() here, making the column
+        // NOT NULL — which broke inserting a ProductIngredient (create/update product
+        // with detailed ingredients), since the handlers leave UpdatedAt null on create.
 
         // Relationship with Product
         builder.HasOne(pi => pi.Product)
