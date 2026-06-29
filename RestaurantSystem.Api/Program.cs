@@ -340,6 +340,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transport (Smtp | Resend)
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();

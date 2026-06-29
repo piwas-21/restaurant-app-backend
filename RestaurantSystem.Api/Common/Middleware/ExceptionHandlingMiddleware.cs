@@ -83,6 +83,12 @@ public class ExceptionHandlingMiddleware
                 message = exception.Message;
                 break;
 
+            case EmailDeliveryException:
+                // Upstream email provider failure, not an internal bug.
+                statusCode = HttpStatusCode.BadGateway;
+                message = "The email could not be delivered. Please try again later.";
+                break;
+
             default:
                 statusCode = HttpStatusCode.InternalServerError;
                 message = _environment.IsDevelopment()
