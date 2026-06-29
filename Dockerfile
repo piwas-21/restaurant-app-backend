@@ -26,8 +26,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
-# Create keys directory and chown to the non-root user (APP_UID is 64198 in .NET 10 images)
-RUN mkdir -p /app/keys && chown -R $APP_UID:$APP_UID /app/keys
+# Create writable dirs for the non-root user (APP_UID is 64198 in .NET 10 images):
+#   /app/keys           — DataProtection keys (PersistKeysToFileSystem)
+#   /app/wwwroot/uploads — Local file-storage provider target (FileStorage:Provider=Local)
+# Both are bind/named-volume mount points in production; pre-creating them owned by
+# APP_UID lets the non-root process write (a fresh volume otherwise mounts root-owned).
+RUN mkdir -p /app/keys /app/wwwroot/uploads \
+    && chown -R $APP_UID:$APP_UID /app/keys /app/wwwroot
 
 USER $APP_UID
 
