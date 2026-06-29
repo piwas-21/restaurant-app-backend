@@ -8,9 +8,24 @@ namespace RestaurantSystem.Api.Settings;
 public class EmailSettings
 {
     /// <summary>
-    /// SMTP server host
+    /// Email transport provider: "Smtp" (default) or "Resend".
+    /// Resend sends over HTTPS, for hosts that block outbound SMTP.
     /// </summary>
-    [Required]
+    public string Provider { get; set; } = "Smtp";
+
+    /// <summary>
+    /// Resend API key. Required when <see cref="Provider"/> is "Resend".
+    /// </summary>
+    public string ResendApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Resend API base address. Overridable per environment (e.g. for a proxy or tests).
+    /// </summary>
+    public string ResendBaseUrl { get; set; } = "https://api.resend.com/";
+
+    /// <summary>
+    /// SMTP server host (required when <see cref="Provider"/> is "Smtp")
+    /// </summary>
     public string SmtpHost { get; set; } = string.Empty;
 
     /// <summary>
@@ -108,25 +123,35 @@ public class EmailSettings
     /// </summary>
     public void Validate()
     {
-        if (EmailsEnabled && !LogEmailsOnly)
+        if (!EmailsEnabled || LogEmailsOnly)
+            return;
+
+        // Common requirements for any provider that actually sends mail.
+        if (string.IsNullOrEmpty(FromEmail))
+            throw new InvalidOperationException("From Email must be configured");
+
+        if (string.IsNullOrEmpty(FromName))
+            throw new InvalidOperationException("From Name must be configured");
+
+        if (string.Equals(Provider, "Resend", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrEmpty(SmtpHost))
-                throw new InvalidOperationException("SMTP Host must be configured when emails are enabled");
+            if (string.IsNullOrEmpty(ResendApiKey))
+                throw new InvalidOperationException("Resend API key must be configured when Provider is 'Resend'");
 
-            if (string.IsNullOrEmpty(Username) && UseAuthentication)
-                throw new InvalidOperationException("SMTP Username must be configured when authentication is enabled");
-
-            if (string.IsNullOrEmpty(Password) && UseAuthentication)
-                throw new InvalidOperationException("SMTP Password must be configured when authentication is enabled");
-
-            if (string.IsNullOrEmpty(FromEmail))
-                throw new InvalidOperationException("From Email must be configured");
-
-            if (string.IsNullOrEmpty(FromName))
-                throw new InvalidOperationException("From Name must be configured");
-
-            if (SmtpPort <= 0 || SmtpPort > 65535)
-                throw new InvalidOperationException("SMTP Port must be between 1 and 65535");
+            return;
         }
+
+        // SMTP provider.
+        if (string.IsNullOrEmpty(SmtpHost))
+            throw new InvalidOperationException("SMTP Host must be configured when emails are enabled");
+
+        if (string.IsNullOrEmpty(Username) && UseAuthentication)
+            throw new InvalidOperationException("SMTP Username must be configured when authentication is enabled");
+
+        if (string.IsNullOrEmpty(Password) && UseAuthentication)
+            throw new InvalidOperationException("SMTP Password must be configured when authentication is enabled");
+
+        if (SmtpPort <= 0 || SmtpPort > 65535)
+            throw new InvalidOperationException("SMTP Port must be between 1 and 65535");
     }
 }

@@ -1,27 +1,29 @@
 ﻿using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
-using System.Net;
-using System.Net.Mail;
-using System.Text;
 
 namespace RestaurantSystem.Api.Common.Services;
 
 /// <summary>
-/// Email service implementation using SMTP
+/// Email service: builds templated messages and delegates delivery to the configured
+/// <see cref="IEmailSender"/> (SMTP or Resend). Owns enable/log-only checks and retries.
 /// </summary>
 public class EmailService : IEmailService
 {
     private readonly EmailSettings _emailSettings;
+    private readonly IEmailSender _emailSender;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(
         IOptions<EmailSettings> emailSettings,
+        IEmailSender emailSender,
         ILogger<EmailService> logger)
     {
         _emailSettings = emailSettings.Value;
+        _emailSender = emailSender;
         _logger = logger;
     }
 
@@ -134,10 +136,7 @@ public class EmailService : IEmailService
         {
             try
             {
-                using var client = CreateSmtpClient();
-                using var message = CreateMailMessage(to, subject, htmlBody, textBody);
-
-                await client.SendMailAsync(message);
+                await _emailSender.SendAsync(new OutgoingEmail(to, subject, htmlBody, textBody), CancellationToken.None);
 
                 _logger.LogInformation("Email sent successfully to {To} with subject: {Subject}", to, subject);
                 return;
@@ -222,52 +221,6 @@ public class EmailService : IEmailService
             _logger.LogError(ex, "Failed to send reservation approved email to {Email}", customerEmail);
             throw;
         }
-    }
-
-    private SmtpClient CreateSmtpClient()
-    {
-        var client = new SmtpClient(_emailSettings.SmtpHost, _emailSettings.SmtpPort)
-        {
-            EnableSsl = _emailSettings.EnableSsl,
-            Timeout = _emailSettings.TimeoutMs
-        };
-
-        if (_emailSettings.UseAuthentication)
-        {
-            client.Credentials = new NetworkCredential(_emailSettings.Username, _emailSettings.Password);
-        }
-
-        return client;
-    }
-
-    private MailMessage CreateMailMessage(string to, string subject, string htmlBody, string? textBody = null)
-    {
-        var message = new MailMessage
-        {
-            From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
-            Subject = subject,
-            Body = htmlBody,
-            IsBodyHtml = true,
-            BodyEncoding = Encoding.UTF8,
-            SubjectEncoding = Encoding.UTF8
-        };
-
-        message.To.Add(new MailAddress(to));
-
-        // Add plain text alternative if provided
-        if (!string.IsNullOrEmpty(textBody))
-        {
-            var plainTextView = AlternateView.CreateAlternateViewFromString(textBody, Encoding.UTF8, "text/plain");
-            var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
-
-            message.AlternateViews.Add(plainTextView);
-            message.AlternateViews.Add(htmlView);
-        }
-
-        // Set email priority to normal
-        message.Priority = MailPriority.Normal;
-
-        return message;
     }
 
     public async Task SendOrderReceivedEmailAsync(string customerEmail, string customerName, string orderNumber,
@@ -540,40 +493,11 @@ Thank you for being a valued member!";
         {
             try
             {
-                using var client = CreateSmtpClient();
-
-                // Build MailAddress instances FIRST: their ctors throw
-                // FormatException on invalid input. Doing this before any
-                // IDisposable is allocated avoids leaking htmlView/stream/
-                // message when the address is malformed.
-                var fromAddress = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName);
-                var toAddress = new MailAddress(to);
-
-                using var stream = new MemoryStream(imageData);
-                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, Encoding.UTF8, "text/html");
-
-                var imageResource = new LinkedResource(stream, "image/png")
-                {
-                    ContentId = contentId
-                };
-                htmlView.LinkedResources.Add(imageResource);
-
-                using var message = new MailMessage();
-                message.AlternateViews.Add(htmlView);
-                message.From = fromAddress;
-                message.Subject = subject;
-                message.IsBodyHtml = true;
-                message.BodyEncoding = Encoding.UTF8;
-                message.SubjectEncoding = Encoding.UTF8;
-                message.To.Add(toAddress);
-
-                if (!string.IsNullOrEmpty(textBody))
-                {
-                    var plainTextView = AlternateView.CreateAlternateViewFromString(textBody, Encoding.UTF8, "text/plain");
-                    message.AlternateViews.Add(plainTextView);
-                }
-
-                await client.SendMailAsync(message, cancellationToken);
+                // The HTML references the image via cid:{contentId}; pass it as an inline
+                // attachment so the sender (SMTP or Resend) embeds it accordingly.
+                var inlineImage = new EmailAttachment($"{contentId}.png", imageData, "image/png", contentId);
+                await _emailSender.SendAsync(
+                    new OutgoingEmail(to, subject, htmlBody, textBody, [inlineImage]), cancellationToken);
 
                 _logger.LogInformation("Email with embedded image sent successfully to {To}", to);
                 return;
