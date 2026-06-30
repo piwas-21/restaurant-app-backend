@@ -36,6 +36,14 @@ RUN mkdir -p /app/keys /app/wwwroot/uploads \
 
 USER $APP_UID
 
+# Build identity, baked from CI build-args (see build-image.yml). Surfaced at
+# runtime by /api/version and /api/diagnostics. Default to "unknown" so a local
+# `docker build` without args still runs.
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080
