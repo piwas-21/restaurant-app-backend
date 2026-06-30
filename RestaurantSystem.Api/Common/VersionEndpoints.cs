@@ -33,13 +33,26 @@ namespace RestaurantSystem.Api.Common
             // logs are read via `docker compose logs` / Dozzle behind auth instead).
             app.MapGet("/api/diagnostics", async (ApplicationDbContext db, CancellationToken ct) =>
             {
-                var canConnect = await db.Database.CanConnectAsync(ct);
-                var lastMigration = canConnect
-                    ? (await db.Database.GetAppliedMigrationsAsync(ct)).LastOrDefault()
-                    : null;
-                var pendingMigrations = canConnect
-                    ? (await db.Database.GetPendingMigrationsAsync(ct)).Count()
-                    : -1;
+                // Probe the DB defensively: diagnostics must stay reachable even when the
+                // database is down or flaky. Any provider exception (connection drop after
+                // CanConnect, timeout) is captured into the payload rather than 500ing.
+                bool canConnect = false;
+                string? lastMigration = null;
+                int pendingMigrations = -1;
+                string? databaseError = null;
+                try
+                {
+                    canConnect = await db.Database.CanConnectAsync(ct);
+                    if (canConnect)
+                    {
+                        lastMigration = (await db.Database.GetAppliedMigrationsAsync(ct)).LastOrDefault();
+                        pendingMigrations = (await db.Database.GetPendingMigrationsAsync(ct)).Count();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    databaseError = ex.Message;
+                }
 
                 return Results.Ok(new
                 {
@@ -57,6 +70,7 @@ namespace RestaurantSystem.Api.Common
                         canConnect,
                         lastAppliedMigration = lastMigration,
                         pendingMigrations,
+                        error = databaseError,
                     },
                 });
             })
