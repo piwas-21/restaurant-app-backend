@@ -140,6 +140,15 @@ public class EmailSettings
         if (string.IsNullOrEmpty(AdminEmail))
             throw new InvalidOperationException("Admin Email must be configured");
 
+        // [Required][Url] on these only binds; config binding silently accepts an
+        // empty value. Without this, emails would link to an empty/localhost URL in
+        // prod. Fail fast at startup instead (mirrors the AdminEmail check above).
+        if (string.IsNullOrEmpty(FrontendBaseUrl))
+            throw new InvalidOperationException("Frontend Base URL must be configured");
+
+        if (string.IsNullOrEmpty(BackendBaseUrl))
+            throw new InvalidOperationException("Backend Base URL must be configured");
+
         if (string.Equals(Provider, "Resend", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrEmpty(ResendApiKey))
