@@ -31,11 +31,13 @@ namespace RestaurantSystem.Api.Common
             // environment-variable dumps and connection strings: those carry PII /
             // secrets and must never be exposed over HTTP (see the deploy runbook —
             // logs are read via `docker compose logs` / Dozzle behind auth instead).
-            app.MapGet("/api/diagnostics", async (ApplicationDbContext db, CancellationToken ct) =>
+            app.MapGet("/api/diagnostics", async (ApplicationDbContext db, ILoggerFactory loggerFactory, CancellationToken ct) =>
             {
                 // Probe the DB defensively: diagnostics must stay reachable even when the
                 // database is down or flaky. Any provider exception (connection drop after
-                // CanConnect, timeout) is captured into the payload rather than 500ing.
+                // CanConnect, timeout) is captured rather than 500ing — but the raw message
+                // can leak DB host/schema internals, so log it server-side and return only a
+                // coarse status. Let OperationCanceledException propagate (client aborted).
                 bool canConnect = false;
                 string? lastMigration = null;
                 int pendingMigrations = -1;
@@ -49,9 +51,10 @@ namespace RestaurantSystem.Api.Common
                         pendingMigrations = (await db.Database.GetPendingMigrationsAsync(ct)).Count();
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    databaseError = ex.Message;
+                    loggerFactory.CreateLogger("Diagnostics").LogWarning(ex, "Diagnostics DB probe failed");
+                    databaseError = "unavailable";
                 }
 
                 return Results.Ok(new
