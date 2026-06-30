@@ -10,6 +10,7 @@ using Npgsql;
 using System.Threading.RateLimiting;
 using RestaurantSystem.Api.BackgroundServices;
 using RestaurantSystem.Api.Services;
+using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Conventers;
 using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Middleware;
@@ -447,6 +448,9 @@ app.MapGet("/api/health", () => Results.Ok(new
     service = "restaurant-system-api"
 }))
 .WithName("ApiHealthCheck");
+
+// Build-identity endpoints: public /api/version + admin-gated /api/diagnostics.
+app.MapVersionEndpoints();
 
 app.MapControllers();
 
