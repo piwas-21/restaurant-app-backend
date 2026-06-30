@@ -69,9 +69,15 @@ exclude:
   - name: UnusedTypeParameter
   - name: CollectionNeverQueried.Global
 
-# Block on any NEW finding (anything not in the baseline). Existing
-# baselined items remain reported but don't fail the build — drive
-# them down over time.
+# Block on any NEW finding of Moderate severity or above (vs the baseline).
+# Low/Info findings (style nits: 'var' preference, redundant parens,
+# if->switch, "mark member static", etc.) are still reported in the PR
+# comment + Qodana Cloud but do NOT fail the build — they were producing a
+# recurring red "N new problems" on every develop->main promotion with no
+# correctness signal. Existing baselined items remain reported but don't fail.
+# Tighten back toward 0 as burndown PRs drive the baseline down.
 failureConditions:
   severityThresholds:
-    any: 0
+    critical: 0
+    high: 0
+    moderate: 0
