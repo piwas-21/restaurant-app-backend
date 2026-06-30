@@ -133,6 +133,23 @@ public class EmailSettings
         if (string.IsNullOrEmpty(FromName))
             throw new InvalidOperationException("From Name must be configured");
 
+        // AdminEmail backs every admin-notification flow (new order, new reservation,
+        // cancellations). An empty value is silently accepted by config binding and then
+        // produces an empty `to` recipient — Resend rejects it (422) and the admin copy is
+        // dropped without any user-visible signal. Fail fast at startup instead.
+        if (string.IsNullOrEmpty(AdminEmail))
+            throw new InvalidOperationException("Admin Email must be configured");
+
+        // [Required][Url] on these only binds; config binding silently accepts an
+        // empty or malformed value. Both are used to build links in emails, so a
+        // relative/garbage URL means broken links in prod. Require a well-formed
+        // absolute URL, failing fast at startup (mirrors the AdminEmail check above).
+        if (string.IsNullOrEmpty(FrontendBaseUrl) || !Uri.TryCreate(FrontendBaseUrl, UriKind.Absolute, out _))
+            throw new InvalidOperationException("Frontend Base URL must be configured as a valid absolute URL");
+
+        if (string.IsNullOrEmpty(BackendBaseUrl) || !Uri.TryCreate(BackendBaseUrl, UriKind.Absolute, out _))
+            throw new InvalidOperationException("Backend Base URL must be configured as a valid absolute URL");
+
         if (string.Equals(Provider, "Resend", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrEmpty(ResendApiKey))

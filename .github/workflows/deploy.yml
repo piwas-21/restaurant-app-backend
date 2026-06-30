@@ -1,0 +1,72 @@
+name: deploy
+
+# Deploys the BACKEND service of the single-box prod stack (Netcup) by SSHing
+# in and running /opt/rumi/deploy/deploy.sh with BACKEND_TAG set. Two entry points:
+#
+#   - auto:   after `build-image` succeeds on main (workflow_run) -> deploy :latest
+#   - manual: workflow_dispatch with an image_tag input -> deploy / ROLLBACK the
+#             backend to a specific GHCR tag (latest | sha-<40hex> | v<semver>).
+#
+# Rolling back rebuilds nothing — it just re-points the running container at an
+# already-published image. Only the backend service is touched; the frontend
+# stays at whatever FRONTEND_TAG .env pins. See docs/runbooks/DEPLOYMENT.md.
+#
+# Requires repo/org secrets DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key
+# whose public half is in rumi@box:~/.ssh/authorized_keys), DEPLOY_SSH_FINGERPRINT
+# (box host key, pins against MITM). The deploy user needs passwordless sudo for
+# the chown in deploy.sh.
+
+on:
+  workflow_run:
+    workflows: ["build-image"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Backend GHCR tag to deploy/rollback to (latest | sha-<40hex> | v<semver>)"
+        required: true
+        default: latest
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy backend (prod box)
+    # Auto path only when the build actually succeeded; manual path always runs.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Manual dispatch picks the input; the auto (post-build) path ships latest.
+      IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || 'latest' }}
+    steps:
+      - name: Validate image tag
+        # Reject anything that isn't a known-good GHCR tag shape before it reaches
+        # the box (defence-in-depth even though dispatch needs repo write access).
+        run: |
+          case "$IMAGE_TAG" in
+            latest|sha-[0-9a-f]*|v[0-9]*) echo "deploying backend tag: $IMAGE_TAG" ;;
+            *) echo "::error::invalid image_tag '$IMAGE_TAG' (expected latest | sha-<hex> | v<semver>)"; exit 1 ;;
+          esac
+
+      - name: SSH → deploy backend at the requested tag
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          fingerprint: ${{ secrets.DEPLOY_SSH_FINGERPRINT }}
+          command_timeout: 18m
+          # Pass the tag as an env var (not string-interpolated) so it can't break
+          # out of the remote command. flock serializes against a concurrent
+          # frontend deploy (GitHub concurrency groups don't span repos).
+          envs: IMAGE_TAG
+          script: |
+            flock -n /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && BACKEND_TAG=\"$IMAGE_TAG\" ./deploy.sh" \
+              || { echo "::error::another RUMI deploy holds the lock; skipping this run"; exit 1; }

@@ -30,7 +30,7 @@ public record UpdateProductCommand(
     List<Guid>? SuggestedSideItemIds,
     List<ProductIngredientDto>? DetailedIngredients,
     MenuDefinitionDto? MenuDefinition,
-    ProductDescriptionsDto Content
+    ProductDescriptionsDto? Content
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -60,7 +60,11 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
     {
         var product = await _context.Products
+            // Multiple collection includes below — split to avoid a cartesian
+            // explosion (matches GetProductByIdQueryHandler).
+            .AsSplitQuery()
             .Include(p => p.ProductCategories)
+            .Include(p => p.Descriptions)
             .Include(p => p.Variations)
                 .ThenInclude(v => v.Descriptions)
             .Include(p => p.SuggestedSideItems)
@@ -119,7 +123,11 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         }
 
 
-        var languageCodes = command.Content.Select(x => x.Key).ToList();
+        // Content may be omitted from the request body (e.g. an edit that does not
+        // touch translations); treat that as "no translation changes" rather than NRE-ing.
+        var contentMap = command.Content ?? new ProductDescriptionsDto();
+
+        var languageCodes = contentMap.Select(x => x.Key).ToList();
         var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
@@ -131,15 +139,15 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         }
 
 
-        if (command.Content.Any())
+        if (contentMap.Any())
         {
             _context.ProductDescriptions.RemoveRange(product.Descriptions);
         }
 
-        foreach (var key in command.Content.Keys)
+        foreach (var key in contentMap.Keys)
         {
 
-            var content = command.Content[key];
+            var content = contentMap[key];
             var productDescription = new ProductDescription()
             {
                 UpdatedBy = _currentUserService.GetAuditIdentifier(),
