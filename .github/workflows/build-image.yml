@@ -57,3 +57,40 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Auto-deploy to the single-box prod stack (Netcup) once :latest is published.
+  # Only on main (the deploy pulls :latest, which is tagged on the default branch
+  # only). SSHes into the box and runs the existing /opt/rumi/deploy/deploy.sh,
+  # which `compose pull`s BOTH repos' :latest images and restarts the stack — so
+  # a merge to either repo rolls the whole stack forward.
+  #
+  # Requires repo (or org) secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
+  # (private key whose public half is in rumi@box:~/.ssh/authorized_keys),
+  # DEPLOY_SSH_FINGERPRINT (the box host key, to pin against MITM). The deploy
+  # user needs passwordless sudo for the chown in deploy.sh. See deploy/README.md.
+  deploy:
+    name: deploy (prod box)
+    needs: build-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Serialize deploys triggered within this repo. Cross-repo races (frontend
+    # deploying at the same moment) are handled by the flock in the remote
+    # script — GitHub concurrency groups don't span repositories.
+    concurrency:
+      group: prod-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: SSH → pull latest images and restart the stack
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          fingerprint: ${{ secrets.DEPLOY_SSH_FINGERPRINT }}
+          command_timeout: 18m
+          script: |
+            flock -n /tmp/rumi-deploy.lock -c 'cd /opt/rumi/deploy && ./deploy.sh' \
+              || { echo "::error::another RUMI deploy holds the lock; skipping this run"; exit 1; }
