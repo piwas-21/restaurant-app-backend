@@ -60,6 +60,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
     {
         var product = await _context.Products
+            // Multiple collection includes below — split to avoid a cartesian
+            // explosion (matches GetProductByIdQueryHandler).
+            .AsSplitQuery()
             .Include(p => p.ProductCategories)
             .Include(p => p.Descriptions)
             .Include(p => p.Variations)
