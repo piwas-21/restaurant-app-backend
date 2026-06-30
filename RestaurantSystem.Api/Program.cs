@@ -233,8 +233,9 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 // Fail fast on misconfigured email (e.g. missing AdminEmail or provider
 // credentials) instead of silently dropping mail at send time. Mirrors the
-// JwtSettings.Validate() call above.
-emailSettings.Get<EmailSettings>()?.Validate();
+// JwtSettings.Validate() call above. Fall back to a default instance so a
+// missing/unbindable section still triggers validation rather than skipping it.
+(emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 

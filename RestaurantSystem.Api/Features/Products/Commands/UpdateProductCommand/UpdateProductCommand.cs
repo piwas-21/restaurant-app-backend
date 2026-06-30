@@ -61,6 +61,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     {
         var product = await _context.Products
             .Include(p => p.ProductCategories)
+            .Include(p => p.Descriptions)
             .Include(p => p.Variations)
                 .ThenInclude(v => v.Descriptions)
             .Include(p => p.SuggestedSideItems)
