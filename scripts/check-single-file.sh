@@ -21,8 +21,8 @@ loc=$(wc -l < "$f" | tr -d ' ')
 lim=0; kind=""
 case "$f" in
   *Controller.cs)                 lim=150; kind="Controller" ;;
-  *Handler.cs)                    lim=200; kind="Handler" ;;
   *Validator.cs)                  lim=60;  kind="Validator" ;;
+  *Handler.cs|*Command.cs|*Query.cs) lim=200; kind="handler/command/query" ;;
   *Settings.cs|*Configuration.cs) lim=50;  kind="Config" ;;
   *Dto.cs|*/Dtos/*)               lim=60;  kind="DTO/record" ;;
   *Service.cs)                    lim=800; kind="Service" ;;
@@ -31,7 +31,7 @@ esac
 [[ $lim -gt 0 && $loc -gt $lim ]] && warn "file-length: $kind ~${loc} LOC (limit ${lim}) — split per CLAUDE.md §4"
 
 # Convention checks (grep -n for a line hint)
-case "$f" in *Handler.cs)
+case "$f" in *Handler.cs|*Command.cs|*Query.cs)
   grep -nq 'throw new InvalidOperationException' "$f" \
     && warn "use NotFoundException/BadRequestException/ForbiddenException, not InvalidOperationException" ;;
 esac

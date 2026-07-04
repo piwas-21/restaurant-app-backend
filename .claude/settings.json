@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/mahmutkaya/workspace/rumi-workspace/backend/scripts/check-single-file.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/scripts/check-single-file.sh\"",
             "timeout": 10
           }
         ]
