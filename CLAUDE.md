@@ -13,17 +13,10 @@
 - **Production**: deployed from `main` (currently `develop` until cutover); test environment from `develop`
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
-## §1.5 — Subagents (delegate to the right one)
+## §1.5 — Tooling
 
-Versioned Claude Code subagents live in [.claude/agents/](.claude/agents/). When a task fits one, **delegate to it** instead of doing it inline:
-
-| Agent | Lives in | Use for |
-|---|---|---|
-| **backend** | this repo ([.claude/agents/backend.md](.claude/agents/backend.md)) | backend (.NET) feature/handler/EF/test work — defers to this CLAUDE.md |
-| **frontend** | frontend repo | anything in `frontend/` (Next.js) — hand cross-repo UI work over |
-| **devops** | deploy repo (`restaurant-app-deploy`) | any infra/deploy/ops task (boxes, Caddy/TLS, DNS, secrets, release) — never do live-infra ops inline |
-
-A `PostToolUse` hook ([scripts/check-single-file.sh](scripts/check-single-file.sh)) also warns on file-length/convention violations right after each edit — act on its output.
+- A `PostToolUse` hook ([scripts/check-single-file.sh](scripts/check-single-file.sh)) warns on file-length / convention violations right after each edit — act on it.
+- Shared skills (`pr-workflow`, `security-review`) + scripts come from the **rumi-agent-kit** plugin — load them on demand (e.g. the `pr-workflow` skill when opening a PR). Infra/deploy work → the `operating-rumi-infra` skill.
 
 ## §2 — Critical files to read
 
