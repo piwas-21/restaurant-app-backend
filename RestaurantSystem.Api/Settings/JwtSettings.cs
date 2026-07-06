@@ -32,6 +32,14 @@ namespace RestaurantSystem.Api.Settings
         public string Audience { get; set; } = string.Empty;
 
         /// <summary>
+        /// Gets or sets the tenant slug for this install (sofra ADR-001: one
+        /// instance per tenant, so the value is a constant per deployment —
+        /// provisioning injects JwtSettings__TenantSlug from the tenant registry).
+        /// Optional: when empty, no tenant claim is emitted (legacy RUMI install).
+        /// </summary>
+        public string TenantSlug { get; set; } = string.Empty;
+
+        /// <summary>
         /// Gets or sets the expiry time for access tokens in minutes.
         /// Default is 60 minutes (1 hour).
         /// </summary>
