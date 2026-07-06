@@ -13,6 +13,11 @@
 - **Production**: deployed from `main` (currently `develop` until cutover); test environment from `develop`
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
+## §1.5 — Tooling
+
+- A `PostToolUse` hook ([scripts/check-single-file.sh](scripts/check-single-file.sh)) warns on file-length / convention violations right after each edit — act on it.
+- Shared skills (`pr-workflow`, `security-review`) + scripts come from the **rumi-agent-kit** plugin — load them on demand (e.g. the `pr-workflow` skill when opening a PR). Infra/deploy work → the `operating-rumi-infra` skill.
+
 ## §2 — Critical files to read
 
 | When | Read |
@@ -105,27 +110,7 @@ All soft-delete-aware entities use `IsDeleted` with a global query filter in `Ap
 
 ## §4 — File length limits
 
-Enforced by [scripts/check-file-length.sh](scripts/check-file-length.sh) (pre-commit + CI `file_length` job, blocking).
-
-| File type | Max LOC | Action if exceeded |
-|---|---|---|
-| Controller | 150 | Extract handlers — controllers are dispatchers, not logic |
-| Command/Query handler | 200 | Decompose into use-case + repository methods |
-| Service class | 800 | Split by responsibility (target: one service = one concern) |
-| Entity (Domain) | 100 | Decompose; the model is doing too much |
-| DTO / Record | 60 | Split into focused DTOs |
-| Validator | 60 | Split per command if multi-aspect |
-| Configuration class (`*Settings.cs`) | 50 | Group related settings into separate classes |
-
-**Existing oversized files** are baselined in [scripts/file-length-baseline.txt](scripts/file-length-baseline.txt) (set at the current honest floor; ratchet down as the refactor track lands). New violations block the gate.
-
-**Per-file opt-out** (rare; needs reviewer sign-off): add `// FILE_LENGTH_EXEMPT: <reason>` within the first 5 lines of the file.
-
-**After a refactor lands** that brings a baselined file under its limit:
-```bash
-bash scripts/check-file-length.sh --regen-baseline
-```
-Commit the updated `scripts/file-length-baseline.txt` in the same MR.
+Enforced (blocking) by `scripts/check-file-length.sh` (pre-commit + CI) and warned in-loop by the PostToolUse checker. Max LOC: **Controller 150 · Command/Query/Handler 200 · Service 800 · Entity 100 · DTO 60 · Validator 60 · `*Settings.cs` 50**. Over the limit ⇒ decompose (controllers dispatch, one service = one concern). Existing violations are baselined in `scripts/file-length-baseline.txt`; opt a file out with `// FILE_LENGTH_EXEMPT: <reason>` in the first 5 lines; after a refactor drops a file under its limit run `bash scripts/check-file-length.sh --regen-baseline` and commit the baseline.
 
 ---
 
@@ -181,29 +166,11 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 ---
 
-## §7 — Quality gates
+## §7 — Quality gates (all blocking unless noted; source of truth `.github/workflows/ci.yml` + `.pre-commit-config.yaml`)
 
-| Gate | When | What | Blocking? | Source of truth |
-|---|---|---|---|---|
-| `dotnet build RestaurantSystem.sln` (warnings as errors) | Pre-commit (when .cs/.csproj/.sln/.props/.targets staged) **and** CI workflow (`dotnet_build_strict` job) | 0 errors, 0 non-excluded warnings | yes | [Directory.Build.props](Directory.Build.props), `.github/workflows/ci.yml` |
-| `dotnet test RestaurantSystem.IntegrationTests` | CI workflow (`dotnet_test` job, dind service for Testcontainers) | All non-skipped tests pass | yes | `.github/workflows/ci.yml` |
-| Coverage threshold (coverlet, line ≥ 17% / branch ≥ 9% / method ≥ 15%, migrations excluded) | CI workflow (same `dotnet_test` job) | No regression below the current floor | yes | `.github/workflows/ci.yml` |
-| `dotnet format --verify-no-changes` | Pre-commit (when .cs/.csproj/.sln staged) **and** CI workflow (`dotnet_format` job) | 0 formatting drift | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml), `.github/workflows/ci.yml` |
-| File-length gate | Pre-commit (per-file when .cs staged) **and** CI workflow (`file_length` job) | LOC ≤ §4 limit OR file is in `scripts/file-length-baseline.txt` | yes | [scripts/check-file-length.sh](scripts/check-file-length.sh), [.pre-commit-config.yaml](.pre-commit-config.yaml), `.github/workflows/ci.yml` |
-| Pre-commit hooks | Every `git commit` | trailing whitespace, EOF, large files, secret scan, no-commit-to-protected | yes | [.pre-commit-config.yaml](.pre-commit-config.yaml) |
-| CodeQL (SAST) | CI workflow | Auto-injected analyzers | yes | `.github/workflows/ci.yml` |
-| Gitleaks | CI workflow | No leaked credentials (allowlist via `.gitleaks.toml`) | yes | [.gitleaks.toml](.gitleaks.toml) |
-| Trivy image scan | After build | Reports CRITICAL/HIGH CVEs | **no** (currently `allow_failure: true`) | `.github/workflows/ci.yml` |
-
-Trivy is non-blocking today — it surfaces findings without failing the pipeline. Sprint 4 of [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) flips it to `exit-code: 1` for CRITICAL/HIGH.
-
-Analyzer warnings-as-errors gate fully blocking as of Sprint 3 via `TreatWarningsAsErrors` in [Directory.Build.props](Directory.Build.props). Only NuGet vulnerability advisories (NU1901–NU1904, dep-upgrade track) and EF migration class names (CS8981) remain excluded. Coverage gate landed (line ≥ 17%, branch ≥ 9%, method ≥ 15% — pinned at the current honest floor with migrations excluded; raise as coverage grows). SAST quality gate (SonarCloud) lands later in Sprint 3.
-
-### Setup for a new developer
-```bash
-bash scripts/setup_hooks.sh   # installs pre-commit hooks (one-time)
-bash scripts/dev-up.sh        # boots local DB + applies migrations + runs API
-```
+- **Pre-commit** (on `git commit`): trailing-whitespace / EOF / large-files / secret-scan / no-commit-to-protected; `dotnet format`; file-length (§4).
+- **CI**: `dotnet build` warnings-as-errors (`Directory.Build.props`); `dotnet test` (integration, Testcontainers) + coverage floor (line ≥ 17 / branch ≥ 9 / method ≥ 15%, migrations excluded — raise as coverage grows); `dotnet format`; file-length; CodeQL; Gitleaks. **Trivy** image scan is currently non-blocking (Sprint 4 flips it for CRITICAL/HIGH).
+- **New-dev setup**: `bash scripts/setup_hooks.sh` (hooks) · `bash scripts/dev-up.sh` (DB + migrate + run API).
 
 ---
 
