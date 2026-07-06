@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderDelayed
     {
-        public static string Subject => "Action Required: Order Delay - Rumi Restaurant";
+        public static string GetSubject(EmailBranding brand) => $"Action Required: Order Delay - {brand.Name}";
 
-        public static string GetHtmlBody(string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
+        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
         {
             return $@"
 <!DOCTYPE html>
@@ -172,14 +172,14 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Rumi Restaurant</h1>
+            <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
             <div class='status-icon'>⏳</div>
             <div class='message-title'>Update on Your Order</div>
 
             <p>Dear {customerName},</p>
-            <p>Thank you for choosing Rumi Restaurant! We are currently experiencing high demand, and we want to ensure your meal meets our quality standards.</p>
+            <p>Thank you for choosing {brand.Name}! We are currently experiencing high demand, and we want to ensure your meal meets our quality standards.</p>
 
             <div class='order-details'>
                 Order #{orderNumber}
@@ -205,18 +205,18 @@ public static partial class EmailTemplates
             </p>
         </div>
         <div class='footer'>
-            <p>Rumi Restaurant | Geneva | +41 22 786 33 33</p>
-            <p>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p>{brand.Name} | {brand.City} | {contactEmail}</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
+        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
         {
             var email = contactEmail;
-            return $@"Rumi Restaurant - Action Required: Order Delay
+            return $@"{brand.Name} - Action Required: Order Delay
 
 Dear {customerName},
 
@@ -236,10 +236,10 @@ Cancel Order: {rejectUrl}
 If you choose to cancel, you will not be charged.
 
 Best regards,
-Rumi Restaurant Team
+{brand.Name} Team
 
-Rumi Restaurant | Geneva | {email}
-© 2024 Rumi Restaurant. All rights reserved.";
+{brand.Name} | {brand.City} | {email}
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

@@ -15,15 +15,18 @@ public class EmailService : IEmailService
 {
     private readonly EmailSettings _emailSettings;
     private readonly IEmailSender _emailSender;
+    private readonly IEmailBrandingProvider _brandingProvider;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(
         IOptions<EmailSettings> emailSettings,
         IEmailSender emailSender,
+        IEmailBrandingProvider brandingProvider,
         ILogger<EmailService> logger)
     {
         _emailSettings = emailSettings.Value;
         _emailSender = emailSender;
+        _brandingProvider = brandingProvider;
         _logger = logger;
     }
 
@@ -37,9 +40,10 @@ public class EmailService : IEmailService
                 resetUrl = $"{_emailSettings.FrontendBaseUrl}/reset-password?token={Uri.EscapeDataString(resetToken)}&email={Uri.EscapeDataString(user.Email!)}";
             }
 
-            var subject = EmailTemplates.PasswordReset.Subject;
-            var htmlBody = EmailTemplates.PasswordReset.GetHtmlBody(user.FirstName, user.LastName, resetUrl);
-            var textBody = EmailTemplates.PasswordReset.GetTextBody(user.FirstName, user.LastName, resetUrl);
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.PasswordReset.GetSubject(brand);
+            var htmlBody = EmailTemplates.PasswordReset.GetHtmlBody(brand, user.FirstName, user.LastName, resetUrl);
+            var textBody = EmailTemplates.PasswordReset.GetTextBody(brand, user.FirstName, user.LastName, resetUrl);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -56,9 +60,10 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.Welcome.Subject;
-            var htmlBody = EmailTemplates.Welcome.GetHtmlBody(user.FirstName, user.LastName, user.Role.ToString());
-            var textBody = EmailTemplates.Welcome.GetTextBody(user.FirstName, user.LastName, user.Role.ToString());
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.Welcome.GetSubject(brand);
+            var htmlBody = EmailTemplates.Welcome.GetHtmlBody(brand, user.FirstName, user.LastName, user.Role.ToString());
+            var textBody = EmailTemplates.Welcome.GetTextBody(brand, user.FirstName, user.LastName, user.Role.ToString());
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -81,9 +86,10 @@ public class EmailService : IEmailService
                 verificationUrl = $"{_emailSettings.FrontendBaseUrl}/verify-email?token={Uri.EscapeDataString(verificationToken)}&email={Uri.EscapeDataString(user.Email!)}";
             }
 
-            var subject = EmailTemplates.EmailVerification.Subject;
-            var htmlBody = EmailTemplates.EmailVerification.GetHtmlBody(user.FirstName, user.LastName, verificationUrl);
-            var textBody = EmailTemplates.EmailVerification.GetTextBody(user.FirstName, user.LastName, verificationUrl);
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.EmailVerification.GetSubject(brand);
+            var htmlBody = EmailTemplates.EmailVerification.GetHtmlBody(brand, user.FirstName, user.LastName, verificationUrl);
+            var textBody = EmailTemplates.EmailVerification.GetTextBody(brand, user.FirstName, user.LastName, verificationUrl);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -100,9 +106,10 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.PasswordChanged.Subject;
-            var htmlBody = EmailTemplates.PasswordChanged.GetHtmlBody(user.FirstName, user.LastName, DateTime.UtcNow);
-            var textBody = EmailTemplates.PasswordChanged.GetTextBody(user.FirstName, user.LastName, DateTime.UtcNow);
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.PasswordChanged.GetSubject(brand);
+            var htmlBody = EmailTemplates.PasswordChanged.GetHtmlBody(brand, user.FirstName, user.LastName, DateTime.UtcNow);
+            var textBody = EmailTemplates.PasswordChanged.GetTextBody(brand, user.FirstName, user.LastName, DateTime.UtcNow);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -181,11 +188,12 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.ReservationConfirmation.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.ReservationConfirmation.GetSubject(brand);
             var htmlBody = EmailTemplates.ReservationConfirmation.GetHtmlBody(
-                customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
+                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
             var textBody = EmailTemplates.ReservationConfirmation.GetTextBody(
-                customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
+                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -205,11 +213,12 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.ReservationApproved.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.ReservationApproved.GetSubject(brand);
             var htmlBody = EmailTemplates.ReservationApproved.GetHtmlBody(
-                customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
+                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
             var textBody = EmailTemplates.ReservationApproved.GetTextBody(
-                customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
+                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -229,11 +238,12 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.OrderReceived.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.OrderReceived.GetSubject(brand);
             var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-                customerName, orderNumber, orderType, total, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                brand, customerName, orderNumber, orderType, total, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderReceived.GetTextBody(
-                customerName, orderNumber, orderType, total, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                brand, customerName, orderNumber, orderType, total, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -253,11 +263,12 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.OrderConfirmed.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.OrderConfirmed.GetSubject(brand);
             var htmlBody = EmailTemplates.OrderConfirmed.GetHtmlBody(
-                customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
+                brand, customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderConfirmed.GetTextBody(
-                customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
+                brand, customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -277,11 +288,12 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.OrderCancelled.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.OrderCancelled.GetSubject(brand);
             var htmlBody = EmailTemplates.OrderCancelled.GetHtmlBody(
-                customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
+                brand, customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderCancelled.GetTextBody(
-                customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
+                brand, customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -301,11 +313,12 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.OrderDelayed.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.OrderDelayed.GetSubject(brand);
             var htmlBody = EmailTemplates.OrderDelayed.GetHtmlBody(
-                customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
+                brand, customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderDelayed.GetTextBody(
-                customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
+                brand, customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -327,15 +340,16 @@ public class EmailService : IEmailService
     {
         try
         {
-            var subject = EmailTemplates.OrderConfirmationAdmin.Subject;
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.OrderConfirmationAdmin.GetSubject(brand);
             var baseUrl = _emailSettings.BackendBaseUrl;
             var frontendUrl = _emailSettings.FrontendBaseUrl;
             var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-                orderNumber, customerName, customerEmail, customerPhone, orderType, total, items,
+                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, items,
                 baseUrl, frontendUrl, _emailSettings.AdminEmail,
                 specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-                orderNumber, customerName, customerEmail, customerPhone, orderType, total, items,
+                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, items,
                 _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
 
             await SendEmailAsync(adminEmail, subject, htmlBody, textBody);
@@ -363,6 +377,7 @@ public class EmailService : IEmailService
     {
         try
         {
+            var brand = await _brandingProvider.GetAsync(cancellationToken);
             var subject = $"Welcome to {groupName}!";
 
             var expiryText = expiryDate.HasValue
@@ -411,7 +426,7 @@ public class EmailService : IEmailService
             </div>
         </div>
         <div class=""footer"">
-            <p>RUMI Restaurant | Thank you for being a valued member!</p>
+            <p>{brand.Name} | Thank you for being a valued member!</p>
         </div>
     </div>
 </body>
@@ -432,7 +447,7 @@ Your membership QR code is attached to this email. Show this QR code at the rest
 QR Code Data: {qrCodeData}
 
 ---
-RUMI Restaurant
+{brand.Name}
 Thank you for being a valued member!";
 
             await SendEmailWithEmbeddedImageAsync(toEmail, subject, htmlBody, textBody, qrCodeImage, "qrcode", cancellationToken);
@@ -450,9 +465,10 @@ Thank you for being a valued member!";
     {
         try
         {
-            var subject = EmailTemplates.AccountDeletion.Subject;
-            var htmlBody = EmailTemplates.AccountDeletion.GetHtmlBody(firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
-            var textBody = EmailTemplates.AccountDeletion.GetTextBody(firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.AccountDeletion.GetSubject(brand);
+            var htmlBody = EmailTemplates.AccountDeletion.GetHtmlBody(brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
+            var textBody = EmailTemplates.AccountDeletion.GetTextBody(brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
 
             await SendEmailAsync(toEmail, subject, htmlBody, textBody);
 

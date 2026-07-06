@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Api.Settings;
@@ -18,17 +19,20 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly IEmailBrandingProvider _brandingProvider;
     private readonly ILogger<CreateReservationCommandHandler> _logger;
     private readonly EmailSettings _emailSettings;
 
     public CreateReservationCommandHandler(
         ApplicationDbContext context,
         IEmailService emailService,
+        IEmailBrandingProvider brandingProvider,
         ILogger<CreateReservationCommandHandler> logger,
         IOptions<EmailSettings> emailSettings)
     {
         _context = context;
         _emailService = emailService;
+        _brandingProvider = brandingProvider;
         _logger = logger;
         _emailSettings = emailSettings.Value;
     }
@@ -112,11 +116,13 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                 // Send to admin with action buttons
                 var baseUrl = _emailSettings.BackendBaseUrl;
                 var frontendUrl = _emailSettings.FrontendBaseUrl;
+                var brand = await _brandingProvider.GetAsync(cancellationToken);
 
                 await _emailService.SendEmailAsync(
                     _emailSettings.AdminEmail,
-                    Common.Templates.EmailTemplates.ReservationAdminNotification.Subject,
+                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetSubject(brand),
                     Common.Templates.EmailTemplates.ReservationAdminNotification.GetHtmlBody(
+                        brand,
                         reservation.Id,
                         reservation.CustomerName,
                         reservation.CustomerEmail,
@@ -132,6 +138,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                         reservation.SpecialRequests
                     ),
                     Common.Templates.EmailTemplates.ReservationAdminNotification.GetTextBody(
+                        brand,
                         reservation.Id,
                         reservation.CustomerName,
                         reservation.CustomerEmail,

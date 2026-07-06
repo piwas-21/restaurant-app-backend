@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class Welcome
     {
-        public static string Subject => "Welcome to Restaurant System! 🍽️";
+        public static string GetSubject(EmailBranding brand) => $"Welcome to {brand.Name}! 🍽️";
 
-        public static string GetHtmlBody(string firstName, string lastName, string role)
+        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string role)
         {
             return $@"
 <!DOCTYPE html>
@@ -30,7 +30,7 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Welcome to Restaurant System!</h1>
+            <h1>🍽️ Welcome to {brand.Name}!</h1>
         </div>
         <div class='content'>
             <h2>Welcome aboard, {firstName}!</h2>
@@ -51,21 +51,21 @@ public static partial class EmailTemplates
                 <p>If you have any questions or need assistance, our support team is here to help. Contact us anytime!</p>
             </div>
 
-            <p>Thank you for joining Restaurant System. We're excited to have you on board!</p>
-            <p>Best regards,<br>The Restaurant System Team</p>
+            <p>Thank you for joining {brand.Name}. We're excited to have you on board!</p>
+            <p>Best regards,<br>The {brand.Name} Team</p>
         </div>
         <div class='footer'>
             <p>This is an automated message, please do not reply to this email.</p>
-            <p>© 2024 Restaurant System. All rights reserved.</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string firstName, string lastName, string role)
+        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string role)
         {
-            return $@"Welcome to Restaurant System!
+            return $@"Welcome to {brand.Name}!
 
 Welcome aboard, {firstName}!
 
@@ -80,13 +80,13 @@ You can now log in to your account and start using all the features available to
 Need Help?
 If you have any questions or need assistance, our support team is here to help. Contact us anytime!
 
-Thank you for joining Restaurant System. We're excited to have you on board!
+Thank you for joining {brand.Name}. We're excited to have you on board!
 
 Best regards,
-The Restaurant System Team
+The {brand.Name} Team
 
 This is an automated message, please do not reply to this email.
-© 2024 Restaurant System. All rights reserved.";
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }
