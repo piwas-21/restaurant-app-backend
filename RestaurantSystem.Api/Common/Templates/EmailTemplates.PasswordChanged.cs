@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class PasswordChanged
     {
-        public static string Subject => "Password Changed - Restaurant System";
+        public static string GetSubject(EmailBranding brand) => $"Password Changed - {brand.Name}";
 
-        public static string GetHtmlBody(string firstName, string lastName, DateTime changedAt)
+        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, DateTime changedAt)
         {
             return $@"
 <!DOCTYPE html>
@@ -30,7 +30,7 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🔐 Restaurant System</h1>
+            <h1>🔐 {brand.Name}</h1>
         </div>
         <div class='content'>
             <h2>Password Changed Successfully</h2>
@@ -47,20 +47,20 @@ public static partial class EmailTemplates
                 <li>Consider changing your password again</li>
             </ul>
             <p>For your security, always use a strong, unique password and never share it with others.</p>
-            <p>Best regards,<br>The Restaurant System Team</p>
+            <p>Best regards,<br>The {brand.Name} Team</p>
         </div>
         <div class='footer'>
             <p>This is an automated message, please do not reply to this email.</p>
-            <p>© 2024 Restaurant System. All rights reserved.</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string firstName, string lastName, DateTime changedAt)
+        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, DateTime changedAt)
         {
-            return $@"Restaurant System - Password Changed
+            return $@"{brand.Name} - Password Changed
 
 Hello {firstName} {lastName},
 
@@ -76,10 +76,10 @@ If you didn't change your password:
 For your security, always use a strong, unique password and never share it with others.
 
 Best regards,
-The Restaurant System Team
+The {brand.Name} Team
 
 This is an automated message, please do not reply to this email.
-© {DateTime.Now.Year} Restaurant System. All rights reserved.";
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

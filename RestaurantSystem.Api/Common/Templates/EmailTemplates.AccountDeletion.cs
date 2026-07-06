@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class AccountDeletion
     {
-        public static string Subject => "Action Required: Account Deletion Request - Restaurant System";
+        public static string GetSubject(EmailBranding brand) => $"Action Required: Account Deletion Request - {brand.Name}";
 
-        public static string GetHtmlBody(string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
+        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
         {
             return $@"
 <!DOCTYPE html>
@@ -36,7 +36,7 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <h2>Hello {firstName} {lastName},</h2>
-            <p>We received a request to delete your Restaurant System account. Your account is scheduled for permanent deletion on <strong>{scheduledDeletionDate:MMMM dd, yyyy}</strong>.</p>
+            <p>We received a request to delete your {brand.Name} account. Your account is scheduled for permanent deletion on <strong>{scheduledDeletionDate:MMMM dd, yyyy}</strong>.</p>
 
             <p>You have two options:</p>
 
@@ -60,20 +60,20 @@ public static partial class EmailTemplates
         </div>
         <div class='footer'>
             <p>This is an automated message, please do not reply to this email.</p>
-            <p>© 2024 Restaurant System. All rights reserved.</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
+        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
         {
-            return $@"Restaurant System - Account Deletion Request
+            return $@"{brand.Name} - Account Deletion Request
 
 Hello {firstName} {lastName},
 
-We received a request to delete your Restaurant System account. Your account is scheduled for permanent deletion on {scheduledDeletionDate:MMMM dd, yyyy}.
+We received a request to delete your {brand.Name} account. Your account is scheduled for permanent deletion on {scheduledDeletionDate:MMMM dd, yyyy}.
 
 You have two options:
 
@@ -90,7 +90,7 @@ IMPORTANT: If you take no action, your account will be automatically deleted on 
 If you did not request this, please change your password immediately.
 
 This is an automated message, please do not reply to this email.
-© 2024 Restaurant System. All rights reserved.";
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

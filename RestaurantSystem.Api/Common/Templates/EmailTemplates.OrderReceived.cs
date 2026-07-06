@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderReceived
     {
-        public static string Subject => "Order Received - Rumi Restaurant";
+        public static string GetSubject(EmailBranding brand) => $"Order Received - {brand.Name}";
 
-        public static string GetHtmlBody(string customerName, string orderNumber, string orderType, decimal total,
+        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
             IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
@@ -67,12 +67,12 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Rumi Restaurant</h1>
+            <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
             <h2>Order Received</h2>
             <p>Dear {customerName},</p>
-            <p>Thank you for your order at Rumi Restaurant! We have received your order details.</p>
+            <p>Thank you for your order at {brand.Name}! We have received your order details.</p>
 
             <div class='order-number'>
                 <div class='order-number-label'>ORDER NUMBER</div>
@@ -108,18 +108,18 @@ public static partial class EmailTemplates
 
             <p>You can track your order status in your account. If you have any questions, please contact us at {email}</p>
             <p>We look forward to serving you!</p>
-            <p>Best regards,<br>Rumi Restaurant Team</p>
+            <p>Best regards,<br>{brand.Name} Team</p>
         </div>
         <div class='footer'>
-            <p>Rumi Restaurant | Geneva | {email}</p>
-            <p>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p>{brand.Name} | {brand.City} | {email}</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string customerName, string orderNumber, string orderType, decimal total,
+        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
             IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
@@ -149,13 +149,13 @@ Delivery Address:
                 _ => orderType
             };
 
-            return $@"Rumi Restaurant - Order Received
+            return $@"{brand.Name} - Order Received
 
 ORDER RECEIVED
 
 Dear {customerName},
 
-Thank you for your order at Rumi Restaurant! We have received your order details.
+Thank you for your order at {brand.Name}! We have received your order details.
 
 ORDER NUMBER: {orderNumber}
 
@@ -173,10 +173,10 @@ You can track your order status in your account. If you have any questions, plea
 We look forward to serving you!
 
 Best regards,
-Rumi Restaurant Team
+{brand.Name} Team
 
-Rumi Restaurant | Geneva | {email}
-© 2024 Rumi Restaurant. All rights reserved.";
+{brand.Name} | {brand.City} | {email}
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }
