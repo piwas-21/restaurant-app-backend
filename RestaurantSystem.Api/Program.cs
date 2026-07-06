@@ -240,6 +240,12 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
+// Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
+// section means admin seeding is skipped (roles still seed) — see issue #116.
+// Per-tenant provisioning injects SeedSettings__AdminEmail/__AdminPassword env
+// vars (sofra ADR-003); env vars override JSON here.
+builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.SeedSettings>(builder.Configuration.GetSection("SeedSettings"));
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 

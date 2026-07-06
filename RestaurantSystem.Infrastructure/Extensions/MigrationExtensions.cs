@@ -2,9 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Infrastructure.Persistence.Seeders;
+using RestaurantSystem.Infrastructure.Settings;
 
 
 namespace RestaurantSystem.Infrastructure.Extensions
@@ -40,9 +42,10 @@ namespace RestaurantSystem.Infrastructure.Extensions
                 await GlobalIngredientsSeeder.SeedAsync(dbContext, logger);
                 logger.LogInformation("Global ingredients data seeded successfully");
 
-                // Seed users and roles
+                // Seed users and roles (admin credentials from SeedSettings — issue #116)
                 logger.LogInformation("Seeding users and roles");
-                await UserSeeder.SeedAsync(userManager, roleManager, logger);
+                var seedSettings = scope.ServiceProvider.GetService<IOptions<SeedSettings>>()?.Value ?? new SeedSettings();
+                await UserSeeder.SeedAsync(userManager, roleManager, logger, seedSettings);
                 logger.LogInformation("Users and roles seeded successfully");
 
                 // Seed working hours
