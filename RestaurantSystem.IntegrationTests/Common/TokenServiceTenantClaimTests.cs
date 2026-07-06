@@ -40,10 +40,12 @@ public class TokenServiceTenantClaimTests
         RefreshToken = string.Empty,
     };
 
-    [Fact]
-    public void GenerateAccessToken_WithTenantSlugConfigured_EmitsTenantClaim()
+    [Theory]
+    [InlineData("demo")]
+    [InlineData("  demo  ")] // env-injected values may carry stray whitespace
+    public void GenerateAccessToken_WithTenantSlugConfigured_EmitsTrimmedTenantClaim(string tenantSlug)
     {
-        var token = CreateTokenService("demo").GenerateAccessToken(CreateUser());
+        var token = CreateTokenService(tenantSlug).GenerateAccessToken(CreateUser());
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
         jwt.Claims.Should().ContainSingle(c => c.Type == TokenService.TenantClaimType)

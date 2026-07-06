@@ -39,7 +39,9 @@ namespace RestaurantSystem.Api.Common.Services
 
             if (!string.IsNullOrWhiteSpace(_jwtSettings.TenantSlug))
             {
-                claims.Add(new Claim(TenantClaimType, _jwtSettings.TenantSlug));
+                // Trim: env-injected values can carry stray whitespace that
+                // would otherwise end up inside the claim.
+                claims.Add(new Claim(TenantClaimType, _jwtSettings.TenantSlug.Trim()));
             }
 
             var expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
