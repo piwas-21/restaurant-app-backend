@@ -52,6 +52,13 @@ namespace RestaurantSystem.Infrastructure.Extensions
                 logger.LogInformation("Seeding working hours");
                 await WorkingHoursSeeder.SeedAsync(dbContext, logger);
                 logger.LogInformation("Working hours seeded successfully");
+
+                // Seed tenant identity into the RestaurantInfo singleton
+                // (pristine migration-seeded row only — issue #120)
+                logger.LogInformation("Seeding restaurant info");
+                var restaurantInfoSeed = scope.ServiceProvider.GetService<IOptions<RestaurantInfoSeedSettings>>()?.Value ?? new RestaurantInfoSeedSettings();
+                await RestaurantInfoSeeder.SeedAsync(dbContext, logger, restaurantInfoSeed);
+                logger.LogInformation("Restaurant info seeding completed");
             }
             catch (Exception ex)
             {

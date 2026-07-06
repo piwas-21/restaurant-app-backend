@@ -246,6 +246,12 @@ builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("Pr
 // vars (sofra ADR-003); env vars override JSON here.
 builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.SeedSettings>(builder.Configuration.GetSection("SeedSettings"));
 
+// Tenant identity for the RestaurantInfo singleton, consumed by
+// RestaurantInfoSeeder on the first boot of a fresh database only — see issue
+// #120. Provisioning injects RestaurantInfoSeed__Name/__City/__Email from the
+// tenant registry (sofra ADR-003); an empty section means the seeder is a no-op.
+builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantInfoSeedSettings>(builder.Configuration.GetSection("RestaurantInfoSeed"));
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
