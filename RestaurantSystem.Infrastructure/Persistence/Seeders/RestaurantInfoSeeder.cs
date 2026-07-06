@@ -39,7 +39,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Seeders
 
             info.Name = settings.Name.Trim();
             info.Email = settings.Email.Trim();
-            info.City = settings.City.Trim();
+            // City is optional; defensive null-coalesce in case a caller
+            // constructs the settings with a null (config binding never does).
+            info.City = (settings.City ?? string.Empty).Trim();
 
             // The migration seeds tenant-1 (RUMI) identity; none of it belongs
             // on a fresh tenant install. Fields the registry doesn't provide
