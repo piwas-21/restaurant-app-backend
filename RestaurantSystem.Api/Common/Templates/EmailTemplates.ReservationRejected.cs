@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class ReservationRejected
     {
-        public static string Subject => "Reservation Update - Rumi Restaurant";
+        public static string GetSubject(EmailBranding brand) => $"Reservation Update - {brand.Name}";
 
-        public static string GetHtmlBody(string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
+        public static string GetHtmlBody(EmailBranding brand, string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
         {
             var email = contactEmail;
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
@@ -34,7 +34,7 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Rumi Restaurant</h1>
+            <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
             <h2>Reservation Update</h2>
@@ -55,23 +55,23 @@ public static partial class EmailTemplates
             <p>We encourage you to try booking for another date or time. You can make a new reservation on our website or contact us directly.</p>
             <p>If you have any questions, please don't hesitate to reach out to us at {email} or call us.</p>
             <p>We hope to welcome you soon!</p>
-            <p>Best regards,<br>Rumi Restaurant Team</p>
+            <p>Best regards,<br>{brand.Name} Team</p>
         </div>
         <div class='footer'>
-            <p>Rumi Restaurant | Geneva | {email}</p>
-            <p>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p>{brand.Name} | {brand.City} | {email}</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
+        public static string GetTextBody(EmailBranding brand, string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
         {
             var email = contactEmail;
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
 
-            return $@"Rumi Restaurant - Reservation Update
+            return $@"{brand.Name} - Reservation Update
 
 Dear {customerName},
 
@@ -92,10 +92,10 @@ If you have any questions, please don't hesitate to reach out to us at {email} o
 We hope to welcome you soon!
 
 Best regards,
-Rumi Restaurant Team
+{brand.Name} Team
 
-Rumi Restaurant | Geneva | {email}
-© 2024 Rumi Restaurant. All rights reserved.";
+{brand.Name} | {brand.City} | {email}
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

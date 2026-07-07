@@ -240,6 +240,18 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
+// Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
+// section means admin seeding is skipped (roles still seed) — see issue #116.
+// Per-tenant provisioning injects SeedSettings__AdminEmail/__AdminPassword env
+// vars (sofra ADR-003); env vars override JSON here.
+builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.SeedSettings>(builder.Configuration.GetSection("SeedSettings"));
+
+// Tenant identity for the RestaurantInfo singleton, consumed by
+// RestaurantInfoSeeder on the first boot of a fresh database only — see issue
+// #120. Provisioning injects RestaurantInfoSeed__Name/__City/__Email from the
+// tenant registry (sofra ADR-003); an empty section means the seeder is a no-op.
+builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantInfoSeedSettings>(builder.Configuration.GetSection("RestaurantInfoSeed"));
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
@@ -349,6 +361,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transport (Smtp | Resend)
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();

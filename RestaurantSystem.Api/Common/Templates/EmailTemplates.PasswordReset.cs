@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class PasswordReset
     {
-        public static string Subject => "Reset Your Password - Restaurant System";
+        public static string GetSubject(EmailBranding brand) => $"Reset Your Password - {brand.Name}";
 
-        public static string GetHtmlBody(string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
+        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
         {
             return $@"
 <!DOCTYPE html>
@@ -31,12 +31,12 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Restaurant System</h1>
+            <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
             <h2>Password Reset Request</h2>
             <p>Hello {firstName} {lastName},</p>
-            <p>We received a request to reset your password for your Restaurant System account. If you didn't make this request, please ignore this email.</p>
+            <p>We received a request to reset your password for your {brand.Name} account. If you didn't make this request, please ignore this email.</p>
             <p>To reset your password, click the button below:</p>
             <div style='text-align: center;'>
                 <a href='{resetUrl}' class='button'>Reset Password</a>
@@ -47,24 +47,24 @@ public static partial class EmailTemplates
                 <strong>⚠️ Important:</strong> This link will expire in {expirationMinutes} minutes for security reasons.
             </div>
             <p>If you have any questions, please contact our support team.</p>
-            <p>Best regards,<br>The Restaurant System Team</p>
+            <p>Best regards,<br>The {brand.Name} Team</p>
         </div>
         <div class='footer'>
             <p>This is an automated message, please do not reply to this email.</p>
-            <p>© 2024 Restaurant System. All rights reserved.</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
+        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
         {
-            return $@"Restaurant System - Password Reset Request
+            return $@"{brand.Name} - Password Reset Request
 
 Hello {firstName} {lastName},
 
-We received a request to reset your password for your Restaurant System account. If you didn't make this request, please ignore this email.
+We received a request to reset your password for your {brand.Name} account. If you didn't make this request, please ignore this email.
 
 To reset your password, visit the following link:
 {resetUrl}
@@ -74,10 +74,10 @@ IMPORTANT: This link will expire in {expirationMinutes} minutes for security rea
 If you have any questions, please contact our support team.
 
 Best regards,
-The Restaurant System Team
+The {brand.Name} Team
 
 This is an automated message, please do not reply to this email.
-© 2024 Restaurant System. All rights reserved.";
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

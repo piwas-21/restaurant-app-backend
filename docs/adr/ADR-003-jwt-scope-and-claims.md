@@ -1,6 +1,6 @@
 # ADR-003 — JWT scope and claim shape
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-07-06 — tenant claim, see §Amendment)
 **Date:** 2026-04-26
 **Author:** mahmutkaya
 **Reviewers:** —
@@ -78,7 +78,7 @@ These wrap `RequireRoleAttribute` for clarity at the callsite.
 ### Negative
 - **Revocation latency = token TTL.** A compromised access token is valid until expiry. Mitigated by short lifetime (60 min) + refresh-token revocation in DB.
 - **Role changes don't take effect until token refresh.** If admin demotes a user mid-session, that user retains admin permissions for up to 60 min. Acceptable for current trust model; would need tighter control if we add high-risk operations.
-- **No per-tenant claim.** Today there's only one restaurant. If RUMI becomes SaaS multi-tenant, every existing token + every authorization check needs a tenant claim. Flagged as a SaaS-prerequisite ADR.
+- ~~**No per-tenant claim.** Today there's only one restaurant. If RUMI becomes SaaS multi-tenant, every existing token + every authorization check needs a tenant claim. Flagged as a SaaS-prerequisite ADR.~~ Resolved by the 2026-07-06 amendment below (issue #117).
 - **Email in a claim** — if a user changes their email, old tokens still show the old email until refresh. Display-only impact; not a security issue.
 
 ### Mitigation for the negatives
@@ -95,3 +95,31 @@ Public-key verification would let us share tokens with a separate verifier servi
 
 ### Alternative C: Embedding more user state in the token (FullName, Phone, Address)
 Saves DB lookups for read-mostly UI views (e.g. show the user's name in the header). Rejected because (a) any change in user data is invisible until token refresh, (b) PII surface grows — a leaked log line now exposes more, (c) tokens get larger.
+
+---
+
+## Amendment 2026-07-06 — `tenant` claim + per-tenant config surface (issue #117)
+
+Sofra went **strangler-fig / instance-per-tenant** (sofra ADR-001): each tenant runs its own backend + DB, so a token never crosses a tenant boundary and per-request tenant authorization is NOT needed today. The claim below is groundwork that makes a later consolidation (shared multi-tenant API tier) cheap instead of a full token/authz retrofit.
+
+### `tenant` claim
+
+| Claim | Source | Purpose |
+|---|---|---|
+| `tenant` | `JwtSettings.TenantSlug` (constant per install; provisioning injects `JwtSettings__TenantSlug` from the tenant registry — sofra ADR-003/ADR-007) | Identifies which tenant instance issued the token. **Emitted only when configured**; absent on the legacy RUMI install until its env is updated. Not used in any authorization check yet. |
+
+Claim name constant: `TokenService.TenantClaimType`. No validation-side change: tokens with and without the claim verify identically (`TokenValidationParameters` untouched), so rollout is additive and requires no re-login.
+
+### Per-tenant configuration surface (documented for provisioning)
+
+Under instance-per-tenant, "tenant identity" lives in configuration, not in the DB schema. The sections a tenant install varies by (all overridable via `Section__Key` env vars injected by `provision-tenant.sh`):
+
+| Section | Per-tenant keys | Notes |
+|---|---|---|
+| `JwtSettings` | `TenantSlug`, `Issuer`, `Audience`, `Secret` | Issuer/audience/secret are already per-install secrets; TenantSlug added by this amendment |
+| `EmailSettings` | `AdminEmail`, `FromEmail`, `FromName`, `FrontendBaseUrl`, `BackendBaseUrl` | Branding/routing of all outbound mail (see also #119 — template branding comes from `RestaurantInfo`) |
+| `CorsSettings` | `AllowedOrigins` | Must list the tenant's frontend origin(s) |
+| `SeedSettings` | `AdminEmail`, `AdminPassword`, `AdminFirstName`, `AdminLastName` | First-boot admin bootstrap (#116) |
+| `ConnectionStrings` | `DefaultConnection` | Per-tenant database |
+
+Follow-up in the same series: seeding `RestaurantInfo` (name/city/email) from tenant env at first boot — issue #120.

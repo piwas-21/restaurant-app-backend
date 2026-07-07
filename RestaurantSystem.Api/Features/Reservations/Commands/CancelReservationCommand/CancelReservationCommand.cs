@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
@@ -15,17 +16,20 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly IEmailBrandingProvider _brandingProvider;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<CancelReservationCommandHandler> _logger;
 
     public CancelReservationCommandHandler(
         ApplicationDbContext context,
         IEmailService emailService,
+        IEmailBrandingProvider brandingProvider,
         IOptions<EmailSettings> emailSettings,
         ILogger<CancelReservationCommandHandler> logger)
     {
         _context = context;
         _emailService = emailService;
+        _brandingProvider = brandingProvider;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
@@ -58,10 +62,13 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
             // Send rejection email to customer
             try
             {
+                var brand = await _brandingProvider.GetAsync(cancellationToken);
+
                 await _emailService.SendEmailAsync(
                     reservation.CustomerEmail,
-                    Common.Templates.EmailTemplates.ReservationRejected.Subject,
+                    Common.Templates.EmailTemplates.ReservationRejected.GetSubject(brand),
                     Common.Templates.EmailTemplates.ReservationRejected.GetHtmlBody(
+                        brand,
                         reservation.CustomerName,
                         reservation.ReservationDate,
                         reservation.StartTime,
@@ -69,6 +76,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
                         _emailSettings.AdminEmail
                     ),
                     Common.Templates.EmailTemplates.ReservationRejected.GetTextBody(
+                        brand,
                         reservation.CustomerName,
                         reservation.ReservationDate,
                         reservation.StartTime,

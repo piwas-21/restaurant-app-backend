@@ -11,6 +11,13 @@ namespace RestaurantSystem.Api.Common.Services
 {
     public class TokenService : ITokenService
     {
+        /// <summary>
+        /// Claim carrying the tenant slug (ADR-003 amendment). Constant per
+        /// install under instance-per-tenant; groundwork for any later
+        /// consolidated multi-tenant deployment.
+        /// </summary>
+        public const string TenantClaimType = "tenant";
+
         private readonly JwtSettings _jwtSettings;
 
         public TokenService(IOptions<JwtSettings> jwtSettings)
@@ -29,6 +36,13 @@ namespace RestaurantSystem.Api.Common.Services
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };
+
+            if (!string.IsNullOrWhiteSpace(_jwtSettings.TenantSlug))
+            {
+                // Trim: env-injected values can carry stray whitespace that
+                // would otherwise end up inside the claim.
+                claims.Add(new Claim(TenantClaimType, _jwtSettings.TenantSlug.Trim()));
+            }
 
             var expires = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
 

@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderCancelled
     {
-        public static string Subject => "Order Cancelled - Rumi Restaurant";
+        public static string GetSubject(EmailBranding brand) => $"Order Cancelled - {brand.Name}";
 
-        public static string GetHtmlBody(string customerName, string orderNumber, string cancellationReason, string contactEmail)
+        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, string cancellationReason, string contactEmail)
         {
             var email = contactEmail;
             return $@"
@@ -34,7 +34,7 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Rumi Restaurant</h1>
+            <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
             <h2>Order Cancelled</h2>
@@ -53,21 +53,21 @@ public static partial class EmailTemplates
 
             <p>If you have any questions or concerns, please don't hesitate to contact us at {email} or call us.</p>
             <p>We apologize for any inconvenience and hope to serve you again soon.</p>
-            <p>Best regards,<br>Rumi Restaurant Team</p>
+            <p>Best regards,<br>{brand.Name} Team</p>
         </div>
         <div class='footer'>
-            <p>Rumi Restaurant | Geneva | {email}</p>
-            <p>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p>{brand.Name} | {brand.City} | {email}</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string customerName, string orderNumber, string cancellationReason, string contactEmail)
+        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, string cancellationReason, string contactEmail)
         {
             var email = contactEmail;
-            return $@"Rumi Restaurant - Order Cancelled
+            return $@"{brand.Name} - Order Cancelled
 
 Dear {customerName},
 
@@ -83,10 +83,10 @@ If you have any questions or concerns, please don't hesitate to contact us at {e
 We apologize for any inconvenience and hope to serve you again soon.
 
 Best regards,
-Rumi Restaurant Team
+{brand.Name} Team
 
-Rumi Restaurant | Geneva | {email}
-© 2024 Rumi Restaurant. All rights reserved.";
+{brand.Name} | {brand.City} | {email}
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

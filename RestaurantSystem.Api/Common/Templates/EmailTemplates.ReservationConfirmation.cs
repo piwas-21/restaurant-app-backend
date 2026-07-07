@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class ReservationConfirmation
     {
-        public static string Subject => "Reservation Confirmation - Rumi Restaurant";
+        public static string GetSubject(EmailBranding brand) => $"Reservation Confirmation - {brand.Name}";
 
-        public static string GetHtmlBody(string customerName, string tableNumber, DateTime reservationDate,
+        public static string GetHtmlBody(EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
             TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
             string? specialRequests = null)
         {
@@ -41,12 +41,12 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Rumi Restaurant</h1>
+            <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
             <h2>Reservation Received</h2>
             <p>Dear {customerName},</p>
-            <p>Thank you for your reservation request at Rumi Restaurant. We have received your booking details:</p>
+            <p>Thank you for your reservation request at {brand.Name}. We have received your booking details:</p>
 
             <div class='info-box'>
                 <strong>📅 Date:</strong> {reservationDate:dddd, MMMM dd, yyyy}<br>
@@ -64,18 +64,18 @@ public static partial class EmailTemplates
 
             <p>If you need to make any changes or have questions, please contact us at {email}</p>
             <p>We look forward to serving you!</p>
-            <p>Best regards,<br>Rumi Restaurant Team</p>
+            <p>Best regards,<br>{brand.Name} Team</p>
         </div>
         <div class='footer'>
-            <p>Rumi Restaurant | Geneva | {email}</p>
-            <p>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p>{brand.Name} | {brand.City} | {email}</p>
+            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string customerName, string tableNumber, DateTime reservationDate,
+        public static string GetTextBody(EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
             TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
             string? specialRequests = null)
         {
@@ -87,11 +87,11 @@ public static partial class EmailTemplates
 Special Requests:
 {specialRequests}";
 
-            return $@"Rumi Restaurant - Reservation Received
+            return $@"{brand.Name} - Reservation Received
 
 Dear {customerName},
 
-Thank you for your reservation request at Rumi Restaurant. We have received your booking details:
+Thank you for your reservation request at {brand.Name}. We have received your booking details:
 
 Date: {reservationDate:dddd, MMMM dd, yyyy}
 Time: {startTime:hh':'mm} - {endTime:hh':'mm}
@@ -106,10 +106,10 @@ If you need to make any changes or have questions, please contact us at {email}
 We look forward to serving you!
 
 Best regards,
-Rumi Restaurant Team
+{brand.Name} Team
 
-Rumi Restaurant | Geneva | {email}
-© 2024 Rumi Restaurant. All rights reserved.";
+{brand.Name} | {brand.City} | {email}
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }

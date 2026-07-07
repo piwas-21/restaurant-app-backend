@@ -7,9 +7,9 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderConfirmationAdmin
     {
-        public static string Subject => "New Order - Rumi Restaurant";
+        public static string GetSubject(EmailBranding brand) => $"New Order - {brand.Name}";
 
-        public static string GetHtmlBody(string orderNumber, string customerName, string customerEmail, string customerPhone,
+        public static string GetHtmlBody(EmailBranding brand, string orderNumber, string customerName, string customerEmail, string customerPhone,
             string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
             string baseUrl, string frontendBaseUrl, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
@@ -70,7 +70,7 @@ public static partial class EmailTemplates
     <div class='light-only' style='max-width: 600px; margin: 0 auto; background: #ffffff;'>
         <!-- Header -->
         <div style='background: linear-gradient(135deg, #d4af37 0%, #f4c430 100%); padding: 32px 24px; text-align: center;'>
-            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ Rumi Restaurant</h1>
+            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
             <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>New Order Notification</p>
         </div>
 
@@ -164,14 +164,14 @@ public static partial class EmailTemplates
 
             <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;'>
                 <p style='margin: 0 0 8px 0; color: #6b7280; font-size: 14px;'>The customer will be notified automatically after you take action.</p>
-                <p style='margin: 0; color: #111827; font-size: 14px;'><strong>Best regards,</strong><br>Restaurant System</p>
+                <p style='margin: 0; color: #111827; font-size: 14px;'><strong>Best regards,</strong><br>{brand.Name}</p>
             </div>
         </div>
 
         <!-- Footer -->
         <div style='background: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;'>
-            <p style='margin: 0 0 8px 0; color: #6b7280; font-size: 13px;'><strong>Rumi Restaurant</strong> | Geneva | {email}</p>
-            <p style='margin: 0; color: #9ca3af; font-size: 12px;'>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p style='margin: 0 0 8px 0; color: #6b7280; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
+            <p style='margin: 0; color: #9ca3af; font-size: 12px;'>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 
@@ -179,7 +179,7 @@ public static partial class EmailTemplates
     <div class='dark-only' style='max-width: 600px; margin: 0 auto; background: #1f2937;'>
         <!-- Header -->
         <div style='background: linear-gradient(135deg, #b8941f 0%, #d4af37 100%); padding: 32px 24px; text-align: center;'>
-            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ Rumi Restaurant</h1>
+            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
             <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>New Order Notification</p>
         </div>
 
@@ -273,21 +273,21 @@ public static partial class EmailTemplates
 
             <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid #4b5563;'>
                 <p style='margin: 0 0 8px 0; color: #9ca3af; font-size: 14px;'>The customer will be notified automatically after you take action.</p>
-                <p style='margin: 0; color: #f9fafb; font-size: 14px;'><strong>Best regards,</strong><br>Restaurant System</p>
+                <p style='margin: 0; color: #f9fafb; font-size: 14px;'><strong>Best regards,</strong><br>{brand.Name}</p>
             </div>
         </div>
 
         <!-- Footer -->
         <div style='background: #374151; padding: 24px; text-align: center; border-top: 1px solid #4b5563;'>
-            <p style='margin: 0 0 8px 0; color: #9ca3af; font-size: 13px;'><strong>Rumi Restaurant</strong> | Geneva | {email}</p>
-            <p style='margin: 0; color: #6b7280; font-size: 12px;'>© 2024 Rumi Restaurant. All rights reserved.</p>
+            <p style='margin: 0 0 8px 0; color: #9ca3af; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
+            <p style='margin: 0; color: #6b7280; font-size: 12px;'>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(string orderNumber, string customerName, string customerEmail, string customerPhone,
+        public static string GetTextBody(EmailBranding brand, string orderNumber, string customerName, string customerEmail, string customerPhone,
             string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
             string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
@@ -318,7 +318,7 @@ Delivery Address:
                 _ => orderType
             };
 
-            return $@"Rumi Restaurant - New Order
+            return $@"{brand.Name} - New Order
 
 📦 NEW ORDER RECEIVED
 
@@ -340,10 +340,10 @@ Please prepare this order for {(orderType == "Delivery" ? "delivery" : orderType
 Log in to your admin dashboard to manage this order.
 
 Best regards,
-Restaurant System
+{brand.Name}
 
-Rumi Restaurant | Geneva | {email}
-© 2024 Rumi Restaurant. All rights reserved.";
+{brand.Name} | {brand.City} | {email}
+© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
         }
     }
 }
