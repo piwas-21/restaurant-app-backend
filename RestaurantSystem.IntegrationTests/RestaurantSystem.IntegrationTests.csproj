@@ -9,7 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="coverlet.collector" Version="6.0.2" />
+		<PackageReference Include="coverlet.collector" Version="10.0.1" />
 		<!-- coverlet.msbuild lets us pass /p:Threshold=NN to fail the build
 		     below a coverage floor; coverlet.collector does data collection
 		     only. Both are needed because each runs in a different mode. -->
