@@ -36,8 +36,7 @@ public class DatabaseFixture : IAsyncLifetime
         }
         else
         {
-            _postgres = new PostgreSqlBuilder()
-                .WithImage("postgres:16-alpine")
+            _postgres = new PostgreSqlBuilder("postgres:16-alpine")
                 .WithDatabase("restaurant_test")
                 .WithUsername("test")
                 .WithPassword("test")
