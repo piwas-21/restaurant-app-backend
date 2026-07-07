@@ -170,6 +170,7 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 - **Pre-commit** (on `git commit`): trailing-whitespace / EOF / large-files / secret-scan / no-commit-to-protected; `dotnet format`; file-length (§4).
 - **CI**: `dotnet build` warnings-as-errors (`Directory.Build.props`); `dotnet test` (integration, Testcontainers) + coverage floor (line ≥ 17 / branch ≥ 9 / method ≥ 15%, migrations excluded — raise as coverage grows); `dotnet format`; file-length; CodeQL; Gitleaks. **Trivy** image scan is currently non-blocking (Sprint 4 flips it for CRITICAL/HIGH).
+- **Roslyn analyzers** (DEV-PHASES W1): built-in .NET analyzers at `AnalysisMode=Recommended` + **Meziantou.Analyzer** (`Directory.Build.props`; SonarAnalyzer deliberately omitted — SonarCloud autoscan covers it server-side). Pre-existing violations are **baselined in the root `.editorconfig`** as `suggestion`-severity rules (so warnings-as-errors stays green while findings stay IDE-visible). **Ratchet:** when a rule's violation count reaches zero, delete its `.editorconfig` line — it then enforces at warning = error. EF migrations are excluded as generated code. Do NOT set `EnforceCodeStyleInBuild` — IDExxxx style rules belong to the `dotnet format` job.
 - **New-dev setup**: `bash scripts/setup_hooks.sh` (hooks) · `bash scripts/dev-up.sh` (DB + migrate + run API).
 
 ---

@@ -238,8 +238,8 @@ public class EventsController : ControllerBase
         // - ip-api.com
 
         // For localhost/private IPs, return a default
-        if (ipAddress == "Unknown" || ipAddress.StartsWith("127.") || ipAddress.StartsWith("192.168.") ||
-            ipAddress.StartsWith("10.") || ipAddress == "::1" || ipAddress.StartsWith("172."))
+        if (ipAddress == "Unknown" || ipAddress.StartsWith("127.", StringComparison.Ordinal) || ipAddress.StartsWith("192.168.", StringComparison.Ordinal) ||
+            ipAddress.StartsWith("10.", StringComparison.Ordinal) || ipAddress == "::1" || ipAddress.StartsWith("172.", StringComparison.Ordinal))
         {
             return "Local";
         }

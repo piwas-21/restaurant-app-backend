@@ -14,7 +14,7 @@ public record CreateTableDto
 
     public bool IsActive { get; set; } = true;
 
-    public bool IsOutdoor { get; set; } = false;
+    public bool IsOutdoor { get; set; }
 
     [Range(0, 10000)]
     public decimal PositionX { get; set; }

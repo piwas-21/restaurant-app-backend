@@ -19,7 +19,7 @@ public class CreatePointEarningRuleDto
     public decimal? MaxOrderAmount { get; set; }
     public int PointsAwarded { get; set; }
     public bool IsActive { get; set; } = true;
-    public int Priority { get; set; } = 0;
+    public int Priority { get; set; }
 }
 
 public class UpdatePointEarningRuleDto

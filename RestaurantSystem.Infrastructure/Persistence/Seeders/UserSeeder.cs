@@ -11,7 +11,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Seeders
         public static async Task SeedAsync(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole<Guid>> roleManager, ILogger logger, SeedSettings seedSettings)
         {
             // Seed Roles
-            foreach (var roleName in Enum.GetNames(typeof(UserRole)))
+            foreach (var roleName in Enum.GetNames<UserRole>())
             {
                 if (!await roleManager.RoleExistsAsync(roleName))
                 {

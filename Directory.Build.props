@@ -29,4 +29,30 @@
     </WarningsNotAsErrors>
   </PropertyGroup>
 
+  <!--
+    DEV-PHASES W1: Roslyn analyzers.
+
+    - AnalysisLevel latest + AnalysisMode Recommended dials the built-in
+      .NET SDK analyzers (CAxxxx) up from the minimal default set.
+    - Meziantou.Analyzer adds MAxxxx rules (async/culture/perf correctness).
+    - SonarAnalyzer.CSharp is deliberately NOT added: SonarCloud automatic
+      analysis already runs those rules server-side; a local copy would
+      duplicate findings and double build cost.
+    - EnforceCodeStyleInBuild stays off: IDExxxx style rules are owned by
+      the `dotnet format` CI job, not the compiler.
+
+    Pre-existing violations are baselined in the root .editorconfig as
+    suggestion-severity rules (ratchet: promote back to warning as their
+    violation counts reach zero). EF migrations are excluded there as
+    generated code.
+  -->
+  <PropertyGroup>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <PackageReference Include="Meziantou.Analyzer" Version="3.0.121" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+  </ItemGroup>
+
 </Project>
