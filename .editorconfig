@@ -35,6 +35,7 @@ dotnet_diagnostic.CA1860.severity = suggestion  #  35 — prefer Count/Length ==
 dotnet_diagnostic.CA1861.severity = suggestion  #  19 — avoid constant arrays as arguments (tests)
 dotnet_diagnostic.CA1862.severity = suggestion  #  12 — use StringComparison for case-insensitive compares
 dotnet_diagnostic.CA1869.severity = suggestion  #   9 — cache and reuse JsonSerializerOptions
+dotnet_diagnostic.CA1873.severity = suggestion  #   8 — guard expensive log-arg evaluation (seeders; surfaces only on the CI SDK, newer than local 10.0.101 — no global.json pin)
 dotnet_diagnostic.CA2016.severity = suggestion  #   2 — forward the CancellationToken
 dotnet_diagnostic.CA2201.severity = suggestion  #   4 — do not raise reserved exception types
 dotnet_diagnostic.CA2254.severity = suggestion  #  35 — logging message template should be constant
