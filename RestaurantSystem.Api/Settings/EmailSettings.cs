@@ -106,7 +106,7 @@ public class EmailSettings
     /// <summary>
     /// Whether to log emails instead of sending them (useful for development)
     /// </summary>
-    public bool LogEmailsOnly { get; set; } = false;
+    public bool LogEmailsOnly { get; set; }
 
     /// <summary>
     /// Maximum number of retry attempts for failed emails

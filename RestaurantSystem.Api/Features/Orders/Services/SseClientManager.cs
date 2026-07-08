@@ -176,5 +176,6 @@ public class SseClientManager : ISseClientManager, IDisposable
             client.Dispose();
         }
         _clients.Clear();
+        GC.SuppressFinalize(this);
     }
 }

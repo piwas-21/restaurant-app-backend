@@ -90,8 +90,7 @@ namespace RestaurantSystem.Api.Common
             where TRequest : notnull
         {
             var behaviors = _serviceProvider
-                .GetServices(typeof(IPipelineBehavior<TRequest, TResult>))
-                .Cast<IPipelineBehavior<TRequest, TResult>>()
+                .GetServices<IPipelineBehavior<TRequest, TResult>>()
                 .Reverse()
                 .ToList();
 

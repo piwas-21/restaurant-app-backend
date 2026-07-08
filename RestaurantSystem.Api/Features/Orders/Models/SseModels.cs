@@ -69,6 +69,7 @@ public class SseClient : IDisposable
             WriteLock.Dispose();
             _disposed = true;
         }
+        GC.SuppressFinalize(this);
     }
 }
 
