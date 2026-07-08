@@ -72,8 +72,11 @@ public class ReservationRetentionService : BackgroundService
             {
                 await ScrubExpiredReservations(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // OperationCanceledException on shutdown (stoppingToken cancelled mid-sweep)
+                // is normal, not an error — let it propagate out and end the loop quietly
+                // instead of logging a false-positive error every time the host stops.
                 _logger.LogError(ex, "Error occurred while scrubbing expired-reservation PII.");
             }
 
@@ -96,24 +99,53 @@ public class ReservationRetentionService : BackgroundService
         // idempotent and doesn't rewrite the same rows every run. CustomerId is left
         // intact — the account link is governed by the account lifecycle
         // (AccountCleanupService nulls it on deletion); here we only drop the redundant
-        // contact snapshot on the reservation itself. Set-based update (no tracking,
-        // no unbounded ToList) keeps this O(1) in memory over any backlog size.
-        var scrubbed = await context.Reservations
-            .Where(r => r.ReservationDate < cutoff && r.CustomerEmail != Erased)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.CustomerName, Erased)
-                .SetProperty(r => r.CustomerEmail, Erased)
-                .SetProperty(r => r.CustomerPhone, Erased)
-                .SetProperty(r => r.SpecialRequests, (string?)null)
-                .SetProperty(r => r.Notes, (string?)null), stoppingToken);
+        // contact snapshot on the reservation itself. The set-based ExecuteUpdate is
+        // chunked so the first run after enablement — potentially a large historical
+        // backlog — can't hold one long transaction / lock the table / exhaust the WAL.
+        // We page the IDs first (bounded to batchSize Guids in memory) rather than
+        // `.Take().ExecuteUpdate()`, which doesn't translate to a bounded UPDATE on PostgreSQL.
+        const int batchSize = 1000;
+        var totalScrubbed = 0;
 
-        if (scrubbed > 0)
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var expiredIds = await context.Reservations
+                .Where(r => r.ReservationDate < cutoff && r.CustomerEmail != Erased)
+                .Select(r => r.Id)
+                .Take(batchSize)
+                .ToListAsync(stoppingToken);
+
+            if (expiredIds.Count == 0)
+            {
+                break;
+            }
+
+            var scrubbed = await context.Reservations
+                .Where(r => expiredIds.Contains(r.Id))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.CustomerName, Erased)
+                    .SetProperty(r => r.CustomerEmail, Erased)
+                    .SetProperty(r => r.CustomerPhone, Erased)
+                    .SetProperty(r => r.SpecialRequests, (string?)null)
+                    .SetProperty(r => r.Notes, (string?)null), stoppingToken);
+
+            totalScrubbed += scrubbed;
+
+            // A short page means the backlog is drained — stop. (The `!= Erased` filter
+            // guarantees forward progress: every scrubbed row drops out of the predicate.)
+            if (expiredIds.Count < batchSize)
+            {
+                break;
+            }
+        }
+
+        if (totalScrubbed > 0)
         {
             _logger.LogInformation(
                 "Scrubbed contact PII from {Count} reservations older than {Months} months.",
-                scrubbed, _settings.RetentionMonths);
+                totalScrubbed, _settings.RetentionMonths);
         }
 
-        return scrubbed;
+        return totalScrubbed;
     }
 }
