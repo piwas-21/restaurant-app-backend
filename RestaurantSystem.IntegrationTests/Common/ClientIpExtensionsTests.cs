@@ -45,6 +45,13 @@ public class ClientIpExtensionsTests
     }
 
     [Fact]
+    public void Ignores_a_trailing_comma_or_empty_segment_and_keeps_the_last_real_hop()
+    {
+        Ctx("1.2.3.4, 203.0.113.9, ").GetClientIp().Should().Be("203.0.113.9");
+        Ctx("203.0.113.9,,").GetClientIp().Should().Be("203.0.113.9");
+    }
+
+    [Fact]
     public void Falls_back_to_the_connection_ip_when_the_header_is_absent()
     {
         Ctx(xff: null, remoteIp: "192.0.2.7").GetClientIp().Should().Be("192.0.2.7");

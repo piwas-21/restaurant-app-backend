@@ -14,17 +14,16 @@ public static class ClientIpExtensions
     /// </summary>
     public static string GetClientIp(this HttpContext context)
     {
-        // StringValues.ToString() joins repeated headers with ", ", so a single
-        // split-on-',' + last element covers both one header with a list and
-        // multiple X-Forwarded-For headers.
-        var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
-        if (!string.IsNullOrWhiteSpace(forwarded))
+        // StringValues.ToString() joins repeated headers with ", ", so one split
+        // covers both a single comma-list header and multiple X-Forwarded-For
+        // headers. RemoveEmptyEntries|TrimEntries makes the last hop the last
+        // *non-empty* token, so a trailing comma / stray whitespace can't collapse
+        // it to "" and wrongly fall back to Caddy's proxy IP.
+        var hops = context.Request.Headers["X-Forwarded-For"].ToString()
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (hops.Length > 0)
         {
-            var lastHop = forwarded.Split(',')[^1].Trim();
-            if (lastHop.Length > 0)
-            {
-                return lastHop;
-            }
+            return hops[^1];
         }
 
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
