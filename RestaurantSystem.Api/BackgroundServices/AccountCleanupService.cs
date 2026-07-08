@@ -8,6 +8,10 @@ public class AccountCleanupService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AccountCleanupService> _logger;
 
+    // Tombstone for NON-nullable contact columns on retained business records
+    // (nullable columns are cleared to null instead).
+    private const string Erased = "[erased]";
+
     public AccountCleanupService(
         IServiceProvider serviceProvider,
         ILogger<AccountCleanupService> logger)
@@ -36,7 +40,7 @@ public class AccountCleanupService : BackgroundService
         }
     }
 
-    private async Task ProcessDeletionRequests(CancellationToken stoppingToken)
+    internal async Task ProcessDeletionRequests(CancellationToken stoppingToken)
     {
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -60,14 +64,66 @@ public class AccountCleanupService : BackgroundService
             {
                 var userId = user.Id;
 
-                // Unlink orders and reservations (business records — keep rows, clear FK)
-                await context.Orders
+                // Orders/reservations are retained as business/financial records
+                // (bookkeeping) but the PERSON is erased from them (GDPR Art. 17):
+                // clear the FK AND scrub the denormalized contact snapshots.
+                // Previously only the FK was nulled, so name/email/phone/address
+                // survived — an incomplete erasure. Capture the ids first (before
+                // the FK is cleared) so the delivery-address snapshots can be scrubbed.
+                // soft-delete-bypass: erasure is a permanent purge, NOT a restore —
+                // it must reach soft-deleted orders to remove their PII too.
+                var orderIds = await context.Orders
+                    .IgnoreQueryFilters()
                     .Where(o => o.UserId == userId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(o => o.UserId, (Guid?)null), stoppingToken);
+                    .Select(o => o.Id)
+                    .ToListAsync(stoppingToken);
 
+                // soft-delete-bypass: same GDPR-erasure rationale as the id capture above.
+                await context.Orders
+                    .IgnoreQueryFilters()
+                    .Where(o => o.UserId == userId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(o => o.UserId, (Guid?)null)
+                        .SetProperty(o => o.CustomerName, (string?)null)
+                        .SetProperty(o => o.CustomerEmail, (string?)null)
+                        .SetProperty(o => o.CustomerPhone, (string?)null)
+                        // Free-text fields can embed identifying details too.
+                        .SetProperty(o => o.Notes, (string?)null)
+                        .SetProperty(o => o.CancellationReason, (string?)null)
+                        .SetProperty(o => o.FocusReason, (string?)null), stoppingToken);
+
+                if (orderIds.Count > 0)
+                {
+                    await context.OrderAddresses
+                        .Where(a => orderIds.Contains(a.OrderId))
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(a => a.Label, Erased)
+                            .SetProperty(a => a.AddressLine1, Erased)
+                            .SetProperty(a => a.AddressLine2, (string?)null)
+                            .SetProperty(a => a.City, Erased)
+                            .SetProperty(a => a.State, (string?)null)
+                            .SetProperty(a => a.PostalCode, Erased)
+                            .SetProperty(a => a.Country, Erased)
+                            .SetProperty(a => a.Phone, (string?)null)
+                            .SetProperty(a => a.Latitude, (double?)null)
+                            .SetProperty(a => a.Longitude, (double?)null)
+                            .SetProperty(a => a.DeliveryInstructions, (string?)null), stoppingToken);
+                }
+
+                // Reservation's Name/Email/Phone columns are NOT NULL in the DB
+                // (ReservationConfiguration .IsRequired() + migration nullable:false),
+                // even though the entity types read string?/string — so tombstone
+                // them (nulling would throw a NOT NULL violation here). SpecialRequests
+                // and Notes are nullable free-text → cleared to null.
                 await context.Reservations
                     .Where(r => r.CustomerId == userId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(r => r.CustomerId, (Guid?)null), stoppingToken);
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(r => r.CustomerId, (Guid?)null)
+                        .SetProperty(r => r.CustomerName, Erased)
+                        .SetProperty(r => r.CustomerEmail, Erased)
+                        .SetProperty(r => r.CustomerPhone, Erased)
+                        .SetProperty(r => r.SpecialRequests, (string?)null)
+                        .SetProperty(r => r.Notes, (string?)null), stoppingToken);
 
                 // Unlink discount rule references on orders before deleting discount rules
                 var discountRuleIds = await context.CustomerDiscountRules
