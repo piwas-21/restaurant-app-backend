@@ -58,11 +58,20 @@ public class GetCategoryProductsQueryHandler : IQueryHandler<GetCategoryProducts
 
         var totalCount = await productsQuery.CountAsync(cancellationToken);
 
-        var products = await productsQuery
+        // Materialize the entities first (the Includes above are all
+        // SQL-translatable), THEN project to DTOs in memory. Building the DTOs
+        // inside the IQueryable Select would push the nested
+        // `Descriptions.GroupBy(..).Select(g => g.First()).ToDictionary(..)`
+        // into SQL, which EF Core cannot translate — it threw at query
+        // execution and returned 500 for every request (backend #138).
+        var pagedEntities = await productsQuery
             .OrderBy(pc => pc.DisplayOrder)
             .ThenBy(pc => pc.Product.DisplayOrder)
             .Skip((query.PageNumber - 1) * query.PageSize)
             .Take(query.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var products = pagedEntities
             .Select(pc => new CategoryProductDto
             {
                 Id = pc.Product.Id,
@@ -101,7 +110,7 @@ public class GetCategoryProductsQueryHandler : IQueryHandler<GetCategoryProducts
                             )
                     }).ToList()
             })
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);
 
