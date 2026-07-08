@@ -104,7 +104,7 @@ These run on timers and **delete** records. Never modify retention windows or po
 
 ### Soft delete
 
-All soft-delete-aware entities use `IsDeleted` with a global query filter in `ApplicationDbContext`. Never bypass with `IgnoreQueryFilters()` unless restoring records. See [docs/adr/ADR-002-soft-delete-strategy.md](docs/adr/ADR-002-soft-delete-strategy.md).
+All soft-delete-aware entities use `IsDeleted` with a global query filter in `ApplicationDbContext`. Never bypass with `IgnoreQueryFilters()` unless restoring records **or permanently purging/erasing them** (e.g. GDPR Art. 17 account deletion in `AccountCleanupService`, which must reach soft-deleted rows to erase their PII) — the purge case requires an explicit `// soft-delete-bypass:` justification comment on the call. See [docs/adr/ADR-002-soft-delete-strategy.md](docs/adr/ADR-002-soft-delete-strategy.md).
 
 ---
 

@@ -48,4 +48,10 @@
 	  <Folder Include="Features\Dashboard\" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <!-- Test seam: lets the integration tests drive internal service methods
+	       (e.g. AccountCleanupService.ProcessDeletionRequests) deterministically. -->
+	  <InternalsVisibleTo Include="RestaurantSystem.IntegrationTests" />
+	</ItemGroup>
+
 </Project>
