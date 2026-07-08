@@ -1,9 +1,13 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Categories.Commands.CreateCategoryCommand;
 using RestaurantSystem.Api.Features.Categories.Commands.ReorderCategoriesCommand;
 using RestaurantSystem.Api.Features.Categories.Commands.UpdateCategoryCommand;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
 
@@ -61,13 +65,85 @@ public class CategoriesControllerTests : IntegrationTestBase
         result.Data.Should().BeNull();
     }
 
-    // NOTE: GET /api/categories/{id}/products is intentionally NOT covered here —
-    // it returns HTTP 500 for an existing category. Near-certain cause (backend
-    // issue #138): the untranslatable EF projection at GetCategoryProductsQuery.cs
-    // :91-102 (v.Descriptions.GroupBy(..).Select(g => g.First()).ToDictionary(..)
-    // inside the SQL-translated Select), which throws at ToListAsync regardless of
-    // row count — i.e. broadly broken, not a seed-data artifact. Left as a tracked
-    // follow-up rather than swallowed by a test asserting the broken behavior.
+    [Fact]
+    public async Task GetCategoryProducts_ForExistingCategory_ReturnsOk()
+    {
+        // Regression for #138: this endpoint used to return HTTP 500 because the
+        // DTO projection was built inside the IQueryable Select, pushing an
+        // untranslatable Descriptions.GroupBy(..).First().ToDictionary(..) into
+        // SQL — EF threw at query execution regardless of row count. Empty-path
+        // guard: even with no linked products the query must now return OK.
+        var seeded = await FirstSeededCategoryAsync();
+
+        var response = await Client.GetAsync($"/api/categories/{seeded.Id}/products");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var result = await ReadResponseAsync<ApiResponse<PagedResult<CategoryProductDto>>>(response);
+        result!.Success.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetCategoryProducts_WithLinkedProductVariations_BuildsDedupedContent()
+    {
+        // Regression for #138 exercising the ACTUAL projection path: link a
+        // product whose variation carries two descriptions sharing a language
+        // code, then read it back. Pre-fix this 500'd at query translation; the
+        // fix materializes then projects in memory, where the
+        // Descriptions.GroupBy(lang).First().ToDictionary(lang) dedup runs.
+        Guid categoryId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            categoryId = (await db.Categories.FirstAsync()).Id;
+            // CreatedBy is a required member; SaveChanges overwrites it, but the
+            // compiler needs it set. Matches the seeder's CreatedBy = "seed".
+            var product = new Product
+            {
+                Name = "Linked QA Product",
+                BasePrice = 9.99m,
+                IsActive = true,
+                IsAvailable = true,
+                CreatedBy = "test",
+                Variations = new List<ProductVariation>
+                {
+                    new()
+                    {
+                        Name = "Large",
+                        DisplayOrder = 1,
+                        IsActive = true,
+                        CreatedBy = "test",
+                        Descriptions = new List<ProductVariationDescription>
+                        {
+                            new() { LanguageCode = "en", Name = "Large", CreatedBy = "test" },
+                            new() { LanguageCode = "en", Name = "Large (duplicate language)", CreatedBy = "test" },
+                        },
+                    },
+                },
+            };
+            db.Products.Add(product);
+            await db.SaveChangesAsync();
+            db.ProductCategories.Add(new ProductCategory
+            {
+                ProductId = product.Id,
+                CategoryId = categoryId,
+                DisplayOrder = 1,
+                IsPrimary = true,
+                CreatedBy = "test",
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await GetFromJsonAsync<ApiResponse<PagedResult<CategoryProductDto>>>(
+            $"/api/categories/{categoryId}/products");
+
+        result!.Success.Should().BeTrue();
+        var item = result.Data!.Items.Should().ContainSingle().Subject;
+        item.Name.Should().Be("Linked QA Product");
+        var variation = item.Variations.Should().ContainSingle().Subject;
+        // Two "en" descriptions collapse to a single key via GroupBy(lang).First().
+        variation.Content.Should().HaveCount(1).And.ContainKey("en");
+    }
 
     [Fact]
     public async Task CreateCategory_AsAdmin_Succeeds_AndIsRetrievable()
