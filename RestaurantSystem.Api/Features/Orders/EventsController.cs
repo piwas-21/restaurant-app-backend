@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Features.Orders.Models;
+using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -122,12 +123,9 @@ public class EventsController : ControllerBase
         var bufferingFeature = Response.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpResponseBodyFeature>();
         bufferingFeature?.DisableBuffering();
 
-        // Get client IP address (handle proxy forwarded headers)
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-        if (HttpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
-        {
-            ipAddress = forwardedFor.FirstOrDefault()?.Split(',').FirstOrDefault()?.Trim() ?? ipAddress;
-        }
+        // Real client IP from the trustworthy last X-Forwarded-For hop. The previous
+        // code read the spoofable FIRST hop (same class as sofra #30).
+        var ipAddress = HttpContext.GetClientIp();
 
         // Get country from IP (placeholder - integrate with GeoIP service if needed)
         string? country = GetCountryFromIp(ipAddress);

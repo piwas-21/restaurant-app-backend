@@ -255,7 +255,12 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantIn
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
-// Trust the K8s nginx-ingress X-Forwarded-For header so rate limiter partitions by real client IP
+// NOTE: known proxies/networks are cleared, so this middleware trusts NO forwarder
+// and never overwrites Connection.RemoteIpAddress from X-Forwarded-For — behind
+// Caddy that address is Caddy's container IP for every request. The rate limiter
+// and other client-IP consumers therefore read the trustworthy last XFF hop via
+// context.GetClientIp() instead of RemoteIpAddress (see ClientIpExtensions). A
+// follow-up may trust the Docker network here to also fix RemoteIpAddress for logs.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -281,7 +286,7 @@ builder.Services.AddRateLimiter(options =>
 
     // /api/Auth/login + refresh-token
     options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        partitionKey: context.GetClientIp(),
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = rateLimiter.AuthPermitLimit,
@@ -291,7 +296,7 @@ builder.Services.AddRateLimiter(options =>
 
     // /api/Auth/forgot-password + reset-password
     options.AddPolicy("forgot-password", context => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        partitionKey: context.GetClientIp(),
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = rateLimiter.ForgotPasswordPermitLimit,
@@ -301,7 +306,7 @@ builder.Services.AddRateLimiter(options =>
 
     // /api/User/register/customer
     options.AddPolicy("register", context => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        partitionKey: context.GetClientIp(),
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = rateLimiter.RegisterPermitLimit,
@@ -315,7 +320,7 @@ builder.Services.AddRateLimiter(options =>
     // scraped order IDs from receipts/URLs and tries to spam customers or
     // inflate SMTP cost via the admin-notification email.
     options.AddPolicy("confirmation-email", context => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        partitionKey: context.GetClientIp(),
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = rateLimiter.ConfirmationEmailPermitLimit,
