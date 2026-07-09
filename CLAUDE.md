@@ -10,7 +10,7 @@
 - **Stack**: .NET 10, EF Core 10, PostgreSQL, custom CQRS mediator (`CustomMediator` — **NOT MediatR**)
 - **Architecture**: Clean Architecture (API → Domain → Infrastructure) + CQRS + feature folders
 - **Hosted on**: GitHub — https://github.com/piwas-21/restaurant-app-backend
-- **Production**: deployed from `main` (currently `develop` until cutover); test environment from `develop`
+- **Production**: deployed from `main` — a merge to `main` auto-builds + deploys (`build-image.yml` → `deploy.yml`). `develop` is **legacy** (develop→main cutover done 2026-06-30); staging runs on a separate Netcup box (see the `deploy` repo)
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
 ## §1.5 — Tooling
@@ -180,16 +180,17 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 ### Branch strategy
 
 ```
-main                    ← production (currently develop; cutover pending)
-  └── develop           ← test environment (auto-deployed)
-       ├── feature/<x>
-       ├── fix/<x>
-       ├── chore/<x>
-       └── docs/<x>
+main                    ← production; a merge auto-builds + deploys (build-image.yml → deploy.yml)
+  ├── feature/<x>
+  ├── fix/<x>
+  ├── chore/<x>
+  └── docs/<x>
+
+develop                 ← LEGACY (pre-2026-06-30 promotion model); not used for new work
 ```
 
-- **Never push to `main` or `develop` directly** — pre-commit hook blocks this.
-- Branch off **`develop`**. Open PR to `develop`. After merge to `develop` and test-env validation, `develop` is promoted to `main` for prod.
+- **Never push to `main` directly** — pre-commit hook blocks this; open a PR.
+- Branch off **`main`**, open PR to **`main`** (develop→main promotion done 2026-06-30; `develop` is legacy — don't branch from or target it).
 - One issue = one branch. Delete branch after merge (via `gh pr merge --delete-branch`, or enable "Automatically delete head branches" in the repo's General settings).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
@@ -225,7 +226,7 @@ Every PR uses [.github/pull_request_template.md](.github/pull_request_template.m
 Never auto-edit these files / take these actions without explicit user instruction:
 
 ### Hard refusals
-- **EF migrations after they've been applied to staging or production.** Once a migration is in `Migrations/` and merged to `develop`, treat it as immutable. New schema changes = new migration.
+- **EF migrations after they've been applied to staging or production.** Once a migration is in `Migrations/` and merged to `main`, treat it as immutable. New schema changes = new migration.
 - **`appsettings.Production.json`** (if it exists in repo). Production config changes are a deploy event, not a code change.
 - **`app-secrets.json`** (gitignored) — never recreate, never commit. If missing, flag it; don't fabricate values.
 - **`BackgroundServices/*.cs` retention windows / polling intervals** — data-loss class. Changes need explicit approval.
@@ -249,7 +250,7 @@ Never commit:
 1. Read this file (auto-loaded).
 2. Read [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) if picking up a sprint task.
 3. Run `dotnet build RestaurantSystem.sln` — confirm baseline green.
-4. Check `git status` — start from clean tree on `develop`.
+4. Check `git status` — start from clean tree on `main`.
 
 ### During implementation
 1. Output the §6 verification block before writing code.
