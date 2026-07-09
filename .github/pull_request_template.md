@@ -67,7 +67,7 @@
 - [ ] No raw `DbContext` injection in controllers
 - [ ] Sibling file conventions matched (DI registration, naming, base class)
 - [ ] Pre-commit hooks pass locally (`pre-commit run --all-files`)
-- [ ] Branch is off `develop`; MR targets `develop`
+- [ ] Branch is off `main`; PR targets `main` (`develop` is legacy)
 
 ## Test plan
 <!-- Manual testing steps; specific scenarios to verify. -->
