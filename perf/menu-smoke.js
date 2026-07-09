@@ -21,7 +21,11 @@ import { Trend } from 'k6/metrics';
 //   BASE_URL=https://www.rumirestaurant.ch k6 run menu-smoke.js
 // ---------------------------------------------------------------------------
 
-const BASE_URL = (__ENV.BASE_URL || 'https://staging.fooderist.com').replace(/\/+$/, '');
+// Trailing slashes stripped without a regex (a `/+$` pattern trips ReDoS
+// linters) so `${BASE_URL}${path}` never doubles the slash.
+let baseUrl = __ENV.BASE_URL || 'https://staging.fooderist.com';
+while (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+const BASE_URL = baseUrl;
 
 // Per-surface latency trends so a red run points at the slow group, not just
 // "something is slow". `true` => report in ms with p(95)/p(99) in the summary.
@@ -63,7 +67,7 @@ function probe(path, name) {
   return res.timings.duration;
 }
 
-export default function () {
+export default function menuSmoke() {
   group('menu browse', () => {
     menuBrowse.add(probe('/api/categories', 'categories'));
     menuBrowse.add(probe('/api/products', 'products'));

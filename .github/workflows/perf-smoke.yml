@@ -66,7 +66,10 @@ jobs:
           set -euo pipefail
           K6_VERSION="v2.1.0"
           K6_SHA256="295d961ebfca306f295f1133068dcd403a8171c87f387928f5f30b0fbcff858a"
-          curl -fsSL -o k6.tar.gz \
+          # --proto '=https' keeps the initial request AND every -L redirect on
+          # HTTPS (a release download redirects to the object store) — no silent
+          # downgrade to http before the checksum gate below.
+          curl --proto '=https' --tlsv1.2 -fsSL -o k6.tar.gz \
             "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K6_VERSION}-linux-amd64.tar.gz"
           echo "${K6_SHA256}  k6.tar.gz" | sha256sum -c -
           tar -xzf k6.tar.gz
