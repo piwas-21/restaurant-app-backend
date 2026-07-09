@@ -1,0 +1,88 @@
+# ============================================================================
+# Perf smoke — public menu + checkout-entry read path (staging)
+# ----------------------------------------------------------------------------
+# Cadence : daily 06:30 UTC (cron below) + manual via workflow_dispatch.
+# Purpose : DEV-PHASES-PLAN W3 ("operate") / D2 performance. A light k6 SMOKE
+#           against the deployed staging API that verifies the guest read path
+#           (menu browse + checkout entry) is up and answers within a latency
+#           budget. It is the backend's first D2 signal — the per-PR ci.yml has
+#           no performance gate, and a scheduled probe catches a regression a
+#           staging deploy introduces, or box/DB degradation, without waiting
+#           for a human to notice a slow page.
+#
+#           Smoke, NOT load: 3 VUs for 30s over [AllowAnonymous] GETs only —
+#           nothing authenticated, nothing mutated (no order is submitted).
+#           Script + rationale: perf/menu-smoke.js.
+#
+# Reading failures:
+#   A red run means k6 breached a threshold (latency budget or >1% errors).
+#   Failure here is an ALERT, not a broken pipeline — open the failed run's
+#   Summary for the k6 report, then investigate (staging down? slow query?
+#   deploy regression?). Nothing auto-merges or auto-deploys off this workflow.
+#   Budgets are deliberately generous for a bed-in period (p95<1200ms); ratchet
+#   them down in perf/menu-smoke.js once a stable baseline is established.
+#
+# Security: scheduled/dispatch only (never on PR — it targets DEPLOYED staging,
+#           which reflects merged main, not a PR branch). No untrusted-input
+#           expressions in run blocks; the one dispatch input (base_url) is
+#           passed through `env:`, never interpolated into a shell line. k6 is
+#           version-pinned and SHA256-verified; the checkout action is SHA-pinned
+#           (same pin as ci.yml). permissions: contents: read only.
+# ============================================================================
+name: Perf Smoke (staging)
+
+on:
+  schedule:
+    # Daily 06:30 UTC (after the Monday security audit at 06:00, no overlap)
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Target base URL to probe"
+        required: false
+        default: "https://staging.fooderist.com"
+
+concurrency:
+  group: perf-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  k6_smoke:
+    name: k6 menu + checkout-entry smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Dispatch input wins; schedule runs have no input, so fall back to staging.
+      # Injected via env (not inline ${{ }} in a run: line) to avoid shell injection.
+      BASE_URL: ${{ github.event.inputs.base_url || 'https://staging.fooderist.com' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install k6 (pinned + checksum-verified)
+        run: |
+          set -euo pipefail
+          K6_VERSION="v2.1.0"
+          K6_SHA256="295d961ebfca306f295f1133068dcd403a8171c87f387928f5f30b0fbcff858a"
+          curl -fsSL -o k6.tar.gz \
+            "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K6_VERSION}-linux-amd64.tar.gz"
+          echo "${K6_SHA256}  k6.tar.gz" | sha256sum -c -
+          tar -xzf k6.tar.gz
+          echo "${PWD}/k6-${K6_VERSION}-linux-amd64" >> "${GITHUB_PATH}"
+
+      - name: Run smoke
+        run: |
+          set -o pipefail
+          k6 run perf/menu-smoke.js | tee k6-summary.txt
+
+      - name: Publish summary
+        if: always()
+        run: |
+          {
+            echo "### k6 perf smoke — \`${BASE_URL}\`"
+            echo '```'
+            tail -n 45 k6-summary.txt 2>/dev/null || echo "(no k6 output captured)"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
