@@ -84,6 +84,7 @@ All MRs require the pipeline to pass before merge.
 | `EmailSettings` | `app-secrets.json` + `appsettings.<Env>.json` | `FrontendBaseUrl`, `BackendBaseUrl` are `[Required] [Url]` — no localhost defaults |
 | `JwtSettings` | `app-secrets.json` | Secret must be ≥ 32 bytes |
 | `CorsSettings:AllowedOrigins` | `appsettings.<Env>.json` | App throws on startup in non-Dev if empty |
+| `SENTRY_DSN` (+ optional `SENTRY_ENVIRONMENT`) | env var (box `.env` → compose passthrough, deploy repo) | Empty/unset = Sentry never initializes (inert). Errors only — no PII, no request bodies, tracing off. Enable runbook: deploy repo `DEPLOYMENT.md` §Error tracking |
 
 ## Pull requests
 
