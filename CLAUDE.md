@@ -177,21 +177,22 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 ## §8 — Git workflow
 
-### Branch strategy
+### Branch strategy (GitFlow — updated 2026-07-10; supersedes the retired 2026-06-30 main-based model)
 
 ```
-main                    ← production; a merge auto-builds + deploys (build-image.yml → deploy.yml)
-  ├── feature/<x>
-  ├── fix/<x>
-  ├── chore/<x>
-  └── docs/<x>
+develop                 ← DEFAULT + integration branch; all feature work targets it
+  ├── feature/<x>       → PR to develop
+  ├── fix/<x>           → PR to develop
+  ├── chore/<x>         → PR to develop
+  └── docs/<x>          → PR to develop
 
-develop                 ← LEGACY (pre-2026-06-30 promotion model); not used for new work
+main                    ← production RELEASES ONLY; updated solely via a develop→main release PR
 ```
 
-- **Never push to `main` directly** — pre-commit hook blocks this; open a PR.
-- Branch off **`main`**, open PR to **`main`** (develop→main promotion done 2026-06-30; `develop` is legacy — don't branch from or target it).
-- One issue = one branch. Delete branch after merge (via `gh pr merge --delete-branch`, or enable "Automatically delete head branches" in the repo's General settings).
+- **Never push directly to `main` or `develop`** — a GitHub **Ruleset** (`main-develop`, **no bypass**) blocks it server-side (direct push / force-push / deletion), and the pre-commit `no-commit-to-branch` hook blocks it locally. Always open a PR.
+- **Branch off `develop`; open every `feature/`·`fix/`·`chore/`·`docs/`·`test/` PR to `develop`.** Merge only when **all CI checks are green and review comments are resolved** (the ruleset requires it).
+- **Releases:** open a PR **`develop` → `main`**. Merging it is the release — a merge to `main` auto-builds + deploys to prod (`build-image.yml` → `deploy.yml`).
+- One issue = one branch. Delete branch after merge (`gh pr merge --delete-branch`).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
 ### Commit messages
