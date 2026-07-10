@@ -9,6 +9,18 @@ namespace RestaurantSystem.Infrastructure.Settings;
 /// </summary>
 public class LocalizationSettings
 {
-    /// <summary>Tenant display currency label (registry <c>currency</c>).</summary>
-    public string Currency { get; set; } = "CHF";
+    private const string DefaultCurrency = "CHF";
+    private string _currency = DefaultCurrency;
+
+    /// <summary>
+    /// Tenant display currency label (registry <c>currency</c>). Falls back to
+    /// <c>CHF</c> when unset or blank, so an empty <c>Localization__Currency</c>
+    /// (e.g. a tenant provisioned with an empty <c>TENANT_CURRENCY</c>) never
+    /// renders a blank currency in emails.
+    /// </summary>
+    public string Currency
+    {
+        get => string.IsNullOrWhiteSpace(_currency) ? DefaultCurrency : _currency;
+        set => _currency = value;
+    }
 }

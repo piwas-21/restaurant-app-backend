@@ -278,10 +278,10 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.SeedSettings
 // tenant registry (sofra ADR-003); an empty section means the seeder is a no-op.
 builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantInfoSeedSettings>(builder.Configuration.GetSection("RestaurantInfoSeed"));
 
-// Tenant display currency label for order-confirmation emails, consumed by
-// EmailService. Provisioning injects Localization__Currency (mapped from the
-// tenant registry's currency field via TENANT_CURRENCY; sofra ADR-003);
-// default CHF keeps the legacy RUMI install byte-identical.
+// Order-email currency label. Per-tenant provisioning injects the
+// Localization__Currency value, mapped from the tenant registry currency field
+// via TENANT_CURRENCY per sofra ADR-003. The default CHF keeps the legacy RUMI
+// install unchanged.
 builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.LocalizationSettings>(builder.Configuration.GetSection("Localization"));
 
 builder.Services.AddFileStorage(builder.Configuration);

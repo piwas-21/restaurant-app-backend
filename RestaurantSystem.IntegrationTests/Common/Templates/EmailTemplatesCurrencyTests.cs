@@ -33,6 +33,16 @@ public class EmailTemplatesCurrencyTests
     }
 
     [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void LocalizationSettings_BlankCurrency_FallsBackToChf(string blank)
+    {
+        // An empty Localization__Currency (an empty TENANT_CURRENCY) must not
+        // render a blank currency in emails — it falls back to CHF.
+        new LocalizationSettings { Currency = blank }.Currency.Should().Be("CHF");
+    }
+
+    [Theory]
     [InlineData("CHF")]
     [InlineData("EUR")]
     public void OrderReceived_HtmlAndTextBody_UseConfiguredCurrency_NotHardcodedChf(string currency)
@@ -42,14 +52,7 @@ public class EmailTemplatesCurrencyTests
         var textBody = EmailTemplates.OrderReceived.GetTextBody(
             Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
 
-        htmlBody.Should().Contain($"{currency} {Amount(Total)}").And.Contain($"{currency} {Amount(ItemPrice)}");
-        textBody.Should().Contain($"{currency} {Amount(Total)}").And.Contain($"{currency} {Amount(ItemPrice)}");
-
-        if (currency != "CHF")
-        {
-            htmlBody.Should().NotContain("CHF");
-            textBody.Should().NotContain("CHF");
-        }
+        AssertCurrencyRendered(htmlBody, textBody, currency);
     }
 
     [Theory]
@@ -64,6 +67,11 @@ public class EmailTemplatesCurrencyTests
             Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
             "admin@demo.test");
 
+        AssertCurrencyRendered(htmlBody, textBody, currency);
+    }
+
+    private static void AssertCurrencyRendered(string htmlBody, string textBody, string currency)
+    {
         htmlBody.Should().Contain($"{currency} {Amount(Total)}").And.Contain($"{currency} {Amount(ItemPrice)}");
         textBody.Should().Contain($"{currency} {Amount(Total)}").And.Contain($"{currency} {Amount(ItemPrice)}");
 
