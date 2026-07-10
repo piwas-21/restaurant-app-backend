@@ -10,7 +10,7 @@ public static partial class EmailTemplates
         public static string GetSubject(EmailBranding brand) => $"Order Received - {brand.Name}";
 
         public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
-            IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
+            string currency, IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
             var email = contactEmail;
@@ -18,7 +18,7 @@ public static partial class EmailTemplates
                 $@"<tr>
                     <td style='padding: 10px; border-bottom: 1px solid #eee;'>{item.name}</td>
                     <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: center;'>x{item.quantity}</td>
-                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: right;'>CHF {item.price:F2}</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: right;'>{currency} {item.price:F2}</td>
                 </tr>"));
 
             var instructionsSection = string.IsNullOrEmpty(specialInstructions)
@@ -86,7 +86,7 @@ public static partial class EmailTemplates
 
             <div class='info-box'>
                 <strong>📦 Order Type:</strong> {orderTypeEmoji}<br>
-                <strong>💰 Total Amount:</strong> CHF {total:F2}
+                <strong>💰 Total Amount:</strong> {currency} {total:F2}
             </div>
 
             <h3>Order Items:</h3>
@@ -120,12 +120,12 @@ public static partial class EmailTemplates
         }
 
         public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
-            IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
+            string currency, IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
             var email = contactEmail;
             var itemsSection = string.Join("\n", items.Select(item =>
-                $"{item.name} x{item.quantity} = CHF {item.price:F2}"));
+                $"{item.name} x{item.quantity} = {currency} {item.price:F2}"));
 
             var instructionsSection = string.IsNullOrEmpty(specialInstructions)
                 ? ""
@@ -163,7 +163,7 @@ PENDING CONFIRMATION
 Your order is currently pending confirmation. We will notify you as soon as the restaurant confirms your order.
 
 Order Type: {orderTypeText}
-Total Amount: CHF {total:F2}
+Total Amount: {currency} {total:F2}
 
 Order Items:
 {itemsSection}{deliverySection}{instructionsSection}
