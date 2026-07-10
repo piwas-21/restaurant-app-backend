@@ -11,7 +11,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Seeders
             if (!await context.Set<WorkingHours>().AnyAsync())
             {
                 var hours = new List<WorkingHours>();
-                foreach (DayOfWeek day in Enum.GetValues(typeof(DayOfWeek)))
+                foreach (DayOfWeek day in Enum.GetValues<DayOfWeek>())
                 {
                     hours.Add(new WorkingHours
                     {

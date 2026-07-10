@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
+using Sentry.Extensibility;
 using System.Threading.RateLimiting;
 using RestaurantSystem.Api.BackgroundServices;
 using RestaurantSystem.Api.Services;
@@ -56,6 +57,31 @@ builder.Configuration.SetBasePath(Directory.GetCurrentDirectory())
     // this they'd be shadowed). Lets us point at Mailpit / a different DB
     // for E2E without touching app-secrets.json.
     .AddEnvironmentVariables();
+
+// Error tracking (DEV-PHASES W3 follow-up): Sentry, env-gated on SENTRY_DSN —
+// the same convention as the frontend's server-side wiring and the deploy
+// repo's compose passthrough. With no DSN (the default) this block is skipped
+// entirely, the SDK never initializes, and behaviour is exactly as before.
+// Error tracking ONLY: performance tracing stays off and no PII / request
+// bodies are captured.
+var sentryDsn = builder.Configuration["SENTRY_DSN"];
+if (!string.IsNullOrEmpty(sentryDsn))
+{
+    builder.WebHost.UseSentry(options =>
+    {
+        options.Dsn = sentryDsn;
+        options.SendDefaultPii = false;                // no user identifiers, cookies, or client IPs
+        options.MaxRequestBodySize = RequestSize.None; // never capture request bodies
+        options.TracesSampleRate = 0;                  // errors only — tracing/performance off
+        // SENTRY_ENVIRONMENT distinguishes the prod/staging boxes (both run
+        // ASPNETCORE_ENVIRONMENT=Production); fall back to the host environment.
+        var sentryEnvironment = builder.Configuration["SENTRY_ENVIRONMENT"];
+        options.Environment = string.IsNullOrEmpty(sentryEnvironment)
+            ? builder.Environment.EnvironmentName
+            : sentryEnvironment;
+        options.Release = typeof(Program).Assembly.GetName().Version?.ToString();
+    });
+}
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -252,6 +278,12 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.SeedSettings
 // tenant registry (sofra ADR-003); an empty section means the seeder is a no-op.
 builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantInfoSeedSettings>(builder.Configuration.GetSection("RestaurantInfoSeed"));
 
+// Order-email currency label. Per-tenant provisioning injects the
+// Localization__Currency value, mapped from the tenant registry currency field
+// via TENANT_CURRENCY per sofra ADR-003. The default CHF keeps the legacy RUMI
+// install unchanged.
+builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.LocalizationSettings>(builder.Configuration.GetSection("Localization"));
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
@@ -392,9 +424,11 @@ builder.Services.AddScoped<IUserGroupService, UserGroupService>();
 builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
+builder.Services.Configure<ReservationRetentionSettings>(builder.Configuration.GetSection("ReservationRetention"));
 builder.Services.AddHostedService<BasketCleanupService>();
 builder.Services.AddHostedService<AccountCleanupService>();
 builder.Services.AddHostedService<TableReservationCleanupService>();
+builder.Services.AddHostedService<ReservationRetentionService>();
 
 // Register OrderEventService as singleton - both interface and concrete type share same instance
 builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();

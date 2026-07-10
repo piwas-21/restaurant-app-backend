@@ -22,6 +22,15 @@
 - [ ] `test` — tests only
 - [ ] `perf` — performance
 
+## NFR triage (DEV-PHASES-PLAN P1 — one line per touched dimension, "rest: n/a because …")
+<!--
+  D1 security · D2 performance (N+1, AsNoTracking, indexed, payload) · D3 cpu/mem (BackgroundService intervals, unbounded reads) ·
+  D4 UX · D5 a11y · D6 i18n · D7 privacy/PII (no PII in logs) · D8 observability · D9 testing · D10 conventions.
+  Auth/payment/PII/new-endpoint changes: add 3–5 threat-model-lite bullets under D1.
+-->
+- D…:
+- Rest: n/a because …
+
 ## Acceptance criteria coverage
 <!--
   For each acceptance criterion in the linked issue / sprint task, state coverage.
@@ -58,7 +67,7 @@
 - [ ] No raw `DbContext` injection in controllers
 - [ ] Sibling file conventions matched (DI registration, naming, base class)
 - [ ] Pre-commit hooks pass locally (`pre-commit run --all-files`)
-- [ ] Branch is off `develop`; MR targets `develop`
+- [ ] Branch is off `main`; PR targets `main` (`develop` is legacy)
 
 ## Test plan
 <!-- Manual testing steps; specific scenarios to verify. -->

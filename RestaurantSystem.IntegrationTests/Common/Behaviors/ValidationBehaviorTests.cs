@@ -13,9 +13,9 @@ namespace RestaurantSystem.IntegrationTests.Common.Behaviors;
 /// </summary>
 public class ValidationBehaviorTests
 {
-    private record SampleRequest(string Name) : ICommand<string>;
+    private sealed record SampleRequest(string Name) : ICommand<string>;
 
-    private class PassingValidator : AbstractValidator<SampleRequest>
+    private sealed class PassingValidator : AbstractValidator<SampleRequest>
     {
         public PassingValidator()
         {
@@ -23,7 +23,7 @@ public class ValidationBehaviorTests
         }
     }
 
-    private class FailingValidator : AbstractValidator<SampleRequest>
+    private sealed class FailingValidator : AbstractValidator<SampleRequest>
     {
         public FailingValidator()
         {

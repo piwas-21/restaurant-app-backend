@@ -10,7 +10,7 @@
 - **Stack**: .NET 10, EF Core 10, PostgreSQL, custom CQRS mediator (`CustomMediator` — **NOT MediatR**)
 - **Architecture**: Clean Architecture (API → Domain → Infrastructure) + CQRS + feature folders
 - **Hosted on**: GitHub — https://github.com/piwas-21/restaurant-app-backend
-- **Production**: deployed from `main` (currently `develop` until cutover); test environment from `develop`
+- **Production**: deployed from `main` — a merge to `main` auto-builds + deploys (`build-image.yml` → `deploy.yml`). `develop` is **legacy** (develop→main cutover done 2026-06-30); staging runs on a separate Netcup box (see the `deploy` repo)
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
 ## §1.5 — Tooling
@@ -104,7 +104,7 @@ These run on timers and **delete** records. Never modify retention windows or po
 
 ### Soft delete
 
-All soft-delete-aware entities use `IsDeleted` with a global query filter in `ApplicationDbContext`. Never bypass with `IgnoreQueryFilters()` unless restoring records. See [docs/adr/ADR-002-soft-delete-strategy.md](docs/adr/ADR-002-soft-delete-strategy.md).
+All soft-delete-aware entities use `IsDeleted` with a global query filter in `ApplicationDbContext`. Never bypass with `IgnoreQueryFilters()` unless restoring records **or permanently purging/erasing them** (e.g. GDPR Art. 17 account deletion in `AccountCleanupService`, which must reach soft-deleted rows to erase their PII) — the purge case requires an explicit `// soft-delete-bypass:` justification comment on the call. See [docs/adr/ADR-002-soft-delete-strategy.md](docs/adr/ADR-002-soft-delete-strategy.md).
 
 ---
 
@@ -169,7 +169,8 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 ## §7 — Quality gates (all blocking unless noted; source of truth `.github/workflows/ci.yml` + `.pre-commit-config.yaml`)
 
 - **Pre-commit** (on `git commit`): trailing-whitespace / EOF / large-files / secret-scan / no-commit-to-protected; `dotnet format`; file-length (§4).
-- **CI**: `dotnet build` warnings-as-errors (`Directory.Build.props`); `dotnet test` (integration, Testcontainers) + coverage floor (line ≥ 17 / branch ≥ 9 / method ≥ 15%, migrations excluded — raise as coverage grows); `dotnet format`; file-length; CodeQL; Gitleaks. **Trivy** image scan is currently non-blocking (Sprint 4 flips it for CRITICAL/HIGH).
+- **CI**: `dotnet build` warnings-as-errors (`Directory.Build.props`); `dotnet test` (integration, Testcontainers) + coverage floor (line ≥ 27 / branch ≥ 18 / method ≥ 32%, migrations excluded — raised from 17/9/15 in DEV-PHASES W2 to lock in actual ~31/22/36%, with ~3pt headroom for run-to-run variance from timer-driven BackgroundServices; ratchet up as coverage grows); `dotnet format`; file-length; CodeQL; Gitleaks. **Trivy** image scan is currently non-blocking (Sprint 4 flips it for CRITICAL/HIGH).
+- **Roslyn analyzers** (DEV-PHASES W1): built-in .NET analyzers at `AnalysisMode=Recommended` + **Meziantou.Analyzer** (`Directory.Build.props`; SonarAnalyzer deliberately omitted — SonarCloud autoscan covers it server-side). Pre-existing violations are **baselined in the root `.editorconfig`** as `suggestion`-severity rules (so warnings-as-errors stays green while findings stay IDE-visible). **Ratchet:** when a rule's violation count reaches zero, delete its `.editorconfig` line — it then enforces at warning = error. EF migrations are excluded as generated code. Do NOT set `EnforceCodeStyleInBuild` — IDExxxx style rules belong to the `dotnet format` job.
 - **New-dev setup**: `bash scripts/setup_hooks.sh` (hooks) · `bash scripts/dev-up.sh` (DB + migrate + run API).
 
 ---
@@ -179,16 +180,17 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 ### Branch strategy
 
 ```
-main                    ← production (currently develop; cutover pending)
-  └── develop           ← test environment (auto-deployed)
-       ├── feature/<x>
-       ├── fix/<x>
-       ├── chore/<x>
-       └── docs/<x>
+main                    ← production; a merge auto-builds + deploys (build-image.yml → deploy.yml)
+  ├── feature/<x>
+  ├── fix/<x>
+  ├── chore/<x>
+  └── docs/<x>
+
+develop                 ← LEGACY (pre-2026-06-30 promotion model); not used for new work
 ```
 
-- **Never push to `main` or `develop` directly** — pre-commit hook blocks this.
-- Branch off **`develop`**. Open PR to `develop`. After merge to `develop` and test-env validation, `develop` is promoted to `main` for prod.
+- **Never push to `main` directly** — pre-commit hook blocks this; open a PR.
+- Branch off **`main`**, open PR to **`main`** (develop→main promotion done 2026-06-30; `develop` is legacy — don't branch from or target it).
 - One issue = one branch. Delete branch after merge (via `gh pr merge --delete-branch`, or enable "Automatically delete head branches" in the repo's General settings).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
@@ -224,7 +226,7 @@ Every PR uses [.github/pull_request_template.md](.github/pull_request_template.m
 Never auto-edit these files / take these actions without explicit user instruction:
 
 ### Hard refusals
-- **EF migrations after they've been applied to staging or production.** Once a migration is in `Migrations/` and merged to `develop`, treat it as immutable. New schema changes = new migration.
+- **EF migrations after they've been applied to staging or production.** Once a migration is in `Migrations/` and merged to `main`, treat it as immutable. New schema changes = new migration.
 - **`appsettings.Production.json`** (if it exists in repo). Production config changes are a deploy event, not a code change.
 - **`app-secrets.json`** (gitignored) — never recreate, never commit. If missing, flag it; don't fabricate values.
 - **`BackgroundServices/*.cs` retention windows / polling intervals** — data-loss class. Changes need explicit approval.
@@ -248,7 +250,7 @@ Never commit:
 1. Read this file (auto-loaded).
 2. Read [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) if picking up a sprint task.
 3. Run `dotnet build RestaurantSystem.sln` — confirm baseline green.
-4. Check `git status` — start from clean tree on `develop`.
+4. Check `git status` — start from clean tree on `main`.
 
 ### During implementation
 1. Output the §6 verification block before writing code.

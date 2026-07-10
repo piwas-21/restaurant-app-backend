@@ -83,7 +83,7 @@ namespace RestaurantSystem.Api.Common.Services
                     out var securityToken);
 
                 if (securityToken is not JwtSecurityToken jwtSecurityToken ||
-                    !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+                    !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new SecurityTokenException("Invalid token");
                 }

@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Settings;
 
 namespace RestaurantSystem.Api.Common.Services;
 
@@ -14,17 +15,20 @@ namespace RestaurantSystem.Api.Common.Services;
 public class EmailService : IEmailService
 {
     private readonly EmailSettings _emailSettings;
+    private readonly LocalizationSettings _localizationSettings;
     private readonly IEmailSender _emailSender;
     private readonly IEmailBrandingProvider _brandingProvider;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(
         IOptions<EmailSettings> emailSettings,
+        IOptions<LocalizationSettings> localizationSettings,
         IEmailSender emailSender,
         IEmailBrandingProvider brandingProvider,
         ILogger<EmailService> logger)
     {
         _emailSettings = emailSettings.Value;
+        _localizationSettings = localizationSettings.Value;
         _emailSender = emailSender;
         _brandingProvider = brandingProvider;
         _logger = logger;
@@ -241,9 +245,9 @@ public class EmailService : IEmailService
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.OrderReceived.GetSubject(brand);
             var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-                brand, customerName, orderNumber, orderType, total, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderReceived.GetTextBody(
-                brand, customerName, orderNumber, orderType, total, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -345,11 +349,11 @@ public class EmailService : IEmailService
             var baseUrl = _emailSettings.BackendBaseUrl;
             var frontendUrl = _emailSettings.FrontendBaseUrl;
             var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, items,
+                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
                 baseUrl, frontendUrl, _emailSettings.AdminEmail,
                 specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, items,
+                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
                 _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
 
             await SendEmailAsync(adminEmail, subject, htmlBody, textBody);

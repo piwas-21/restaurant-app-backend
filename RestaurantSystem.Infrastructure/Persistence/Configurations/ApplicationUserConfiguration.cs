@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations
 {
-    class ApplicationUserConfiguration : IEntityTypeConfiguration<ApplicationUser>
+    sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<ApplicationUser>
     {
         public void Configure(EntityTypeBuilder<ApplicationUser> builder)
         {

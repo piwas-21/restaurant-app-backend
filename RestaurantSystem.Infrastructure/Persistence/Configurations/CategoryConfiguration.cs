@@ -1,6 +1,6 @@
 ﻿
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
 
-internal class CategoryConfiguration
+internal sealed class CategoryConfiguration
 {
 }
