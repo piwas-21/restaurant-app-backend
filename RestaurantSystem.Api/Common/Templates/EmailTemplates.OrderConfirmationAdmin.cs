@@ -10,7 +10,7 @@ public static partial class EmailTemplates
         public static string GetSubject(EmailBranding brand) => $"New Order - {brand.Name}";
 
         public static string GetHtmlBody(EmailBranding brand, string orderNumber, string customerName, string customerEmail, string customerPhone,
-            string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
+            string orderType, decimal total, string currency, IEnumerable<(string name, int quantity, decimal price)> items,
             string baseUrl, string frontendBaseUrl, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
@@ -21,7 +21,7 @@ public static partial class EmailTemplates
                 $@"<tr>
                     <td style='padding: 12px; border-bottom: 1px solid #e5e7eb;'>{item.name}</td>
                     <td style='padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;'>×{item.quantity}</td>
-                    <td style='padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;'>CHF {item.price:F2}</td>
+                    <td style='padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;'>{currency} {item.price:F2}</td>
                 </tr>"));
 
             var instructionsSection = string.IsNullOrEmpty(specialInstructions)
@@ -111,7 +111,7 @@ public static partial class EmailTemplates
                     </tr>
                     <tr>
                         <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>Total:</td>
-                        <td style='padding: 6px 0; color: #059669; font-size: 18px; font-weight: 700;'>CHF {total:F2}</td>
+                        <td style='padding: 6px 0; color: #059669; font-size: 18px; font-weight: 700;'>{currency} {total:F2}</td>
                     </tr>
                 </table>
             </div>
@@ -220,7 +220,7 @@ public static partial class EmailTemplates
                     </tr>
                     <tr>
                         <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>Total:</td>
-                        <td style='padding: 6px 0; color: #34d399; font-size: 18px; font-weight: 700;'>CHF {total:F2}</td>
+                        <td style='padding: 6px 0; color: #34d399; font-size: 18px; font-weight: 700;'>{currency} {total:F2}</td>
                     </tr>
                 </table>
             </div>
@@ -288,13 +288,13 @@ public static partial class EmailTemplates
         }
 
         public static string GetTextBody(EmailBranding brand, string orderNumber, string customerName, string customerEmail, string customerPhone,
-            string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
+            string orderType, decimal total, string currency, IEnumerable<(string name, int quantity, decimal price)> items,
             string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
             var email = contactEmail;
             var itemsSection = string.Join("\n", items.Select(item =>
-                $"{item.name} x{item.quantity} = CHF {item.price:F2}"));
+                $"{item.name} x{item.quantity} = {currency} {item.price:F2}"));
 
             var instructionsSection = string.IsNullOrEmpty(specialInstructions)
                 ? ""
@@ -329,7 +329,7 @@ Email: {customerEmail}
 Phone: {customerPhone}
 
 Order Type: {orderTypeText}
-Total Amount: CHF {total:F2}
+Total Amount: {currency} {total:F2}
 
 Order Items:
 {itemsSection}{deliverySection}{instructionsSection}
