@@ -241,11 +241,19 @@ public class OrderMappingService : IOrderMappingService
             foreach (var item in order.Items)
             {
                 // Load Product for regular product items
-                if (item.ProductId.HasValue && !_context.Entry(item).Reference(i => i.Product).IsLoaded)
+                if (item.ProductId.HasValue)
                 {
-                    await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
+                    if (!_context.Entry(item).Reference(i => i.Product).IsLoaded)
+                    {
+                        await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
+                    }
 
-                    // Load DetailedIngredients with GlobalIngredient for ingredient names
+                    // Load DetailedIngredients with GlobalIngredient for ingredient names.
+                    // Checked independently of the Product load above: when the Product is
+                    // already tracked (e.g. the order was just built by OrderItemFactory in
+                    // this same context), relationship fixup marks the reference loaded and
+                    // the previously nested check skipped this — leaving ingredient
+                    // customizations empty on the create-order response. Issue #150.
                     if (item.Product != null && !_context.Entry(item.Product).Collection(p => p.DetailedIngredients).IsLoaded)
                     {
                         await _context.Entry(item.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);

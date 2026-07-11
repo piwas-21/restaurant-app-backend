@@ -116,18 +116,7 @@ public class BasketMappingService : IBasketMappingService
             }
 
             // Deserialize ingredient quantities
-            Dictionary<Guid, int>? ingredientQuantities = null;
-            if (!string.IsNullOrEmpty(item.IngredientQuantitiesJson))
-            {
-                try
-                {
-                    ingredientQuantities = JsonSerializer.Deserialize<Dictionary<Guid, int>>(item.IngredientQuantitiesJson);
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize ingredient quantities JSON for basket item {BasketItemId}", item.Id);
-                }
-            }
+            var ingredientQuantities = DeserializeIngredientQuantities(item.IngredientQuantitiesJson, item.Id);
 
             allItems.Add(new BasketItemDto
             {
@@ -167,7 +156,12 @@ public class BasketMappingService : IBasketMappingService
                     UnitPrice = child.UnitPrice,
                     ItemTotal = child.ItemTotal,
                     CustomizationPrice = child.CustomizationPrice,
-                    // Map other properties if needed, but for menu options these are usually minimal
+                    // Per-option ingredient customizations must round-trip through the cart,
+                    // or the checkout payload (and ultimately the kitchen ticket) loses them.
+                    // See issue #150.
+                    SpecialInstructions = child.SpecialInstructions,
+                    SelectedIngredients = child.SelectedIngredients,
+                    IngredientQuantities = DeserializeIngredientQuantities(child.IngredientQuantitiesJson, child.Id),
                 }).ToList()
             });
         }
@@ -200,5 +194,23 @@ public class BasketMappingService : IBasketMappingService
             Notes = basket.Notes,
             Items = rootItems
         };
+    }
+
+    private Dictionary<Guid, int>? DeserializeIngredientQuantities(string? ingredientQuantitiesJson, Guid? basketItemId)
+    {
+        if (string.IsNullOrEmpty(ingredientQuantitiesJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<Guid, int>>(ingredientQuantitiesJson);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to deserialize ingredient quantities JSON for basket item {BasketItemId}", basketItemId);
+            return null;
+        }
     }
 }
