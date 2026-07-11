@@ -213,8 +213,10 @@ public class BasketItemFactory : IBasketItemFactory
             // an explicit selection list for this option, backfill quantity = 0 for
             // deselected optional ingredients — the same mechanism as regular items above —
             // so the kitchen ticket can print "NO xxx" for bundle children too (issue #150).
-            // The frontend deletes deselected optionals from IngredientQuantities instead of
-            // zeroing them, so serializing the map as provided would lose every removal.
+            // Both client conventions for a deselect are handled: an explicit 0 in
+            // IngredientQuantities wins via providedQuantities (frontend PR #172 sends
+            // zeroes), while an ingredient deleted from the map falls through to the
+            // optional-not-selected branch, which synthesizes the 0 (delete-style clients).
             string? ingredientQuantitiesJson = null;
             if (option.SelectedIngredients != null && childProduct.DetailedIngredients.Any())
             {
