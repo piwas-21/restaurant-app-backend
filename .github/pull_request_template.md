@@ -9,7 +9,7 @@
 - ...
 
 ## Sprint task / issue
-<!-- Link the sprint task (docs/SPRINT-PLAN.md task ID) or GitLab issue number. -->
+<!-- Link the sprint task (docs/SPRINT-PLAN.md task ID) or GitHub issue number. -->
 - Closes #
 - Sprint task:
 
@@ -67,7 +67,7 @@
 - [ ] No raw `DbContext` injection in controllers
 - [ ] Sibling file conventions matched (DI registration, naming, base class)
 - [ ] Pre-commit hooks pass locally (`pre-commit run --all-files`)
-- [ ] Branch is off `main`; PR targets `main` (`develop` is legacy)
+- [ ] Branch is off `develop`; PR targets `develop` (releases ship via a `develop` → `main` release PR — CLAUDE.md §8)
 
 ## Test plan
 <!-- Manual testing steps; specific scenarios to verify. -->

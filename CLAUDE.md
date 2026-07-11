@@ -10,7 +10,7 @@
 - **Stack**: .NET 10, EF Core 10, PostgreSQL, custom CQRS mediator (`CustomMediator` — **NOT MediatR**)
 - **Architecture**: Clean Architecture (API → Domain → Infrastructure) + CQRS + feature folders
 - **Hosted on**: GitHub — https://github.com/piwas-21/restaurant-app-backend
-- **Production**: deployed from `main` — a merge to `main` auto-builds + deploys (`build-image.yml` → `deploy.yml`). `develop` is **legacy** (develop→main cutover done 2026-06-30); staging runs on a separate Netcup box (see the `deploy` repo)
+- **Production**: deployed from `main` — a merge to `main` auto-builds + deploys (`build-image.yml` → `deploy.yml`). `develop` is the **default + integration branch** (GitFlow reinstated 2026-07-10 — see §8); staging runs on a separate Netcup box (see the `deploy` repo)
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
 ## §1.5 — Tooling
