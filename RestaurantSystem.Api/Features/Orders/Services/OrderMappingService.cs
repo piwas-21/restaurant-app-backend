@@ -248,22 +248,19 @@ public class OrderMappingService : IOrderMappingService
                         await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
                     }
 
-                    // Load DetailedIngredients with GlobalIngredient for ingredient names.
-                    // Checked independently of the Product load above: when the Product is
-                    // already tracked (e.g. the order was just built by OrderItemFactory in
-                    // this same context), relationship fixup marks the reference loaded and
-                    // the previously nested check skipped this — leaving ingredient
-                    // customizations empty on the create-order response. Issue #150.
-                    if (item.Product != null && !_context.Entry(item.Product).Collection(p => p.DetailedIngredients).IsLoaded)
+                    // Load DetailedIngredients + their GlobalIngredient refs for
+                    // ingredient names. Runs independently of the Product load above:
+                    // when the Product is already tracked (e.g. the order was just built
+                    // by OrderItemFactory in this same context), relationship fixup marks
+                    // the reference loaded and a nested check would skip this — leaving
+                    // ingredient customizations empty on the create-order response
+                    // (#150/#152). The helper guards each load level on its own IsLoaded
+                    // flag so the GlobalIngredient refs still load even when
+                    // DetailedIngredients was already tracked — same class, one level
+                    // deeper (#161).
+                    if (item.Product != null)
                     {
-                        await _context.Entry(item.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
-                        foreach (var ing in item.Product.DetailedIngredients)
-                        {
-                            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
-                            {
-                                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
-                            }
-                        }
+                        await EnsureProductIngredientsLoadedAsync(item.Product, cancellationToken);
                     }
                 }
 
@@ -286,7 +283,11 @@ public class OrderMappingService : IOrderMappingService
                         await _context.Entry(item.Menu).Collection(m => m.MenuItems).LoadAsync(cancellationToken);
                     }
 
-                    // Load Product and DetailedIngredients for each menu item
+                    // Load Product + DetailedIngredients (and their GlobalIngredient
+                    // refs) for each menu item. The per-ingredient loads run through the
+                    // shared helper regardless of whether DetailedIngredients was already
+                    // tracked — closing the same fixup-loaded defect class one level
+                    // deeper than the Menu-reference fix in #153 (#161).
                     if (item.Menu?.MenuItems != null)
                     {
                         foreach (var menuItem in item.Menu.MenuItems)
@@ -296,16 +297,9 @@ public class OrderMappingService : IOrderMappingService
                                 await _context.Entry(menuItem).Reference(mi => mi.Product).LoadAsync(cancellationToken);
                             }
 
-                            if (menuItem.Product != null && !_context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).IsLoaded)
+                            if (menuItem.Product != null)
                             {
-                                await _context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
-                                foreach (var ing in menuItem.Product.DetailedIngredients)
-                                {
-                                    if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
-                                    {
-                                        await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
-                                    }
-                                }
+                                await EnsureProductIngredientsLoadedAsync(menuItem.Product, cancellationToken);
                             }
                         }
                     }
@@ -329,5 +323,35 @@ public class OrderMappingService : IOrderMappingService
         }
 
         return MapToOrderDto(order);
+    }
+
+    // Ensures a product's DetailedIngredients — and each ingredient's GlobalIngredient
+    // reference, needed to resolve display names — are loaded. Each load is guarded by
+    // its own IsLoaded flag so the inner GlobalIngredient loads still run when
+    // DetailedIngredients was already tracked (e.g. via EF relationship fixup). That
+    // closes the fixup-loaded ingredient defect (#150/#152/#153) one level deeper and
+    // deduplicates the identical graph-walk the Product and Menu branches shared (#161).
+    private async Task EnsureProductIngredientsLoadedAsync(Product product, CancellationToken cancellationToken)
+    {
+        if (!_context.Entry(product).Collection(p => p.DetailedIngredients).IsLoaded)
+        {
+            await _context.Entry(product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
+        }
+
+        // DetailedIngredients is initialized to [] on the entity, but guard anyway to
+        // match the file's existing defensive style (see MapToOrderItemDto) and stay
+        // safe for manually-constructed / mocked Products.
+        if (product.DetailedIngredients == null)
+        {
+            return;
+        }
+
+        foreach (var ing in product.DetailedIngredients)
+        {
+            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
+            {
+                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
+            }
+        }
     }
 }
