@@ -1,9 +1,29 @@
+using RestaurantSystem.Api.Features.FidelityPoints.Dtos;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 
 public interface ICustomerDiscountService
 {
+    /// <summary>
+    /// Get all customer discount rules as enriched DTOs (admin view). When
+    /// <paramref name="userId"/> is supplied the result is scoped to that user;
+    /// otherwise it spans every user. <paramref name="activeOnly"/> applies the
+    /// active validity-window + usage-count filter.
+    /// </summary>
+    Task<List<CustomerDiscountRuleDto>> GetDiscountRuleDtosAsync(Guid? userId, bool activeOnly, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Enrich a single discount rule with its owning user's email/name and map
+    /// it to a <see cref="CustomerDiscountRuleDto"/>.
+    /// </summary>
+    Task<CustomerDiscountRuleDto> ToDtoAsync(CustomerDiscountRule discount, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Whether a user with the given id exists.
+    /// </summary>
+    Task<bool> UserExistsAsync(Guid userId, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Get all active discounts for a specific user
     /// </summary>

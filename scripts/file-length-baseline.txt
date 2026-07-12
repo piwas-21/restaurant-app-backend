@@ -18,7 +18,6 @@ RestaurantSystem.Api/Features/Products/Commands/UpdateProductCommand/UpdateProdu
 RestaurantSystem.Api/Features/Products/Commands/CreateProductCommand/CreateProductCommand.cs
 RestaurantSystem.Api/Features/FidelityPoints/Controllers/FidelityPointsController.cs
 RestaurantSystem.Api/Features/FidelityPoints/Controllers/PointRulesController.cs
-RestaurantSystem.Api/Features/FidelityPoints/Controllers/CustomerDiscountsController.cs
 RestaurantSystem.Api/Features/FidelityPoints/Services/FidelityPointsService.cs
 RestaurantSystem.Api/Features/FidelityPoints/Services/CustomerDiscountService.cs
 RestaurantSystem.Api/Features/Auth/AuthController.cs

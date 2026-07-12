@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Dtos;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Mapping;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -334,5 +336,80 @@ public class CustomerDiscountService : ICustomerDiscountService
         return await _context.CustomerDiscountRules
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<CustomerDiscountRuleDto>> GetDiscountRuleDtosAsync(
+        Guid? userId,
+        bool activeOnly,
+        CancellationToken cancellationToken = default)
+    {
+        List<CustomerDiscountRule> discounts;
+
+        if (userId.HasValue)
+        {
+            discounts = activeOnly
+                ? await GetActiveDiscountsForUserAsync(userId.Value, cancellationToken)
+                : await GetAllDiscountsForUserAsync(userId.Value, cancellationToken);
+        }
+        else
+        {
+            // All discounts across all users.
+            var query = _context.CustomerDiscountRules.AsNoTracking();
+
+            if (activeOnly)
+            {
+                var now = DateTime.UtcNow;
+                query = query.Where(d => d.IsActive
+                    && (d.ValidFrom == null || d.ValidFrom <= now)
+                    && (d.ValidUntil == null || d.ValidUntil >= now)
+                    && (d.MaxUsageCount == null || d.UsageCount < d.MaxUsageCount));
+            }
+
+            discounts = await query
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync(cancellationToken);
+        }
+
+        if (discounts.Count == 0)
+        {
+            return new List<CustomerDiscountRuleDto>();
+        }
+
+        // Batch-fetch the owning users so enrichment is a single round-trip.
+        var userIds = discounts.Select(d => d.UserId).Distinct().ToList();
+        var users = await _context.Users
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Email, u.FirstName, u.LastName })
+            .ToListAsync(cancellationToken);
+
+        var userLookup = users.ToDictionary(
+            u => u.Id,
+            u => (u.Email, u.FirstName, u.LastName));
+
+        return discounts
+            .Select(d => CustomerDiscountRuleMapper.ToDtoFromLookup(d, userLookup))
+            .ToList();
+    }
+
+    public async Task<CustomerDiscountRuleDto> ToDtoAsync(
+        CustomerDiscountRule discount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(discount);
+
+        var user = await _context.Users
+            .Where(u => u.Id == discount.UserId)
+            .Select(u => new { u.Email, u.FirstName, u.LastName })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        (string? Email, string FirstName, string LastName)? userInfo =
+            user is null ? null : (user.Email, user.FirstName, user.LastName);
+
+        return CustomerDiscountRuleMapper.ToDtoFromUser(discount, userInfo);
+    }
+
+    public Task<bool> UserExistsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return _context.Users.AnyAsync(u => u.Id == userId, cancellationToken);
     }
 }
