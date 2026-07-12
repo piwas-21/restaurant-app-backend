@@ -338,6 +338,14 @@ public class OrderMappingService : IOrderMappingService
             await _context.Entry(product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
         }
 
+        // DetailedIngredients is initialized to [] on the entity, but guard anyway to
+        // match the file's existing defensive style (see MapToOrderItemDto) and stay
+        // safe for manually-constructed / mocked Products.
+        if (product.DetailedIngredients == null)
+        {
+            return;
+        }
+
         foreach (var ing in product.DetailedIngredients)
         {
             if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
