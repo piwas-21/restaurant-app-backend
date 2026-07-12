@@ -25,7 +25,6 @@ RestaurantSystem.Api/Features/Reservations/TablesController.cs
 RestaurantSystem.Api/Features/User/UserController.cs
 RestaurantSystem.Api/Features/User/Dtos/UserDto.cs
 RestaurantSystem.Api/Features/Groups/Dtos/UserGroupDtos.cs
-RestaurantSystem.Api/Features/Groups/Services/UserGroupService.cs
 RestaurantSystem.Api/Features/Menus/Dtos/MenuBundleDto.cs
 RestaurantSystem.Api/Features/Menus/Commands/CreateMenuBundleCommand/CreateMenuBundleCommand.cs
 RestaurantSystem.Api/Features/Menus/Commands/UpdateMenuBundleCommand/UpdateMenuBundleCommand.cs
