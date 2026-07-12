@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace RestaurantSystem.Api.Features.Basket.Services;
 
@@ -112,26 +113,9 @@ public class BasketService : IBasketService
                     bi.ProductVariationId == item.ProductVariationId)
                 .ToListAsync();
 
-            // Find exact match including customizations
-            var exactMatch = existingItem.FirstOrDefault(bi =>
-            {
-                // Compare special instructions
-                var sameInstructions = (bi.SpecialInstructions ?? "") == (item.SpecialInstructions ?? "");
-
-                // Compare selected ingredients lists
-                var biSelected = bi.SelectedIngredients ?? new List<Guid>();
-                var itemSelected = item.SelectedIngredients ?? new List<Guid>();
-                var sameSelected = biSelected.Count == itemSelected.Count &&
-                                   biSelected.OrderBy(x => x).SequenceEqual(itemSelected.OrderBy(x => x));
-
-                // Compare excluded ingredients lists
-                var biExcluded = bi.ExcludedIngredients ?? new List<Guid>();
-                var itemExcluded = item.ExcludedIngredients ?? new List<Guid>();
-                var sameExcluded = biExcluded.Count == itemExcluded.Count &&
-                                   biExcluded.OrderBy(x => x).SequenceEqual(itemExcluded.OrderBy(x => x));
-
-                return sameInstructions && sameSelected && sameExcluded;
-            });
+            // Find exact match including customizations (instructions, selected/excluded
+            // ingredients, per-ingredient quantities, AND top-level side items).
+            var exactMatch = existingItem.FirstOrDefault(bi => IsSameCustomization(bi, item));
 
             if (exactMatch != null)
             {
@@ -294,4 +278,68 @@ public class BasketService : IBasketService
 
     public Task RecalculateBasketTotalsAsync(Guid basketId)
         => _basketRepository.RecalculateTotalsAsync(basketId);
+
+    /// <summary>
+    /// Two adds dedup onto one basket line only when their full customization matches: special
+    /// instructions, selected/excluded ingredients, per-selected-ingredient quantities, AND
+    /// top-level side items. The last two were previously ignored, so two otherwise-identical
+    /// lines that differed only by their sides or ingredient quantity silently merged into one
+    /// (menu-bundles redesign #155).
+    /// </summary>
+    private static bool IsSameCustomization(BasketItem existing, AddToBasketDto incoming) =>
+        (existing.SpecialInstructions ?? "") == (incoming.SpecialInstructions ?? "")
+        && SameGuidSet(existing.SelectedIngredients, incoming.SelectedIngredients)
+        && SameGuidSet(existing.ExcludedIngredients, incoming.ExcludedIngredients)
+        && SameSideItems(existing.SelectedSideItemsJson, incoming.SelectedSideItems)
+        && SameSelectedQuantities(incoming.SelectedIngredients, existing.IngredientQuantitiesJson, incoming.IngredientQuantities);
+
+    private static bool SameGuidSet(List<Guid>? a, List<Guid>? b)
+    {
+        var la = a ?? new List<Guid>();
+        var lb = b ?? new List<Guid>();
+        return la.Count == lb.Count && la.OrderBy(x => x).SequenceEqual(lb.OrderBy(x => x));
+    }
+
+    private static bool SameSideItems(string? existingJson, List<SelectedSideItemDto>? incoming)
+    {
+        // Mirror BuildRegularItemAsync: only positive-quantity sides are persisted.
+        var incomingSides = (incoming ?? new List<SelectedSideItemDto>())
+            .Where(s => s.Quantity > 0)
+            .Select(s => (s.Id, s.Quantity))
+            .OrderBy(s => s.Id)
+            .ToList();
+
+        var existingSides = new List<(Guid Id, int Quantity)>();
+        if (!string.IsNullOrEmpty(existingJson))
+        {
+            var parsed = JsonSerializer.Deserialize<List<SelectedSideItemDto>>(existingJson);
+            if (parsed != null)
+            {
+                existingSides = parsed.Select(s => (s.Id, s.Quantity)).OrderBy(s => s.Id).ToList();
+            }
+        }
+
+        return incomingSides.SequenceEqual(existingSides);
+    }
+
+    private static bool SameSelectedQuantities(List<Guid>? selectedIngredients, string? existingJson, Dictionary<Guid, int>? incoming)
+    {
+        var selected = selectedIngredients ?? new List<Guid>();
+        if (selected.Count == 0)
+        {
+            return true; // no selected ingredients → nothing to compare (the selection sets already matched)
+        }
+
+        Dictionary<Guid, int>? existing = string.IsNullOrEmpty(existingJson)
+            ? null
+            : JsonSerializer.Deserialize<Dictionary<Guid, int>>(existingJson);
+
+        // A selected ingredient's effective quantity is its map value when > 0, else 1. This
+        // ignores the backfilled 0-entries for deselected ingredients (already captured by the
+        // selection-set comparison), so a client that omits defaults still dedups correctly.
+        return selected.All(id => EffectiveQuantity(incoming, id) == EffectiveQuantity(existing, id));
+    }
+
+    private static int EffectiveQuantity(Dictionary<Guid, int>? quantities, Guid ingredientId) =>
+        quantities != null && quantities.TryGetValue(ingredientId, out var q) && q > 0 ? q : 1;
 }
