@@ -290,6 +290,7 @@ public class BasketService : IBasketService
         (existing.SpecialInstructions ?? "") == (incoming.SpecialInstructions ?? "")
         && SameGuidSet(existing.SelectedIngredients, incoming.SelectedIngredients)
         && SameGuidSet(existing.ExcludedIngredients, incoming.ExcludedIngredients)
+        && SameGuidSet(existing.AddedIngredients, incoming.AddedIngredients)
         && SameSideItems(existing.SelectedSideItemsJson, incoming.SelectedSideItems)
         && SameSelectedQuantities(incoming.SelectedIngredients, existing.IngredientQuantitiesJson, incoming.IngredientQuantities);
 
@@ -315,7 +316,9 @@ public class BasketService : IBasketService
             var parsed = JsonSerializer.Deserialize<List<SelectedSideItemDto>>(existingJson);
             if (parsed != null)
             {
-                existingSides = parsed.Select(s => (s.Id, s.Quantity)).OrderBy(s => s.Id).ToList();
+                // OfType filters out any null array elements (corrupt/hand-edited JSON) without a
+                // nullable-reference warning, so the projection below can't NRE.
+                existingSides = parsed.OfType<SelectedSideItemDto>().Select(s => (s.Id, s.Quantity)).OrderBy(s => s.Id).ToList();
             }
         }
 
