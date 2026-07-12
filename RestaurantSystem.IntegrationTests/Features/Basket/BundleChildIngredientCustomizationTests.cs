@@ -11,6 +11,7 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
+using System.Text;
 
 namespace RestaurantSystem.IntegrationTests.Features.Basket;
 
@@ -23,6 +24,9 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 //    IngredientQuantities / SpecialInstructions through the cart DTO,
 //  - OrderItemFactory persists child IngredientQuantities and
 //    OrderMappingService derives IsRemoved for child order items.
+// Issue #151 (redesign slice 1): the per-option SelectedSideItems field was removed
+// from SelectedMenuOptionDto (bundle-child sides were never persisted or displayed);
+// the last test pins that a stale client still sending it is tolerated and ignored.
 public class BundleChildIngredientCustomizationTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();
@@ -407,5 +411,57 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         pizzaItemTwo.IngredientQuantities.Should().NotBeNull();
         pizzaItemTwo.IngredientQuantities.Should().HaveCount(1);
         pizzaItemTwo.IngredientQuantities![_mushrooms.Id].Should().Be(2);
+    }
+
+    // Slice 1 (#151): the per-option `SelectedSideItems` field was removed from
+    // SelectedMenuOptionDto (bundle-child sides were never persisted or displayed).
+    // A stale client that still sends it must not break — System.Text.Json ignores
+    // the unknown property and the child is built from its ingredient customization
+    // only. Sent as raw JSON because the typed DTO no longer carries the field.
+    [Fact]
+    public async Task BundleChild_LegacyPerOptionSelectedSideItems_AreAcceptedAndIgnored()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        var json = $$"""
+        {
+          "productId": "{{_menuProduct.Id}}",
+          "quantity": 1,
+          "selectedMenuOptions": [
+            {
+              "sectionId": "{{_mainSection.Id}}",
+              "itemId": "{{_testPizza.Id}}",
+              "quantity": 1,
+              "selectedIngredients": ["{{_tomatoSauce.Id}}", "{{_mushrooms.Id}}"],
+              "selectedSideItems": [{ "id": "{{Guid.NewGuid()}}", "quantity": 2 }]
+            },
+            {
+              "sectionId": "{{_drinkSection.Id}}",
+              "itemId": "{{_testCola.Id}}",
+              "quantity": 1
+            }
+          ]
+        }
+        """;
+
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await Client.PostAsync("/api/basket/items", content);
+
+        // The unknown per-option side field is tolerated — the request still succeeds.
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(response);
+        var pizzaChild = GetChildItem(basket!.Data!, _menuProduct.Id, _testPizza.Id);
+
+        // The option was processed normally: its ingredient customization survives.
+        pizzaChild.SelectedIngredients.Should().Contain(new[] { _tomatoSauce.Id, _mushrooms.Id });
+
+        // The ignored per-option side field is not persisted onto the child row —
+        // children never carry SelectedSideItemsJson (that column is top-level only),
+        // so this fails if anyone ever wires per-option sides into child persistence.
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var childRow = await context.BasketItems.SingleAsync(bi => bi.Id == pizzaChild.Id);
+        childRow.SelectedSideItemsJson.Should().BeNull();
     }
 }
