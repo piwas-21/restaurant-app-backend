@@ -11,5 +11,4 @@ public record SelectedMenuOptionDto
     public List<Guid>? SelectedIngredients { get; set; }
     public List<Guid>? ExcludedIngredients { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; }
-    public List<SelectedSideItemDto>? SelectedSideItems { get; set; }
 }
