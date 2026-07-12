@@ -1,4 +1,5 @@
 ﻿using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -160,11 +161,22 @@ public class OrderMappingService : IOrderMappingService
             kitchenType = firstMenuItem?.Product?.KitchenType.ToString();
         }
 
-        // Map child items (side items/additionals)
+        // Map child items. A child of a bundle/combo (ProductType.Menu parent) is a bundle
+        // component; a child of a regular item is a true add-on side. The Kind discriminator
+        // (DTO-only, derived from the parent's product type) lets the kitchen ticket and the
+        // order UI tell the two apart — they otherwise share the SideItems collection (#158).
         List<OrderItemDto>? sideItems = null;
         if (item.ChildOrderItems != null && item.ChildOrderItems.Any())
         {
-            sideItems = item.ChildOrderItems.Select(MapToOrderItemDto).ToList();
+            var childKind = item.Product?.Type == ProductType.Menu ? ItemKind.BundleChild : ItemKind.SideItem;
+            sideItems = item.ChildOrderItems
+                .Select(child =>
+                {
+                    var childDto = MapToOrderItemDto(child);
+                    childDto.Kind = childKind;
+                    return childDto;
+                })
+                .ToList();
         }
 
         return new OrderItemDto
