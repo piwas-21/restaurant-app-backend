@@ -268,15 +268,27 @@ public class OrderMappingService : IOrderMappingService
                 }
 
                 // Load Menu and its Product for menu items (e.g., Chief's Special)
-                if (item.MenuId.HasValue && !_context.Entry(item).Reference(i => i.Menu).IsLoaded)
+                if (item.MenuId.HasValue)
                 {
-                    await _context.Entry(item).Reference(i => i.Menu).LoadAsync(cancellationToken);
+                    if (!_context.Entry(item).Reference(i => i.Menu).IsLoaded)
+                    {
+                        await _context.Entry(item).Reference(i => i.Menu).LoadAsync(cancellationToken);
+                    }
 
+                    // Checked independently of the Menu load above: when the Menu is
+                    // already tracked (e.g. the order was just built in this same
+                    // context), relationship fixup marks the reference loaded and the
+                    // previously nested checks skipped these loads — leaving ingredient
+                    // customizations empty on the create-order response. Issue #153,
+                    // same class as the Product branch fixed in #152.
                     if (item.Menu != null && !_context.Entry(item.Menu).Collection(m => m.MenuItems).IsLoaded)
                     {
                         await _context.Entry(item.Menu).Collection(m => m.MenuItems).LoadAsync(cancellationToken);
+                    }
 
-                        // Load Product and DetailedIngredients for each menu item
+                    // Load Product and DetailedIngredients for each menu item
+                    if (item.Menu?.MenuItems != null)
+                    {
                         foreach (var menuItem in item.Menu.MenuItems)
                         {
                             if (!_context.Entry(menuItem).Reference(mi => mi.Product).IsLoaded)
