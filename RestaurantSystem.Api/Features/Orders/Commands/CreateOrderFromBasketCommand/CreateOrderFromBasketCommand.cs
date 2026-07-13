@@ -17,7 +17,9 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCom
 /// </summary>
 public record CreateOrderFromBasketCommand : ICommand<ApiResponse<OrderDto>>
 {
-    // Basket source — set by the controller from the X-Session-Id header (not client-body trusted).
+    // Basket source — set by the controller from the X-Session-Id header. [JsonIgnore] keeps it out
+    // of the request-body schema so a body value can't bind (and it stays out of the OpenAPI docs).
+    [JsonIgnore]
     public string SessionId { get; set; } = string.Empty;
 
     public string? CustomerName { get; set; }

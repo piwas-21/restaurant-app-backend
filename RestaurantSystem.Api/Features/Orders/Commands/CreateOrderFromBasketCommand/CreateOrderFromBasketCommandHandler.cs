@@ -34,7 +34,7 @@ public class CreateOrderFromBasketCommandHandler
         CreateOrderFromBasketCommand command, CancellationToken cancellationToken)
     {
         var basket = await _basketService.GetBasketAsync(command.SessionId, _currentUserService.UserId);
-        if (basket == null || basket.Items.Count == 0)
+        if (basket is null || basket.Items is not { Count: > 0 })
         {
             // 400, matching the legacy path's empty-Items rejection (CreateOrderCommandValidator)
             // so this new public surface has a single, consistent order-error contract.
