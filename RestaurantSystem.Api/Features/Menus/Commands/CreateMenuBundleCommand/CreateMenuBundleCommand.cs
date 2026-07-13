@@ -170,7 +170,6 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             await transaction.CommitAsync(cancellationToken);
 
             // Re-fetch with the navigations the shared ProductDtoMapper reads, then map.
-            // For now, I'll duplicate the relevant parts for Menu Bundle.
 
             var createdProduct = await _context.Products
                .Include(p => p.ProductCategories)
