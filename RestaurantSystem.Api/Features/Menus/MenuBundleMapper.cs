@@ -60,9 +60,7 @@ public static class MenuBundleMapper
                         AdditionalPrice = i.AdditionalPrice,
                         DisplayOrder = i.DisplayOrder,
                         IsDefault = i.IsDefault,
-                        Ingredients = i.Product != null ? (i.Product.DetailedIngredients.Any()
-                            ? i.Product.DetailedIngredients.Where(di => di.IsActive).Select(di => di.Name).ToList()
-                            : i.Product.Ingredients) : null,
+                        Ingredients = SectionItemIngredients(i.Product),
                         Allergens = i.Product?.Allergens,
                         DetailedIngredients = i.Product?.DetailedIngredients
                             .Where(di => di.IsActive)
@@ -112,5 +110,21 @@ public static class MenuBundleMapper
             };
         }
         return dto;
+    }
+
+    /// <summary>
+    /// A section-item's display ingredient names: the active detailed-ingredient names when the
+    /// child product has any, otherwise its plain string ingredient list (null when no product).
+    /// </summary>
+    private static List<string>? SectionItemIngredients(Product? product)
+    {
+        if (product == null)
+        {
+            return null;
+        }
+
+        return product.DetailedIngredients.Any()
+            ? product.DetailedIngredients.Where(di => di.IsActive).Select(di => di.Name).ToList()
+            : product.Ingredients;
     }
 }
