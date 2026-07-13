@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -223,7 +223,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 .Include(p => p.Descriptions)
                 .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
-            var productDto = MapToProductDto(updatedProduct);
+            var productDto = ProductDtoMapper.MapToProductDto(updatedProduct);
 
             _logger.LogInformation("Menu Bundle {ProductId} updated successfully by user {UserId}",
                     product.Id, _currentUserService.UserId);
@@ -241,85 +241,5 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             }
             throw;
         }
-    }
-
-    private static ProductDto MapToProductDto(Product product)
-    {
-        var dto = new ProductDto
-        {
-            Id = product.Id,
-            Name = product.Name,
-            Description = product.Description,
-            BasePrice = product.BasePrice,
-            IsActive = product.IsActive,
-            IsAvailable = product.IsAvailable,
-            PreparationTimeMinutes = product.PreparationTimeMinutes,
-            Type = product.Type,
-            KitchenType = product.KitchenType,
-            DisplayOrder = product.DisplayOrder,
-            Categories = product.ProductCategories.Select(pc => new ProductCategoryDto
-            {
-                CategoryId = pc.CategoryId,
-                CategoryName = pc.Category.Name,
-                IsPrimary = pc.IsPrimary,
-                DisplayOrder = pc.DisplayOrder
-            }).ToList(),
-            PrimaryCategory = product.ProductCategories
-                .Where(pc => pc.IsPrimary)
-                .Select(pc => new CategoryDto
-                {
-                    Id = pc.Category.Id,
-                    Name = pc.Category.Name,
-                    Description = pc.Category.Description,
-                    ImageUrl = pc.Category.ImageUrl,
-                    IsActive = pc.Category.IsActive,
-                    DisplayOrder = pc.Category.DisplayOrder
-                })
-                .FirstOrDefault(),
-            MenuDefinition = product.MenuDefinition != null ? new MenuDefinitionDto
-            {
-                Id = product.MenuDefinition.Id,
-                IsAlwaysAvailable = product.MenuDefinition.IsAlwaysAvailable,
-                StartTime = product.MenuDefinition.StartTime,
-                EndTime = product.MenuDefinition.EndTime,
-                AvailableMonday = product.MenuDefinition.AvailableMonday,
-                AvailableTuesday = product.MenuDefinition.AvailableTuesday,
-                AvailableWednesday = product.MenuDefinition.AvailableWednesday,
-                AvailableThursday = product.MenuDefinition.AvailableThursday,
-                AvailableFriday = product.MenuDefinition.AvailableFriday,
-                AvailableSaturday = product.MenuDefinition.AvailableSaturday,
-                AvailableSunday = product.MenuDefinition.AvailableSunday,
-                Sections = product.MenuDefinition.Sections.Select(s => new MenuSectionDto
-                {
-                    Id = s.Id,
-                    Name = s.Name,
-                    Description = s.Description,
-                    DisplayOrder = s.DisplayOrder,
-                    IsRequired = s.IsRequired,
-                    MinSelection = s.MinSelection,
-                    MaxSelection = s.MaxSelection,
-                    Items = s.Items.Select(i => new MenuSectionItemDto
-                    {
-                        Id = i.Id,
-                        ProductId = i.ProductId,
-                        ProductName = i.Product?.Name,
-                        AdditionalPrice = i.AdditionalPrice,
-                        DisplayOrder = i.DisplayOrder,
-                        IsDefault = i.IsDefault
-                    }).OrderBy(i => i.DisplayOrder).ToList()
-                }).OrderBy(s => s.DisplayOrder).ToList()
-            } : null,
-            Content = new()
-        };
-
-        foreach (var description in product.Descriptions)
-        {
-            dto.Content[description.Lang] = new ProductDescriptionDto
-            {
-                Name = description.Name,
-                Description = description.Description
-            };
-        }
-        return dto;
     }
 }
