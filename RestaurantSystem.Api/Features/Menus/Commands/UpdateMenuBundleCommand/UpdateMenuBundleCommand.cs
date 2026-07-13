@@ -24,7 +24,7 @@ public record UpdateMenuBundleCommand(
     Guid? PrimaryCategoryId,
     MenuDefinitionDto MenuDefinition,
     ProductDescriptionsDto Content
-) : ICommand<ApiResponse<ProductDto>>;
+) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
 {

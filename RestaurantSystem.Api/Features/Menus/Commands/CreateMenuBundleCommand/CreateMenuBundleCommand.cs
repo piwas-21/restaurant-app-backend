@@ -23,7 +23,7 @@ public record CreateMenuBundleCommand(
     Guid? PrimaryCategoryId,
     MenuDefinitionDto MenuDefinition,
     ProductDescriptionsDto Content
-) : ICommand<ApiResponse<ProductDto>>;
+) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCommand, ApiResponse<ProductDto>>
 {
