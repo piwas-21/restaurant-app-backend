@@ -12,6 +12,7 @@ RestaurantSystem.Api/Settings/EmailSettings.cs
 RestaurantSystem.Api/Settings/JwtSettings.cs
 RestaurantSystem.Api/Features/Settings/TaxConfigurationController.cs
 RestaurantSystem.Api/Features/Basket/BasketController.cs
+RestaurantSystem.Api/Features/Basket/Services/BasketService.cs
 RestaurantSystem.Api/Features/Products/ProductsController.cs
 RestaurantSystem.Api/Features/Products/Queries/GetProductByIdQuery/GetProductByIdQuery.cs
 RestaurantSystem.Api/Features/Products/Commands/UpdateProductCommand/UpdateProductCommand.cs
