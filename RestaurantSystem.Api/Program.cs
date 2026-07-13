@@ -396,6 +396,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
+builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>();
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
 builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();

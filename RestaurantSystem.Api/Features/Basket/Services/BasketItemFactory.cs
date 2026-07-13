@@ -13,25 +13,25 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// Default <see cref="IBasketItemFactory"/>. <c>BuildRegularItemAsync</c> is a faithful
 /// extraction of the non-menu item-creation branch of <c>BasketService.AddItemToBasketAsync</c>;
 /// behaviour is unchanged. It resolves side-item prices from the database, so it depends on
-/// <see cref="ApplicationDbContext"/>; the ingredient customisation maths is delegated to
-/// <see cref="IBasketPricingService"/>.
+/// <see cref="ApplicationDbContext"/>; the ingredient customisation state (price + quantities JSON)
+/// is delegated to the single shared <see cref="ILineCustomizationBuilder"/>.
 /// </summary>
 public class BasketItemFactory : IBasketItemFactory
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IBasketPricingService _basketPricingService;
+    private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
     private readonly ILogger<BasketItemFactory> _logger;
 
     public BasketItemFactory(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        IBasketPricingService basketPricingService,
+        ILineCustomizationBuilder lineCustomizationBuilder,
         ILogger<BasketItemFactory> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _basketPricingService = basketPricingService;
+        _lineCustomizationBuilder = lineCustomizationBuilder;
         _logger = logger;
     }
 
@@ -40,9 +40,13 @@ public class BasketItemFactory : IBasketItemFactory
         // Calculate unit price
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
 
-        // Customization price from optional-ingredient selections (shared calc — see BasketPricingService).
-        decimal customizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-            product.DetailedIngredients, item.SelectedIngredients, item.IngredientQuantities);
+        // Ingredient customization (price + quantities JSON) via the single shared writer, so the
+        // regular and bundle-child paths can never diverge on a new field. Regular items keep the
+        // "explicit client map persisted verbatim" precedence (preferProvidedQuantities: true).
+        var customization = _lineCustomizationBuilder.Build(
+            product.DetailedIngredients, item.SelectedIngredients, item.ExcludedIngredients,
+            item.IngredientQuantities, preferProvidedQuantities: true);
+        decimal customizationPrice = customization.CustomizationPrice;
 
         // Calculate side items price. Drop non-positive quantities first: side-item
         // quantities are client-supplied, and a negative quantity would otherwise
@@ -73,26 +77,6 @@ public class BasketItemFactory : IBasketItemFactory
             selectedSideItemsJson = JsonSerializer.Serialize(validSideItems);
         }
 
-        // Serialize ingredient quantities to JSON
-        // Build from selectedIngredients if ingredientQuantities wasn't provided
-        string? ingredientQuantitiesJson = null;
-        if (item.IngredientQuantities != null && item.IngredientQuantities.Count > 0)
-        {
-            ingredientQuantitiesJson = JsonSerializer.Serialize(item.IngredientQuantities);
-        }
-        else if (product.DetailedIngredients.Any())
-        {
-            // Build ingredientQuantities from selectedIngredients
-            // This ensures kitchen prints can show "NO xxx" for deselected ingredients
-            var builtQuantities = BuildIngredientQuantities(
-                product.DetailedIngredients, item.SelectedIngredients, item.IngredientQuantities);
-
-            if (builtQuantities.Count > 0)
-            {
-                ingredientQuantitiesJson = JsonSerializer.Serialize(builtQuantities);
-            }
-        }
-
         return new BasketItem
         {
             BasketId = basketId,
@@ -102,10 +86,10 @@ public class BasketItemFactory : IBasketItemFactory
             UnitPrice = unitPrice,
             ItemTotal = (unitPrice + customizationPrice) * item.Quantity,
             SpecialInstructions = item.SpecialInstructions,
-            SelectedIngredients = item.SelectedIngredients,
-            ExcludedIngredients = item.ExcludedIngredients,
+            SelectedIngredients = customization.SelectedIngredients,
+            ExcludedIngredients = customization.ExcludedIngredients,
             AddedIngredients = item.AddedIngredients,
-            IngredientQuantitiesJson = ingredientQuantitiesJson,
+            IngredientQuantitiesJson = customization.IngredientQuantitiesJson,
             CustomizationPrice = customizationPrice,
             SelectedSideItemsJson = selectedSideItemsJson,
             CreatedAt = DateTime.UtcNow,
@@ -202,37 +186,16 @@ public class BasketItemFactory : IBasketItemFactory
             if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");
 
-            // Customization price for this child item (shared calc — see BasketPricingService).
-            decimal childCustomizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-                childProduct.DetailedIngredients, option.SelectedIngredients, option.IngredientQuantities);
+            // Ingredient customization (price + quantities JSON) via the single shared writer.
+            // Bundle children keep the "backfill from the selection when present" precedence so a
+            // deselected optional's "NO xxx" reaches the kitchen ticket (issue #150), while an
+            // explicit client quantity still wins inside the backfill.
+            var childCustomization = _lineCustomizationBuilder.Build(
+                childProduct.DetailedIngredients, option.SelectedIngredients, option.ExcludedIngredients,
+                option.IngredientQuantities, preferProvidedQuantities: false);
 
             // Add child customization price to total
-            totalCustomizationPrice += childCustomizationPrice * option.Quantity;
-
-            // Serialize ingredient quantities to JSON for child item. When the client sent
-            // an explicit selection list for this option, backfill quantity = 0 for
-            // deselected optional ingredients — the same mechanism as regular items above —
-            // so the kitchen ticket can print "NO xxx" for bundle children too (issue #150).
-            // Both client conventions for a deselect are handled: an explicit 0 in
-            // IngredientQuantities wins via providedQuantities (frontend PR #172 sends
-            // zeroes), while an ingredient deleted from the map falls through to the
-            // optional-not-selected branch, which synthesizes the 0 (delete-style clients).
-            string? ingredientQuantitiesJson = null;
-            if (option.SelectedIngredients != null && childProduct.DetailedIngredients.Any())
-            {
-                var builtQuantities = BuildIngredientQuantities(
-                    childProduct.DetailedIngredients, option.SelectedIngredients, option.IngredientQuantities);
-
-                if (builtQuantities.Count > 0)
-                {
-                    ingredientQuantitiesJson = JsonSerializer.Serialize(builtQuantities);
-                }
-            }
-            else if (option.IngredientQuantities is { Count: > 0 })
-            {
-                // No explicit selection list — legacy behaviour: persist as provided.
-                ingredientQuantitiesJson = JsonSerializer.Serialize(option.IngredientQuantities);
-            }
+            totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
 
             var childItem = new BasketItem
             {
@@ -242,11 +205,11 @@ public class BasketItemFactory : IBasketItemFactory
                 Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
                 UnitPrice = sectionItem.AdditionalPrice, // Section-level additional price
                 ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
-                CustomizationPrice = childCustomizationPrice, // Store customization price for this child
+                CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child
                 SpecialInstructions = option.SpecialInstructions,
-                SelectedIngredients = option.SelectedIngredients,
-                ExcludedIngredients = option.ExcludedIngredients,
-                IngredientQuantitiesJson = ingredientQuantitiesJson,
+                SelectedIngredients = childCustomization.SelectedIngredients,
+                ExcludedIngredients = childCustomization.ExcludedIngredients,
+                IngredientQuantitiesJson = childCustomization.IngredientQuantitiesJson,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             };
@@ -259,45 +222,5 @@ public class BasketItemFactory : IBasketItemFactory
         basketItem.CustomizationPrice = totalCustomizationPrice;
 
         return basketItem;
-    }
-
-    /// <summary>
-    /// Builds the per-ingredient quantity map persisted as <c>IngredientQuantitiesJson</c>.
-    /// A client-provided quantity wins; otherwise a selected ingredient gets quantity 1 and a
-    /// deselected optional / included-in-base ingredient gets an explicit quantity 0, so the
-    /// kitchen ticket can print "NO xxx" (OrderMappingService derives IsRemoved from 0).
-    /// Non-optional ingredients missing from the selection are implicitly included (no entry).
-    /// </summary>
-    private static Dictionary<Guid, int> BuildIngredientQuantities(
-        IEnumerable<ProductIngredient> detailedIngredients,
-        IReadOnlyCollection<Guid>? selectedIngredients,
-        Dictionary<Guid, int>? providedQuantities)
-    {
-        var selectedIngredientIds = selectedIngredients != null
-            ? new HashSet<Guid>(selectedIngredients)
-            : new HashSet<Guid>();
-        var builtQuantities = new Dictionary<Guid, int>();
-
-        foreach (var ingredient in detailedIngredients.Where(i => i.IsActive))
-        {
-            if (providedQuantities != null && providedQuantities.TryGetValue(ingredient.Id, out var quantity))
-            {
-                // Explicit client quantity (e.g. double cheese) takes precedence.
-                builtQuantities[ingredient.Id] = quantity;
-            }
-            else if (selectedIngredientIds.Contains(ingredient.Id))
-            {
-                // Selected ingredient without an explicit quantity: quantity 1
-                builtQuantities[ingredient.Id] = 1;
-            }
-            else if (ingredient.IsOptional || ingredient.IsIncludedInBasePrice)
-            {
-                // Optional ingredient not selected: mark as deselected (quantity 0)
-                builtQuantities[ingredient.Id] = 0;
-            }
-            // Non-optional ingredients that are not selected are implicitly included
-        }
-
-        return builtQuantities;
     }
 }
