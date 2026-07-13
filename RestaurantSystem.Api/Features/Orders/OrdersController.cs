@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.Orders.Commands.AddPaymentToOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CompleteAllTableOrdersCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
+using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.DeleteOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.RefundPaymentCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.ToggleFocusOrderCommand;
@@ -47,6 +48,18 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<OrderDto>>> CreateOrder([FromBody] CreateOrderCommand command)
         => Ok(await _mediator.SendCommand(command));
+
+    // Order-from-basket: the server reads the user's persisted basket and owns the basket→order
+    // item translation (menu-bundles redesign #157), instead of the client hand-building Items.
+    // Session comes from the header (as with the basket endpoints), never the request body.
+    [HttpPost("from-basket")]
+    public async Task<ActionResult<ApiResponse<OrderDto>>> CreateOrderFromBasket(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromBody] CreateOrderFromBasketCommand command)
+    {
+        command.SessionId = sessionId;
+        return Ok(await _mediator.SendCommand(command));
+    }
 
     [HttpPost("{orderId}/payments")]
     [Authorize]

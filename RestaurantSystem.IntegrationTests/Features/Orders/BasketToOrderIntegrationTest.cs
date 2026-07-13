@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
+using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -149,6 +150,29 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         _colaOption = colaOption;
     }
 
+    // Shared basket-building helpers so the legacy-path, totals, and from-basket parity tests
+    // add identical items without duplicating the request payloads.
+    private Task<HttpResponseMessage> AddStandalonePizzaAsync(int quantity, string? instructions = null) =>
+        PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _testProduct.Id,
+            Quantity = quantity,
+            SpecialInstructions = instructions,
+        });
+
+    private Task<HttpResponseMessage> AddComboAsync(int quantity, string? instructions = null) =>
+        PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _menuProduct.Id,
+            Quantity = quantity,
+            SpecialInstructions = instructions,
+            SelectedMenuOptions = new List<SelectedMenuOptionDto>
+            {
+                new() { SectionId = _mainSection.Id, ItemId = _pizzaOption.ProductId, Quantity = 1 },
+                new() { SectionId = _drinkSection.Id, ItemId = _colaOption.ProductId, Quantity = 1 }
+            }
+        });
+
     [Fact]
     public async Task Should_Add_Product_And_Menu_To_Basket_Then_Create_Order_Successfully()
     {
@@ -157,14 +181,7 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
 
         // Act & Assert - Step 1: Add Product to Basket
-        var addProductRequest = new AddToBasketDto
-        {
-            ProductId = _testProduct.Id,
-            Quantity = 2,
-            SpecialInstructions = "Extra cheese please"
-        };
-
-        var productResponse = await PostAsJsonAsync("/api/basket/items", addProductRequest);
+        var productResponse = await AddStandalonePizzaAsync(2, "Extra cheese please");
         productResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var basketAfterProduct = await ReadResponseAsync<ApiResponse<BasketDto>>(productResponse);
@@ -176,19 +193,7 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         basketAfterProduct.Data.Items.First().Quantity.Should().Be(2);
 
         // Act & Assert - Step 2: Add Menu (ProductType.Menu product) to Basket
-        var addMenuRequest = new AddToBasketDto
-        {
-            ProductId = _menuProduct.Id,
-            Quantity = 1,
-            SpecialInstructions = "No ice in drink",
-            SelectedMenuOptions = new List<SelectedMenuOptionDto>
-            {
-                new() { SectionId = _mainSection.Id, ItemId = _pizzaOption.ProductId, Quantity = 1 },
-                new() { SectionId = _drinkSection.Id, ItemId = _colaOption.ProductId, Quantity = 1 }
-            }
-        };
-
-        var menuResponse = await PostAsJsonAsync("/api/basket/items", addMenuRequest);
+        var menuResponse = await AddComboAsync(1, "No ice in drink");
         menuResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var basketAfterMenu = await ReadResponseAsync<ApiResponse<BasketDto>>(menuResponse);
@@ -430,27 +435,10 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
 
         // Add multiple products to basket
-        var addProductRequest1 = new AddToBasketDto
-        {
-            ProductId = _testProduct.Id,
-            Quantity = 3
-        };
-
-        await PostAsJsonAsync("/api/basket/items", addProductRequest1);
+        await AddStandalonePizzaAsync(3);
 
         // Add a ProductType.Menu combo with its required selections.
-        var addMenuRequest = new AddToBasketDto
-        {
-            ProductId = _menuProduct.Id,
-            Quantity = 2,
-            SelectedMenuOptions = new List<SelectedMenuOptionDto>
-            {
-                new() { SectionId = _mainSection.Id, ItemId = _pizzaOption.ProductId, Quantity = 1 },
-                new() { SectionId = _drinkSection.Id, ItemId = _colaOption.ProductId, Quantity = 1 }
-            }
-        };
-
-        await PostAsJsonAsync("/api/basket/items", addMenuRequest);
+        await AddComboAsync(2);
 
         // Get basket to verify totals
         var basketResponse = await Client.GetAsync("/api/basket");
@@ -466,5 +454,109 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
 
         basket.Data!.SubTotal.Should().Be(expectedSubTotal);
         basket.Data.Total.Should().BeGreaterThanOrEqualTo(expectedSubTotal); // May include tax/fees
+    }
+
+    // Slice 5 (#157): POST /api/orders/from-basket reads the persisted basket and the SERVER owns
+    // the basket→order item translation (replacing the client's orderItemsPayload.ts). This pins
+    // parity with the legacy items-payload path — same basket ⇒ identical order rows + totals —
+    // which is what makes deleting the client-side transform safe. Runs as a guest checkout
+    // (anonymous throughout) so GetBasketAsync resolves the session-owned basket; item translation
+    // (the thing under test) is independent of authentication.
+    [Fact]
+    public async Task Should_Create_Order_From_Basket_With_Same_Rows_And_Totals_As_Legacy_Path()
+    {
+        var sessionId = Guid.NewGuid().ToString();
+        Client.DefaultRequestHeaders.Add("X-Session-Id", sessionId);
+
+        (await AddStandalonePizzaAsync(2, "Extra cheese please")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await AddComboAsync(1, "No ice in drink")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act — no client-built Items; the server derives them from the basket.
+        var request = new CreateOrderFromBasketCommand
+        {
+            Type = OrderType.DineIn,
+            TableNumber = 5,
+            CustomerName = "Test Customer",
+            CustomerEmail = "test@example.com",
+            CustomerPhone = "+1234567890",
+            Notes = "Please prepare quickly",
+            Payments = new List<CreateOrderPaymentDto>
+            {
+                new() { PaymentMethod = PaymentMethod.Cash, Amount = 100.00m }
+            }
+        };
+
+        var orderResponse = await PostAsJsonAsync("/api/orders/from-basket", request);
+        orderResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var orderResult = await ReadResponseAsync<ApiResponse<OrderDto>>(orderResponse);
+        orderResult!.Success.Should().BeTrue();
+        var order = orderResult.Data!;
+
+        // Order-level fields carried through.
+        order.Type.Should().Be(OrderType.DineIn.ToString());
+        order.TableNumber.Should().Be(5);
+        order.CustomerName.Should().Be("Test Customer");
+        order.Status.Should().Be(OrderStatus.Confirmed.ToString());
+
+        // Same 4 rows as the legacy path: standalone pizza + combo parent + 2 combo children.
+        order.Items.Should().HaveCount(4);
+        order.Items.FirstOrDefault(i => i.ProductId == _testProduct.Id && i.Quantity == 2)
+            .Should().NotBeNull("the standalone pizza (qty 2) must be present");
+        order.Items.FirstOrDefault(i => i.ProductId == _menuProduct.Id)
+            .Should().NotBeNull("the combo parent must be present");
+        order.Items.FirstOrDefault(i => i.ProductId == _testCola.Id)
+            .Should().NotBeNull("the cola combo child must be present");
+
+        // Identical items total: children contribute 0 (their price is rolled into the parent's
+        // UnitPrice by BasketService), so only the standalone pizza + the combo parent count.
+        var expectedItemsTotal = (_testProduct.BasePrice * 2) + ExpectedMenuUnitPrice;
+        order.Items.Sum(i => i.ItemTotal).Should().Be(expectedItemsTotal);
+
+        // DB-level parity: combo children persist with ItemTotal 0 and their per-section UnitPrice
+        // (issue #54), and the combo's special instructions round-tripped basket→order.
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var orderInDb = await context.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.Id == order.Id);
+
+        orderInDb!.Items.Should().HaveCount(4);
+        orderInDb.Items.Where(i => i.ParentOrderItemId != null).Should().HaveCount(2);
+        orderInDb.Items
+            .Where(i => i.ParentOrderItemId != null)
+            .Select(i => i.ItemTotal)
+            .Should().OnlyContain(t => t == 0m);
+        orderInDb.Items
+            .Where(i => i.ParentOrderItemId != null)
+            .Select(i => i.UnitPrice)
+            .Should().BeEquivalentTo(new[] { MainAdditional, DrinkAdditional });
+        orderInDb.Items
+            .First(i => i.ProductId == _menuProduct.Id && i.ParentOrderItemId == null)
+            .SpecialInstructions.Should().Be("No ice in drink");
+    }
+
+    // An empty (or missing) basket is rejected with HTTP 400 — the same contract the legacy
+    // items-payload path gets from CreateOrderCommandValidator's non-empty-items rule.
+    [Fact]
+    public async Task Should_Reject_From_Basket_Order_When_Basket_Is_Empty()
+    {
+        var emptySessionId = Guid.NewGuid().ToString();
+        Client.DefaultRequestHeaders.Add("X-Session-Id", emptySessionId);
+
+        var request = new CreateOrderFromBasketCommand
+        {
+            Type = OrderType.DineIn,
+            TableNumber = 3,
+            CustomerName = "Test Customer",
+            Payments = new List<CreateOrderPaymentDto>
+            {
+                new() { PaymentMethod = PaymentMethod.Cash, Amount = 10.00m }
+            }
+        };
+
+        var response = await PostAsJsonAsync("/api/orders/from-basket", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }
