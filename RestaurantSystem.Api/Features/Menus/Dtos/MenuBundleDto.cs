@@ -1,3 +1,5 @@
+using RestaurantSystem.Api.Features.Products.Dtos;
+
 namespace RestaurantSystem.Api.Features.Menus.Dtos;
 
 // The menu-bundle READ/response contract (menu-bundles redesign #156, slice 4c). These types are
@@ -25,7 +27,7 @@ public class MenuBundleDto
     public int DisplayOrder { get; set; }
     public MenuBundleDefinitionDto? MenuDefinition { get; set; }
     public Dictionary<string, MenuBundleContentDto> Content { get; set; } = new();
-    public List<RestaurantSystem.Api.Features.Products.Dtos.ProductImageDto> Images { get; set; } = new();
+    public List<ProductImageDto> Images { get; set; } = new();
 }
 
 /// <summary>
