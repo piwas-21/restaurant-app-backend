@@ -46,29 +46,26 @@ public class CreateOrderFromBasketCommandHandler
         // pipeline (validation included), so behaviour is identical to a direct POST /api/orders.
         var createOrder = new LegacyCreateOrderCommand
         {
-            UserId = command.UserId,
             CustomerName = command.CustomerName,
             CustomerEmail = command.CustomerEmail,
             CustomerPhone = command.CustomerPhone,
             Type = command.Type,
             TableNumber = command.TableNumber,
             PromoCode = command.PromoCode,
-            HasUserLimitDiscount = command.HasUserLimitDiscount,
-            UserLimitAmount = command.UserLimitAmount,
             BasketSubTotal = command.BasketSubTotal,
             BasketTax = command.BasketTax,
             BasketDiscount = command.BasketDiscount,
             BasketCustomerDiscount = command.BasketCustomerDiscount,
             BasketTotal = command.BasketTotal,
             PointsToRedeem = command.PointsToRedeem,
-            Tip = command.Tip,
-            IsFocusOrder = command.IsFocusOrder,
-            Priority = command.Priority,
-            FocusReason = command.FocusReason,
+            Tip = command.Tip ?? 0m,
             Notes = command.Notes,
             DeliveryAddress = command.DeliveryAddress,
             Items = _translator.Translate(basket.Items),
             Payments = command.Payments,
+            // UserId and staff/POS-only fields (focus order, user-limit discount) are left at their
+            // CreateOrderCommand defaults — the basket-checkout flow never sets them (UserId falls
+            // back to the current user inside the delegated handler).
         };
 
         return await _mediator.SendCommand(createOrder, cancellationToken);

@@ -106,12 +106,12 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
 
         if (item.SelectedIngredients is not null)
         {
-            foreach (var ingredientId in processed.Keys.ToList())
+            var deselected = processed.Keys
+                .Where(id => !item.SelectedIngredients.Contains(id))
+                .ToList();
+            foreach (var ingredientId in deselected)
             {
-                if (!item.SelectedIngredients.Contains(ingredientId))
-                {
-                    processed[ingredientId] = 0;
-                }
+                processed[ingredientId] = 0;
             }
         }
 
