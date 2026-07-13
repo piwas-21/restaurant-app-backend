@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Menus.Dtos;
-using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundlesQuery;
@@ -26,12 +24,6 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
                         .ThenInclude(i => i.Product)
                             .ThenInclude(p => p.DetailedIngredients)
                                 .ThenInclude(di => di.Descriptions)
-            .Include(p => p.MenuDefinition)
-                .ThenInclude(md => md!.Sections)
-                    .ThenInclude(s => s.Items)
-                        .ThenInclude(i => i.Product)
-                            .ThenInclude(p => p.SuggestedSideItems)
-                                .ThenInclude(si => si.SideItemProduct)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
             .Where(p => !p.IsDeleted && p.MenuDefinition != null);
@@ -74,7 +66,7 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = products.Select(MapToMenuBundleDto).ToList();
+        var dtos = products.Select(p => MenuBundleMapper.MapToMenuBundleDto(p, _baseUrl)).ToList();
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);
 
@@ -88,111 +80,5 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
 
         return ApiResponse<PagedResult<MenuBundleDto>>.SuccessWithData(result,
             $"Retrieved {products.Count} menu bundles");
-    }
-
-    private MenuBundleDto MapToMenuBundleDto(Product product)
-    {
-        var dto = new MenuBundleDto
-        {
-            Id = product.Id,
-            Name = product.Name,
-            Description = product.Description,
-            BasePrice = product.BasePrice,
-            IsActive = product.IsActive,
-            IsAvailable = product.IsAvailable,
-            IsSpecial = product.IsSpecial,
-            PreparationTimeMinutes = product.PreparationTimeMinutes,
-            Type = "menu",
-            DisplayOrder = product.DisplayOrder,
-            MenuDefinition = product.MenuDefinition != null ? new MenuDefinitionDto
-            {
-                Id = product.MenuDefinition.Id,
-                IsAlwaysAvailable = product.MenuDefinition.IsAlwaysAvailable,
-                StartTime = product.MenuDefinition.StartTime?.ToString(@"hh\:mm\:ss"),
-                EndTime = product.MenuDefinition.EndTime?.ToString(@"hh\:mm\:ss"),
-                AvailableMonday = product.MenuDefinition.AvailableMonday,
-                AvailableTuesday = product.MenuDefinition.AvailableTuesday,
-                AvailableWednesday = product.MenuDefinition.AvailableWednesday,
-                AvailableThursday = product.MenuDefinition.AvailableThursday,
-                AvailableFriday = product.MenuDefinition.AvailableFriday,
-                AvailableSaturday = product.MenuDefinition.AvailableSaturday,
-                AvailableSunday = product.MenuDefinition.AvailableSunday,
-                Sections = product.MenuDefinition.Sections.OrderBy(s => s.DisplayOrder).Select(s => new MenuSectionDto
-                {
-                    Id = s.Id,
-                    Name = s.Name,
-                    Description = s.Description,
-                    DisplayOrder = s.DisplayOrder,
-                    IsRequired = s.IsRequired,
-                    MinSelection = s.MinSelection,
-                    MaxSelection = s.MaxSelection,
-                    Items = s.Items.OrderBy(i => i.DisplayOrder).Select(i => new MenuSectionItemDto
-                    {
-                        Id = i.Id,
-                        ProductId = i.ProductId,
-                        ProductName = i.Product?.Name,
-                        AdditionalPrice = i.AdditionalPrice,
-                        DisplayOrder = i.DisplayOrder,
-                        IsDefault = i.IsDefault,
-                        Ingredients = i.Product != null ? (i.Product.DetailedIngredients.Any()
-                            ? i.Product.DetailedIngredients.Where(di => di.IsActive).Select(di => di.Name).ToList()
-                            : i.Product.Ingredients) : null,
-                        Allergens = i.Product?.Allergens,
-                        DetailedIngredients = i.Product?.DetailedIngredients
-                            .Where(di => di.IsActive)
-                            .OrderBy(di => di.DisplayOrder)
-                            .Select(di => new ProductIngredientDto
-                            {
-                                Id = di.Id,
-                                Name = di.Name,
-                                IsOptional = di.IsOptional,
-                                Price = di.Price,
-                                IsIncludedInBasePrice = di.IsIncludedInBasePrice,
-                                IsActive = di.IsActive,
-                                DisplayOrder = di.DisplayOrder,
-                                MaxQuantity = di.MaxQuantity,
-                                Content = di.Descriptions?.ToDictionary(
-                                    desc => desc.LanguageCode,
-                                    desc => new ProductIngredientContentDto
-                                    {
-                                        Name = desc.Name,
-                                        Description = desc.Description
-                                    }
-                                )
-                            }).ToList(),
-                        SuggestedSideItems = i.Product?.SuggestedSideItems
-                            .OrderBy(si => si.DisplayOrder)
-                            .Select(si => new SuggestedSideItemDto
-                            {
-                                Id = si.Id,
-                                SideItemProductId = si.SideItemProductId,
-                                SideItemProductName = si.SideItemProduct?.Name,
-                                SideItemBasePrice = si.SideItemProduct?.BasePrice ?? 0,
-                                IsRequired = si.IsRequired,
-                                DisplayOrder = si.DisplayOrder
-                            }).ToList()
-                    }).ToList()
-                }).ToList()
-            } : null,
-            Content = new(),
-            Images = product.Images.Select(i => new RestaurantSystem.Api.Features.Products.Dtos.ProductImageDto
-            {
-                Id = i.Id,
-                Url = UrlJoin.Join(_baseUrl, i.Url),
-                AltText = i.AltText,
-                IsPrimary = i.IsPrimary,
-                SortOrder = i.SortOrder
-            }).OrderBy(i => i.SortOrder).ToList()
-        };
-
-        foreach (var description in product.Descriptions)
-        {
-            dto.Content[description.Lang] = new MenuBundleContentDto
-            {
-                Name = description.Name,
-                Description = description.Description
-            };
-        }
-        return dto;
     }
 }
