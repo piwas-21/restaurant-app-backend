@@ -110,7 +110,7 @@ All soft-delete-aware entities use `IsDeleted` with a global query filter in `Ap
 
 ## §4 — File length limits
 
-Enforced (blocking) by `scripts/check-file-length.sh` (pre-commit + CI) and warned in-loop by the PostToolUse checker. Max LOC: **Controller 150 · Command/Query/Handler 200 · Service 800 · Entity 100 · DTO 60 · Validator 60 · `*Settings.cs` 50**. Over the limit ⇒ decompose (controllers dispatch, one service = one concern). Existing violations are baselined in `scripts/file-length-baseline.txt`; opt a file out with `// FILE_LENGTH_EXEMPT: <reason>` in the first 5 lines; after a refactor drops a file under its limit run `bash scripts/check-file-length.sh --regen-baseline` and commit the baseline.
+Enforced (blocking) by `scripts/check-file-length.sh` (pre-commit + CI) and warned in-loop by the PostToolUse checker. Max LOC: **Controller 150 · Command/Query/Handler 200 · Service 300 · Entity 100 · DTO 60 · Validator 60 · `*Settings.cs` 50**. Over the limit ⇒ decompose (controllers dispatch, one service = one concern). Existing violations are baselined in `scripts/file-length-baseline.txt`; opt a file out with `// FILE_LENGTH_EXEMPT: <reason>` in the first 5 lines; after a refactor drops a file under its limit run `bash scripts/check-file-length.sh --regen-baseline` and commit the baseline.
 
 ---
 
