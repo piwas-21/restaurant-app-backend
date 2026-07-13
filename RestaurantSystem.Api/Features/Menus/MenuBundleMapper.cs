@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Menus.Dtos;
+using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Menus;
@@ -30,7 +31,7 @@ public static class MenuBundleMapper
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = "menu",
             DisplayOrder = product.DisplayOrder,
-            MenuDefinition = product.MenuDefinition != null ? new MenuDefinitionDto
+            MenuDefinition = product.MenuDefinition != null ? new MenuBundleDefinitionDto
             {
                 Id = product.MenuDefinition.Id,
                 IsAlwaysAvailable = product.MenuDefinition.IsAlwaysAvailable,
@@ -43,7 +44,7 @@ public static class MenuBundleMapper
                 AvailableFriday = product.MenuDefinition.AvailableFriday,
                 AvailableSaturday = product.MenuDefinition.AvailableSaturday,
                 AvailableSunday = product.MenuDefinition.AvailableSunday,
-                Sections = product.MenuDefinition.Sections.OrderBy(s => s.DisplayOrder).Select(s => new MenuSectionDto
+                Sections = product.MenuDefinition.Sections.OrderBy(s => s.DisplayOrder).Select(s => new MenuBundleSectionDto
                 {
                     Id = s.Id,
                     Name = s.Name,
@@ -52,7 +53,7 @@ public static class MenuBundleMapper
                     IsRequired = s.IsRequired,
                     MinSelection = s.MinSelection,
                     MaxSelection = s.MaxSelection,
-                    Items = s.Items.OrderBy(i => i.DisplayOrder).Select(i => new MenuSectionItemDto
+                    Items = s.Items.OrderBy(i => i.DisplayOrder).Select(i => new MenuBundleSectionItemDto
                     {
                         Id = i.Id,
                         ProductId = i.ProductId,
@@ -65,7 +66,7 @@ public static class MenuBundleMapper
                         DetailedIngredients = i.Product?.DetailedIngredients
                             .Where(di => di.IsActive)
                             .OrderBy(di => di.DisplayOrder)
-                            .Select(di => new ProductIngredientDto
+                            .Select(di => new MenuBundleIngredientDto
                             {
                                 Id = di.Id,
                                 Name = di.Name,
@@ -80,7 +81,7 @@ public static class MenuBundleMapper
                                     .Select(g => g.First()) // first wins on duplicate language codes
                                     .ToDictionary(
                                         desc => desc.LanguageCode,
-                                        desc => new ProductIngredientContentDto
+                                        desc => new MenuBundleIngredientContentDto
                                         {
                                             Name = desc.Name,
                                             Description = desc.Description
@@ -91,7 +92,7 @@ public static class MenuBundleMapper
                 }).ToList()
             } : null,
             Content = new(),
-            Images = product.Images.Select(i => new RestaurantSystem.Api.Features.Products.Dtos.ProductImageDto
+            Images = product.Images.Select(i => new ProductImageDto
             {
                 Id = i.Id,
                 Url = UrlJoin.Join(baseUrl, i.Url),
