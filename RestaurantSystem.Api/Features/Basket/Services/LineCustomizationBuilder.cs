@@ -25,7 +25,7 @@ public interface ILineCustomizationBuilder
     /// selection when present, else persist a provided map as-is).
     /// </param>
     LineCustomization Build(
-        ICollection<ProductIngredient> detailedIngredients,
+        ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
         List<Guid>? excludedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
@@ -42,7 +42,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
     }
 
     public LineCustomization Build(
-        ICollection<ProductIngredient> detailedIngredients,
+        ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
         List<Guid>? excludedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
@@ -58,7 +58,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
     }
 
     private static string? BuildIngredientQuantitiesJson(
-        ICollection<ProductIngredient> detailedIngredients,
+        ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities)
@@ -72,7 +72,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
                 return JsonSerializer.Serialize(ingredientQuantities);
             }
 
-            if (detailedIngredients.Count > 0)
+            if (detailedIngredients is { Count: > 0 })
             {
                 var built = BuildIngredientQuantities(detailedIngredients, selectedIngredients, ingredientQuantities);
                 return built.Count > 0 ? JsonSerializer.Serialize(built) : null;
@@ -84,7 +84,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         // Bundle-child precedence (was the BuildMenuItemAsync child loop): backfill from the
         // selection when present (so a deselected optional's "NO xxx" always reaches the kitchen
         // ticket), otherwise persist a provided map as-is.
-        if (selectedIngredients != null && detailedIngredients.Count > 0)
+        if (selectedIngredients != null && detailedIngredients is { Count: > 0 })
         {
             var built = BuildIngredientQuantities(detailedIngredients, selectedIngredients, ingredientQuantities);
             return built.Count > 0 ? JsonSerializer.Serialize(built) : null;
