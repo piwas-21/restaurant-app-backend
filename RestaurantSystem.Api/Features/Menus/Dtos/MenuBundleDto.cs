@@ -1,5 +1,13 @@
 namespace RestaurantSystem.Api.Features.Menus.Dtos;
 
+// The menu-bundle READ/response contract (menu-bundles redesign #156, slice 4c). These types are
+// deliberately distinct from the same-shaped Products.Dtos family, which is the WRITE/input contract
+// for the bundle Create/Update commands (and the product-read contract). The two carry different wire
+// shapes — this response family formats times as "hh:mm:ss" strings, uses non-null Guid Ids, and
+// projects DetailedIngredients/Content the input family doesn't — so they can't be merged. Naming the
+// response family MenuBundle* (rather than reusing MenuDefinitionDto/MenuSectionDto/… from
+// Products.Dtos) removes the CS0104 collision that previously forced callers to fully-qualify.
+
 /// <summary>
 /// DTO for menu bundle responses - excludes product-specific fields
 /// </summary>
@@ -15,7 +23,7 @@ public class MenuBundleDto
     public int PreparationTimeMinutes { get; set; }
     public string Type { get; set; } = "menu";
     public int DisplayOrder { get; set; }
-    public MenuDefinitionDto? MenuDefinition { get; set; }
+    public MenuBundleDefinitionDto? MenuDefinition { get; set; }
     public Dictionary<string, MenuBundleContentDto> Content { get; set; } = new();
     public List<RestaurantSystem.Api.Features.Products.Dtos.ProductImageDto> Images { get; set; } = new();
 }
@@ -30,9 +38,9 @@ public class MenuBundleContentDto
 }
 
 /// <summary>
-/// DTO for menu definition
+/// DTO for a bundle's menu definition (response shape; times pre-formatted as strings)
 /// </summary>
-public class MenuDefinitionDto
+public class MenuBundleDefinitionDto
 {
     public Guid Id { get; set; }
     public bool IsAlwaysAvailable { get; set; }
@@ -45,13 +53,13 @@ public class MenuDefinitionDto
     public bool AvailableFriday { get; set; }
     public bool AvailableSaturday { get; set; }
     public bool AvailableSunday { get; set; }
-    public List<MenuSectionDto> Sections { get; set; } = new();
+    public List<MenuBundleSectionDto> Sections { get; set; } = new();
 }
 
 /// <summary>
-/// DTO for menu section
+/// DTO for a bundle menu section
 /// </summary>
-public class MenuSectionDto
+public class MenuBundleSectionDto
 {
     public Guid Id { get; set; }
     public required string Name { get; set; }
@@ -60,13 +68,13 @@ public class MenuSectionDto
     public bool IsRequired { get; set; }
     public int MinSelection { get; set; }
     public int MaxSelection { get; set; }
-    public List<MenuSectionItemDto> Items { get; set; } = new();
+    public List<MenuBundleSectionItemDto> Items { get; set; } = new();
 }
 
 /// <summary>
-/// DTO for menu section item
+/// DTO for a bundle menu section item
 /// </summary>
-public class MenuSectionItemDto
+public class MenuBundleSectionItemDto
 {
     public Guid Id { get; set; }
     public Guid ProductId { get; set; }
@@ -76,11 +84,11 @@ public class MenuSectionItemDto
     public bool IsDefault { get; set; }
     public List<string>? Ingredients { get; set; }
     public List<string>? Allergens { get; set; }
-    public List<ProductIngredientDto>? DetailedIngredients { get; set; }
-    public List<SuggestedSideItemDto>? SuggestedSideItems { get; set; }
+    public List<MenuBundleIngredientDto>? DetailedIngredients { get; set; }
+    public List<MenuBundleSuggestedSideItemDto>? SuggestedSideItems { get; set; }
 }
 
-public class ProductIngredientDto
+public class MenuBundleIngredientDto
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -90,16 +98,16 @@ public class ProductIngredientDto
     public bool IsActive { get; set; }
     public int DisplayOrder { get; set; }
     public int MaxQuantity { get; set; }
-    public Dictionary<string, ProductIngredientContentDto>? Content { get; set; }
+    public Dictionary<string, MenuBundleIngredientContentDto>? Content { get; set; }
 }
 
-public class ProductIngredientContentDto
+public class MenuBundleIngredientContentDto
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
 }
 
-public class SuggestedSideItemDto
+public class MenuBundleSuggestedSideItemDto
 {
     public Guid Id { get; set; }
     public Guid SideItemProductId { get; set; }
