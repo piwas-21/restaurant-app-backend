@@ -42,17 +42,8 @@ public static class ProductDtoMapper
                 IsActive = di.IsActive,
                 DisplayOrder = di.DisplayOrder,
                 MaxQuantity = di.MaxQuantity,
-                Content = di.Descriptions
-                    .GroupBy(d => d.LanguageCode)
-                    .Select(g => g.First()) // Take first if duplicates exist
-                    .ToDictionary(
-                        d => d.LanguageCode,
-                        d => new ProductIngredientContentDto
-                        {
-                            Name = d.Name,
-                            Description = d.Description
-                        }
-                    )
+                Content = ToLocalizedContent(di.Descriptions, d => d.LanguageCode,
+                    d => new ProductIngredientContentDto { Name = d.Name, Description = d.Description })
             }).ToList(),
             Categories = product.ProductCategories.Select(pc => new ProductCategoryDto
             {
@@ -82,17 +73,8 @@ public static class ProductDtoMapper
                 FinalPrice = product.BasePrice + v.PriceModifier,
                 IsActive = v.IsActive,
                 DisplayOrder = v.DisplayOrder,
-                Content = v.Descriptions
-                    .GroupBy(d => d.LanguageCode)
-                    .Select(g => g.First())
-                    .ToDictionary(
-                        d => d.LanguageCode,
-                        d => new ProductVariationContentDto
-                        {
-                            Name = d.Name,
-                            Description = d.Description
-                        }
-                    )
+                Content = ToLocalizedContent(v.Descriptions, d => d.LanguageCode,
+                    d => new ProductVariationContentDto { Name = d.Name, Description = d.Description })
             }).ToList(),
             SuggestedSideItems = product.SuggestedSideItems.Select(si => new SideItemDto
             {
@@ -149,4 +131,18 @@ public static class ProductDtoMapper
         }
         return dto;
     }
+
+    /// <summary>
+    /// Projects a set of localized descriptions into a language-code → content map, taking the
+    /// first entry when a language code is duplicated. Shared by the ingredient and variation
+    /// content maps (which differ only by their content DTO type).
+    /// </summary>
+    private static Dictionary<string, TContent> ToLocalizedContent<TDescription, TContent>(
+        IEnumerable<TDescription> descriptions,
+        Func<TDescription, string> languageCode,
+        Func<TDescription, TContent> content)
+        => descriptions
+            .GroupBy(languageCode)
+            .Select(g => g.First()) // first wins on duplicate language codes
+            .ToDictionary(languageCode, content);
 }
