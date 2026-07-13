@@ -77,14 +77,17 @@ public static class MenuBundleMapper
                                 IsActive = di.IsActive,
                                 DisplayOrder = di.DisplayOrder,
                                 MaxQuantity = di.MaxQuantity,
-                                Content = di.Descriptions?.ToDictionary(
-                                    desc => desc.LanguageCode,
-                                    desc => new ProductIngredientContentDto
-                                    {
-                                        Name = desc.Name,
-                                        Description = desc.Description
-                                    }
-                                )
+                                Content = di.Descriptions?
+                                    .GroupBy(desc => desc.LanguageCode)
+                                    .Select(g => g.First()) // first wins on duplicate language codes
+                                    .ToDictionary(
+                                        desc => desc.LanguageCode,
+                                        desc => new ProductIngredientContentDto
+                                        {
+                                            Name = desc.Name,
+                                            Description = desc.Description
+                                        }
+                                    )
                             }).ToList()
                     }).ToList()
                 }).ToList()
