@@ -55,8 +55,16 @@ jobs:
           # while the prod box pins BACKEND_TAG=latest — one deploy.sh away from
           # shipping unreleased code. Releases must be the only thing :latest moves
           # for (fix 2026-07-15; same root cause as sofra's 2026-07-12 fix).
+          #
+          # :staging is the moving tag the STAGING box pins (BACKEND_TAG=staging).
+          # The backend image is domain-agnostic (no baked-in host, unlike the
+          # frontend), so :staging is simply an alias for this same develop build
+          # — no separate build job is needed. Staging tracks develop through it;
+          # without it, staging would have to pin :latest, which now means main
+          # and would silently roll staging back to prod code on any deploy.
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=staging,enable=${{ github.ref == 'refs/heads/develop' }}
             type=sha,format=long
             type=ref,event=tag
 
