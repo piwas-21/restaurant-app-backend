@@ -12,7 +12,8 @@ name: retag-mutable-tags
 #
 # Security posture mirrors build-image.yml: the operator-supplied `sha` input is
 # passed via env and regex-validated (never interpolated into a run: shell), the
-# action is pinned to an immutable SHA, and GITHUB_TOKEN is packages:write only.
+# action is pinned to an immutable SHA, and GITHUB_TOKEN is scoped to
+# packages:write (retag) + contents:read (the compare-to-main guard) only.
 
 on:
   workflow_dispatch:
@@ -42,16 +43,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Re-point :latest (server-side manifest copy)
+      - name: Validate sha and assert it is released (reachable from main)
+        # :latest is the production tag — it must only ever point at RELEASED code.
+        # Guard against the real footgun: an operator pasting the develop-tip sha
+        # (which is exactly the wrong value :latest may currently hold) and thereby
+        # re-poisoning :latest with unreleased code — the very bug this tool exists
+        # to repair. `identical` = same commit as main tip, `behind` = an ancestor
+        # of main; `ahead`/`diverged` = not on main = refuse.
         env:
           SHA: ${{ inputs.sha }}
-          IMAGE: ghcr.io/${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::sha must be a 40-char lowercase hex commit SHA (got: '$SHA')"
             exit 1
           fi
+          status="$(gh api "repos/$REPO/compare/main...$SHA" --jq .status)"
+          case "$status" in
+            identical|behind) echo "OK: $SHA is reachable from main ($status)" ;;
+            *) echo "::error::$SHA is not on main ($status) — :latest must only point at released code"; exit 1 ;;
+          esac
+
+      - name: Re-point :latest (server-side manifest copy)
+        env:
+          SHA: ${{ inputs.sha }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
           echo "Re-pointing $IMAGE:latest -> $IMAGE:sha-$SHA"
           docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:sha-$SHA"
 
