@@ -67,6 +67,9 @@ public class OrderMappingServiceMenuIngredientTests : IntegrationTestBase
                 ProductId = product.Id,
                 Name = "Cheese",
                 IsOptional = true,
+                // Included in the base recipe, so qty 0 is a genuine removal → IsRemoved=true
+                // (a non-included add-on at qty 0 is "not added", not removed).
+                IsIncludedInBasePrice = true,
                 GlobalIngredientId = globalCheese.Id,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = "test"

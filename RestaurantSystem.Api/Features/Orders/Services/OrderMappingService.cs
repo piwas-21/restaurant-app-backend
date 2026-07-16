@@ -124,13 +124,23 @@ public class OrderMappingService : IOrderMappingService
                     {
                         if (selectedIngredients.TryGetValue(ing.Id, out var quantity))
                         {
-                            // Ingredient is in the order - show it regardless of quantity
+                            // Ingredient is in the order - show it regardless of quantity.
+                            // "Removed" (→ a "NO X" kitchen-ticket line) only applies to
+                            // ingredients that are part of the base recipe: a required one, or
+                            // an optional one included in the base price. A non-included
+                            // optional (a paid add-on) at qty 0 was simply NEVER added — it is
+                            // not a removal, so it must not print "NO X". The unified
+                            // customization sheet sends every option's quantity (incl. 0 for
+                            // unselected ones), so without this guard every un-added add-on
+                            // produced spurious kitchen-ticket noise. Mirrors the frontend's
+                            // base-recipe rule (utils/ingredientSelection.ts).
+                            bool inBaseRecipe = !ing.IsOptional || ing.IsIncludedInBasePrice;
                             ingredientCustomizations.Add(new OrderItemIngredientDto
                             {
                                 IngredientId = ing.Id,
                                 IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
                                 Quantity = quantity,
-                                IsRemoved = quantity == 0
+                                IsRemoved = quantity == 0 && inBaseRecipe
                             });
                         }
                         else if (!ing.IsOptional)
