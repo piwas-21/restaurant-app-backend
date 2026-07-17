@@ -396,6 +396,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
+builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>();
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
 builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();
@@ -404,6 +405,7 @@ builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
+builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();
 builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
@@ -418,6 +420,8 @@ builder.Services.AddScoped<IOrderTypeConfigurationService, OrderTypeConfiguratio
 builder.Services.AddScoped<IWorkingHoursService, WorkingHoursService>();
 
 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
+builder.Services.AddScoped<IGroupMembershipService, GroupMembershipService>();
+builder.Services.AddScoped<IMembershipQrService, MembershipQrService>();
 builder.Services.AddScoped<IUserGroupService, UserGroupService>();
 // HTML page builder for email-link landing endpoints (Sprint 2 task 2.1).
 // Pure string composition — singleton lifetime is appropriate.

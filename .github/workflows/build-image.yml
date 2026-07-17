@@ -12,7 +12,7 @@ name: build-image
 
 on:
   push:
-    branches: [main, develop]   # builds on develop too (dry-run); :latest only tagged on the default branch (main)
+    branches: [main, develop]   # builds on develop too (dry-run); :latest is tagged on main only (see the meta step)
     tags: ['v*']
 
 concurrency:
@@ -49,8 +49,22 @@ jobs:
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
           images: ghcr.io/${{ github.repository }}
+          # Gate :latest on the main branch explicitly, NOT {{is_default_branch}}:
+          # under GitFlow (2026-07-10) the repo's default branch is `develop`, so
+          # is_default_branch made every develop merge re-point :latest at develop
+          # while the prod box pins BACKEND_TAG=latest — one deploy.sh away from
+          # shipping unreleased code. Releases must be the only thing :latest moves
+          # for (fix 2026-07-15; same root cause as sofra's 2026-07-12 fix).
+          #
+          # :staging is the moving tag the STAGING box pins (BACKEND_TAG=staging).
+          # The backend image is domain-agnostic (no baked-in host, unlike the
+          # frontend), so :staging is simply an alias for this same develop build
+          # — no separate build job is needed. Staging tracks develop through it;
+          # without it, staging would have to pin :latest, which now means main
+          # and would silently roll staging back to prod code on any deploy.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=staging,enable=${{ github.ref == 'refs/heads/develop' }}
             type=sha,format=long
             type=ref,event=tag
 

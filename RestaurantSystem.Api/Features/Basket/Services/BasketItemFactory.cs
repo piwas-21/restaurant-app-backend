@@ -13,25 +13,25 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// Default <see cref="IBasketItemFactory"/>. <c>BuildRegularItemAsync</c> is a faithful
 /// extraction of the non-menu item-creation branch of <c>BasketService.AddItemToBasketAsync</c>;
 /// behaviour is unchanged. It resolves side-item prices from the database, so it depends on
-/// <see cref="ApplicationDbContext"/>; the ingredient customisation maths is delegated to
-/// <see cref="IBasketPricingService"/>.
+/// <see cref="ApplicationDbContext"/>; the ingredient customisation state (price + quantities JSON)
+/// is delegated to the single shared <see cref="ILineCustomizationBuilder"/>.
 /// </summary>
 public class BasketItemFactory : IBasketItemFactory
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IBasketPricingService _basketPricingService;
+    private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
     private readonly ILogger<BasketItemFactory> _logger;
 
     public BasketItemFactory(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        IBasketPricingService basketPricingService,
+        ILineCustomizationBuilder lineCustomizationBuilder,
         ILogger<BasketItemFactory> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _basketPricingService = basketPricingService;
+        _lineCustomizationBuilder = lineCustomizationBuilder;
         _logger = logger;
     }
 
@@ -40,9 +40,13 @@ public class BasketItemFactory : IBasketItemFactory
         // Calculate unit price
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
 
-        // Customization price from optional-ingredient selections (shared calc — see BasketPricingService).
-        decimal customizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-            product.DetailedIngredients, item.SelectedIngredients, item.IngredientQuantities);
+        // Ingredient customization (price + quantities JSON) via the single shared writer, so the
+        // regular and bundle-child paths can never diverge on a new field. Regular items keep the
+        // "explicit client map persisted verbatim" precedence (preferProvidedQuantities: true).
+        var customization = _lineCustomizationBuilder.Build(
+            product.DetailedIngredients, item.SelectedIngredients, item.ExcludedIngredients,
+            item.IngredientQuantities, preferProvidedQuantities: true);
+        decimal customizationPrice = customization.CustomizationPrice;
 
         // Calculate side items price. Drop non-positive quantities first: side-item
         // quantities are client-supplied, and a negative quantity would otherwise
@@ -73,45 +77,6 @@ public class BasketItemFactory : IBasketItemFactory
             selectedSideItemsJson = JsonSerializer.Serialize(validSideItems);
         }
 
-        // Serialize ingredient quantities to JSON
-        // Build from selectedIngredients if ingredientQuantities wasn't provided
-        string? ingredientQuantitiesJson = null;
-        if (item.IngredientQuantities != null && item.IngredientQuantities.Count > 0)
-        {
-            ingredientQuantitiesJson = JsonSerializer.Serialize(item.IngredientQuantities);
-        }
-        else if (product.DetailedIngredients.Any())
-        {
-            // Build ingredientQuantities from selectedIngredients
-            // This ensures kitchen prints can show "NO xxx" for deselected ingredients
-            var selectedIngredientIds = item.SelectedIngredients != null
-                ? new HashSet<Guid>(item.SelectedIngredients)
-                : new HashSet<Guid>();
-            var builtQuantities = new Dictionary<Guid, int>();
-
-            foreach (var ingredient in product.DetailedIngredients.Where(i => i.IsActive))
-            {
-                bool isSelected = selectedIngredientIds.Contains(ingredient.Id);
-
-                if (isSelected)
-                {
-                    // Selected ingredient: quantity 1 (or from ingredientQuantities if provided)
-                    builtQuantities[ingredient.Id] = 1;
-                }
-                else if (ingredient.IsOptional || ingredient.IsIncludedInBasePrice)
-                {
-                    // Optional ingredient not selected: mark as deselected (quantity 0)
-                    builtQuantities[ingredient.Id] = 0;
-                }
-                // Non-optional ingredients that are not selected are implicitly included
-            }
-
-            if (builtQuantities.Count > 0)
-            {
-                ingredientQuantitiesJson = JsonSerializer.Serialize(builtQuantities);
-            }
-        }
-
         return new BasketItem
         {
             BasketId = basketId,
@@ -121,10 +86,10 @@ public class BasketItemFactory : IBasketItemFactory
             UnitPrice = unitPrice,
             ItemTotal = (unitPrice + customizationPrice) * item.Quantity,
             SpecialInstructions = item.SpecialInstructions,
-            SelectedIngredients = item.SelectedIngredients,
-            ExcludedIngredients = item.ExcludedIngredients,
+            SelectedIngredients = customization.SelectedIngredients,
+            ExcludedIngredients = customization.ExcludedIngredients,
             AddedIngredients = item.AddedIngredients,
-            IngredientQuantitiesJson = ingredientQuantitiesJson,
+            IngredientQuantitiesJson = customization.IngredientQuantitiesJson,
             CustomizationPrice = customizationPrice,
             SelectedSideItemsJson = selectedSideItemsJson,
             CreatedAt = DateTime.UtcNow,
@@ -221,19 +186,16 @@ public class BasketItemFactory : IBasketItemFactory
             if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");
 
-            // Customization price for this child item (shared calc — see BasketPricingService).
-            decimal childCustomizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-                childProduct.DetailedIngredients, option.SelectedIngredients, option.IngredientQuantities);
+            // Ingredient customization (price + quantities JSON) via the single shared writer.
+            // Bundle children keep the "backfill from the selection when present" precedence so a
+            // deselected optional's "NO xxx" reaches the kitchen ticket (issue #150), while an
+            // explicit client quantity still wins inside the backfill.
+            var childCustomization = _lineCustomizationBuilder.Build(
+                childProduct.DetailedIngredients, option.SelectedIngredients, option.ExcludedIngredients,
+                option.IngredientQuantities, preferProvidedQuantities: false);
 
             // Add child customization price to total
-            totalCustomizationPrice += childCustomizationPrice * option.Quantity;
-
-            // Serialize ingredient quantities to JSON for child item
-            string? ingredientQuantitiesJson = null;
-            if (option.IngredientQuantities != null && option.IngredientQuantities.Count > 0)
-            {
-                ingredientQuantitiesJson = JsonSerializer.Serialize(option.IngredientQuantities);
-            }
+            totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
 
             var childItem = new BasketItem
             {
@@ -243,10 +205,11 @@ public class BasketItemFactory : IBasketItemFactory
                 Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
                 UnitPrice = sectionItem.AdditionalPrice, // Section-level additional price
                 ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
-                CustomizationPrice = childCustomizationPrice, // Store customization price for this child
-                SelectedIngredients = option.SelectedIngredients,
-                ExcludedIngredients = option.ExcludedIngredients,
-                IngredientQuantitiesJson = ingredientQuantitiesJson,
+                CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child
+                SpecialInstructions = option.SpecialInstructions,
+                SelectedIngredients = childCustomization.SelectedIngredients,
+                ExcludedIngredients = childCustomization.ExcludedIngredients,
+                IngredientQuantitiesJson = childCustomization.IngredientQuantitiesJson,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             };

@@ -1,4 +1,5 @@
 ﻿using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -123,13 +124,23 @@ public class OrderMappingService : IOrderMappingService
                     {
                         if (selectedIngredients.TryGetValue(ing.Id, out var quantity))
                         {
-                            // Ingredient is in the order - show it regardless of quantity
+                            // Ingredient is in the order - show it regardless of quantity.
+                            // "Removed" (→ a "NO X" kitchen-ticket line) only applies to
+                            // ingredients that are part of the base recipe: a required one, or
+                            // an optional one included in the base price. A non-included
+                            // optional (a paid add-on) at qty 0 was simply NEVER added — it is
+                            // not a removal, so it must not print "NO X". The unified
+                            // customization sheet sends every option's quantity (incl. 0 for
+                            // unselected ones), so without this guard every un-added add-on
+                            // produced spurious kitchen-ticket noise. Mirrors the frontend's
+                            // base-recipe rule (utils/ingredientSelection.ts).
+                            bool inBaseRecipe = !ing.IsOptional || ing.IsIncludedInBasePrice;
                             ingredientCustomizations.Add(new OrderItemIngredientDto
                             {
                                 IngredientId = ing.Id,
                                 IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
                                 Quantity = quantity,
-                                IsRemoved = quantity == 0
+                                IsRemoved = quantity == 0 && inBaseRecipe
                             });
                         }
                         else if (!ing.IsOptional)
@@ -160,11 +171,22 @@ public class OrderMappingService : IOrderMappingService
             kitchenType = firstMenuItem?.Product?.KitchenType.ToString();
         }
 
-        // Map child items (side items/additionals)
+        // Map child items. A child of a bundle/combo (ProductType.Menu parent) is a bundle
+        // component; a child of a regular item is a true add-on side. The Kind discriminator
+        // (DTO-only, derived from the parent's product type) lets the kitchen ticket and the
+        // order UI tell the two apart — they otherwise share the SideItems collection (#158).
         List<OrderItemDto>? sideItems = null;
         if (item.ChildOrderItems != null && item.ChildOrderItems.Any())
         {
-            sideItems = item.ChildOrderItems.Select(MapToOrderItemDto).ToList();
+            var childKind = item.Product?.Type == ProductType.Menu ? ItemKind.BundleChild : ItemKind.SideItem;
+            sideItems = item.ChildOrderItems
+                .Select(child =>
+                {
+                    var childDto = MapToOrderItemDto(child);
+                    childDto.Kind = childKind;
+                    return childDto;
+                })
+                .ToList();
         }
 
         return new OrderItemDto
@@ -241,34 +263,55 @@ public class OrderMappingService : IOrderMappingService
             foreach (var item in order.Items)
             {
                 // Load Product for regular product items
-                if (item.ProductId.HasValue && !_context.Entry(item).Reference(i => i.Product).IsLoaded)
+                if (item.ProductId.HasValue)
                 {
-                    await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
-
-                    // Load DetailedIngredients with GlobalIngredient for ingredient names
-                    if (item.Product != null && !_context.Entry(item.Product).Collection(p => p.DetailedIngredients).IsLoaded)
+                    if (!_context.Entry(item).Reference(i => i.Product).IsLoaded)
                     {
-                        await _context.Entry(item.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
-                        foreach (var ing in item.Product.DetailedIngredients)
-                        {
-                            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
-                            {
-                                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
-                            }
-                        }
+                        await _context.Entry(item).Reference(i => i.Product).LoadAsync(cancellationToken);
+                    }
+
+                    // Load DetailedIngredients + their GlobalIngredient refs for
+                    // ingredient names. Runs independently of the Product load above:
+                    // when the Product is already tracked (e.g. the order was just built
+                    // by OrderItemFactory in this same context), relationship fixup marks
+                    // the reference loaded and a nested check would skip this — leaving
+                    // ingredient customizations empty on the create-order response
+                    // (#150/#152). The helper guards each load level on its own IsLoaded
+                    // flag so the GlobalIngredient refs still load even when
+                    // DetailedIngredients was already tracked — same class, one level
+                    // deeper (#161).
+                    if (item.Product != null)
+                    {
+                        await EnsureProductIngredientsLoadedAsync(item.Product, cancellationToken);
                     }
                 }
 
                 // Load Menu and its Product for menu items (e.g., Chief's Special)
-                if (item.MenuId.HasValue && !_context.Entry(item).Reference(i => i.Menu).IsLoaded)
+                if (item.MenuId.HasValue)
                 {
-                    await _context.Entry(item).Reference(i => i.Menu).LoadAsync(cancellationToken);
+                    if (!_context.Entry(item).Reference(i => i.Menu).IsLoaded)
+                    {
+                        await _context.Entry(item).Reference(i => i.Menu).LoadAsync(cancellationToken);
+                    }
 
+                    // Checked independently of the Menu load above: when the Menu is
+                    // already tracked (e.g. the order was just built in this same
+                    // context), relationship fixup marks the reference loaded and the
+                    // previously nested checks skipped these loads — leaving ingredient
+                    // customizations empty on the create-order response. Issue #153,
+                    // same class as the Product branch fixed in #152.
                     if (item.Menu != null && !_context.Entry(item.Menu).Collection(m => m.MenuItems).IsLoaded)
                     {
                         await _context.Entry(item.Menu).Collection(m => m.MenuItems).LoadAsync(cancellationToken);
+                    }
 
-                        // Load Product and DetailedIngredients for each menu item
+                    // Load Product + DetailedIngredients (and their GlobalIngredient
+                    // refs) for each menu item. The per-ingredient loads run through the
+                    // shared helper regardless of whether DetailedIngredients was already
+                    // tracked — closing the same fixup-loaded defect class one level
+                    // deeper than the Menu-reference fix in #153 (#161).
+                    if (item.Menu?.MenuItems != null)
+                    {
                         foreach (var menuItem in item.Menu.MenuItems)
                         {
                             if (!_context.Entry(menuItem).Reference(mi => mi.Product).IsLoaded)
@@ -276,16 +319,9 @@ public class OrderMappingService : IOrderMappingService
                                 await _context.Entry(menuItem).Reference(mi => mi.Product).LoadAsync(cancellationToken);
                             }
 
-                            if (menuItem.Product != null && !_context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).IsLoaded)
+                            if (menuItem.Product != null)
                             {
-                                await _context.Entry(menuItem.Product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
-                                foreach (var ing in menuItem.Product.DetailedIngredients)
-                                {
-                                    if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
-                                    {
-                                        await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
-                                    }
-                                }
+                                await EnsureProductIngredientsLoadedAsync(menuItem.Product, cancellationToken);
                             }
                         }
                     }
@@ -309,5 +345,35 @@ public class OrderMappingService : IOrderMappingService
         }
 
         return MapToOrderDto(order);
+    }
+
+    // Ensures a product's DetailedIngredients — and each ingredient's GlobalIngredient
+    // reference, needed to resolve display names — are loaded. Each load is guarded by
+    // its own IsLoaded flag so the inner GlobalIngredient loads still run when
+    // DetailedIngredients was already tracked (e.g. via EF relationship fixup). That
+    // closes the fixup-loaded ingredient defect (#150/#152/#153) one level deeper and
+    // deduplicates the identical graph-walk the Product and Menu branches shared (#161).
+    private async Task EnsureProductIngredientsLoadedAsync(Product product, CancellationToken cancellationToken)
+    {
+        if (!_context.Entry(product).Collection(p => p.DetailedIngredients).IsLoaded)
+        {
+            await _context.Entry(product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
+        }
+
+        // DetailedIngredients is initialized to [] on the entity, but guard anyway to
+        // match the file's existing defensive style (see MapToOrderItemDto) and stay
+        // safe for manually-constructed / mocked Products.
+        if (product.DetailedIngredients == null)
+        {
+            return;
+        }
+
+        foreach (var ing in product.DetailedIngredients)
+        {
+            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
+            {
+                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
+            }
+        }
     }
 }

@@ -10,7 +10,7 @@
 - **Stack**: .NET 10, EF Core 10, PostgreSQL, custom CQRS mediator (`CustomMediator` — **NOT MediatR**)
 - **Architecture**: Clean Architecture (API → Domain → Infrastructure) + CQRS + feature folders
 - **Hosted on**: GitHub — https://github.com/piwas-21/restaurant-app-backend
-- **Production**: deployed from `main` — a merge to `main` auto-builds + deploys (`build-image.yml` → `deploy.yml`). `develop` is **legacy** (develop→main cutover done 2026-06-30); staging runs on a separate Netcup box (see the `deploy` repo)
+- **Production**: deployed from `main` — a merge to `main` auto-builds + deploys (`build-image.yml` → `deploy.yml`). `develop` is the **default + integration branch** (GitFlow reinstated 2026-07-10 — see §8); staging runs on a separate Netcup box (see the `deploy` repo)
 - **In-flight workspace**: this repo is one of three under [/Users/mahmutkaya/workspace/rumi-workspace/](../). The workspace meta-repo holds cross-repo plans and the master roadmap. When this repo is cloned standalone, only this `CLAUDE.md` is in scope.
 
 ## §1.5 — Tooling
@@ -110,7 +110,7 @@ All soft-delete-aware entities use `IsDeleted` with a global query filter in `Ap
 
 ## §4 — File length limits
 
-Enforced (blocking) by `scripts/check-file-length.sh` (pre-commit + CI) and warned in-loop by the PostToolUse checker. Max LOC: **Controller 150 · Command/Query/Handler 200 · Service 800 · Entity 100 · DTO 60 · Validator 60 · `*Settings.cs` 50**. Over the limit ⇒ decompose (controllers dispatch, one service = one concern). Existing violations are baselined in `scripts/file-length-baseline.txt`; opt a file out with `// FILE_LENGTH_EXEMPT: <reason>` in the first 5 lines; after a refactor drops a file under its limit run `bash scripts/check-file-length.sh --regen-baseline` and commit the baseline.
+Enforced (blocking) by `scripts/check-file-length.sh` (pre-commit + CI) and warned in-loop by the PostToolUse checker. Max LOC: **Controller 150 · Command/Query/Handler 200 · Service 300 · Entity 100 · DTO 60 · Validator 60 · `*Settings.cs` 50**. Over the limit ⇒ decompose (controllers dispatch, one service = one concern). Existing violations are baselined in `scripts/file-length-baseline.txt`; opt a file out with `// FILE_LENGTH_EXEMPT: <reason>` in the first 5 lines; after a refactor drops a file under its limit run `bash scripts/check-file-length.sh --regen-baseline` and commit the baseline.
 
 ---
 
@@ -177,21 +177,22 @@ Grep for the type/method/key you're adding or modifying. List every callsite. Co
 
 ## §8 — Git workflow
 
-### Branch strategy
+### Branch strategy (GitFlow — updated 2026-07-10; supersedes the retired 2026-06-30 main-based model)
 
 ```
-main                    ← production; a merge auto-builds + deploys (build-image.yml → deploy.yml)
-  ├── feature/<x>
-  ├── fix/<x>
-  ├── chore/<x>
-  └── docs/<x>
+develop                 ← DEFAULT + integration branch; all feature work targets it
+  ├── feature/<x>       → PR to develop
+  ├── fix/<x>           → PR to develop
+  ├── chore/<x>         → PR to develop
+  └── docs/<x>          → PR to develop
 
-develop                 ← LEGACY (pre-2026-06-30 promotion model); not used for new work
+main                    ← production RELEASES ONLY; updated solely via a develop→main release PR
 ```
 
-- **Never push to `main` directly** — pre-commit hook blocks this; open a PR.
-- Branch off **`main`**, open PR to **`main`** (develop→main promotion done 2026-06-30; `develop` is legacy — don't branch from or target it).
-- One issue = one branch. Delete branch after merge (via `gh pr merge --delete-branch`, or enable "Automatically delete head branches" in the repo's General settings).
+- **Never push directly to `main` or `develop`** — a GitHub **Ruleset** (`main-develop`, **no bypass**) blocks it server-side (direct push / force-push / deletion), and the pre-commit `no-commit-to-branch` hook blocks it locally. Always open a PR.
+- **Branch off `develop`; open every `feature/`·`fix/`·`chore/`·`docs/`·`test/` PR to `develop`.** Merge only when **all CI checks are green and review comments are resolved** (the ruleset requires it).
+- **Releases:** open a PR **`develop` → `main`**. Merging it is the release — a merge to `main` auto-builds + deploys to prod (`build-image.yml` → `deploy.yml`).
+- One issue = one branch. Delete branch after merge (`gh pr merge --delete-branch`).
 - Branch naming: `feature/`, `fix/`, `chore/`, `docs/`, `test/`.
 
 ### Commit messages
