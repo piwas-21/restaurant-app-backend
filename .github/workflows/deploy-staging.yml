@@ -1,0 +1,60 @@
+name: deploy-staging
+
+# Auto-deploys the BACKEND service to the STAGING box (Netcup, staging.fooderist.com)
+# after `build-image` succeeds on `develop`. This is the staging counterpart of deploy.yml
+# (which auto-deploys :latest to PROD on `main`); before it existed, a develop merge only
+# built the :staging image and the box had to be rolled by hand.
+#
+#   - auto:   after `build-image` succeeds on develop (workflow_run) -> roll backend :staging
+#   - manual: workflow_dispatch -> re-roll the current :staging (no rebuild)
+#
+# SCOPED to the `backend` service on purpose: the staging box co-locates the sofra site
+# (its own :latest, behind a compose profile) + postgres/redis/caddy, and a RUMI deploy must
+# not recreate any of them. `.env` on the box already pins BACKEND_TAG=staging, so pulling
+# the moving :staging tag + recreating just that service is the whole deploy.
+#
+# app-secrets.json perms: NOT re-applied here (the full ./deploy.sh chowns it to the backend
+# container gid). Routine develop builds keep the same gid, so the existing perms hold. A
+# release that CHANGES the backend image uid/gid needs a one-time manual `./deploy.sh` on the
+# staging box (see docs/runbooks/DEPLOYMENT.md); that is rare and self-evident (backend won't
+# start). EF migrations, if any, run at backend startup as they do on every deploy.
+#
+# Requires repo secrets STAGING_DEPLOY_{HOST,USER,SSH_KEY,SSH_FINGERPRINT} (staging box +
+# key, distinct from prod's DEPLOY_*).
+
+on:
+  workflow_run:
+    workflows: ["build-image"]
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch: {}
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy backend (staging box)
+    # Auto path only when the build actually succeeded; manual path always runs.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: SSH → roll backend :staging (scoped, never touches sofra)
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.STAGING_DEPLOY_HOST }}
+          username: ${{ secrets.STAGING_DEPLOY_USER }}
+          key: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_DEPLOY_SSH_FINGERPRINT }}
+          command_timeout: 18m
+          # flock serialises against a concurrent frontend staging deploy (GitHub concurrency
+          # groups don't span repos). Scoped `pull backend` + `up -d backend` recreates only
+          # the backend (its :staging digest moved); every other service keeps running.
+          script: |
+            flock -n /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && docker compose -f docker-compose.prod.yml pull backend && docker compose -f docker-compose.prod.yml up -d backend && docker image prune -f" \
+              || { echo "::error::another RUMI deploy holds the lock; skipping this run"; exit 1; }
