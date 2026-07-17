@@ -130,24 +130,20 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
 
             // Update Content (Descriptions).
             //
-            // Content may be omitted or empty (e.g. an edit that does not touch translations);
-            // treat that as "no translation changes" rather than NRE-ing on a null or wiping
+            // Content may be omitted or empty — an edit that does not touch translations, say.
+            // Treat that as "no translation changes" rather than NRE-ing on a null or wiping
             // every description. Mirrors UpdateProductCommandHandler, which already had both
             // guards — this handler had neither, so the same UI action meant "no-op" on a
             // product and "delete every translation" on a bundle (#190).
             var contentMap = command.Content ?? new ProductDescriptionsDto();
 
-            var languageCodes = contentMap.Select(x => x.Key).ToList();
-            var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
-                .Where(g => g.Count() > 1)
-                .Select(g => g.Key)
-                .ToList();
-
-            if (duplicateLanguageCodes.Any())
-            {
-                return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
-            }
-
+            // The duplicate-language-code check both handlers carried here was DEAD and has been
+            // dropped: ProductDescriptionsDto derives from Dictionary<string, …>, so duplicate
+            // keys cannot survive deserialization — System.Text.Json applies last-wins via the
+            // indexer. Verified: a body with two "fr" entries deserializes to Count == 1, so the
+            // check reported zero duplicates and its failure branch was unreachable. The copy in
+            // UpdateProductCommandHandler is equally dead; removing it there belongs with that
+            // handler's own tests (#193).
             if (contentMap.Any())
             {
                 _context.ProductDescriptions.RemoveRange(product.Descriptions);
