@@ -86,12 +86,33 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             product.UpdatedAt = DateTime.UtcNow;
             product.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-            // Update Categories
-            _context.ProductCategories.RemoveRange(product.ProductCategories);
-
-            var displayOrder = 0;
-            if (command.CategoryIds != null)
+            // Update Categories.
+            //
+            // An absent or empty CategoryIds means "no category instruction", NOT "clear them".
+            // The RemoveRange used to run BEFORE this check, so null and [] both deleted every
+            // assignment and re-added none — and since no client can populate the field for a
+            // bundle (the bundle form has no category control and MenuBundleDto returns none),
+            // every bundle update silently dropped its categories (#190).
+            //
+            // The condition deliberately matches the validation block above, which already read
+            // `CategoryIds?.Any() == true` — empty already meant "nothing to validate" there, so
+            // this only makes the mutation path agree with the check that guards it.
+            //
+            // There is deliberately no "clear all categories" payload: products cannot express
+            // one either, since UpdateProductCommandValidator requires CategoryIds NotEmpty. If
+            // clearing is ever wanted it needs an explicit opt-in, not an empty list — which is
+            // indistinguishable from a client that simply has nothing to say.
+            //
+            // NOTE: skipping this block is only safe for PrimaryCategoryId because
+            // MenuBundleCommandValidatorBase rejects a primary that isn't in CategoryIds — so
+            // when we skip, PrimaryCategoryId is necessarily null and there is nothing to apply.
+            // Relaxing that rule to allow re-pointing the primary without resending categories
+            // would need this block to handle it, or the change would be silently ignored.
+            if (command.CategoryIds?.Any() == true)
             {
+                _context.ProductCategories.RemoveRange(product.ProductCategories);
+
+                var displayOrder = 0;
                 foreach (var categoryId in command.CategoryIds)
                 {
                     var productCategory = new ProductCategory
@@ -107,8 +128,16 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 }
             }
 
-            // Update Content (Descriptions)
-            var languageCodes = command.Content.Select(x => x.Key).ToList();
+            // Update Content (Descriptions).
+            //
+            // Content may be omitted or empty (e.g. an edit that does not touch translations);
+            // treat that as "no translation changes" rather than NRE-ing on a null or wiping
+            // every description. Mirrors UpdateProductCommandHandler, which already had both
+            // guards — this handler had neither, so the same UI action meant "no-op" on a
+            // product and "delete every translation" on a bundle (#190).
+            var contentMap = command.Content ?? new ProductDescriptionsDto();
+
+            var languageCodes = contentMap.Select(x => x.Key).ToList();
             var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
                 .Where(g => g.Count() > 1)
                 .Select(g => g.Key)
@@ -119,9 +148,12 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
             }
 
-            _context.ProductDescriptions.RemoveRange(product.Descriptions);
+            if (contentMap.Any())
+            {
+                _context.ProductDescriptions.RemoveRange(product.Descriptions);
+            }
 
-            foreach (var (languageCode, description) in command.Content)
+            foreach (var (languageCode, description) in contentMap)
             {
                 var productDescription = new ProductDescription
                 {
