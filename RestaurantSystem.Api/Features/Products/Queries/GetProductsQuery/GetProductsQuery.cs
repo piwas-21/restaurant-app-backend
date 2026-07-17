@@ -17,7 +17,15 @@ public record GetProductsQuery(
     bool? isSpeacial,
     string? Search,
     int Page = 1,
-    int PageSize = 20
+    int PageSize = 20,
+    // Opt in to a mixed list of items AND Menu bundles. Without it an unfiltered
+    // query hides Menu bundles, which is what the customer catalog wants but
+    // leaves the admin unable to page one list over both (redesign #176).
+    // Only skips the default exclusion — it never widens an explicit filter, so
+    // both Type and ExcludeType still win over it. Non-nullable unlike the sibling
+    // filters: those are tri-state (null = don't filter on it), this is a binary
+    // opt-in where false and "omitted" mean the same thing.
+    bool IncludeMenus = false
 ) : IQuery<ApiResponse<PagedResult<ProductSummaryDto>>>;
 
 public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiResponse<PagedResult<ProductSummaryDto>>>
@@ -54,9 +62,10 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
         {
             productsQuery = productsQuery.Where(p => p.Type == query.Type.Value);
         }
-        else
+        else if (!query.IncludeMenus)
         {
             // Default behavior: Exclude Menu bundles unless specifically requested via Type
+            // or opted into via IncludeMenus.
             productsQuery = productsQuery.Where(p => p.Type != ProductType.Menu);
         }
 
