@@ -23,7 +23,8 @@ public record UpdateRestaurantInfoCommand(
     decimal? Latitude,
     decimal? Longitude,
     string Email,
-    string? Website
+    string? Website,
+    string? ThemePaletteKey = null
 ) : ICommand<ApiResponse<RestaurantInfoDto>>;
 
 public class UpdateRestaurantInfoCommandHandler
@@ -71,6 +72,7 @@ public class UpdateRestaurantInfoCommandHandler
         info.Longitude = command.Longitude;
         info.Email = command.Email;
         info.Website = command.Website;
+        info.ThemePaletteKey = command.ThemePaletteKey;
         info.UpdatedAt = DateTime.UtcNow;
         info.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -79,7 +81,7 @@ public class UpdateRestaurantInfoCommandHandler
         return ApiResponse<RestaurantInfoDto>.SuccessWithData(new RestaurantInfoDto(
             info.Id, info.Name, info.AddressLine1, info.AddressLine2,
             info.City, info.PostalCode, info.Country, info.Latitude, info.Longitude,
-            info.Email, info.Website,
+            info.Email, info.Website, info.ThemePaletteKey,
             info.PhoneNumbers
                 .OrderBy(p => p.DisplayOrder)
                 .Select(p => new RestaurantPhoneNumberDto(

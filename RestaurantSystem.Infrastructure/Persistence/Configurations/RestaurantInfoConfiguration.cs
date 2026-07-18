@@ -20,6 +20,7 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
         builder.Property(r => r.Longitude).HasColumnType("decimal(9,6)");
         builder.Property(r => r.Email).IsRequired().HasMaxLength(254);
         builder.Property(r => r.Website).HasMaxLength(2048);
+        builder.Property(r => r.ThemePaletteKey).HasMaxLength(64);
 
         builder.HasMany(r => r.PhoneNumbers)
             .WithOne(p => p.RestaurantInfo)

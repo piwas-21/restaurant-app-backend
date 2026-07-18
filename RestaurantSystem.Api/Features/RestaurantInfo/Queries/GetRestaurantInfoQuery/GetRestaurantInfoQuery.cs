@@ -51,6 +51,7 @@ public class GetRestaurantInfoQueryHandler
             info.Longitude,
             info.Email,
             info.Website,
+            info.ThemePaletteKey,
             info.PhoneNumbers
                 .OrderBy(p => p.DisplayOrder)
                 .Select(p => new RestaurantPhoneNumberDto(
