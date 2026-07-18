@@ -114,6 +114,45 @@ public class RestaurantInfoMutationTests : IntegrationTestBase
         info.ThemePaletteKey.Should().Be("olive-grove");
     }
 
+    // ── Required-field validation ────────────────────────────────────────
+    // The handler carries no inline null/empty guards; required-field and
+    // email-format validation is enforced by UpdateRestaurantInfoCommandValidator
+    // via ValidationBehavior in the CustomMediator pipeline (→ 400) before the
+    // handler runs. NotEmpty() rejects null, empty, and whitespace-only.
+
+    // One case per required field the removed inline guards used to check, so a
+    // regression that drops any single RuleFor(...).NotEmpty() is caught.
+    [Theory]
+    [InlineData("", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "contact@rumirestaurant.ch")]    // Name empty
+    [InlineData("   ", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "contact@rumirestaurant.ch")] // Name whitespace-only
+    [InlineData("Rumi", "", "Genève", "1202", "Switzerland", "contact@rumirestaurant.ch")]                   // AddressLine1 empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "", "1202", "Switzerland", "contact@rumirestaurant.ch")]      // City empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "", "Switzerland", "contact@rumirestaurant.ch")]    // PostalCode empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "1202", "", "contact@rumirestaurant.ch")]           // Country empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "")]                         // Email empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "not-an-email")]             // Email malformed
+    public async Task Update_AsAdmin_InvalidRequiredField_Returns400(
+        string name, string addressLine1, string city, string postalCode, string country, string email)
+    {
+        AuthenticateAsAdmin();
+
+        var response = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: name,
+                AddressLine1: addressLine1,
+                AddressLine2: null,
+                City: city,
+                PostalCode: postalCode,
+                Country: country,
+                Latitude: null,
+                Longitude: null,
+                Email: email,
+                Website: null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ── Phone CRUD ───────────────────────────────────────────────────────
 
     [Fact]
