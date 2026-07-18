@@ -114,6 +114,38 @@ public class RestaurantInfoMutationTests : IntegrationTestBase
         info.ThemePaletteKey.Should().Be("olive-grove");
     }
 
+    // ── Required-field validation ────────────────────────────────────────
+    // The handler carries no inline null/empty guards; required-field and
+    // email-format validation is enforced by UpdateRestaurantInfoCommandValidator
+    // via ValidationBehavior in the CustomMediator pipeline (→ 400) before the
+    // handler runs. NotEmpty() rejects null, empty, and whitespace-only.
+
+    [Theory]
+    [InlineData("", "contact@rumirestaurant.ch")]     // Name empty
+    [InlineData("   ", "contact@rumirestaurant.ch")]  // Name whitespace-only
+    [InlineData("Rumi", "")]                          // Email empty
+    [InlineData("Rumi", "not-an-email")]              // Email malformed
+    public async Task Update_AsAdmin_InvalidRequiredField_Returns400(string name, string email)
+    {
+        AuthenticateAsAdmin();
+
+        var response = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: name,
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: email,
+                Website: null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ── Phone CRUD ───────────────────────────────────────────────────────
 
     [Fact]

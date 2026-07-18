@@ -44,15 +44,9 @@ public class UpdateRestaurantInfoCommandHandler
     public async Task<ApiResponse<RestaurantInfoDto>> Handle(
         UpdateRestaurantInfoCommand command, CancellationToken cancellationToken)
     {
-        // TODO(#9): replace these inline guards with a FluentValidation
-        // validator once the validation pipeline is wired into CustomMediator.
-        if (string.IsNullOrWhiteSpace(command.Name)) throw new BadRequestException("Name is required.");
-        if (string.IsNullOrWhiteSpace(command.AddressLine1)) throw new BadRequestException("AddressLine1 is required.");
-        if (string.IsNullOrWhiteSpace(command.City)) throw new BadRequestException("City is required.");
-        if (string.IsNullOrWhiteSpace(command.PostalCode)) throw new BadRequestException("PostalCode is required.");
-        if (string.IsNullOrWhiteSpace(command.Country)) throw new BadRequestException("Country is required.");
-        if (string.IsNullOrWhiteSpace(command.Email)) throw new BadRequestException("Email is required.");
-
+        // Required-field and format validation runs in UpdateRestaurantInfoCommandValidator,
+        // executed by ValidationBehavior in the CustomMediator pipeline before this handler
+        // (returns 400 on failure). Keep this handler focused on persistence.
         var info = await _context.RestaurantInfo
             .Include(r => r.PhoneNumbers)
             .FirstOrDefaultAsync(cancellationToken);
