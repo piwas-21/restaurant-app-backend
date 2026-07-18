@@ -83,6 +83,37 @@ public class RestaurantInfoMutationTests : IntegrationTestBase
         dto.Website.Should().Be("https://rumirestaurant.ch");
     }
 
+    [Fact]
+    public async Task Update_AsAdmin_RoundTripsThemePaletteKey()
+    {
+        AuthenticateAsAdmin();
+
+        // Set a palette key (ADR-007); it must persist and surface on the
+        // public GET, which is where SSR reads it to inject the palette.
+        var response = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: "Rumi Restaurant Geneva",
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: "contact@rumirestaurant.ch",
+                Website: null,
+                ThemePaletteKey: "olive-grove"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await ReadDataAsync<RestaurantInfoDto>(response);
+        dto.ThemePaletteKey.Should().Be("olive-grove");
+
+        var getResp = await Client.GetAsync("/api/restaurant-info");
+        var info = await ReadDataAsync<RestaurantInfoDto>(getResp);
+        info.ThemePaletteKey.Should().Be("olive-grove");
+    }
+
     // ── Phone CRUD ───────────────────────────────────────────────────────
 
     [Fact]

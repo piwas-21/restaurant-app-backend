@@ -37,5 +37,12 @@ public class UpdateRestaurantInfoCommandValidator : AbstractValidator<UpdateRest
         RuleFor(x => x.Website)
             .MaximumLength(500).WithMessage("Website cannot exceed 500 characters")
             .When(x => x.Website != null);
+
+        // Loose validation (ADR-007): a frontend preset key, stored opaquely.
+        // The frontend owns the catalogue and safe-falls-back on an unknown key,
+        // so we only bound the length here, never the value.
+        RuleFor(x => x.ThemePaletteKey)
+            .MaximumLength(64).WithMessage("Theme palette key cannot exceed 64 characters")
+            .When(x => x.ThemePaletteKey != null);
     }
 }

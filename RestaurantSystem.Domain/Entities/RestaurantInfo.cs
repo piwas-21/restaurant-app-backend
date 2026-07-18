@@ -21,5 +21,13 @@ public class RestaurantInfo : Entity
     public required string Email { get; set; }
     public string? Website { get; set; }
 
+    /// <summary>
+    /// Optional runtime colour-palette key (ADR-007). Null = the template's
+    /// baked palette. Stored opaquely — the frontend owns the preset catalogue
+    /// and safe-falls-back on an unknown key, so the backend does not validate
+    /// it against a fixed list.
+    /// </summary>
+    public string? ThemePaletteKey { get; set; }
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
 }
