@@ -120,12 +120,19 @@ public class RestaurantInfoMutationTests : IntegrationTestBase
     // via ValidationBehavior in the CustomMediator pipeline (→ 400) before the
     // handler runs. NotEmpty() rejects null, empty, and whitespace-only.
 
+    // One case per required field the removed inline guards used to check, so a
+    // regression that drops any single RuleFor(...).NotEmpty() is caught.
     [Theory]
-    [InlineData("", "contact@rumirestaurant.ch")]     // Name empty
-    [InlineData("   ", "contact@rumirestaurant.ch")]  // Name whitespace-only
-    [InlineData("Rumi", "")]                          // Email empty
-    [InlineData("Rumi", "not-an-email")]              // Email malformed
-    public async Task Update_AsAdmin_InvalidRequiredField_Returns400(string name, string email)
+    [InlineData("", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "contact@rumirestaurant.ch")]    // Name empty
+    [InlineData("   ", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "contact@rumirestaurant.ch")] // Name whitespace-only
+    [InlineData("Rumi", "", "Genève", "1202", "Switzerland", "contact@rumirestaurant.ch")]                   // AddressLine1 empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "", "1202", "Switzerland", "contact@rumirestaurant.ch")]      // City empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "", "Switzerland", "contact@rumirestaurant.ch")]    // PostalCode empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "1202", "", "contact@rumirestaurant.ch")]           // Country empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "")]                         // Email empty
+    [InlineData("Rumi", "Rue du Grand-Pré 99", "Genève", "1202", "Switzerland", "not-an-email")]             // Email malformed
+    public async Task Update_AsAdmin_InvalidRequiredField_Returns400(
+        string name, string addressLine1, string city, string postalCode, string country, string email)
     {
         AuthenticateAsAdmin();
 
@@ -133,11 +140,11 @@ public class RestaurantInfoMutationTests : IntegrationTestBase
             "/api/restaurant-info",
             new UpdateRestaurantInfoCommand(
                 Name: name,
-                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine1: addressLine1,
                 AddressLine2: null,
-                City: "Genève",
-                PostalCode: "1202",
-                Country: "Switzerland",
+                City: city,
+                PostalCode: postalCode,
+                Country: country,
                 Latitude: null,
                 Longitude: null,
                 Email: email,
