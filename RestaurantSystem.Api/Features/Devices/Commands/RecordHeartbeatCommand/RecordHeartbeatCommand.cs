@@ -18,7 +18,7 @@ public record RecordHeartbeatCommand(
     string? TenantSlug,
     string? Platform,
     string? AppVersion,
-    bool FeedRunning,
+    bool? FeedRunning,
     DateTime? LastSuccessfulPollAt,
     string? ApiBaseUrl,
     string? KitchenPrinter,
@@ -58,7 +58,7 @@ public class RecordHeartbeatCommandHandler
         device.TenantSlug = command.TenantSlug;
         device.Platform = command.Platform;
         device.AppVersion = command.AppVersion;
-        device.FeedRunning = command.FeedRunning;
+        device.FeedRunning = command.FeedRunning ?? false;
         // Normalise the only client-supplied timestamp to UTC Kind — the column is `timestamptz`
         // and Npgsql rejects a non-UTC Kind. The app reports UTC instants, so relabel (SpecifyKind)
         // rather than convert — matching Groups/UserGroupService's client-DateTime handling.
