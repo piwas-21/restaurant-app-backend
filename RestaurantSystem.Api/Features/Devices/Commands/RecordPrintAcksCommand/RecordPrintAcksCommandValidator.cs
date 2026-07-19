@@ -15,6 +15,9 @@ public class RecordPrintAcksCommandValidator : AbstractValidator<RecordPrintAcks
         RuleForEach(x => x.Acks).ChildRules(a =>
         {
             a.RuleFor(x => x.OrderId).NotEmpty();
+            // Enums persist as strings; reject out-of-range values so they can't store as "0".
+            a.RuleFor(x => x.Target).IsInEnum();
+            a.RuleFor(x => x.Status).IsInEnum();
             a.RuleFor(x => x.Copies).GreaterThanOrEqualTo(0);
             a.RuleFor(x => x.FailureReason).MaximumLength(500);
         });

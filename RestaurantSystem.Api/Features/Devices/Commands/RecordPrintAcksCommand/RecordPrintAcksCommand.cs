@@ -41,13 +41,14 @@ public class RecordPrintAcksCommandHandler
             .Where(r => r.DeviceId == command.DeviceId && orderIds.Contains(r.OrderId))
             .ToListAsync(cancellationToken);
 
+        // Index existing rows by their natural key for O(N+M) matching (batches can hold up to 500).
+        // (OrderId, Target) is unique per device — the DB's (OrderId, DeviceId, Target) index and the
+        // DeviceId filter above guarantee it — so a plain ToDictionary can't collide.
+        var byKey = existing.ToDictionary(r => (r.OrderId, r.Target));
         var auditId = _currentUserService.GetAuditIdentifier();
         foreach (var ack in command.Acks)
         {
-            var receipt = existing.FirstOrDefault(r =>
-                r.OrderId == ack.OrderId && r.Target == ack.Target);
-
-            if (receipt is null)
+            if (!byKey.TryGetValue((ack.OrderId, ack.Target), out var receipt))
             {
                 receipt = new DeviceOrderReceipt
                 {
@@ -57,7 +58,7 @@ public class RecordPrintAcksCommandHandler
                     CreatedBy = auditId,
                 };
                 _context.DeviceOrderReceipts.Add(receipt);
-                existing.Add(receipt);
+                byKey[(ack.OrderId, ack.Target)] = receipt;
             }
 
             receipt.Status = ack.Status;

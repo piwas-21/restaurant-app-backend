@@ -115,6 +115,17 @@ public class DeviceTelemetryTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task PrintAcks_OutOfRangeTargetEnum_ReturnsBadRequest()
+    {
+        // Enums persist as strings; an out-of-range value must be rejected (not stored as "0"/"99").
+        var body = new { acks = new[] { new { orderId = Guid.NewGuid(), target = 99, status = "Printed", receivedAt = DateTime.UtcNow, printedAt = (DateTime?)null, failureReason = (string?)null, copies = 1 } } };
+
+        var response = await PostAsync("/api/devices/print-acks", body, NewDeviceId());
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ---- events -------------------------------------------------------------
 
     [Fact]

@@ -15,6 +15,8 @@ public class RecordDeviceEventsCommandValidator : AbstractValidator<RecordDevice
         RuleForEach(x => x.Events).ChildRules(e =>
         {
             e.RuleFor(x => x.ClientEventId).NotEmpty().MaximumLength(64);
+            // Level persists as a string; reject out-of-range values so they can't store as "0".
+            e.RuleFor(x => x.Level).IsInEnum();
             e.RuleFor(x => x.Message).NotEmpty().MaximumLength(2000);
             e.RuleFor(x => x.Code).MaximumLength(80);
             e.RuleFor(x => x.Context).MaximumLength(4000);
