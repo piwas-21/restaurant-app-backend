@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -13,7 +14,9 @@ namespace RestaurantSystem.Api.Features.Devices.Commands.RecordHeartbeatCommand;
 /// only non-secret config — never the printer-feed API key.
 /// </summary>
 public record RecordHeartbeatCommand(
-    string DeviceId,
+    // Populated from the X-Device-Id header by the controller, never the body — ignore for JSON
+    // binding + OpenAPI so it can't be set (or spoofed) via the request payload.
+    [property: JsonIgnore] string DeviceId,
     string? Label,
     string? TenantSlug,
     string? Platform,
