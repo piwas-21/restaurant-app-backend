@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
@@ -5,6 +6,10 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Devices.Commands.RecordDeviceEventsCommand;
 using RestaurantSystem.Api.Features.Devices.Commands.RecordHeartbeatCommand;
 using RestaurantSystem.Api.Features.Devices.Commands.RecordPrintAcksCommand;
+using RestaurantSystem.Api.Features.Devices.Dtos;
+using RestaurantSystem.Api.Features.Devices.Queries.GetDeviceEventsQuery;
+using RestaurantSystem.Api.Features.Devices.Queries.GetDevicesQuery;
+using RestaurantSystem.Api.Features.Devices.Queries.GetMissedOrdersQuery;
 
 namespace RestaurantSystem.Api.Features.Devices;
 
@@ -12,6 +17,11 @@ namespace RestaurantSystem.Api.Features.Devices;
 [Route("api/devices")]
 public class DevicesController : ControllerBase
 {
+    // API defaults (operator-tunable via query string), named so they aren't magic literals.
+    private const int DefaultEventLimit = 100;
+    private const int DefaultGraceMinutes = 15;
+    private const int DefaultLookbackHours = 24;
+
     private readonly CustomMediator _mediator;
 
     public DevicesController(CustomMediator mediator) => _mediator = mediator;
@@ -70,4 +80,34 @@ public class DevicesController : ControllerBase
             command with { DeviceId = deviceId ?? string.Empty }, cancellationToken);
         return Ok(result);
     }
+
+    /// <summary>Admin: list every known device with its last-reported fleet status (most-recent first).</summary>
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ApiResponse<List<DeviceSummaryDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<List<DeviceSummaryDto>>>> GetDevices(
+        CancellationToken cancellationToken)
+        => Ok(await _mediator.SendQuery(new GetDevicesQuery(), cancellationToken));
+
+    /// <summary>Admin: recent diagnostic events for one device, newest-first.</summary>
+    [HttpGet("{deviceId}/events")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ApiResponse<List<DeviceEventLogDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<List<DeviceEventLogDto>>>> GetDeviceEvents(
+        string deviceId,
+        [FromQuery] int limit = DefaultEventLimit,
+        CancellationToken cancellationToken = default)
+        => Ok(await _mediator.SendQuery(new GetDeviceEventsQuery(deviceId, limit), cancellationToken));
+
+    /// <summary>Admin: recent confirmed orders (within <c>lookbackHours</c>) past the grace window
+    /// with no Printed receipt — i.e. served to the feed but never printed (missed orders).</summary>
+    [HttpGet("missed-orders")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ApiResponse<List<MissedOrderDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<List<MissedOrderDto>>>> GetMissedOrders(
+        [FromQuery] int graceMinutes = DefaultGraceMinutes,
+        [FromQuery] int lookbackHours = DefaultLookbackHours,
+        CancellationToken cancellationToken = default)
+        => Ok(await _mediator.SendQuery(
+            new GetMissedOrdersQuery(graceMinutes, lookbackHours), cancellationToken));
 }
