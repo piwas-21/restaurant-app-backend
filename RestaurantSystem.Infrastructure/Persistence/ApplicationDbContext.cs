@@ -80,6 +80,8 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
         // Fleet observability
         public DbSet<PrinterDevice> PrinterDevices { get; set; }
+        public DbSet<DeviceOrderReceipt> DeviceOrderReceipts { get; set; }
+        public DbSet<DeviceEvent> DeviceEvents { get; set; }
 
         // Data Protection Keys
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
