@@ -40,20 +40,18 @@ public class GetMissedOrdersQueryHandler
         // ...but not older than the lookback floor (excludes the stale Confirmed back-catalogue).
         var lookbackFloor = now.AddHours(-Math.Max(1, query.LookbackHours));
 
-        // Orders with at least one Printed receipt on any device are accounted for.
-        var printedOrderIds = _context.DeviceOrderReceipts
-            .Where(r => r.Status == DevicePrintStatus.Printed)
-            .Select(r => r.OrderId);
-
         // Served = Confirmed (the printer-feed's eligibility filter) + not soft-deleted. Explicit
-        // !IsDeleted mirrors PrinterFeedQuery so the read intent is unambiguous.
+        // !IsDeleted mirrors PrinterFeedQuery so the read intent is unambiguous. "Accounted for" =
+        // has at least one Printed receipt on any device — a correlated !Any() so EF emits a
+        // NOT EXISTS (more efficient in Postgres than NOT IN over an uncorrelated subquery).
         var missed = await _context.Orders
             .AsNoTracking()
             .Where(o => !o.IsDeleted
                 && o.Status == OrderStatus.Confirmed
                 && o.CreatedAt < graceCutoff
                 && o.CreatedAt >= lookbackFloor
-                && !printedOrderIds.Contains(o.Id))
+                && !_context.DeviceOrderReceipts.Any(r =>
+                    r.OrderId == o.Id && r.Status == DevicePrintStatus.Printed))
             .OrderBy(o => o.OrderDate)
             .Take(GetMissedOrdersQuery.MaxResults)
             .Select(o => new MissedOrderDto(
