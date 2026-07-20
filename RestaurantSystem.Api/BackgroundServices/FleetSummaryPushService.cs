@@ -42,13 +42,16 @@ public class FleetSummaryPushService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var validUrl = Uri.TryCreate(_settings.SofraIngestUrl, UriKind.Absolute, out var ingestUri)
+            && (ingestUri.Scheme == Uri.UriSchemeHttp || ingestUri.Scheme == Uri.UriSchemeHttps);
+
         if (!_settings.Enabled
-            || string.IsNullOrWhiteSpace(_settings.SofraIngestUrl)
+            || !validUrl
             || string.IsNullOrWhiteSpace(_settings.Secret)
             || string.IsNullOrWhiteSpace(_settings.TenantSlug))
         {
             _logger.LogInformation(
-                "FleetSummaryPushService is disabled (needs Enabled=true + SofraIngestUrl + Secret + TenantSlug).");
+                "FleetSummaryPushService is disabled (needs Enabled=true + a valid absolute SofraIngestUrl + Secret + TenantSlug).");
             return;
         }
 
@@ -62,12 +65,26 @@ public class FleetSummaryPushService : BackgroundService
                 var payload = await BuildPayloadAsync(stoppingToken);
                 await PushAsync(payload, stoppingToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
+                break; // genuine host shutdown — end the loop quietly.
+            }
+            catch (Exception ex)
+            {
+                // Catches an HttpClient TIMEOUT too (TaskCanceledException while NOT shutting down):
+                // must be logged + retried next tick, NOT allowed to bubble out of ExecuteAsync, which
+                // under the default StopHost behaviour would take the whole API down.
                 _logger.LogWarning(ex, "Fleet summary push failed.");
             }
 
-            await Task.Delay(interval, stoppingToken);
+            try
+            {
+                await Task.Delay(interval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break; // host shutting down mid-wait.
+            }
         }
     }
 
