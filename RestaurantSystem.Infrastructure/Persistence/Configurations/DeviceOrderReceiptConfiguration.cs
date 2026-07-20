@@ -20,5 +20,7 @@ public class DeviceOrderReceiptConfiguration : IEntityTypeConfiguration<DeviceOr
         // Reconciliation joins the served set (Orders) to acks on OrderId.
         builder.HasIndex(r => r.OrderId);
         builder.HasIndex(r => r.DeviceId);
+        // The retention sweep purges by ingest time; index it so the 24h sweep never seq-scans.
+        builder.HasIndex(r => r.CreatedAt);
     }
 }

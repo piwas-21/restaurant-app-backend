@@ -23,5 +23,7 @@ public class DeviceEventConfiguration : IEntityTypeConfiguration<DeviceEvent>
         builder.HasIndex(e => new { e.DeviceId, e.ClientEventId }).IsUnique();
         // Admin reads list a device's events newest-first.
         builder.HasIndex(e => new { e.DeviceId, e.OccurredAt });
+        // The retention sweep purges by ingest time; index it so the 24h sweep never seq-scans.
+        builder.HasIndex(e => e.CreatedAt);
     }
 }
