@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260719230300_AddDeviceTelemetry")]
+    partial class AddDeviceTelemetry
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -822,8 +825,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_device_events");
 
-                    b.HasIndex("CreatedAt");
-
                     b.HasIndex("DeviceId", "ClientEventId")
                         .IsUnique();
 
@@ -900,8 +901,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_device_order_receipts");
-
-                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("DeviceId");
 

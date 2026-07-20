@@ -78,6 +78,11 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<GroupMembership> GroupMemberships { get; set; }
         public DbSet<GroupDiscount> GroupDiscounts { get; set; }
 
+        // Fleet observability
+        public DbSet<PrinterDevice> PrinterDevices { get; set; }
+        public DbSet<DeviceOrderReceipt> DeviceOrderReceipts { get; set; }
+        public DbSet<DeviceEvent> DeviceEvents { get; set; }
+
         // Data Protection Keys
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 

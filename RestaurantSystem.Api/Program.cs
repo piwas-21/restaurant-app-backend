@@ -429,10 +429,14 @@ builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
 builder.Services.Configure<ReservationRetentionSettings>(builder.Configuration.GetSection("ReservationRetention"));
+builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configuration.GetSection("DeviceTelemetryRetention"));
+builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();
 builder.Services.AddHostedService<AccountCleanupService>();
 builder.Services.AddHostedService<TableReservationCleanupService>();
 builder.Services.AddHostedService<ReservationRetentionService>();
+builder.Services.AddHostedService<DeviceTelemetryRetentionService>();
+builder.Services.AddHostedService<FleetSummaryPushService>();
 
 // Register OrderEventService as singleton - both interface and concrete type share same instance
 builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();
