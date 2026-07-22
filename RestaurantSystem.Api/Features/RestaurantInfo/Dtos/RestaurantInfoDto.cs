@@ -13,4 +13,6 @@ public record RestaurantInfoDto(
     string Email,
     string? Website,
     string? ThemePaletteKey,
+    decimal? EntrancePositionX,
+    decimal? EntrancePositionY,
     IReadOnlyList<RestaurantPhoneNumberDto> PhoneNumbers);
