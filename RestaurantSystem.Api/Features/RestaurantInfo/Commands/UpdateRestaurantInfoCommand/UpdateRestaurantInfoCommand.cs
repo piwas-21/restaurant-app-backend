@@ -12,6 +12,9 @@ namespace RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurant
 /// Updates the singleton <see cref="Domain.Entities.RestaurantInfo"/> row.
 /// Phone numbers are managed through dedicated phone CRUD commands;
 /// this command updates only the singleton's own fields.
+/// Full-replace semantics: every field is assigned unconditionally, so an
+/// omitted/null <see cref="ThemePaletteKey"/> or entrance position CLEARS the
+/// stored value (entrance falls back to the frontend's default position).
 /// </summary>
 public record UpdateRestaurantInfoCommand(
     string Name,
@@ -24,7 +27,9 @@ public record UpdateRestaurantInfoCommand(
     decimal? Longitude,
     string Email,
     string? Website,
-    string? ThemePaletteKey = null
+    string? ThemePaletteKey = null,
+    decimal? EntrancePositionX = null,
+    decimal? EntrancePositionY = null
 ) : ICommand<ApiResponse<RestaurantInfoDto>>;
 
 public class UpdateRestaurantInfoCommandHandler
@@ -67,6 +72,8 @@ public class UpdateRestaurantInfoCommandHandler
         info.Email = command.Email;
         info.Website = command.Website;
         info.ThemePaletteKey = command.ThemePaletteKey;
+        info.EntrancePositionX = command.EntrancePositionX;
+        info.EntrancePositionY = command.EntrancePositionY;
         info.UpdatedAt = DateTime.UtcNow;
         info.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -76,6 +83,7 @@ public class UpdateRestaurantInfoCommandHandler
             info.Id, info.Name, info.AddressLine1, info.AddressLine2,
             info.City, info.PostalCode, info.Country, info.Latitude, info.Longitude,
             info.Email, info.Website, info.ThemePaletteKey,
+            info.EntrancePositionX, info.EntrancePositionY,
             info.PhoneNumbers
                 .OrderBy(p => p.DisplayOrder)
                 .Select(p => new RestaurantPhoneNumberDto(

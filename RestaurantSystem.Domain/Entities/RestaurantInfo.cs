@@ -29,5 +29,18 @@ public class RestaurantInfo : Entity
     /// </summary>
     public string? ThemePaletteKey { get; set; }
 
+    /// <summary>
+    /// Percent coordinate (0–100) of the entrance marker on the reservation
+    /// floor plan's virtual canvas — X axis. Null = the frontend's default
+    /// position (previously this lived only in admin-browser localStorage).
+    /// </summary>
+    public decimal? EntrancePositionX { get; set; }
+
+    /// <summary>
+    /// Percent coordinate (0–100) of the entrance marker on the reservation
+    /// floor plan's virtual canvas — Y axis. Null = the frontend's default position.
+    /// </summary>
+    public decimal? EntrancePositionY { get; set; }
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
 }
