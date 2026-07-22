@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields.Dtos;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
@@ -11,17 +12,25 @@ public class FormFieldConfigurationService : IFormFieldConfigurationService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IFormFieldSeedState _seedState;
 
     public FormFieldConfigurationService(
         ApplicationDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IFormFieldSeedState seedState)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _seedState = seedState;
     }
 
     public async Task EnsureSeededAsync(CancellationToken cancellationToken = default)
     {
+        if (_seedState.IsSeeded)
+        {
+            return;
+        }
+
         var existing = await _context.CustomerFormFieldConfigurations
             .Select(c => new { c.FormKey, c.FieldKey })
             .ToListAsync(cancellationToken);
@@ -32,6 +41,7 @@ public class FormFieldConfigurationService : IFormFieldConfigurationService
             .ToList();
         if (missing.Count == 0)
         {
+            _seedState.MarkSeeded();
             return;
         }
 
@@ -50,7 +60,22 @@ public class FormFieldConfigurationService : IFormFieldConfigurationService
             });
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+            when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // A concurrent first request seeded the same rows and won the unique
+            // (form_key, field_key) index race — its rows are exactly what we were
+            // inserting. Drop our tracked duplicates so this context stays usable for
+            // the read that follows. (The OrderTypeConfiguration precedent this
+            // follows has no unique index, so this race is specific to this table.)
+            _context.ChangeTracker.Clear();
+        }
+
+        _seedState.MarkSeeded();
     }
 
     public async Task<List<FormFieldsDto>> GetGroupedAsync(CancellationToken cancellationToken = default)

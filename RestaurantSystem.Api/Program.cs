@@ -422,6 +422,8 @@ builder.Services.AddScoped<IOrderTypeConfigurationService, OrderTypeConfiguratio
 builder.Services.AddScoped<IWorkingHoursService, WorkingHoursService>();
 builder.Services.AddScoped<IFormFieldConfigurationService, FormFieldConfigurationService>();
 builder.Services.AddScoped<IFormFieldRequirementService, FormFieldRequirementService>();
+// Per-app-instance "registry rows seeded" marker — pure in-memory flag, singleton lifetime.
+builder.Services.AddSingleton<IFormFieldSeedState, FormFieldSeedState>();
 
 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
 builder.Services.AddScoped<IGroupMembershipService, GroupMembershipService>();

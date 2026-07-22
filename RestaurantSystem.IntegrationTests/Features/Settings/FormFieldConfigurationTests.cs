@@ -4,8 +4,11 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields;
 using RestaurantSystem.Api.Features.Settings.FormFields.Dtos;
+using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
+using RestaurantSystem.Api.Features.Settings.FormFields.Services;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
@@ -53,6 +56,25 @@ public class FormFieldConfigurationTests : IntegrationTestBase
         // Every registry row is lazily seeded on first read.
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.CustomerFormFieldConfigurations.CountAsync())
+            .Should().Be(FormFieldRegistry.Fields.Count);
+    }
+
+    [Fact]
+    public async Task EnsureSeeded_RepeatedCallsAndFreshAppInstance_AreIdempotent()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IFormFieldConfigurationService>();
+        await service.EnsureSeededAsync();
+        await service.EnsureSeededAsync(); // seed-state short-circuit — no throw
+
+        // A fresh seed-state mimics a new app replica hitting an already-seeded DB:
+        // the key scan must no-op instead of violating the unique index.
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var currentUser = scope.ServiceProvider.GetRequiredService<ICurrentUserService>();
+        var freshInstance = new FormFieldConfigurationService(db, currentUser, new FormFieldSeedState());
+        await freshInstance.EnsureSeededAsync();
+
         (await db.CustomerFormFieldConfigurations.CountAsync())
             .Should().Be(FormFieldRegistry.Fields.Count);
     }

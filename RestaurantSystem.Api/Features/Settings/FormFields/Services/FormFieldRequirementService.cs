@@ -5,6 +5,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Settings.FormFields.Services;
 
+// DECISION (D1 review, 2026-07-23): enforcement covers requiredness only. A field
+// configured hidden is still accepted and stored if a crafted request supplies a
+// value — hiding is presentation-level (the admin removes it from the rendered
+// form), not a data-rejection rule. Deliberate, not an oversight; revisit only if
+// hiding ever needs to mean "must not be stored".
 public class FormFieldRequirementService : IFormFieldRequirementService
 {
     private readonly ApplicationDbContext _context;
