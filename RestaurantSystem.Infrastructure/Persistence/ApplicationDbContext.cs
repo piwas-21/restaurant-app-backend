@@ -66,6 +66,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Order Type Configuration
         public DbSet<OrderTypeConfiguration> OrderTypeConfigurations { get; set; }
 
+        // Customer form field configuration (admin-configurable visibility/requiredness)
+        public DbSet<CustomerFormFieldConfiguration> CustomerFormFieldConfigurations { get; set; }
+
         // Working Hours
         public DbSet<WorkingHours> WorkingHours { get; set; }
 
