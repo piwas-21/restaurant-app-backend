@@ -167,6 +167,7 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpPost("{id}/images/bulk")]
     [Consumes("multipart/form-data")]
+    [RequireAdmin]
     public async Task<ActionResult<ApiResponse<List<ProductImageDto>>>> UploadMultipleProductImages(
         Guid id,
         [FromForm] UploadMultipleProductImagesDto request)
