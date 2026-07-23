@@ -109,7 +109,7 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         var accessToken = _tokenService.GenerateAccessToken(existingUser);
         var rawRefreshToken = _tokenService.GenerateRefreshToken();
         existingUser.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-        existingUser.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        existingUser.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
         await _userManager.UpdateAsync(existingUser);
 
         var authResponse = new AuthResponse

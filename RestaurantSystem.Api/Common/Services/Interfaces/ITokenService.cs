@@ -10,5 +10,6 @@ namespace RestaurantSystem.Api.Common.Services.Interfaces
         string HashRefreshToken(string token);
         ClaimsPrincipal GetPrincipalFromExpiredToken(string token);
         DateTime GetAccessTokenExpiration();
+        DateTime GetRefreshTokenExpiration();
     }
 }
