@@ -100,5 +100,10 @@ namespace RestaurantSystem.Api.Common.Services
         {
             return DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes);
         }
+
+        public DateTime GetRefreshTokenExpiration()
+        {
+            return DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays);
+        }
     }
 }
