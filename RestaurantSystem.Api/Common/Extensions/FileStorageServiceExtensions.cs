@@ -14,6 +14,9 @@ public static class FileStorageServiceExtensions
 
         services.Configure<FileStorageSettings>(configuration.GetSection(FileStorageSettings.SectionName));
 
+        // Resize/recompress raster uploads at the storage seam, regardless of provider.
+        services.AddSingleton<IImageProcessor, ImageSharpImageProcessor>();
+
         switch (fileStorageSettings.Provider.ToLower())
         {
             case "s3":
@@ -45,11 +48,17 @@ public static class FileStorageServiceExtensions
             return new AmazonS3Client(awsSettings.AccessKey, awsSettings.SecretKey, config);
         });
 
-        services.AddScoped<IFileStorageService, S3FileStorageService>();
+        services.AddScoped<S3FileStorageService>();
+        services.AddScoped<IFileStorageService>(sp => new ImageProcessingFileStorageService(
+            sp.GetRequiredService<S3FileStorageService>(),
+            sp.GetRequiredService<IImageProcessor>()));
     }
 
     private static void AddLocalFileStorage(this IServiceCollection services)
     {
-        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<LocalFileStorageService>();
+        services.AddScoped<IFileStorageService>(sp => new ImageProcessingFileStorageService(
+            sp.GetRequiredService<LocalFileStorageService>(),
+            sp.GetRequiredService<IImageProcessor>()));
     }
 }

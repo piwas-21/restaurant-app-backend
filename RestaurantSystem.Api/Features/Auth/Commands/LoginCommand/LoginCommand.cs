@@ -75,7 +75,7 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
         var token = _tokenService.GenerateAccessToken(user);
         var rawRefreshToken = _tokenService.GenerateRefreshToken();
         user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
         await _userManager.UpdateAsync(user);
 
         // Merge anonymous basket if session ID exists

@@ -7,6 +7,7 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
+using System.Text.Json;
 
 namespace RestaurantSystem.IntegrationTests.Features.Products;
 
@@ -126,5 +127,152 @@ public class ProductsControllerTests : IntegrationTestBase
         await context.SaveChangesAsync();
 
         return bundle.Id;
+    }
+
+    // --- PATCH /api/products/{id}/price (admin quick-edit) ---
+
+    [Fact]
+    public async Task UpdateProductPrice_AsAdmin_PersistsNewBasePrice()
+    {
+        var productId = await SeedPricedProductAsync("Quick-edit Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, 14.50m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await ReadResponseAsync<ApiResponse<decimal>>(response);
+        body!.Success.Should().BeTrue();
+        body.Data.Should().Be(14.50m);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(14.50m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_AsNonAdmin_IsForbidden()
+    {
+        var productId = await SeedPricedProductAsync("Guarded Cola", 10.00m);
+        AuthenticateAsUser(); // authenticated Customer, not admin
+
+        var response = await PatchPriceAsync(productId, 99.00m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await GetPersistedBasePriceAsync(productId)).Should()
+            .Be(10.00m, "a non-admin must not be able to mutate the price");
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_UnknownProduct_ReturnsNotFound()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(Guid.NewGuid(), 12.00m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_NegativePrice_IsRejected()
+    {
+        var productId = await SeedPricedProductAsync("Cheap Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, -1.00m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_OverColumnBound_IsRejected()
+    {
+        var productId = await SeedPricedProductAsync("Priceless Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        // decimal(10,2) tops out at 99,999,999.99 — one over must 400, not overflow into a 500.
+        var response = await PatchPriceAsync(productId, 100_000_000.00m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_MoreThanTwoDecimals_IsRejected()
+    {
+        var productId = await SeedPricedProductAsync("Fractional Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, 10.999m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_ZeroIsAccepted()
+    {
+        var productId = await SeedPricedProductAsync("Free Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, 0m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_SoftDeletedProduct_ReturnsNotFound()
+    {
+        var productId = await SeedPricedProductAsync("Deleted Cola", 10.00m, isDeleted: true);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, 12.00m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    private async Task<Guid> SeedPricedProductAsync(string name, decimal price, bool isDeleted = false)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Description = "Seeded by ProductsControllerTests",
+            BasePrice = price,
+            IsActive = true,
+            IsAvailable = true,
+            PreparationTimeMinutes = 10,
+            Type = ProductType.Beverage,
+            Ingredients = new List<string>(),
+            Allergens = new List<string>(),
+            DisplayOrder = 50,
+            IsDeleted = isDeleted,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+
+        context.Products.Add(product);
+        await context.SaveChangesAsync();
+
+        return product.Id;
+    }
+
+    private Task<HttpResponseMessage> PatchPriceAsync(Guid id, decimal price)
+    {
+        var content = new StringContent(
+            JsonSerializer.Serialize(new { price }, JsonOptions),
+            System.Text.Encoding.UTF8,
+            "application/json");
+        return Client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Patch, $"/api/products/{id}/price") { Content = content });
+    }
+
+    private async Task<decimal> GetPersistedBasePriceAsync(Guid id)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var product = await context.Products.FindAsync(id);
+        return product!.BasePrice;
     }
 }

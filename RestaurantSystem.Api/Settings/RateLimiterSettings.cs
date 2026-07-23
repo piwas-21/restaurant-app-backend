@@ -8,11 +8,21 @@ namespace RestaurantSystem.Api.Settings
     // appsettings.Development.json. Wired up in Program.cs.
     public class RateLimiterSettings
     {
-        // /api/Auth/login + refresh-token, per IP.
+        // /api/Auth/login (+ google/apple-login), per IP. Kept tight: with account
+        // lockout not yet enforced on the login path, this per-IP window is the only
+        // active brute-force throttle, so it must not be loosened casually.
         [Range(1, int.MaxValue)]
         public int AuthPermitLimit { get; set; } = 5;
         [Range(1, int.MaxValue)]
         public int AuthWindowMinutes { get; set; } = 15;
+
+        // /api/Auth/refresh-token, per IP. Separate policy from login so a burst
+        // of token refreshes can't drain the login bucket (root cause of admins
+        // getting 429 on re-login after a mid-session refresh storm).
+        [Range(1, int.MaxValue)]
+        public int AuthRefreshPermitLimit { get; set; } = 30;
+        [Range(1, int.MaxValue)]
+        public int AuthRefreshWindowMinutes { get; set; } = 15;
 
         // /api/Auth/forgot-password + reset-password, per IP.
         [Range(1, int.MaxValue)]

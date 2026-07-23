@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Features.Products.Commands.DeleteProductCommand;
 using RestaurantSystem.Api.Features.Products.Commands.DeleteProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductImageCommand;
+using RestaurantSystem.Api.Features.Products.Commands.UpdateProductPriceCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductImagesCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UploadProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -113,6 +114,20 @@ public class ProductsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Update only a product's base price (admin quick-edit from the menu cards)
+    /// </summary>
+    [HttpPatch("{id}/price")]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<decimal>>> UpdateProductPrice(
+        Guid id,
+        [FromBody] UpdateProductPriceRequest request)
+    {
+        var command = new UpdateProductPriceCommand(id, request.Price);
+        var result = await _mediator.SendCommand(command);
+        return Ok(result);
+    }
+
     ///// <summary>
     ///// Delete a product
     ///// </summary>
@@ -167,6 +182,7 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpPost("{id}/images/bulk")]
     [Consumes("multipart/form-data")]
+    [RequireAdmin]
     public async Task<ActionResult<ApiResponse<List<ProductImageDto>>>> UploadMultipleProductImages(
         Guid id,
         [FromForm] UploadMultipleProductImagesDto request)
