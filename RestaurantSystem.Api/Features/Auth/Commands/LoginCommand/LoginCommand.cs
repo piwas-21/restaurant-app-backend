@@ -14,17 +14,20 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
 {
 
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ITokenService _tokenService;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public LoginCommandHandler(
         UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
         ITokenService tokenService,
         LoginEventHandler loginEventHandler,
         IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
+        _signInManager = signInManager;
         _tokenService = tokenService;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;
@@ -40,10 +43,22 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
             throw new UnauthorizedAccessException("Invalid credentials");
         }
 
-        // Verify password
-        var isPasswordValid = await _userManager.CheckPasswordAsync(user, command.Password);
+        // Verify the password WITH lockout tracking: repeated wrong passwords lock the account
+        // (Identity lockout: 5 attempts / 15 min). This is the real per-account brute-force defense
+        // — the per-IP rate limit alone doesn't stop an IP-rotating attacker.
+        // NOTE: relies on SignIn.RequireConfirmedEmail staying false — enabling it would make
+        // CheckPasswordSignInAsync return NotAllowed (a generic 401 here) and bypass the friendlier
+        // customer email-verification message below.
+        var signInResult = await _signInManager.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: true);
 
-        if (!isPasswordValid)
+        if (signInResult.IsLockedOut)
+        {
+            return ApiResponse<AuthResponse>.Failure(
+                "Too many failed attempts. This account is temporarily locked. Please try again later.",
+                "Account locked");
+        }
+
+        if (!signInResult.Succeeded)
         {
             throw new UnauthorizedAccessException("Invalid credentials");
         }
