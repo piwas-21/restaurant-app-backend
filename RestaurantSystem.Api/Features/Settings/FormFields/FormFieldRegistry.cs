@@ -64,7 +64,11 @@ public static class FormFieldRegistry
         // NOTE: effective requiredness of checkout phone = config-required OR the
         // frontend's per-order-type rule (Takeaway/Delivery require a phone number);
         // that merge is computed frontend-side — see FormFieldConfigurationDto.
-        Optional(FormKeys.CheckoutContact, CheckoutContactFields.Phone, 2),
+        // Default = HIDDEN so the frontend formula (shown = config-visible OR
+        // order-type-required) reproduces today's behaviour exactly: DineIn shows
+        // no phone field, Takeaway/Delivery show it required via the floor. An
+        // admin flips it to Optional/Required to add phone to DineIn too.
+        Hidden(FormKeys.CheckoutContact, CheckoutContactFields.Phone, 2),
 
         Locked(FormKeys.DeliveryAddress, DeliveryAddressFields.Street, 0),
         Locked(FormKeys.DeliveryAddress, DeliveryAddressFields.PostalCode, 1),
@@ -81,4 +85,7 @@ public static class FormFieldRegistry
 
     private static FormFieldDefinition Optional(string formKey, string fieldKey, int displayOrder) =>
         new(formKey, fieldKey, IsLocked: false, DefaultIsVisible: true, DefaultIsRequired: false, displayOrder);
+
+    private static FormFieldDefinition Hidden(string formKey, string fieldKey, int displayOrder) =>
+        new(formKey, fieldKey, IsLocked: false, DefaultIsVisible: false, DefaultIsRequired: false, displayOrder);
 }

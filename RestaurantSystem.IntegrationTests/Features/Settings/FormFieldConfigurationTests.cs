@@ -53,6 +53,13 @@ public class FormFieldConfigurationTests : IntegrationTestBase
         reservation.Fields.Single(f => f.FieldKey == "customerPhone")
             .Should().BeEquivalentTo(new { IsLocked = false, IsVisible = true, IsRequired = false });
 
+        // Checkout phone seeds HIDDEN: the frontend's shown-if-config-visible-OR-
+        // order-type-required formula then reproduces today's behaviour exactly
+        // (no phone on DineIn; required phone on Takeaway/Delivery via the floor).
+        var checkout = forms.Single(f => f.FormKey == "checkout_contact");
+        checkout.Fields.Single(f => f.FieldKey == "phone")
+            .Should().BeEquivalentTo(new { IsLocked = false, IsVisible = false, IsRequired = false });
+
         // Every registry row is lazily seeded on first read.
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
