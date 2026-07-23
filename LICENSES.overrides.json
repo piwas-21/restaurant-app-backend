@@ -1,0 +1,8 @@
+[
+  {
+    "Id": "SixLabors.ImageSharp",
+    "Version": "3.1.12",
+    "License": "Apache-2.0",
+    "Comment": "Six Labors Split License. ImageSharp 3.x is Apache-2.0 for organizations under ~$1M USD annual revenue; a paid commercial license is required above that. Sofra/RUMI qualifies for the free (Apache-2.0) tier today, so this override records the license that actually applies at our revenue tier rather than the unclassifiable embedded license file the scanner sees. PINNED TO THE EXACT VERSION ON PURPOSE: any bump (incl. Dependabot) breaks the license-compliance job until this version is updated, forcing a deliberate license re-review. Revisit when revenue approaches $1M OR on a bump to 4.x (4.0 hard-fails the build without a Six Labors license key). Tracking: piwas-21/restaurant-app-backend#213."
+  }
+]
