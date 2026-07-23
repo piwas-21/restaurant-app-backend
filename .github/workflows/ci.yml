@@ -198,6 +198,14 @@ jobs:
         # --licenseurl-to-license-mappings maps non-SPDX license URLs
         # (older Microsoft.AspNetCore packages declare their license as
         # a raw GitHub URL rather than SPDX) to the actual SPDX type.
+        # --override-package-information declares the SPDX license for a
+        # specific package+version whose embedded license file the tool
+        # can't classify. LICENSES.overrides.json is pure JSON (already
+        # the shape nuget-license wants) so it's passed directly — its
+        # per-entry `Comment` field carries the rationale + is version-
+        # pinned so any bump forces a fresh license re-review. Currently:
+        # SixLabors.ImageSharp (Six Labors Split License == Apache-2.0 at
+        # our revenue tier; see the file + backend#213).
         run: |
           # Ignored packages: build-time-only Microsoft tooling that
           # ships its license as an embedded file the tool can't classify.
@@ -209,11 +217,14 @@ jobs:
             LICENSES.ignored.txt > /tmp/ignored-packages.json
           echo "Ignored packages:"
           cat /tmp/ignored-packages.json
+          echo "License overrides:"
+          cat LICENSES.overrides.json
           nuget-license \
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.json \
             --licenseurl-to-license-mappings LICENSES.urlmap.json \
             --ignored-packages /tmp/ignored-packages.json \
+            --override-package-information LICENSES.overrides.json \
             -o JsonPretty
 
   osv_scanner:
