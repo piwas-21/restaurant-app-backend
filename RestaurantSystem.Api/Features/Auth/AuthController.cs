@@ -68,7 +68,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("refresh-token")]
     [AllowAnonymous]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting("auth-refresh")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> RefreshToken([FromBody] RefreshTokenCommand command)
     {
         var result = await _mediator.SendCommand(command);
