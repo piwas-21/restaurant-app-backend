@@ -78,7 +78,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
 
         // Generate tokens
         var token = _tokenService.GenerateAccessToken(newUser);
-        newUser.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        newUser.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
         await _userManager.UpdateAsync(newUser);
 
         // Send welcome email

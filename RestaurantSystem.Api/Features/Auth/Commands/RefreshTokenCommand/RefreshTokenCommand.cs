@@ -75,7 +75,7 @@ public class RefreshTokenCommandHandler : ICommandHandler<RefreshTokenCommand, A
 
             // Step 5: Update user with hash of new refresh token
             user.RefreshToken = _tokenService.HashRefreshToken(newRefreshToken);
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // Configurable refresh token expiry
+            user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
             user.UpdatedAt = DateTime.UtcNow;
             user.UpdatedBy = user.Id.ToString();
 
