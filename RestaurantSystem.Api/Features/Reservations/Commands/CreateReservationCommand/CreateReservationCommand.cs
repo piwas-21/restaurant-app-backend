@@ -5,6 +5,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.Settings.FormFields;
+using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -20,6 +22,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly IEmailBrandingProvider _brandingProvider;
+    private readonly IFormFieldRequirementService _formFieldRequirements;
     private readonly ILogger<CreateReservationCommandHandler> _logger;
     private readonly EmailSettings _emailSettings;
 
@@ -27,12 +30,14 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
         ApplicationDbContext context,
         IEmailService emailService,
         IEmailBrandingProvider brandingProvider,
+        IFormFieldRequirementService formFieldRequirements,
         ILogger<CreateReservationCommandHandler> logger,
         IOptions<EmailSettings> emailSettings)
     {
         _context = context;
         _emailService = emailService;
         _brandingProvider = brandingProvider;
+        _formFieldRequirements = formFieldRequirements;
         _logger = logger;
         _emailSettings = emailSettings.Value;
     }
@@ -42,6 +47,16 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
         try
         {
             var data = command.ReservationData;
+
+            // Admin-configured requiredness (locked fields are covered by DataAnnotations).
+            await _formFieldRequirements.EnsureRequiredFieldsPresentAsync(
+                FormFieldRegistry.FormKeys.Reservation,
+                new Dictionary<string, string?>
+                {
+                    [FormFieldRegistry.ReservationFields.CustomerPhone] = data.CustomerPhone,
+                    [FormFieldRegistry.ReservationFields.SpecialRequests] = data.SpecialRequests,
+                },
+                cancellationToken);
 
             // Validate date is not in the past
             if (data.ReservationDate.Date < DateTime.UtcNow.Date)
@@ -161,31 +176,16 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                 // Don't fail the reservation creation if email fails
             }
 
-            var reservationDto = new ReservationDto
-            {
-                Id = reservation.Id,
-                CustomerId = reservation.CustomerId,
-                CustomerName = reservation.CustomerName,
-                CustomerEmail = reservation.CustomerEmail,
-                CustomerPhone = reservation.CustomerPhone ?? string.Empty,
-                TableId = reservation.TableId,
-                TableNumber = table.TableNumber,
-                ReservationDate = reservation.ReservationDate,
-                StartTime = reservation.StartTime,
-                EndTime = reservation.EndTime,
-                NumberOfGuests = reservation.NumberOfGuests,
-                Status = reservation.Status,
-                SpecialRequests = reservation.SpecialRequests,
-                Notes = reservation.Notes,
-                CreatedAt = reservation.CreatedAt
-            };
+            var reservationDto = ReservationDtoMapper.ToDto(reservation, table.TableNumber);
 
             _logger.LogInformation("Created reservation {ReservationId} for table {TableNumber} on {Date}",
                 reservation.Id, table.TableNumber, reservation.ReservationDate);
 
             return ApiResponse<ReservationDto>.SuccessWithData(reservationDto, "Reservation created successfully. You will receive a confirmation email once approved.");
         }
-        catch (Exception ex)
+        // BadRequestException carries the config-driven required-field message —
+        // let the exception middleware map it to a 400 instead of swallowing it here.
+        catch (Exception ex) when (ex is not Common.Exceptions.BadRequestException)
         {
             _logger.LogError(ex, "Error creating reservation");
             return ApiResponse<ReservationDto>.Failure("Failed to create reservation");
