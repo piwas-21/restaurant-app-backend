@@ -287,7 +287,7 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.Localization
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
-// Trust the K8s nginx-ingress X-Forwarded-For header so rate limiter partitions by real client IP
+// Trust the Caddy reverse-proxy's X-Forwarded-For header so the rate limiter partitions by real client IP
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -311,13 +311,41 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // /api/Auth/login + refresh-token
+    // Emit a small JSON body + Retry-After on rejection. Without this the 429 body is
+    // empty, which the SPA's fetch(...).json() throws on — turning a transient rate-limit
+    // rejection into a spurious "session expired" logout on the client.
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsync(
+            "{\"success\":false,\"message\":\"Too many requests. Please slow down and try again shortly.\"}",
+            cancellationToken);
+    };
+
+    // /api/Auth/login (+ google/apple-login)
     options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = rateLimiter.AuthPermitLimit,
             Window = TimeSpan.FromMinutes(rateLimiter.AuthWindowMinutes),
+            QueueLimit = 0
+        }));
+
+    // /api/Auth/refresh-token — its OWN partition so refresh bursts can't exhaust the
+    // login bucket (an expired-token refresh stampede was 429-ing admins out of re-login).
+    options.AddPolicy("auth-refresh", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.AuthRefreshPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.AuthRefreshWindowMinutes),
             QueueLimit = 0
         }));
 
