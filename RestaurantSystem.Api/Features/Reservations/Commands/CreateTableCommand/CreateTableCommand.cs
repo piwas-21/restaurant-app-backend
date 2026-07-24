@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Infrastructure.Persistence.Support;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.CreateTableCommand;
 
@@ -35,17 +36,37 @@ public class CreateTableCommandHandler : ICommandHandler<CreateTableCommand, Api
                 return ApiResponse<TableDto>.Failure($"Table with number '{data.TableNumber}' already exists");
             }
 
+            // Auto-link the new table to the plan the guest map renders — the
+            // same default-plan selection as FloorPlanService — and coerce its
+            // geometry into metres. The still-deployed pixel-canvas frontend
+            // posts pixel-scale size/position that must not reach the guest map
+            // as-is (FLOOR-PLAN-REVAMP §5.2/§6, prod-first).
+            var plan = await _context.FloorPlans
+                .OrderByDescending(p => p.IsDefault)
+                .ThenBy(p => p.DisplayOrder)
+                .Select(p => new { p.Id, p.WidthMeters, p.HeightMeters })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var planWidth = plan?.WidthMeters ?? FloorPlanMigrationSql.RoomWidthMeters;
+            var planHeight = plan?.HeightMeters ?? FloorPlanMigrationSql.RoomHeightMeters;
+
+            var (width, height) = TableGeometryDefaults.MetreFootprint(
+                data.Width, data.Height, data.MaxGuests, planWidth, planHeight);
+            var (positionX, positionY) = TableGeometryDefaults.MetrePosition(
+                data.PositionX, data.PositionY, planWidth, planHeight);
+
             var table = new Table
             {
                 TableNumber = data.TableNumber,
                 MaxGuests = data.MaxGuests,
                 IsActive = data.IsActive,
                 IsOutdoor = data.IsOutdoor,
-                PositionX = data.PositionX,
-                PositionY = data.PositionY,
-                Width = data.Width,
-                Height = data.Height,
-                Shape = data.Shape,
+                FloorPlanId = plan?.Id,
+                PositionX = positionX,
+                PositionY = positionY,
+                Width = width,
+                Height = height,
+                Shape = TableGeometryDefaults.NormalizeShape(data.Shape),
                 Rotation = data.Rotation,
                 Notes = data.Notes,
                 CreatedBy = "System" // TODO: Get from current user
