@@ -150,7 +150,7 @@ public static class FloorPlanDocumentMapper
     }
 
     private static decimal Clamp(decimal value, decimal min, decimal max) =>
-        value < min ? min : value > max ? max : value;
+        Math.Clamp(value, min, max);
 
     private static decimal NormalizeAngle(decimal degrees)
     {

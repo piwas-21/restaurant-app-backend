@@ -25,13 +25,16 @@ public class SaveFloorPlanCommandHandler : ICommandHandler<SaveFloorPlanCommand,
         try
         {
             var result = await _service.SaveAsync(command.PlanId, command.Document, cancellationToken);
-            if (result.Success)
+            if (result.Document is { } document)
             {
                 _logger.LogInformation("Saved floor plan {PlanId}", command.PlanId);
-                return ApiResponse<FloorPlanDocumentDto>.SuccessWithData(result.Document!, "Floor plan saved");
+                return ApiResponse<FloorPlanDocumentDto>.SuccessWithData(document, "Floor plan saved");
             }
 
-            return ApiResponse<FloorPlanDocumentDto>.FailureWithCode(result.Error!, result.ErrorCode!, "Failed to save floor plan");
+            return ApiResponse<FloorPlanDocumentDto>.FailureWithCode(
+                result.Error ?? "Failed to save floor plan",
+                result.ErrorCode ?? "SaveFailed",
+                "Failed to save floor plan");
         }
         catch (Exception ex)
         {

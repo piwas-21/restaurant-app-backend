@@ -8,14 +8,16 @@ namespace RestaurantSystem.Api.Features.FloorPlan.Dtos;
 /// </summary>
 public record FloorPlanDocumentDto
 {
-    public Guid Id { get; set; }
+    // Value-type members are `required` so an omitted field is a deserialization
+    // error, not a silent 0 (under-posting on the PUT body — Sonar S6964).
+    public required Guid Id { get; set; }
     public string Name { get; set; } = "Main floor";
-    public decimal WidthMeters { get; set; }
-    public decimal HeightMeters { get; set; }
+    public required decimal WidthMeters { get; set; }
+    public required decimal HeightMeters { get; set; }
     public int GridSizeCm { get; set; } = 25;
     public string BackgroundStyle { get; set; } = "plain";
-    public bool IsDefault { get; set; }
-    public int DisplayOrder { get; set; }
+    public required bool IsDefault { get; set; }
+    public required int DisplayOrder { get; set; }
 
     /// <summary>Concurrency token — echo it back unchanged on save.</summary>
     public DateTime? UpdatedAt { get; set; }

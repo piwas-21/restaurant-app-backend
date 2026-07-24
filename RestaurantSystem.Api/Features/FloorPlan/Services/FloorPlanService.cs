@@ -79,8 +79,9 @@ public class FloorPlanService : IFloorPlanService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var saved = await GetByIdAsync(plan.Id, cancellationToken);
-        return SaveFloorPlanResult.Ok(saved!);
+        var saved = await GetByIdAsync(plan.Id, cancellationToken)
+            ?? throw new InvalidOperationException($"Floor plan '{plan.Id}' could not be re-read immediately after save.");
+        return SaveFloorPlanResult.Ok(saved);
     }
 
     private async Task ApplyTableGeometryAsync(Domain.Entities.FloorPlan plan, FloorPlanDocumentDto document, CancellationToken cancellationToken)
