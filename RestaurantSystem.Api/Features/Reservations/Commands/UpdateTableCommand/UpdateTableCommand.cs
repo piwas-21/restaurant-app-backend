@@ -48,10 +48,38 @@ public class UpdateTableCommandHandler : ICommandHandler<UpdateTableCommand, Api
             table.IsOutdoor = command.TableData.IsOutdoor;
             table.PositionX = command.TableData.PositionX;
             table.PositionY = command.TableData.PositionY;
-            table.Width = command.TableData.Width;
-            table.Height = command.TableData.Height;
-            table.Shape = command.TableData.Shape;
-            table.Rotation = command.TableData.Rotation;
+
+            // Geometry is patch-style: only overwrite what the caller supplied.
+            // The admin table-layout editor stopped sending these four fields
+            // (frontend PR #272), and assigning them unconditionally wrote the
+            // DTO's defaults over the stored values — shape → "circle" and
+            // rotation → 0 landed silently, while width/height → 0 failed
+            // [Range(10, 500)] and rejected the entire save with a 400.
+            // FLOOR-PLAN-REVAMP slice S1 migrates the surviving values to
+            // metres, so they must not be clobbered here.
+            if (command.TableData.Width.HasValue)
+            {
+                table.Width = command.TableData.Width.Value;
+            }
+
+            if (command.TableData.Height.HasValue)
+            {
+                table.Height = command.TableData.Height.Value;
+            }
+
+            // Blank is treated as "not supplied" too: the shape column was
+            // created NOT NULL DEFAULT '', so an empty string is a legacy
+            // placeholder to preserve, never a shape worth writing.
+            if (!string.IsNullOrWhiteSpace(command.TableData.Shape))
+            {
+                table.Shape = command.TableData.Shape;
+            }
+
+            if (command.TableData.Rotation.HasValue)
+            {
+                table.Rotation = command.TableData.Rotation.Value;
+            }
+
             table.Notes = command.TableData.Notes;
 
             await _context.SaveChangesAsync(cancellationToken);
