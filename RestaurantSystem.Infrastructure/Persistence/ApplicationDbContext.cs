@@ -60,6 +60,12 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<Reservation> Reservations { get; set; }
         public DbSet<TableReservation> TableReservations { get; set; }
 
+        // Floor plan aggregate (FLOOR-PLAN-REVAMP S3)
+        public DbSet<FloorPlan> FloorPlans { get; set; }
+        public DbSet<FloorPlanItem> FloorPlanItems { get; set; }
+        public DbSet<FloorPlanWall> FloorPlanWalls { get; set; }
+        public DbSet<FloorPlanOpening> FloorPlanOpenings { get; set; }
+
         // Tax Configuration
         public DbSet<TaxConfiguration> TaxConfigurations { get; set; }
 

@@ -32,6 +32,12 @@ namespace RestaurantSystem.Infrastructure.Extensions
                 await FidelityPointsSeeder.SeedAsync(dbContext);
                 logger.LogInformation("Fidelity points data seeded successfully");
 
+                // Seed the default floor plan BEFORE tables — TableSeeder links
+                // new tables to the plan this creates (FLOOR-PLAN-REVAMP S3).
+                logger.LogInformation("Seeding default floor plan");
+                await FloorPlanSeeder.SeedAsync(dbContext, logger);
+                logger.LogInformation("Default floor plan seeded successfully");
+
                 // Seed tables data
                 logger.LogInformation("Seeding tables data");
                 await TableSeeder.SeedAsync(dbContext, logger);
