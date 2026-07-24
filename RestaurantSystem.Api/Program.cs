@@ -454,6 +454,7 @@ builder.Services.AddScoped<IFormFieldRequirementService, FormFieldRequirementSer
 builder.Services.AddSingleton<IFormFieldSeedState, FormFieldSeedState>();
 
 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.FloorPlan.Services.IFloorPlanService, RestaurantSystem.Api.Features.FloorPlan.Services.FloorPlanService>();
 builder.Services.AddScoped<IGroupMembershipService, GroupMembershipService>();
 builder.Services.AddScoped<IMembershipQrService, MembershipQrService>();
 builder.Services.AddScoped<IUserGroupService, UserGroupService>();
