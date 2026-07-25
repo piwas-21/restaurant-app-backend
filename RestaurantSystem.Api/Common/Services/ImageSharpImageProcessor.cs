@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Settings;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
@@ -18,6 +19,14 @@ public class ImageSharpImageProcessor : IImageProcessor
     // Only formats we can losslessly-enough round-trip. Animated GIF / SVG are passed through.
     private static readonly HashSet<string> ProcessableExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+
+    /// <summary>
+    /// How much further past <see cref="FileStorageSettings.MaxDecodePixels"/> an oversized JPEG
+    /// may go, given its bitmap is bounded by the target box rather than the source. 4x takes the
+    /// default 24 MP to 96 MP — comfortably past any current camera — while still refusing a header
+    /// claiming an absurd canvas. Bytes are separately capped by MaxFileSizeBytes.
+    /// </summary>
+    private const int ScaledDecodeBudgetMultiplier = 4;
 
     private readonly FileStorageSettings _settings;
     private readonly ILogger<ImageSharpImageProcessor> _logger;
@@ -59,9 +68,14 @@ public class ImageSharpImageProcessor : IImageProcessor
 
             var start = input.Position;
 
-            // Cheap header read first — bail before allocating a huge bitmap.
+            // Cheap header read first — decide everything from the declared size before allocating
+            // a bitmap.
             var info = await Image.IdentifyAsync(input, cancellationToken);
-            if ((long)info.Width * info.Height > _settings.MaxDecodePixels)
+            var maxEdge = Math.Max(1, _settings.MaxImageEdgePixels);
+            // Max(width, height) is orientation-invariant, so this is safe to decide pre-AutoOrient.
+            var needsResize = Math.Max(info.Width, info.Height) > maxEdge;
+
+            if ((long)info.Width * info.Height > EffectiveDecodePixelBudget(info, needsResize))
             {
                 _logger.LogWarning(
                     "Skipping resize for {FileName}: {Width}x{Height} exceeds the decode guard",
@@ -70,11 +84,11 @@ public class ImageSharpImageProcessor : IImageProcessor
             }
 
             input.Position = start;
-            using var image = await Image.LoadAsync(input, cancellationToken);
-
-            var maxEdge = Math.Max(1, _settings.MaxImageEdgePixels);
-            // Max(width, height) is orientation-invariant, so this decision is safe pre-AutoOrient.
-            var needsResize = Math.Max(image.Width, image.Height) > maxEdge;
+            // Only an oversized source gets TargetSize — see DecoderOptionsFor: handing it a
+            // smaller image would ENLARGE it.
+            using var image = needsResize
+                ? await Image.LoadAsync(ScaledDecoderOptions(maxEdge), input, cancellationToken)
+                : await Image.LoadAsync(input, cancellationToken);
 
             image.Mutate(ctx =>
             {
@@ -116,6 +130,37 @@ public class ImageSharpImageProcessor : IImageProcessor
                 await buffered.DisposeAsync();
             }
         }
+    }
+
+    /// <summary>
+    /// Decode straight into the target box when — and only when — the source is bigger than it.
+    /// JPEG decodes natively at 1/2, 1/4 and 1/8 scale, so peak memory then tracks the OUTPUT
+    /// rather than the input: a 40 MP photo costs about what a 1.7 MP one does.
+    ///
+    /// The `needsResize` condition is load-bearing, not an optimisation. `TargetSize` scales
+    /// TOWARDS the box in both directions, so handing it a smaller image ENLARGES it — passing it
+    /// unconditionally turned an 800px upload into 1600px of interpolated mush. (Caught by
+    /// `ProcessAsync_SmallImage_IsNotUpscaled`, which is why that test exists.)
+    /// </summary>
+    private static DecoderOptions ScaledDecoderOptions(int maxEdge)
+        => new() { TargetSize = new Size(maxEdge, maxEdge) };
+
+    /// <summary>
+    /// Pixel ceiling for the decompression-bomb guard. The guard exists because decoding costs
+    /// ~4 bytes per SOURCE pixel, so a small file declaring a huge canvas can exhaust memory.
+    ///
+    /// That reasoning only holds for a full decode. When we scale on decode (an oversized JPEG),
+    /// the bitmap is bounded by the target box instead, so the source pixel count stops driving
+    /// memory and the plain limit is simply over-strict — it was refusing five of RUMI's real
+    /// menu photos (up to 40.2 MP), leaving them served full-size. Formats that cannot scale on
+    /// decode (PNG, WebP) keep the strict limit, because for them the original reasoning stands.
+    /// </summary>
+    private long EffectiveDecodePixelBudget(ImageInfo info, bool needsResize)
+    {
+        var scalesOnDecode = needsResize && info.Metadata.DecodedImageFormat is JpegFormat;
+        return scalesOnDecode
+            ? (long)_settings.MaxDecodePixels * ScaledDecodeBudgetMultiplier
+            : _settings.MaxDecodePixels;
     }
 
     private static async Task<MemoryStream> BufferAsync(Stream source, CancellationToken cancellationToken)

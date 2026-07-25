@@ -179,6 +179,41 @@ public class ImageBackfillServiceTests : IDisposable
         File.Exists(Path.Combine(UploadsRoot, "products", "big.jpg")).Should().BeTrue();
     }
 
+    /// <summary>
+    /// The guard that stops a silently-failed decode being written over a good photo. Thresholds
+    /// come from RUMI's real library (2026-07-25): healthy re-encodes measured 0.6–3.1x density
+    /// drop, the one image the decoder mangled measured 16.7x.
+    /// </summary>
+    [Theory]
+    // healthy: 3000x2000 @ 4.6MB -> 1600x1067 @ 420KB is a ~3.1x drop — must pass
+    [InlineData(4_823_449L, 3000, 2000, 430_080L, 1600, 1067, false)]
+    // healthy: barely-compressible source, output denser than input — must pass
+    [InlineData(1_855_425L, 3000, 2000, 149_504L, 1600, 1067, false)]
+    // the real corruption: 3000x1999 @ 4.26MB -> 1600x1066 @ 74KB is a 16.7x drop
+    [InlineData(4_467_668L, 3000, 1999, 75_776L, 1600, 1066, true)]
+    // degenerate: an empty result is never trustworthy
+    [InlineData(4_467_668L, 3000, 1999, 0L, 1600, 1066, true)]
+    public void IsImplausiblySparse_SeparatesRealCompressionFromAFailedDecode(
+        long ob, int ow, int oh, long nb, int nw, int nh, bool expected)
+    {
+        ImageBackfillService.IsImplausiblySparse(ob, ow, oh, nb, nw, nh).Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task RunAsync_OversizedImage_IsNowResizedInsteadOfRefused()
+    {
+        // 4016x6016 = 24.2 MP — over the 24 MP decode guard, so this used to come back
+        // "skipped-unprocessable" and stay full-size. Scaled decoding means it no longer has to.
+        WriteImage("products/huge.jpg", 4016, 6016);
+
+        var report = await CreateService().RunAsync(apply: true, maxFiles: 10);
+
+        var entry = report.Entries.Single();
+        entry.Outcome.Should().Be("resized");
+        Math.Max(entry.NewWidth, entry.NewHeight).Should().Be(1600);
+        entry.BytesSaved.Should().BeGreaterThan(0);
+    }
+
     [Fact]
     public async Task RunAsync_NonLocalProvider_IsRejected()
     {
