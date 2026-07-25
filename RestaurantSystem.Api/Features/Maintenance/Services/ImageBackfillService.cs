@@ -24,6 +24,15 @@ public class ImageBackfillService : IImageBackfillService
 
     private static readonly string[] ScannedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
 
+    /// <summary>
+    /// How much less dense (bytes per pixel) the output may be than the source before we stop
+    /// trusting it. A silently-failed decode yields a near-empty image, which is *tiny* — so a
+    /// size-only check actively PREFERS corruption. Measured over RUMI's real library: healthy
+    /// re-encodes landed at 0.6–3.1x, and the one image the decoder mangled at 16.7x. 6x sits in
+    /// the gap with room either side. Flagged files are reported and never written.
+    /// </summary>
+    private const double MaxDensityDropFactor = 6.0;
+
     private readonly IImageProcessor _processor;
     private readonly FileStorageSettings _settings;
     private readonly string _uploadsRoot;
@@ -149,6 +158,20 @@ public class ImageBackfillService : IImageBackfillService
                 return Skip(entry, "skipped-no-gain");
             }
 
+            // Integrity: a decoder that fails silently hands back a near-empty image, which encodes
+            // implausibly small — so "smaller is better" would overwrite a good photo with a ruined
+            // one. Compare pixel DENSITY, not raw size, since a legitimate downscale shrinks bytes
+            // and pixels together.
+            if (IsImplausiblySparse(originalBytes, info.Width, info.Height, processed.Length, newInfo.Width, newInfo.Height))
+            {
+                _logger.LogWarning(
+                    "Image backfill flagged {RelativePath} for review: {OriginalBytes}B/{OriginalPixels}px -> "
+                    + "{NewBytes}B/{NewPixels}px is a density drop beyond {Factor}x; leaving the original in place",
+                    relativePath, originalBytes, (long)info.Width * info.Height,
+                    processed.Length, (long)newInfo.Width * newInfo.Height, MaxDensityDropFactor);
+                return Skip(entry, "needs-review");
+            }
+
             entry.NewWidth = newInfo.Width;
             entry.NewHeight = newInfo.Height;
             entry.NewBytes = processed.Length;
@@ -182,6 +205,26 @@ public class ImageBackfillService : IImageBackfillService
             entry.NewHeight = entry.OriginalHeight;
             return entry;
         }
+    }
+
+    /// <summary>
+    /// True when the result carries far fewer bytes per pixel than the source did — the signature
+    /// of a decode that produced a blank or truncated image rather than a genuine re-compression.
+    /// </summary>
+    internal static bool IsImplausiblySparse(
+        long originalBytes, int originalWidth, int originalHeight,
+        long newBytes, int newWidth, int newHeight)
+    {
+        var originalPixels = (long)originalWidth * originalHeight;
+        var newPixels = (long)newWidth * newHeight;
+        if (originalPixels <= 0 || newPixels <= 0 || newBytes <= 0)
+        {
+            return true;
+        }
+
+        var originalDensity = (double)originalBytes / originalPixels;
+        var newDensity = (double)newBytes / newPixels;
+        return newDensity > 0 && originalDensity / newDensity > MaxDensityDropFactor;
     }
 
     private static ImageBackfillEntryDto Skip(ImageBackfillEntryDto entry, string outcome)

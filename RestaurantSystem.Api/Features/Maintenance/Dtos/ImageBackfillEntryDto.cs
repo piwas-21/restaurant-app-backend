@@ -29,6 +29,10 @@ public class ImageBackfillEntryDto
     /// <summary>Bytes saved (never negative — a file that would grow is skipped instead).</summary>
     public long BytesSaved => Math.Max(0, OriginalBytes - NewBytes);
 
-    /// <summary>"resized", "recompressed", "skipped-no-gain", "skipped-unprocessable", or "failed".</summary>
+    /// <summary>
+    /// "resized", "recompressed", "skipped-no-gain", "skipped-unprocessable", "needs-review", or
+    /// "failed". <c>needs-review</c> means the result looked like a failed decode (far too few
+    /// bytes per pixel) and was deliberately NOT written — inspect that file by hand.
+    /// </summary>
     public required string Outcome { get; set; }
 }
