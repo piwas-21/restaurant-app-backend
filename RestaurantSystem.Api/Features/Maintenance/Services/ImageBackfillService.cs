@@ -157,7 +157,15 @@ public class ImageBackfillService : IImageBackfillService
                 : "resized";
 
             var destination = apply ? path : Path.Combine(_uploadsRoot, PreviewFolder, relativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            // Both branches are rooted paths, so this is never null in practice — but assert it
+            // rather than silencing the compiler with `!` (Sonar S8970).
+            var destinationDirectory = Path.GetDirectoryName(destination);
+            if (string.IsNullOrEmpty(destinationDirectory))
+            {
+                return Skip(entry, "skipped-unprocessable");
+            }
+
+            Directory.CreateDirectory(destinationDirectory);
             await WriteAsync(processed, destination, cancellationToken);
 
             if (!apply)
