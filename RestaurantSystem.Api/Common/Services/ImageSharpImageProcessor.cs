@@ -30,28 +30,46 @@ public class ImageSharpImageProcessor : IImageProcessor
 
     public async Task<Stream?> ProcessAsync(IFormFile file, CancellationToken cancellationToken = default)
     {
-        var extension = Path.GetExtension(file.FileName);
+        // This overload opens the stream, so this overload closes it. The stream overload never
+        // disposes what it was handed — the caller owns that.
+        await using var stream = file.OpenReadStream();
+        return await ProcessAsync(stream, file.FileName, cancellationToken);
+    }
+
+    public async Task<Stream?> ProcessAsync(Stream source, string fileName, CancellationToken cancellationToken = default)
+    {
+        var extension = Path.GetExtension(fileName);
         if (!ProcessableExtensions.Contains(extension))
         {
             return null;
         }
 
+        // We read the stream twice (probe, then decode), so it has to rewind. Uploads and
+        // FileStreams both do; anything else gets buffered — bounded by the upload size limit the
+        // command validator already enforces. Only the buffer we allocate is ours to dispose.
+        MemoryStream? buffered = null;
         try
         {
-            // Cheap header read first — bail before allocating a huge bitmap.
-            await using (var probe = file.OpenReadStream())
+            Stream input = source;
+            if (!source.CanSeek)
             {
-                var info = await Image.IdentifyAsync(probe, cancellationToken);
-                if ((long)info.Width * info.Height > _settings.MaxDecodePixels)
-                {
-                    _logger.LogWarning(
-                        "Skipping resize for {FileName}: {Width}x{Height} exceeds the decode guard",
-                        file.FileName, info.Width, info.Height);
-                    return null;
-                }
+                buffered = await BufferAsync(source, cancellationToken);
+                input = buffered;
             }
 
-            await using var input = file.OpenReadStream();
+            var start = input.Position;
+
+            // Cheap header read first — bail before allocating a huge bitmap.
+            var info = await Image.IdentifyAsync(input, cancellationToken);
+            if ((long)info.Width * info.Height > _settings.MaxDecodePixels)
+            {
+                _logger.LogWarning(
+                    "Skipping resize for {FileName}: {Width}x{Height} exceeds the decode guard",
+                    fileName, info.Width, info.Height);
+                return null;
+            }
+
+            input.Position = start;
             using var image = await Image.LoadAsync(input, cancellationToken);
 
             var maxEdge = Math.Max(1, _settings.MaxImageEdgePixels);
@@ -88,9 +106,24 @@ public class ImageSharpImageProcessor : IImageProcessor
         {
             // Fail open: an undecodable upload is stored as-is rather than rejected at this seam
             // (the command validator already screens type + size).
-            _logger.LogWarning(ex, "Image processing failed for {FileName}; storing the original", file.FileName);
+            _logger.LogWarning(ex, "Image processing failed for {FileName}; storing the original", fileName);
             return null;
         }
+        finally
+        {
+            if (buffered is not null)
+            {
+                await buffered.DisposeAsync();
+            }
+        }
+    }
+
+    private static async Task<MemoryStream> BufferAsync(Stream source, CancellationToken cancellationToken)
+    {
+        var buffered = new MemoryStream();
+        await source.CopyToAsync(buffered, cancellationToken);
+        buffered.Position = 0;
+        return buffered;
     }
 
     private IImageEncoder EncoderFor(string extension)
