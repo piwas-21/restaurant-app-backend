@@ -54,6 +54,9 @@ public class ImageProcessingFileStorageServiceTests
     {
         public Task<Stream?> ProcessAsync(IFormFile file, CancellationToken cancellationToken = default) =>
             Task.FromResult(result);
+
+        public Task<Stream?> ProcessAsync(Stream source, string fileName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(result);
     }
 
     private sealed class RecordingStorage : IFileStorageService
