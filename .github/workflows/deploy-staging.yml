@@ -53,8 +53,13 @@ jobs:
           fingerprint: ${{ secrets.STAGING_DEPLOY_SSH_FINGERPRINT }}
           command_timeout: 18m
           # flock serialises against a concurrent frontend staging deploy (GitHub concurrency
-          # groups don't span repos). Scoped `pull backend` + `up -d backend` recreates only
+          # groups don't span repos, and the frontend + demo-tenant rolls share this
+          # lock). `-w 300` WAITS for it: with `-n` whichever deploy lost the race
+          # exited 1 and the box silently kept the old image, reported as a red X
+          # reading "skipping this run" (2026-07-25: RUMI staging missed a roll that
+          # way). 5m fits inside command_timeout: 18m.
+          # Scoped `pull backend` + `up -d backend` recreates only
           # the backend (its :staging digest moved); every other service keeps running.
           script: |
-            flock -n /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && docker compose -f docker-compose.prod.yml pull backend && docker compose -f docker-compose.prod.yml up -d backend && docker image prune -f" \
-              || { echo "::error::another RUMI deploy holds the lock; skipping this run"; exit 1; }
+            flock -w 300 /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && docker compose -f docker-compose.prod.yml pull backend && docker compose -f docker-compose.prod.yml up -d backend && docker image prune -f" \
+              || { echo "::error::timed out after 5m waiting for the RUMI deploy lock — this deploy did NOT run; re-run the job"; exit 1; }

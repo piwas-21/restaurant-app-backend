@@ -60,11 +60,20 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<Reservation> Reservations { get; set; }
         public DbSet<TableReservation> TableReservations { get; set; }
 
+        // Floor plan aggregate (FLOOR-PLAN-REVAMP S3)
+        public DbSet<FloorPlan> FloorPlans { get; set; }
+        public DbSet<FloorPlanItem> FloorPlanItems { get; set; }
+        public DbSet<FloorPlanWall> FloorPlanWalls { get; set; }
+        public DbSet<FloorPlanOpening> FloorPlanOpenings { get; set; }
+
         // Tax Configuration
         public DbSet<TaxConfiguration> TaxConfigurations { get; set; }
 
         // Order Type Configuration
         public DbSet<OrderTypeConfiguration> OrderTypeConfigurations { get; set; }
+
+        // Customer form field configuration (admin-configurable visibility/requiredness)
+        public DbSet<CustomerFormFieldConfiguration> CustomerFormFieldConfigurations { get; set; }
 
         // Working Hours
         public DbSet<WorkingHours> WorkingHours { get; set; }

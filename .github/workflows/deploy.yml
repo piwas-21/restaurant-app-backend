@@ -66,7 +66,12 @@ jobs:
           # Pass the tag as an env var (not string-interpolated) so it can't break
           # out of the remote command. flock serializes against a concurrent
           # frontend deploy (GitHub concurrency groups don't span repos).
+          # `-w 300` WAITS for the lock (mirrors frontend #301). With `-n` a
+          # coordinated frontend+backend release could drop one deploy, leaving
+          # prod's two halves out of step — signalled only by a red X reading
+          # "skipping this run". deploy.sh holds the lock ~15s, so 300s is ample
+          # and far inside command_timeout: 18m.
           envs: IMAGE_TAG
           script: |
-            flock -n /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && BACKEND_TAG=\"$IMAGE_TAG\" ./deploy.sh" \
-              || { echo "::error::another RUMI deploy holds the lock; skipping this run"; exit 1; }
+            flock -w 300 /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && BACKEND_TAG=\"$IMAGE_TAG\" ./deploy.sh" \
+              || { echo "::error::timed out after 5m waiting for the RUMI deploy lock — this deploy did NOT run; re-run the job"; exit 1; }

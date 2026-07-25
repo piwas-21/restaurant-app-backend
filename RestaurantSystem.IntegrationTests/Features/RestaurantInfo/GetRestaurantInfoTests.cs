@@ -41,6 +41,11 @@ public class GetRestaurantInfoTests : IntegrationTestBase
         info.Country.Should().Be("Switzerland");
         info.Email.Should().Be("rumigeneve@gmail.com");
 
+        // Entrance position is not seeded — null means the frontend places
+        // the reservation floor plan's entrance marker at its default position.
+        info.EntrancePositionX.Should().BeNull();
+        info.EntrancePositionY.Should().BeNull();
+
         info.PhoneNumbers.Should().ContainSingle();
         var seededPhone = info.PhoneNumbers[0];
         seededPhone.Number.Should().Be("+41227863333");

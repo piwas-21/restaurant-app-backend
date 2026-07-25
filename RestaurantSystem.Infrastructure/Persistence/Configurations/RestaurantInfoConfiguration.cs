@@ -21,6 +21,9 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
         builder.Property(r => r.Email).IsRequired().HasMaxLength(254);
         builder.Property(r => r.Website).HasMaxLength(2048);
         builder.Property(r => r.ThemePaletteKey).HasMaxLength(64);
+        // Percent coordinates (0–100) — 2 decimal places is ample granularity.
+        builder.Property(r => r.EntrancePositionX).HasColumnType("decimal(5,2)");
+        builder.Property(r => r.EntrancePositionY).HasColumnType("decimal(5,2)");
 
         builder.HasMany(r => r.PhoneNumbers)
             .WithOne(p => p.RestaurantInfo)

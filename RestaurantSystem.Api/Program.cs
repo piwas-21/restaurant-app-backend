@@ -25,6 +25,8 @@ using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
+using RestaurantSystem.Api.Features.Settings.FormFields.Services;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Api.Features.Settings.Services;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
@@ -446,8 +448,13 @@ builder.Services.AddScoped<ITaxConfigurationService, TaxConfigurationService>();
 // Settings Services
 builder.Services.AddScoped<IOrderTypeConfigurationService, OrderTypeConfigurationService>();
 builder.Services.AddScoped<IWorkingHoursService, WorkingHoursService>();
+builder.Services.AddScoped<IFormFieldConfigurationService, FormFieldConfigurationService>();
+builder.Services.AddScoped<IFormFieldRequirementService, FormFieldRequirementService>();
+// Per-app-instance "registry rows seeded" marker — pure in-memory flag, singleton lifetime.
+builder.Services.AddSingleton<IFormFieldSeedState, FormFieldSeedState>();
 
 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.FloorPlan.Services.IFloorPlanService, RestaurantSystem.Api.Features.FloorPlan.Services.FloorPlanService>();
 builder.Services.AddScoped<IGroupMembershipService, GroupMembershipService>();
 builder.Services.AddScoped<IMembershipQrService, MembershipQrService>();
 builder.Services.AddScoped<IUserGroupService, UserGroupService>();

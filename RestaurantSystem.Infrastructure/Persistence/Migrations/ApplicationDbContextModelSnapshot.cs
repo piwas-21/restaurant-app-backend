@@ -754,6 +754,66 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_discount_rules");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerFormFieldConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("field_key");
+
+                    b.Property<string>("FormKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("form_key");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_visible");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_form_field_configurations");
+
+                    b.HasIndex("FormKey", "FieldKey")
+                        .IsUnique();
+
+                    b.ToTable("CustomerFormFieldConfigurations", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.DeviceEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1047,6 +1107,296 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_fidelity_points_transactions_user_id");
 
                     b.ToTable("fidelity_points_transactions");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("BackgroundStyle")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasDefaultValue("plain")
+                        .HasColumnName("background_style");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<int>("GridSizeCm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(25)
+                        .HasColumnName("grid_size_cm");
+
+                    b.Property<decimal>("HeightMeters")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("height_meters");
+
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_default");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<decimal>("WidthMeters")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("width_meters");
+
+                    b.HasKey("Id")
+                        .HasName("pk_floor_plans");
+
+                    b.HasIndex("IsDefault");
+
+                    b.ToTable("FloorPlans", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("FloorPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("floor_plan_id");
+
+                    b.Property<decimal>("HeightMeters")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("height_meters");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("label");
+
+                    b.Property<decimal>("RotationDegrees")
+                        .HasColumnType("decimal(5,1)")
+                        .HasColumnName("rotation_degrees");
+
+                    b.Property<string>("StyleVariant")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("style_variant");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<decimal>("WidthMeters")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("width_meters");
+
+                    b.Property<decimal>("X")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("x");
+
+                    b.Property<decimal>("Y")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("y");
+
+                    b.Property<int>("ZIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("z_index");
+
+                    b.HasKey("Id")
+                        .HasName("pk_floor_plan_items");
+
+                    b.HasIndex("FloorPlanId")
+                        .HasDatabaseName("ix_floor_plan_items_floor_plan_id");
+
+                    b.ToTable("FloorPlanItems", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanOpening", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<decimal>("OffsetMeters")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("offset_meters");
+
+                    b.Property<int>("SegmentIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("segment_index");
+
+                    b.Property<string>("SwingDirection")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("none")
+                        .HasColumnName("swing_direction");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<Guid>("WallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wall_id");
+
+                    b.Property<decimal>("WidthMeters")
+                        .HasColumnType("decimal(6,2)")
+                        .HasColumnName("width_meters");
+
+                    b.HasKey("Id")
+                        .HasName("pk_floor_plan_openings");
+
+                    b.HasIndex("WallId")
+                        .HasDatabaseName("ix_floor_plan_openings_wall_id");
+
+                    b.ToTable("FloorPlanOpenings", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanWall", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("FloorPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("floor_plan_id");
+
+                    b.Property<string>("FloorStyle")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("floor_style");
+
+                    b.Property<bool>("IsClosed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_closed");
+
+                    b.Property<string>("PointsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("points_json");
+
+                    b.Property<string>("RoomName")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("room_name");
+
+                    b.Property<decimal>("ThicknessMeters")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(5,2)")
+                        .HasDefaultValue(0.12m)
+                        .HasColumnName("thickness_meters");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("ZIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("z_index");
+
+                    b.HasKey("Id")
+                        .HasName("pk_floor_plan_walls");
+
+                    b.HasIndex("FloorPlanId")
+                        .HasDatabaseName("ix_floor_plan_walls_floor_plan_id");
+
+                    b.ToTable("FloorPlanWalls", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalIngredient", b =>
@@ -3232,6 +3582,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("email");
 
+                    b.Property<decimal?>("EntrancePositionX")
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("entrance_position_x");
+
+                    b.Property<decimal?>("EntrancePositionY")
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("entrance_position_y");
+
                     b.Property<decimal?>("Latitude")
                         .HasColumnType("decimal(9,6)")
                         .HasColumnName("latitude");
@@ -3358,6 +3716,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("created_by");
 
+                    b.Property<Guid?>("FloorPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("floor_plan_id");
+
                     b.Property<decimal>("Height")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("decimal(10,2)")
@@ -3406,7 +3768,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Shape")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
                         .HasColumnName("shape");
 
                     b.Property<string>("TableNumber")
@@ -3431,6 +3794,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_tables");
+
+                    b.HasIndex("FloorPlanId")
+                        .HasDatabaseName("ix_tables_floor_plan_id");
 
                     b.HasIndex("TableNumber")
                         .IsUnique();
@@ -3960,6 +4326,42 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanItem", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.FloorPlan", "FloorPlan")
+                        .WithMany("Items")
+                        .HasForeignKey("FloorPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_floor_plan_items_floor_plans_floor_plan_id");
+
+                    b.Navigation("FloorPlan");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanOpening", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.FloorPlanWall", "Wall")
+                        .WithMany("Openings")
+                        .HasForeignKey("WallId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_floor_plan_openings_floorplanwalls_wall_id");
+
+                    b.Navigation("Wall");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanWall", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.FloorPlan", "FloorPlan")
+                        .WithMany("Walls")
+                        .HasForeignKey("FloorPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_floor_plan_walls_floor_plans_floor_plan_id");
+
+                    b.Navigation("FloorPlan");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalIngredientTranslation", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.GlobalIngredient", "GlobalIngredient")
@@ -4334,6 +4736,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("RestaurantInfo");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.Table", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.FloorPlan", "FloorPlan")
+                        .WithMany("Tables")
+                        .HasForeignKey("FloorPlanId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_tables_floor_plans_floor_plan_id");
+
+                    b.Navigation("FloorPlan");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableReservation", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
@@ -4383,6 +4796,20 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Category", b =>
                 {
                     b.Navigation("ProductCategories");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlan", b =>
+                {
+                    b.Navigation("Items");
+
+                    b.Navigation("Tables");
+
+                    b.Navigation("Walls");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlanWall", b =>
+                {
+                    b.Navigation("Openings");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalIngredient", b =>

@@ -4,316 +4,102 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Seeders;
 
+/// <summary>
+/// Seeds the reference dining tables in real-world metres (FLOOR-PLAN-REVAMP §6),
+/// matching the prototype's 14×9 m layout, and links them to the default plan
+/// seeded by <see cref="FloorPlanSeeder"/> (which must run first). Preserves the
+/// legacy behaviour: on an existing install only genuinely missing table numbers
+/// are added, so admin customisations and the migration's in-place unit→metre
+/// conversion of existing rows are never overwritten.
+/// </summary>
 public static class TableSeeder
 {
+    private const string Round2 = "round_2";
+    private const string Round4 = "round_4";
+    private const string Square4 = "square_4";
+    private const string Rect6 = "rect_6";
+    private const string Rect8 = "rect_8";
+    private const string Booth4 = "booth_4";
+
+    /// <summary>Footprint presets by table kind (shape, seats, width×height in metres).</summary>
+    private static readonly Dictionary<string, (string Shape, int Seats, decimal W, decimal H)> Presets = new()
+    {
+        [Round2] = ("round", 2, 0.7m, 0.7m),
+        [Round4] = ("round", 4, 1.0m, 1.0m),
+        [Square4] = ("square", 4, 0.92m, 0.92m),
+        [Rect6] = ("rectangle", 6, 1.65m, 0.85m),
+        [Rect8] = ("rectangle", 8, 2.3m, 0.95m),
+        [Booth4] = ("booth", 4, 1.25m, 0.78m),
+    };
+
+    // (number, presetKey, x, y, outdoor, note) — the prototype's reference layout
+    // (Main room tables indoor, Terrace tables outdoor).
+    private static readonly (string Number, string Preset, decimal X, decimal Y, bool Outdoor, string? Note)[] Layout =
+    {
+        ("1", Round4, 1.5m, 2.5m, false, null),
+        ("2", Round4, 3.5m, 2.5m, false, null),
+        ("3", Round4, 5.5m, 2.5m, false, null),
+        ("4", Square4, 1.3m, 4.4m, false, "By the fire"),
+        ("5", Square4, 1.3m, 6.1m, false, "By the fire"),
+        ("6", Rect6, 4.3m, 4.6m, false, "Long table, good for groups"),
+        ("7", Round4, 7.0m, 4.7m, false, null),
+        ("8", Booth4, 2.1m, 7.3m, false, "Corner booth"),
+        ("9", Rect8, 5.2m, 6.6m, false, "Our biggest table"),
+        ("10", Round2, 7.6m, 6.3m, false, null),
+        ("11a", Round2, 10.4m, 1.1m, true, null),
+        ("11b", Round2, 12.6m, 2.4m, true, null),
+        ("12a", Round2, 10.4m, 2.6m, true, null),
+        ("12b", Round2, 12.6m, 3.9m, true, null),
+        ("13a", Round2, 10.4m, 6.2m, true, null),
+        ("13b", Round2, 12.6m, 6.3m, true, null),
+        ("14a", Round2, 10.4m, 7.7m, true, "Under the tree"),
+        ("14b", Round2, 12.6m, 7.7m, true, null),
+    };
+
     public static async Task SeedAsync(ApplicationDbContext context, ILogger logger)
     {
-        logger.LogInformation("Seeding tables...");
+        var defaultPlanId = await context.FloorPlans
+            .Where(p => p.IsDefault)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync();
 
-        // Layout based on actual restaurant floor plan
-        // Canvas size: 600x500 pixels
-        // Indoor tables (1-10): Circle shape, 4 guests
-        // Outdoor tables (11a-14b): Square shape, 2 guests each
-
-        var tables = new List<Table>
+        var tables = Layout.Select(row =>
         {
-            // ========== INDOOR TABLES (1-10) - Circle Shape ==========
-
-            // Table 1
-            new Table
+            var preset = Presets[row.Preset];
+            return new Table
             {
-                TableNumber = "1",
-                MaxGuests = 4,
+                TableNumber = row.Number,
+                MaxGuests = preset.Seats,
                 IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 80,
-                PositionY = 40,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
+                IsOutdoor = row.Outdoor,
+                Shape = preset.Shape,
+                PositionX = row.X,
+                PositionY = row.Y,
+                Width = preset.W,
+                Height = preset.H,
+                Rotation = 0,
+                Notes = row.Note,
+                FloorPlanId = defaultPlanId,
+                CreatedBy = "System",
+            };
+        }).ToList();
 
-            // Table 2
-            new Table
-            {
-                TableNumber = "2",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 160,
-                PositionY = 40,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
+        var existingNumbers = await context.Tables
+            .Select(t => t.TableNumber)
+            .ToListAsync();
 
-            // Table 3
-            new Table
-            {
-                TableNumber = "3",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 40,
-                PositionY = 120,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
+        var toAdd = existingNumbers.Count == 0
+            ? tables
+            : tables.Where(t => !existingNumbers.Contains(t.TableNumber)).ToList();
 
-            // Table 4
-            new Table
-            {
-                TableNumber = "4",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 40,
-                PositionY = 180,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // Table 5
-            new Table
-            {
-                TableNumber = "5",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 40,
-                PositionY = 240,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // Table 6
-            new Table
-            {
-                TableNumber = "6",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 40,
-                PositionY = 320,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // Table 7
-            new Table
-            {
-                TableNumber = "7",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 140,
-                PositionY = 160,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // Table 8
-            new Table
-            {
-                TableNumber = "8",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 140,
-                PositionY = 220,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // Table 9
-            new Table
-            {
-                TableNumber = "9",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 260,
-                PositionY = 120,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // Table 10
-            new Table
-            {
-                TableNumber = "10",
-                MaxGuests = 4,
-                IsActive = true,
-                IsOutdoor = false,
-                Shape = "circle",
-                PositionX = 260,
-                PositionY = 180,
-                Width = 100,
-                Height = 100,
-                CreatedBy = "System"
-            },
-
-            // ========== OUTDOOR TABLES (11a-14b) - Square Shape ==========
-
-            // Tables 11a & 11b
-            new Table
-            {
-                TableNumber = "11a",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 100,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            new Table
-            {
-                TableNumber = "11b",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 160,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            // Tables 12a & 12b
-            new Table
-            {
-                TableNumber = "12a",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 220,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            new Table
-            {
-                TableNumber = "12b",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 280,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            // Tables 13a & 13b
-            new Table
-            {
-                TableNumber = "13a",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 340,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            new Table
-            {
-                TableNumber = "13b",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 400,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            // Tables 14a & 14b
-            new Table
-            {
-                TableNumber = "14a",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 460,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            },
-
-            new Table
-            {
-                TableNumber = "14b",
-                MaxGuests = 2,
-                IsActive = true,
-                IsOutdoor = true,
-                Shape = "square",
-                PositionX = 520,
-                PositionY = 400,
-                Width = 60,
-                Height = 60,
-                CreatedBy = "System"
-            }
-        };
-
-        // Check if tables already exist
-        var existingTables = await context.Tables.ToListAsync();
-
-        if (existingTables.Any())
+        if (toAdd.Count > 0)
         {
-            // Tables already exist, only add missing ones (don't overwrite user customizations)
-            var missingTables = tables.Where(t => !existingTables.Any(e => e.TableNumber == t.TableNumber)).ToList();
-
-            if (missingTables.Any())
-            {
-                logger.LogInformation("Adding {Count} missing tables...", missingTables.Count);
-                await context.Tables.AddRangeAsync(missingTables);
-                await context.SaveChangesAsync();
-                logger.LogInformation($"Successfully added {missingTables.Count} missing tables");
-            }
-            else
-            {
-                logger.LogInformation("All tables already exist. Skipping seeding to preserve user customizations.");
-            }
-        }
-        else
-        {
-            // First time seeding - insert all default tables
-            await context.Tables.AddRangeAsync(tables);
+            await context.Tables.AddRangeAsync(toAdd);
             await context.SaveChangesAsync();
-            logger.LogInformation($"Successfully seeded {tables.Count} tables");
         }
+
+        logger.LogInformation(
+            "Table seeding complete: {Added} added, {Existing} already present.",
+            toAdd.Count, existingNumbers.Count);
     }
 }
