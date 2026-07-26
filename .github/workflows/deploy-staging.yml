@@ -60,6 +60,13 @@ jobs:
           # way). 5m fits inside command_timeout: 18m.
           # Scoped `pull backend` + `up -d backend` recreates only
           # the backend (its :staging digest moved); every other service keeps running.
+          # The tenant refresh rides the SAME lock acquisition, not a second one: a
+          # separate flock would re-queue behind the frontend/demo rolls and could
+          # interleave a tenant pull with them. It refreshes every managed:scripts
+          # tenant on this box pinned to backend_tag=staging (today: demo, which
+          # otherwise only rolls when the FRONTEND builds — deploy #52). The `-x`
+          # guard keeps this deploy green on a box that has not yet rsynced the
+          # script; drop the guard once both boxes are past that release.
           script: |
-            flock -w 300 /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && docker compose -f docker-compose.prod.yml pull backend && docker compose -f docker-compose.prod.yml up -d backend && docker image prune -f" \
+            flock -w 300 /tmp/rumi-deploy.lock -c "cd /opt/rumi/deploy && docker compose -f docker-compose.prod.yml pull backend && docker compose -f docker-compose.prod.yml up -d backend && if [ -x ./refresh-tenant-images.sh ]; then ./refresh-tenant-images.sh backend staging; else echo 'note: refresh-tenant-images.sh not on this box yet — skipping tenant refresh'; fi && docker image prune -f" \
               || { echo "::error::timed out after 5m waiting for the RUMI deploy lock — this deploy did NOT run; re-run the job"; exit 1; }
