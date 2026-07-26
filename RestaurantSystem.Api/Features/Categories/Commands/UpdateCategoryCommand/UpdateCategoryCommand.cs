@@ -12,7 +12,12 @@ public record UpdateCategoryCommand(
     string Name,
     string? Description,
     bool IsActive,
-    int DisplayOrder
+    // NOTE: DisplayOrder is accepted but deliberately NOT assigned by this handler —
+    // ReorderCategoriesCommand owns ordering. Left as-is to avoid clobbering a tenant's order
+    // from an unrelated edit; the dead parameter is tracked as follow-up debt.
+    int DisplayOrder,
+    // OrderChannels bitmask; null = every order type. Written by the admin channel matrix.
+    int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<CategoryDto>>;
 
 public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryCommand, ApiResponse<CategoryDto>>
@@ -55,6 +60,7 @@ public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryComman
         category.Name = command.Name;
         category.Description = command.Description;
         category.IsActive = command.IsActive;
+        category.AvailableOrderTypes = command.AvailableOrderTypes;
         category.UpdatedAt = DateTime.UtcNow;
         category.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -68,6 +74,7 @@ public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryComman
             ImageUrl = category.ImageUrl,
             IsActive = category.IsActive,
             DisplayOrder = category.DisplayOrder,
+            AvailableOrderTypes = category.AvailableOrderTypes,
             ProductCount = category.ProductCategories.Count(pc => !pc.Product.IsDeleted && pc.Product.IsActive),
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt

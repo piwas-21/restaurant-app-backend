@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Api.Common.Utilities;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -25,7 +25,12 @@ public record GetProductsQuery(
     // both Type and ExcludeType still win over it. Non-nullable unlike the sibling
     // filters: those are tri-state (null = don't filter on it), this is a binary
     // opt-in where false and "omitted" mean the same thing.
-    bool IncludeMenus = false
+    bool IncludeMenus = false,
+    // The channel the guest is ordering through. Does NOT filter the list — blocked items stay
+    // visible so the customer sees "Dürüm is takeaway & delivery only" instead of a hole in the
+    // menu. It only resolves each row's `Availability`. Null (no type chosen yet, the dominant
+    // browse state) reports everything as orderable and still fills AllowedOrderTypes for the chip.
+    OrderType? RequestedOrderType = null
 ) : IQuery<ApiResponse<PagedResult<ProductSummaryDto>>>;
 
 public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiResponse<PagedResult<ProductSummaryDto>>>
@@ -108,75 +113,9 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
         .Take(query.PageSize)
         .ToListAsync(cancellationToken);
 
-        var productDtos = products.Select(p =>
-        {
-            var dto = new ProductSummaryDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                BasePrice = p.BasePrice,
-                IsActive = p.IsActive,
-                IsAvailable = p.IsAvailable,
-                IsSpecial = p.IsSpecial,
-                Type = p.Type,
-                Allergens = p.Allergens,
-                Ingredients = p.Ingredients,
-                DetailedIngredients = new List<ProductIngredientDto>(),
-                Images = p.Images.Select(s => new ProductImageDto
-                {
-                    Id = s.Id,
-                    Url = UrlJoin.Join(_baseUrl, s.Url),
-                    IsPrimary = s.IsPrimary,
-                    SortOrder = s.SortOrder,
-                    AltText = s.AltText
-                }).ToList(),
-                CategoryNames = p.ProductCategories.Select(pc => pc.Category.Name).ToList(),
-                PrimaryCategoryName = p.ProductCategories
-                    .Where(pc => pc.IsPrimary)
-                    .Select(pc => pc.Category.Name)
-                    .FirstOrDefault(),
-                VariationCount = p.Variations.Count,
-                Variations = p.Variations
-                    .Where(v => v.IsActive)
-                    .OrderBy(v => v.DisplayOrder)
-                    .Select(v => new ProductVariationDto
-                    {
-                        Id = v.Id,
-                        Name = v.Name,
-                        Description = v.Description,
-                        PriceModifier = v.PriceModifier,
-                        IsActive = v.IsActive,
-                        DisplayOrder = v.DisplayOrder,
-                        Content = v.Descriptions
-                            .GroupBy(d => d.LanguageCode)
-                            .Select(g => g.First())
-                            .ToDictionary(
-                                d => d.LanguageCode,
-                                d => new ProductVariationContentDto
-                                {
-                                    Name = d.Name,
-                                    Description = d.Description
-                                }
-                            )
-                    })
-                    .ToList(),
-                SuggestedSideItems = new List<SideItemDto>(),
-                Content = new() // Initialize Content dictionary
-            };
-
-            // Fill Content from Descriptions
-            foreach (var description in p.Descriptions)
-            {
-                dto.Content[description.Lang] = new ProductDescriptionDto
-                {
-                    Name = description.Name,
-                    Description = description.Description
-                };
-            }
-
-            return dto;
-        }).ToList();
+        var productDtos = products
+            .Select(p => ProductSummaryMapper.MapToSummaryDto(p, _baseUrl, query.RequestedOrderType))
+            .ToList();
 
 
 
