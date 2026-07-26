@@ -21,6 +21,14 @@ public class Product : SoftDeleteEntity
     public List<string>? Allergens { get; set; } // JSON array of allergens
     public int DisplayOrder { get; set; }
 
+    /// <summary>
+    /// The <see cref="Common.Enums.OrderChannels"/> bitmask this product may be ordered through.
+    /// <c>null</c> = INHERIT from the primary category (which may itself be null = every channel).
+    /// Inheritance is all-or-nothing: a product either inherits fully or overrides fully.
+    /// Always read via <see cref="Common.OrderChannelMap"/> — never cast.
+    /// </summary>
+    public int? AvailableOrderTypes { get; set; }
+
     // Navigation properties
     public virtual ICollection<ProductImage> Images { get; set; } = [];
     public virtual ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();

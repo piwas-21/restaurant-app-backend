@@ -30,7 +30,10 @@ public record UpdateProductCommand(
     List<Guid>? SuggestedSideItemIds,
     List<ProductIngredientDto>? DetailedIngredients,
     MenuDefinitionDto? MenuDefinition,
-    ProductDescriptionsDto? Content
+    ProductDescriptionsDto? Content,
+    // OrderChannels bitmask; null = INHERIT from the primary category. Optional so existing
+    // clients keep working (they inherit, which is the pre-feature behaviour).
+    int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -94,6 +97,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         product.BasePrice = command.BasePrice;
         product.IsActive = command.IsActive;
         product.IsAvailable = command.IsAvailable;
+        product.AvailableOrderTypes = command.AvailableOrderTypes;
         product.IsSpecial = command.IsSpecial;
         product.PreparationTimeMinutes = command.PreparationTimeMinutes;
         product.Type = command.Type;

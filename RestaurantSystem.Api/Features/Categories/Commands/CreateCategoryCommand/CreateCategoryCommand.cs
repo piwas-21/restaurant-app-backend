@@ -12,7 +12,10 @@ public record CreateCategoryCommand(
     string Name,
     string? Description,
     bool IsActive,
-    int DisplayOrder
+    int DisplayOrder,
+    // OrderChannels bitmask; null = available on every order type (the default, so existing
+    // clients that omit it are unrestricted). Written by the admin channel matrix.
+    int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<CategoryDto>>;
 
 public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryCommand, ApiResponse<CategoryDto>>
@@ -51,6 +54,7 @@ public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryComman
         {
             Id = Guid.NewGuid(),
             Name = command.Name,
+            AvailableOrderTypes = command.AvailableOrderTypes,
             Description = command.Description,
             IsActive = command.IsActive,
             DisplayOrder = max + 1,
@@ -68,6 +72,7 @@ public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryComman
             Description = category.Description,
             IsActive = category.IsActive,
             DisplayOrder = category.DisplayOrder,
+            AvailableOrderTypes = category.AvailableOrderTypes,
             ProductCount = 0,
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt

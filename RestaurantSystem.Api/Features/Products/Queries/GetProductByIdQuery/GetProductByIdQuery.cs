@@ -3,12 +3,16 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 
-public record GetProductByIdQuery(Guid Id) : IQuery<ApiResponse<ProductDto>>;
+// RequestedOrderType resolves the item's `Availability` for the guest's channel; null (no type
+// chosen yet) reports it as orderable and still fills AllowedOrderTypes for the chip.
+public record GetProductByIdQuery(Guid Id, OrderType? RequestedOrderType = null) : IQuery<ApiResponse<ProductDto>>;
 
 public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, ApiResponse<ProductDto>>
 {
@@ -55,6 +59,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
 
         var productDto = new ProductDto
         {
+            Availability = OrderTypeAvailability.Resolve(product, query.RequestedOrderType),
+            AvailableOrderTypes = product.AvailableOrderTypes,
             Id = product.Id,
             Name = product.Name,
             Description = product.Description,
@@ -138,7 +144,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     Description = pc.Category.Description,
                     ImageUrl = pc.Category.ImageUrl,
                     IsActive = pc.Category.IsActive,
-                    DisplayOrder = pc.Category.DisplayOrder
+                    DisplayOrder = pc.Category.DisplayOrder,
+                    AvailableOrderTypes = pc.Category.AvailableOrderTypes
                 })
                 .FirstOrDefault(),
             Variations = product.Variations

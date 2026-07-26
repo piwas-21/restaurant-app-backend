@@ -29,7 +29,10 @@ public record CreateProductCommand(
     List<Guid>? SuggestedSideItemIds,
     List<ProductIngredientDto>? DetailedIngredients,
 
-    ProductDescriptionsDto Content
+    ProductDescriptionsDto Content,
+    // OrderChannels bitmask; null = INHERIT from the primary category. Optional so existing
+    // clients keep working (they inherit, which is the pre-feature behaviour).
+    int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -88,6 +91,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 IsActive = command.IsActive,
                 IsSpecial = command.IsSpecial,
                 IsAvailable = command.IsAvailable,
+                AvailableOrderTypes = command.AvailableOrderTypes,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,
                 Type = command.Type,
                 KitchenType = command.KitchenType,

@@ -1,4 +1,7 @@
-﻿namespace RestaurantSystem.Api.Features.Categories.Dtos;
+﻿using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Common.Enums;
+
+namespace RestaurantSystem.Api.Features.Categories.Dtos;
 
 public record CategoryDto
 {
@@ -11,4 +14,22 @@ public record CategoryDto
     public int ProductCount { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
+
+    /// <summary>
+    /// The raw <c>OrderChannels</c> mask (<c>null</c> = every channel). The admin channel matrix
+    /// writes this; products in the category inherit it unless they override.
+    /// </summary>
+    public int? AvailableOrderTypes { get; init; }
+
+    /// <summary>
+    /// The order types this category permits, expanded from <see cref="AvailableOrderTypes"/> so
+    /// clients never decode the mask themselves. Unrestricted categories list all three.
+    /// </summary>
+    /// <remarks>
+    /// Computed rather than assigned so each of the six <c>CategoryDto</c> projections only has to
+    /// set the mask — one EF-translatable field. <c>GetCategoriesQuery</c> builds its DTO inside a
+    /// server-side <c>.Select()</c> (it counts products in SQL), where a call to
+    /// <c>OrderChannelMap</c> could not be translated.
+    /// </remarks>
+    public IReadOnlyList<OrderType> AllowedOrderTypes => OrderChannelMap.ToOrderTypes(AvailableOrderTypes);
 }

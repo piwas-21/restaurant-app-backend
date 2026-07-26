@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.CreateProductCommand;
@@ -31,7 +32,9 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             .NotEmpty().WithMessage("At least one category must be selected")
             .Must(x => x.Distinct().Count() == x.Count).WithMessage("Duplicate categories are not allowed");
 
+        // Required, not just valid-when-present (ORDER-TYPE-AVAILABILITY-PLAN §3.4).
         RuleFor(x => x.PrimaryCategoryId)
+            .NotNull().WithMessage("A primary category is required")
             .Must((command, primaryCategoryId) =>
                 !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
             .WithMessage("Primary category must be one of the selected categories");
@@ -52,5 +55,6 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
         RuleFor(x => x.SuggestedSideItemIds)
             .Must(x => x == null || x.Distinct().Count() == x.Count)
             .WithMessage("Duplicate side items are not allowed");
+        RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
     }
 }

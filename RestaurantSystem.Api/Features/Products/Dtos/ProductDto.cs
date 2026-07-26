@@ -1,4 +1,5 @@
-﻿using RestaurantSystem.Api.Features.Categories.Dtos;
+﻿using RestaurantSystem.Api.Features.Catalog.Dtos;
+using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
@@ -30,4 +31,12 @@ public record ProductDto
     public List<SideItemDto> SuggestedSideItems { get; init; } = [];
     public MenuDefinitionDto? MenuDefinition { get; init; }
 
+    /// <summary>Resolved per-order-type availability. Additive.</summary>
+    public ItemAvailabilityDto Availability { get; init; } = new();
+
+    /// <summary>
+    /// The raw <c>OrderChannels</c> mask stored on the item (<c>null</c> = inherit from the primary
+    /// category). Admin editors need the stored value; customers read <see cref="Availability"/>.
+    /// </summary>
+    public int? AvailableOrderTypes { get; init; }
 }

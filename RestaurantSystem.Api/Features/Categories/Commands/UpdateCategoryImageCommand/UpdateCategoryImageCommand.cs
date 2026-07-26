@@ -105,6 +105,7 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
                 ImageUrl = UrlJoin.Join(_configuration["AWS:S3:BaseUrl"], category.ImageUrl),
                 IsActive = category.IsActive,
                 DisplayOrder = category.DisplayOrder,
+                AvailableOrderTypes = category.AvailableOrderTypes,
                 ProductCount = category.ProductCategories.Count(pc => !pc.Product.IsDeleted && pc.Product.IsActive),
                 CreatedAt = category.CreatedAt,
                 UpdatedAt = category.UpdatedAt

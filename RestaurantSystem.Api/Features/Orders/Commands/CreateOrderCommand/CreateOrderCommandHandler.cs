@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -23,6 +24,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderTableReservationService _tableReservation;
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderNotificationService _notifications;
+    private readonly IOrderChannelGuard _channelGuard;
+    private readonly IOrderNumberGenerator _orderNumbers;
 
     public CreateOrderCommandHandler(
         ApplicationDbContext context,
@@ -35,10 +38,14 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderTableReservationService tableReservation,
         IOrderFidelityCoordinator fidelity,
         IOrderNotificationService notifications,
+        IOrderChannelGuard channelGuard,
+        IOrderNumberGenerator orderNumbers,
         ILogger<CreateOrderCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _channelGuard = channelGuard;
+        _orderNumbers = orderNumbers;
         _mappingService = mappingService;
         _addressFactory = addressFactory;
         _itemFactory = itemFactory;
@@ -56,7 +63,9 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
         try
         {
-            var orderNumber = await GenerateOrderNumber(cancellationToken);
+            await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
+
+            var orderNumber = await _orderNumbers.GenerateAsync(cancellationToken);
             var userId = command.UserId ?? _currentUserService.UserId;
             var auditId = _currentUserService.GetAuditIdentifier();
             var now = DateTime.UtcNow;
@@ -175,24 +184,4 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         }
     }
 
-    private async Task<string> GenerateOrderNumber(CancellationToken cancellationToken)
-    {
-        var date = DateTime.UtcNow.ToString("yyyyMMdd");
-        var lastOrder = await _context.Orders
-            .Where(o => o.OrderNumber.StartsWith(date))
-            .OrderByDescending(o => o.OrderNumber)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        int sequence = 1;
-        if (lastOrder != null)
-        {
-            var lastSequence = lastOrder.OrderNumber.Substring(8);
-            if (int.TryParse(lastSequence, out var seq))
-            {
-                sequence = seq + 1;
-            }
-        }
-
-        return $"{date}{sequence:D4}";
-    }
 }
