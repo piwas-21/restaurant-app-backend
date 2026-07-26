@@ -41,6 +41,9 @@ public class ExceptionHandlingMiddleware
 
         HttpStatusCode statusCode;
         string message;
+        // Set only by exceptions that carry a stable discriminator; null leaves ErrorCode off the
+        // wire entirely (JsonIgnore-when-null on ApiResponse.ErrorCode).
+        string? errorCode = null;
 
         // Determine status code and message based on exception type
         switch (exception)
@@ -68,9 +71,10 @@ public class ExceptionHandlingMiddleware
                 message = exception.Message;
                 break;
 
-            case BadRequestException:
+            case BadRequestException badRequestEx:
                 statusCode = HttpStatusCode.BadRequest;
                 message = exception.Message;
+                errorCode = badRequestEx.ErrorCode;
                 break;
 
             case NotFoundException:
@@ -97,10 +101,10 @@ public class ExceptionHandlingMiddleware
                 break;
         }
 
-        var response = ApiResponse<object>.Failure(
-            _environment.IsDevelopment() ? exception.ToString() : message,
-            message
-        );
+        var detail = _environment.IsDevelopment() ? exception.ToString() : message;
+        var response = errorCode is null
+            ? ApiResponse<object>.Failure(detail, message)
+            : ApiResponse<object>.FailureWithCode(detail, errorCode, message);
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;

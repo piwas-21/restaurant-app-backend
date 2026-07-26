@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
@@ -26,9 +27,11 @@ public static class BasketChannelGuard
     /// state, which is deliberately permissive so pre-pick adds keep working.
     /// </param>
     /// <remarks>
-    /// The message names the channels the item IS available on, because the client turns it into
-    /// "Dürüm is takeaway &amp; delivery only" plus a one-tap switch. A bare "not available" would
-    /// destroy the point of the feature.
+    /// The message names the channels the item IS available on, because the client re-displays it
+    /// verbatim — a bare "not available" would destroy the point of the feature. It is tagged with
+    /// <see cref="ErrorCodes.OrderTypeNotAvailable"/> so the client can tell THIS rejection apart
+    /// from every other 400 on the endpoint ("Session ID is required", the generic "Validation
+    /// failed" wrapper, an incidental EF message) without substring-matching English prose.
     /// <para>
     /// Requires <c>ProductCategories → Category</c> to be loaded for inheritance to resolve; an
     /// unloaded collection reads as unrestricted (permissive), never as blocked.
@@ -49,6 +52,7 @@ public static class BasketChannelGuard
 
         var allowed = string.Join(", ", OrderChannelMap.ToOrderTypes(mask));
         throw new BadRequestException(
-            $"{product.Name} is not available for {basketOrderType}. Available for: {allowed}.");
+            $"{product.Name} is not available for {basketOrderType}. Available for: {allowed}.",
+            ErrorCodes.OrderTypeNotAvailable);
     }
 }
