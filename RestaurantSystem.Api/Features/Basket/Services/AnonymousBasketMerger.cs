@@ -1,7 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Basket.Services;
@@ -33,17 +36,20 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
     private readonly IBasketRepository _basketRepository;
     private readonly IBasketMappingService _basketMappingService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<AnonymousBasketMerger> _logger;
 
     public AnonymousBasketMerger(
         ApplicationDbContext context,
         IBasketRepository basketRepository,
         IBasketMappingService basketMappingService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        ILogger<AnonymousBasketMerger> logger)
     {
         _context = context;
         _basketRepository = basketRepository;
         _basketMappingService = basketMappingService;
         _currentUserService = currentUserService;
+        _logger = logger;
     }
 
     public async Task<BasketDto> MergeAsync(string sessionId, Guid userId)
@@ -140,11 +146,67 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         anonymousBasket.DeletedAt = DateTime.UtcNow;
         anonymousBasket.DeletedBy = _currentUserService.GetAuditIdentifier();
 
+        await ResetOrderTypeIfMergedItemsConflictAsync(userBasket);
+
         await _context.SaveChangesAsync();
         await _basketRepository.RecalculateTotalsAsync(userBasket.Id);
 
         return await MapByUserAsync(userId)
             ?? throw new BadRequestException("Failed to retrieve basket");
+    }
+
+    /// <summary>
+    /// Merging re-homes rows by direct assignment, so it bypasses the add-to-basket channel guard —
+    /// a Takeaway anonymous basket merging into a DineIn user basket could land lines that are
+    /// invalid for the surviving channel (ORDER-TYPE-AVAILABILITY-PLAN G11).
+    /// </summary>
+    /// <remarks>
+    /// The rule: never drop a line (the guest chose it) and never keep an invalid line under a
+    /// channel. So on conflict the CHANNEL is cleared instead — the guest re-picks, and the normal
+    /// two-phase switch (IBasketChannelService) then shows a proper itemized confirm. Clearing a
+    /// channel is always safe: null is the permissive browse state.
+    /// </remarks>
+    private async Task ResetOrderTypeIfMergedItemsConflictAsync(Domain.Entities.Basket userBasket)
+    {
+        if (userBasket.OrderType is null)
+        {
+            return;
+        }
+
+        var productIds = userBasket.Items
+            .Where(i => i.ParentBasketItemId is null && i.ProductId.HasValue)
+            .Select(i => i.ProductId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (productIds.Count == 0)
+        {
+            return;
+        }
+
+        var products = await _context.Products
+            .AsNoTracking()
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
+            .Where(p => productIds.Contains(p.Id))
+            .ToListAsync();
+
+        var conflicting = products
+            .Where(p => !OrderChannelMap.Allows(
+                OrderTypeAvailability.EffectiveMask(p), userBasket.OrderType.Value))
+            .Select(p => p.Name)
+            .ToList();
+
+        if (conflicting.Count == 0)
+        {
+            return;
+        }
+
+        _logger.LogInformation(
+            "Cleared order type {OrderType} on merged basket {BasketId}: {Count} line(s) unavailable ({Names})",
+            userBasket.OrderType, userBasket.Id, conflicting.Count, string.Join(", ", conflicting));
+
+        userBasket.OrderType = null;
     }
 
     // Re-loads the user's basket with the full item graph (FindBasketAsync) and maps it.

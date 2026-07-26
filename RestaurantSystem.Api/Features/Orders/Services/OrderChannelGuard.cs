@@ -1,0 +1,90 @@
+using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Api.Features.Orders.Interfaces;
+using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Infrastructure.Persistence;
+
+namespace RestaurantSystem.Api.Features.Orders.Services;
+
+/// <summary>
+/// Final enforcement of per-order-type availability at order creation — the last line of defence.
+/// </summary>
+/// <remarks>
+/// Needed independently of the basket guard because the waiter flow (<c>createServerOrder</c>) posts
+/// items straight to <c>POST /api/Orders</c> and never touches a basket, and because a stale tab or
+/// tampered payload must not be able to create an unfulfillable order.
+/// <para>
+/// Staff get <b>warn-and-allow</b>, not a block: a waiter genuinely does need to plate a
+/// takeaway-only item for a guest at a table, and hard-blocking them would earn a support ticket in
+/// week one. Any authenticated staff account qualifies (not role-gated beyond "not a Customer") —
+/// the override is recorded, not restricted.
+/// </para>
+/// </remarks>
+public class OrderChannelGuard : IOrderChannelGuard
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<OrderChannelGuard> _logger;
+
+    public OrderChannelGuard(
+        ApplicationDbContext context,
+        ICurrentUserService currentUserService,
+        ILogger<OrderChannelGuard> logger)
+    {
+        _context = context;
+        _currentUserService = currentUserService;
+        _logger = logger;
+    }
+
+    public async Task EnsureOrderableAsync(
+        IReadOnlyCollection<Guid> productIds,
+        OrderType orderType,
+        CancellationToken cancellationToken = default)
+    {
+        if (productIds.Count == 0)
+        {
+            return;
+        }
+
+        var products = await _context.Products
+            .AsNoTracking()
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
+            .Where(p => productIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+
+        var blocked = products
+            .Where(p => !OrderChannelMap.Allows(OrderTypeAvailability.EffectiveMask(p), orderType))
+            .ToList();
+
+        if (blocked.Count == 0)
+        {
+            return;
+        }
+
+        var names = string.Join(", ", blocked.Select(p => p.Name));
+
+        if (IsStaff())
+        {
+            // Recorded via structured logging so the override is auditable. Persisting a flag on the
+            // Order itself is tracked as follow-up (it needs its own migration).
+            _logger.LogWarning(
+                "STAFF ORDER-TYPE OVERRIDE by user {UserId} (role {Role}): {Count} item(s) not available "
+                + "for {OrderType} were accepted ({Names})",
+                _currentUserService.UserId, _currentUserService.Role, blocked.Count, orderType, names);
+            return;
+        }
+
+        throw new BadRequestException(
+            $"Not available for {orderType}: {names}. Please change your order type or remove these items.");
+    }
+
+    // Any authenticated non-Customer account is staff. Role is null for anonymous callers.
+    private bool IsStaff() =>
+        _currentUserService.IsAuthenticated
+        && _currentUserService.Role is not null
+        && _currentUserService.Role != UserRole.Customer;
+}

@@ -24,6 +24,7 @@ using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Services;
+using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields.Services;
@@ -430,6 +431,9 @@ builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>(
 builder.Services.AddScoped<IBasketMappingService, BasketMappingService>();
 builder.Services.AddScoped<IBasketItemFactory, BasketItemFactory>();
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();
+builder.Services.AddScoped<IBasketChannelService, BasketChannelService>();
+builder.Services.AddScoped<IOrderChannelGuard, OrderChannelGuard>();
+builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
