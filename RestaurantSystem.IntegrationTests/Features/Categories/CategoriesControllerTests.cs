@@ -206,6 +206,94 @@ public class CategoriesControllerTests : IntegrationTestBase
         updated.Data.IsActive.Should().BeFalse();
     }
 
+    // Attach a product to a category through a SEPARATE scope/DbContext on purpose: seeding via the
+    // same context would let change-tracker fix-up populate `pc.Product` and mask the very bug these
+    // tests exist for. `Id` is set explicitly because the product and its link are saved together.
+    private async Task AttachProductAsync(Guid categoryId, string productName, decimal price)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = productName,
+            BasePrice = price,
+            IsActive = true,
+            IsAvailable = true,
+            CreatedBy = "integration-test"
+        };
+        db.Products.Add(product);
+        db.ProductCategories.Add(new ProductCategory
+        {
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            CategoryId = categoryId,
+            IsPrimary = true,
+            CreatedBy = "integration-test"
+        });
+        await db.SaveChangesAsync();
+    }
+
+    // Regression: updating a category that HAS PRODUCTS used to 500.
+    //
+    // The response's ProductCount dereferences `pc.Product` in memory after materialisation, and the
+    // handler included ProductCategories without ThenInclude(pc => pc.Product) — with lazy loading
+    // off, the navigation was null and the Count lambda threw a NullReferenceException.
+    //
+    // It survived because every existing update test creates a BRAND-NEW, EMPTY category: with no
+    // ProductCategories rows the lambda never runs, so the null is never dereferenced. Only a
+    // category with at least one product reaches the bug — which is every real one, so in practice
+    // the admin could not rename a category, toggle it, or save the order-type channel matrix
+    // (ORDER-TYPE-AVAILABILITY-PLAN §9.1's surface) against live data at all.
+    [Fact]
+    public async Task UpdateCategory_WithProducts_Succeeds_AndReportsProductCount()
+    {
+        AuthenticateAsAdmin();
+        var created = await ReadResponseAsync<ApiResponse<CategoryDto>>(
+            await PostAsJsonAsync("/api/categories", new CreateCategoryCommand("Populated QA", null, true, 30)));
+        var categoryId = created!.Data!.Id;
+
+        // Attach a product directly: the point is the category's read-back projection, not the
+        // product-creation contract.
+        await AttachProductAsync(categoryId, "Populated QA Product", 9.5m);
+
+        var update = new UpdateCategoryCommand(categoryId, "Populated QA Renamed", "still has a product", true, 30);
+        var response = await PutAsJsonAsync($"/api/categories/{categoryId}", update);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await ReadResponseAsync<ApiResponse<CategoryDto>>(response);
+        updated!.Success.Should().BeTrue();
+        updated.Data!.Name.Should().Be("Populated QA Renamed");
+        // The very projection that used to throw.
+        updated.Data.ProductCount.Should().Be(1);
+    }
+
+    // NOTE: this exercises `UpdateCategoryCommand`, NOT the image handler. `UpdateCategoryImageCommand`
+    // carries the identical defect and the identical fix, but is corrected BY INSPECTION and has no
+    // test: its route is a multipart PUT and the NRE sits after a real image is stored, so covering
+    // it means the suite's first multipart upload through image validation. Tracked as follow-up —
+    // do not read the fix below as evidence for that handler.
+    [Fact]
+    public async Task UpdateCategory_WithProducts_PreservesOrderTypeMask()
+    {
+        AuthenticateAsAdmin();
+        var created = await ReadResponseAsync<ApiResponse<CategoryDto>>(
+            await PostAsJsonAsync("/api/categories", new CreateCategoryCommand("Channel QA", null, true, 31, 6)));
+        var categoryId = created!.Data!.Id;
+        created.Data.AvailableOrderTypes.Should().Be(6);
+
+        await AttachProductAsync(categoryId, "Channel QA Product", 11m);
+
+        // A rename that ECHOES the mask must keep it — the §9.1 contract, now on a populated
+        // category so the 500 cannot mask the assertion.
+        var update = new UpdateCategoryCommand(categoryId, "Channel QA Renamed", null, true, 31, 6);
+        var response = await PutAsJsonAsync($"/api/categories/{categoryId}", update);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await ReadResponseAsync<ApiResponse<CategoryDto>>(response);
+        updated!.Data!.AvailableOrderTypes.Should().Be(6);
+    }
+
     [Fact]
     public async Task UpdateCategory_IdMismatch_ReturnsBadRequest()
     {

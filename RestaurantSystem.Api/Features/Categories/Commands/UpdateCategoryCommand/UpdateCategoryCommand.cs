@@ -39,8 +39,15 @@ public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryComman
 
     public async Task<ApiResponse<CategoryDto>> Handle(UpdateCategoryCommand command, CancellationToken cancellationToken)
     {
+        // ThenInclude is load-bearing, not tidiness: the response's ProductCount dereferences
+        // `pc.Product` AFTER materialisation, in memory. Lazy loading is off, so without this the
+        // navigation is null and every update of a category that has at least one product threw a
+        // NullReferenceException — a 500 on the admin's rename, active-toggle AND the order-type
+        // channel matrix, i.e. on every real category. A category with NO products succeeded,
+        // because the Count lambda then never ran, which is why this survived so long.
         var category = await _context.Categories
             .Include(c => c.ProductCategories)
+                .ThenInclude(pc => pc.Product)
             .FirstOrDefaultAsync(c => c.Id == command.Id && !c.IsDeleted, cancellationToken);
 
         if (category == null)
