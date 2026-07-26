@@ -74,12 +74,12 @@ public class AddToBasketCommandHandler : ICommandHandler<AddToBasketCommand, Api
             return ApiResponse<BasketDto>.Failure(ex.Message);
         }
 
-        // NOTE: the bare `catch (Exception)` that used to sit here was removed deliberately. It
-        // turned every failure into HTTP 200 + success:false AND replaced the message with a generic
-        // string — so a BadRequestException from BasketChannelGuard ("Dürüm is not available for
-        // DineIn. Available for: Takeaway, Delivery.") was swallowed, destroying the actionable
-        // reason this feature exists to deliver. Domain exceptions now reach the exception
-        // middleware, which maps them to their proper status codes (400/403/404), and genuinely
-        // unexpected exceptions surface as 500 instead of masquerading as a handled failure.
+        // NOTE: there is deliberately no catch-all handler for Exception below this point. The one
+        // that used to sit here turned every failure into HTTP 200 plus success:false AND replaced
+        // the message with a generic string, so the channel guard's rejection reason — "Dürüm is
+        // not available for DineIn. Available for: Takeaway, Delivery." — was swallowed, destroying
+        // the actionable message this feature exists to deliver. Domain exceptions now reach the
+        // exception middleware, which maps them to their proper status codes, and genuinely
+        // unexpected ones surface as 500 instead of masquerading as a handled failure.
     }
 }

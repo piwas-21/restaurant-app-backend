@@ -38,16 +38,7 @@ public static class OrderChannelMap
     /// <summary>The order types present in a mask, in <see cref="OrderType"/> declaration order.</summary>
     public static IReadOnlyList<OrderType> ToOrderTypes(OrderChannels channels)
     {
-        var result = new List<OrderType>(3);
-        foreach (var orderType in AllOrderTypes)
-        {
-            if (channels.HasFlag(From(orderType)))
-            {
-                result.Add(orderType);
-            }
-        }
-
-        return result;
+        return AllOrderTypes.Where(orderType => channels.HasFlag(From(orderType))).ToList();
     }
 
     /// <summary>

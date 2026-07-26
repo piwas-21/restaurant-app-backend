@@ -188,8 +188,13 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         // already validated by BasketChannelGuard when it was added, so the check would be a no-op
         // for exactly the scenario it exists to catch.
         var productIds = rehomed
-            .Where(i => i.ParentBasketItemId is null && i.ProductId.HasValue)
-            .Select(i => i.ProductId!.Value)
+            .Where(i => i.ParentBasketItemId is null)
+            // OfType filters the nulls AND unwraps in one step. The obvious
+            // `.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value)` needs a
+            // null-forgiving operator, because C# flow analysis does not carry the Where's
+            // guarantee across the Select's lambda boundary.
+            .Select(i => i.ProductId)
+            .OfType<Guid>()
             .Distinct()
             .ToList();
 

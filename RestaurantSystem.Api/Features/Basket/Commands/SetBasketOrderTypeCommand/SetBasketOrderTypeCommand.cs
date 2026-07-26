@@ -23,10 +23,16 @@ public record SetBasketOrderTypeCommand : ICommand<ApiResponse<BasketChannelSwit
     public OrderType OrderType { get; set; }
 
     /// <summary>
-    /// Opt in to removing forbidden lines. Leave false on the first call to get the conflict list
-    /// without changing anything, then repeat with true once the guest confirms.
+    /// Opt in to removing forbidden lines. Omit (or send false) on the first call to get the
+    /// conflict list without changing anything, then repeat with true once the guest confirms.
     /// </summary>
-    public bool RemoveConflicts { get; set; }
+    /// <remarks>
+    /// Nullable so an omitted value is distinguishable from an explicit false on the wire rather
+    /// than silently defaulting (S6964). Both mean the same thing here — the conservative,
+    /// nothing-is-mutated branch — which is deliberate: a client that has not learned this field
+    /// gets a dry run, never a destructive one.
+    /// </remarks>
+    public bool? RemoveConflicts { get; set; }
 }
 
 public class SetBasketOrderTypeCommandHandler
@@ -54,7 +60,7 @@ public class SetBasketOrderTypeCommandHandler
             command.SessionId,
             _currentUserService.UserId,
             command.OrderType,
-            command.RemoveConflicts,
+            command.RemoveConflicts == true,
             cancellationToken);
 
         var message = result.Applied

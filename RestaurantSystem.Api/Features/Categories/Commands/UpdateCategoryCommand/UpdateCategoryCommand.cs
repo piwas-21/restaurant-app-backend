@@ -14,8 +14,9 @@ public record UpdateCategoryCommand(
     bool IsActive,
     // NOTE: DisplayOrder is accepted but deliberately NOT assigned by this handler —
     // ReorderCategoriesCommand owns ordering. Left as-is to avoid clobbering a tenant's order
-    // from an unrelated edit; the dead parameter is tracked as follow-up debt.
-    int DisplayOrder,
+    // from an unrelated edit; the dead parameter is tracked as follow-up debt. Nullable so an
+    // omitted value is distinguishable from a posted 0 rather than silently becoming one (S6964).
+    int? DisplayOrder = null,
     // OrderChannels bitmask; null = every order type. Written by the admin channel matrix.
     int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<CategoryDto>>;

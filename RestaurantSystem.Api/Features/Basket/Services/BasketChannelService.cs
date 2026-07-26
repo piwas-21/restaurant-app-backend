@@ -118,8 +118,13 @@ public class BasketChannelService : IBasketChannelService
         CancellationToken cancellationToken)
     {
         var productIds = basket.Items
-            .Where(i => i.ParentBasketItemId is null && i.ProductId.HasValue)
-            .Select(i => i.ProductId!.Value)
+            .Where(i => i.ParentBasketItemId is null)
+            // OfType filters the nulls AND unwraps in one step. The obvious
+            // `.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value)` needs a
+            // null-forgiving operator, because C# flow analysis does not carry the Where's
+            // guarantee across the Select's lambda boundary.
+            .Select(i => i.ProductId)
+            .OfType<Guid>()
             .Distinct()
             .ToList();
 
@@ -136,9 +141,10 @@ public class BasketChannelService : IBasketChannelService
             .ToDictionaryAsync(p => p.Id, cancellationToken);
 
         var conflicts = new List<BasketChannelConflictDto>();
-        foreach (var item in basket.Items.Where(i => i.ParentBasketItemId is null && i.ProductId.HasValue))
+        foreach (var item in basket.Items.Where(i => i.ParentBasketItemId is null))
         {
-            if (!products.TryGetValue(item.ProductId!.Value, out var product))
+            // The `is not { } productId` pattern narrows for the compiler, so no `!` is needed.
+            if (item.ProductId is not { } productId || !products.TryGetValue(productId, out var product))
             {
                 continue;
             }

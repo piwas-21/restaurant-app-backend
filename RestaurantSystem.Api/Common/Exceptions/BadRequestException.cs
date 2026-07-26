@@ -10,6 +10,11 @@ public class BadRequestException : Exception
     {
     }
 
+    public BadRequestException(string message, string errorCode) : base(message)
+    {
+        ErrorCode = errorCode;
+    }
+
     /// <summary>
     /// Optional stable discriminator surfaced as <c>ApiResponse.ErrorCode</c>, from
     /// <see cref="Common.Models.ErrorCodes"/>.
@@ -23,9 +28,4 @@ public class BadRequestException : Exception
     /// uncoded BadRequestException behaves exactly as before.
     /// </remarks>
     public string? ErrorCode { get; init; }
-
-    public BadRequestException(string message, string errorCode) : base(message)
-    {
-        ErrorCode = errorCode;
-    }
 }
