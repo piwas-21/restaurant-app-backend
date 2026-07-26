@@ -68,8 +68,11 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
             return ApiResponse<CategoryDto>.Failure("Invalid image MIME type");
         }
 
+        // See UpdateCategoryCommand: ProductCount dereferences `pc.Product` in memory after
+        // materialisation, so without ThenInclude this 500s for any category that has products.
         var category = await _context.Categories
             .Include(c => c.ProductCategories)
+                .ThenInclude(pc => pc.Product)
             .FirstOrDefaultAsync(c => c.Id == command.CategoryId && !c.IsDeleted, cancellationToken);
 
         if (category == null)
