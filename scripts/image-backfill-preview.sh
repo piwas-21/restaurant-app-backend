@@ -10,11 +10,11 @@
 # "next step" line this prints at the end.
 #
 # Usage:
-#   API_BASE=https://api.rumirestaurant.ch ADMIN_TOKEN=eyJ… ./scripts/image-backfill-preview.sh
+#   API_BASE=https://www.rumirestaurant.ch ADMIN_TOKEN=eyJ… ./scripts/image-backfill-preview.sh
 #   API_BASE=… ADMIN_TOKEN=… MAX_FILES=50 OUT_DIR=/tmp/backfill ./scripts/image-backfill-preview.sh
 set -euo pipefail
 
-API_BASE="${API_BASE:?set API_BASE, e.g. https://api.rumirestaurant.ch}"
+API_BASE="${API_BASE:?set API_BASE, e.g. https://www.rumirestaurant.ch}"
 ADMIN_TOKEN="${ADMIN_TOKEN:?set ADMIN_TOKEN to an Admin JWT}"
 MAX_FILES="${MAX_FILES:-500}"
 OUT_DIR="${OUT_DIR:-./image-backfill-preview}"
