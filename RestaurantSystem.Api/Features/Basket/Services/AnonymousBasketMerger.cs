@@ -87,6 +87,11 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         // via EF relationship fix-up, which would otherwise break the enumeration.
         var anonymousItems = anonymousBasket.Items.ToList();
 
+        // Rows actually moved into the user basket. Tracked explicitly because EF's navigation
+        // fix-up has not run yet at the point we need to inspect them (see
+        // ResetOrderTypeIfMergedItemsConflictAsync).
+        var rehomed = new List<Domain.Entities.BasketItem>();
+
         // Items that are menu-bundle parents within the anonymous basket (some other item
         // points at them). Used to keep the duplicate-removal below to safe standalone leaves.
         var parentItemIds = anonymousItems
@@ -128,6 +133,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
                 item.BasketId = userBasket.Id;
                 item.UpdatedAt = DateTime.UtcNow;
                 item.UpdatedBy = _currentUserService.GetAuditIdentifier();
+                rehomed.Add(item);
 
                 // Also move any child items belonging to this bundle — without this they
                 // would be left orphaned under the soft-deleted anonymous basket.
@@ -146,7 +152,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         anonymousBasket.DeletedAt = DateTime.UtcNow;
         anonymousBasket.DeletedBy = _currentUserService.GetAuditIdentifier();
 
-        await ResetOrderTypeIfMergedItemsConflictAsync(userBasket);
+        await ResetOrderTypeIfMergedItemsConflictAsync(userBasket, rehomed);
 
         await _context.SaveChangesAsync();
         await _basketRepository.RecalculateTotalsAsync(userBasket.Id);
@@ -166,14 +172,22 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
     /// two-phase switch (IBasketChannelService) then shows a proper itemized confirm. Clearing a
     /// channel is always safe: null is the permissive browse state.
     /// </remarks>
-    private async Task ResetOrderTypeIfMergedItemsConflictAsync(Domain.Entities.Basket userBasket)
+    private async Task ResetOrderTypeIfMergedItemsConflictAsync(
+        Domain.Entities.Basket userBasket,
+        List<Domain.Entities.BasketItem> rehomed)
     {
-        if (userBasket.OrderType is null)
+        if (userBasket.OrderType is null || rehomed.Count == 0)
         {
             return;
         }
 
-        var productIds = userBasket.Items
+        // Inspect the EXPLICIT re-homed list, not userBasket.Items. The merge loop re-homes rows by
+        // scalar FK assignment (item.BasketId = ...), and EF only fixes up the Items navigation
+        // during DetectChanges/SaveChanges — which happens AFTER this runs. Reading
+        // userBasket.Items here would see only the user's pre-existing lines, every one of which was
+        // already validated by BasketChannelGuard when it was added, so the check would be a no-op
+        // for exactly the scenario it exists to catch.
+        var productIds = rehomed
             .Where(i => i.ParentBasketItemId is null && i.ProductId.HasValue)
             .Select(i => i.ProductId!.Value)
             .Distinct()

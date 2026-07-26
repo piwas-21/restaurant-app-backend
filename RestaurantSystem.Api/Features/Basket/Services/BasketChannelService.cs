@@ -63,10 +63,20 @@ public class BasketChannelService : IBasketChannelService
         if (conflicts.Count > 0)
         {
             var doomedIds = conflicts.Select(c => c.BasketItemId).ToHashSet();
-            // Remove the parent lines; bundle children cascade via the Items→ParentBasketItem
-            // relationship, so they must not be deleted individually here.
-            var doomed = basket.Items.Where(i => doomedIds.Contains(i.Id)).ToList();
-            _context.BasketItems.RemoveRange(doomed);
+
+            // Children MUST be removed explicitly, before their parents. The self-referencing
+            // Items→ParentBasketItem FK has NO cascade rule (ParentBasketItemId is nullable, so EF
+            // uses ClientSetNull and the DB rule is NO ACTION). Removing only the parents would set
+            // each tracked child's ParentBasketItemId to null instead of deleting it — promoting
+            // bundle children to top-level basket lines, inflating the item count, and putting them
+            // on the kitchen ticket. Mirrors BasketService.RemoveItemFromBasketAsync.
+            var doomedChildren = basket.Items
+                .Where(i => i.ParentBasketItemId.HasValue && doomedIds.Contains(i.ParentBasketItemId.Value))
+                .ToList();
+            var doomedParents = basket.Items.Where(i => doomedIds.Contains(i.Id)).ToList();
+
+            _context.BasketItems.RemoveRange(doomedChildren);
+            _context.BasketItems.RemoveRange(doomedParents);
         }
 
         basket.OrderType = orderType;
@@ -92,9 +102,15 @@ public class BasketChannelService : IBasketChannelService
     }
 
     /// <summary>
-    /// Top-level lines the requested order type forbids. Bundle CHILD lines are skipped on purpose:
-    /// a bundle carries its own channel set (no auto-intersection with its children), so the parent
-    /// line is the only thing whose availability governs the order.
+    /// Top-level lines the requested order type forbids.
+    /// </summary>
+    /// <remarks>
+    /// Bundle CHILD lines are skipped here by design — the intent is that a bundle carries its own
+    /// channel set. ⚠️ That premise is NOT yet implemented: no bundle command accepts
+    /// <c>AvailableOrderTypes</c>, so a bundle's mask is always inherited-or-null today and nothing
+    /// constrains it. <c>OrderChannelGuard</c> does walk children at order creation, so an
+    /// unfulfillable ORDER cannot be created; the residual gap is that such a line can still be
+    /// added to a basket. Tracked as follow-up with bundle mask support.
     /// </summary>
     private async Task<List<BasketChannelConflictDto>> FindConflictsAsync(
         Domain.Entities.Basket basket,

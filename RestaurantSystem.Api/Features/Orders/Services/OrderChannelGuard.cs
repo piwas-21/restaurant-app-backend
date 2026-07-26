@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
@@ -40,10 +41,14 @@ public class OrderChannelGuard : IOrderChannelGuard
     }
 
     public async Task EnsureOrderableAsync(
-        IReadOnlyCollection<Guid> productIds,
+        IReadOnlyCollection<CreateOrderItemDto> items,
         OrderType orderType,
         CancellationToken cancellationToken = default)
     {
+        // Walk ChildItems too. BasketToOrderTranslator puts BOTH bundle children and top-level side
+        // items there, so checking only the top level would let a takeaway-only product through as a
+        // bundle option or a side item — through the basket path and a direct POST /api/Orders alike.
+        var productIds = FlattenProductIds(items).ToList();
         if (productIds.Count == 0)
         {
             return;
@@ -80,6 +85,27 @@ public class OrderChannelGuard : IOrderChannelGuard
 
         throw new BadRequestException(
             $"Not available for {orderType}: {names}. Please change your order type or remove these items.");
+    }
+
+    private static IEnumerable<Guid> FlattenProductIds(IEnumerable<CreateOrderItemDto>? items)
+    {
+        if (items is null)
+        {
+            yield break;
+        }
+
+        foreach (var item in items)
+        {
+            if (item.ProductId.HasValue)
+            {
+                yield return item.ProductId.Value;
+            }
+
+            foreach (var childId in FlattenProductIds(item.ChildItems))
+            {
+                yield return childId;
+            }
+        }
     }
 
     // Any authenticated non-Customer account is staff. Role is null for anonymous callers.

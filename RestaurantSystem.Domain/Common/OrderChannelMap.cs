@@ -18,6 +18,10 @@ namespace RestaurantSystem.Domain.Common;
 /// </remarks>
 public static class OrderChannelMap
 {
+    // Cached: ToOrderTypes runs per product, per row, per request, and CategoryDto.AllowedOrderTypes
+    // is a computed property re-evaluated on every serialization.
+    private static readonly OrderType[] AllOrderTypes = Enum.GetValues<OrderType>();
+
     /// <summary>The single-channel mask for one order type.</summary>
     /// <exception cref="ArgumentOutOfRangeException">
     /// The order type is not a known value — fail loudly rather than silently returning
@@ -35,7 +39,7 @@ public static class OrderChannelMap
     public static IReadOnlyList<OrderType> ToOrderTypes(OrderChannels channels)
     {
         var result = new List<OrderType>(3);
-        foreach (var orderType in Enum.GetValues<OrderType>())
+        foreach (var orderType in AllOrderTypes)
         {
             if (channels.HasFlag(From(orderType)))
             {
@@ -52,7 +56,7 @@ public static class OrderChannelMap
     /// </summary>
     public static IReadOnlyList<OrderType> ToOrderTypes(int? storedMask) =>
         storedMask is null
-            ? Enum.GetValues<OrderType>()
+            ? AllOrderTypes
             : ToOrderTypes((OrderChannels)storedMask.Value);
 
     /// <summary>

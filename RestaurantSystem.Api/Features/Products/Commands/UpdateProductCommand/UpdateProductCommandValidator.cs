@@ -1,4 +1,5 @@
 using FluentValidation;
+using RestaurantSystem.Api.Common.Validation;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 
@@ -21,5 +22,6 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
             .Must((command, primaryCategoryId) =>
                 !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
             .WithMessage("Primary category must be one of the selected categories");
+        RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
     }
 }

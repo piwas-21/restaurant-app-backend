@@ -6,14 +6,20 @@ using RestaurantSystem.Domain.Entities;
 namespace RestaurantSystem.Api.Features.Catalog;
 
 /// <summary>
-/// The single resolver for per-order-type catalog availability, shared by every catalog projection
-/// (product list/detail, category products, menu bundles). Static to match its sibling
+/// The single resolver for per-order-type catalog availability. Static to match its sibling
 /// <see cref="ProductDtoMapper"/>.
 /// </summary>
 /// <remarks>
-/// Exists because the field would otherwise be hand-rolled in six projections. Callers must have
-/// loaded <c>ProductCategories → Category</c> for inheritance to resolve; a product with that
+/// Exists because the field would otherwise be hand-rolled in every catalog projection. Callers must
+/// have loaded <c>ProductCategories → Category</c> for inheritance to resolve; a product with that
 /// collection unloaded reads as unrestricted (permissive), never as blocked.
+/// <para>
+/// WIRED UP: <see cref="ProductDtoMapper"/>, <see cref="ProductSummaryMapper"/> and
+/// <c>GetProductByIdQuery</c>. NOT YET WIRED: <c>MenuBundleDto</c> (bundle list/detail),
+/// <c>SpecialProductDto</c> (specials carousel) and <c>FeaturedSpecialDto</c> — those surfaces still
+/// render blocked items as fully orderable. Bundles additionally cannot yet STORE a mask: no bundle
+/// command accepts <c>AvailableOrderTypes</c>. Tracked as follow-up.
+/// </para>
 /// </remarks>
 public static class OrderTypeAvailability
 {

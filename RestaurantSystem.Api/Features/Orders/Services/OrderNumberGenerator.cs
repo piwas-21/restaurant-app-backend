@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -22,22 +23,22 @@ public class OrderNumberGenerator : IOrderNumberGenerator
 
     public async Task<string> GenerateAsync(CancellationToken cancellationToken = default)
     {
-        var date = DateTime.UtcNow.ToString("yyyyMMdd");
+        var date = DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         var lastOrder = await _context.Orders
-            .Where(o => o.OrderNumber.StartsWith(date))
+            .Where(o => o.OrderNumber.StartsWith(date))  // EF translates to SQL LIKE; no StringComparison overload is translatable
             .OrderByDescending(o => o.OrderNumber)
             .FirstOrDefaultAsync(cancellationToken);
 
         int sequence = 1;
-        if (lastOrder != null)
+        if (lastOrder is not null)
         {
-            var lastSequence = lastOrder.OrderNumber.Substring(8);
+            var lastSequence = lastOrder.OrderNumber[8..];
             if (int.TryParse(lastSequence, out var seq))
             {
                 sequence = seq + 1;
             }
         }
 
-        return $"{date}{sequence:D4}";
+        return string.Create(CultureInfo.InvariantCulture, $"{date}{sequence:D4}");
     }
 }

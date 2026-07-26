@@ -63,10 +63,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
         try
         {
-            await _channelGuard.EnsureOrderableAsync(
-                command.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList(),
-                command.Type,
-                cancellationToken);
+            await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
 
             var orderNumber = await _orderNumbers.GenerateAsync(cancellationToken);
             var userId = command.UserId ?? _currentUserService.UserId;
