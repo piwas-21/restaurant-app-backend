@@ -44,14 +44,5 @@ public class UpdateRestaurantInfoCommandValidator : AbstractValidator<UpdateRest
         RuleFor(x => x.ThemePaletteKey)
             .MaximumLength(64).WithMessage("Theme palette key cannot exceed 64 characters")
             .When(x => x.ThemePaletteKey != null);
-
-        // Percent coordinates on the reservation floor plan's virtual canvas.
-        RuleFor(x => x.EntrancePositionX)
-            .InclusiveBetween(0m, 100m).WithMessage("Entrance position X must be between 0 and 100")
-            .When(x => x.EntrancePositionX != null);
-
-        RuleFor(x => x.EntrancePositionY)
-            .InclusiveBetween(0m, 100m).WithMessage("Entrance position Y must be between 0 and 100")
-            .When(x => x.EntrancePositionY != null);
     }
 }

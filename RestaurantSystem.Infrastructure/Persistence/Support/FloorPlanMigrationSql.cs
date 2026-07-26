@@ -51,4 +51,45 @@ UPDATE ""Tables"" SET
         ELSE lower(shape) END
     , floor_plan_id = {PLAN_ID}
 WHERE floor_plan_id IS NULL;";
+
+    /// <summary>Footprint of the entrance arrow, matching the seeder and the palette.</summary>
+    public const decimal EntranceWidthMeters = 0.90m;
+    public const decimal EntranceHeightMeters = 0.60m;
+
+    /// <summary>
+    /// Carries a stored <c>RestaurantInfo.entrance_position_x/y</c> onto the
+    /// default plan as an <c>entrance</c> item, before
+    /// <c>RetireRestaurantInfoEntrancePosition</c> drops those columns
+    /// (FLOOR-PLAN-REVAMP §6 step 4 — the columns were a read fallback for one
+    /// release, not something to throw away).
+    ///
+    /// The stored values are **percentages of a virtual canvas**, so they are
+    /// clamped to [0, 100] and scaled by the plan's real dimensions. Nothing is
+    /// written when the plan already carries an entrance — the seeded plan does,
+    /// and two entrance arrows in different places is exactly the defect §4.4
+    /// called out.
+    /// </summary>
+    public const string CarryEntranceToPlanTemplate = @"
+INSERT INTO ""FloorPlanItems"" (
+    floor_plan_id, kind, x, y, width_meters, height_meters, rotation_degrees, z_index, created_by)
+SELECT
+    p.id,
+    'entrance',
+    ROUND(LEAST(GREATEST(r.entrance_position_x, 0), 100) / 100.0 * p.width_meters, 2),
+    ROUND(LEAST(GREATEST(r.entrance_position_y, 0), 100) / 100.0 * p.height_meters, 2),
+    0.90, 0.60, 0, 0,
+    'RetireRestaurantInfoEntrancePosition'
+FROM ""RestaurantInfo"" r
+CROSS JOIN (
+    SELECT id, width_meters, height_meters
+    FROM ""FloorPlans""
+    ORDER BY is_default DESC, display_order
+    LIMIT 1
+) p
+WHERE r.entrance_position_x IS NOT NULL
+  AND r.entrance_position_y IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM ""FloorPlanItems"" i
+      WHERE i.floor_plan_id = p.id AND i.kind = 'entrance')
+LIMIT 1;";
 }
