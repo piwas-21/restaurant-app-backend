@@ -24,4 +24,13 @@ public class SeedSettings
     public string AdminFirstName { get; set; } = "Admin";
 
     public string AdminLastName { get; set; } = "User";
+
+    /// <summary>
+    /// Seed the E2E menu fixtures — a mixed-kitchen bundle the printer-app suite needs to assert
+    /// kitchen routing (issue #238). <b>Defaults to false and must stay false in production:</b>
+    /// this inserts a visible, orderable product, so a tenant would find "E2E Menu Deal" on their
+    /// menu. Enabled per-environment on staging/demo via
+    /// <c>SeedSettings__SeedE2EMenuFixtures=true</c>.
+    /// </summary>
+    public bool SeedE2EMenuFixtures { get; set; }
 }
