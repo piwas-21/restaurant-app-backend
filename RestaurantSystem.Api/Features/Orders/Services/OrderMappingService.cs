@@ -22,11 +22,11 @@ public class OrderMappingService : IOrderMappingService
         // its parent's OrderId — so the flat list already holds the whole tree. Grouping it
         // here, rather than reading the ChildOrderItems navigation, is what makes SideItems
         // independent of how the caller happened to query (#234):
-        //   - AsNoTracking reads (the printer feed) never populated ChildOrderItems, and
-        //     there is no relationship fix-up to compensate, so SideItems came back null on
-        //     every order and bundle components printed as flat top-level lines;
-        //   - tracked reads DID get it populated by fix-up, but still projected every child
-        //     a second time as its own top-level line, rendering it twice.
+        // On AsNoTracking reads (the printer feed) the navigation was never populated and
+        // there is no relationship fix-up to compensate, so SideItems came back null on every
+        // order and bundle components printed as flat top-level lines. On tracked reads fix-up
+        // DID populate it, but every child was still projected a second time as its own
+        // top-level line, rendering it twice.
         // It also spans arbitrary bundle depth (OrderItemFactory nests grandchildren) with
         // no include chain to keep in sync. Root-only projection matches the precedent in
         // GetZReportQuery (.Where(i => i.ParentOrderItemId == null)).
@@ -121,86 +121,11 @@ public class OrderMappingService : IOrderMappingService
     // MapToOrderDto; null means "fall back to the navigation" (see MapToOrderItemDto).
     private OrderItemDto MapOrderItem(OrderItem item, ILookup<Guid, OrderItem>? childrenByParent)
     {
-        // Parse ingredient customizations
-        List<OrderItemIngredientDto>? ingredientCustomizations = null;
-
-        // Get product ingredients - either from direct Product or from Menu's first MenuItem's Product
-        ICollection<ProductIngredient>? productIngredients = null;
-        if (item.Product?.DetailedIngredients != null)
-        {
-            productIngredients = item.Product.DetailedIngredients;
-        }
-        else if (item.Menu?.MenuItems?.Any() == true)
-        {
-            // For menu items (e.g., Chief's Special), get ingredients from the menu's product
-            var firstMenuItem = item.Menu.MenuItems.FirstOrDefault();
-            if (firstMenuItem?.Product?.DetailedIngredients != null)
-            {
-                productIngredients = firstMenuItem.Product.DetailedIngredients;
-            }
-        }
-
-        if (!string.IsNullOrEmpty(item.IngredientQuantitiesJson) && productIngredients != null)
-        {
-            try
-            {
-                var selectedIngredients = System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, int>>(item.IngredientQuantitiesJson);
-                if (selectedIngredients != null && selectedIngredients.Any())
-                {
-                    ingredientCustomizations = new List<OrderItemIngredientDto>();
-
-                    // Map ingredient customizations
-                    // Show all ingredients for kitchen (both selected and removed)
-                    foreach (var ing in productIngredients)
-                    {
-                        if (selectedIngredients.TryGetValue(ing.Id, out var quantity))
-                        {
-                            // Ingredient is in the order - show it regardless of quantity.
-                            // "Removed" (→ a "NO X" kitchen-ticket line) only applies to
-                            // ingredients that are part of the base recipe: a required one, or
-                            // an optional one included in the base price. A non-included
-                            // optional (a paid add-on) at qty 0 was simply NEVER added — it is
-                            // not a removal, so it must not print "NO X". The unified
-                            // customization sheet sends every option's quantity (incl. 0 for
-                            // unselected ones), so without this guard every un-added add-on
-                            // produced spurious kitchen-ticket noise. Mirrors the frontend's
-                            // base-recipe rule (utils/ingredientSelection.ts).
-                            bool inBaseRecipe = !ing.IsOptional || ing.IsIncludedInBasePrice;
-                            ingredientCustomizations.Add(new OrderItemIngredientDto
-                            {
-                                IngredientId = ing.Id,
-                                IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
-                                Quantity = quantity,
-                                IsRemoved = quantity == 0 && inBaseRecipe
-                            });
-                        }
-                        else if (!ing.IsOptional)
-                        {
-                            // Required ingredient not in selection at all = removed
-                            ingredientCustomizations.Add(new OrderItemIngredientDto
-                            {
-                                IngredientId = ing.Id,
-                                IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
-                                Quantity = 0,
-                                IsRemoved = true
-                            });
-                        }
-                    }
-                }
-            }
-            catch (System.Text.Json.JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse ingredient quantities for order item {ItemId}", item.Id);
-            }
-        }
+        var ingredientCustomizations = MapIngredientCustomizations(item);
 
         // Get KitchenType from Product or Menu's first MenuItem's Product
-        string? kitchenType = item.Product?.KitchenType.ToString();
-        if (kitchenType == null && item.Menu?.MenuItems?.Any() == true)
-        {
-            var firstMenuItem = item.Menu.MenuItems.FirstOrDefault();
-            kitchenType = firstMenuItem?.Product?.KitchenType.ToString();
-        }
+        string? kitchenType = item.Product?.KitchenType.ToString()
+            ?? item.Menu?.MenuItems?.FirstOrDefault()?.Product?.KitchenType.ToString();
 
         // Map child items. A child of a bundle/combo (ProductType.Menu parent) is a bundle
         // component; a child of a regular item is a true add-on side. The Kind discriminator
@@ -243,6 +168,78 @@ public class OrderMappingService : IOrderMappingService
             IngredientCustomizations = ingredientCustomizations,
             SideItems = sideItems
         };
+    }
+
+    // Projects the line's ingredient-quantities snapshot against the recipe it belongs to.
+    // Returns null when the line has no snapshot, no resolvable recipe, or an unparseable one.
+    private List<OrderItemIngredientDto>? MapIngredientCustomizations(OrderItem item)
+    {
+        // Either the line's own Product, or — for a menu-backed line (e.g. Chief's Special) —
+        // the product behind the menu's first item.
+        var productIngredients = item.Product?.DetailedIngredients
+            ?? item.Menu?.MenuItems?.FirstOrDefault()?.Product?.DetailedIngredients;
+
+        if (string.IsNullOrEmpty(item.IngredientQuantitiesJson) || productIngredients == null)
+        {
+            return null;
+        }
+
+        Dictionary<Guid, int>? selectedIngredients;
+        try
+        {
+            selectedIngredients = System.Text.Json.JsonSerializer
+                .Deserialize<Dictionary<Guid, int>>(item.IngredientQuantitiesJson);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse ingredient quantities for order item {ItemId}", item.Id);
+            return null;
+        }
+
+        if (selectedIngredients == null || selectedIngredients.Count == 0)
+        {
+            return null;
+        }
+
+        // Show all ingredients for kitchen (both selected and removed).
+        var customizations = new List<OrderItemIngredientDto>();
+        foreach (var ing in productIngredients)
+        {
+            if (selectedIngredients.TryGetValue(ing.Id, out var quantity))
+            {
+                // Ingredient is in the order - show it regardless of quantity.
+                // "Removed" (→ a "NO X" kitchen-ticket line) only applies to
+                // ingredients that are part of the base recipe: a required one, or
+                // an optional one included in the base price. A non-included
+                // optional (a paid add-on) at qty 0 was simply NEVER added — it is
+                // not a removal, so it must not print "NO X". The unified
+                // customization sheet sends every option's quantity (incl. 0 for
+                // unselected ones), so without this guard every un-added add-on
+                // produced spurious kitchen-ticket noise. Mirrors the frontend's
+                // base-recipe rule (utils/ingredientSelection.ts).
+                bool inBaseRecipe = !ing.IsOptional || ing.IsIncludedInBasePrice;
+                customizations.Add(new OrderItemIngredientDto
+                {
+                    IngredientId = ing.Id,
+                    IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
+                    Quantity = quantity,
+                    IsRemoved = quantity == 0 && inBaseRecipe
+                });
+            }
+            else if (!ing.IsOptional)
+            {
+                // Required ingredient not in selection at all = removed
+                customizations.Add(new OrderItemIngredientDto
+                {
+                    IngredientId = ing.Id,
+                    IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
+                    Quantity = 0,
+                    IsRemoved = true
+                });
+            }
+        }
+
+        return customizations;
     }
 
     public OrderPaymentDto MapToOrderPaymentDto(OrderPayment payment)
