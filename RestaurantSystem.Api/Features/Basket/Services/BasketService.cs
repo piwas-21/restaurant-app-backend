@@ -94,7 +94,7 @@ public class BasketService : IBasketService
             // factory and added in one go — EF cascades the children from the parent.
             if (product.Type == ProductType.Menu)
             {
-                var menuItem = await _basketItemFactory.BuildMenuItemAsync(product, item, basket.Id);
+                var menuItem = await _basketItemFactory.BuildMenuItemAsync(product, item, basket.Id, basket.OrderType);
                 _context.BasketItems.Add(menuItem);
 
                 await _context.SaveChangesAsync();
@@ -133,7 +133,7 @@ public class BasketService : IBasketService
             }
             else
             {
-                var basketItem = await _basketItemFactory.BuildRegularItemAsync(product, variation, item, basket.Id);
+                var basketItem = await _basketItemFactory.BuildRegularItemAsync(product, variation, item, basket.Id, basket.OrderType);
                 _context.BasketItems.Add(basketItem);
             }
         }

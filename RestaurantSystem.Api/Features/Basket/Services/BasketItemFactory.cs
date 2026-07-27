@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using System.Text.Json;
@@ -35,7 +36,8 @@ public class BasketItemFactory : IBasketItemFactory
         _logger = logger;
     }
 
-    public async Task<BasketItem> BuildRegularItemAsync(Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId)
+    public async Task<BasketItem> BuildRegularItemAsync(
+        Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
         // Calculate unit price
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
@@ -62,8 +64,20 @@ public class BasketItemFactory : IBasketItemFactory
             var sideItemIds = validSideItems.Select(s => s.Id).ToList();
             var sideItems = await _context.Products
                 .AsNoTracking()
+                // ProductCategories -> Category is what makes the guard below MEAN anything: an
+                // inheriting product with that collection unloaded resolves as UNRESTRICTED, so a
+                // guard without this include would permit everything and still look done (the
+                // #231/#236/#237/#241 class).
+                .Include(p => p.ProductCategories)
+                    .ThenInclude(pc => pc.Category)
                 .Where(p => sideItemIds.Contains(p.Id) && p.IsActive && p.IsAvailable)
                 .ToListAsync();
+
+            // §9.3: the caller guards the LINE's product; nothing guarded what was attached to it.
+            foreach (var sideItemProduct in sideItems)
+            {
+                BasketChannelGuard.EnsureOrderable(sideItemProduct, basketOrderType);
+            }
 
             foreach (var selectedSide in validSideItems)
             {
@@ -97,7 +111,8 @@ public class BasketItemFactory : IBasketItemFactory
         };
     }
 
-    public async Task<BasketItem> BuildMenuItemAsync(Product product, AddToBasketDto item, Guid basketId)
+    public async Task<BasketItem> BuildMenuItemAsync(
+        Product product, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
         if (product.MenuDefinition == null)
             throw new NotFoundException("Menu definition not found");
@@ -166,8 +181,21 @@ public class BasketItemFactory : IBasketItemFactory
         var childProductIds = selectedOptions.Select(o => o.ItemId).Distinct().ToList();
         var childProducts = await _context.Products
             .Include(p => p.DetailedIngredients)
+            // See the side-item load: without the inheritance chain the guard below resolves every
+            // inheriting option as unrestricted, which is worse than no guard — it looks like one.
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
             .Where(p => childProductIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id);
+
+        // §9.3: a combo being orderable on this channel says nothing about the components chosen
+        // inside it, and the caller's guard only ever saw the combo. `OrderChannelGuard` already
+        // walks children at order creation, so before this the basket could hold a line the order
+        // endpoint would then refuse — a dead end discovered at checkout rather than at add time.
+        foreach (var childProduct in childProducts.Values)
+        {
+            BasketChannelGuard.EnsureOrderable(childProduct, basketOrderType);
+        }
 
         // Create Child Basket Items for selected options. They are attached to the parent's
         // ChildBasketItems navigation (rather than added to the context here) so the caller
