@@ -118,18 +118,22 @@ public class BasketItemFactory : IBasketItemFactory
         };
     }
 
-    public async Task<BasketItem> BuildMenuItemAsync(
-        Product product, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
+    /// <summary>
+    /// Validates each section's required / min / max selection rules and returns the section-option
+    /// surcharge to add to the menu's base price.
+    /// </summary>
+    /// <remarks>
+    /// Extracted from <see cref="BuildMenuItemAsync"/>: adding the §9.3 channel guard pushed that
+    /// method past the cognitive-complexity limit, and this validation is a self-contained concern
+    /// with one output — the surcharge — so it splits cleanly rather than by cutting the method in
+    /// an arbitrary place to satisfy a number.
+    /// </remarks>
+    private decimal ValidateSectionsAndSumOptionPrices(
+        IEnumerable<MenuSection> sections, List<SelectedMenuOptionDto> selectedOptions)
     {
-        if (product.MenuDefinition == null)
-            throw new NotFoundException("Menu definition not found");
+        decimal optionsPrice = 0m;
 
-        // Calculate total price including options
-        decimal menuTotalPrice = product.BasePrice;
-        var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
-
-        // Validate required sections and calculate price
-        foreach (var section in product.MenuDefinition.Sections)
+        foreach (var section in sections)
         {
             var sectionSelections = selectedOptions.Where(o => o.SectionId == section.Id).ToList();
 
@@ -152,21 +156,46 @@ public class BasketItemFactory : IBasketItemFactory
                 throw new BadRequestException($"Section '{section.Name}' allows at most {section.MaxSelection} selection(s)");
             }
 
-            foreach (var selection in sectionSelections)
-            {
-                // Validate individual selection
-                if (selection.Quantity < 1)
-                {
-                    throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
-                }
-
-                var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId);
-                if (sectionItem == null)
-                    throw new NotFoundException($"Item not found in section '{section.Name}'");
-
-                menuTotalPrice += sectionItem.AdditionalPrice * selection.Quantity;
-            }
+            optionsPrice += SumSelectionPrices(section, sectionSelections);
         }
+
+        return optionsPrice;
+    }
+
+    /// <summary>One section's selections: per-selection validation plus its additional-price total.</summary>
+    private static decimal SumSelectionPrices(MenuSection section, List<SelectedMenuOptionDto> sectionSelections)
+    {
+        decimal price = 0m;
+
+        foreach (var selection in sectionSelections)
+        {
+            // Validate individual selection
+            if (selection.Quantity < 1)
+            {
+                throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
+            }
+
+            var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId)
+                ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
+
+            price += sectionItem.AdditionalPrice * selection.Quantity;
+        }
+
+        return price;
+    }
+
+    public async Task<BasketItem> BuildMenuItemAsync(
+        Product product, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
+    {
+        if (product.MenuDefinition == null)
+            throw new NotFoundException("Menu definition not found");
+
+        // Calculate total price including options
+        decimal menuTotalPrice = product.BasePrice;
+        var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
+
+        // Validate required sections and calculate price
+        menuTotalPrice += ValidateSectionsAndSumOptionPrices(product.MenuDefinition.Sections, selectedOptions);
 
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
 
