@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Utilities;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Queries.GetFeaturedSpecialQuery;
@@ -10,7 +12,12 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetFeaturedSpecialQuery
 /// <summary>
 /// Query to get the currently featured special product
 /// </summary>
-public record GetFeaturedSpecialQuery : IQuery<ApiResponse<FeaturedSpecialDto?>>;
+/// <param name="RequestedOrderType">
+/// The channel the guest is browsing on, or <c>null</c> when they have not chosen one. Drives
+/// <see cref="FeaturedSpecialDto.Availability"/> exactly as it does on the catalog queries.
+/// </param>
+public record GetFeaturedSpecialQuery(OrderType? RequestedOrderType = null)
+    : IQuery<ApiResponse<FeaturedSpecialDto?>>;
 
 public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQuery, ApiResponse<FeaturedSpecialDto?>>
 {
@@ -34,6 +41,12 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
     {
         // Get the product where IsFeaturedSpecial = true
         var featuredProduct = await _context.Products
+            // ProductCategories -> Category is load-bearing, not cosmetic: `OrderTypeAvailability`
+            // resolves an inheriting product through its PRIMARY category, and an unloaded
+            // collection reads as UNRESTRICTED. Omit this include and the banner reports every
+            // restricted special as orderable, silently — no exception, no empty field.
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
             .Include(p => p.Images)
             .Include(p => p.Variations)
             .Include(p => p.SuggestedSideItems)
@@ -42,6 +55,10 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
             .Include(p => p.DetailedIngredients)
                 .ThenInclude(di => di.Descriptions)
             .Where(p => p.IsFeaturedSpecial && p.IsSpecial && p.IsActive)
+            // Five sibling collections LEFT-JOIN into each other's cartesian product, and this
+            // endpoint is public + uncached + hit on every menu page load. `GetProductByIdQuery`
+            // splits a near-identical graph for the same reason.
+            .AsSplitQuery()
             .FirstOrDefaultAsync(cancellationToken);
 
         if (featuredProduct == null)
@@ -61,6 +78,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                 .Where(img => img.IsPrimary && !string.IsNullOrEmpty(img.Url))
                 .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? featuredProduct.ImageUrl,
+            Availability = OrderTypeAvailability.Resolve(featuredProduct, query.RequestedOrderType),
             FeaturedDate = featuredProduct.FeaturedDate ?? DateTime.UtcNow,
             PreparationTimeMinutes = featuredProduct.PreparationTimeMinutes,
             Ingredients = featuredProduct.Ingredients,
