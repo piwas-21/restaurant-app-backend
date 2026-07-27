@@ -36,21 +36,11 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
         // global query filter would also handle this but we keep it explicit
         // so the read intent is unambiguous when grepping for delete-aware paths.
         var ordersQuery = _context.Orders
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.DetailedIngredients)
-                        .ThenInclude(di => di.GlobalIngredient)
-            // A menu-backed line (MenuId, no ProductId) resolves both its KitchenType and
-            // its ingredient customizations through Menu -> MenuItems -> Product. Without
-            // this chain the mapper's null-conditional reads yield KitchenType = null, and
-            // the printer app routes kitchen tickets by KitchenType — so the line printed
-            // on NEITHER kitchen printer rather than merely losing its customizations.
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Menu)
-                    .ThenInclude(m => m!.MenuItems)
-                        .ThenInclude(mi => mi.Product)
-                            .ThenInclude(p => p.DetailedIngredients)
-                                .ThenInclude(di => di.GlobalIngredient)
+            // Covers BOTH line-resolution paths. The menu-backed one was missing: the mapper
+            // reads it null-conditionally, so KitchenType came back null — and the printer app
+            // routes kitchen tickets by KitchenType, so those lines printed on NEITHER kitchen
+            // printer rather than merely losing their customizations.
+            .IncludeOrderLineGraph()
             .Include(o => o.Payments)
             // Order.StatusHistory is initialized non-null on the entity, so the mapper's
             // `?? new List<>()` guard can never fire — omitting the include silently

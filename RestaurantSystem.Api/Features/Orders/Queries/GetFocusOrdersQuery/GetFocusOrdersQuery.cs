@@ -34,19 +34,9 @@ public class GetFocusOrdersQueryHandler : IQueryHandler<GetFocusOrdersQuery, Api
     public async Task<ApiResponse<List<OrderDto>>> Handle(GetFocusOrdersQuery query, CancellationToken cancellationToken)
     {
         var ordersQuery = _context.Orders
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.DetailedIngredients)
-                        .ThenInclude(pi => pi.GlobalIngredient)
-            // Menu-backed lines resolve KitchenType + ingredient customizations through
-            // Menu -> MenuItems -> Product; without the chain the mapper silently emits
-            // null for both. Same omission as the printer feed (#234).
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Menu)
-                    .ThenInclude(m => m!.MenuItems)
-                        .ThenInclude(mi => mi.Product)
-                            .ThenInclude(p => p.DetailedIngredients)
-                                .ThenInclude(di => di.GlobalIngredient)
+            // The menu-backed half of this was missing, so those lines silently mapped with a
+            // null KitchenType and null customizations. Same omission as the printer feed (#234).
+            .IncludeOrderLineGraph()
             .Include(o => o.Payments)
             // StatusHistory is initialized non-null on the entity, so the mapper's
             // `?? new List<>()` guard never fires — omitting it silently emitted [].

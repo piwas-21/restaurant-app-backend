@@ -75,19 +75,9 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
     public async Task<ApiResponse<PagedResult<OrderDto>>> Handle(GetOrdersQuery query, CancellationToken cancellationToken)
     {
         var ordersQuery = _context.Orders
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.DetailedIngredients)
-                        .ThenInclude(pi => pi.GlobalIngredient)
-            // Menu-backed lines resolve KitchenType + ingredient customizations through
-            // Menu -> MenuItems -> Product; without the chain the mapper silently emits
-            // null for both. Same omission as the printer feed (#234).
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Menu)
-                    .ThenInclude(m => m!.MenuItems)
-                        .ThenInclude(mi => mi.Product)
-                            .ThenInclude(p => p.DetailedIngredients)
-                                .ThenInclude(di => di.GlobalIngredient)
+            // The menu-backed half of this was missing, so those lines silently mapped with a
+            // null KitchenType and null customizations. Same omission as the printer feed (#234).
+            .IncludeOrderLineGraph()
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Include(o => o.DeliveryAddress)
