@@ -22,11 +22,22 @@ namespace RestaurantSystem.Infrastructure.Persistence.Seeders;
 /// <para>
 /// <b>Opt-in, and it must stay that way.</b> Unlike every other seeder here this inserts a VISIBLE,
 /// ORDERABLE product — a tenant would find "E2E Menu Deal" on their menu and a guest could buy it.
-/// It runs only when <c>SeedSettings:SeedE2EMenuFixtures</c> is true. The default is false precisely
-/// so that forgetting to set it is the safe outcome, and the prod compose file passes an explicit
-/// env allowlist rather than the whole environment — so a stray variable in a box <c>.env</c> cannot
-/// turn it on either. <b>Nothing enables it yet:</b> switching staging on is a companion change in
-/// the deploy repo, without which the printer-app E2E still sees no fixture.
+/// It runs only when <c>SeedSettings:SeedE2EMenuFixtures</c> is true, and the default is false
+/// precisely so that forgetting to set it is the safe outcome.
+/// <para>
+/// <b>The invariant that keeps it off production</b> is worth stating exactly, because the obvious
+/// one is wrong. It is NOT that the compose file filters the environment: since deploy #65,
+/// <c>docker-compose.prod.yml</c> forwards <c>SEED_E2E_MENU_FIXTURES</c> on BOTH boxes, defaulting
+/// to <c>false</c>. What pins prod off is that <c>Program.cs</c> adds environment variables LAST in
+/// the configuration chain, so that compose default outranks even a <c>SeedSettings</c> block in a
+/// box <c>app-secrets.json</c> — which was previously the one way in. The single remaining lever is
+/// an explicit <c>SEED_E2E_MENU_FIXTURES=true</c> line in the STAGING box's <c>.env</c>, which is
+/// the design intent (see the deploy repo's DEPLOYMENT.md).
+/// </para>
+/// <para>
+/// The value must be literally <c>true</c> or <c>false</c>: anything else fails bool binding, which
+/// throws out of <c>MigrateApplicationDatabaseAsync</c>, so the backend never reaches
+/// <c>app.Run()</c> and restart-loops.
 /// </para>
 /// <para>
 /// Idempotent by fixed ids: a second boot finds the combo and returns, so it never duplicates and
