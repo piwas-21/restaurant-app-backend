@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.ClearBasketCommand;
+using RestaurantSystem.Api.Features.Basket.Commands.SetBasketOrderTypeCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.RemoveFromBasketCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.UpdateBasketItemCommand;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -147,6 +148,27 @@ public class BasketController : ControllerBase
         }
 
         var command = new ClearBasketCommand(sessionId);
+        var result = await _mediator.SendCommand(command);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Set the basket's order type (channel). Call with removeConflicts=false first: if any line is
+    /// unavailable for the new type NOTHING changes and the conflicts come back, so the guest can
+    /// confirm. Repeat with removeConflicts=true to drop those lines and apply the switch.
+    /// </summary>
+    [HttpPut("order-type")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<BasketChannelSwitchDto>>> SetOrderType(
+        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromBody] SetBasketOrderTypeCommand command)
+    {
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            return BadRequest(ApiResponse<BasketChannelSwitchDto>.Failure("Session ID is required"));
+        }
+
+        command.SessionId = sessionId;
         var result = await _mediator.SendCommand(command);
         return Ok(result);
     }

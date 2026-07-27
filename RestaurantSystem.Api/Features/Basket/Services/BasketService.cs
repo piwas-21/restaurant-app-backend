@@ -75,6 +75,10 @@ public class BasketService : IBasketService
             var product = await _context.Products
                 .Include(p => p.Variations)
                 .Include(p => p.DetailedIngredients)
+                // Needed so BasketChannelGuard can resolve availability inherited from the
+                // PRIMARY category (ORDER-TYPE-AVAILABILITY-PLAN §4.1).
+                .Include(p => p.ProductCategories)
+                    .ThenInclude(pc => pc.Category)
                 .Include(p => p.MenuDefinition)
                     .ThenInclude(md => md!.Sections)
                         .ThenInclude(s => s.Items)
@@ -83,6 +87,8 @@ public class BasketService : IBasketService
 
             if (product == null)
                 throw new NotFoundException("Product not found or unavailable");
+
+            BasketChannelGuard.EnsureOrderable(product, basket.OrderType);
 
             // Handle Menu Type Product. The menu parent/child graph is built by the
             // factory and added in one go — EF cascades the children from the parent.

@@ -35,6 +35,12 @@ public class BasketConfiguration : IEntityTypeConfiguration<Basket>
         builder.Property(b => b.Notes)
             .HasMaxLength(1000);
 
+        // Stored as a string to match Order.Type (OrderConfiguration) — this codebase's convention
+        // for the OrderType enum. Nullable: an unchosen channel is a real, permissive state.
+        builder.Property(b => b.OrderType)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.HasIndex(b => b.SessionId);
         builder.HasIndex(b => b.UserId);
         builder.HasIndex(b => new { b.SessionId, b.UserId });

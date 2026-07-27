@@ -1,4 +1,5 @@
-﻿using RestaurantSystem.Domain.Common.Enums;
+﻿using RestaurantSystem.Api.Features.Catalog.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
@@ -23,4 +24,15 @@ public record ProductSummaryDto
     public int VariationCount { get; init; }
     public List<ProductVariationDto>? Variations { get; init; } = [];
     public List<SideItemDto> SuggestedSideItems { get; init; } = [];
+
+    /// <summary>
+    /// Resolved per-order-type availability. Additive — clients that ignore it are unaffected.
+    /// </summary>
+    public ItemAvailabilityDto Availability { get; init; } = new();
+
+    /// <summary>
+    /// The raw <c>OrderChannels</c> mask stored on the item (<c>null</c> = inherit). Admin editors
+    /// need the stored value; customers should read <see cref="Availability"/> instead.
+    /// </summary>
+    public int? AvailableOrderTypes { get; init; }
 }

@@ -20,6 +20,7 @@ using RestaurantSystem.Api.Features.Products.Queries.GetSpecialProductsQuery;
 using RestaurantSystem.Api.Features.Products.Queries.GetFeaturedSpecialQuery;
 using RestaurantSystem.Api.Features.Products.Commands.SetFeaturedSpecialCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UnsetFeaturedSpecialCommand;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products;
 
@@ -79,9 +80,11 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpGet("{id}")]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<ProductDto>>> GetProduct(Guid id)
+    public async Task<ActionResult<ApiResponse<ProductDto>>> GetProduct(
+        Guid id,
+        [FromQuery] OrderType? requestedOrderType = null)
     {
-        var query = new GetProductByIdQuery(id);
+        var query = new GetProductByIdQuery(id, requestedOrderType);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
     }

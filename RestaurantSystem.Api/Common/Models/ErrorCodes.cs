@@ -18,4 +18,12 @@ public static class ErrorCodes
     /// "Email already registered" hint without substring-matching the message.
     /// </summary>
     public const string EmailAlreadyExists = "EmailAlreadyExists";
+
+    /// <summary>
+    /// Returned when an item cannot be ordered through the basket's current order type. The
+    /// message names the channels the item IS available on, and the frontend re-displays it
+    /// verbatim — this code is what tells it that the message is safe to show a guest, rather
+    /// than it having to trust every 400 on the endpoint.
+    /// </summary>
+    public const string OrderTypeNotAvailable = "OrderTypeNotAvailable";
 }

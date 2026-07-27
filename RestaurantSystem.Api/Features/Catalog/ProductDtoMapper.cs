@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Catalog;
@@ -16,10 +17,15 @@ namespace RestaurantSystem.Api.Features.Catalog;
 /// </summary>
 public static class ProductDtoMapper
 {
-    public static ProductDto MapToProductDto(Product product)
+    /// <param name="requestedOrderType">
+    /// The guest's channel, or null on admin write-path responses (nothing is reported blocked).
+    /// </param>
+    public static ProductDto MapToProductDto(Product product, OrderType? requestedOrderType = null)
     {
         var dto = new ProductDto
         {
+            Availability = OrderTypeAvailability.Resolve(product, requestedOrderType),
+            AvailableOrderTypes = product.AvailableOrderTypes,
             Id = product.Id,
             Name = product.Name,
             Description = product.Description,
@@ -61,7 +67,8 @@ public static class ProductDtoMapper
                     Description = pc.Category.Description,
                     ImageUrl = pc.Category.ImageUrl,
                     IsActive = pc.Category.IsActive,
-                    DisplayOrder = pc.Category.DisplayOrder
+                    DisplayOrder = pc.Category.DisplayOrder,
+                    AvailableOrderTypes = pc.Category.AvailableOrderTypes
                 })
                 .FirstOrDefault(),
             Variations = product.Variations.Select(v => new ProductVariationDto
