@@ -341,9 +341,11 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         orderResult!.Success.Should().BeTrue();
         var createdOrder = orderResult.Data!;
 
-        // OrderDto.Items is flat (parents + children); the pizza row only exists
-        // as the combo's child here.
-        var pizzaOrderItem = createdOrder.Items.FirstOrDefault(i => i.ProductId == _testPizza.Id);
+        // OrderDto.Items holds only root rows; the pizza exists solely as the combo's
+        // child, so it is reached through the parent's SideItems (#234).
+        var comboParent = createdOrder.Items.Single();
+        comboParent.ProductId.Should().Be(_menuProduct.Id);
+        var pizzaOrderItem = comboParent.SideItems?.FirstOrDefault(i => i.ProductId == _testPizza.Id);
         pizzaOrderItem.Should().NotBeNull();
         pizzaOrderItem!.IngredientCustomizations.Should().NotBeNull();
 

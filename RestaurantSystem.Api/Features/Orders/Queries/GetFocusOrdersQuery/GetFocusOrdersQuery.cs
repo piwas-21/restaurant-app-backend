@@ -34,12 +34,17 @@ public class GetFocusOrdersQueryHandler : IQueryHandler<GetFocusOrdersQuery, Api
     public async Task<ApiResponse<List<OrderDto>>> Handle(GetFocusOrdersQuery query, CancellationToken cancellationToken)
     {
         var ordersQuery = _context.Orders
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.DetailedIngredients)
-                        .ThenInclude(pi => pi.GlobalIngredient)
+            // The menu-backed half of this was missing, so those lines silently mapped with a
+            // null KitchenType and null customizations. Same omission as the printer feed (#234).
+            .IncludeOrderLineGraph()
             .Include(o => o.Payments)
+            // StatusHistory is initialized non-null on the entity, so the mapper's
+            // `?? new List<>()` guard never fires — omitting it silently emitted [].
+            .Include(o => o.StatusHistory)
             .Include(o => o.DeliveryAddress)
+            // Sibling collection includes cartesian-multiply in EF's default single-query
+            // mode, and the Menu branch multiplies against the Product branch under Items.
+            .AsSplitQuery()
             .Where(o => !o.IsDeleted && o.IsFocusOrder);
 
         // Filter by active status
