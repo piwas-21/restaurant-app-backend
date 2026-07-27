@@ -308,11 +308,12 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         createdOrder.CustomerName.Should().Be("Test Customer");
         createdOrder.Status.Should().Be(OrderStatus.Confirmed.ToString());
         createdOrder.PaymentStatus.Should().Be(PaymentStatus.Pending.ToString());
-        // OrderDto.Items is the flat list of all OrderItem rows (parents +
-        // children — the mapping doesn't filter). Four rows here: the
-        // standalone pizza, the combo parent, and the combo's two
-        // child option rows (pizza + cola).
-        createdOrder.Items.Should().HaveCount(4);
+        // OrderDto.Items holds only ROOT rows; child rows hang off their parent's
+        // SideItems (#234 — the flat projection emitted every child twice on the
+        // paths where SideItems was populated, and left it null on the printer
+        // feed). Two roots here: the standalone pizza and the combo parent. The
+        // combo's two child option rows (pizza + cola) are asserted below.
+        createdOrder.Items.Should().HaveCount(2);
 
         // Verify Order Items - standalone pizza (qty 2, no parent)
         var orderProductItem = createdOrder.Items
@@ -327,17 +328,22 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         orderMenuItem!.Quantity.Should().Be(1);
         orderMenuItem.ProductName.Should().Be("Lunch Special Combo");
 
-        // Verify the cola option (child of the combo) is also present.
-        var orderColaChild = createdOrder.Items
+        // The combo's children are nested under it, not listed top-level. The combo
+        // parent is ProductType.Menu, so its children are stamped BundleChild.
+        createdOrder.Items.Should().NotContain(i => i.ProductId == _testCola.Id,
+            "child rows belong under their parent's SideItems, not at the top level");
+        orderMenuItem.SideItems.Should().NotBeNull().And.HaveCount(2);
+        var orderColaChild = orderMenuItem.SideItems!
             .FirstOrDefault(i => i.ProductId == _testCola.Id);
         orderColaChild.Should().NotBeNull();
         orderColaChild!.ProductName.Should().Be("Test Cola");
+        orderColaChild.Kind.Should().Be(ItemKind.BundleChild);
 
         // Verify Order Totals
         //
-        // itemsTotal sums ItemTotal across every OrderItem row (parents +
-        // children). Pinning the exact sum so this assertion fails loudly
-        // if pricing logic ever shifts under us.
+        // itemsTotal sums ItemTotal across the root rows. Children carry ItemTotal = 0
+        // (see below), so root-only summing is equivalent to the old flat sum. Pinning
+        // the exact value so this assertion fails loudly if pricing logic ever shifts.
         //
         // Per issue #54 (now fixed): OrderItemFactory aligns with
         // BasketService.AddItemToBasketAsync (BasketService.cs:230-231) —
@@ -499,14 +505,17 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         order.CustomerName.Should().Be("Test Customer");
         order.Status.Should().Be(OrderStatus.Confirmed.ToString());
 
-        // Same 4 rows as the legacy path: standalone pizza + combo parent + 2 combo children.
-        order.Items.Should().HaveCount(4);
+        // Same rows as the legacy path, in the same shape: 2 roots (standalone pizza +
+        // combo parent) with the 2 combo children nested under the parent (#234). DB-level
+        // row parity is asserted separately below.
+        order.Items.Should().HaveCount(2);
         order.Items.FirstOrDefault(i => i.ProductId == _testProduct.Id && i.Quantity == 2)
             .Should().NotBeNull("the standalone pizza (qty 2) must be present");
-        order.Items.FirstOrDefault(i => i.ProductId == _menuProduct.Id)
-            .Should().NotBeNull("the combo parent must be present");
-        order.Items.FirstOrDefault(i => i.ProductId == _testCola.Id)
-            .Should().NotBeNull("the cola combo child must be present");
+        var comboParent = order.Items.FirstOrDefault(i => i.ProductId == _menuProduct.Id);
+        comboParent.Should().NotBeNull("the combo parent must be present");
+        comboParent!.SideItems.Should().NotBeNull().And.HaveCount(2);
+        comboParent.SideItems!.FirstOrDefault(i => i.ProductId == _testCola.Id)
+            .Should().NotBeNull("the cola combo child must be nested under the combo parent");
 
         // Identical items total: children contribute 0 (their price is rolled into the parent's
         // UnitPrice by BasketService), so only the standalone pizza + the combo parent count.

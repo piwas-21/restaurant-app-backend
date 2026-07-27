@@ -36,15 +36,25 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
         // global query filter would also handle this but we keep it explicit
         // so the read intent is unambiguous when grepping for delete-aware paths.
         var ordersQuery = _context.Orders
-            .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.DetailedIngredients)
-                        .ThenInclude(di => di.GlobalIngredient)
+            // Covers BOTH line-resolution paths. The menu-backed one was missing: the mapper
+            // reads it null-conditionally, so KitchenType came back null — and the printer app
+            // routes kitchen tickets by KitchenType, so those lines printed on NEITHER kitchen
+            // printer rather than merely losing their customizations.
+            .IncludeOrderLineGraph()
             .Include(o => o.Payments)
+            // Order.StatusHistory is initialized non-null on the entity, so the mapper's
+            // `?? new List<>()` guard can never fire — omitting the include silently
+            // emitted [] instead of the history. Mirrors GetOrdersQuery/GetOrderByIdQuery.
+            .Include(o => o.StatusHistory)
             .Include(o => o.DeliveryAddress)
             .Where(o => !o.IsDeleted)
             .Where(o => o.Status == OrderStatus.Confirmed)
             .AsNoTracking()
+            // Sibling collection includes (Items, Payments, StatusHistory) LEFT JOIN into one
+            // cartesian result set in EF's default single-query mode, and the Menu branch
+            // multiplies against the Product branch under Items. This endpoint is polled
+            // continuously by the printer app, so the row blow-up is not a one-off cost.
+            .AsSplitQuery()
             .AsQueryable();
 
         if (query.ModifiedSince.HasValue)
@@ -56,6 +66,9 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 
         var orders = await ordersQuery
             .OrderByDescending(o => o.OrderDate)
+            // OrderDate is not unique, and a split query runs one SQL statement per
+            // collection — without a tiebreaker the Take window can differ between them.
+            .ThenBy(o => o.Id)
             .Take(PrinterFeedQuery.MaxOrdersPerPoll)
             .ToListAsync(cancellationToken);
 
