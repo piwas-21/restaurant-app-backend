@@ -1,3 +1,5 @@
+using RestaurantSystem.Api.Features.Catalog.Dtos;
+
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 /// <summary>
@@ -16,4 +18,9 @@ public record SpecialProductDto
     public bool IsFeaturedSpecial { get; init; }
     public DateTime? FeaturedDate { get; init; }
     public int DisplayOrder { get; init; }
+
+    /// <summary>
+    /// Server-resolved per-order-type availability, as on every other catalog DTO.
+    /// </summary>
+    public required ItemAvailabilityDto Availability { get; init; }
 }

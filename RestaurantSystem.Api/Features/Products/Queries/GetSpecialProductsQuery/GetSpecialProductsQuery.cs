@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Utilities;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Queries.GetSpecialProductsQuery;
@@ -10,9 +12,13 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetSpecialProductsQuery
 /// <summary>
 /// Query to get all products marked as special (IsSpecial = true)
 /// </summary>
+/// <param name="RequestedOrderType">
+/// The channel the guest is browsing on, or <c>null</c> when they have not chosen one.
+/// </param>
 public record GetSpecialProductsQuery(
     int Page = 1,
-    int PageSize = 20
+    int PageSize = 20,
+    OrderType? RequestedOrderType = null
 ) : IQuery<ApiResponse<PagedResult<SpecialProductDto>>>;
 
 public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQuery, ApiResponse<PagedResult<SpecialProductDto>>>
@@ -37,6 +43,10 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
     {
         // Query all products where IsSpecial = true
         var specialProductsQuery = _context.Products
+            // See GetFeaturedSpecialQuery: without the inheritance chain an inheriting product
+            // resolves as UNRESTRICTED, so a restricted special would advertise itself as orderable.
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
             .Include(p => p.Images)
             .Where(p => p.IsSpecial)
             .AsQueryable();
@@ -64,6 +74,7 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
                 .Where(img => img.IsPrimary && !string.IsNullOrEmpty(img.Url))
                 .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? p.ImageUrl,
+            Availability = OrderTypeAvailability.Resolve(p, query.RequestedOrderType),
             IsActive = p.IsActive,
             IsAvailable = p.IsAvailable,
             IsSpecial = p.IsSpecial,

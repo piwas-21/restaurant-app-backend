@@ -14,11 +14,15 @@ namespace RestaurantSystem.Api.Features.Catalog;
 /// have loaded <c>ProductCategories → Category</c> for inheritance to resolve; a product with that
 /// collection unloaded reads as unrestricted (permissive), never as blocked.
 /// <para>
-/// WIRED UP: <see cref="ProductDtoMapper"/>, <see cref="ProductSummaryMapper"/> and
-/// <c>GetProductByIdQuery</c>. NOT YET WIRED: <c>MenuBundleDto</c> (bundle list/detail),
-/// <c>SpecialProductDto</c> (specials carousel) and <c>FeaturedSpecialDto</c> — those surfaces still
-/// render blocked items as fully orderable. Bundles additionally cannot yet STORE a mask: no bundle
+/// WIRED UP: <see cref="ProductDtoMapper"/>, <see cref="ProductSummaryMapper"/>,
+/// <c>GetProductByIdQuery</c>, and — since the G7 / §9.2 slice — <c>FeaturedSpecialDto</c> and
+/// <c>SpecialProductDto</c>. NOT YET WIRED: <c>MenuBundleDto</c> (bundle list/detail), which still
+/// renders blocked items as fully orderable and additionally cannot yet STORE a mask — no bundle
 /// command accepts <c>AvailableOrderTypes</c>. Tracked as follow-up.
+/// </para>
+/// <para>
+/// Every caller must load <c>ProductCategories -&gt; Category</c>. An unloaded collection resolves
+/// as UNRESTRICTED, so a missing include is a silently permissive verdict rather than an error.
 /// </para>
 /// </remarks>
 public static class OrderTypeAvailability
