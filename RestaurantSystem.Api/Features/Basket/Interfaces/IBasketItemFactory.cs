@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -17,7 +18,14 @@ public interface IBasketItemFactory
     /// side-items and ingredient quantities serialised to their JSON columns. Side-item
     /// prices are resolved from the database.
     /// </summary>
-    Task<BasketItem> BuildRegularItemAsync(Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId);
+    /// <param name="basketOrderType">
+    /// The basket's channel, or <c>null</c> when none is chosen. Every product this builds a line
+    /// from — the SIDE ITEMS as well as the product itself — is guarded against it (§9.3): the
+    /// caller can only guard the top-level product, so a blocked side item would otherwise ride in
+    /// underneath one that is allowed.
+    /// </param>
+    Task<BasketItem> BuildRegularItemAsync(
+        Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId, OrderType? basketOrderType);
 
     /// <summary>
     /// Builds a menu (bundle) basket item: validates each section's required/min/max
@@ -28,5 +36,11 @@ public interface IBasketItemFactory
     /// whole graph builds successfully. <paramref name="product"/> must have its
     /// <c>MenuDefinition.Sections.Items.Product</c> graph eagerly loaded.
     /// </summary>
-    Task<BasketItem> BuildMenuItemAsync(Product product, AddToBasketDto item, Guid basketId);
+    /// <param name="basketOrderType">
+    /// The basket's channel, or <c>null</c> when none is chosen. Every selected OPTION is guarded
+    /// against it (§9.3) — the combo being orderable says nothing about the components chosen
+    /// inside it, and the caller's guard only ever saw the combo.
+    /// </param>
+    Task<BasketItem> BuildMenuItemAsync(
+        Product product, AddToBasketDto item, Guid basketId, OrderType? basketOrderType);
 }
