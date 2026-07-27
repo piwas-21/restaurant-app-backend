@@ -48,4 +48,12 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
+
+	<!-- Contract snapshots (issue #238). Copied so the test can read the committed golden file at
+	     runtime; the test asserts its presence rather than silently passing when it is missing. -->
+	<ItemGroup>
+		<Content Include="Features/Orders/printer-feed.golden.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 </Project>

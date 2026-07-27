@@ -65,6 +65,12 @@ namespace RestaurantSystem.Infrastructure.Extensions
                 var restaurantInfoSeed = scope.ServiceProvider.GetService<IOptions<RestaurantInfoSeedSettings>>()?.Value ?? new RestaurantInfoSeedSettings();
                 await RestaurantInfoSeeder.SeedAsync(dbContext, logger, restaurantInfoSeed);
                 logger.LogInformation("Restaurant info seeding completed");
+
+                // LAST on purpose (issue #238): opt-in, off by default, and the only seeder here
+                // that inserts a visible, orderable product — so it is also the likeliest to throw.
+                // Running it after the others means a failure in it cannot abort the seeding a
+                // tenant actually depends on.
+                await E2EMenuFixtureSeeder.SeedAsync(dbContext, logger, seedSettings);
             }
             catch (Exception ex)
             {
