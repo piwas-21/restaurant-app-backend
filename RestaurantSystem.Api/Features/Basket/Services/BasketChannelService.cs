@@ -56,7 +56,7 @@ public class BasketChannelService : IBasketChannelService
             {
                 Applied = false,
                 Conflicts = conflicts,
-                Basket = await _mappingService.MapAsync(basket)
+                Basket = await MapFullGraphAsync(sessionId, userId)
             };
         }
 
@@ -90,15 +90,40 @@ public class BasketChannelService : IBasketChannelService
             "Basket {BasketId} order type set to {OrderType}; {RemovedCount} conflicting line(s) removed",
             basket.Id, orderType, conflicts.Count);
 
-        var refreshed = await _basketRepository.FindBasketAsync(sessionId, userId);
-
         return new BasketChannelSwitchDto
         {
             Applied = true,
             Conflicts = [],
             Removed = conflicts,
-            Basket = refreshed is null ? null : await _mappingService.MapAsync(refreshed)
+            Basket = await MapFullGraphAsync(sessionId, userId)
         };
+    }
+
+    /// <summary>
+    /// Re-reads the basket through the FULL-graph load and maps it. Both exits use this; neither may
+    /// map the <c>basket</c> local.
+    /// </summary>
+    /// <remarks>
+    /// That local comes from <see cref="IBasketRepository.FindTrackedBasketWithItemsAsync"/>, which
+    /// includes <c>.Items</c> and nothing else. <c>BasketMappingService</c> reads product /
+    /// variation / menu through null-conditionals, so mapping that graph THROWS NOTHING and simply
+    /// emits <c>ProductName = ""</c> (<c>null</c> on a bundle CHILD line, which has no
+    /// <c>?? string.Empty</c> fallback), <c>ProductDescription = ""</c>,
+    /// <c>ProductImageUrl = ""</c>, and — on the lines that carry them — a null variation name and
+    /// raw GUID strings where the ingredient names belong. The conflict list itself is unaffected:
+    /// it names products from its own query. So the damage lands on the basket the client
+    /// re-renders from, and only on the blocked branch, which is why the success path's re-read hid
+    /// it.
+    /// <para>
+    /// The invariant that keeps the narrow load safe is <b>no caller may MAP that graph while it
+    /// still has lines</b> — not "callers only mutate". <c>BasketService.ClearBasketAsync</c> does
+    /// map it, and is correct only because it empties <c>Items</c> first.
+    /// </para>
+    /// </remarks>
+    private async Task<BasketDto?> MapFullGraphAsync(string sessionId, Guid? userId)
+    {
+        var full = await _basketRepository.FindBasketAsync(sessionId, userId);
+        return full is null ? null : await _mappingService.MapAsync(full);
     }
 
     /// <summary>
@@ -111,7 +136,7 @@ public class BasketChannelService : IBasketChannelService
     /// constrains it. <c>OrderChannelGuard</c> does walk children at order creation, so an
     /// unfulfillable ORDER cannot be created; the residual gap is that such a line can still be
     /// added to a basket. Tracked as follow-up with bundle mask support.
-    /// </summary>
+    /// </remarks>
     private async Task<List<BasketChannelConflictDto>> FindConflictsAsync(
         Domain.Entities.Basket basket,
         OrderType orderType,
