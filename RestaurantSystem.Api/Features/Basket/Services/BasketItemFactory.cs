@@ -79,16 +79,23 @@ public class BasketItemFactory : IBasketItemFactory
                 BasketChannelGuard.EnsureOrderable(sideItemProduct, basketOrderType);
             }
 
+            // Persist only the sides that RESOLVED. The guard above can only see what the query
+            // returned, so serializing the raw client list would let an unresolved id — a sold-out
+            // side (`IsAvailable = false`, a routine pairing with a channel restriction) or one that
+            // simply does not exist — reach the line unpriced and unguarded, and from there the
+            // kitchen ticket. That is the "stale tab or tampered payload" case this guard exists for.
+            var resolvedSides = new List<SelectedSideItemDto>();
             foreach (var selectedSide in validSideItems)
             {
                 var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
                 if (sideItem != null)
                 {
                     customizationPrice += sideItem.BasePrice * selectedSide.Quantity;
+                    resolvedSides.Add(selectedSide);
                 }
             }
 
-            selectedSideItemsJson = JsonSerializer.Serialize(validSideItems);
+            selectedSideItemsJson = resolvedSides.Count > 0 ? JsonSerializer.Serialize(resolvedSides) : null;
         }
 
         return new BasketItem
@@ -190,8 +197,13 @@ public class BasketItemFactory : IBasketItemFactory
 
         // §9.3: a combo being orderable on this channel says nothing about the components chosen
         // inside it, and the caller's guard only ever saw the combo. `OrderChannelGuard` already
-        // walks children at order creation, so before this the basket could hold a line the order
-        // endpoint would then refuse — a dead end discovered at checkout rather than at add time.
+        // walks children at order creation, so a line that gets past here is a dead end the guest
+        // discovers at checkout rather than at add time.
+        //
+        // This closes the ADD-under-a-channel half only. The add-then-SWITCH half is still open:
+        // `BasketChannelService.FindConflictsAsync` walks root lines only, so a combo added with no
+        // channel chosen (permissive by design, and the dominant browse state) still reports zero
+        // conflicts when the guest later picks a channel its components refuse. Tracked as §9.15.
         foreach (var childProduct in childProducts.Values)
         {
             BasketChannelGuard.EnsureOrderable(childProduct, basketOrderType);

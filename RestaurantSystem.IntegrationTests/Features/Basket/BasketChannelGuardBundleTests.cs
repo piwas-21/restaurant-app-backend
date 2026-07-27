@@ -85,6 +85,87 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
         thrown.Which.ErrorCode.Should().Be(ErrorCodes.OrderTypeNotAvailable);
     }
 
+    /// <summary>
+    /// THROUGH the service, not the factory — the two tests above call `BuildMenuItemAsync` directly
+    /// with an explicit channel, so replacing `basket.OrderType` with `null` at both call sites in
+    /// `BasketService` would leave them green while the guard saw nothing. That is verbatim the
+    /// §9.13 failure mode: the whole S2 enforcement half sat inert in production because nothing
+    /// crossed the wiring boundary and no test did either.
+    /// </summary>
+    [Fact]
+    public async Task AddToBasket_ThroughTheService_PassesTheBasketsChannelToTheFactory()
+    {
+        var sessionId = Guid.NewGuid().ToString();
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            // Put a line in first: the endpoint that sets the channel 404s on an empty basket by
+            // construction (only the add path creates one) — §9.13.
+            var basketService = scope.ServiceProvider.GetRequiredService<IBasketService>();
+            await basketService.AddItemToBasketAsync(
+                sessionId, null, new AddToBasketDto { ProductId = PlainProductId, Quantity = 1 });
+
+            var channelService = scope.ServiceProvider.GetRequiredService<IBasketChannelService>();
+            await channelService.SetOrderTypeAsync(sessionId, null, OrderType.DineIn, removeConflicts: true);
+        }
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var basketService = scope.ServiceProvider.GetRequiredService<IBasketService>();
+            var act = () => basketService.AddItemToBasketAsync(
+                sessionId,
+                null,
+                new AddToBasketDto
+                {
+                    ProductId = ComboId,
+                    Quantity = 1,
+                    SelectedMenuOptions =
+                    [
+                        new SelectedMenuOptionDto { SectionId = SectionId, ItemId = BlockedOptionId, Quantity = 1 },
+                    ],
+                });
+
+            var thrown = await act.Should().ThrowAsync<BadRequestException>();
+            thrown.Which.ErrorCode.Should().Be(ErrorCodes.OrderTypeNotAvailable);
+        }
+    }
+
+    [Fact]
+    public async Task SideItem_AllowedOnTheBasketsChannel_IsAccepted()
+    {
+        var act = () => BuildRegularAsync(OrderType.DineIn, AllowedOptionId);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task SideItem_ThatDoesNotResolve_IsNotPersistedAtAll()
+    {
+        // The guard can only see what the query returned, so a side id that resolves to nothing —
+        // sold out (`IsAvailable = false`, a routine pairing with a channel restriction) or simply
+        // fabricated — must not survive into the line's JSON. It would otherwise reach the order
+        // (and the kitchen ticket) unpriced and unguarded, which is the "stale tab or tampered
+        // payload" case this guard exists for.
+        using var scope = Factory.Services.CreateScope();
+        var factory = scope.ServiceProvider.GetRequiredService<IBasketItemFactory>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var product = await context.Products.FindAsync(PlainProductId);
+
+        var item = await factory.BuildRegularItemAsync(
+            product!,
+            null,
+            new AddToBasketDto
+            {
+                ProductId = PlainProductId,
+                Quantity = 1,
+                SelectedSideItems = [new SelectedSideItemDto { Id = Guid.NewGuid(), Quantity = 1 }],
+            },
+            Guid.NewGuid(),
+            OrderType.DineIn);
+
+        item.SelectedSideItemsJson.Should().BeNull("a phantom side must not reach the kitchen ticket");
+    }
+
     private async Task BuildMenuAsync(OrderType? basketOrderType, Guid optionProductId)
     {
         using var scope = Factory.Services.CreateScope();

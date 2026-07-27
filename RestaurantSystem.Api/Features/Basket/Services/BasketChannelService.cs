@@ -134,8 +134,16 @@ public class BasketChannelService : IBasketChannelService
     /// channel set. ⚠️ That premise is NOT yet implemented: no bundle command accepts
     /// <c>AvailableOrderTypes</c>, so a bundle's mask is always inherited-or-null today and nothing
     /// constrains it. <c>OrderChannelGuard</c> does walk children at order creation, so an
-    /// unfulfillable ORDER cannot be created; the residual gap is that such a line can still be
-    /// added to a basket. Tracked as follow-up with bundle mask support.
+    /// unfulfillable ORDER cannot be created, and since §9.3 such a line can no longer be ADDED
+    /// under a chosen channel either (<c>BasketItemFactory</c> guards every option and side item).
+    /// <para>
+    /// ⚠️ <b>The residual gap is this scan itself.</b> It is root-only, so a combo added while NO
+    /// channel was chosen — permissive by design, and the dominant browse state — reports zero
+    /// conflicts when the guest later picks one its components refuse. The guest gets no confirm
+    /// dialog, the channel is set, and the 400 arrives at checkout instead. Closing it means
+    /// flattening children + <c>SelectedSideItemsJson</c> here, which this scan already has the data
+    /// for. Tracked as §9.15 (and the same root-only shape sits in
+    /// <c>AnonymousBasketMerger.ResetOrderTypeIfMergedItemsConflictAsync</c>).
     /// </remarks>
     private async Task<List<BasketChannelConflictDto>> FindConflictsAsync(
         Domain.Entities.Basket basket,
