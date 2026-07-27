@@ -18,6 +18,23 @@ public class OrderMappingService : IOrderMappingService
 
     public OrderDto MapToOrderDto(Order order)
     {
+        // Child rows live in the SAME Items collection as their parents — a child carries
+        // its parent's OrderId — so the flat list already holds the whole tree. Grouping it
+        // here, rather than reading the ChildOrderItems navigation, is what makes SideItems
+        // independent of how the caller happened to query (#234):
+        //   - AsNoTracking reads (the printer feed) never populated ChildOrderItems, and
+        //     there is no relationship fix-up to compensate, so SideItems came back null on
+        //     every order and bundle components printed as flat top-level lines;
+        //   - tracked reads DID get it populated by fix-up, but still projected every child
+        //     a second time as its own top-level line, rendering it twice.
+        // It also spans arbitrary bundle depth (OrderItemFactory nests grandchildren) with
+        // no include chain to keep in sync. Root-only projection matches the precedent in
+        // GetZReportQuery (.Where(i => i.ParentOrderItemId == null)).
+        var items = order.Items ?? new List<OrderItem>();
+        var childrenByParent = items
+            .Where(i => i.ParentOrderItemId.HasValue)
+            .ToLookup(i => i.ParentOrderItemId!.Value);
+
         return new OrderDto
         {
             Id = order.Id,
@@ -55,7 +72,10 @@ public class OrderMappingService : IOrderMappingService
             Notes = order.Notes,
             CancellationReason = order.CancellationReason,
             DeliveryAddress = MapToDeliveryAddressDto(order.DeliveryAddress),
-            Items = order.Items?.Select(MapToOrderItemDto).ToList() ?? new List<OrderItemDto>(),
+            Items = items
+                .Where(i => !i.ParentOrderItemId.HasValue)
+                .Select(i => MapOrderItem(i, childrenByParent))
+                .ToList(),
             Payments = order.Payments?.Select(MapToOrderPaymentDto).ToList() ?? new List<OrderPaymentDto>(),
             StatusHistory = order.StatusHistory?.Select(sh => new OrderStatusHistoryDto
             {
@@ -83,12 +103,23 @@ public class OrderMappingService : IOrderMappingService
             PaymentStatus = order.PaymentStatus.ToString(),
             Total = order.Total,
             OrderDate = order.OrderDate,
-            ItemCount = order.Items?.Count ?? 0,
+            // Root rows only, so this stays consistent with OrderDto.Items — a 1-line combo
+            // with 3 components is 1 item, not 4.
+            ItemCount = order.Items?.Count(i => !i.ParentOrderItemId.HasValue) ?? 0,
             IsFocusOrder = order.IsFocusOrder
         };
     }
 
-    public OrderItemDto MapToOrderItemDto(OrderItem item)
+    // Single-item entry point with no surrounding order, so children can only come from the
+    // ChildOrderItems navigation — and the CALLER owns whether it is populated. Mapping an
+    // item off an AsNoTracking query through here yields SideItems = null, silently: issue
+    // #234 verbatim. Prefer MapToOrderDto, which sources children from the order's own flat
+    // Items list and is immune to that.
+    public OrderItemDto MapToOrderItemDto(OrderItem item) => MapOrderItem(item, childrenByParent: null);
+
+    // childrenByParent is the order-wide parent -> children lookup built once by
+    // MapToOrderDto; null means "fall back to the navigation" (see MapToOrderItemDto).
+    private OrderItemDto MapOrderItem(OrderItem item, ILookup<Guid, OrderItem>? childrenByParent)
     {
         // Parse ingredient customizations
         List<OrderItemIngredientDto>? ingredientCustomizations = null;
@@ -175,14 +206,21 @@ public class OrderMappingService : IOrderMappingService
         // component; a child of a regular item is a true add-on side. The Kind discriminator
         // (DTO-only, derived from the parent's product type) lets the kitchen ticket and the
         // order UI tell the two apart — they otherwise share the SideItems collection (#158).
+        // ChildOrderItems is initialized non-null on the entity, so no null guard here — an
+        // unpopulated navigation is an EMPTY collection, which is exactly why #234 failed
+        // silently rather than throwing. See MapToOrderItemDto for when this branch applies.
+        var childItems = childrenByParent is not null
+            ? childrenByParent[item.Id]
+            : item.ChildOrderItems;
+
         List<OrderItemDto>? sideItems = null;
-        if (item.ChildOrderItems != null && item.ChildOrderItems.Any())
+        if (childItems.Any())
         {
             var childKind = item.Product?.Type == ProductType.Menu ? ItemKind.BundleChild : ItemKind.SideItem;
-            sideItems = item.ChildOrderItems
+            sideItems = childItems
                 .Select(child =>
                 {
-                    var childDto = MapToOrderItemDto(child);
+                    var childDto = MapOrderItem(child, childrenByParent);
                     childDto.Kind = childKind;
                     return childDto;
                 })

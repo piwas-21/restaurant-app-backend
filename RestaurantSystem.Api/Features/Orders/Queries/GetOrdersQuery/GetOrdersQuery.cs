@@ -79,10 +79,22 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
                 .ThenInclude(i => i.Product)
                     .ThenInclude(p => p!.DetailedIngredients)
                         .ThenInclude(pi => pi.GlobalIngredient)
+            // Menu-backed lines resolve KitchenType + ingredient customizations through
+            // Menu -> MenuItems -> Product; without the chain the mapper silently emits
+            // null for both. Same omission as the printer feed (#234).
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Menu)
+                    .ThenInclude(m => m!.MenuItems)
+                        .ThenInclude(mi => mi.Product)
+                            .ThenInclude(p => p.DetailedIngredients)
+                                .ThenInclude(di => di.GlobalIngredient)
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Include(o => o.DeliveryAddress)
             .Where(o => !o.IsDeleted)
+            // Sibling collection includes cartesian-multiply in EF's default single-query
+            // mode, and the Menu branch multiplies against the Product branch under Items.
+            .AsSplitQuery()
             .AsQueryable();
 
         // Determine if user is staff (Admin, Cashier, KitchenStaff, or Server)
@@ -181,9 +193,12 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
             _ => o => o.OrderDate
         };
 
+        // None of the sort keys is unique, and a split query runs one SQL statement per
+        // collection — without a tiebreaker the Skip/Take window can differ between them
+        // (and pages could overlap or drop rows even in single-query mode).
         ordersQuery = query.Descending
-            ? ordersQuery.OrderByDescending(keySelector)
-            : ordersQuery.OrderBy(keySelector);
+            ? ordersQuery.OrderByDescending(keySelector).ThenBy(o => o.Id)
+            : ordersQuery.OrderBy(keySelector).ThenBy(o => o.Id);
 
         // Apply pagination
         var orders = await ordersQuery
