@@ -1,9 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
-using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -43,8 +41,36 @@ public class BasketChannelService : IBasketChannelService
         bool removeConflicts,
         CancellationToken cancellationToken = default)
     {
-        var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId)
-            ?? throw new NotFoundException("Basket not found");
+        // Both identifiers empty addresses no basket at all. Without this the upsert below would
+        // happily CREATE one under a random session id that no later request can ever name — an
+        // orphan row, reported back as Applied = true with a null Basket. The NotFoundException this
+        // method used to throw was carrying that guard for free.
+        if (string.IsNullOrEmpty(sessionId) && (userId is null || userId == Guid.Empty))
+        {
+            throw new BadRequestException("Session ID or an authenticated user is required");
+        }
+
+        // §9.13: UPSERT rather than 404. This endpoint used to refuse an empty cart by
+        // construction — only the add path ever created a basket — so a guest who picked a channel
+        // before adding anything had the choice silently dropped, and the client had no way to tell
+        // (nothing on the wire carried the basket's channel until BasketDto.OrderType).
+        //
+        // ⚠️ The re-fetch is NOT redundant. GetOrCreateBasketAsync returns a TRACKED entity on its
+        // create path but an UNTRACKED one on its find path (FindBasketAsync is AsNoTracking), so
+        // taking its return value directly is only correct if it definitely created. Filter parity
+        // between the two finders makes that true at an instant but NOT across two round trips: a
+        // concurrent add-to-basket, a double-tap or a client retry can insert the row in between,
+        // GetOrCreate then FINDS it, and the OrderType assignment below lands on a detached entity —
+        // saving nothing, throwing nothing, and answering Applied = true. That is the PR #89 class,
+        // which is exactly what this comment used to argue was impossible. Re-reading through the
+        // tracked finder is correct on every interleaving and costs one cheap query on create only.
+        var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
+        if (basket is null)
+        {
+            await _basketRepository.GetOrCreateBasketAsync(sessionId, userId);
+            basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId)
+                ?? throw new NotFoundException("Basket not found");
+        }
 
         var conflicts = await FindConflictsAsync(basket, orderType, cancellationToken);
 
