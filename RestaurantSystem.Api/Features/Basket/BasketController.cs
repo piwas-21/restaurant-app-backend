@@ -4,7 +4,6 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Features.Basket.Commands.AddToBasketCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.ClearBasketCommand;
-using RestaurantSystem.Api.Features.Basket.Commands.SetBasketOrderTypeCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.RemoveFromBasketCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.UpdateBasketItemCommand;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -14,15 +13,14 @@ using RestaurantSystem.Api.Features.Basket.Queries.GetBasketSummaryQuery;
 
 namespace RestaurantSystem.Api.Features.Basket;
 
-[ApiController]
-[Route("api/[controller]")]
-public class BasketController : ControllerBase
+/// <summary>
+/// The basket and its LINES. The channel lives on <see cref="BasketChannelController"/> — same
+/// route prefix, different concern (ORDER-TYPE-AVAILABILITY-PLAN §9.7).
+/// </summary>
+public class BasketController : BasketControllerBase
 {
-    private readonly CustomMediator _mediator;
-
-    public BasketController(CustomMediator mediator)
+    public BasketController(CustomMediator mediator) : base(mediator)
     {
-        _mediator = mediator;
     }
 
     /// <summary>
@@ -30,16 +28,11 @@ public class BasketController : ControllerBase
     /// </summary>
     [HttpGet]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<BasketDto>>> GetBasket([FromHeader(Name = "X-Session-Id")] string sessionId)
+    public async Task<ActionResult<ApiResponse<BasketDto>>> GetBasket([FromHeader(Name = SessionIdHeader)] string sessionId)
     {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketDto>.Failure("Session ID is required"));
-        }
+        if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
-        var query = new GetBasketQuery(sessionId);
-        var result = await _mediator.SendQuery(query);
-        return Ok(result);
+        return Ok(await Mediator.SendQuery(new GetBasketQuery(sessionId)));
     }
 
     /// <summary>
@@ -47,16 +40,11 @@ public class BasketController : ControllerBase
     /// </summary>
     [HttpGet("summary")]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<BasketSummaryDto>>> GetBasketSummary([FromHeader(Name = "X-Session-Id")] string sessionId)
+    public async Task<ActionResult<ApiResponse<BasketSummaryDto>>> GetBasketSummary([FromHeader(Name = SessionIdHeader)] string sessionId)
     {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketSummaryDto>.Failure("Session ID is required"));
-        }
+        if (MissingSession<BasketSummaryDto>(sessionId) is { } error) return error;
 
-        var query = new GetBasketSummaryQuery(sessionId);
-        var result = await _mediator.SendQuery(query);
-        return Ok(result);
+        return Ok(await Mediator.SendQuery(new GetBasketSummaryQuery(sessionId)));
     }
 
     /// <summary>
@@ -65,13 +53,10 @@ public class BasketController : ControllerBase
     [HttpPost("items")]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<BasketDto>>> AddToBasket(
-        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromHeader(Name = SessionIdHeader)] string sessionId,
         [FromBody] AddToBasketDto request)
     {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketDto>.Failure("Session ID is required"));
-        }
+        if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
         var command = new AddToBasketCommand(
             sessionId,
@@ -87,8 +72,7 @@ public class BasketController : ControllerBase
             request.SelectedSideItems,
             request.SelectedMenuOptions);
 
-        var result = await _mediator.SendCommand(command);
-        return Ok(result);
+        return Ok(await Mediator.SendCommand(command));
     }
 
     /// <summary>
@@ -97,14 +81,11 @@ public class BasketController : ControllerBase
     [HttpPut("items/{basketItemId}")]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<BasketDto>>> UpdateBasketItem(
-        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromHeader(Name = SessionIdHeader)] string sessionId,
         Guid basketItemId,
         [FromBody] UpdateBasketItemDto request)
     {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketDto>.Failure("Session ID is required"));
-        }
+        if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
         var command = new UpdateBasketItemCommand(
             sessionId,
@@ -112,8 +93,7 @@ public class BasketController : ControllerBase
             request.Quantity,
             request.SpecialInstructions);
 
-        var result = await _mediator.SendCommand(command);
-        return Ok(result);
+        return Ok(await Mediator.SendCommand(command));
     }
 
     /// <summary>
@@ -122,17 +102,12 @@ public class BasketController : ControllerBase
     [HttpDelete("items/{basketItemId}")]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<BasketDto>>> RemoveFromBasket(
-        [FromHeader(Name = "X-Session-Id")] string sessionId,
+        [FromHeader(Name = SessionIdHeader)] string sessionId,
         Guid basketItemId)
     {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketDto>.Failure("Session ID is required"));
-        }
+        if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
-        var command = new RemoveFromBasketCommand(sessionId, basketItemId);
-        var result = await _mediator.SendCommand(command);
-        return Ok(result);
+        return Ok(await Mediator.SendCommand(new RemoveFromBasketCommand(sessionId, basketItemId)));
     }
 
     /// <summary>
@@ -140,64 +115,34 @@ public class BasketController : ControllerBase
     /// </summary>
     [HttpDelete]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<BasketDto>>> ClearBasket([FromHeader(Name = "X-Session-Id")] string sessionId)
+    public async Task<ActionResult<ApiResponse<BasketDto>>> ClearBasket([FromHeader(Name = SessionIdHeader)] string sessionId)
     {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketDto>.Failure("Session ID is required"));
-        }
+        if (MissingSession<BasketDto>(sessionId) is { } error) return error;
 
-        var command = new ClearBasketCommand(sessionId);
-        var result = await _mediator.SendCommand(command);
-        return Ok(result);
+        return Ok(await Mediator.SendCommand(new ClearBasketCommand(sessionId)));
     }
 
     /// <summary>
-    /// Set the basket's order type (channel). Call with removeConflicts=false first: if any line is
-    /// unavailable for the new type NOTHING changes and the conflicts come back, so the guest can
-    /// confirm. Repeat with removeConflicts=true to drop those lines and apply the switch.
-    /// </summary>
-    [HttpPut("order-type")]
-    [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<BasketChannelSwitchDto>>> SetOrderType(
-        [FromHeader(Name = "X-Session-Id")] string sessionId,
-        [FromBody] SetBasketOrderTypeCommand command)
-    {
-        if (string.IsNullOrEmpty(sessionId))
-        {
-            return BadRequest(ApiResponse<BasketChannelSwitchDto>.Failure("Session ID is required"));
-        }
-
-        command.SessionId = sessionId;
-        var result = await _mediator.SendCommand(command);
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Apply promo code to basket
+    /// Apply promo code to basket. Not implemented — see <see cref="RemovePromoCode"/>.
     /// </summary>
     [HttpPost("promo-code")]
     [AllowAnonymous]
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-    public async Task<ActionResult<ApiResponse<BasketDto>>> ApplyPromoCode(
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-        [FromHeader(Name = "X-Session-Id")] string sessionId,
+    public ActionResult<ApiResponse<BasketDto>> ApplyPromoCode(
+        [FromHeader(Name = SessionIdHeader)] string sessionId,
         [FromBody] ApplyPromoCodeRequest request)
-    {
-        // TODO: Implement when promo code functionality is ready
-        return BadRequest(ApiResponse<BasketDto>.Failure("Promo code functionality not yet implemented"));
-    }
+        => BadRequest(ApiResponse<BasketDto>.Failure("Promo code functionality not yet implemented"));
 
     /// <summary>
-    /// Remove promo code from basket
+    /// Remove promo code from basket.
     /// </summary>
+    /// <remarks>
+    /// Both promo endpoints are deliberate STUBS, not dead code: <c>basketService.ts</c> calls them
+    /// and the cart renders the 400's message, so deleting them would turn a stated "not implemented
+    /// yet" into a 404 the client has no wording for. Synchronous now — they were <c>async</c> with
+    /// no <c>await</c>, which needed a <c>#pragma warning disable CS1998</c> pair each to compile.
+    /// </remarks>
     [HttpDelete("promo-code")]
     [AllowAnonymous]
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-    public async Task<ActionResult<ApiResponse<BasketDto>>> RemovePromoCode([FromHeader(Name = "X-Session-Id")] string sessionId)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-    {
-        // TODO: Implement when promo code functionality is ready
-        return BadRequest(ApiResponse<BasketDto>.Failure("Promo code functionality not yet implemented"));
-    }
+    public ActionResult<ApiResponse<BasketDto>> RemovePromoCode([FromHeader(Name = SessionIdHeader)] string sessionId)
+        => BadRequest(ApiResponse<BasketDto>.Failure("Promo code functionality not yet implemented"));
 }
