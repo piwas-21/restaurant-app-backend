@@ -61,8 +61,24 @@ public class OrdersController : ControllerBase
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // ── Back-of-house order operations ──────────────────────────────────
+    // These five were [Authorize]-only while their handlers loaded the order by id alone,
+    // so any authenticated customer could drive another customer's order and take back a
+    // full OrderDto (name, email, phone, address, payments). No customer surface calls them.
+    //
+    // The gate is the attribute, NOT a check inside the handlers: OrderQuickActions-
+    // Controller dispatches UpdateOrderStatusCommand and CancelOrderCommand from
+    // [AllowAnonymous] email-link actions, where a handler-level IsStaff check would see
+    // no user at all and break those links.
+    //
+    // [RequireStaff] is the attribute form of ICurrentUserService.IsStaff — the same four
+    // roles on purpose, so route gate and ownership predicate cannot drift. A 403 here
+    // leaks no ids: the attribute rejects before any DB lookup.
+
+    // Admin/Cashier rather than all staff: this writes money, and belongs to the till
+    // cluster (z-report above, refund below). No server/kitchen surface takes payment.
     [HttpPost("{orderId}/payments")]
-    [Authorize]
+    [RequireAdminOrCashier]
     public async Task<ActionResult<ApiResponse<OrderDto>>> AddPayment(Guid orderId, [FromBody] AddPaymentToOrderCommand command)
     {
         command.OrderId = orderId;
@@ -70,28 +86,33 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPut("{orderId}/focus")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> ToggleFocusOrder(Guid orderId, [FromBody] ToggleFocusOrderCommand command)
     {
         command.OrderId = orderId;
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // Unfiltered by owner by design — the expo/priority queue over every order, so it is
+    // staff-only rather than scoped the way the customer order list is.
     [HttpGet("focus")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<List<OrderDto>>>> GetFocusOrders([FromQuery] GetFocusOrdersQuery query)
         => Ok(await _mediator.SendQuery(query));
 
     [HttpPut("{orderId}/status")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> UpdateOrderStatus(Guid orderId, [FromBody] UpdateOrderStatusCommand command)
     {
         command.OrderId = orderId;
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // No owner branch: no customer surface cancels an order, and the customer-initiated
+    // path is the emailed reject-delay link, which is anonymous and reaches
+    // RejectDelayCommand instead. An owner branch here would be unreachable code.
     [HttpPost("{orderId}/cancel")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> CancelOrder(Guid orderId, [FromBody] CancelOrderCommand command)
     {
         command.OrderId = orderId;
