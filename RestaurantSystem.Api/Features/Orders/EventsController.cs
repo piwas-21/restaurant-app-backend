@@ -43,11 +43,19 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
-    /// Subscribe to service order events
+    /// Subscribe to service order events (cashier till + server floor view).
     /// </summary>
+    /// <remarks>
+    /// Staff-only for the same reason the id-addressed order routes are: every event on this
+    /// stream carries a full <see cref="OrderDto"/> — customer name, email, phone, delivery
+    /// address and payment rows — and SseEventReplayService replays the recent buffer to each
+    /// new subscriber. Left [Authorize]-only this is the PII leak closed on the REST routes,
+    /// just streamed: a customer needed no order id, only a connection. The sibling streams
+    /// were already gated (kitchen above, all below); this one was the outlier.
+    /// </remarks>
     [HttpGet("service")]
     [Produces("text/event-stream")]
-    [Authorize]
+    [RequireStaff]
     public async Task ServiceEvents(CancellationToken cancellationToken)
     {
         await SetupSseConnection(ClientType.Service, cancellationToken);

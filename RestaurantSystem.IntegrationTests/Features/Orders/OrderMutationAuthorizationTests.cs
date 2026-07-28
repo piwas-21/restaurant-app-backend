@@ -36,8 +36,10 @@ public class OrderMutationAuthorizationTests : IntegrationTestBase
     private static readonly Guid OtherCustomerOrderId = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001");
     private static readonly Guid OwnOrderId = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002");
     private static readonly Guid QuickCancelOrderId = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000003");
+    private static readonly Guid QuickConfirmOrderId = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000004");
 
-    private const string QuickCancelOrderNumber = "ORD-QUICK";
+    private const string QuickCancelOrderNumber = "ORD-QUICK-CANCEL";
+    private const string QuickConfirmOrderNumber = "ORD-QUICK-CONFIRM";
 
     // Route templates for the whole back-of-house set, so a gate that is dropped from any
     // one of them fails here rather than only on whichever route a test happened to name.
@@ -84,8 +86,10 @@ public class OrderMutationAuthorizationTests : IntegrationTestBase
         context.Orders.AddRange(
             CreateOrder(OtherCustomerOrderId, "ORD-OTHER", OtherCustomerId, OrderStatus.Confirmed),
             CreateOrder(OwnOrderId, "ORD-OWN", Guid.Parse(TestAuthHandler.UserId), OrderStatus.Confirmed),
-            // quick-cancel only acts on a Pending order.
-            CreateOrder(QuickCancelOrderId, QuickCancelOrderNumber, OtherCustomerId, OrderStatus.Pending));
+            // quick-cancel and quick-confirm both only act on a Pending order. Two separate
+            // orders so the two tests cannot contend for one row.
+            CreateOrder(QuickCancelOrderId, QuickCancelOrderNumber, OtherCustomerId, OrderStatus.Pending),
+            CreateOrder(QuickConfirmOrderId, QuickConfirmOrderNumber, OtherCustomerId, OrderStatus.Pending));
 
         await context.SaveChangesAsync();
     }
@@ -254,11 +258,20 @@ public class OrderMutationAuthorizationTests : IntegrationTestBase
         result!.Data.Should().ContainSingle(o => o.Id == OtherCustomerOrderId);
     }
 
-    /// <summary>Payments are the till's job, and the cashier is the surface that calls this.</summary>
-    [Fact]
-    public async Task Cashier_AddingAPayment_Succeeds()
+    /// <summary>Payments are the till's job: both roles the narrower gate admits still get through.</summary>
+    [Theory]
+    [InlineData(UserRole.Cashier)]
+    [InlineData(UserRole.Admin)]
+    public async Task TillRoles_AddingAPayment_Succeed(UserRole role)
     {
-        AuthenticateAsRole(UserRole.Cashier);
+        if (role == UserRole.Admin)
+        {
+            AuthenticateAsAdmin();
+        }
+        else
+        {
+            AuthenticateAsRole(role);
+        }
 
         var response = await Send("POST", PaymentsRoute, OtherCustomerOrderId, PaymentBody);
 
@@ -304,6 +317,26 @@ public class OrderMutationAuthorizationTests : IntegrationTestBase
         (await response.Content.ReadAsStringAsync()).Should().Contain("Order Cancelled");
         (await LoadOrder(QuickCancelOrderId)).Status.Should().Be(OrderStatus.Cancelled,
             "the anonymous email-link path must keep reaching CancelOrderCommand");
+    }
+
+    /// <summary>
+    /// The quick-confirm half of the same argument. Covered separately because the controller
+    /// comment names BOTH commands as the reason the gate stays out of the handlers, and
+    /// quick-cancel alone leaves UpdateOrderStatusCommand unpinned — an IsStaff check added to
+    /// that handler would keep the whole suite green while killing every confirm link in an inbox.
+    /// minutes stays under OrderQuickActionsController's 10-minute delay threshold, so this
+    /// lands on Confirmed rather than PendingApproval.
+    /// </summary>
+    [Fact]
+    public async Task EmailQuickConfirmLink_StillConfirmsWithNoCredentialsAtAll()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await Client.GetAsync($"/api/orders/{QuickConfirmOrderNumber}/quick-confirm?minutes=5");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await LoadOrder(QuickConfirmOrderId)).Status.Should().Be(OrderStatus.Confirmed,
+            "the anonymous email-link path must keep reaching UpdateOrderStatusCommand");
     }
 
     // ── helpers ─────────────────────────────────────────────────────────

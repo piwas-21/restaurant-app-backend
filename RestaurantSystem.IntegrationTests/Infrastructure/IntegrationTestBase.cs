@@ -63,9 +63,16 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         Client.DefaultRequestHeaders.Add("X-Test-Admin", "true");
     }
 
+    /// <summary>
+    /// Authenticates as the default Customer. Clears the role and anonymous headers too: a test
+    /// that switched identity mid-run (AuthenticateAsRole(...) then this) would otherwise stay
+    /// staff and quietly assert the wrong side of an authorization rule.
+    /// </summary>
     protected void AuthenticateAsUser()
     {
         Client.DefaultRequestHeaders.Remove("X-Test-Admin");
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.RoleHeader);
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.AnonymousHeader);
     }
 
     /// <summary>
