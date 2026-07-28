@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
@@ -152,7 +152,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         anonymousBasket.DeletedAt = DateTime.UtcNow;
         anonymousBasket.DeletedBy = _currentUserService.GetAuditIdentifier();
 
-        await ResetOrderTypeIfMergedItemsConflictAsync(userBasket, rehomed);
+        await ResetOrderTypeIfMergedItemsConflictAsync(userBasket, rehomed, anonymousItems);
 
         await _context.SaveChangesAsync();
         await _basketRepository.RecalculateTotalsAsync(userBasket.Id);
@@ -174,7 +174,8 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
     /// </remarks>
     private async Task ResetOrderTypeIfMergedItemsConflictAsync(
         Domain.Entities.Basket userBasket,
-        List<Domain.Entities.BasketItem> rehomed)
+        List<Domain.Entities.BasketItem> rehomed,
+        IReadOnlyCollection<Domain.Entities.BasketItem> anonymousItems)
     {
         if (userBasket.OrderType is null || rehomed.Count == 0)
         {
@@ -187,34 +188,50 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         // userBasket.Items here would see only the user's pre-existing lines, every one of which was
         // already validated by BasketChannelGuard when it was added, so the check would be a no-op
         // for exactly the scenario it exists to catch.
-        var productIds = rehomed
-            .Where(i => i.ParentBasketItemId is null)
-            // OfType filters the nulls AND unwraps in one step. The obvious
-            // `.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value)` needs a
-            // null-forgiving operator, because C# flow analysis does not carry the Where's
-            // guarantee across the Select's lambda boundary.
-            .Select(i => i.ProductId)
-            .OfType<Guid>()
-            .Distinct()
-            .ToList();
-
-        if (productIds.Count == 0)
+        //
+        // §9.15: `rehomed` holds ROOTS only (the merge loop iterates roots and re-homes each one's
+        // children alongside it), so the descendants are resolved from `anonymousItems` — the same
+        // snapshot the loop walked. Scanning roots alone let a bundle whose COMPONENT the surviving
+        // channel forbids merge in silently, which is this method's own failure mode one level down.
+        List<string> conflicting;
+        try
         {
+            var productIds = BasketLineChannelScan.CollectProductIds(rehomed, anonymousItems);
+            if (productIds.Count == 0)
+            {
+                return;
+            }
+
+            var products = await BasketLineChannelScan.LoadProductsAsync(_context, productIds, CancellationToken.None);
+
+            conflicting = rehomed
+                .Where(root => !OrderChannelMap.Allows(
+                    BasketLineChannelScan.LineMask(root, anonymousItems, products), userBasket.OrderType.Value))
+                .Select(root => root.ProductId is { } id && products.TryGetValue(id, out var p) ? p.Name : "(unknown item)")
+                .ToList();
+        }
+        catch (JsonException ex)
+        {
+            // Caught HERE and nowhere else. BasketLineChannelScan deliberately lets a corrupt
+            // SelectedSideItemsJson throw, because a swallowed parse failure makes the scan silently
+            // permissive — but on THIS path a throw is worse than the bug it guards. It would escape
+            // before SaveChangesAsync, abandoning the adopt, the re-home AND the soft-delete, and
+            // BasketMergeService catches everything out of here on purpose ("basket merge should not
+            // break login flow") — so the guest would log in and watch their whole basket vanish,
+            // silently. The switch path has no such swallow: there the throw surfaces as a 500 the
+            // guest can retry, and the cart still renders.
+            //
+            // Clearing the channel is the fail-safe this method already has: it is what a genuine
+            // conflict does, it never drops a line, and null is the permissive browse state. So an
+            // unreadable line is treated as conflicting rather than as fine.
+            _logger.LogError(ex,
+                "Unreadable side-item JSON while merging into basket {BasketId}; clearing order type {OrderType} "
+                + "rather than assuming the merged lines are orderable",
+                userBasket.Id, userBasket.OrderType);
+
+            userBasket.OrderType = null;
             return;
         }
-
-        var products = await _context.Products
-            .AsNoTracking()
-            .Include(p => p.ProductCategories)
-                .ThenInclude(pc => pc.Category)
-            .Where(p => productIds.Contains(p.Id))
-            .ToListAsync();
-
-        var conflicting = products
-            .Where(p => !OrderChannelMap.Allows(
-                OrderTypeAvailability.EffectiveMask(p), userBasket.OrderType.Value))
-            .Select(p => p.Name)
-            .ToList();
 
         if (conflicting.Count == 0)
         {

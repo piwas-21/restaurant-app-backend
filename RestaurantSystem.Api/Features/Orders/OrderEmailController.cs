@@ -71,7 +71,12 @@ public class OrderEmailController : ControllerBase
     [EnableRateLimiting("confirmation-email")]
     public async Task<ActionResult<ApiResponse<string>>> SendOrderConfirmationEmail(Guid orderId)
     {
-        var orderResult = await _mediator.SendQuery(new GetOrderByIdQuery(orderId));
+        // EnforceOwnership: false — this endpoint is [AllowAnonymous] by design (above), so the
+        // caller is routinely a guest with no token and the order routinely has UserId == null.
+        // The ownership check would reject both. Safe here because the order is never returned
+        // to the caller: it only feeds the email, which goes to the addresses already recorded
+        // on the order. The response body carries no order data either way.
+        var orderResult = await _mediator.SendQuery(new GetOrderByIdQuery(orderId, EnforceOwnership: false));
         if (!orderResult.Success || orderResult.Data == null)
         {
             return BadRequest(ApiResponse<string>.Failure("Order not found"));

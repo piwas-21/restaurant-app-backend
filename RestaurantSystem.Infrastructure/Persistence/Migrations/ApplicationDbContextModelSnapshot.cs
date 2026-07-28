@@ -2090,20 +2090,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("fidelity_points_redeemed");
 
-                    b.Property<string>("FocusReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("focus_reason");
-
-                    b.Property<DateTime?>("FocusedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("focused_at");
-
-                    b.Property<string>("FocusedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("focused_by");
-
                     b.Property<bool>("HasUserLimitDiscount")
                         .HasColumnType("boolean")
                         .HasColumnName("has_user_limit_discount");
@@ -2113,12 +2099,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsFocusOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_focus_order");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
@@ -2135,20 +2115,29 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("order_number");
 
+                    b.Property<string>("OrderTypeOverrideBy")
+                        .HasColumnType("text")
+                        .HasColumnName("order_type_override_by");
+
+                    b.Property<string>("OrderTypeOverrideItems")
+                        .HasColumnType("text")
+                        .HasColumnName("order_type_override_items");
+
                     b.Property<string>("PaymentStatus")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("payment_status");
 
-                    b.Property<int?>("Priority")
-                        .HasColumnType("integer")
-                        .HasColumnName("priority");
-
                     b.Property<string>("PromoCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("promo_code");
+
+                    b.Property<string>("QuickActionToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("quick_action_token");
 
                     b.Property<decimal>("RemainingAmount")
                         .HasColumnType("decimal(10,2)")
@@ -2212,19 +2201,18 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("CustomerDiscountRuleId")
                         .HasDatabaseName("ix_orders_customer_discount_rule_id");
 
-                    b.HasIndex("IsFocusOrder");
-
                     b.HasIndex("OrderDate");
 
                     b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.HasIndex("QuickActionToken")
                         .IsUnique();
 
                     b.HasIndex("Status");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_orders_user_id");
-
-                    b.HasIndex("IsFocusOrder", "Priority");
 
                     b.HasIndex("UserId", "OrderDate");
 
@@ -4503,7 +4491,44 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_orders_asp_net_users_user_id");
 
+                    b.OwnsOne("RestaurantSystem.Domain.Entities.OrderFocus", "Focus", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTime>("FocusedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("focused_at");
+
+                            b1.Property<string>("FocusedBy")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("focused_by");
+
+                            b1.Property<int?>("Priority")
+                                .HasColumnType("integer")
+                                .HasColumnName("priority");
+
+                            b1.Property<string>("Reason")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("focus_reason");
+
+                            b1.HasKey("OrderId");
+
+                            b1.HasIndex("Priority", "FocusedAt")
+                                .HasDatabaseName("IX_orders_priority_focused_at")
+                                .HasFilter("\"focused_at\" IS NOT NULL");
+
+                            b1.ToTable("orders", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId");
+                        });
+
                     b.Navigation("CustomerDiscountRule");
+
+                    b.Navigation("Focus");
 
                     b.Navigation("User");
                 });

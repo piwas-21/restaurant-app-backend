@@ -53,7 +53,7 @@ public class AccountCleanupServiceTests : IntegrationTestBase
                 CustomerPhone = "+41791112233",
                 Notes = "call Ada on 0791112233",
                 CancellationReason = "Ada changed her mind",
-                FocusReason = "VIP Ada",
+                Focus = new OrderFocus { FocusedAt = DateTime.UtcNow, Reason = "VIP Ada" },
             });
             db.OrderAddresses.Add(new OrderAddress
             {
@@ -110,7 +110,8 @@ public class AccountCleanupServiceTests : IntegrationTestBase
             order.CustomerPhone.Should().BeNull();
             order.Notes.Should().BeNull();
             order.CancellationReason.Should().BeNull();
-            order.FocusReason.Should().BeNull();
+            order.Focus!.Reason.Should().BeNull();
+            order.Focus.FocusedAt.Should().NotBe(default, "erasure scrubs the reason, not the focus itself");
             order.Total.Should().Be(20m, "the financial record is retained");
 
             var address = await db.OrderAddresses.FirstAsync(a => a.OrderId == orderId);

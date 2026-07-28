@@ -90,7 +90,9 @@ public class AccountCleanupService : BackgroundService
                         // Free-text fields can embed identifying details too.
                         .SetProperty(o => o.Notes, (string?)null)
                         .SetProperty(o => o.CancellationReason, (string?)null)
-                        .SetProperty(o => o.FocusReason, (string?)null), stoppingToken);
+                        // Only the free text goes: the order stays focused, and Focus.FocusedBy is
+                        // the staff member who focused it, not the customer being erased.
+                        .SetProperty(o => o.Focus!.Reason, (string?)null), stoppingToken);
 
                 if (orderIds.Count > 0)
                 {

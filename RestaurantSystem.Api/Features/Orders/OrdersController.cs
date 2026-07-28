@@ -61,37 +61,48 @@ public class OrdersController : ControllerBase
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // §9.19 follow-up: [RequireStaff], not [Authorize]. Taking a payment is a till action — there is
+    // no gateway behind this, the handler marks the payment Completed outright — so with only
+    // "is authenticated" any customer could mark ANY order paid and mint its fidelity points.
     [HttpPost("{orderId}/payments")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> AddPayment(Guid orderId, [FromBody] AddPaymentToOrderCommand command)
     {
         command.OrderId = orderId;
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // Focus is a kitchen/cashier triage flag. It also returned the full OrderDto for any order id,
+    // which made it a read primitive for another customer's PII with a near-no-op write attached.
     [HttpPut("{orderId}/focus")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> ToggleFocusOrder(Guid orderId, [FromBody] ToggleFocusOrderCommand command)
     {
         command.OrderId = orderId;
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // Returns every focused order with no ownership filter of any kind.
     [HttpGet("focus")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<List<OrderDto>>>> GetFocusOrders([FromQuery] GetFocusOrdersQuery query)
         => Ok(await _mediator.SendQuery(query));
 
+    // Drives the kitchen/cashier state machine and sends customer emails on some transitions.
     [HttpPut("{orderId}/status")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> UpdateOrderStatus(Guid orderId, [FromBody] UpdateOrderStatusCommand command)
     {
         command.OrderId = orderId;
         return Ok(await _mediator.SendCommand(command));
     }
 
+    // Cancelling force-refunds every completed payment on the order and emails the customer. Staff
+    // only, which matches the product as it exists: no customer surface calls this (verified across
+    // the frontend — cashier and admin only). If "cancel my own order" is ever wanted, the shape is
+    // an owner-or-staff test in the HANDLER, as GetOrderByIdQuery does — not a return to [Authorize].
     [HttpPost("{orderId}/cancel")]
-    [Authorize]
+    [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> CancelOrder(Guid orderId, [FromBody] CancelOrderCommand command)
     {
         command.OrderId = orderId;

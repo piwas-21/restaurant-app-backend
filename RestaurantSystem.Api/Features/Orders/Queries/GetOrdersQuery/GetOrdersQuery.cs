@@ -87,17 +87,22 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
             .AsSplitQuery()
             .AsQueryable();
 
-        // Determine if user is staff (Admin, Cashier, KitchenStaff, or Server)
-        // Staff members can see all orders, customers only see their own
-        var isStaff = _currentUserService.IsAdmin ||
-                      _currentUserService.Role == UserRole.Cashier ||
-                      _currentUserService.Role == UserRole.KitchenStaff ||
-                      _currentUserService.Role == UserRole.Server;
+        // Staff members can see all orders, customers only see their own. The role predicate
+        // lives on ICurrentUserService so this and GetOrderByIdQuery cannot drift apart.
+        var isStaff = _currentUserService.IsStaff;
 
-        // For non-staff users, automatically filter to their own orders
-        if (!isStaff && _currentUserService.UserId.HasValue)
+        // For non-staff callers, restrict to their own orders — and to NOTHING when there is no
+        // caller. The guard used to also require UserId.HasValue, which read as "scope it if we
+        // can" but meant an anonymous caller matched neither branch and got the whole order book
+        // unfiltered. Over HTTP the controller's [Authorize] hid that, but any in-process
+        // SendQuery dispatched from an [AllowAnonymous] action inherited the hole; the
+        // quick-action email links did exactly that (ORDER-TYPE-AVAILABILITY-PLAN §9.20).
+        if (!isStaff)
         {
-            ordersQuery = ordersQuery.Where(o => o.UserId == _currentUserService.UserId.Value);
+            var callerId = _currentUserService.UserId;
+            ordersQuery = callerId.HasValue
+                ? ordersQuery.Where(o => o.UserId == callerId.Value)
+                : ordersQuery.Where(_ => false);
         }
 
         // Apply filters - handle comma-separated status values
@@ -147,7 +152,11 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
 
         if (query.IsFocusOrder.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => o.IsFocusOrder == query.IsFocusOrder.Value);
+            // Branching rather than comparing `(o.Focus != null) == value`, which EF has no
+            // reason to translate into the partial index's predicate.
+            ordersQuery = query.IsFocusOrder.Value
+                ? ordersQuery.Where(o => o.Focus != null)
+                : ordersQuery.Where(o => o.Focus == null);
         }
 
         // ModifiedSince filter - returns orders created or updated after the timestamp

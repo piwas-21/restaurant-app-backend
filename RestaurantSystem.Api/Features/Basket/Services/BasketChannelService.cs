@@ -1,9 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
-using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -43,8 +41,36 @@ public class BasketChannelService : IBasketChannelService
         bool removeConflicts,
         CancellationToken cancellationToken = default)
     {
-        var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId)
-            ?? throw new NotFoundException("Basket not found");
+        // Both identifiers empty addresses no basket at all. Without this the upsert below would
+        // happily CREATE one under a random session id that no later request can ever name — an
+        // orphan row, reported back as Applied = true with a null Basket. The NotFoundException this
+        // method used to throw was carrying that guard for free.
+        if (string.IsNullOrEmpty(sessionId) && (userId is null || userId == Guid.Empty))
+        {
+            throw new BadRequestException("Session ID or an authenticated user is required");
+        }
+
+        // §9.13: UPSERT rather than 404. This endpoint used to refuse an empty cart by
+        // construction — only the add path ever created a basket — so a guest who picked a channel
+        // before adding anything had the choice silently dropped, and the client had no way to tell
+        // (nothing on the wire carried the basket's channel until BasketDto.OrderType).
+        //
+        // ⚠️ The re-fetch is NOT redundant. GetOrCreateBasketAsync returns a TRACKED entity on its
+        // create path but an UNTRACKED one on its find path (FindBasketAsync is AsNoTracking), so
+        // taking its return value directly is only correct if it definitely created. Filter parity
+        // between the two finders makes that true at an instant but NOT across two round trips: a
+        // concurrent add-to-basket, a double-tap or a client retry can insert the row in between,
+        // GetOrCreate then FINDS it, and the OrderType assignment below lands on a detached entity —
+        // saving nothing, throwing nothing, and answering Applied = true. That is the PR #89 class,
+        // which is exactly what this comment used to argue was impossible. Re-reading through the
+        // tracked finder is correct on every interleaving and costs one cheap query on create only.
+        var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
+        if (basket is null)
+        {
+            await _basketRepository.GetOrCreateBasketAsync(sessionId, userId);
+            basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId)
+                ?? throw new NotFoundException("Basket not found");
+        }
 
         var conflicts = await FindConflictsAsync(basket, orderType, cancellationToken);
 
@@ -127,72 +153,72 @@ public class BasketChannelService : IBasketChannelService
     }
 
     /// <summary>
-    /// Top-level lines the requested order type forbids.
+    /// Top-level lines the requested order type forbids — judged on the WHOLE line, including its
+    /// bundle children and side items.
     /// </summary>
     /// <remarks>
-    /// Bundle CHILD lines are skipped here by design — the intent is that a bundle carries its own
-    /// channel set. ⚠️ That premise is NOT yet implemented: no bundle command accepts
-    /// <c>AvailableOrderTypes</c>, so a bundle's mask is always inherited-or-null today and nothing
-    /// constrains it. <c>OrderChannelGuard</c> does walk children at order creation, so an
-    /// unfulfillable ORDER cannot be created, and since §9.3 such a line can no longer be ADDED
-    /// under a chosen channel either (<c>BasketItemFactory</c> guards every option and side item).
+    /// §9.15: this scan used to walk root rows only, which left §9.3's fix an add-then-switch twin.
+    /// The ordinary guest journey defeated it: browse with NO channel chosen (permissive by design,
+    /// and the dominant browse state) → add a combo whose component is takeaway-only → switch to
+    /// Dine-in → zero conflicts, no confirm dialog, channel set → <c>OrderChannelGuard</c> flattens
+    /// children at checkout and returns 400. The guest chose, was told nothing, and was refused at
+    /// the till.
     /// <para>
-    /// ⚠️ <b>The residual gap is this scan itself.</b> It is root-only, so a combo added while NO
-    /// channel was chosen — permissive by design, and the dominant browse state — reports zero
-    /// conflicts when the guest later picks one its components refuse. The guest gets no confirm
-    /// dialog, the channel is set, and the 400 arrives at checkout instead. Closing it means
-    /// flattening children + <c>SelectedSideItemsJson</c> here, which this scan already has the data
-    /// for. Tracked as §9.15 (and the same root-only shape sits in
-    /// <c>AnonymousBasketMerger.ResetOrderTypeIfMergedItemsConflictAsync</c>).
+    /// It now agrees with <c>OrderChannelGuard</c> by scanning the same set — see
+    /// <see cref="BasketLineChannelScan"/>, which also owns the <c>ProductCategories → Category</c>
+    /// include that keeps the verdict meaningful.
+    /// </para>
+    /// <para>
+    /// Conflicts stay ROOT-granular even when the blocked part is a component: the reported
+    /// <c>AllowedOrderTypes</c> is the intersection across the line, which is what
+    /// <see cref="BasketChannelConflictDto.AllowedOrderTypes"/> already promises ("order types this
+    /// line IS available on"). Naming the component instead would need a DTO field and a client
+    /// change; naming the line is both true and actionable, since the line is what gets removed.
+    /// </para>
     /// </remarks>
     private async Task<List<BasketChannelConflictDto>> FindConflictsAsync(
         Domain.Entities.Basket basket,
         OrderType orderType,
         CancellationToken cancellationToken)
     {
-        var productIds = basket.Items
-            .Where(i => i.ParentBasketItemId is null)
-            // OfType filters the nulls AND unwraps in one step. The obvious
-            // `.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value)` needs a
-            // null-forgiving operator, because C# flow analysis does not carry the Where's
-            // guarantee across the Select's lambda boundary.
-            .Select(i => i.ProductId)
-            .OfType<Guid>()
-            .Distinct()
-            .ToList();
+        var allItems = basket.Items.ToList();
+        var roots = allItems.Where(i => i.ParentBasketItemId is null).ToList();
 
+        var productIds = BasketLineChannelScan.CollectProductIds(roots, allItems);
         if (productIds.Count == 0)
         {
             return [];
         }
 
-        var products = await _context.Products
-            .AsNoTracking()
-            .Include(p => p.ProductCategories)
-                .ThenInclude(pc => pc.Category)
-            .Where(p => productIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, cancellationToken);
+        var products = await BasketLineChannelScan.LoadProductsAsync(_context, productIds, cancellationToken);
 
         var conflicts = new List<BasketChannelConflictDto>();
-        foreach (var item in basket.Items.Where(i => i.ParentBasketItemId is null))
+        foreach (var item in roots)
         {
-            // The `is not { } productId` pattern narrows for the compiler, so no `!` is needed.
-            if (item.ProductId is not { } productId || !products.TryGetValue(productId, out var product))
-            {
-                continue;
-            }
-
-            var mask = OrderTypeAvailability.EffectiveMask(product);
+            // Judge the line BEFORE resolving its name. An unresolvable root — its product
+            // soft-deleted out from under the basket, which `DeleteProductCommand` does without
+            // touching basket rows — must not discard its children unscanned: `OrderChannelGuard`
+            // would still resolve those children at checkout and refuse the order, which is the
+            // §9.15 symptom this method exists to prevent.
+            var mask = BasketLineChannelScan.LineMask(item, allItems, products);
             if (OrderChannelMap.Allows(mask, orderType))
             {
                 continue;
             }
 
+            var product = item.ProductId is { } productId && products.TryGetValue(productId, out var resolved)
+                ? resolved
+                : null;
+
             conflicts.Add(new BasketChannelConflictDto
             {
                 BasketItemId = item.Id,
-                ProductId = product.Id,
-                ProductName = product.Name,
+                ProductId = product?.Id ?? item.ProductId,
+                // Empty rather than a placeholder, because that is already what every other surface
+                // shows for this line: `BasketMappingService` reads the product null-conditionally,
+                // so a deleted-product line renders nameless in the cart too. Inventing a name here
+                // would need a locale key for a state the rest of the app leaves blank.
+                ProductName = product?.Name ?? string.Empty,
                 Quantity = item.Quantity,
                 AllowedOrderTypes = OrderChannelMap.ToOrderTypes(mask)
             });

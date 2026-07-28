@@ -1,8 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -88,12 +90,36 @@ public class OrderNotificationService : IOrderNotificationService
         var adminEmail = _emailSettings.AdminEmail;
         var logger = _logger;
         var orderNumber = order.OrderNumber;
+        var orderId = order.Id;
         _ = Task.Run(async () =>
         {
             try
             {
                 using var scope = scopeFactory.CreateScope();
                 var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
+                // Read here rather than take it from OrderDto: the token authorises the anonymous
+                // confirm/cancel endpoints (ORDER-TYPE-AVAILABILITY-PLAN §9.20), so putting it on
+                // the DTO would publish a credential through every endpoint that returns an order.
+                // This scope is the narrowest place that needs it.
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var quickActionToken = await db.Orders
+                    .AsNoTracking()
+                    .Where(o => o.Id == orderId)
+                    .Select(o => o.QuickActionToken)
+                    .FirstOrDefaultAsync();
+
+                if (string.IsNullOrEmpty(quickActionToken))
+                {
+                    // Not the documented legacy-row case: this path runs only for an order just
+                    // committed by CreateOrderCommandHandler, which mints the token at insert. So
+                    // null here means the row vanished, was soft-deleted, or the generator broke —
+                    // and the owner silently receives an email whose every button says "Order Not
+                    // Found". Send it anyway (the dashboard link still works), but say so.
+                    logger.LogWarning(
+                        "Order {OrderNumber} has no quick-action token; admin email will render dead confirm/cancel links",
+                        orderNumber);
+                }
                 await emailService.SendOrderConfirmationAdminEmailAsync(
                     adminEmail,
                     orderNumber,
@@ -103,6 +129,7 @@ public class OrderNotificationService : IOrderNotificationService
                     order.Type,
                     order.Total,
                     items,
+                    quickActionToken,
                     order.Notes,
                     deliveryAddress);
             }

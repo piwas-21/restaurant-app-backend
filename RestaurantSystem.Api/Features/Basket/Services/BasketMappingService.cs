@@ -192,6 +192,7 @@ public class BasketMappingService : IBasketMappingService
             TotalItems = basket.Items.Where(i => i.ParentBasketItemId == null).Sum(i => i.Quantity), // Count only root items? Or all? Usually root items (bundles) count as 1
             ExpiresAt = basket.ExpiresAt,
             Notes = basket.Notes,
+            OrderType = basket.OrderType,
             Items = rootItems
         };
     }

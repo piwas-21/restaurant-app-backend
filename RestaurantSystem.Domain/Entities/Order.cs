@@ -6,6 +6,11 @@ namespace RestaurantSystem.Domain.Entities;
 public class Order : SoftDeleteEntity
 {
     public string OrderNumber { get; set; } = null!;
+
+    /// <summary>Credential for the anonymous quick-action email links (plan §9.20). Null on rows
+    /// predating it and must never authenticate; never expose in a DTO, log or SSE.</summary>
+    public string? QuickActionToken { get; set; }
+
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }
@@ -41,16 +46,33 @@ public class Order : SoftDeleteEntity
     public decimal CustomerDiscountAmount { get; set; } // Special customer discount amount
     public Guid? CustomerDiscountRuleId { get; set; } // Reference to discount rule used
 
+    /// <summary>
+    /// The staff member who accepted this order despite items not being available for
+    /// <see cref="Type"/>, and what they accepted. Both <c>null</c> on an ordinary order.
+    /// </summary>
+    /// <remarks>
+    /// The override is a deliberate warn-and-allow (a waiter genuinely does need to plate a
+    /// takeaway-only item for a guest at a table), so the only question is whether it leaves a trace.
+    /// It used to leave one only in the application log, which no owner reads and which rotates
+    /// (ORDER-TYPE-AVAILABILITY-PLAN §9.6).
+    /// <para>
+    /// Deliberate: <b>no timestamp</b> (the guard runs at creation, so <c>CreatedAt</c> dates it, and
+    /// a column that can only equal another one is a state that can go wrong); <b>By duplicates
+    /// <c>CreatedBy</c></b>, byte-identical today because the overrider IS the creator — kept so the
+    /// record stands alone rather than relying on a rule nothing enforces; <b>names, not ids, and no
+    /// length cap</b> — a name freezes the label as it read at the time, and truncating an audit
+    /// record is worse than a long column.
+    /// </para>
+    /// </remarks>
+    public string? OrderTypeOverrideBy { get; set; }
+    public string? OrderTypeOverrideItems { get; set; }
+
     // Status
     public OrderStatus Status { get; set; }
     public PaymentStatus PaymentStatus { get; set; }
 
-    // Focus Order Feature
-    public bool IsFocusOrder { get; set; }
-    public int? Priority { get; set; } // 1-5, where 1 is highest priority
-    public string? FocusReason { get; set; }
-    public DateTime? FocusedAt { get; set; }
-    public string? FocusedBy { get; set; }
+    /// <summary>Present exactly when staff have focused this order; null otherwise.</summary>
+    public OrderFocus? Focus { get; set; }
 
     // Timestamps
     public DateTime OrderDate { get; set; }

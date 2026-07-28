@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundleByIdQuery;
 using RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundlesQuery;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Menus;
 
@@ -43,7 +44,8 @@ public class MenusController : ControllerBase
     public async Task<ActionResult<ApiResponse<PagedResult<MenuBundleDto>>>> GetMenuBundles(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] bool includeUnavailable = false)
+        [FromQuery] bool includeUnavailable = false,
+        [FromQuery] OrderType? requestedOrderType = null)
     {
         // Only admins can view unavailable menus
         if (includeUnavailable && !User.IsInRole("Admin"))
@@ -51,7 +53,7 @@ public class MenusController : ControllerBase
             return Unauthorized(ApiResponse<PagedResult<MenuBundleDto>>.Failure("Only admins can view unavailable menus"));
         }
 
-        var query = new GetMenuBundlesQuery(page, pageSize, null, includeUnavailable);
+        var query = new GetMenuBundlesQuery(page, pageSize, null, includeUnavailable, requestedOrderType);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
     }
@@ -60,9 +62,11 @@ public class MenusController : ControllerBase
     /// Get a specific menu bundle by ID
     /// </summary>
     [HttpGet("{id}")]
-    public async Task<ActionResult<ApiResponse<MenuBundleDto>>> GetMenuBundleById(Guid id)
+    public async Task<ActionResult<ApiResponse<MenuBundleDto>>> GetMenuBundleById(
+        Guid id,
+        [FromQuery] OrderType? requestedOrderType = null)
     {
-        var query = new GetMenuBundleByIdQuery(id);
+        var query = new GetMenuBundleByIdQuery(id, requestedOrderType);
         var result = await _mediator.SendQuery(query);
 
         if (!result.Success)
