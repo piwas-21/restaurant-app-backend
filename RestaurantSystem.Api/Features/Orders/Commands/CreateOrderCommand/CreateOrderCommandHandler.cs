@@ -74,6 +74,10 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             var order = new Order
             {
                 OrderNumber = orderNumber,
+                // Minted for every order, not just the ones that trigger an admin email: which
+                // orders get mailed is a runtime decision made later and elsewhere, and an order
+                // that reaches the template without a token would render dead links.
+                QuickActionToken = QuickActionTokens.Generate(),
                 UserId = userId,
                 CustomerName = command.CustomerName,
                 CustomerEmail = command.CustomerEmail,

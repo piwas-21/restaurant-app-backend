@@ -6,6 +6,11 @@ namespace RestaurantSystem.Domain.Entities;
 public class Order : SoftDeleteEntity
 {
     public string OrderNumber { get; set; } = null!;
+
+    /// <summary>Credential for the anonymous quick-action email links (plan §9.20). Null on rows
+    /// predating it and must never authenticate; never expose in a DTO, log or SSE.</summary>
+    public string? QuickActionToken { get; set; }
+
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }

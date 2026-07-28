@@ -47,6 +47,13 @@ public sealed class HtmlResponseBuilder : IHtmlResponseBuilder
         sb.AppendLine("<head>");
         sb.AppendLine("    <meta charset='utf-8'>");
         sb.AppendLine("    <meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        // These pages are reached from email links whose QUERY STRING is the credential
+        // (ORDER-TYPE-AVAILABILITY-PLAN §9.20), and several of them meta-refresh onward to the
+        // admin dashboard. Frontend and backend share an origin in production, so the app's
+        // strict-origin-when-cross-origin default would send the full token-bearing URL as the
+        // Referer on that same-origin hop, landing it in document.referrer. Nothing here reads
+        // the referrer, so suppressing it outright costs nothing.
+        sb.AppendLine("    <meta name='referrer' content='no-referrer'>");
         sb.Append("    <title>").Append(title).AppendLine("</title>");
 
         if (page.Redirect is { } redirect)

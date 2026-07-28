@@ -142,13 +142,18 @@ public interface IEmailService
     /// <param name="orderType">Order type (DineIn, Takeaway, Delivery)</param>
     /// <param name="total">Order total amount</param>
     /// <param name="items">List of order items with name, quantity, and price</param>
+    /// <param name="quickActionToken">
+    /// The order's <c>QuickActionToken</c>. The confirm/cancel buttons in this email are the only
+    /// way to reach those anonymous endpoints, and the token is what authorises them
+    /// (ORDER-TYPE-AVAILABILITY-PLAN §9.20) — omit it and the buttons land on "Order Not Found".
+    /// </param>
     /// <param name="specialInstructions">Special instructions</param>
     /// <param name="deliveryAddress">Delivery address (if applicable)</param>
     /// <returns>Task representing the async operation</returns>
     Task SendOrderConfirmationAdminEmailAsync(string adminEmail, string orderNumber, string customerName,
         string customerEmail, string customerPhone, string orderType, decimal total,
-        IEnumerable<(string name, int quantity, decimal price)> items, string? specialInstructions = null,
-        string? deliveryAddress = null);
+        IEnumerable<(string name, int quantity, decimal price)> items, string? quickActionToken,
+        string? specialInstructions = null, string? deliveryAddress = null);
 
     /// <summary>
     /// Sends group membership confirmation email with QR code

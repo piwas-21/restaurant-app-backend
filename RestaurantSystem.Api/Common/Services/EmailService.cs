@@ -339,8 +339,8 @@ public class EmailService : IEmailService
 
     public async Task SendOrderConfirmationAdminEmailAsync(string adminEmail, string orderNumber, string customerName,
         string customerEmail, string customerPhone, string orderType, decimal total,
-        IEnumerable<(string name, int quantity, decimal price)> items, string? specialInstructions = null,
-        string? deliveryAddress = null)
+        IEnumerable<(string name, int quantity, decimal price)> items, string? quickActionToken,
+        string? specialInstructions = null, string? deliveryAddress = null)
     {
         try
         {
@@ -350,7 +350,7 @@ public class EmailService : IEmailService
             var frontendUrl = _emailSettings.FrontendBaseUrl;
             var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
                 brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
-                baseUrl, frontendUrl, _emailSettings.AdminEmail,
+                baseUrl, frontendUrl, _emailSettings.AdminEmail, quickActionToken,
                 specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
                 brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,

@@ -62,7 +62,7 @@ public class EmailTemplatesCurrencyTests
     {
         var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
-            "https://api.demo.test", "https://demo.test", "admin@demo.test");
+            "https://api.demo.test", "https://demo.test", "admin@demo.test", "test-quick-action-token");
         var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
             Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
             "admin@demo.test");
