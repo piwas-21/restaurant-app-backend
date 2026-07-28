@@ -39,9 +39,14 @@ public record OrderDto
     public DateTime? FocusedAt { get; set; }
     public string? FocusedBy { get; set; }
 
-    // Staff order-type override (§9.6) — both null on an ordinary order. Additive and read-only;
-    // no client is required to render them, but a column nothing can read is a column nobody trusts.
+    /// <summary>
+    /// Staff order-type override, per ORDER-TYPE-AVAILABILITY-PLAN section 9.6. Both are null on an
+    /// ordinary order. Additive and read-only: no client is required to render them, but a column
+    /// nothing can read is a column nobody trusts.
+    /// </summary>
     public string? OrderTypeOverrideBy { get; set; }
+
+    /// <inheritdoc cref="OrderTypeOverrideBy" />
     public string? OrderTypeOverrideItems { get; set; }
 
     // Timestamps
