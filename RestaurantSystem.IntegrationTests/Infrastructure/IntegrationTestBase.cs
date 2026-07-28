@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Conventers;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Common;
 using System.Text.Json;
@@ -65,6 +66,33 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     protected void AuthenticateAsUser()
     {
         Client.DefaultRequestHeaders.Remove("X-Test-Admin");
+    }
+
+    /// <summary>
+    /// Authenticates as a non-admin back-of-house role (Cashier / KitchenStaff / Server),
+    /// so authorization rules that turn on <c>ICurrentUserService.IsStaff</c> can be pinned
+    /// for every staff role rather than for Admin alone.
+    /// </summary>
+    protected void AuthenticateAsRole(UserRole role)
+    {
+        Client.DefaultRequestHeaders.Remove("X-Test-Admin");
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.AnonymousHeader);
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.RoleHeader);
+        Client.DefaultRequestHeaders.Add(TestAuthHandler.RoleHeader, role.ToString());
+    }
+
+    /// <summary>
+    /// Sends requests with no credentials at all. Note that merely clearing the
+    /// Authorization header does NOT do this — <see cref="TestAuthHandler"/> authenticates
+    /// every request by default, so a guest scenario needs this explicit opt-in.
+    /// </summary>
+    protected void AuthenticateAsAnonymous()
+    {
+        Client.DefaultRequestHeaders.Remove("X-Test-Admin");
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.RoleHeader);
+        Client.DefaultRequestHeaders.Authorization = null;
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.AnonymousHeader);
+        Client.DefaultRequestHeaders.Add(TestAuthHandler.AnonymousHeader, "true");
     }
 
     protected void AuthenticateAsTestUser()

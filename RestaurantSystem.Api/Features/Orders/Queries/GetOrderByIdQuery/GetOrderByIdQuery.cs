@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -18,8 +19,20 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrderByIdQuery;
 /// confirmation-email endpoint, which must resolve guest orders (UserId == null)
 /// for a caller who has no token at all. Defaulting to true keeps a new route
 /// secure unless it explicitly opts out.
+///
+/// [BindNever] because sibling query records in this codebase are bound straight
+/// off the query string ([FromQuery] GetOrdersQuery, GetFocusOrdersQuery, …). Both
+/// callers construct this one by hand today, but if someone later normalises the
+/// route to [FromQuery] then `?enforceOwnership=false` would silently reopen the
+/// IDOR this record exists to close. Refuse the binding rather than rely on nobody
+/// making that edit. Applied to BOTH the parameter and the property: a positional
+/// record binds through its constructor parameter, so the property-only form would
+/// leave the very path this guards against uncovered.
 /// </param>
-public record GetOrderByIdQuery(Guid Id, bool EnforceOwnership = true) : IQuery<ApiResponse<OrderDto>>;
+public record GetOrderByIdQuery(
+    Guid Id,
+    [BindNever][property: BindNever] bool EnforceOwnership = true)
+    : IQuery<ApiResponse<OrderDto>>;
 
 public class GetOrderByIdQueryHandler : IQueryHandler<GetOrderByIdQuery, ApiResponse<OrderDto>>
 {

@@ -114,6 +114,71 @@ public class GetOrderByIdAuthorizationTests : IntegrationTestBase
         result.Data!.OrderNumber.Should().Be("ORD-OTHER");
     }
 
+    /// <summary>
+    /// The non-admin staff roles, which Admin-only coverage would miss entirely: narrowing
+    /// ICurrentUserService.IsStaff back to IsAdmin would break the cashier till, the kitchen
+    /// display and the floor view while every other test in the suite still passed.
+    /// </summary>
+    [Theory]
+    [InlineData(UserRole.Cashier)]
+    [InlineData(UserRole.KitchenStaff)]
+    [InlineData(UserRole.Server)]
+    public async Task EveryStaffRole_ReadingAnotherCustomersOrder_GetsTheOrder(UserRole role)
+    {
+        AuthenticateAsRole(role);
+
+        var result = await GetOrder(OtherCustomerOrderId);
+
+        result!.Success.Should().BeTrue($"{role} is back-of-house and reads any customer's order");
+        result.Data!.OrderNumber.Should().Be("ORD-OTHER");
+    }
+
+    /// <summary>
+    /// Customer is the one role that is NOT staff. Pinned explicitly because IsStaff is now
+    /// shared with GetOrdersQuery, where widening it would silently unscope the list too.
+    /// </summary>
+    [Fact]
+    public async Task CustomerRole_IsNotTreatedAsStaff()
+    {
+        AuthenticateAsRole(UserRole.Customer);
+
+        var result = await GetOrder(OtherCustomerOrderId);
+
+        result!.Success.Should().BeFalse();
+        result.Data.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The ownership flag is a server-side concern; it must not be settable from the wire.
+    /// Both callers construct the query by hand today, so this pins the property against a
+    /// future refactor to [FromQuery] binding (the prevailing convention for sibling queries).
+    /// </summary>
+    [Fact]
+    public async Task EnforceOwnership_CannotBeTurnedOffFromTheQueryString()
+    {
+        AuthenticateAsUser();
+
+        var response = await Client.GetAsync(
+            $"/api/orders/{OtherCustomerOrderId}?enforceOwnership=false");
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(json, JsonOptions);
+
+        result!.Success.Should().BeFalse("the caller must not be able to disable the ownership check");
+        result.Data.Should().BeNull();
+    }
+
+    /// <summary>An unauthenticated caller has no route to order data at all.</summary>
+    [Fact]
+    public async Task Anonymous_ReadingAnyOrder_IsChallenged()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await Client.GetAsync($"/api/orders/{GuestOrderId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "the read route is [Authorize]; only the confirmation-email route is anonymous");
+    }
+
     [Fact]
     public async Task Customer_ReadingAnotherCustomersOrder_GetsNotFound()
     {
@@ -174,8 +239,10 @@ public class GetOrderByIdAuthorizationTests : IntegrationTestBase
     [Fact]
     public async Task GuestConfirmationEmail_StillResolvesTheGuestOrder()
     {
-        Client.DefaultRequestHeaders.Remove("X-Test-Admin");
-        Client.DefaultRequestHeaders.Authorization = null;
+        // A real tokenless request: TestAuthHandler authenticates everything by default, so
+        // clearing the Authorization header alone would still arrive as the Customer identity
+        // and would not exercise the guest path this test exists to protect.
+        AuthenticateAsAnonymous();
 
         var response = await Client.PostAsync(
             $"/api/orders/{GuestOrderId}/send-confirmation-email", content: null);
