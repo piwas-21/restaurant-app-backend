@@ -105,7 +105,7 @@ public class MenuBundleAvailabilityTests : IntegrationTestBase
     {
         var listed = await FetchListedAsync(InheritingBundleName, "DineIn");
         var detail = await GetFromJsonAsync<ApiResponse<MenuBundleDto>>(
-            $"/api/Menus/{_inheritingBundleId}?requestedOrderType=DineIn");
+            $"/api/Menus/{_inheritingBundleId}?RequestedOrderType=DineIn");
 
         detail!.Data!.Availability.Should().BeEquivalentTo(listed.Availability);
         detail.Data.Availability.CanOrder.Should().BeFalse(
@@ -191,9 +191,14 @@ public class MenuBundleAvailabilityTests : IntegrationTestBase
             "0 means orderable on no channel — a blocked item with no stateable reason");
     }
 
+    /// <summary>
+    /// PascalCase, matching what the client actually sends (`getPublicMenuBundles`, and its
+    /// `getProducts`/`getFeaturedSpecial` siblings). ASP.NET binds query keys case-insensitively, but
+    /// a test that exercises a different spelling from production is testing a different request.
+    /// </summary>
     private async Task<MenuBundleDto> FetchListedAsync(string name, string? requestedOrderType)
     {
-        var channel = requestedOrderType is null ? string.Empty : $"&requestedOrderType={requestedOrderType}";
+        var channel = requestedOrderType is null ? string.Empty : $"&RequestedOrderType={requestedOrderType}";
         var response = await GetFromJsonAsync<ApiResponse<PagedResult<MenuBundleDto>>>(
             $"/api/Menus?page=1&pageSize=50{channel}");
         return response!.Data!.Items.Single(b => b.Name == name);
