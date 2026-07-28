@@ -1,4 +1,6 @@
-﻿namespace RestaurantSystem.Api.Features.Basket.Dtos;
+﻿using RestaurantSystem.Domain.Common.Enums;
+
+namespace RestaurantSystem.Api.Features.Basket.Dtos;
 
 public record BasketDto
 {
@@ -16,5 +18,14 @@ public record BasketDto
     public int TotalItems { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// The channel this basket is on, or <c>null</c> when the guest has not chosen one (the
+    /// permissive browse state). §9.13: without this the client can ASSERT a channel but never
+    /// RECONCILE it — nothing on the wire let it ask what the server actually has, so a basket
+    /// changed in another tab, or one whose channel the login merge cleared, went unnoticed.
+    /// </summary>
+    public OrderType? OrderType { get; set; }
+
     public List<BasketItemDto> Items { get; set; } = new();
 }
