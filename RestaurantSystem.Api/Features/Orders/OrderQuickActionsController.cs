@@ -23,13 +23,13 @@ namespace RestaurantSystem.Api.Features.Orders;
 //
 // Every action here is [AllowAnonymous] because it is opened from a mail client,
 // which carries no session. What authenticates the caller is therefore the link
-// itself, and each route needs its own unguessable secret:
-//   - approve-delay / reject-delay are keyed on the order's 128-bit GUID id;
-//   - quick-confirm / quick-cancel are keyed on Order.QuickActionToken, since
-//     their order NUMBER is a daily counter and was enumerable by anyone
-//     (ORDER-TYPE-AVAILABILITY-PLAN §9.20).
-// A missing or wrong token renders the same "Order Not Found" page as an unknown
-// order, so the endpoint cannot be used to test whether an order exists.
+// itself, so each route needs its own unguessable secret. The approve-delay and
+// reject-delay routes get one for free from the order's 128-bit GUID id. The
+// quick-confirm and quick-cancel routes are keyed on Order.QuickActionToken
+// instead, because their order NUMBER is a daily counter that anyone could walk
+// (ORDER-TYPE-AVAILABILITY-PLAN §9.20). A missing or wrong token renders the same
+// "Order Not Found" page as an unknown order, so neither route can be used to
+// test whether a given order exists.
 [ApiController]
 [Route("api/orders")]
 public class OrderQuickActionsController : ControllerBase
