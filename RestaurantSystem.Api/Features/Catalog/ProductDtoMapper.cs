@@ -51,14 +51,16 @@ public static class ProductDtoMapper
                 Content = ToLocalizedContent(di.Descriptions, d => d.LanguageCode,
                     d => new ProductIngredientContentDto { Name = d.Name, Description = d.Description })
             }).ToList(),
-            Categories = product.ProductCategories.Select(pc => new ProductCategoryDto
+            // `LiveProductCategories`, not the raw collection: a deleted category must not be listed
+            // as a live assignment on any surface (§9.14).
+            Categories = LiveProductCategories.Of(product).Select(pc => new ProductCategoryDto
             {
                 CategoryId = pc.CategoryId,
                 CategoryName = pc.Category.Name,
                 IsPrimary = pc.IsPrimary,
                 DisplayOrder = pc.DisplayOrder
             }).ToList(),
-            PrimaryCategory = product.ProductCategories
+            PrimaryCategory = LiveProductCategories.Of(product)
                 .Where(pc => pc.IsPrimary)
                 .Select(pc => new CategoryDto
                 {

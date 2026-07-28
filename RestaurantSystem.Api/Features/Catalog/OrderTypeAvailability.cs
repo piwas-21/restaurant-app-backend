@@ -15,10 +15,11 @@ namespace RestaurantSystem.Api.Features.Catalog;
 /// collection unloaded reads as unrestricted (permissive), never as blocked.
 /// <para>
 /// WIRED UP: <see cref="ProductDtoMapper"/>, <see cref="ProductSummaryMapper"/>,
-/// <c>GetProductByIdQuery</c>, and — since the G7 / §9.2 slice — <c>FeaturedSpecialDto</c> and
-/// <c>SpecialProductDto</c>. NOT YET WIRED: <c>MenuBundleDto</c> (bundle list/detail), which still
-/// renders blocked items as fully orderable and additionally cannot yet STORE a mask — no bundle
-/// command accepts <c>AvailableOrderTypes</c>. Tracked as follow-up.
+/// <c>GetProductByIdQuery</c>, <c>FeaturedSpecialDto</c> and <c>SpecialProductDto</c> (the G7 slice),
+/// and — since §9.2 — <c>MenuBundleDto</c> (bundle list + detail), whose commands now also STORE a
+/// mask. NOT WIRED: <c>CategoryProductDto</c> (<c>GetCategoryProductsQuery</c>), which carries no
+/// availability field at all and does not filter out bundles, so a restricted item is undimmed
+/// there; tracked in the plan's §6 shared-projection item, not here.
 /// </para>
 /// <para>
 /// Every caller must load <c>ProductCategories -&gt; Category</c>. An unloaded collection resolves
@@ -34,11 +35,12 @@ public static class OrderTypeAvailability
     /// Inheritance is all-or-nothing — the mask is one nullable field, so a product cannot inherit
     /// one channel while overriding another.
     /// <para>
-    /// A product with no primary category resolves to <c>null</c> (unrestricted). That is the
-    /// deliberate permissive fallback: silently blocking sales is worse than allowing them. It is a
-    /// DATA GAP though, not a normal state — <see cref="HasResolvableInheritance"/> lets the admin
-    /// surface flag it, because <c>ProductCategory.IsPrimary</c> can be silently re-pointed by an
-    /// unrelated product save.
+    /// A product with no primary category — or one whose primary category has been soft-deleted
+    /// (§9.14) — resolves to <c>null</c> (unrestricted). That is the deliberate permissive fallback:
+    /// silently blocking sales is worse than allowing them. It is a DATA GAP though, not a normal
+    /// state, because <c>ProductCategory.IsPrimary</c> can be silently re-pointed by an unrelated
+    /// product save. <see cref="HasResolvableInheritance"/> exists for an admin surface to flag it;
+    /// nothing calls it yet.
     /// </para>
     /// </remarks>
     public static int? EffectiveMask(Product product)
@@ -52,8 +54,9 @@ public static class OrderTypeAvailability
     }
 
     /// <summary>
-    /// False when a product inherits (no own mask) but has no primary category to inherit FROM — the
-    /// data gap described on <see cref="EffectiveMask"/>. Admin surfaces warn on this.
+    /// False when a product inherits (no own mask) but has no LIVE primary category to inherit FROM —
+    /// the data gap described on <see cref="EffectiveMask"/>, which a soft-deleted primary also
+    /// produces. Intended for an admin warning; no production caller yet.
     /// </summary>
     public static bool HasResolvableInheritance(Product product) =>
         product.AvailableOrderTypes is not null || PrimaryCategoryOf(product) is not null;
@@ -94,6 +97,30 @@ public static class OrderTypeAvailability
         };
     }
 
+    /// <summary>
+    /// The product's primary category, or <c>null</c> when it has none, when the navigation was not
+    /// loaded, or when the category has been SOFT-DELETED.
+    /// </summary>
+    /// <remarks>
+    /// The deleted check is what makes the verdict independent of which query filters ran (§9.14).
+    /// <c>Category</c> is a <c>SoftDeleteEntity</c> behind a global filter and <c>ProductCategory</c>
+    /// is not, so a product whose primary category is deleted came back with that join row DROPPED on
+    /// the ordinary catalog queries (measured: permissive, all three channels) but present and
+    /// live-looking on <c>GetProductByIdQuery</c>, whose <c>IgnoreQueryFilters()</c> un-filters the
+    /// INCLUDES (measured: blocked). One data state, two answers: the card said yes, the sheet said
+    /// no — §9.10's shape with the surfaces swapped.
+    /// <para>
+    /// Permissive is the correct side. A restriction inherited from a category the admin can no
+    /// longer see or edit is an invisible block on sales, and "no primary category" already resolves
+    /// permissively by documented design — so this simply makes a deleted primary mean the same thing
+    /// as a missing one, which is what it is.
+    /// </para>
+    /// <para>
+    /// The filter is shared with the catalog projections via <see cref="LiveProductCategories"/> so
+    /// the two cannot drift; its null-pattern also means this never dereferences a navigation whose
+    /// principal was filtered out, without depending on EF's exact treatment of that case.
+    /// </para>
+    /// </remarks>
     private static Category? PrimaryCategoryOf(Product product) =>
-        product.ProductCategories.FirstOrDefault(pc => pc.IsPrimary)?.Category;
+        LiveProductCategories.Of(product).FirstOrDefault(pc => pc.IsPrimary)?.Category;
 }

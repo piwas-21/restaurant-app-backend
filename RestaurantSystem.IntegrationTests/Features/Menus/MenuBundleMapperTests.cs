@@ -83,10 +83,82 @@ public class MenuBundleMapperTests
             CreatedBy = "test"
         };
 
-        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example");
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", requestedOrderType: null);
 
         var item = dto.MenuDefinition!.Sections.Single().Items.Single();
         item.DetailedIngredients.Should().ContainSingle().Which.Name.Should().Be("Ice");
         item.SuggestedSideItems.Should().BeNull("the dead per-option suggested sides are no longer projected");
     }
+
+    // §9.2: bundles had no availability at all — MenuBundleDto was never wired to
+    // OrderTypeAvailability and no bundle command accepted a mask, so a restricted combo rendered as
+    // fully orderable. These pin BOTH halves of the resolution the mapper is responsible for; the
+    // include that feeds the inheritance half can only be pinned through the query, and is
+    // (MenuBundleAvailabilityTests).
+    [Theory]
+    [InlineData(OrderType.DineIn, false)]
+    [InlineData(OrderType.Takeaway, true)]
+    public void ResolvesAvailabilityFromTheBundlesOwnMask(OrderType requested, bool expectedCanOrder)
+    {
+        var bundle = BundleWith(availableOrderTypes: (int)(OrderChannels.Takeaway | OrderChannels.Delivery));
+
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", requested);
+
+        dto.Availability.CanOrder.Should().Be(expectedCanOrder);
+        dto.Availability.InheritsOrderTypes.Should().BeFalse();
+        dto.AvailableOrderTypes.Should().Be((int)(OrderChannels.Takeaway | OrderChannels.Delivery),
+            "the admin editor round-trips the stored mask, not the resolved verdict");
+    }
+
+    [Fact]
+    public void InheritsTheMaskOfThePrimaryCategory()
+    {
+        var bundle = BundleWith(availableOrderTypes: null);
+        bundle.ProductCategories.Add(new ProductCategory
+        {
+            ProductId = bundle.Id,
+            IsPrimary = true,
+            Category = new Category
+            {
+                Id = Guid.NewGuid(),
+                Name = "Combos",
+                AvailableOrderTypes = (int)OrderChannels.Takeaway,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            },
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", OrderType.DineIn);
+
+        dto.Availability.CanOrder.Should().BeFalse();
+        dto.Availability.InheritsOrderTypes.Should().BeTrue();
+        dto.Availability.AllowedOrderTypes.Should().Equal(OrderType.Takeaway);
+        dto.AvailableOrderTypes.Should().BeNull("inheriting means the bundle stores no mask of its own");
+    }
+
+    [Fact]
+    public void ResolvesUnrestrictedWhenNothingRestrictsTheBundle()
+    {
+        var dto = MenuBundleMapper.MapToMenuBundleDto(
+            BundleWith(availableOrderTypes: null), "https://cdn.example", OrderType.DineIn);
+
+        dto.Availability.CanOrder.Should().BeTrue();
+        dto.Availability.AllowedOrderTypes.Should().HaveCount(3);
+    }
+
+    private static Product BundleWith(int? availableOrderTypes) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = "Combo",
+        BasePrice = 12m,
+        Type = ProductType.Menu,
+        IsAvailable = true,
+        AvailableOrderTypes = availableOrderTypes,
+        Ingredients = new List<string>(),
+        Allergens = new List<string>(),
+        CreatedAt = DateTime.UtcNow,
+        CreatedBy = "test"
+    };
 }
