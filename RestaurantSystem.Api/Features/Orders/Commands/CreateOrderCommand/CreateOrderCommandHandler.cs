@@ -63,7 +63,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
         try
         {
-            await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
+            // Non-null only when a staff member was warned and allowed through anyway (§9.6).
+            var channelOverride = await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
 
             var orderNumber = await _orderNumbers.GenerateAsync(cancellationToken);
             var userId = command.UserId ?? _currentUserService.UserId;
@@ -87,6 +88,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 FocusReason = command.FocusReason,
                 FocusedAt = command.IsFocusOrder ? now : null,
                 FocusedBy = command.IsFocusOrder ? userId?.ToString() : null,
+                OrderTypeOverrideBy = channelOverride?.By,
+                OrderTypeOverrideItems = channelOverride?.Items,
                 Notes = command.Notes,
                 OrderDate = now,
                 Tip = command.Tip,
