@@ -87,12 +87,9 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
             .AsSplitQuery()
             .AsQueryable();
 
-        // Determine if user is staff (Admin, Cashier, KitchenStaff, or Server)
-        // Staff members can see all orders, customers only see their own
-        var isStaff = _currentUserService.IsAdmin ||
-                      _currentUserService.Role == UserRole.Cashier ||
-                      _currentUserService.Role == UserRole.KitchenStaff ||
-                      _currentUserService.Role == UserRole.Server;
+        // Staff members can see all orders, customers only see their own. The role predicate
+        // lives on ICurrentUserService so this and GetOrderByIdQuery cannot drift apart.
+        var isStaff = _currentUserService.IsStaff;
 
         // For non-staff users, automatically filter to their own orders
         if (!isStaff && _currentUserService.UserId.HasValue)
