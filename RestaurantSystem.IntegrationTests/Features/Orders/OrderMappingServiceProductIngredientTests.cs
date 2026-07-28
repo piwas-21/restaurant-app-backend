@@ -172,6 +172,115 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
         sauce.IngredientName.Should().Be("Tomato Sauce");
     }
 
+    // §9.18 — the ingredient name on ALREADY-PLACED orders, and therefore on the kitchen
+    // ticket, falls back to ProductIngredient.Name once the GlobalIngredient behind it is
+    // deleted. Orders read through the global query filter (nothing in the order graph uses
+    // IgnoreQueryFilters), so a soft-deleted global resolves to null and the `?? ing.Name`
+    // fallback at OrderMappingService.cs:226/237 takes over.
+    //
+    // This is newly REACHABLE rather than newly broken: before the §9.18 fix the FK rejected
+    // the delete outright (a 500), so an admin could not reach this state for an ingredient
+    // any product used. Making the delete work is what exposes the fallback. Pinned rather
+    // than "fixed" because the fallback is the intended behaviour for an ingredient with no
+    // global — resolving through a deleted row would mean the order graph deliberately reads
+    // soft-deleted data, which nothing else in this codebase does. The name stays meaningful;
+    // it just stops being the global's. If that is ever judged wrong, this test is where the
+    // decision is recorded, and it is the printer-app-visible surface (#161's sibling).
+    [Fact]
+    public async Task MapToOrderDtoAsync_GlobalIngredientSoftDeleted_FallsBackToTheLocalName()
+    {
+        var cheeseId = Guid.NewGuid();
+        Guid orderId;
+
+        using (var seedScope = Factory.Services.CreateScope())
+        {
+            var seed = seedScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var globalCheese = new GlobalIngredient
+            {
+                Id = Guid.NewGuid(),
+                DefaultName = "Mozzarella",
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            };
+
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = "Margherita Pizza",
+                BasePrice = 15.00m,
+                Type = ProductType.MainItem,
+                Ingredients = new List<string>(),
+                Allergens = new List<string>(),
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            };
+            product.DetailedIngredients.Add(new ProductIngredient
+            {
+                Id = cheeseId,
+                ProductId = product.Id,
+                Name = "Cheese",
+                IsOptional = false,
+                IsIncludedInBasePrice = true,
+                GlobalIngredientId = globalCheese.Id,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                OrderNumber = "TEST-9-18",
+                Type = OrderType.DineIn,
+                Status = OrderStatus.Confirmed,
+                PaymentStatus = PaymentStatus.Pending,
+                OrderDate = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            };
+            order.Items.Add(new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                ProductId = product.Id,
+                ProductName = "Margherita Pizza",
+                Quantity = 1,
+                UnitPrice = 15.00m,
+                ItemTotal = 15.00m,
+                IngredientQuantitiesJson = System.Text.Json.JsonSerializer.Serialize(
+                    new Dictionary<Guid, int> { [cheeseId] = 1 }),
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+
+            seed.AddRange(globalCheese, product, order);
+            await seed.SaveChangesAsync();
+            orderId = order.Id;
+
+            // Soft-delete exactly as DeleteGlobalIngredientCommand now does — by setting the
+            // flag, not via Remove(): Remove() + SaveChangesAsync still HARD-deletes (that is
+            // §9.18's unfixed root half), which here would hit the FK and throw instead.
+            globalCheese.IsDeleted = true;
+            globalCheese.DeletedAt = DateTime.UtcNow;
+            await seed.SaveChangesAsync();
+        }
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var mapper = scope.ServiceProvider.GetRequiredService<IOrderMappingService>();
+
+        var loadedOrder = await context.Orders
+            .Include(o => o.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.DetailedIngredients)
+            .FirstAsync(o => o.Id == orderId);
+
+        var dto = await mapper.MapToOrderDtoAsync(loadedOrder);
+
+        var cheese = dto.Items.Single().IngredientCustomizations!.Single(c => c.IngredientId == cheeseId);
+        // Not "Mozzarella" — the first test in this class pins that same field resolving to the
+        // global's name while it is live, so the pair brackets the behaviour on both sides.
+        cheese.IngredientName.Should().Be("Cheese");
+    }
+
     // "Removed" (a "NO X" kitchen-ticket line) applies ONLY to base-recipe
     // ingredients at qty 0 — a required ingredient, or an optional one included in
     // the base price. A non-included optional (a paid add-on) at qty 0 was never
