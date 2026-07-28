@@ -30,7 +30,11 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
     public async Task<ApiResponse<ProductDto>> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)
     {
         var product = await _context.Products
-            .IgnoreQueryFilters() // This will load ALL products, including soft-deleted ones
+            // NOT for reaching soft-deleted products — the predicate below re-applies `!p.IsDeleted`,
+            // so it does not. What it actually does is un-filter every INCLUDE, which is why deleted
+            // categories reached the projection (§9.14) and why the side-item include below still
+            // needs a filter of its own. Dropping it would silently change what this endpoint returns.
+            .IgnoreQueryFilters()
             .AsSplitQuery()
             .Include(p => p.Descriptions)
             .Include(p => p.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
@@ -125,7 +129,10 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 SortOrder = i.SortOrder,
                 ProductId = i.ProductId
             }).ToList(),
-            Categories = product.ProductCategories
+            // `LiveProductCategories`, not `ProductCategories`: `IgnoreQueryFilters()` above
+            // un-filters the INCLUDES, so without this a SOFT-DELETED category comes back here as a
+            // live assignment while every other catalog surface reports none (§9.14).
+            Categories = LiveProductCategories.Of(product)
                 .OrderBy(pc => pc.DisplayOrder)
                 .Select(pc => new ProductCategoryDto
                 {
@@ -135,7 +142,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     DisplayOrder = pc.DisplayOrder
                 })
                 .ToList(),
-            PrimaryCategory = product.ProductCategories
+            PrimaryCategory = LiveProductCategories.Of(product)
                 .Where(pc => pc.IsPrimary)
                 .Select(pc => new CategoryDto
                 {

@@ -48,8 +48,10 @@ public static class ProductSummaryMapper
                 SortOrder = image.SortOrder,
                 AltText = image.AltText
             }).ToList(),
-            CategoryNames = product.ProductCategories.Select(pc => pc.Category.Name).ToList(),
-            PrimaryCategoryName = product.ProductCategories
+            // Soft-deleted categories are filtered out before `.Category` is read — see
+            // `LiveProductCategories` for why the navigation can outlive its principal (§9.14).
+            CategoryNames = LiveProductCategories.Of(product).Select(pc => pc.Category.Name).ToList(),
+            PrimaryCategoryName = LiveProductCategories.Of(product)
                 .Where(pc => pc.IsPrimary)
                 .Select(pc => pc.Category.Name)
                 .FirstOrDefault(),

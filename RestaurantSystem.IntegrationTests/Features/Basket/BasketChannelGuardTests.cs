@@ -102,4 +102,24 @@ public class BasketChannelGuardTests
         blocked.Should().Throw<BadRequestException>();
         allowed.Should().NotThrow();
     }
+
+    /// <summary>
+    /// §9.14: the enforcement boundary must NOT tighten when a primary category is soft-deleted. The
+    /// guards share <c>OrderTypeAvailability</c> with the catalog projections, so making the resolver
+    /// ignore deleted categories moved this verdict too — deliberately, and in the permissive
+    /// direction. In practice the guards load products with the query filters ON, so the join row was
+    /// already gone and this was always the answer; pinned because "the guard silently went
+    /// permissive and looked done" is the failure mode this feature keeps producing, and a verdict
+    /// that depends on which filters ran is exactly how it happens.
+    /// </summary>
+    [Fact]
+    public void Permits_the_add_when_the_restricting_category_has_been_soft_deleted()
+    {
+        var product = Product(categoryMask: TakeawayAndDelivery);
+        product.ProductCategories.First().Category.IsDeleted = true;
+
+        var act = () => BasketChannelGuard.EnsureOrderable(product, OrderType.DineIn);
+
+        act.Should().NotThrow();
+    }
 }
