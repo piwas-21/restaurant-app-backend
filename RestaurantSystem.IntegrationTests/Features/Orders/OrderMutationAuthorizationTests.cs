@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -87,6 +88,60 @@ public class OrderMutationAuthorizationTests : IntegrationTestBase
 
         focus.StatusCode.Should().Be(HttpStatusCode.OK);
         queue.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>
+    /// The refusal above is a status code; this is the thing that status code stands for. A gate
+    /// that ran AFTER the handler had already written would satisfy every assertion above while
+    /// the order was cancelled and the payment banked.
+    /// </summary>
+    [Fact]
+    public async Task A_customers_refused_mutation_leaves_the_order_and_its_payments_untouched()
+    {
+        AuthenticateAsUser();
+
+        await Client.PostAsJsonAsync($"/api/Orders/{_orderId}/cancel", new { cancellationReason = "let me in" });
+        await Client.PostAsJsonAsync($"/api/Orders/{_orderId}/payments", new { paymentMethod = "Cash", amount = 10.0m });
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var order = await context.Orders.AsNoTracking().FirstAsync(o => o.Id == _orderId);
+        order.Status.Should().Be(OrderStatus.Pending, "the cancellation must not have been applied");
+        order.CancellationReason.Should().BeNull();
+
+        var payments = await context.OrderPayments.AsNoTracking().Where(p => p.OrderId == _orderId).ToListAsync();
+        payments.Should().BeEmpty("no payment row may be written by a customer");
+    }
+
+    /// <summary>
+    /// The control above authenticates as Admin, so it passes just as well under [RequireAdmin] —
+    /// which would close the hole and take the cashier till, the kitchen display and the floor view
+    /// down with it. These are the three roles that assertion cannot see.
+    /// </summary>
+    [Theory]
+    [InlineData(UserRole.Cashier)]
+    [InlineData(UserRole.KitchenStaff)]
+    [InlineData(UserRole.Server)]
+    public async Task Every_staff_role_can_still_drive_an_order(UserRole role)
+    {
+        AuthenticateAsRole(role);
+
+        var status = await Client.PutAsJsonAsync(
+            $"/api/Orders/{_orderId}/status", new { newStatus = "Confirmed" });
+
+        status.StatusCode.Should().Be(HttpStatusCode.OK, $"{role} is back-of-house");
+    }
+
+    /// <summary>A caller with no credentials is challenged, not merely forbidden.</summary>
+    [Fact]
+    public async Task An_anonymous_caller_is_challenged_rather_than_forbidden()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await Client.GetAsync("/api/Orders/focus");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     protected override async Task SeedTestData()
