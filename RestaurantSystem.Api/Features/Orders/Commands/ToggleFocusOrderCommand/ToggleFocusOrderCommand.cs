@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.ToggleFocusOrderCommand;
@@ -52,23 +53,17 @@ public class ToggleFocusOrderCommandHandler : ICommandHandler<ToggleFocusOrderCo
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
-        // Update focus order settings
-        order.IsFocusOrder = command.IsFocusOrder;
-
-        if (command.IsFocusOrder)
-        {
-            order.Priority = command.Priority ?? 3; // Default priority
-            order.FocusReason = command.FocusReason;
-            order.FocusedAt = DateTime.UtcNow;
-            order.FocusedBy = _currentUserService.UserId?.ToString();
-        }
-        else
-        {
-            order.Priority = null;
-            order.FocusReason = null;
-            order.FocusedAt = null;
-            order.FocusedBy = null;
-        }
+        // Un-focusing is now dropping the record rather than clearing four columns one by one,
+        // so it cannot leave a stale FocusedBy or FocusReason behind.
+        order.Focus = command.IsFocusOrder
+            ? new OrderFocus
+            {
+                Priority = command.Priority ?? 3, // Default priority
+                Reason = command.FocusReason,
+                FocusedAt = DateTime.UtcNow,
+                FocusedBy = _currentUserService.UserId?.ToString()
+            }
+            : null;
 
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();

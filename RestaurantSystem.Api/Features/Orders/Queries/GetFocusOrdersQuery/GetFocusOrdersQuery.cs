@@ -45,7 +45,7 @@ public class GetFocusOrdersQueryHandler : IQueryHandler<GetFocusOrdersQuery, Api
             // Sibling collection includes cartesian-multiply in EF's default single-query
             // mode, and the Menu branch multiplies against the Product branch under Items.
             .AsSplitQuery()
-            .Where(o => !o.IsDeleted && o.IsFocusOrder);
+            .Where(o => !o.IsDeleted && o.Focus != null);
 
         // Filter by active status
         if (query.ActiveOnly == true)
@@ -58,18 +58,18 @@ public class GetFocusOrdersQueryHandler : IQueryHandler<GetFocusOrdersQuery, Api
         // Filter by priority
         if (query.Priority.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => o.Priority == query.Priority.Value);
+            ordersQuery = ordersQuery.Where(o => o.Focus!.Priority == query.Priority.Value);
         }
 
         // Apply ordering
         ordersQuery = query.OrderBy?.ToLower() switch
         {
             "priority" => ordersQuery
-                .OrderBy(o => o.Priority ?? 999)
-                .ThenBy(o => o.FocusedAt),
+                .OrderBy(o => o.Focus!.Priority ?? 999)
+                .ThenBy(o => o.Focus!.FocusedAt),
             "orderdate" => ordersQuery.OrderByDescending(o => o.OrderDate),
-            "focusedat" => ordersQuery.OrderByDescending(o => o.FocusedAt),
-            _ => ordersQuery.OrderBy(o => o.Priority ?? 999).ThenBy(o => o.FocusedAt)
+            "focusedat" => ordersQuery.OrderByDescending(o => o.Focus!.FocusedAt),
+            _ => ordersQuery.OrderBy(o => o.Focus!.Priority ?? 999).ThenBy(o => o.Focus!.FocusedAt)
         };
 
         var orders = await ordersQuery.ToListAsync(cancellationToken);

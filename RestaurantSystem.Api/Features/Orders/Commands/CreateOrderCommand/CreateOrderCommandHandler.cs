@@ -87,11 +87,17 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 PromoCode = command.PromoCode,
                 HasUserLimitDiscount = command.HasUserLimitDiscount,
                 UserLimitAmount = command.UserLimitAmount,
-                IsFocusOrder = command.IsFocusOrder,
-                Priority = command.Priority,
-                FocusReason = command.FocusReason,
-                FocusedAt = command.IsFocusOrder ? now : null,
-                FocusedBy = command.IsFocusOrder ? userId?.ToString() : null,
+                // Priority and FocusReason used to be copied in unconditionally, so an unfocused
+                // order could carry both; they now travel with the focus record or not at all.
+                Focus = command.IsFocusOrder
+                    ? new OrderFocus
+                    {
+                        Priority = command.Priority,
+                        Reason = command.FocusReason,
+                        FocusedAt = now,
+                        FocusedBy = userId?.ToString()
+                    }
+                    : null,
                 OrderTypeOverrideBy = channelOverride?.By,
                 OrderTypeOverrideItems = channelOverride?.Items,
                 Notes = command.Notes,

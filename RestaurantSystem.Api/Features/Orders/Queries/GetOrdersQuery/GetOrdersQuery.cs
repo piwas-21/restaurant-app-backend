@@ -152,7 +152,11 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
 
         if (query.IsFocusOrder.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => o.IsFocusOrder == query.IsFocusOrder.Value);
+            // Branching rather than comparing `(o.Focus != null) == value`, which EF has no
+            // reason to translate into the partial index's predicate.
+            ordersQuery = query.IsFocusOrder.Value
+                ? ordersQuery.Where(o => o.Focus != null)
+                : ordersQuery.Where(o => o.Focus == null);
         }
 
         // ModifiedSince filter - returns orders created or updated after the timestamp

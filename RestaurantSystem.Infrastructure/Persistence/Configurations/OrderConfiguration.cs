@@ -108,20 +108,44 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.RemainingAmount)
             .HasColumnType("decimal(10,2)");
 
-        builder.Property(o => o.IsFocusOrder)
-            .HasDefaultValue(false);
+        // Focus shares the Orders row rather than getting a table of its own: it is read on every
+        // order fetch, so a join would cost more than the five columns it saves. Column names are
+        // pinned to the pre-extraction ones, which keeps this a code move — the only schema change
+        // is dropping IsFocusOrder, whose truth now lives in whether FocusedAt is NULL.
+        // ToTable and the snake_case names are spelled out rather than left to convention:
+        // ApplicationDbContext.ConfigurePostgreSQL runs *before* ApplyConfigurationsFromAssembly,
+        // so nothing this file introduces is reached by the snake_case pass, and an owned type left
+        // to its own devices here scaffolds a separate order_focus table with PascalCase columns.
+        builder.OwnsOne(o => o.Focus, focus =>
+        {
+            focus.ToTable("orders");
 
-        builder.Property(o => o.Priority)
-            .HasDefaultValue(null);
+            focus.Property(f => f.Priority)
+                .HasColumnName("priority");
 
-        builder.Property(o => o.FocusReason)
-            .HasMaxLength(500);
+            focus.Property(f => f.Reason)
+                .HasColumnName("focus_reason")
+                .HasMaxLength(500);
 
-        builder.Property(o => o.FocusedBy)
-            .HasMaxLength(100);
+            focus.Property(f => f.FocusedAt)
+                .HasColumnName("focused_at");
 
-        builder.HasIndex(o => o.IsFocusOrder);
-        builder.HasIndex(o => new { o.IsFocusOrder, o.Priority });
+            focus.Property(f => f.FocusedBy)
+                .HasColumnName("focused_by")
+                .HasMaxLength(100);
 
+            // Replaces HasIndex(IsFocusOrder) and HasIndex(IsFocusOrder, Priority). Focused orders
+            // are a small slice of a table that only grows, so a partial index stays proportional to
+            // the slice instead of the table, and it covers GetFocusOrders exactly: filter on
+            // focused, then order by priority, then by focused_at.
+            focus.HasIndex(f => new { f.Priority, f.FocusedAt })
+                .HasDatabaseName("IX_orders_priority_focused_at")
+                .HasFilter("\"focused_at\" IS NOT NULL");
+        });
+
+        // Owned references that share the owner's table are required by default; this one is the
+        // whole point of the extraction, so it has to be optional.
+        builder.Navigation(o => o.Focus)
+            .IsRequired(false);
     }
 }
