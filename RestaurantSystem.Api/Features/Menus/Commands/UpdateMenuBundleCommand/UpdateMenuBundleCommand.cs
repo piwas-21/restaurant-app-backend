@@ -23,7 +23,8 @@ public record UpdateMenuBundleCommand(
     List<Guid>? CategoryIds,
     Guid? PrimaryCategoryId,
     MenuDefinitionDto MenuDefinition,
-    ProductDescriptionsDto Content
+    ProductDescriptionsDto Content,
+    int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
@@ -83,6 +84,18 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             product.IsAvailable = command.IsAvailable;
             product.PreparationTimeMinutes = command.PreparationTimeMinutes;
             product.DisplayOrder = command.DisplayOrder;
+            // Assigned UNCONDITIONALLY, like every other field on this full-replace PUT: an
+            // omit-means-keep rule would make "back to unrestricted" unexpressible, since that IS
+            // null. §9.1 accepted the same trade for products and closed the resulting landmine by
+            // making the one writer always echo the field.
+            //
+            // That mitigation is NOT yet in place for bundles: `baseMenuBundleSchema` has no
+            // `availableOrderTypes` key, so the bundle editor cannot echo what it does not carry.
+            // Until the frontend half of §9.2 lands, a mask set out of band (direct SQL, curl, or
+            // `PUT /api/Products` on a Menu-type product) is silently nulled by any unrelated bundle
+            // save — a NEW exposure, since this PUT previously left the column alone. Both halves
+            // must ship in the same release.
+            product.AvailableOrderTypes = command.AvailableOrderTypes;
             product.UpdatedAt = DateTime.UtcNow;
             product.UpdatedBy = _currentUserService.GetAuditIdentifier();
 

@@ -15,10 +15,11 @@ namespace RestaurantSystem.Api.Features.Catalog;
 /// collection unloaded reads as unrestricted (permissive), never as blocked.
 /// <para>
 /// WIRED UP: <see cref="ProductDtoMapper"/>, <see cref="ProductSummaryMapper"/>,
-/// <c>GetProductByIdQuery</c>, and — since the G7 / §9.2 slice — <c>FeaturedSpecialDto</c> and
-/// <c>SpecialProductDto</c>. NOT YET WIRED: <c>MenuBundleDto</c> (bundle list/detail), which still
-/// renders blocked items as fully orderable and additionally cannot yet STORE a mask — no bundle
-/// command accepts <c>AvailableOrderTypes</c>. Tracked as follow-up.
+/// <c>GetProductByIdQuery</c>, <c>FeaturedSpecialDto</c> and <c>SpecialProductDto</c> (the G7 slice),
+/// and — since §9.2 — <c>MenuBundleDto</c> (bundle list + detail), whose commands now also STORE a
+/// mask. NOT WIRED: <c>CategoryProductDto</c> (<c>GetCategoryProductsQuery</c>), which carries no
+/// availability field at all and does not filter out bundles, so a restricted item is undimmed
+/// there; tracked in the plan's §6 shared-projection item, not here.
 /// </para>
 /// <para>
 /// Every caller must load <c>ProductCategories -&gt; Category</c>. An unloaded collection resolves

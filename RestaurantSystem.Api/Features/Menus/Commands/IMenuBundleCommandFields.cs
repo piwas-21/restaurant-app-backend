@@ -17,4 +17,12 @@ public interface IMenuBundleCommandFields
     List<Guid>? CategoryIds { get; }
     Guid? PrimaryCategoryId { get; }
     MenuDefinitionDto MenuDefinition { get; }
+
+    /// <summary>
+    /// The bundle's own <c>OrderChannels</c> mask; <c>null</c> = inherit from the primary category
+    /// (ORDER-TYPE-AVAILABILITY-PLAN §9.2). Bundles created through the admin editor carry no
+    /// categories at all, so inheritance has nothing to resolve — this field is the only way a
+    /// bundle's channel set can be expressed.
+    /// </summary>
+    int? AvailableOrderTypes { get; }
 }
