@@ -15,6 +15,17 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(o => o.OrderNumber)
             .IsUnique();
 
+        // 32 random bytes, base64url-encoded => 43 chars. Capped well above that so a future
+        // widening is a config change rather than a data migration.
+        builder.Property(o => o.QuickActionToken)
+            .HasMaxLength(64);
+
+        // Unique so a generator regression that emitted a constant or repeated token fails the
+        // INSERT instead of silently making one link open several orders. Postgres treats NULLs
+        // as distinct, so the pre-column rows (all null) do not collide with each other.
+        builder.HasIndex(o => o.QuickActionToken)
+            .IsUnique();
+
         builder.Property(o => o.CustomerName)
             .HasMaxLength(100);
 

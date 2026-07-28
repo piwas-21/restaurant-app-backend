@@ -8,7 +8,7 @@ using RestaurantSystem.Api.Features.Orders.Commands.ApproveDelayCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.RejectDelayCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand;
-using RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
+using RestaurantSystem.Api.Features.Orders.Queries.GetOrderForQuickActionQuery;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 
@@ -20,6 +20,16 @@ namespace RestaurantSystem.Api.Features.Orders;
 // from URL path parameters (orderNumber, id) and from
 // CommandResult.Message are HTML-escaped before composition — fixes a
 // pre-existing XSS pattern in the inline-HTML versions of these actions.
+//
+// Every action here is [AllowAnonymous] because it is opened from a mail client,
+// which carries no session. What authenticates the caller is therefore the link
+// itself, and each route needs its own unguessable secret:
+//   - approve-delay / reject-delay are keyed on the order's 128-bit GUID id;
+//   - quick-confirm / quick-cancel are keyed on Order.QuickActionToken, since
+//     their order NUMBER is a daily counter and was enumerable by anyone
+//     (ORDER-TYPE-AVAILABILITY-PLAN §9.20).
+// A missing or wrong token renders the same "Order Not Found" page as an unknown
+// order, so the endpoint cannot be used to test whether an order exists.
 [ApiController]
 [Route("api/orders")]
 public class OrderQuickActionsController : ControllerBase
@@ -52,14 +62,17 @@ public class OrderQuickActionsController : ControllerBase
     /// <summary>Quick confirm order from email link.</summary>
     [HttpGet("{orderNumber}/quick-confirm")]
     [AllowAnonymous]
-    public async Task<IActionResult> QuickConfirmOrder(string orderNumber, [FromQuery] int minutes = 15)
+    public async Task<IActionResult> QuickConfirmOrder(
+        string orderNumber,
+        [FromQuery] string? token = null,
+        [FromQuery] int minutes = 15)
     {
         try
         {
-            var order = await FindOrderByNumber(orderNumber);
+            var order = await FindOrder(orderNumber, token);
             if (order == null) return HtmlNotFound(orderNumber);
 
-            if (order.Status != "Pending")
+            if (order.Status != OrderStatus.Pending)
             {
                 return Html(new HtmlStatusPage
                 {
@@ -68,8 +81,8 @@ public class OrderQuickActionsController : ControllerBase
                     AccentColor = "#374151",
                     Heading = "Order Already Processed",
                     Style = HtmlPageStyle.Plain,
-                    BodyHtml = $"<p>Order {_html.Escape(orderNumber)} has already been {_html.Escape(order.Status.ToLower())}.</p>" +
-                               $"<p>Current status: <strong>{_html.Escape(order.Status)}</strong></p>",
+                    BodyHtml = $"<p>Order {_html.Escape(order.OrderNumber)} has already been {order.Status.ToString().ToLowerInvariant()}.</p>" +
+                               $"<p>Current status: <strong>{order.Status}</strong></p>",
                 });
             }
 
@@ -92,7 +105,7 @@ public class OrderQuickActionsController : ControllerBase
             if (!result.Success) return HtmlActionFailed("Confirmation Failed", result.Message);
 
             var redirect = new HtmlRedirect($"{_emailSettings.FrontendBaseUrl}/admin/orders-management", ConfirmRedirectSeconds);
-            var safeOrderNumber = _html.Escape(orderNumber);
+            var safeOrderNumber = _html.Escape(order.OrderNumber);
             return minutes > DelayThresholdMinutes
                 ? Html(new HtmlStatusPage
                 {
@@ -127,14 +140,14 @@ public class OrderQuickActionsController : ControllerBase
     /// <summary>Quick cancel order from email link.</summary>
     [HttpGet("{orderNumber}/quick-cancel")]
     [AllowAnonymous]
-    public async Task<IActionResult> QuickCancelOrder(string orderNumber)
+    public async Task<IActionResult> QuickCancelOrder(string orderNumber, [FromQuery] string? token = null)
     {
         try
         {
-            var order = await FindOrderByNumber(orderNumber);
+            var order = await FindOrder(orderNumber, token);
             if (order == null) return HtmlNotFound(orderNumber);
 
-            if (order.Status == "Cancelled")
+            if (order.Status == OrderStatus.Cancelled)
             {
                 return Html(new HtmlStatusPage
                 {
@@ -143,11 +156,11 @@ public class OrderQuickActionsController : ControllerBase
                     AccentColor = "#374151",
                     Heading = "Order Already Cancelled",
                     Style = HtmlPageStyle.Plain,
-                    BodyHtml = $"<p>Order {_html.Escape(orderNumber)} has already been cancelled.</p>",
+                    BodyHtml = $"<p>Order {_html.Escape(order.OrderNumber)} has already been cancelled.</p>",
                 });
             }
 
-            if (order.Status != "Pending")
+            if (order.Status != OrderStatus.Pending)
             {
                 return Html(new HtmlStatusPage
                 {
@@ -156,8 +169,8 @@ public class OrderQuickActionsController : ControllerBase
                     AccentColor = "#f59e0b",
                     Heading = "Cannot Cancel Order",
                     Style = HtmlPageStyle.Plain,
-                    BodyHtml = $"<p>Order {_html.Escape(orderNumber)} cannot be cancelled because it is already {_html.Escape(order.Status.ToLower())}.</p>" +
-                               $"<p>Current status: <strong>{_html.Escape(order.Status)}</strong></p>",
+                    BodyHtml = $"<p>Order {_html.Escape(order.OrderNumber)} cannot be cancelled because it is already {order.Status.ToString().ToLowerInvariant()}.</p>" +
+                               $"<p>Current status: <strong>{order.Status}</strong></p>",
                 });
             }
 
@@ -177,7 +190,7 @@ public class OrderQuickActionsController : ControllerBase
                 Heading = "Order Cancelled",
                 Style = HtmlPageStyle.Plain,
                 Redirect = new HtmlRedirect($"{_emailSettings.FrontendBaseUrl}/admin/orders-management", CancelRedirectSeconds),
-                BodyHtml = $"<p>Order <strong>{_html.Escape(orderNumber)}</strong> has been cancelled.</p>" +
+                BodyHtml = $"<p>Order <strong>{_html.Escape(order.OrderNumber)}</strong> has been cancelled.</p>" +
                            "<p>The customer will be notified about the cancellation.</p>",
             });
         }
@@ -247,16 +260,13 @@ public class OrderQuickActionsController : ControllerBase
 
     // ── helpers ─────────────────────────────────────────────────────────
 
-    private async Task<Dtos.OrderDto?> FindOrderByNumber(string orderNumber)
-    {
-        var orders = await _mediator.SendQuery(new GetOrdersQuery(
-            Status: null, PaymentStatus: null, OrderType: null,
-            StartDate: null, EndDate: null, UserId: null,
-            Search: orderNumber, IsFocusOrder: null,
-            OrderBy: "OrderDate", Descending: true,
-            Page: 1, PageSize: 1));
-        return orders.Data?.Items.FirstOrDefault();
-    }
+    /// <summary>
+    /// Resolves the order the link refers to, or null when the link does not prove it was issued
+    /// for that order. Callers must render <see cref="HtmlNotFound"/> for null without
+    /// distinguishing "no such order" from "bad token".
+    /// </summary>
+    private Task<QuickActionOrder?> FindOrder(string orderNumber, string? token) =>
+        _mediator.SendQuery(new GetOrderForQuickActionQuery(orderNumber, token));
 
     private ContentResult Html(HtmlStatusPage page) =>
         Content(_html.BuildStatusPage(page), "text/html");
