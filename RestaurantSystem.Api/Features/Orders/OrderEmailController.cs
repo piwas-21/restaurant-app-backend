@@ -71,7 +71,13 @@ public class OrderEmailController : ControllerBase
     [EnableRateLimiting("confirmation-email")]
     public async Task<ActionResult<ApiResponse<string>>> SendOrderConfirmationEmail(Guid orderId)
     {
-        var orderResult = await _mediator.SendQuery(new GetOrderByIdQuery(orderId));
+        // SystemNotification, not Caller: this endpoint is deliberately [AllowAnonymous] (above), so
+        // the §9.19 owner-or-staff gate would refuse EVERY request and guest confirmation emails
+        // would silently stop — the caller has no bearer token by design. Safe here for the reason
+        // the threat-surface note above already gives: no order data reaches the response; the
+        // details only ever go to the address already recorded on the order.
+        var orderResult = await _mediator.SendQuery(
+            new GetOrderByIdQuery(orderId, OrderReadScope.SystemNotification));
         if (!orderResult.Success || orderResult.Data == null)
         {
             return BadRequest(ApiResponse<string>.Failure("Order not found"));

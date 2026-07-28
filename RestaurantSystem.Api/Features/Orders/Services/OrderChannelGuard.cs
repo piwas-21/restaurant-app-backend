@@ -73,7 +73,7 @@ public class OrderChannelGuard : IOrderChannelGuard
 
         var names = string.Join(", ", blocked.Select(p => p.Name));
 
-        if (IsStaff())
+        if (_currentUserService.IsStaff)
         {
             // Logged AND returned: the log is the operational trace (it carries the role and the
             // count), the return value is the durable one the caller stamps onto the order. The log
@@ -110,10 +110,4 @@ public class OrderChannelGuard : IOrderChannelGuard
             }
         }
     }
-
-    // Any authenticated non-Customer account is staff. Role is null for anonymous callers.
-    private bool IsStaff() =>
-        _currentUserService.IsAuthenticated
-        && _currentUserService.Role is not null
-        && _currentUserService.Role != UserRole.Customer;
 }
