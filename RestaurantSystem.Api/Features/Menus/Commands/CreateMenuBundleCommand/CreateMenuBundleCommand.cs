@@ -22,7 +22,8 @@ public record CreateMenuBundleCommand(
     List<Guid>? CategoryIds,
     Guid? PrimaryCategoryId,
     MenuDefinitionDto MenuDefinition,
-    ProductDescriptionsDto Content
+    ProductDescriptionsDto Content,
+    int? AvailableOrderTypes = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCommand, ApiResponse<ProductDto>>
@@ -54,6 +55,7 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 IsSpecial = command.IsSpecial,
                 IsAvailable = command.IsAvailable,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,
+                AvailableOrderTypes = command.AvailableOrderTypes,
                 Type = ProductType.Menu, // Hardcoded
                 KitchenType = KitchenType.None, // Menus usually don't have kitchen type directly, or maybe FrontKitchen?
                 DisplayOrder = command.DisplayOrder,

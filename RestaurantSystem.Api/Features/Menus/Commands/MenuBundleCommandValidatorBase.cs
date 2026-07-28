@@ -1,4 +1,5 @@
 using FluentValidation;
+using RestaurantSystem.Api.Common.Validation;
 
 namespace RestaurantSystem.Api.Features.Menus.Commands;
 
@@ -37,5 +38,18 @@ public abstract class MenuBundleCommandValidatorBase<T> : AbstractValidator<T> w
             .Must((command, primaryCategoryId) =>
                 !primaryCategoryId.HasValue || (command.CategoryIds != null && command.CategoryIds.Contains(primaryCategoryId.Value)))
             .WithMessage("Primary category must be one of the selected categories");
+
+        // Required only WHEN categories are sent — deliberately weaker than the product validator's
+        // unconditional NotNull. The update handler rebuilds ProductCategories from a non-empty
+        // CategoryIds, so a null primary in that payload un-primaries the bundle and kills its
+        // inheritance (§3.4); but an absent/empty list means "no category instruction" and leaves
+        // the existing rows (primary flag included) alone — #190, pinned by
+        // UpdateMenuBundlePreservesAssignmentsTests. The bundle editor sends exactly that, so an
+        // unconditional rule would 400 every save from the only client there is.
+        RuleFor(x => x.PrimaryCategoryId)
+            .NotNull().WithMessage("A primary category is required when categories are sent")
+            .When(x => x.CategoryIds?.Count > 0);
+
+        RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
     }
 }
