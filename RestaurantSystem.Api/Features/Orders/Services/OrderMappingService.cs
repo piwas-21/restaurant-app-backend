@@ -66,6 +66,8 @@ public class OrderMappingService : IOrderMappingService
             FocusReason = order.FocusReason,
             FocusedAt = order.FocusedAt,
             FocusedBy = order.FocusedBy,
+            OrderTypeOverrideBy = order.OrderTypeOverrideBy,
+            OrderTypeOverrideItems = order.OrderTypeOverrideItems,
             OrderDate = order.OrderDate,
             EstimatedDeliveryTime = order.EstimatedDeliveryTime,
             ActualDeliveryTime = order.ActualDeliveryTime,

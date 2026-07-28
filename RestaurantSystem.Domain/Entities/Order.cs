@@ -41,6 +41,27 @@ public class Order : SoftDeleteEntity
     public decimal CustomerDiscountAmount { get; set; } // Special customer discount amount
     public Guid? CustomerDiscountRuleId { get; set; } // Reference to discount rule used
 
+    /// <summary>
+    /// The staff member who accepted this order despite items not being available for
+    /// <see cref="Type"/>, and what they accepted. Both <c>null</c> on an ordinary order.
+    /// </summary>
+    /// <remarks>
+    /// The override is a deliberate warn-and-allow (a waiter genuinely does need to plate a
+    /// takeaway-only item for a guest at a table), so the only question is whether it leaves a trace.
+    /// It used to leave one only in the application log, which no owner reads and which rotates
+    /// (ORDER-TYPE-AVAILABILITY-PLAN §9.6).
+    /// <para>
+    /// Deliberate: <b>no timestamp</b> (the guard runs at creation, so <c>CreatedAt</c> dates it, and
+    /// a column that can only equal another one is a state that can go wrong); <b>By duplicates
+    /// <c>CreatedBy</c></b>, byte-identical today because the overrider IS the creator — kept so the
+    /// record stands alone rather than relying on a rule nothing enforces; <b>names, not ids, and no
+    /// length cap</b> — a name freezes the label as it read at the time, and truncating an audit
+    /// record is worse than a long column.
+    /// </para>
+    /// </remarks>
+    public string? OrderTypeOverrideBy { get; set; }
+    public string? OrderTypeOverrideItems { get; set; }
+
     // Status
     public OrderStatus Status { get; set; }
     public PaymentStatus PaymentStatus { get; set; }

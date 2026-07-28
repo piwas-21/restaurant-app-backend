@@ -21,7 +21,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// Staff get <b>warn-and-allow</b>, not a block: a waiter genuinely does need to plate a
 /// takeaway-only item for a guest at a table, and hard-blocking them would earn a support ticket in
 /// week one. Any authenticated staff account qualifies (not role-gated beyond "not a Customer") —
-/// the override is recorded, not restricted.
+/// the override is recorded, not restricted. Recorded means PERSISTED since §9.6: the guard returns
+/// what it let through and <c>CreateOrderCommandHandler</c> stamps it onto the order.
 /// </para>
 /// </remarks>
 public class OrderChannelGuard : IOrderChannelGuard
@@ -40,7 +41,7 @@ public class OrderChannelGuard : IOrderChannelGuard
         _logger = logger;
     }
 
-    public async Task EnsureOrderableAsync(
+    public async Task<OrderChannelOverride?> EnsureOrderableAsync(
         IReadOnlyCollection<CreateOrderItemDto> items,
         OrderType orderType,
         CancellationToken cancellationToken = default)
@@ -51,7 +52,7 @@ public class OrderChannelGuard : IOrderChannelGuard
         var productIds = FlattenProductIds(items).ToList();
         if (productIds.Count == 0)
         {
-            return;
+            return null;
         }
 
         var products = await _context.Products
@@ -67,20 +68,22 @@ public class OrderChannelGuard : IOrderChannelGuard
 
         if (blocked.Count == 0)
         {
-            return;
+            return null;
         }
 
         var names = string.Join(", ", blocked.Select(p => p.Name));
 
         if (IsStaff())
         {
-            // Recorded via structured logging so the override is auditable. Persisting a flag on the
-            // Order itself is tracked as follow-up (it needs its own migration).
+            // Logged AND returned: the log is the operational trace (it carries the role and the
+            // count), the return value is the durable one the caller stamps onto the order. The log
+            // alone was the whole record until §9.6, and no owner reads application logs.
             _logger.LogWarning(
                 "STAFF ORDER-TYPE OVERRIDE by user {UserId} (role {Role}): {Count} item(s) not available "
                 + "for {OrderType} were accepted ({Names})",
                 _currentUserService.UserId, _currentUserService.Role, blocked.Count, orderType, names);
-            return;
+
+            return new OrderChannelOverride(_currentUserService.GetAuditIdentifier(), names);
         }
 
         throw new BadRequestException(
