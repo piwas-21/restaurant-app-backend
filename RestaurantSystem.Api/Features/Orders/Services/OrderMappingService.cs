@@ -61,11 +61,11 @@ public class OrderMappingService : IOrderMappingService
             UserLimitAmount = order.UserLimitAmount,
             Status = order.Status.ToString(),
             PaymentStatus = order.PaymentStatus.ToString(),
-            IsFocusOrder = order.IsFocusOrder,
-            Priority = order.Priority,
-            FocusReason = order.FocusReason,
-            FocusedAt = order.FocusedAt,
-            FocusedBy = order.FocusedBy,
+            IsFocusOrder = order.Focus is not null,
+            Priority = order.Focus?.Priority,
+            FocusReason = order.Focus?.Reason,
+            FocusedAt = order.Focus?.FocusedAt,
+            FocusedBy = order.Focus?.FocusedBy,
             OrderTypeOverrideBy = order.OrderTypeOverrideBy,
             OrderTypeOverrideItems = order.OrderTypeOverrideItems,
             OrderDate = order.OrderDate,
@@ -108,7 +108,7 @@ public class OrderMappingService : IOrderMappingService
             // Root rows only, so this stays consistent with OrderDto.Items — a 1-line combo
             // with 3 components is 1 item, not 4.
             ItemCount = order.Items?.Count(i => !i.ParentOrderItemId.HasValue) ?? 0,
-            IsFocusOrder = order.IsFocusOrder
+            IsFocusOrder = order.Focus is not null
         };
     }
 

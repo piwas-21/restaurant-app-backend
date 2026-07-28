@@ -71,12 +71,8 @@ public class Order : SoftDeleteEntity
     public OrderStatus Status { get; set; }
     public PaymentStatus PaymentStatus { get; set; }
 
-    // Focus Order Feature
-    public bool IsFocusOrder { get; set; }
-    public int? Priority { get; set; } // 1-5, where 1 is highest priority
-    public string? FocusReason { get; set; }
-    public DateTime? FocusedAt { get; set; }
-    public string? FocusedBy { get; set; }
+    /// <summary>Present exactly when staff have focused this order; null otherwise.</summary>
+    public OrderFocus? Focus { get; set; }
 
     // Timestamps
     public DateTime OrderDate { get; set; }
