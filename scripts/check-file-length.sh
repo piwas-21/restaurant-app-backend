@@ -39,9 +39,13 @@ limit_for_path() {
     */Dtos/*.cs)                                                     echo 60 ;;
     # Configuration / settings classes
     *Settings.cs)                                                    echo 50 ;;
-    # Controllers
+    # Controllers. ControllerBase.cs is matched explicitly: a shared controller base is a controller
+    # by every measure the limit cares about, but `*Controller.cs` does not match it, so one could
+    # grow without bound while the classes deriving from it stayed compliant.
     RestaurantSystem.Api/Features/*Controller.cs)                    echo 150 ;;
     RestaurantSystem.Api/Features/**/*Controller.cs)                 echo 150 ;;
+    RestaurantSystem.Api/Features/*ControllerBase.cs)                echo 150 ;;
+    RestaurantSystem.Api/Features/**/*ControllerBase.cs)             echo 150 ;;
     # Domain entities
     RestaurantSystem.Domain/*.cs|RestaurantSystem.Domain/**/*.cs)    echo 100 ;;
     # Command / Query handlers
