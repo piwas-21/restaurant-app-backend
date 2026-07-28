@@ -55,9 +55,10 @@ public class ProductsController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<PagedResult<SpecialProductDto>>>> GetSpecialProducts(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] OrderType? requestedOrderType = null)
     {
-        var query = new GetSpecialProductsQuery(page, pageSize);
+        var query = new GetSpecialProductsQuery(page, pageSize, requestedOrderType);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
     }
@@ -68,9 +69,10 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpGet("featured-special")]
     [AllowAnonymous]
-    public async Task<ActionResult<ApiResponse<FeaturedSpecialDto?>>> GetFeaturedSpecial()
+    public async Task<ActionResult<ApiResponse<FeaturedSpecialDto?>>> GetFeaturedSpecial(
+        [FromQuery] OrderType? requestedOrderType = null)
     {
-        var query = new GetFeaturedSpecialQuery();
+        var query = new GetFeaturedSpecialQuery(requestedOrderType);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
     }

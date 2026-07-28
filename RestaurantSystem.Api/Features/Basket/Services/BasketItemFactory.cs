@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using System.Text.Json;
@@ -35,7 +36,8 @@ public class BasketItemFactory : IBasketItemFactory
         _logger = logger;
     }
 
-    public async Task<BasketItem> BuildRegularItemAsync(Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId)
+    public async Task<BasketItem> BuildRegularItemAsync(
+        Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
         // Calculate unit price
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
@@ -62,19 +64,38 @@ public class BasketItemFactory : IBasketItemFactory
             var sideItemIds = validSideItems.Select(s => s.Id).ToList();
             var sideItems = await _context.Products
                 .AsNoTracking()
+                // ProductCategories -> Category is what makes the guard below MEAN anything: an
+                // inheriting product with that collection unloaded resolves as UNRESTRICTED, so a
+                // guard without this include would permit everything and still look done (the
+                // #231/#236/#237/#241 class).
+                .Include(p => p.ProductCategories)
+                    .ThenInclude(pc => pc.Category)
                 .Where(p => sideItemIds.Contains(p.Id) && p.IsActive && p.IsAvailable)
                 .ToListAsync();
 
+            // §9.3: the caller guards the LINE's product; nothing guarded what was attached to it.
+            foreach (var sideItemProduct in sideItems)
+            {
+                BasketChannelGuard.EnsureOrderable(sideItemProduct, basketOrderType);
+            }
+
+            // Persist only the sides that RESOLVED. The guard above can only see what the query
+            // returned, so serializing the raw client list would let an unresolved id — a sold-out
+            // side (`IsAvailable = false`, a routine pairing with a channel restriction) or one that
+            // simply does not exist — reach the line unpriced and unguarded, and from there the
+            // kitchen ticket. That is the "stale tab or tampered payload" case this guard exists for.
+            var resolvedSides = new List<SelectedSideItemDto>();
             foreach (var selectedSide in validSideItems)
             {
                 var sideItem = sideItems.FirstOrDefault(s => s.Id == selectedSide.Id);
                 if (sideItem != null)
                 {
                     customizationPrice += sideItem.BasePrice * selectedSide.Quantity;
+                    resolvedSides.Add(selectedSide);
                 }
             }
 
-            selectedSideItemsJson = JsonSerializer.Serialize(validSideItems);
+            selectedSideItemsJson = resolvedSides.Count > 0 ? JsonSerializer.Serialize(resolvedSides) : null;
         }
 
         return new BasketItem
@@ -97,17 +118,22 @@ public class BasketItemFactory : IBasketItemFactory
         };
     }
 
-    public async Task<BasketItem> BuildMenuItemAsync(Product product, AddToBasketDto item, Guid basketId)
+    /// <summary>
+    /// Validates each section's required / min / max selection rules and returns the section-option
+    /// surcharge to add to the menu's base price.
+    /// </summary>
+    /// <remarks>
+    /// Extracted from <see cref="BuildMenuItemAsync"/>: adding the §9.3 channel guard pushed that
+    /// method past the cognitive-complexity limit, and this validation is a self-contained concern
+    /// with one output — the surcharge — so it splits cleanly rather than by cutting the method in
+    /// an arbitrary place to satisfy a number.
+    /// </remarks>
+    private decimal ValidateSectionsAndSumOptionPrices(
+        IEnumerable<MenuSection> sections, List<SelectedMenuOptionDto> selectedOptions)
     {
-        if (product.MenuDefinition == null)
-            throw new NotFoundException("Menu definition not found");
+        decimal optionsPrice = 0m;
 
-        // Calculate total price including options
-        decimal menuTotalPrice = product.BasePrice;
-        var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
-
-        // Validate required sections and calculate price
-        foreach (var section in product.MenuDefinition.Sections)
+        foreach (var section in sections)
         {
             var sectionSelections = selectedOptions.Where(o => o.SectionId == section.Id).ToList();
 
@@ -130,21 +156,46 @@ public class BasketItemFactory : IBasketItemFactory
                 throw new BadRequestException($"Section '{section.Name}' allows at most {section.MaxSelection} selection(s)");
             }
 
-            foreach (var selection in sectionSelections)
-            {
-                // Validate individual selection
-                if (selection.Quantity < 1)
-                {
-                    throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
-                }
-
-                var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId);
-                if (sectionItem == null)
-                    throw new NotFoundException($"Item not found in section '{section.Name}'");
-
-                menuTotalPrice += sectionItem.AdditionalPrice * selection.Quantity;
-            }
+            optionsPrice += SumSelectionPrices(section, sectionSelections);
         }
+
+        return optionsPrice;
+    }
+
+    /// <summary>One section's selections: per-selection validation plus its additional-price total.</summary>
+    private static decimal SumSelectionPrices(MenuSection section, List<SelectedMenuOptionDto> sectionSelections)
+    {
+        decimal price = 0m;
+
+        foreach (var selection in sectionSelections)
+        {
+            // Validate individual selection
+            if (selection.Quantity < 1)
+            {
+                throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
+            }
+
+            var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId)
+                ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
+
+            price += sectionItem.AdditionalPrice * selection.Quantity;
+        }
+
+        return price;
+    }
+
+    public async Task<BasketItem> BuildMenuItemAsync(
+        Product product, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
+    {
+        if (product.MenuDefinition == null)
+            throw new NotFoundException("Menu definition not found");
+
+        // Calculate total price including options
+        decimal menuTotalPrice = product.BasePrice;
+        var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
+
+        // Validate required sections and calculate price
+        menuTotalPrice += ValidateSectionsAndSumOptionPrices(product.MenuDefinition.Sections, selectedOptions);
 
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
 
@@ -166,8 +217,26 @@ public class BasketItemFactory : IBasketItemFactory
         var childProductIds = selectedOptions.Select(o => o.ItemId).Distinct().ToList();
         var childProducts = await _context.Products
             .Include(p => p.DetailedIngredients)
+            // See the side-item load: without the inheritance chain the guard below resolves every
+            // inheriting option as unrestricted, which is worse than no guard — it looks like one.
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
             .Where(p => childProductIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id);
+
+        // §9.3: a combo being orderable on this channel says nothing about the components chosen
+        // inside it, and the caller's guard only ever saw the combo. `OrderChannelGuard` already
+        // walks children at order creation, so a line that gets past here is a dead end the guest
+        // discovers at checkout rather than at add time.
+        //
+        // This closes the ADD-under-a-channel half only. The add-then-SWITCH half is still open:
+        // `BasketChannelService.FindConflictsAsync` walks root lines only, so a combo added with no
+        // channel chosen (permissive by design, and the dominant browse state) still reports zero
+        // conflicts when the guest later picks a channel its components refuse. Tracked as §9.15.
+        foreach (var childProduct in childProducts.Values)
+        {
+            BasketChannelGuard.EnsureOrderable(childProduct, basketOrderType);
+        }
 
         // Create Child Basket Items for selected options. They are attached to the parent's
         // ChildBasketItems navigation (rather than added to the context here) so the caller

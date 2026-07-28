@@ -1,3 +1,5 @@
+using RestaurantSystem.Api.Features.Catalog.Dtos;
+
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 /// <summary>
@@ -18,4 +20,11 @@ public record FeaturedSpecialDto
     public List<ProductVariationDto> Variations { get; init; } = [];
     public List<SideItemDto> SuggestedSideItems { get; init; } = [];
     public List<ProductIngredientDto> DetailedIngredients { get; init; } = [];
+
+    /// <summary>
+    /// Server-resolved per-order-type availability, exactly as the catalog cards carry it. Required
+    /// rather than optional: the banner is an ENTRY POINT — a guest can order straight from it — so
+    /// an absent verdict here is an unguarded add, not a cosmetic gap.
+    /// </summary>
+    public required ItemAvailabilityDto Availability { get; init; }
 }
