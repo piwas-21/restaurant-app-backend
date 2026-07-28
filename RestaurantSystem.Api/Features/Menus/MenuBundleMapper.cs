@@ -1,6 +1,8 @@
 using RestaurantSystem.Api.Common.Utilities;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Menus;
@@ -14,10 +16,19 @@ namespace RestaurantSystem.Api.Features.Menus;
 /// subset — this unifies them (list keeps its ingredients; detail gains them). The caller loads the
 /// navigations it reads (menu-definition → sections → items → product → detailed-ingredients →
 /// descriptions, plus descriptions and images).
+/// <para>
+/// Since §9.2 the caller must ALSO load <c>ProductCategories → Category</c>: a bundle with no mask
+/// of its own inherits its primary category's, and an unloaded collection resolves as UNRESTRICTED
+/// — a missing include here is a silently permissive verdict, not an error.
+/// </para>
 /// </summary>
 public static class MenuBundleMapper
 {
-    public static MenuBundleDto MapToMenuBundleDto(Product product, string baseUrl)
+    /// <param name="requestedOrderType">
+    /// The channel the guest is ordering through, or <c>null</c> when they have not chosen one (the
+    /// dominant browse state) — nothing is reported as blocked in that case.
+    /// </param>
+    public static MenuBundleDto MapToMenuBundleDto(Product product, string baseUrl, OrderType? requestedOrderType)
     {
         var dto = new MenuBundleDto
         {
@@ -31,6 +42,8 @@ public static class MenuBundleMapper
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = "menu",
             DisplayOrder = product.DisplayOrder,
+            Availability = OrderTypeAvailability.Resolve(product, requestedOrderType),
+            AvailableOrderTypes = product.AvailableOrderTypes,
             MenuDefinition = product.MenuDefinition != null ? new MenuBundleDefinitionDto
             {
                 Id = product.MenuDefinition.Id,

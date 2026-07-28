@@ -2,11 +2,22 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Menus.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundlesQuery;
 
-public record GetMenuBundlesQuery(int Page, int PageSize, Guid? CategoryId = null, bool IncludeUnavailable = false) : IQuery<ApiResponse<PagedResult<MenuBundleDto>>>;
+/// <param name="RequestedOrderType">
+/// The channel the guest is ordering through. Does NOT filter the list — a blocked bundle stays
+/// visible with a reason, exactly as products do (ORDER-TYPE-AVAILABILITY-PLAN §4.4). It only
+/// resolves each row's <see cref="MenuBundleDto.Availability"/>.
+/// </param>
+public record GetMenuBundlesQuery(
+    int Page,
+    int PageSize,
+    Guid? CategoryId = null,
+    bool IncludeUnavailable = false,
+    OrderType? RequestedOrderType = null) : IQuery<ApiResponse<PagedResult<MenuBundleDto>>>;
 
 public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfiguration configuration)
     : IQueryHandler<GetMenuBundlesQuery, ApiResponse<PagedResult<MenuBundleDto>>>
@@ -18,6 +29,12 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
     public async Task<ApiResponse<PagedResult<MenuBundleDto>>> Handle(GetMenuBundlesQuery query, CancellationToken cancellationToken)
     {
         var queryable = _context.Products
+            // ProductCategories -> Category is load-bearing, not cosmetic: a bundle with no mask of
+            // its own inherits its PRIMARY category's, and an unloaded collection reads as
+            // UNRESTRICTED. Omit this include and every restricted bundle reports as orderable,
+            // silently — no exception, no empty field.
+            .Include(p => p.ProductCategories)
+                .ThenInclude(pc => pc.Category)
             .Include(p => p.MenuDefinition)
                 .ThenInclude(md => md!.Sections)
                     .ThenInclude(s => s.Items)
@@ -66,7 +83,9 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = products.Select(p => MenuBundleMapper.MapToMenuBundleDto(p, _baseUrl)).ToList();
+        var dtos = products
+            .Select(p => MenuBundleMapper.MapToMenuBundleDto(p, _baseUrl, query.RequestedOrderType))
+            .ToList();
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);
 

@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
 
 namespace RestaurantSystem.Api.Features.Menus.Dtos;
@@ -28,6 +29,34 @@ public class MenuBundleDto
     public MenuBundleDefinitionDto? MenuDefinition { get; set; }
     public Dictionary<string, MenuBundleContentDto> Content { get; set; } = new();
     public List<ProductImageDto> Images { get; set; } = new();
+
+    /// <summary>
+    /// Server-resolved per-order-type availability for the requested channel — the same field, from
+    /// the same resolver, that <c>ProductSummaryDto</c> carries (ORDER-TYPE-AVAILABILITY-PLAN §9.2).
+    /// </summary>
+    /// <remarks>
+    /// Judges the BUNDLE's own mask (its override, else its primary category's), not its options'.
+    /// A bundle whose optional side is takeaway-only is still orderable on dine-in — the guest picks
+    /// a different side — so intersecting the children here would block sellable combos. Making a
+    /// bundle unorderable when a REQUIRED section has no option on the channel is the genuinely
+    /// correct child-derived rule and is deferred (plan §8, "bundle ↔ child intersection"); until it
+    /// lands, <c>BasketChannelGuard</c> refuses the blocked component at add time (§9.3).
+    /// </remarks>
+    public ItemAvailabilityDto Availability { get; set; } = new();
+
+    /// <summary>
+    /// The bundle's OWN stored channel mask — <c>null</c> = inherit from the primary category.
+    /// Admin-facing, so the editor can echo it back on save. Read <see cref="Availability"/>, never
+    /// this, for a verdict.
+    /// </summary>
+    /// <remarks>
+    /// <b>No client reads or writes this yet.</b> `baseMenuBundleSchema` has no such key and the
+    /// editor renders its order-type control only for non-bundles, so until the frontend half of
+    /// §9.2 lands this field is emitted and ignored — and, because the bundle PUT assigns the column
+    /// unconditionally, a bundle mask set out of band is CLEARED by any unrelated bundle save. See
+    /// <c>UpdateMenuBundleCommandHandler</c>.
+    /// </remarks>
+    public int? AvailableOrderTypes { get; set; }
 }
 
 /// <summary>
