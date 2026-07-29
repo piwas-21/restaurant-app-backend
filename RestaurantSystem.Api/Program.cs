@@ -33,6 +33,7 @@ using RestaurantSystem.Api.Features.Settings.Services;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
 using RestaurantSystem.Api.Features.Groups.Services;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -421,6 +422,12 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+// Lets ApplicationDbContext (Infrastructure, which cannot see ICurrentUserService) backfill audit
+// columns with the acting user. NOT forwarded to ICurrentUserService: that is a dependency CYCLE —
+// CurrentUserService needs UserManager, which needs IUserStore, which AddEntityFrameworkStores
+// binds back to ApplicationDbContext. It hangs the host rather than throwing. See
+// HttpContextAuditIdentityProvider, which depends on IHttpContextAccessor and nothing else.
+builder.Services.AddScoped<IAuditIdentityProvider, HttpContextAuditIdentityProvider>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transport (Smtp | Resend)
 builder.Services.AddScoped<IEmailService, EmailService>();

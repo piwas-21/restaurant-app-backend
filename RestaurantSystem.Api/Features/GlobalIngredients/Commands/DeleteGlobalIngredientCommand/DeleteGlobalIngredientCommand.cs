@@ -32,12 +32,17 @@ public class DeleteGlobalIngredientCommandHandler : ICommandHandler<DeleteGlobal
         }
 
         // Set by hand, as every other soft delete in the codebase does. This used to be a `Remove()`
-        // under a comment claiming the entity configuration handled the soft delete; nothing does.
-        // `ApplicationDbContext` DOES convert `EntityState.Deleted` into `IsDeleted`, in
-        // `ApplyAuditInformation()` — but that is called only from the SYNCHRONOUS `SaveChanges()`
-        // override, and every handler awaits `SaveChangesAsync`, so it never ran. The `Remove()`
-        // reached the database as a permanent DELETE (and, where a product still referenced the row,
-        // as a foreign-key error). Do not reintroduce it before §9.18's root fix lands.
+        // under a comment claiming the entity configuration handled the soft delete; nothing did.
+        // `ApplicationDbContext.ApplyAuditInformation()` converts `EntityState.Deleted` into
+        // `IsDeleted`, but it used to run only from the SYNCHRONOUS `SaveChanges()` override, and
+        // every handler awaits `SaveChangesAsync` — so it never ran, and the `Remove()` reached the
+        // database as a permanent DELETE (and, where a product still referenced the row, as a
+        // foreign-key error).
+        //
+        // §9.18's root fix has since landed: `SaveChangesAsync` is overridden too, so a `Remove()`
+        // here WOULD now soft-delete correctly. The explicit form is kept anyway — it is what the
+        // rest of the codebase does, it states the intent at the callsite, and it keeps the audit
+        // identity the handler's decision rather than the ambient one.
         ingredient.IsDeleted = true;
         ingredient.DeletedAt = DateTime.UtcNow;
         ingredient.DeletedBy = _currentUserService.GetAuditIdentifier();

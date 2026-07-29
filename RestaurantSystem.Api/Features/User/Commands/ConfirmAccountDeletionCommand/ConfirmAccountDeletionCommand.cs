@@ -90,12 +90,27 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
         }
         // -----------------------------------------------------
 
-        var result = await _userManager.DeleteAsync(user);
-        if (!result.Succeeded)
+        // soft-delete-bypass: GDPR Art. 17 erasure. This MUST remove the row, not flag it —
+        // ApplicationUser is ISoftDelete AND IExcludeFromGlobalFilter, so a flagged row keeps every
+        // piece of PII on it (email, names, phone, password hash, metadata) and is not even hidden
+        // by a query filter; its unfiltered unique indexes on Email/NormalizedEmail/NormalizedUserName
+        // would also burn that address forever, so the customer could never re-register.
+        //
+        // Deliberately NOT _userManager.DeleteAsync: that calls _context.Remove(user) internally, and
+        // ApplyAuditInformation now converts a Remove of an ISoftDelete entity into a soft delete —
+        // which would silently turn this erasure into a no-op. ExecuteDeleteAsync bypasses the change
+        // tracker, so erasure no longer depends on ASP.NET Identity's internals at all. This also
+        // makes all three deletion paths consistent: DeleteUserCommand and AccountCleanupService
+        // already erase this way.
+        var deleted = await _context.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.Id == user.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (deleted == 0)
         {
-            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-            _logger.LogError("Failed to delete user {UserId}: {Errors}", user.Id, errors);
-            return ApiResponse<string>.Failure($"Failed to delete account: {errors}");
+            _logger.LogError("Failed to delete user {UserId}: no row was removed", user.Id);
+            return ApiResponse<string>.Failure("Failed to delete account.");
         }
 
         _logger.LogInformation("User {UserId} permanently deleted via confirmation token", user.Id);
