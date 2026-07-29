@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RestaurantSystem.IntegrationTests.Common;
@@ -13,15 +14,36 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
+    private readonly IReadOnlyDictionary<string, string> _settings;
 
-    public TestWebApplicationFactory(string connectionString)
+    /// <param name="settings">
+    /// Extra configuration keys, per-instance (a process-wide environment variable would
+    /// race across xUnit's parallel runs). Used by tests that need the host built with a
+    /// different configuration than appsettings.json — e.g. module enforcement on.
+    ///
+    /// Added as the LAST configuration source rather than via UseSetting: UseSetting lands in
+    /// host configuration, which the appsettings*.json sources are layered on top of, so it
+    /// silently loses to any key those files already define. (It works for
+    /// ConnectionStrings:restaurantdb above only because appsettings.Test.json declares
+    /// `redis` and not `restaurantdb`.)
+    /// </param>
+    public TestWebApplicationFactory(
+        string connectionString, IReadOnlyDictionary<string, string>? settings = null)
     {
         _connectionString = connectionString;
+        _settings = settings ?? new Dictionary<string, string>();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Test");
+
+        if (_settings.Count > 0)
+        {
+            builder.ConfigureAppConfiguration(configuration =>
+                configuration.AddInMemoryCollection(
+                    _settings.Select(kv => new KeyValuePair<string, string?>(kv.Key, kv.Value))));
+        }
 
         // restaurantdb: inject per-instance via UseSetting (NOT
         // Environment.SetEnvironmentVariable — that's process-wide and

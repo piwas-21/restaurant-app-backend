@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Devices.Commands.RecordDeviceEventsCommand;
 using RestaurantSystem.Api.Features.Devices.Commands.RecordHeartbeatCommand;
 using RestaurantSystem.Api.Features.Devices.Commands.RecordPrintAcksCommand;
@@ -14,6 +15,7 @@ using RestaurantSystem.Api.Features.Devices.Queries.GetMissedOrdersQuery;
 namespace RestaurantSystem.Api.Features.Devices;
 
 [ApiController]
+[RequireModule(ModuleIds.Printing)]
 [Route("api/devices")]
 public class DevicesController : ControllerBase
 {

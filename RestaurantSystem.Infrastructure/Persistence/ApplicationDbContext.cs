@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
 using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
@@ -12,7 +13,31 @@ namespace RestaurantSystem.Infrastructure.Persistence
 {
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>, IDataProtectionKeyContext
     {
+        private readonly IAuditIdentityProvider? _auditIdentity;
+
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
+
+        /// <summary>
+        /// Preferred constructor. The provider is resolved from DI at runtime so audit columns are
+        /// stamped with the acting user rather than the literal "System".
+        /// </summary>
+        /// <remarks>
+        /// The parameterless-audit overload above is kept deliberately for callers that construct the
+        /// context directly with no container — <c>DatabaseFixture.CreateContext</c> is the one in
+        /// this repo. Those saves fall back to "System", which is what they are. (Design-time
+        /// <c>dotnet ef</c> resolves through the app host and so gets THIS constructor, not that one.)
+        ///
+        /// Note the sharp edge the two constructors create: a composition root that registers the
+        /// context WITHOUT registering <see cref="IAuditIdentityProvider"/> silently binds the 1-arg
+        /// overload and degrades every stamp to "System" with no error. <c>Program.cs</c> registers
+        /// both together for that reason.
+        /// </remarks>
+        public ApplicationDbContext(
+            DbContextOptions<ApplicationDbContext> options,
+            IAuditIdentityProvider auditIdentity) : base(options)
+        {
+            _auditIdentity = auditIdentity;
+        }
 
         // Product-related DbSets
         public DbSet<Category> Categories { get; set; }
@@ -224,41 +249,196 @@ namespace RestaurantSystem.Infrastructure.Persistence
             return base.SaveChanges();
         }
 
+        /// <summary>
+        /// The override that actually matters. Every save in this codebase is asynchronous — there
+        /// are no <c>SaveChanges()</c> callers outside the override above — so until this existed,
+        /// <see cref="ApplyAuditInformation"/> never ran in production at all.
+        /// </summary>
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            ApplyAuditInformation();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        /// <summary>
+        /// Fills in audit columns a handler did not set, and turns a <c>Remove</c> of a
+        /// soft-deletable entity into a soft delete.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Backfill only — never overwrite.</b> Handlers stamp these columns themselves at ~125
+        /// callsites via <c>ICurrentUserService.GetAuditIdentifier()</c>, and some deliberately
+        /// write a non-user identity (<c>BasketCleanupService</c> writes its own name). Clobbering
+        /// those would destroy real audit identity, so a value the caller set in this unit of work
+        /// is left exactly as it is; this only supplies what is missing.
+        /// </para>
+        /// <para>
+        /// "Did the caller set it?" is asked of EF, not of the value: <c>IsModified</c> on the
+        /// property is true only when this unit of work changed it. Comparing against null would
+        /// get <c>Modified</c> wrong, because a row loaded from the database already carries the
+        /// previous save's UpdatedBy and would then never refresh.
+        /// </para>
+        /// </remarks>
         private void ApplyAuditInformation()
         {
             var now = DateTime.UtcNow;
-
-            // Get the current user ID if available
-            var userId = "System"; // Default if no user context is available
+            var userId = _auditIdentity?.GetAuditIdentifier() ?? "System";
 
             foreach (var entry in ChangeTracker.Entries<IAuditable>())
             {
                 switch (entry.State)
                 {
                     case EntityState.Added:
-                        entry.Entity.CreatedAt = now;
-                        entry.Entity.CreatedBy = userId;
+                        StampCreation(entry, now, userId);
                         break;
 
                     case EntityState.Modified:
-                        entry.Entity.UpdatedAt = now;
-                        entry.Entity.UpdatedBy = userId;
+                        StampUpdate(entry, now, userId);
                         break;
                 }
             }
 
-            // Handle soft deletion
             foreach (var entry in ChangeTracker.Entries<ISoftDelete>())
             {
                 if (entry.State == EntityState.Deleted)
                 {
-                    // Change state from deleted to modified and set IsDeleted flag
-                    entry.State = EntityState.Modified;
-                    entry.Entity.IsDeleted = true;
-                    entry.Entity.DeletedAt = now;
-                    entry.Entity.DeletedBy = userId;
+                    ConvertDeleteToSoftDelete(entry, now, userId);
                 }
             }
+        }
+
+        /// <remarks>
+        /// <see cref="PropertyEntry.IsModified"/> is false for every property of an Added entry —
+        /// even ones the caller assigned in the initializer — so it cannot distinguish a deliberate
+        /// value from an unset one. The value itself can: <c>CreatedAt</c> is only ever
+        /// <c>default(DateTime)</c> when nobody assigned it.
+        ///
+        /// The <c>CreatedAt</c> stamp is belt-and-braces: <c>ConfigureDefaultValues</c> gives every
+        /// <see cref="IAuditable"/> a <c>CURRENT_TIMESTAMP</c> store default, so an unset value gets
+        /// filled by Postgres anyway. It is kept so the value is on the in-memory entity without a
+        /// round-trip — and it is why no test pins it: through the save path the two are
+        /// indistinguishable, and a test asserting "CreatedAt is populated afterwards" passes with
+        /// this line deleted. <c>CreatedBy</c> has no such default and IS pinned.
+        /// </remarks>
+        private static void StampCreation(EntityEntry<IAuditable> entry, DateTime now, string userId)
+        {
+            if (entry.Entity.CreatedAt == default)
+            {
+                entry.Entity.CreatedAt = now;
+            }
+
+            if (string.IsNullOrEmpty(entry.Entity.CreatedBy))
+            {
+                entry.Entity.CreatedBy = userId;
+            }
+        }
+
+        private static void StampUpdate(EntityEntry<IAuditable> entry, DateTime now, string userId)
+        {
+            if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedAt)))
+            {
+                entry.Entity.UpdatedAt = now;
+            }
+
+            if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedBy)))
+            {
+                entry.Entity.UpdatedBy = userId;
+            }
+        }
+
+        /// <summary>
+        /// Re-targets a <c>Remove()</c> at the <c>IsDeleted</c> flag. Read back through the global
+        /// query filter the row simply disappears, which is why this is invisible to callers.
+        /// </summary>
+        private static void ConvertDeleteToSoftDelete(EntityEntry<ISoftDelete> entry, DateTime now, string userId)
+        {
+            // Read the caller's intent BEFORE re-targeting the delete, and NOT via IsModified: on a
+            // Deleted entry IsModified is false for every property regardless of what the caller
+            // assigned, so an IsModified guard here is constant-false and silently overwrites.
+            // Comparing current against original still works on a Deleted entry — both value sets
+            // survive. (Asking after the flip is no better: the flip marks EVERY property modified,
+            // including ones nobody touched.)
+            var deletedAtWasSet = WasAssignedOnDeletedEntry(entry, nameof(ISoftDelete.DeletedAt));
+            var deletedByWasSet = WasAssignedOnDeletedEntry(entry, nameof(ISoftDelete.DeletedBy));
+            var updatedAtWasSet = WasAssignedOnDeletedEntry(entry, nameof(IAuditable.UpdatedAt));
+            var updatedByWasSet = WasAssignedOnDeletedEntry(entry, nameof(IAuditable.UpdatedBy));
+
+            entry.State = EntityState.Modified;
+            entry.Entity.IsDeleted = true;
+
+            if (!deletedAtWasSet)
+            {
+                entry.Entity.DeletedAt = now;
+            }
+
+            if (!deletedByWasSet)
+            {
+                entry.Entity.DeletedBy = userId;
+            }
+
+            // A soft delete IS a modification, so stamp the update columns too. The IAuditable loop
+            // cannot do it: it runs first, and at that point this entry is still Deleted, which its
+            // switch has no case for. Without this the row is rewritten carrying a stale
+            // UpdatedAt/UpdatedBy — worse than leaving them alone, because the flip marks those
+            // columns modified and they get written back as if they were current.
+            //
+            // Guarded like every other column here. An unconditional stamp would be the same
+            // clobbering bug as an IsModified guard on a Deleted entry, just relocated.
+            if (entry.Entity is not IAuditable auditable)
+            {
+                return;
+            }
+
+            if (!updatedAtWasSet)
+            {
+                auditable.UpdatedAt = now;
+            }
+
+            if (!updatedByWasSet)
+            {
+                auditable.UpdatedBy = userId;
+            }
+        }
+
+        /// <summary>
+        /// True when this unit of work assigned <paramref name="propertyName"/>, i.e. the caller
+        /// meant that value and it must not be overwritten.
+        /// </summary>
+        private static bool IsSetInThisSave(EntityEntry entry, string propertyName)
+        {
+            var property = entry.Metadata.FindProperty(propertyName);
+
+            // An entity that does not map the column at all cannot have been set through it.
+            return property is not null && entry.Property(propertyName).IsModified;
+        }
+
+        /// <summary>
+        /// The <see cref="EntityState.Deleted"/> equivalent of <see cref="IsSetInThisSave"/>.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="PropertyEntry.IsModified"/> is false for every property of a Deleted entry, so
+        /// it cannot answer this question — but the original and current value sets are both still
+        /// populated, and a difference between them means the caller assigned it.
+        ///
+        /// That implication runs one way only. An entity <c>Remove</c>d while DETACHED has its
+        /// originals snapshotted from the stub at attach time, so original == current even for a
+        /// column the caller deliberately set, and the assignment is missed. Every <c>Remove</c> in
+        /// this codebase operates on a tracked, loaded entity, so that is a latent trap rather than
+        /// a live one — but it is the case to check first if a deliberate DeletedBy ever comes back
+        /// as the ambient identity.
+        /// </remarks>
+        private static bool WasAssignedOnDeletedEntry(EntityEntry entry, string propertyName)
+        {
+            var property = entry.Metadata.FindProperty(propertyName);
+            if (property is null)
+            {
+                return false;
+            }
+
+            var propertyEntry = entry.Property(propertyName);
+            return !Equals(propertyEntry.OriginalValue, propertyEntry.CurrentValue);
         }
 
     }

@@ -1,9 +1,10 @@
 ﻿using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Common.Services.Interfaces
 {
-    public interface ICurrentUserService
+    public interface ICurrentUserService : IAuditIdentityProvider
     {
         Guid? UserId { get; }
         string? UserName { get; }
@@ -17,7 +18,15 @@ namespace RestaurantSystem.Api.Common.Services.Interfaces
         /// Returns the current user's ID as a string for audit fields (CreatedBy/UpdatedBy),
         /// or "System" if no user is authenticated.
         /// </summary>
-        string GetAuditIdentifier() => UserId?.ToString() ?? "System";
+        /// <remarks>
+        /// Satisfies <see cref="IAuditIdentityProvider"/> so the two can be compared in a test —
+        /// NOT so this can be registered as the context's provider. Do not wire it that way:
+        /// <c>ApplicationDbContext</c> resolves <c>HttpContextAuditIdentityProvider</c> instead,
+        /// because forwarding to this service is a dependency cycle through
+        /// <c>UserManager</c>/<c>IUserStore</c> that hangs the host rather than throwing.
+        /// <c>AuditIdentityAgreementTests</c> pins the two to the same answer.
+        /// </remarks>
+        string IAuditIdentityProvider.GetAuditIdentifier() => UserId?.ToString() ?? "System";
 
         /// <summary>
         /// True for back-of-house roles that legitimately read/act on *any* customer's data

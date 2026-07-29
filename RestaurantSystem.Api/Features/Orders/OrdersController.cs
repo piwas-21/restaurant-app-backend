@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Commands.AddPaymentToOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CompleteAllTableOrdersCommand;
@@ -33,10 +34,13 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<ApiResponse<PagedResult<OrderDto>>>> GetOrders([FromQuery] GetOrdersQuery query)
         => Ok(await _mediator.SendQuery(query));
 
+    // The till's day-close report — the `cashier` module's own surface (sofra ADR-010), so it is
+    // module-gated here while the rest of this controller stays core order handling.
     // Date is interpreted as a calendar day in UTC; the report covers
     // [date 00:00 UTC, date+1 00:00 UTC). Defaults to today (UTC) if omitted.
     [HttpGet("z-report")]
     [RequireAdminOrCashier]
+    [RequireModule(ModuleIds.Cashier)]
     public async Task<ActionResult<ApiResponse<ZReportDto>>> GetZReport([FromQuery] DateOnly? date)
         => Ok(await _mediator.SendQuery(new GetZReportQuery(date ?? DateOnly.FromDateTime(DateTime.UtcNow))));
 

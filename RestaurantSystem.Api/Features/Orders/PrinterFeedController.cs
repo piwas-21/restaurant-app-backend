@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 
 namespace RestaurantSystem.Api.Features.Orders;
@@ -17,7 +18,14 @@ namespace RestaurantSystem.Api.Features.Orders;
 // printer-app branches on the body's `success` field, so 5xx responses
 // would break it. Do not change without coordinating with the printer-app
 // repo.
+//
+// ONE carve-out: [RequireModule] below answers 404 when the tenant has no
+// `printing` module. That is deliberate and terminal, not a transient
+// failure to retry — a tenant without the module has no printer-app
+// deployed to receive it, and the alternative (a 200 with an empty feed)
+// would look like a working printer that never prints.
 [ApiController]
+[RequireModule(ModuleIds.Printing)]
 [Route("api/orders/printer-feed")]
 public class PrinterFeedController : ControllerBase
 {

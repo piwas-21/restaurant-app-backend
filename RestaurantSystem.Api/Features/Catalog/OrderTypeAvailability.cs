@@ -17,9 +17,13 @@ namespace RestaurantSystem.Api.Features.Catalog;
 /// WIRED UP: <see cref="ProductDtoMapper"/>, <see cref="ProductSummaryMapper"/>,
 /// <c>GetProductByIdQuery</c>, <c>FeaturedSpecialDto</c> and <c>SpecialProductDto</c> (the G7 slice),
 /// and — since §9.2 — <c>MenuBundleDto</c> (bundle list + detail), whose commands now also STORE a
-/// mask. NOT WIRED: <c>CategoryProductDto</c> (<c>GetCategoryProductsQuery</c>), which carries no
-/// availability field at all and does not filter out bundles, so a restricted item is undimmed
-/// there; tracked in the plan's §6 shared-projection item, not here.
+/// mask. NOT WIRED: <c>CategoryProductDto</c>, which carries no availability field at all. Its one
+/// remaining producer is <c>CategoryDetailDto.FeaturedProducts</c> (<c>GetCategoryByIdQuery</c>) —
+/// and <c>GET /api/Categories/{id}</c> has no consumer in any client repo either, so nothing renders
+/// an undimmed item from it today. The other producer, <c>GetCategoryProductsQuery</c>, was DELETED
+/// 2026-07-29 (plan §9.16) rather than wired, for that same reason. Do not add availability here
+/// speculatively: wire it when something actually reads the endpoint, and load
+/// <c>ProductCategories → Category</c> in the same change or the verdict is silently permissive.
 /// </para>
 /// <para>
 /// Every caller must load <c>ProductCategories -&gt; Category</c>. An unloaded collection resolves

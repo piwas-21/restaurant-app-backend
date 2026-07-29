@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Groups.Dtos;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
 
 namespace RestaurantSystem.Api.Features.Groups;
 
 [ApiController]
+[RequireModule(ModuleIds.Loyalty)]
 [Route("api/[controller]")]
 public class UserGroupController : ControllerBase
 {

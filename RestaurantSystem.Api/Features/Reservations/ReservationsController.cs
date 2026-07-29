@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Reservations.Commands.CancelReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.ConfirmReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.CreateReservationCommand;
@@ -16,6 +17,7 @@ using System.Security.Claims;
 namespace RestaurantSystem.Api.Features.Reservations;
 
 [ApiController]
+[RequireModule(ModuleIds.Reservations)]
 [Route("api/[controller]")]
 public class ReservationsController : ControllerBase
 {

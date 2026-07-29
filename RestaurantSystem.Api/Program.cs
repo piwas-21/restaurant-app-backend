@@ -16,6 +16,7 @@ using RestaurantSystem.Api.Common.Conventers;
 using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Middleware;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Validation;
@@ -33,6 +34,7 @@ using RestaurantSystem.Api.Features.Settings.Services;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
 using RestaurantSystem.Api.Features.Groups.Services;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -269,6 +271,17 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
+// Product modules this tenant bought (sofra ADR-010 / S11). The deploy repo's tenant
+// compose template maps the registry's `modules:` list onto Modules__Enabled, and
+// Modules__Enforce opts a tenant in; the legacy RUMI install has NEITHER, which
+// TenantModules reads as UNRESTRICTED. Until that deploy-side mapping ships, nothing
+// sets these keys and the whole feature is inert everywhere — which is the intended
+// merge state, not an accident. Singleton because the answer is fixed for the process
+// lifetime: a change lands via re-provision + restart, which is also the only way the
+// tenant .env changes.
+builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
+builder.Services.AddSingleton<ITenantModules, TenantModules>();
+
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.
 // Per-tenant provisioning injects SeedSettings__AdminEmail/__AdminPassword env
@@ -421,6 +434,12 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+// Lets ApplicationDbContext (Infrastructure, which cannot see ICurrentUserService) backfill audit
+// columns with the acting user. NOT forwarded to ICurrentUserService: that is a dependency CYCLE —
+// CurrentUserService needs UserManager, which needs IUserStore, which AddEntityFrameworkStores
+// binds back to ApplicationDbContext. It hangs the host rather than throwing. See
+// HttpContextAuditIdentityProvider, which depends on IHttpContextAccessor and nothing else.
+builder.Services.AddScoped<IAuditIdentityProvider, HttpContextAuditIdentityProvider>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transport (Smtp | Resend)
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -492,6 +511,12 @@ builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<Or
 
 
 var app = builder.Build();
+
+// Resolve the module set NOW rather than on the first gated request. A lazy singleton would
+// emit its "enforcement ON — enabled: …" line, and any warning about an unrecognised id,
+// hours after boot or never — and that line is the only operator-visible confirmation that a
+// re-provision + restart actually took effect. It belongs in the startup log where it is read.
+app.Services.GetRequiredService<ITenantModules>();
 
 app.MapDefaultEndpoints();
 

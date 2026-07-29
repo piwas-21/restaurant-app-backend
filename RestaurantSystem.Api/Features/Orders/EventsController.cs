@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Features.Orders.Models;
 using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 
@@ -21,11 +22,14 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
-    /// Subscribe to kitchen order events
+    /// Subscribe to kitchen order events — the `kitchen-board` module's own surface
+    /// (sofra ADR-010). Module-gated per action rather than per controller: the sibling
+    /// `stock` and `all` streams are core admin/ops, not a bought module.
     /// </summary>
     [HttpGet("kitchen")]
     [Produces("text/event-stream")]
     [Authorize(Roles = "Admin,KitchenStaff,Server")]
+    [RequireModule(ModuleIds.KitchenBoard)]
     public async Task KitchenEvents(CancellationToken cancellationToken)
     {
         await SetupSseConnection(ClientType.Kitchen, cancellationToken);
@@ -43,7 +47,12 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
-    /// Subscribe to service order events (cashier till + server floor view).
+    /// Subscribe to service order events — the live feed behind BOTH the cashier till and
+    /// the server floor view (sofra ADR-010), which is why it is gated on EITHER module
+    /// rather than on `server` alone. A cashier-without-server tenant would otherwise get a
+    /// till that renders perfectly and never receives an order: no error, just an empty
+    /// screen. The frontend confirms the pairing — src/hooks/cashier/useCashierOrdersStream
+    /// and src/hooks/serverOrders/serverOrdersSseHandlers both point here.
     /// </summary>
     /// <remarks>
     /// Staff-only for the same reason the id-addressed order routes are (#256, #258): every event
@@ -57,6 +66,7 @@ public class EventsController : ControllerBase
     [HttpGet("service")]
     [Produces("text/event-stream")]
     [RequireStaff]
+    [RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
     public async Task ServiceEvents(CancellationToken cancellationToken)
     {
         await SetupSseConnection(ClientType.Service, cancellationToken);
