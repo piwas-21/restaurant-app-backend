@@ -125,6 +125,52 @@ public class BasketChannelService : IBasketChannelService
         };
     }
 
+    public async Task<BasketDto?> ClearOrderTypeAsync(
+        string sessionId,
+        Guid? userId,
+        CancellationToken cancellationToken = default)
+    {
+        // Same guard as the set path, for the same reason: with neither identifier there is no
+        // basket to address, and answering "cleared" for a basket nobody named is a lie.
+        if (string.IsNullOrEmpty(sessionId) && (userId is null || userId == Guid.Empty))
+        {
+            throw new BadRequestException("Session ID or an authenticated user is required");
+        }
+
+        // No GetOrCreate here — see the interface remarks. Nothing to clear is a SUCCESS, not a 404:
+        // the caller asked for "this basket has no channel", and a basket that does not exist
+        // already satisfies that. Making it a 404 would push every client into treating a normal
+        // outcome as an error, which is how §9.13's blindness started.
+        var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
+        if (basket is null)
+        {
+            _logger.LogInformation("No basket to clear the order type on for session {SessionId}", sessionId);
+            return null;
+        }
+
+        // Idempotent by construction, but skip the write when there is nothing to change so a repeat
+        // call does not churn UpdatedAt/UpdatedBy and make an audit trail look like real activity.
+        if (basket.OrderType is null)
+        {
+            return await MapFullGraphAsync(sessionId, userId);
+        }
+
+        var previous = basket.OrderType;
+        basket.OrderType = null;
+        basket.UpdatedAt = DateTime.UtcNow;
+        basket.UpdatedBy = _currentUserService.GetAuditIdentifier();
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Totals are deliberately NOT recalculated. RecalculateTotalsAsync sums LINE totals, and
+        // clearing removes no lines — unlike the set path, which calls it because it may have
+        // deleted some. Tax and delivery are resolved per order type at checkout, not stored here.
+        _logger.LogInformation(
+            "Basket {BasketId} order type cleared (was {PreviousOrderType})", basket.Id, previous);
+
+        return await MapFullGraphAsync(sessionId, userId);
+    }
+
     /// <summary>
     /// Re-reads the basket through the FULL-graph load and maps it. Both exits use this; neither may
     /// map the <c>basket</c> local.
