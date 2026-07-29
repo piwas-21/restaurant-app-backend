@@ -291,101 +291,114 @@ namespace RestaurantSystem.Infrastructure.Persistence
                 switch (entry.State)
                 {
                     case EntityState.Added:
-                        // IsModified is false for every property of an Added entry — even ones the
-                        // caller assigned in the initializer — so it cannot distinguish a deliberate
-                        // value from an unset one here either. The value itself can: CreatedAt is
-                        // only ever default(DateTime) when nobody assigned it.
-                        //
-                        // NOTE this particular stamp is belt-and-braces: ConfigureDefaultValues
-                        // gives every IAuditable's CreatedAt a CURRENT_TIMESTAMP store default, so
-                        // an unset value gets filled by Postgres anyway. It is kept so the value is
-                        // on the in-memory entity without a round-trip. It is also why there is no
-                        // test pinning it — through the save path the two are indistinguishable, and
-                        // a test asserting "CreatedAt is populated afterwards" passes with this
-                        // block deleted. The CreatedBy backfill below has no such default and IS
-                        // pinned.
-                        if (entry.Entity.CreatedAt == default)
-                        {
-                            entry.Entity.CreatedAt = now;
-                        }
-
-                        if (string.IsNullOrEmpty(entry.Entity.CreatedBy))
-                        {
-                            entry.Entity.CreatedBy = userId;
-                        }
-
+                        StampCreation(entry, now, userId);
                         break;
 
                     case EntityState.Modified:
-                        if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedAt)))
-                        {
-                            entry.Entity.UpdatedAt = now;
-                        }
-
-                        if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedBy)))
-                        {
-                            entry.Entity.UpdatedBy = userId;
-                        }
-
+                        StampUpdate(entry, now, userId);
                         break;
                 }
             }
 
             foreach (var entry in ChangeTracker.Entries<ISoftDelete>())
             {
-                if (entry.State != EntityState.Deleted)
+                if (entry.State == EntityState.Deleted)
                 {
-                    continue;
+                    ConvertDeleteToSoftDelete(entry, now, userId);
                 }
+            }
+        }
 
-                // Read the caller's intent BEFORE re-targeting the delete, and NOT via IsModified:
-                // on a Deleted entry IsModified is false for every property regardless of what the
-                // caller assigned, so an IsModified guard here is constant-false and silently
-                // overwrites. Comparing current against original still works on a Deleted entry —
-                // both value sets survive — so that is what the intent is read from. (Asking after
-                // the flip is no better: the flip marks EVERY property modified, including ones
-                // nobody touched.)
-                var deletedAtWasSet = WasAssignedOnDeletedEntry(entry, nameof(ISoftDelete.DeletedAt));
-                var deletedByWasSet = WasAssignedOnDeletedEntry(entry, nameof(ISoftDelete.DeletedBy));
-                var updatedAtWasSet = WasAssignedOnDeletedEntry(entry, nameof(IAuditable.UpdatedAt));
-                var updatedByWasSet = WasAssignedOnDeletedEntry(entry, nameof(IAuditable.UpdatedBy));
+        /// <remarks>
+        /// <see cref="PropertyEntry.IsModified"/> is false for every property of an Added entry —
+        /// even ones the caller assigned in the initializer — so it cannot distinguish a deliberate
+        /// value from an unset one. The value itself can: <c>CreatedAt</c> is only ever
+        /// <c>default(DateTime)</c> when nobody assigned it.
+        ///
+        /// The <c>CreatedAt</c> stamp is belt-and-braces: <c>ConfigureDefaultValues</c> gives every
+        /// <see cref="IAuditable"/> a <c>CURRENT_TIMESTAMP</c> store default, so an unset value gets
+        /// filled by Postgres anyway. It is kept so the value is on the in-memory entity without a
+        /// round-trip — and it is why no test pins it: through the save path the two are
+        /// indistinguishable, and a test asserting "CreatedAt is populated afterwards" passes with
+        /// this line deleted. <c>CreatedBy</c> has no such default and IS pinned.
+        /// </remarks>
+        private static void StampCreation(EntityEntry<IAuditable> entry, DateTime now, string userId)
+        {
+            if (entry.Entity.CreatedAt == default)
+            {
+                entry.Entity.CreatedAt = now;
+            }
 
-                // Re-target the delete at the flag. Read back through the global query filter the
-                // row simply disappears, which is why this is invisible to callers.
-                entry.State = EntityState.Modified;
-                entry.Entity.IsDeleted = true;
+            if (string.IsNullOrEmpty(entry.Entity.CreatedBy))
+            {
+                entry.Entity.CreatedBy = userId;
+            }
+        }
 
-                if (!deletedAtWasSet)
-                {
-                    entry.Entity.DeletedAt = now;
-                }
+        private static void StampUpdate(EntityEntry<IAuditable> entry, DateTime now, string userId)
+        {
+            if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedAt)))
+            {
+                entry.Entity.UpdatedAt = now;
+            }
 
-                if (!deletedByWasSet)
-                {
-                    entry.Entity.DeletedBy = userId;
-                }
+            if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedBy)))
+            {
+                entry.Entity.UpdatedBy = userId;
+            }
+        }
 
-                // A soft delete IS a modification, so stamp the update columns too. The IAuditable
-                // loop above cannot do it: it runs first, and at that point this entry is still
-                // Deleted, which its switch has no case for. Without this the row is rewritten with
-                // a stale UpdatedAt/UpdatedBy — worse than leaving them alone, because the flip
-                // marks those columns modified and they get written back as if they were current.
-                //
-                // Guarded like every other column here. An unconditional stamp would be the same
-                // clobbering bug as an IsModified guard on a Deleted entry, just relocated: a caller
-                // that soft-deletes on behalf of a named actor would have that name overwritten.
-                if (entry.Entity is IAuditable auditable)
-                {
-                    if (!updatedAtWasSet)
-                    {
-                        auditable.UpdatedAt = now;
-                    }
+        /// <summary>
+        /// Re-targets a <c>Remove()</c> at the <c>IsDeleted</c> flag. Read back through the global
+        /// query filter the row simply disappears, which is why this is invisible to callers.
+        /// </summary>
+        private static void ConvertDeleteToSoftDelete(EntityEntry<ISoftDelete> entry, DateTime now, string userId)
+        {
+            // Read the caller's intent BEFORE re-targeting the delete, and NOT via IsModified: on a
+            // Deleted entry IsModified is false for every property regardless of what the caller
+            // assigned, so an IsModified guard here is constant-false and silently overwrites.
+            // Comparing current against original still works on a Deleted entry — both value sets
+            // survive. (Asking after the flip is no better: the flip marks EVERY property modified,
+            // including ones nobody touched.)
+            var deletedAtWasSet = WasAssignedOnDeletedEntry(entry, nameof(ISoftDelete.DeletedAt));
+            var deletedByWasSet = WasAssignedOnDeletedEntry(entry, nameof(ISoftDelete.DeletedBy));
+            var updatedAtWasSet = WasAssignedOnDeletedEntry(entry, nameof(IAuditable.UpdatedAt));
+            var updatedByWasSet = WasAssignedOnDeletedEntry(entry, nameof(IAuditable.UpdatedBy));
 
-                    if (!updatedByWasSet)
-                    {
-                        auditable.UpdatedBy = userId;
-                    }
-                }
+            entry.State = EntityState.Modified;
+            entry.Entity.IsDeleted = true;
+
+            if (!deletedAtWasSet)
+            {
+                entry.Entity.DeletedAt = now;
+            }
+
+            if (!deletedByWasSet)
+            {
+                entry.Entity.DeletedBy = userId;
+            }
+
+            // A soft delete IS a modification, so stamp the update columns too. The IAuditable loop
+            // cannot do it: it runs first, and at that point this entry is still Deleted, which its
+            // switch has no case for. Without this the row is rewritten carrying a stale
+            // UpdatedAt/UpdatedBy — worse than leaving them alone, because the flip marks those
+            // columns modified and they get written back as if they were current.
+            //
+            // Guarded like every other column here. An unconditional stamp would be the same
+            // clobbering bug as an IsModified guard on a Deleted entry, just relocated.
+            if (entry.Entity is not IAuditable auditable)
+            {
+                return;
+            }
+
+            if (!updatedAtWasSet)
+            {
+                auditable.UpdatedAt = now;
+            }
+
+            if (!updatedByWasSet)
+            {
+                auditable.UpdatedBy = userId;
             }
         }
 
