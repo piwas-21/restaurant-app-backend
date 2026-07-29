@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Groups.Dtos;
 using RestaurantSystem.Domain.Entities;
@@ -10,6 +11,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.Groups;
 
 [ApiController]
+[RequireModule(ModuleIds.Loyalty)]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin")]
 public class GroupDiscountController : ControllerBase
