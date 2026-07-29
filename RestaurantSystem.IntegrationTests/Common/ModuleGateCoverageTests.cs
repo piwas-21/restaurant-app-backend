@@ -101,6 +101,36 @@ public class ModuleGateCoverageTests
         owed.Should().BeEmpty("every sellable surface module needs at least one real gate");
     }
 
+    /// <summary>
+    /// Surfaces the plan deliberately leaves UNGATED because their endpoints are shared with a
+    /// core surface. Adding a gate here would break every tenant that bought the *other* module
+    /// — reservations needs the table map as much as `server` does — with no test going red,
+    /// which is the same argument this file makes in the other direction.
+    /// </summary>
+    public static TheoryData<string> DeliberatelyUngatedControllers() => new()
+    {
+        "TablesController",
+        "FloorPlanController",
+    };
+
+    [Theory]
+    [MemberData(nameof(DeliberatelyUngatedControllers))]
+    public void The_shared_controllers_stay_ungated(string controller)
+    {
+        Controller(controller).GetCustomAttribute<RequireModuleAttribute>()
+            .Should().BeNull($"{controller} is shared across modules — see SOFRA-ONBOARDING-PLAN O5");
+    }
+
+    [Theory]
+    [InlineData("OrdersController")]
+    [InlineData("EventsController")]
+    public void The_shared_order_controllers_are_gated_per_action_never_wholesale(string controller)
+    {
+        // A class-level gate here would take core order handling away from a tenant that simply
+        // did not buy the cashier or kitchen-board add-on.
+        Controller(controller).GetCustomAttribute<RequireModuleAttribute>().Should().BeNull();
+    }
+
     [Fact]
     public void The_gated_types_are_controllers()
     {

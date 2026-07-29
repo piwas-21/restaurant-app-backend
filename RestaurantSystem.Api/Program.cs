@@ -271,11 +271,14 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
-// Product modules this tenant bought (sofra ADR-010 / S11). Per-tenant provisioning
-// injects Modules__Enabled / Modules__Enforce from the registry; the legacy RUMI
-// install has neither, which TenantModules reads as UNRESTRICTED. Singleton because
-// the answer is fixed for the process lifetime — a change lands via re-provision +
-// restart, which is also the only way the tenant .env changes.
+// Product modules this tenant bought (sofra ADR-010 / S11). The deploy repo's tenant
+// compose template maps the registry's `modules:` list onto Modules__Enabled, and
+// Modules__Enforce opts a tenant in; the legacy RUMI install has NEITHER, which
+// TenantModules reads as UNRESTRICTED. Until that deploy-side mapping ships, nothing
+// sets these keys and the whole feature is inert everywhere — which is the intended
+// merge state, not an accident. Singleton because the answer is fixed for the process
+// lifetime: a change lands via re-provision + restart, which is also the only way the
+// tenant .env changes.
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
@@ -508,6 +511,12 @@ builder.Services.AddSingleton<IOrderEventService>(sp => sp.GetRequiredService<Or
 
 
 var app = builder.Build();
+
+// Resolve the module set NOW rather than on the first gated request. A lazy singleton would
+// emit its "enforcement ON — enabled: …" line, and any warning about an unrecognised id,
+// hours after boot or never — and that line is the only operator-visible confirmation that a
+// re-provision + restart actually took effect. It belongs in the startup log where it is read.
+app.Services.GetRequiredService<ITenantModules>();
 
 app.MapDefaultEndpoints();
 

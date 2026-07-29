@@ -12,8 +12,15 @@ namespace RestaurantSystem.Api.Common.Modules;
 /// genuinely does not exist on this instance, and 403 would advertise it. The
 /// frontend hides the same routes, so the two agree.
 ///
-/// Runs as an authorization filter so an ungated-out endpoint is 404 for everyone,
-/// including anonymous callers — the answer must not depend on who is asking.
+/// The guarantee is <b>404 once the caller clears authentication and role checks</b> —
+/// not 404 for everyone. <c>AuthorizeAttribute</c> (and every <c>Require*</c> derived
+/// from it) is endpoint METADATA consumed by AuthorizationMiddleware, which runs ahead
+/// of the MVC filter pipeline, so on an authorized endpoint a guest still gets 401 and
+/// a wrong-role caller still gets 403 without this filter ever running. That is fine:
+/// neither answer varies with the module, so neither reveals what the tenant bought.
+/// On an endpoint with no authorize metadata — the public reservations form, the
+/// printer feed — this filter IS the first thing a caller meets and the 404 is what
+/// they see. Both paths are pinned in ModuleEnforcementEndpointTests.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class RequireModuleAttribute : Attribute, IAuthorizationFilter

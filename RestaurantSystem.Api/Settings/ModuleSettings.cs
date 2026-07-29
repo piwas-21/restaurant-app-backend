@@ -2,8 +2,12 @@ namespace RestaurantSystem.Api.Settings;
 
 /// <summary>
 /// Which product modules this tenant instance runs (sofra ADR-010 / S11).
-/// Bound from the "Modules" configuration section; per-tenant provisioning injects
-/// Modules__Enabled and Modules__Enforce from the deploy repo's tenants/registry.yml.
+///
+/// Bound from the "Modules" configuration section. The deploy repo's tenant compose
+/// template is what maps a registry `modules:` list onto Modules__Enabled; both
+/// defaults here mean UNRESTRICTED, so an instance nobody has configured — every
+/// instance, until that mapping ships and a tenant opts in — behaves exactly as it did
+/// before this existed.
 /// </summary>
 public class ModuleSettings
 {

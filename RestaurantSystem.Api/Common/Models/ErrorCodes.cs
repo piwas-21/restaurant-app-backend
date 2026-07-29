@@ -29,7 +29,7 @@ public static class ErrorCodes
 
     /// <summary>
     /// Returned with a 404 when the endpoint belongs to a product module this tenant
-    /// did not buy (sofra ADR-010 / S11, <see cref="Filters.RequireModuleAttribute"/>).
+    /// did not buy (sofra ADR-010 / S11, <see cref="Modules.RequireModuleAttribute"/>).
     /// It is what lets the frontend tell "this restaurant has no reservations module"
     /// apart from "that reservation id does not exist" — both are 404 on the wire.
     /// </summary>
