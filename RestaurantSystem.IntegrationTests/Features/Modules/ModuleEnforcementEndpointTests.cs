@@ -34,13 +34,14 @@ public class ModuleEnforcementEndpointTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // A till-only tenant: core + kitchen-board + cashier bought;
-        // server / reservations / loyalty / printing NOT.
+        // A till-only tenant: core + cashier bought; kitchen-board / server / reservations /
+        // loyalty / printing NOT. `cashier` without `server` on purpose — it is the pairing
+        // that exposed the shared-stream bug below.
         _factory = new TestWebApplicationFactory(_databaseFixture.ConnectionString,
             new Dictionary<string, string>
             {
                 ["Modules:Enforce"] = "true",
-                ["Modules:Enabled"] = "core,kitchen-board,cashier",
+                ["Modules:Enabled"] = "core,cashier",
             });
         _client = _factory.CreateClient();
 
@@ -83,7 +84,6 @@ public class ModuleEnforcementEndpointTests : IAsyncLifetime
     [InlineData("/api/Reservations")]              // reservations — controller-level gate
     [InlineData("/api/FidelityPoints/balance")]    // loyalty
     [InlineData("/api/UserGroup")]                 // loyalty
-    [InlineData("/api/Events/service")]            // server — action-level gate on an SSE route
     public async Task An_unbought_module_answers_404_with_ModuleNotEnabled(string url)
     {
         AsAdmin();
@@ -102,10 +102,33 @@ public class ModuleEnforcementEndpointTests : IAsyncLifetime
         // nothing else keeps that true.
         AsAdmin();
 
-        var response = await _client.GetAsync("/api/Events/service");
+        var response = await _client.GetAsync("/api/Events/kitchen");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+    }
+
+    [Fact]
+    public async Task The_shared_service_stream_survives_on_cashier_alone()
+    {
+        // This tenant bought `cashier` and NOT `server`, and /api/Events/service is the feed
+        // BOTH the till and the floor view read. Gated on `server` alone it 404'd here, and
+        // the till would have rendered perfectly while never receiving an order — silent.
+        // A 200 would hang (it is an SSE stream), so assert only that it is not the denial.
+        AsAdmin();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/Events/service");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            var response = await _client.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            response.StatusCode.Should().NotBe(HttpStatusCode.NotFound);
+        }
+        catch (OperationCanceledException)
+        {
+            // The stream opened and stayed open — which is itself the pass condition.
+        }
     }
 
     // ── A module the tenant DID buy ──────────────────────────────────────────
@@ -189,10 +212,7 @@ public class ModuleEnforcementEndpointTests : IAsyncLifetime
 
         data.GetProperty("enforced").GetBoolean().Should().BeTrue();
         data.GetProperty("modules").EnumerateArray().Select(e => e.GetString())
-            .Should().BeEquivalentTo(new[]
-            {
-                ModuleIds.Core, ModuleIds.KitchenBoard, ModuleIds.Cashier,
-            });
+            .Should().BeEquivalentTo(new[] { ModuleIds.Core, ModuleIds.Cashier });
     }
 }
 

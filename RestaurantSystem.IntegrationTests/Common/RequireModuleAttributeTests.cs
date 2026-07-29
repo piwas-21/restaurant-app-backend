@@ -82,12 +82,45 @@ public class RequireModuleAttributeTests
         context.Result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    [Fact]
+    public void A_multi_module_gate_passes_when_EITHER_is_enabled()
+    {
+        // The shared service stream: cashier till + server floor view behind one endpoint.
+        var gate = new RequireModuleAttribute(ModuleIds.Server, ModuleIds.Cashier);
+
+        var cashierOnly = ContextFor("core,cashier", enforce: true);
+        gate.OnAuthorization(cashierOnly);
+        cashierOnly.Result.Should().BeNull();
+
+        var serverOnly = ContextFor("core,server", enforce: true);
+        gate.OnAuthorization(serverOnly);
+        serverOnly.Result.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_multi_module_gate_denies_when_NEITHER_is_enabled()
+    {
+        var context = ContextFor("core,reservations", enforce: true);
+
+        new RequireModuleAttribute(ModuleIds.Server, ModuleIds.Cashier).OnAuthorization(context);
+
+        context.Result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
     public void The_attribute_refuses_to_be_constructed_without_a_module(string moduleId)
     {
         var construct = () => new RequireModuleAttribute(moduleId);
+
+        construct.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void The_attribute_refuses_an_empty_module_list()
+    {
+        var construct = () => new RequireModuleAttribute();
 
         construct.Should().Throw<ArgumentException>();
     }
