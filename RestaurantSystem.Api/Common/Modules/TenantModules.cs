@@ -50,6 +50,13 @@ public sealed class TenantModules : ITenantModules
         IsEnforced = settings.Enforce && known.Length > 0;
         _enabled = new HashSet<string>(known, StringComparer.OrdinalIgnoreCase);
 
+        // Materialised once here rather than projected per access: the answer cannot change
+        // for the lifetime of this singleton, and a property that rebuilds a collection on
+        // every read is a trap for a caller that treats it like a field (Sonar S2365).
+        EnabledModules = IsEnforced
+            ? ModuleIds.All.Where(IsEnabled).ToArray()
+            : ModuleIds.All;
+
         if (IsEnforced)
         {
             logger.LogInformation(
@@ -59,10 +66,7 @@ public sealed class TenantModules : ITenantModules
 
     public bool IsEnforced { get; }
 
-    public IReadOnlyList<string> EnabledModules =>
-        IsEnforced
-            ? ModuleIds.All.Where(IsEnabled).ToArray()
-            : ModuleIds.All;
+    public IReadOnlyList<string> EnabledModules { get; }
 
     public bool IsEnabled(string moduleId)
     {
