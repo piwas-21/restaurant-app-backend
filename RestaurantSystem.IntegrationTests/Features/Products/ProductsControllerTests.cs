@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -227,6 +228,88 @@ public class ProductsControllerTests : IntegrationTestBase
         var response = await PatchPriceAsync(productId, 12.00m);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetProducts_ByCategory_DedupesVariationContentByLanguage()
+    {
+        // RE-HOMED 2026-07-29 from CategoriesControllerTests, whose endpoint
+        // (GET /api/Categories/{id}/products) was deleted as unconsumed — plan §9.16. That test
+        // was the ONLY fixture in the whole suite seeding two ProductVariationDescription rows
+        // with the same LanguageCode, and #138 had two halves. The SQL-translation half died with
+        // the endpoint; this half did NOT — ProductSummaryMapper:90 still runs
+        // GroupBy(LanguageCode).First().ToDictionary(), and it feeds THIS endpoint, the guest
+        // menu. Without a duplicate-language row anywhere, dropping that GroupBy as redundant
+        // looks safe and 500s /api/Products with "an item with the same key has already been
+        // added". So the coverage moves onto the shipping path rather than being deleted with the
+        // dead one.
+        var (categoryId, productName) = await SeedProductWithDuplicateLanguageVariationAsync();
+
+        var result = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>(
+            $"/api/products?CategoryId={categoryId}&PageSize=50");
+
+        result!.Success.Should().BeTrue();
+        var item = result.Data!.Items.Should().ContainSingle(p => p.Name == productName).Subject;
+        var variation = item.Variations.Should().ContainSingle().Subject;
+        // Two "en" rows collapse to one key. Assert the WINNER, not just the count: First() after
+        // GroupBy has to keep the first row, and a count-only assertion passes either way.
+        variation.Content.Should().HaveCount(1).And.ContainKey("en");
+        // WHICH of the two rows wins is deliberately NOT asserted, because the code does not
+        // guarantee it: `Descriptions` is loaded with no ORDER BY, so GroupBy(lang).First() takes
+        // whichever row EF materialized first. Measured, not assumed — asserting the first-inserted
+        // name passed this test in isolation and failed it in a full-class run, same commit. The
+        // dedup (one key, never a duplicate-key throw) is the real contract and is what this pins.
+        // Making the winner deterministic means an OrderBy in the mapper; that is a behaviour
+        // change to a guest-facing string and belongs in its own PR, not in a §9.16 deletion.
+        variation.Content["en"].Name.Should().BeOneOf("Large", "Large (duplicate language)");
+    }
+
+    private async Task<(Guid CategoryId, string ProductName)> SeedProductWithDuplicateLanguageVariationAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var categoryId = (await context.Categories.FirstAsync()).Id;
+        const string productName = "Duplicate-language QA Product";
+
+        var product = new Product
+        {
+            Name = productName,
+            BasePrice = 9.99m,
+            IsActive = true,
+            IsAvailable = true,
+            CreatedBy = "test",
+            Variations = new List<ProductVariation>
+            {
+                new()
+                {
+                    Name = "Large",
+                    DisplayOrder = 1,
+                    IsActive = true,
+                    CreatedBy = "test",
+                    Descriptions = new List<ProductVariationDescription>
+                    {
+                        new() { LanguageCode = "en", Name = "Large", CreatedBy = "test" },
+                        new() { LanguageCode = "en", Name = "Large (duplicate language)", CreatedBy = "test" },
+                    },
+                },
+            },
+        };
+
+        context.Products.Add(product);
+        await context.SaveChangesAsync();
+
+        context.ProductCategories.Add(new ProductCategory
+        {
+            ProductId = product.Id,
+            CategoryId = categoryId,
+            DisplayOrder = 1,
+            IsPrimary = true,
+            CreatedBy = "test",
+        });
+        await context.SaveChangesAsync();
+
+        return (categoryId, productName);
     }
 
     private async Task<Guid> SeedPricedProductAsync(string name, decimal price, bool isDeleted = false)
