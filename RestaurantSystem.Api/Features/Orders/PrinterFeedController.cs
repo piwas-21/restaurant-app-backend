@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 
 namespace RestaurantSystem.Api.Features.Orders;
@@ -18,6 +19,7 @@ namespace RestaurantSystem.Api.Features.Orders;
 // would break it. Do not change without coordinating with the printer-app
 // repo.
 [ApiController]
+[RequireModule(ModuleIds.Printing)]
 [Route("api/orders/printer-feed")]
 public class PrinterFeedController : ControllerBase
 {

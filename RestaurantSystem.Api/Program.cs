@@ -16,6 +16,7 @@ using RestaurantSystem.Api.Common.Conventers;
 using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Middleware;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Validation;
@@ -269,6 +270,14 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+
+// Product modules this tenant bought (sofra ADR-010 / S11). Per-tenant provisioning
+// injects Modules__Enabled / Modules__Enforce from the registry; the legacy RUMI
+// install has neither, which TenantModules reads as UNRESTRICTED. Singleton because
+// the answer is fixed for the process lifetime — a change lands via re-provision +
+// restart, which is also the only way the tenant .env changes.
+builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
+builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.

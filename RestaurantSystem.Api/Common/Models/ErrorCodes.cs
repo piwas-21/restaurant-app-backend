@@ -26,4 +26,12 @@ public static class ErrorCodes
     /// than it having to trust every 400 on the endpoint.
     /// </summary>
     public const string OrderTypeNotAvailable = "OrderTypeNotAvailable";
+
+    /// <summary>
+    /// Returned with a 404 when the endpoint belongs to a product module this tenant
+    /// did not buy (sofra ADR-010 / S11, <see cref="Filters.RequireModuleAttribute"/>).
+    /// It is what lets the frontend tell "this restaurant has no reservations module"
+    /// apart from "that reservation id does not exist" — both are 404 on the wire.
+    /// </summary>
+    public const string ModuleNotEnabled = "ModuleNotEnabled";
 }

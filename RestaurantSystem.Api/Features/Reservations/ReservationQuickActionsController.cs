@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -18,6 +19,7 @@ namespace RestaurantSystem.Api.Features.Reservations;
 /// (mirrors the <c>OrderQuickActionsController</c> split from task 2.5).
 /// </summary>
 [ApiController]
+[RequireModule(ModuleIds.Reservations)]
 [Route("api/reservations")]
 [AllowAnonymous]
 public class ReservationQuickActionsController : ControllerBase

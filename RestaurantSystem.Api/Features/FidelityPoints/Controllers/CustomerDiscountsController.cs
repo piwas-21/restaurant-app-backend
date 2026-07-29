@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.FidelityPoints.Dtos;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Mapping;
@@ -9,6 +10,7 @@ using RestaurantSystem.Domain.Entities;
 namespace RestaurantSystem.Api.Features.FidelityPoints.Controllers;
 
 [ApiController]
+[RequireModule(ModuleIds.Loyalty)]
 [Route("api/admin/[controller]")]
 [Authorize(Roles = "Admin,Server")]
 public class CustomerDiscountsController : ControllerBase
