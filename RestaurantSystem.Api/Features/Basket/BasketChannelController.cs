@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.Basket.Commands.ClearBasketOrderTypeCommand;
 using RestaurantSystem.Api.Features.Basket.Commands.SetBasketOrderTypeCommand;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 
@@ -49,6 +50,28 @@ public class BasketChannelController : BasketControllerBase
         if (MissingSession<BasketChannelSwitchDto>(sessionId) is { } error) return error;
 
         command.SessionId = sessionId;
+        return Ok(await Mediator.SendCommand(command));
+    }
+
+    /// <summary>
+    /// Clear the basket's order type. Idempotent, never removes lines, and succeeds (with a null
+    /// payload) when there is no basket — a basket that does not exist already has no channel.
+    /// </summary>
+    /// <remarks>
+    /// A separate verb rather than a nullable order type on the PUT above (plan §9.17): clearing
+    /// cannot conflict, because a null channel is unrestricted, so it has no use for that
+    /// endpoint's two-phase <c>RemoveConflicts</c> protocol. Making the PUT's order type nullable
+    /// would also give "field omitted" and "field null" two different meanings on the one field —
+    /// and §9.1 is the entry about clients that fail to echo a field they never learned.
+    /// </remarks>
+    [HttpDelete("order-type")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<BasketDto?>>> ClearOrderType(
+        [FromHeader(Name = SessionIdHeader)] string sessionId)
+    {
+        if (MissingSession<BasketDto?>(sessionId) is { } error) return error;
+
+        var command = new ClearBasketOrderTypeCommand { SessionId = sessionId };
         return Ok(await Mediator.SendCommand(command));
     }
 }
