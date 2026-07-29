@@ -16,8 +16,10 @@ namespace RestaurantSystem.IntegrationTests.Features.GlobalIngredients;
 /// §9.18 — <c>DeleteGlobalIngredientCommand</c> intended a soft delete and performed a permanent one.
 /// It called <c>Remove()</c> under the comment <i>"Soft delete handled by entity type configuration"</i>;
 /// nothing handled it. <c>ApplicationDbContext</c> does convert <c>EntityState.Deleted</c> into
-/// <c>IsDeleted</c> — in <c>ApplyAuditInformation()</c>, which is called only from the SYNCHRONOUS
-/// <c>SaveChanges()</c> override. Every handler awaits <c>SaveChangesAsync</c>, so it never ran.
+/// <c>IsDeleted</c> — in <c>ApplyAuditInformation()</c>, which at the time was called only from the
+/// SYNCHRONOUS <c>SaveChanges()</c> override. Every handler awaits <c>SaveChangesAsync</c>, so it
+/// never ran. (§9.18's root fix has since overridden <c>SaveChangesAsync</c> too, so the conversion
+/// now works on every save; this test pins the handler's explicit soft delete regardless.)
 /// <para>
 /// <b>Why this needed a test rather than inspection.</b> The obvious assertion — "the ingredient is
 /// gone from the list" — passed both before and after the fix, because a hard-deleted row and a
