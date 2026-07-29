@@ -38,7 +38,6 @@ public class ModuleGateCoverageTests
     public static TheoryData<string, string, string> GatedActions() => new()
     {
         { "EventsController", "KitchenEvents", ModuleIds.KitchenBoard },
-        { "EventsController", "ServiceEvents", ModuleIds.Server },
         { "OrdersController", "GetZReport", ModuleIds.Cashier },
     };
 
@@ -49,7 +48,7 @@ public class ModuleGateCoverageTests
         var gate = Controller(controller).GetCustomAttribute<RequireModuleAttribute>();
 
         gate.Should().NotBeNull($"{controller} belongs to the {moduleId} module");
-        gate!.ModuleId.Should().Be(moduleId);
+        gate!.ModuleIdsRequired.Should().Equal(moduleId);
     }
 
     [Theory]
@@ -62,7 +61,21 @@ public class ModuleGateCoverageTests
         var gate = method.GetCustomAttribute<RequireModuleAttribute>();
 
         gate.Should().NotBeNull($"{controller}.{action} is the {moduleId} module's own surface");
-        gate!.ModuleId.Should().Be(moduleId);
+        gate!.ModuleIdsRequired.Should().Equal(moduleId);
+    }
+
+    [Fact]
+    public void The_shared_service_stream_is_reachable_with_EITHER_till_module()
+    {
+        // GET /api/Events/service feeds BOTH the cashier till and the server floor view
+        // (frontend useCashierOrdersStream + serverOrdersSseHandlers both point at it).
+        // Gated on `server` alone, a cashier-without-server tenant got a till that renders
+        // perfectly and never receives an order — silent, which is the worst kind.
+        var gate = Controller("EventsController").GetMethod("ServiceEvents")!
+            .GetCustomAttribute<RequireModuleAttribute>();
+
+        gate.Should().NotBeNull();
+        gate!.ModuleIdsRequired.Should().BeEquivalentTo(new[] { ModuleIds.Server, ModuleIds.Cashier });
     }
 
     [Fact]
@@ -73,7 +86,7 @@ public class ModuleGateCoverageTests
         var gates = Api.GetTypes()
             .SelectMany(t => t.GetCustomAttributes<RequireModuleAttribute>()
                 .Concat(t.GetMethods().SelectMany(m => m.GetCustomAttributes<RequireModuleAttribute>())))
-            .Select(a => a.ModuleId)
+            .SelectMany(a => a.ModuleIdsRequired)
             .Distinct()
             .ToArray();
 
@@ -90,7 +103,7 @@ public class ModuleGateCoverageTests
         var gated = Api.GetTypes()
             .SelectMany(t => t.GetCustomAttributes<RequireModuleAttribute>()
                 .Concat(t.GetMethods().SelectMany(m => m.GetCustomAttributes<RequireModuleAttribute>())))
-            .Select(a => a.ModuleId)
+            .SelectMany(a => a.ModuleIdsRequired)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var owed = ModuleIds.All

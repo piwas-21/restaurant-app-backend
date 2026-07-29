@@ -22,26 +22,34 @@ namespace RestaurantSystem.Api.Common.Modules;
 /// printer feed — this filter IS the first thing a caller meets and the 404 is what
 /// they see. Both paths are pinned in ModuleEnforcementEndpointTests.
 /// </summary>
+/// <remarks>
+/// Takes one OR MORE module ids and passes when ANY of them is enabled. An endpoint shared
+/// by two modules' surfaces needs that: <c>GET /api/Events/service</c> feeds both the
+/// cashier till and the server floor view, so gating it on <c>server</c> alone left a
+/// cashier-without-server tenant with a till that renders perfectly and never receives an
+/// order — silent, no error, just an empty screen.
+/// </remarks>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public sealed class RequireModuleAttribute : Attribute, IAuthorizationFilter
 {
-    public RequireModuleAttribute(string moduleId)
+    public RequireModuleAttribute(params string[] moduleIds)
     {
-        if (string.IsNullOrWhiteSpace(moduleId))
+        if (moduleIds is null || moduleIds.Length == 0 || moduleIds.Any(string.IsNullOrWhiteSpace))
         {
-            throw new ArgumentException("A module id is required", nameof(moduleId));
+            throw new ArgumentException("At least one non-empty module id is required", nameof(moduleIds));
         }
-        ModuleId = moduleId;
+        ModuleIdsRequired = moduleIds;
     }
 
-    public string ModuleId { get; }
+    /// <summary>The module ids that satisfy this gate. ANY of them is enough.</summary>
+    public IReadOnlyList<string> ModuleIdsRequired { get; }
 
     public void OnAuthorization(AuthorizationFilterContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         var modules = context.HttpContext.RequestServices.GetRequiredService<ITenantModules>();
-        if (modules.IsEnabled(ModuleId)) return;
+        if (ModuleIdsRequired.Any(modules.IsEnabled)) return;
 
         // Set the result rather than throwing: ExceptionHandlingMiddleware LogError()s
         // everything it catches, and a module being off is normal operation, not a fault.
