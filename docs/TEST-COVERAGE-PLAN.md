@@ -166,8 +166,8 @@ RestaurantSystem.IntegrationTests/
 |-----------|-------|----------------|
 | `BasketControllerTests.cs` | 12 | Add item (product/menu bundle), update quantity, remove item, clear basket, pricing recalculation, merge on login, menu section validation (min/max), session-based access |
 | `BasketPricingServiceTests.cs` | 10 | Subtotal calculation, tax calculation per order type, delivery fee, user discount, customer discount, fidelity points, rounding, menu item pricing, ingredient customization pricing |
-| `ProductsControllerTests.cs` | 10 | CRUD (create/read/update/delete), variations, images, availability toggle, search/filter, category filter |
-| `CategoriesControllerTests.cs` | 6 | CRUD, reorder, image upload, products-by-category |
+| `ProductsControllerTests.cs` | 14 | CRUD (create/read/update/delete), variations, images, availability toggle, search/filter, category filter, duplicate-language variation dedup (#138, re-homed here 2026-07-29) |
+| `CategoriesControllerTests.cs` | 12 | CRUD, reorder, image upload (products-by-category dropped 2026-07-29 with the unconsumed endpoint — plan §9.16) |
 
 **Total: ~38 tests**
 

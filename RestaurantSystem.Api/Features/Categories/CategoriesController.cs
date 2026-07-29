@@ -12,7 +12,6 @@ using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Categories.Dtos.Requests;
 using RestaurantSystem.Api.Features.Categories.Queries.GetCategoriesQuery;
 using RestaurantSystem.Api.Features.Categories.Queries.GetCategoryByIdQuery;
-using RestaurantSystem.Api.Features.Categories.Queries.GetCategoryProductsQuery;
 
 namespace RestaurantSystem.Api.Features.Categories;
 
@@ -61,30 +60,8 @@ public class CategoriesController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get products in a specific category
-    /// </summary>
-    /// <param name="id">Category ID</param>
-    /// <param name="pageNumber">Page number (default: 1)</param>
-    /// <param name="pageSize">Page size (default: 10)</param>
-    /// <param name="isActive">Filter by active status</param>
-    /// <param name="isAvailable">Filter by availability</param>
-    /// <returns>Paginated list of products in the category</returns>
-    [HttpGet("{id}/products")]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<CategoryProductDto>>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ApiResponse<PagedResult<CategoryProductDto>>>> GetCategoryProducts(
-        Guid id,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] bool? isActive = null,
-        [FromQuery] bool? isAvailable = null)
-    {
-        var query = new GetCategoryProductsQuery(id, pageNumber, pageSize, isActive, isAvailable);
-        var result = await _mediator.SendQuery(query);
-        return Ok(result);
-    }
+    // REMOVED 2026-07-29: GET {id}/products — unconsumed, listed bundles, no availability field.
+    // Rationale and the (non-identical) replacement path in ORDER-TYPE-AVAILABILITY-PLAN.md §9.16.
 
     /// <summary>
     /// Create a new category
