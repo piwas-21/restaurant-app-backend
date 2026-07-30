@@ -107,6 +107,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<RestaurantInfo> RestaurantInfo { get; set; }
         public DbSet<RestaurantPhoneNumber> RestaurantPhoneNumbers { get; set; }
 
+        // First-run setup checklist (singleton row, created lazily on first write)
+        public DbSet<SetupChecklistState> SetupChecklistState { get; set; }
+
         // User Groups & Discounts
         public DbSet<UserGroup> UserGroups { get; set; }
         public DbSet<GroupMembership> GroupMemberships { get; set; }

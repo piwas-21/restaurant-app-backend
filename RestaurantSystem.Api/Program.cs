@@ -473,6 +473,11 @@ builder.Services.AddScoped<IOrderTypeConfigurationService, OrderTypeConfiguratio
 builder.Services.AddScoped<IWorkingHoursService, WorkingHoursService>();
 builder.Services.AddScoped<IFormFieldConfigurationService, FormFieldConfigurationService>();
 builder.Services.AddScoped<IFormFieldRequirementService, FormFieldRequirementService>();
+// First-run setup checklist (SOFRA-ONBOARDING-PLAN O4) — the singleton row's reader +
+// concurrency-safe writer, shared by the query and both commands.
+builder.Services
+    .AddScoped<RestaurantSystem.Api.Features.Setup.Services.ISetupChecklistStore,
+        RestaurantSystem.Api.Features.Setup.Services.SetupChecklistStore>();
 // Per-app-instance "registry rows seeded" marker — pure in-memory flag, singleton lifetime.
 builder.Services.AddSingleton<IFormFieldSeedState, FormFieldSeedState>();
 
