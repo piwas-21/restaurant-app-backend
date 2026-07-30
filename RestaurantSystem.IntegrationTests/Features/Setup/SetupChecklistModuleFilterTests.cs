@@ -107,7 +107,7 @@ public class SetupChecklistModuleFilterTests : IAsyncLifetime
         // reads as broken. So the write is refused outright.
         var ack = await _client.PutAsJsonAsync(
             $"/api/admin/setup-checklist/steps/{SetupSteps.Printing}",
-            new SetStepDoneRequest(true));
+            new SetStepDoneRequest { IsDone = true });
         ack.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         using var scope = _factory.Services.CreateScope();

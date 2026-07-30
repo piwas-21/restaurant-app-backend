@@ -67,9 +67,9 @@ public class SetupChecklistTests : IntegrationTestBase
         AuthenticateAsRole(UserRole.Cashier);
 
         (await Client.PutAsJsonAsync(
-            $"{Url}/steps/{SetupSteps.OpeningHours}", new SetStepDoneRequest(true)))
+            $"{Url}/steps/{SetupSteps.OpeningHours}", new SetStepDoneRequest { IsDone = true }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await Client.PutAsJsonAsync($"{Url}/dismissed", new SetDismissedRequest(true)))
+        (await Client.PutAsJsonAsync($"{Url}/dismissed", new SetDismissedRequest { IsDismissed = true }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -96,7 +96,7 @@ public class SetupChecklistTests : IntegrationTestBase
         AuthenticateAsAdmin();
 
         var response = await Client.PutAsJsonAsync(
-            $"{Url}/steps/{SetupSteps.Menu}", new SetStepDoneRequest(true));
+            $"{Url}/steps/{SetupSteps.Menu}", new SetStepDoneRequest { IsDone = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
@@ -216,17 +216,17 @@ public class SetupChecklistTests : IntegrationTestBase
         AuthenticateAsAdmin();
         var key = SetupSteps.OpeningHours;
 
-        (await Client.PutAsJsonAsync($"{Url}/steps/{key}", new SetStepDoneRequest(true)))
+        (await Client.PutAsJsonAsync($"{Url}/steps/{key}", new SetStepDoneRequest { IsDone = true }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
         Step(await GetChecklistAsync(), key).IsDone.Should().BeTrue();
 
         // Acknowledging twice is a no-op, not an error — the UI fires this from a
         // checkbox and a retried request must land on the same answer.
-        (await Client.PutAsJsonAsync($"{Url}/steps/{key}", new SetStepDoneRequest(true)))
+        (await Client.PutAsJsonAsync($"{Url}/steps/{key}", new SetStepDoneRequest { IsDone = true }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
         Step(await GetChecklistAsync(), key).IsDone.Should().BeTrue();
 
-        (await Client.PutAsJsonAsync($"{Url}/steps/{key}", new SetStepDoneRequest(false)))
+        (await Client.PutAsJsonAsync($"{Url}/steps/{key}", new SetStepDoneRequest { IsDone = false }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
         Step(await GetChecklistAsync(), key).IsDone.Should().BeFalse();
     }
@@ -239,17 +239,37 @@ public class SetupChecklistTests : IntegrationTestBase
         // list without touching any step.
         AuthenticateAsAdmin();
         await Client.PutAsJsonAsync(
-            $"{Url}/steps/{SetupSteps.Appearance}", new SetStepDoneRequest(true));
+            $"{Url}/steps/{SetupSteps.Appearance}", new SetStepDoneRequest { IsDone = true });
 
-        await Client.PutAsJsonAsync($"{Url}/dismissed", new SetDismissedRequest(true));
+        await Client.PutAsJsonAsync($"{Url}/dismissed", new SetDismissedRequest { IsDismissed = true });
         var hidden = await GetChecklistAsync();
         hidden.IsDismissed.Should().BeTrue();
         Step(hidden, SetupSteps.Appearance).IsDone.Should().BeTrue();
 
-        await Client.PutAsJsonAsync($"{Url}/dismissed", new SetDismissedRequest(false));
+        await Client.PutAsJsonAsync($"{Url}/dismissed", new SetDismissedRequest { IsDismissed = false });
         var restored = await GetChecklistAsync();
         restored.IsDismissed.Should().BeFalse();
         Step(restored, SetupSteps.Appearance).IsDone.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MissingBodyField_IsRefused_NotReadAsFalse()
+    {
+        // `IsDone` is `required`, so an absent field is a 400 rather than binding to
+        // `default`. Without that, `PUT {}` means "isDone: false" — silently
+        // UN-acknowledging a step the owner had ticked, on a request that said nothing
+        // about it. A malformed client would quietly undo their progress.
+        AuthenticateAsAdmin();
+        await Client.PutAsJsonAsync(
+            $"{Url}/steps/{SetupSteps.OpeningHours}", new SetStepDoneRequest { IsDone = true });
+        Step(await GetChecklistAsync(), SetupSteps.OpeningHours).IsDone.Should().BeTrue();
+
+        var response = await Client.PutAsync(
+            $"{Url}/steps/{SetupSteps.OpeningHours}",
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Step(await GetChecklistAsync(), SetupSteps.OpeningHours).IsDone.Should().BeTrue();
     }
 
     [Fact]
@@ -257,7 +277,7 @@ public class SetupChecklistTests : IntegrationTestBase
     {
         AuthenticateAsAdmin();
         var response = await Client.PutAsJsonAsync(
-            $"{Url}/steps/not-a-step", new SetStepDoneRequest(true));
+            $"{Url}/steps/not-a-step", new SetStepDoneRequest { IsDone = true });
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
