@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Categories.Commands.UpdateCategoryImageCommand;
@@ -21,51 +23,29 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UpdateCategoryImageCommandHandler> _logger;
     private readonly IConfiguration _configuration;
+    private readonly FileStorageSettings _fileStorageSettings;
 
     public UpdateCategoryImageCommandHandler(
         ApplicationDbContext context,
         IFileStorageService fileStorageService,
         ICurrentUserService currentUserService,
         ILogger<UpdateCategoryImageCommandHandler> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IOptions<FileStorageSettings> fileStorageSettings)
     {
         _context = context;
         _fileStorageService = fileStorageService;
         _currentUserService = currentUserService;
         _logger = logger;
         _configuration = configuration;
+        _fileStorageSettings = fileStorageSettings.Value;
     }
 
     public async Task<ApiResponse<CategoryDto>> Handle(UpdateCategoryImageCommand command, CancellationToken cancellationToken)
     {
-        // Validate file
-        if (command.Image == null || command.Image.Length == 0)
+        if (!ImageUploadRules.IsAcceptable(command.Image, _fileStorageSettings, out var rejection))
         {
-            return ApiResponse<CategoryDto>.Failure("No image file provided");
-        }
-
-        // Validate file size
-        var maxSizeBytes = _configuration.GetValue<long>("FileStorage:MaxFileSizeBytes", 5 * 1024 * 1024);
-        if (command.Image.Length > maxSizeBytes)
-        {
-            return ApiResponse<CategoryDto>.Failure($"File size exceeds maximum allowed size of {maxSizeBytes / (1024 * 1024)}MB");
-        }
-
-        // Validate file type
-        var allowedExtensions = _configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>()
-            ?? new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        var fileExtension = Path.GetExtension(command.Image.FileName).ToLowerInvariant();
-        if (!allowedExtensions.Contains(fileExtension))
-        {
-            return ApiResponse<CategoryDto>.Failure($"File type not allowed. Allowed types: {string.Join(", ", allowedExtensions)}");
-        }
-
-        // Validate MIME type
-        var allowedMimeTypes = _configuration.GetSection("FileStorage:AllowedMimeTypes").Get<string[]>()
-            ?? new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
-        if (!allowedMimeTypes.Contains(command.Image.ContentType.ToLowerInvariant()))
-        {
-            return ApiResponse<CategoryDto>.Failure("Invalid image MIME type");
+            return ApiResponse<CategoryDto>.Failure(rejection);
         }
 
         // See UpdateCategoryCommand: ProductCount dereferences `pc.Product` in memory after

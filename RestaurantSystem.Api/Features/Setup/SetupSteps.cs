@@ -41,10 +41,12 @@ public sealed record SetupStep(string Key, string? ModuleId, bool IsDerived);
 /// one admin. Those two steps are therefore derived, and cannot be faked.
 /// </para>
 /// <para>
-/// There is deliberately no "upload your logo" step: the tenant app has no logo
-/// surface at all — no field on <c>RestaurantInfo</c>, no upload anywhere in
-/// <c>/admin</c>. The branding control that does exist is the theme palette, which is
-/// what <c>appearance</c> points at.
+/// <c>logo</c> is ACKNOWLEDGED even though <c>RestaurantInfo.LogoUrl</c> is a fact the
+/// query could read directly, and provisioning does not seed it — which is normally the
+/// exact profile of a derived step. It is not derived because "we have no logo" is a
+/// legitimate finished state: the app then renders the restaurant's NAME as text, by
+/// design. A derived step would leave that owner permanently one short of done, with no
+/// way to say so. Acknowledging it is the only honest way to express the decision.
 /// </para>
 /// </remarks>
 public static class SetupSteps
@@ -52,6 +54,7 @@ public static class SetupSteps
     public const string RestaurantInfo = "restaurant-info";
     public const string OpeningHours = "opening-hours";
     public const string Appearance = "appearance";
+    public const string Logo = "logo";
     public const string Menu = "menu";
     public const string TablesQr = "tables-qr";
     public const string Staff = "staff";
@@ -72,6 +75,7 @@ public static class SetupSteps
         new(RestaurantInfo, null, IsDerived: false),
         new(OpeningHours, null, IsDerived: false),
         new(Appearance, null, IsDerived: false),
+        new(Logo, null, IsDerived: false),
         // Derived: a fresh tenant has no categories and no products.
         new(Menu, null, IsDerived: true),
         new(TablesQr, null, IsDerived: false),

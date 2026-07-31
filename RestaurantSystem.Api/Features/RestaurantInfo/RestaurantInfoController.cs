@@ -5,9 +5,12 @@ using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.AddPhoneNumberCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.DeletePhoneNumberCommand;
+using RestaurantSystem.Api.Features.RestaurantInfo.Commands.DeleteRestaurantLogoCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdatePhoneNumberCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantInfoCommand;
+using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantLogoCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Dtos;
+using RestaurantSystem.Api.Features.RestaurantInfo.Dtos.Requests;
 using RestaurantSystem.Api.Features.RestaurantInfo.Queries.GetRestaurantInfoQuery;
 
 namespace RestaurantSystem.Api.Features.RestaurantInfo;
@@ -44,6 +47,36 @@ public class RestaurantInfoController : ControllerBase
         [FromBody] UpdateRestaurantInfoCommand command)
     {
         var result = await _mediator.SendCommand(command);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Replace one of the restaurant's logos. Clearing it is a DELETE, not an empty upload —
+    /// "no logo" is a real state (the app then renders the restaurant's name as text).
+    /// </summary>
+    [HttpPut("logo/{variant}")]
+    [Consumes("multipart/form-data")]
+    [RequireAdmin]
+    [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> UpdateLogo(
+        LogoVariant variant,
+        [FromForm] UpdateRestaurantLogoRequest request)
+    {
+        var result = await _mediator.SendCommand(
+            new UpdateRestaurantLogoCommand(variant, request.Logo));
+        return Ok(result);
+    }
+
+    [HttpDelete("logo/{variant}")]
+    [RequireAdmin]
+    [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> DeleteLogo(LogoVariant variant)
+    {
+        var result = await _mediator.SendCommand(new DeleteRestaurantLogoCommand(variant));
         return Ok(result);
     }
 

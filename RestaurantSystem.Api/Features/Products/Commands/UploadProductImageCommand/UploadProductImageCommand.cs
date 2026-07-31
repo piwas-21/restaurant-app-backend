@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -27,13 +29,15 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
     private readonly ILogger<UploadProductImageCommandHandler> _logger;
     private readonly IConfiguration _configuration;
     private readonly string _baseUrl;
+    private readonly FileStorageSettings _fileStorageSettings;
 
     public UploadProductImageCommandHandler(
         ApplicationDbContext context,
         IFileStorageService fileStorageService,
         ICurrentUserService currentUserService,
         ILogger<UploadProductImageCommandHandler> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IOptions<FileStorageSettings> fileStorageSettings)
     {
         _context = context;
         _fileStorageService = fileStorageService;
@@ -41,38 +45,14 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
         _logger = logger;
         _configuration = configuration;
         _baseUrl = configuration["AWS:S3:BaseUrl"]!;
+        _fileStorageSettings = fileStorageSettings.Value;
     }
 
     public async Task<ApiResponse<ProductImageDto>> Handle(UploadProductImageCommand command, CancellationToken cancellationToken)
     {
-        // Validate file
-        if (command.Image == null || command.Image.Length == 0)
+        if (!ImageUploadRules.IsAcceptable(command.Image, _fileStorageSettings, out var rejection))
         {
-            return ApiResponse<ProductImageDto>.Failure("No image file provided");
-        }
-
-        // Validate file size
-        var maxSizeBytes = _configuration.GetValue<long>("FileStorage:MaxFileSizeBytes", 5 * 1024 * 1024);
-        if (command.Image.Length > maxSizeBytes)
-        {
-            return ApiResponse<ProductImageDto>.Failure($"File size exceeds maximum allowed size of {maxSizeBytes / (1024 * 1024)}MB");
-        }
-
-        // Validate file type
-        var allowedExtensions = _configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>()
-            ?? new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        var fileExtension = Path.GetExtension(command.Image.FileName).ToLowerInvariant();
-        if (!allowedExtensions.Contains(fileExtension))
-        {
-            return ApiResponse<ProductImageDto>.Failure($"File type not allowed. Allowed types: {string.Join(", ", allowedExtensions)}");
-        }
-
-        // Validate MIME type
-        var allowedMimeTypes = _configuration.GetSection("FileStorage:AllowedMimeTypes").Get<string[]>()
-            ?? new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
-        if (!allowedMimeTypes.Contains(command.Image.ContentType.ToLowerInvariant()))
-        {
-            return ApiResponse<ProductImageDto>.Failure("Invalid image MIME type");
+            return ApiResponse<ProductImageDto>.Failure(rejection);
         }
 
         // Check if product exists

@@ -35,13 +35,16 @@ public class UpdateRestaurantInfoCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IConfiguration _configuration;
 
     public UpdateRestaurantInfoCommandHandler(
         ApplicationDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IConfiguration configuration)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _configuration = configuration;
     }
 
     public async Task<ApiResponse<RestaurantInfoDto>> Handle(
@@ -75,14 +78,7 @@ public class UpdateRestaurantInfoCommandHandler
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ApiResponse<RestaurantInfoDto>.SuccessWithData(new RestaurantInfoDto(
-            info.Id, info.Name, info.AddressLine1, info.AddressLine2,
-            info.City, info.PostalCode, info.Country, info.Latitude, info.Longitude,
-            info.Email, info.Website, info.ThemePaletteKey,
-            info.PhoneNumbers
-                .OrderBy(p => p.DisplayOrder)
-                .Select(p => new RestaurantPhoneNumberDto(
-                    p.Id, p.Label, p.Number, p.WhatsAppEnabled, p.DisplayOrder, p.IsActive))
-                .ToList()));
+        return ApiResponse<RestaurantInfoDto>.SuccessWithData(
+            RestaurantInfoMapper.ToDto(info, _configuration["AWS:S3:BaseUrl"]));
     }
 }

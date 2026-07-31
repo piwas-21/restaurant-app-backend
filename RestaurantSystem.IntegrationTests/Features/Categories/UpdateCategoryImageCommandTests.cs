@@ -11,6 +11,8 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.IntegrationTests.Features.Categories;
 
@@ -101,13 +103,15 @@ public class UpdateCategoryImageCommandTests : IntegrationTestBase
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var currentUser = scope.ServiceProvider.GetRequiredService<ICurrentUserService>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var fileStorageSettings = scope.ServiceProvider.GetRequiredService<IOptions<FileStorageSettings>>();
 
         var handler = new UpdateCategoryImageCommandHandler(
             context,
             new StubStorage(),
             currentUser,
             NullLogger<UpdateCategoryImageCommandHandler>.Instance,
-            configuration);
+            configuration,
+            fileStorageSettings);
 
         return await handler.Handle(new UpdateCategoryImageCommand(categoryId, file), CancellationToken.None);
     }
