@@ -164,7 +164,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 Product = product,
                 ProductId = product.Id
             };
-            await _context.ProductDescriptions.AddAsync(productDescription);
+            await _context.ProductDescriptions.AddAsync(productDescription, cancellationToken);
         }
 
         // Update variations

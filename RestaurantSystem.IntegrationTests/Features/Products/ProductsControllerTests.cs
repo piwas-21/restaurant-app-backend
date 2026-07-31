@@ -341,6 +341,76 @@ public class ProductsControllerTests : IntegrationTestBase
         return product.Id;
     }
 
+    [Fact]
+    public async Task GetProducts_NeitherDuplicatesNorDropsRows_WhenDisplayOrderAndNameTie()
+    {
+        // The paginated product query orders by DisplayOrder then Name, neither of which is
+        // unique. Without a further tiebreaker the database is FREE to return tied rows in a
+        // different order per statement, so a product could appear on two pages and another on
+        // none — and once the query is AsSplitQuery (added for S8733) the same ambiguity can
+        // attach one product's images to a different product, because EF correlates the split
+        // statements by repeating this ORDER BY.
+        //
+        // HONEST LIMIT, measured: deleting `.ThenBy(p => p.Id)` from the query does NOT fail
+        // this test. Postgres is *permitted* to reorder tied rows, not *required* to, and on a
+        // small table it returns them consistently. So no black-box test can force the defect,
+        // and this one must not be read as pinning the tiebreaker. What it does guard is the
+        // weaker, still-real invariant below — that paging never duplicates or drops a row —
+        // which would catch OrderBy being dropped outright or a Skip/Take off-by-one.
+        //
+        // Seed a deliberate tie: same DisplayOrder, same Name, different ids.
+        var tiedName = $"Tie-{Guid.NewGuid():N}";
+        // NEGATIVE so the tied rows sort FIRST: an earlier version used a high DisplayOrder,
+        // which put them behind more seeded products than the page walk covered, and the test
+        // "failed" by finding nothing rather than by finding a duplicate.
+        const int sharedDisplayOrder = -9_100;
+        var ids = new List<Guid>();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var seeded = new List<Product>();
+            for (var i = 0; i < 4; i++)
+            {
+                var product = new Product
+                {
+                    Name = tiedName,
+                    BasePrice = 10m,
+                    IsActive = true,
+                    IsAvailable = true,
+                    Type = ProductType.MainItem,
+                    Ingredients = new List<string>(),
+                    Allergens = new List<string>(),
+                    DisplayOrder = sharedDisplayOrder,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "test",
+                };
+                context.Products.Add(product);
+                seeded.Add(product);
+            }
+            await context.SaveChangesAsync();
+            // AFTER the save: Id is database-generated, so reading it at Add() time collects
+            // four Guid.Empty values and the assertion below compares against nothing.
+            ids.AddRange(seeded.Select(x => x.Id));
+        }
+
+        // Walk the tied rows one page at a time. Every id must be seen exactly once.
+        var seen = new List<Guid>();
+        string? firstPageNames = null;
+        for (var page = 1; page <= 8; page++)
+        {
+            var result = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>(
+                $"/api/products?page={page}&pageSize=2");
+            var items = result?.Data?.Items;
+            if (items is null || items.Count == 0) break;
+            firstPageNames ??= string.Join(", ", items.Select(i => $"{i.Name}#{i.Id}"));
+            seen.AddRange(items.Where(i => ids.Contains(i.Id)).Select(i => i.Id));
+        }
+
+        seen.Should().BeEquivalentTo(ids,
+            $"every tied product must appear on exactly one page (page 1 held: {firstPageNames})");
+        seen.Should().OnlyHaveUniqueItems("a tied product must not be duplicated across pages");
+    }
+
     private Task<HttpResponseMessage> PatchPriceAsync(Guid id, decimal price)
     {
         var content = new StringContent(

@@ -77,8 +77,11 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
         var totalCount = await queryable.CountAsync(cancellationToken);
 
         var products = await queryable
+            // See GetProductsQuery: split + ThenBy(Id) travel together under Skip/Take.
+            .AsSplitQuery()
             .OrderBy(p => p.DisplayOrder)
             .ThenBy(p => p.Name)
+            .ThenBy(p => p.Id)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);

@@ -124,6 +124,11 @@ public class UserGroupService : IUserGroupService
         var groups = await _context.UserGroups
             .Include(g => g.Discounts)
             .Include(g => g.Memberships)
+            // Discounts x Memberships per group, over every group (S8733). A group with 200
+            // members and 5 discounts is 1000 rows for 205 entities. Unpaginated, so no
+            // ordering guarantee is needed. GetGroupByIdAsync above is deliberately NOT
+            // split: one root, and the extra round-trip costs more than the duplication.
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         return groups.Select(UserGroupMapper.ToDto).ToList();
