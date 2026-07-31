@@ -29,5 +29,21 @@ public class RestaurantInfo : Entity
     /// </summary>
     public string? ThemePaletteKey { get; set; }
 
+    /// <summary>
+    /// The restaurant's own logo, uploaded through admin (SOFRA-ONBOARDING-PLAN O6).
+    /// Null means the tenant has not uploaded one and the app renders its NAME as text —
+    /// not a stand-in image. That fallback is the point of the field: before it existed
+    /// every tenant image shipped with tenant-1's baked <c>/branding/logo.png</c>, so a
+    /// new restaurant's header showed another restaurant's brand.
+    /// </summary>
+    public string? LogoUrl { get; set; }
+
+    /// <summary>
+    /// Optional dark-theme variant. Null falls back to <see cref="LogoUrl"/> — one logo
+    /// that reads on both themes is the common case, and demanding two uploads to get a
+    /// header at all would be worse than a slightly low-contrast mark.
+    /// </summary>
+    public string? LogoDarkUrl { get; set; }
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
 }

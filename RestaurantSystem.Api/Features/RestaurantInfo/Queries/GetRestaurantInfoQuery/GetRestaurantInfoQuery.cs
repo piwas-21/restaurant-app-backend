@@ -18,10 +18,12 @@ public class GetRestaurantInfoQueryHandler
     : IQueryHandler<GetRestaurantInfoQuery, ApiResponse<RestaurantInfoDto>>
 {
     private readonly ApplicationDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public GetRestaurantInfoQueryHandler(ApplicationDbContext context)
+    public GetRestaurantInfoQueryHandler(ApplicationDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
 
     public async Task<ApiResponse<RestaurantInfoDto>> Handle(
@@ -39,24 +41,7 @@ public class GetRestaurantInfoQueryHandler
             throw new NotFoundException("Restaurant info has not been initialised.");
         }
 
-        var dto = new RestaurantInfoDto(
-            info.Id,
-            info.Name,
-            info.AddressLine1,
-            info.AddressLine2,
-            info.City,
-            info.PostalCode,
-            info.Country,
-            info.Latitude,
-            info.Longitude,
-            info.Email,
-            info.Website,
-            info.ThemePaletteKey,
-            info.PhoneNumbers
-                .OrderBy(p => p.DisplayOrder)
-                .Select(p => new RestaurantPhoneNumberDto(
-                    p.Id, p.Label, p.Number, p.WhatsAppEnabled, p.DisplayOrder, p.IsActive))
-                .ToList());
+        var dto = RestaurantInfoMapper.ToDto(info, _configuration["AWS:S3:BaseUrl"]);
 
         return ApiResponse<RestaurantInfoDto>.SuccessWithData(dto);
     }
