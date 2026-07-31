@@ -55,6 +55,11 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
                 .ThenInclude(pc => pc.Category)
             .Include(p => p.Variations.Where(v => v.IsActive))
                 .ThenInclude(v => v.Descriptions)
+            // Split: 2+ collection Includes over MANY roots multiply rows (S8733). Placed in
+            // THIS chain, beside the Includes it is about, rather than on the materialising
+            // statement below — behaviour is identical (it is query metadata, not a positional
+            // operator) but Sonar's rule is syntactic and does not follow the variable.
+            .AsSplitQuery()
             .AsQueryable();
 
         // Apply filters
@@ -107,11 +112,9 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
 
 
         var products = await productsQuery
-        // 2+ collection Includes over many roots multiply rows (S8733). ThenBy(Id) is
-        // REQUIRED alongside it, not cosmetic: a split query with Skip/Take correlates its
-        // separate round-trips by the ordering, so a non-unique one (DisplayOrder+Name is
-        // not unique) can attach a product's images to a different product.
-        .AsSplitQuery()
+        // ThenBy(Id) is REQUIRED by the split above, not cosmetic: a split query with
+        // Skip/Take correlates its separate round-trips by the ordering, so a non-unique one
+        // (DisplayOrder+Name is not unique) can attach a product's images to another product.
         .OrderBy(p => p.DisplayOrder)
         .ThenBy(p => p.Name)
         .ThenBy(p => p.Id)
