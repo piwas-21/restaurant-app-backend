@@ -43,6 +43,11 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
                                 .ThenInclude(di => di.Descriptions)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
+            // Split: 2+ collection Includes over MANY roots multiply rows (S8733). Placed in
+            // THIS chain, beside the Includes it is about, rather than on the materialising
+            // statement below — behaviour is identical (it is query metadata, not a positional
+            // operator) but Sonar's rule is syntactic and does not follow the variable.
+            .AsSplitQuery()
             .Where(p => !p.IsDeleted && p.MenuDefinition != null);
 
         // Filter by schedule availability (only if not including unavailable)
@@ -77,8 +82,7 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
         var totalCount = await queryable.CountAsync(cancellationToken);
 
         var products = await queryable
-            // See GetProductsQuery: split + ThenBy(Id) travel together under Skip/Take.
-            .AsSplitQuery()
+            // See GetProductsQuery: the split above and ThenBy(Id) travel together under Skip/Take.
             .OrderBy(p => p.DisplayOrder)
             .ThenBy(p => p.Name)
             .ThenBy(p => p.Id)

@@ -48,6 +48,11 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
             .Include(p => p.ProductCategories)
                 .ThenInclude(pc => pc.Category)
             .Include(p => p.Images)
+            // Split: 2+ collection Includes over MANY roots multiply rows (S8733). Placed in
+            // THIS chain, beside the Includes it is about, rather than on the materialising
+            // statement below — behaviour is identical (it is query metadata, not a positional
+            // operator) but Sonar's rule is syntactic and does not follow the variable.
+            .AsSplitQuery()
             .Where(p => p.IsSpecial)
             .AsQueryable();
 
@@ -56,8 +61,7 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
 
         // Get paginated products
         var products = await specialProductsQuery
-            // See GetProductsQuery: split + ThenBy(Id) travel together under Skip/Take.
-            .AsSplitQuery()
+            // See GetProductsQuery: the split above and ThenBy(Id) travel together under Skip/Take.
             .OrderByDescending(p => p.IsFeaturedSpecial) // Featured first
             .ThenBy(p => p.DisplayOrder)
             .ThenBy(p => p.Name)
