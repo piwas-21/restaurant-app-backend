@@ -27,7 +27,6 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
     private readonly IFileStorageService _fileStorageService;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UploadProductImageCommandHandler> _logger;
-    private readonly IConfiguration _configuration;
     private readonly string _baseUrl;
     private readonly FileStorageSettings _fileStorageSettings;
 
@@ -43,7 +42,6 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
         _fileStorageService = fileStorageService;
         _currentUserService = currentUserService;
         _logger = logger;
-        _configuration = configuration;
         _baseUrl = configuration["AWS:S3:BaseUrl"]!;
         _fileStorageSettings = fileStorageSettings.Value;
     }

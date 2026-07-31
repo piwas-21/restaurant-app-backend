@@ -16,8 +16,10 @@ namespace RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurant
 /// <see cref="Domain.Entities.RestaurantInfo"/> singleton at it. Admin-only.
 /// </summary>
 /// <remarks>
-/// Mirrors <c>UpdateCategoryImageCommand</c> — same allowlists, same delete-then-upload
-/// order — under <c>branding/</c> rather than <c>categories/{id}</c>.
+/// Mirrors <c>UpdateCategoryImageCommand</c>'s allowlists and stores under <c>branding/</c>
+/// rather than <c>categories/{id}</c>, but deliberately INVERTS its file lifecycle: the category
+/// handler deletes the old file before uploading, this one deletes it after the new URL is
+/// committed. See the comment at the delete call for why.
 /// </remarks>
 public record UpdateRestaurantLogoCommand(
     LogoVariant Variant,
