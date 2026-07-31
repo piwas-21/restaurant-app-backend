@@ -211,6 +211,26 @@ public class SetupChecklistTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task LogoStep_IsOfferedToEveryTenant_AndIsAcknowledgeable()
+    {
+        // O6. Deliberately NOT derived, even though `RestaurantInfo.LogoUrl` is readable and
+        // provisioning never seeds it: "we have no logo" is a finished state — the app renders
+        // the restaurant's name as text — so an owner has to be able to say so. A derived step
+        // would strand that owner one short of done forever.
+        AuthenticateAsAdmin();
+
+        var step = Step(await GetChecklistAsync(), SetupSteps.Logo);
+        step.IsDerived.Should().BeFalse();
+        step.IsDone.Should().BeFalse();
+
+        (await Client.PutAsJsonAsync(
+            $"{Url}/steps/{SetupSteps.Logo}", new SetStepDoneRequest { IsDone = true }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Step(await GetChecklistAsync(), SetupSteps.Logo).IsDone.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task AcknowledgedStep_RoundTrips_AndUndoes()
     {
         AuthenticateAsAdmin();
