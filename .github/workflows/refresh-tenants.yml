@@ -1,0 +1,97 @@
+name: refresh-tenants
+
+# Rolls every Sofra tenant pinned to `backend_tag: latest` onto the backend release
+# that just published, by SSHing to the STAGING box and running
+# /opt/rumi/deploy/refresh-tenant-images.sh. Tenants live on the staging box because
+# that is where the control plane runs, so every self-serve tenant is provisioned
+# there (sofra lib/provisioning-registry.ts) — while `deploy.yml` rolls RUMI's own
+# compose project on the PROD box and never touches a tenant.
+#
+# Why this exists: `deploy-staging.yml` already refreshes the `:staging` tenants on
+# every develop merge (deploy #52). Nothing refreshed the `:latest` ones, so pinning
+# a paying tenant to released code — the correct default since 2026-07-31 — meant it
+# was provisioned once and then never updated at all. See the workspace
+# SOFRA-ONBOARDING-PLAN, the backend_tag decision.
+#
+# Chained off `build-image` (not off `deploy`) for two reasons. It keeps this out of
+# deploy.yml's `prod-deploy` concurrency group, which holds for a whole run with
+# `cancel-in-progress: false` — a tenant refresh living there could keep an emergency
+# rollback dispatch queued for up to its full timeout while working on another box.
+# And it mirrors deploy.yml's own trigger exactly, rather than chaining a
+# `workflow_run` off a workflow that is itself `workflow_run`-triggered.
+#
+# The two are therefore SIBLINGS: prod and the tenants roll in parallel, on different
+# boxes, from the same published image. Nothing is lost by not waiting for the prod
+# deploy — it has no health gate, so its success says the SSH worked, not that the
+# build is good.
+#
+# RELEASE PATH ONLY, by construction: `build-image` is push-triggered and this filters
+# to `main`, which is also the only ref `:latest` is published from. A rollback is a
+# `deploy.yml` dispatch that re-points prod's container WITHOUT moving `:latest`, so it
+# correctly does not reach here. Consequence, documented in deploy DEPLOYMENT.md
+# §Rollback: a rollback leaves tenants on the bad build, and the fix is either a forward
+# release or `retag-mutable-tags.yml` (which moves `:latest` for real) followed by a
+# MANUAL `refresh-tenant-images.sh backend latest` — that workflow is dispatch-only, so
+# it does not chain this one.
+#
+# Requires STAGING_DEPLOY_{HOST,USER,SSH_KEY,SSH_FINGERPRINT} — the same secrets
+# deploy-staging.yml already uses.
+
+on:
+  workflow_run:
+    workflows: ["build-image"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: staging-tenant-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: refresh :latest-pinned tenants (staging box)
+    # Only when the build actually published. A failed build leaves `:latest` pointing
+    # at the previous image, so refreshing would be a no-op that reports success.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: SSH → re-pull tenants riding :latest
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.STAGING_DEPLOY_HOST }}
+          username: ${{ secrets.STAGING_DEPLOY_USER }}
+          key: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
+          fingerprint: ${{ secrets.STAGING_DEPLOY_SSH_FINGERPRINT }}
+          command_timeout: 18m
+          # Scoped to the tenant refresh: NEVER ./deploy.sh here, which would roll RUMI
+          # staging itself onto :latest (it is pinned to :staging on purpose). Shares
+          # /tmp/rumi-deploy.lock with deploy-staging.yml and the frontend rolls.
+          #
+          # `-E 99` is load-bearing. Without it, failing to ACQUIRE the lock and the
+          # script itself failing both exit 1, and the operator is told to re-run a job
+          # that will fail identically. refresh-tenant-images.sh exits non-zero when a
+          # tenant genuinely fails to roll — which is the entire reason it exists (its
+          # own comment: "a silent skip is the exact failure mode this script exists to
+          # end") — so the two must not be conflated.
+          #
+          # `|| rc=$?` rather than a bare call: the action's shell may run under `set -e`,
+          # which would exit before the code could be classified.
+          #
+          # The `-x` guard keeps this green on a box that has not yet rsynced the script.
+          # The script exits 0 and says why when no tenant matches, which is the state
+          # today — every tenant is on :staging or is legacy RUMI.
+          script: |
+            rc=0
+            flock -w 300 -E 99 /tmp/rumi-deploy.lock -c \
+              "cd /opt/rumi/deploy && if [ -x ./refresh-tenant-images.sh ]; then ./refresh-tenant-images.sh backend latest; else echo 'note: refresh-tenant-images.sh not on this box yet — skipping tenant refresh'; fi" || rc=$?
+            if [ "$rc" -eq 99 ]; then
+              echo "::error::timed out after 5m waiting for the RUMI deploy lock — no tenant was touched; re-run this job"
+              exit 1
+            elif [ "$rc" -ne 0 ]; then
+              echo "::error::refresh-tenant-images.sh failed (exit $rc) — one or more tenants are still on the PREVIOUS backend image. Re-running will not help; read the log above for the failing slug and fix it on the box"
+              exit "$rc"
+            fi
