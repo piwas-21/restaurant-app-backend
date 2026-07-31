@@ -11,6 +11,11 @@ name: deploy
 # already-published image. Only the backend service is touched; the frontend
 # stays at whatever FRONTEND_TAG .env pins. See docs/runbooks/DEPLOYMENT.md.
 #
+# This workflow only ever touches the PROD box. Sofra TENANTS live on the staging
+# box and are rolled by the sibling `refresh-tenants.yml`, chained off the same
+# `build-image` success. A rollback here therefore does NOT roll tenants back —
+# see the dispatch-path notice below and deploy repo DEPLOYMENT.md §Rollback.
+#
 # Requires repo/org secrets DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key
 # whose public half is in rumi@box:~/.ssh/authorized_keys), DEPLOY_SSH_FINGERPRINT
 # (box host key, pins against MITM). The deploy user needs passwordless sudo for
@@ -54,6 +59,16 @@ jobs:
             latest|sha-[0-9a-f]*|v[0-9]*) echo "deploying backend tag: $IMAGE_TAG" ;;
             *) echo "::error::invalid image_tag '$IMAGE_TAG' (expected latest | sha-<hex> | v<semver>)"; exit 1 ;;
           esac
+
+      - name: Note the tenant exposure (manual path only)
+        # A release refreshes every `backend_tag: latest` tenant onto it
+        # (refresh-tenants.yml). This dispatch re-points PROD only and does not move
+        # `:latest`, so if this is a rollback, those tenants are still running the build
+        # being rolled away from — and nothing else will say so. Cheap to print, and the
+        # one moment the operator can act on it.
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "::notice::This rolls the PROD box only. Sofra tenants pinned to ':latest' are NOT reached and, after a rollback, are still running the build you are rolling away from. Remedy: roll forward, or run the retag-mutable-tags workflow to re-point ':latest' at the good sha and then './refresh-tenant-images.sh backend latest' on the STAGING box. Do NOT run that script to check which tenants are affected — it pulls and recreates. See deploy DEPLOYMENT.md §Rollback."
 
       - name: SSH → deploy backend at the requested tag
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
