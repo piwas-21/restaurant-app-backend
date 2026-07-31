@@ -107,8 +107,14 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
 
 
         var products = await productsQuery
+        // 2+ collection Includes over many roots multiply rows (S8733). ThenBy(Id) is
+        // REQUIRED alongside it, not cosmetic: a split query with Skip/Take correlates its
+        // separate round-trips by the ordering, so a non-unique one (DisplayOrder+Name is
+        // not unique) can attach a product's images to a different product.
+        .AsSplitQuery()
         .OrderBy(p => p.DisplayOrder)
         .ThenBy(p => p.Name)
+        .ThenBy(p => p.Id)
         .Skip((query.Page - 1) * query.PageSize)
         .Take(query.PageSize)
         .ToListAsync(cancellationToken);

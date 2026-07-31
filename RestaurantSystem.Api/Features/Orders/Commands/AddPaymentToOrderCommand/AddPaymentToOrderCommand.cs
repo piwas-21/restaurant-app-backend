@@ -102,17 +102,12 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
 
         _context.OrderPayments.Add(payment);
 
-        // Process payment (integrate with payment gateway for non-cash payments)
-        if (payment.PaymentMethod != PaymentMethod.Cash)
-        {
-            // TODO: Integrate with payment gateway
-            // For now, mark as completed
-            payment.Status = PaymentStatus.Completed;
-        }
-        else
-        {
-            payment.Status = PaymentStatus.Completed;
-        }
+        // Every payment is recorded as already completed: cash is taken at the till, and
+        // card is captured on the terminal before the cashier enters it here. There is no
+        // gateway integration, so there is nothing to branch on — the two arms of the
+        // if/else this replaces were byte-identical (Sonar S3923). Re-introduce the branch
+        // WITH the gateway call, not before it.
+        payment.Status = PaymentStatus.Completed;
 
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();

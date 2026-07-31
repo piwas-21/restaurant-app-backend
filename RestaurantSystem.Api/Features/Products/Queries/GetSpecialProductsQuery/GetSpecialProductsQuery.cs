@@ -56,9 +56,12 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
 
         // Get paginated products
         var products = await specialProductsQuery
+            // See GetProductsQuery: split + ThenBy(Id) travel together under Skip/Take.
+            .AsSplitQuery()
             .OrderByDescending(p => p.IsFeaturedSpecial) // Featured first
             .ThenBy(p => p.DisplayOrder)
             .ThenBy(p => p.Name)
+            .ThenBy(p => p.Id)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
