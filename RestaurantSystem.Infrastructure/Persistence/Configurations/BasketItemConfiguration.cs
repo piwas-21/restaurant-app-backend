@@ -26,9 +26,6 @@ public class BasketItemConfiguration : IEntityTypeConfiguration<BasketItem>
         builder.Property(bi => bi.SelectedIngredients)
             .HasColumnType("jsonb");
 
-        builder.Property(bi => bi.ExcludedIngredients)
-            .HasColumnType("jsonb");
-
         builder.Property(bi => bi.AddedIngredients)
             .HasColumnType("jsonb");
 

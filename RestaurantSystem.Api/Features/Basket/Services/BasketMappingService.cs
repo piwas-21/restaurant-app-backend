@@ -67,10 +67,6 @@ public class BasketMappingService : IBasketMappingService
                 .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
                 .ToList();
 
-            var excludedNames = item.ExcludedIngredients?
-                .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
-                .ToList();
-
             var addedNames = item.AddedIngredients?
                 .Select(id => productIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
                 .ToList();
@@ -139,12 +135,10 @@ public class BasketMappingService : IBasketMappingService
                 ItemTotal = item.ItemTotal,
                 SpecialInstructions = item.SpecialInstructions,
                 SelectedIngredients = item.SelectedIngredients,
-                ExcludedIngredients = item.ExcludedIngredients,
                 AddedIngredients = item.AddedIngredients,
                 IngredientQuantities = ingredientQuantities,
                 CustomizationPrice = item.CustomizationPrice,
                 SelectedIngredientNames = selectedNames,
-                ExcludedIngredientNames = excludedNames,
                 AddedIngredientNames = addedNames,
                 SelectedSideItems = selectedSideItems,
                 ChildItems = item.ChildBasketItems.Select(child => new BasketItemDto

@@ -10,7 +10,6 @@ public record AddToBasketDto
 
     // Customization fields for optional ingredients
     public List<Guid>? SelectedIngredients { get; set; }
-    public List<Guid>? ExcludedIngredients { get; set; }
     public List<Guid>? AddedIngredients { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; } // { ingredientId: quantity }
 

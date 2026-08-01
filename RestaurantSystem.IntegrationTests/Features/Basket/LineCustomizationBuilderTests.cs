@@ -43,7 +43,7 @@ public class LineCustomizationBuilderTests
     {
         var provided = new Dictionary<Guid, int> { [Bacon] = 2 };
 
-        var result = Build(price: 3m).Build(Ingredients(), [Bacon], null, provided, preferProvidedQuantities: true);
+        var result = Build(price: 3m).Build(Ingredients(), [Bacon], provided, preferProvidedQuantities: true);
 
         result.CustomizationPrice.Should().Be(3m);
         // Verbatim: only what the client sent — no backfilled 0 for the deselected cheese.
@@ -53,7 +53,7 @@ public class LineCustomizationBuilderTests
     [Fact]
     public void PreferProvided_WithoutMap_BackfillsFromSelection()
     {
-        var result = Build().Build(Ingredients(), [Bacon], null, null, preferProvidedQuantities: true);
+        var result = Build().Build(Ingredients(), [Bacon], null, preferProvidedQuantities: true);
 
         // Backfill: selected bacon = 1, deselected cheese = 0.
         Deserialize(result.IngredientQuantitiesJson)
@@ -65,7 +65,7 @@ public class LineCustomizationBuilderTests
     {
         var provided = new Dictionary<Guid, int> { [Bacon] = 2 };
 
-        var result = Build().Build(Ingredients(), [Bacon], null, provided, preferProvidedQuantities: false);
+        var result = Build().Build(Ingredients(), [Bacon], provided, preferProvidedQuantities: false);
 
         // Backfill wins, but honours the provided bacon quantity; the deselected cheese gets 0.
         Deserialize(result.IngredientQuantitiesJson)
@@ -77,7 +77,7 @@ public class LineCustomizationBuilderTests
     {
         var provided = new Dictionary<Guid, int> { [Bacon] = 2 };
 
-        var result = Build().Build(Ingredients(), null, null, provided, preferProvidedQuantities: false);
+        var result = Build().Build(Ingredients(), null, provided, preferProvidedQuantities: false);
 
         Deserialize(result.IngredientQuantitiesJson).Should().BeEquivalentTo(provided);
     }
