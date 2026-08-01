@@ -21,17 +21,20 @@ public class GroupMembershipService : IGroupMembershipService
     private readonly IQRCodeService _qrCodeService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEmailService _emailService;
+    private readonly ILogger<GroupMembershipService> _logger;
 
     public GroupMembershipService(
         ApplicationDbContext context,
         IQRCodeService qrCodeService,
         ICurrentUserService currentUserService,
-        IEmailService emailService)
+        IEmailService emailService,
+        ILogger<GroupMembershipService> logger)
     {
         _context = context;
         _qrCodeService = qrCodeService;
         _currentUserService = currentUserService;
         _emailService = emailService;
+        _logger = logger;
     }
 
     public async Task<GroupMembershipDto> AddMemberAsync(Guid groupId, AddMemberDto dto, CancellationToken cancellationToken = default)
@@ -94,15 +97,19 @@ public class GroupMembershipService : IGroupMembershipService
         }
         catch (Exception ex)
         {
-            // Log email failure but don't fail the membership creation
-            // Email can be resent later if needed
-            // TODO: Add proper logger injection
-            Console.WriteLine($"Failed to send membership confirmation email to {user.Email}: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-            }
+            // Best-effort send: a failed email must never fail membership creation, and it can
+            // be resent later. What is logged is the membership and user IDs, NOT the address —
+            // the recipient's email is the PII this log used to leak to stdout in plaintext, and
+            // the IDs identify the same record for anyone who needs to resend (DEV-PHASES D7,
+            // docs/privacy PII map). Passing the exception to ILogger carries the stack trace
+            // and every inner exception, so the three hand-rolled Console lines are covered by
+            // this one call rather than dropped.
+            _logger.LogError(
+                ex,
+                "Failed to send membership confirmation email for membership {MembershipId} (user {UserId}, group {GroupId})",
+                membership.Id,
+                user.Id,
+                group.Id);
         }
 
         return UserGroupMapper.ToDto(membership, user.Email ?? "", user.UserName ?? "");

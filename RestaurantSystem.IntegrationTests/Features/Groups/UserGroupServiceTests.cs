@@ -11,6 +11,8 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace RestaurantSystem.IntegrationTests.Features.Groups;
 
@@ -69,7 +71,8 @@ public class UserGroupServiceTests : IAsyncLifetime
             _context,
             _qrCodeService,
             _currentUserServiceMock.Object,
-            _emailServiceMock.Object);
+            _emailServiceMock.Object,
+            NullLogger<GroupMembershipService>.Instance);
         var membershipQrService = new MembershipQrService(_context, _qrCodeService);
 
         _service = new UserGroupService(
@@ -335,6 +338,61 @@ public class UserGroupServiceTests : IAsyncLifetime
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    /// <summary>
+    /// Issue #187. The confirmation-email failure path used to `Console.WriteLine` the
+    /// recipient's address, putting a plaintext PII trail in the container logs (DEV-PHASES
+    /// D7, docs/privacy PII map). This pins both halves of the fix: the address must not be
+    /// in the log, and the correlating IDs must be — a log that leaked nothing AND said
+    /// nothing would pass a naive "no email in output" check while making a failed send
+    /// impossible to chase.
+    /// </summary>
+    [Fact]
+    public async Task AddMemberAsync_EmailSendFails_LogsIdsAndNeverTheAddress()
+    {
+        var group = await SeedGroupAsync();
+        var user = await _context.Users.FirstAsync(u => u.Id == _testUserId);
+        var logger = new Mock<ILogger<GroupMembershipService>>();
+
+        var emailServiceMock = new Mock<IEmailService>();
+        emailServiceMock
+            .Setup(x => x.SendMembershipConfirmationEmailAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("smtp exploded"));
+
+        var service = new GroupMembershipService(
+            _context,
+            _qrCodeService,
+            _currentUserServiceMock.Object,
+            emailServiceMock.Object,
+            logger.Object);
+
+        // Unchanged behaviour: a failed email must never fail membership creation.
+        var result = await service.AddMemberAsync(group.Id, new AddMemberDto { UserId = _testUserId });
+        Assert.NotNull(await _context.GroupMemberships.FindAsync(result.Id));
+
+        var logged = new List<string>();
+        logger.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => Capture(v, logged)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+
+        var message = Assert.Single(logged);
+        Assert.DoesNotContain(user.Email!, message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(_testUserId.ToString(), message);
+        Assert.Contains(result.Id.ToString(), message);
+    }
+
+    private static bool Capture(object state, List<string> sink)
+    {
+        sink.Add(state.ToString() ?? string.Empty);
+        return true;
     }
 
     [Fact]
