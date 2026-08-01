@@ -24,7 +24,6 @@ public class AddToBasketCommandValidatorTests
             Quantity: 1,
             SpecialInstructions: specialInstructions,
             SelectedIngredients: null,
-            ExcludedIngredients: null,
             AddedIngredients: null,
             IngredientQuantities: null,
             SelectedSideItems: null,

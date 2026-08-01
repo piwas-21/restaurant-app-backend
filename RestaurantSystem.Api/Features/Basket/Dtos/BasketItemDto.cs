@@ -27,14 +27,12 @@ public record BasketItemDto
 
     // Customization fields for optional ingredients
     public List<Guid>? SelectedIngredients { get; set; }
-    public List<Guid>? ExcludedIngredients { get; set; }
     public List<Guid>? AddedIngredients { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; } // { ingredientId: quantity }
     public decimal CustomizationPrice { get; set; }
 
     // Ingredient names for display purposes
     public List<string>? SelectedIngredientNames { get; set; }
-    public List<string>? ExcludedIngredientNames { get; set; }
     public List<string>? AddedIngredientNames { get; set; }
 
     // Selected side items (with quantities)

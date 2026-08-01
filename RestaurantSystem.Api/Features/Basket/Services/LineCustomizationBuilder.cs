@@ -12,7 +12,6 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// </summary>
 public sealed record LineCustomization(
     List<Guid>? SelectedIngredients,
-    List<Guid>? ExcludedIngredients,
     string? IngredientQuantitiesJson,
     decimal CustomizationPrice);
 
@@ -27,7 +26,6 @@ public interface ILineCustomizationBuilder
     LineCustomization Build(
         ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
-        List<Guid>? excludedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities);
 }
@@ -44,7 +42,6 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
     public LineCustomization Build(
         ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
-        List<Guid>? excludedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities)
     {
@@ -54,7 +51,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         var ingredientQuantitiesJson = BuildIngredientQuantitiesJson(
             detailedIngredients, selectedIngredients, ingredientQuantities, preferProvidedQuantities);
 
-        return new LineCustomization(selectedIngredients, excludedIngredients, ingredientQuantitiesJson, customizationPrice);
+        return new LineCustomization(selectedIngredients, ingredientQuantitiesJson, customizationPrice);
     }
 
     private static string? BuildIngredientQuantitiesJson(

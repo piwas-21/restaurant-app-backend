@@ -19,6 +19,7 @@ public class BasketService : IBasketService
     private readonly IBasketItemFactory _basketItemFactory;
     private readonly IBasketRepository _basketRepository;
     private readonly IAnonymousBasketMerger _anonymousBasketMerger;
+    private readonly ILogger<BasketService> _logger;
 
     public BasketService(
        ApplicationDbContext context,
@@ -26,7 +27,8 @@ public class BasketService : IBasketService
        IBasketMappingService basketMappingService,
        IBasketItemFactory basketItemFactory,
        IBasketRepository basketRepository,
-       IAnonymousBasketMerger anonymousBasketMerger)
+       IAnonymousBasketMerger anonymousBasketMerger,
+        ILogger<BasketService> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -34,6 +36,7 @@ public class BasketService : IBasketService
         _basketItemFactory = basketItemFactory;
         _basketRepository = basketRepository;
         _anonymousBasketMerger = anonymousBasketMerger;
+        _logger = logger;
     }
 
     public async Task<BasketDto?> GetBasketAsync(string sessionId, Guid? userId = null)
@@ -292,13 +295,39 @@ public class BasketService : IBasketService
     /// lines that differed only by their sides or ingredient quantity silently merged into one
     /// (menu-bundles redesign #155).
     /// </summary>
-    private static bool IsSameCustomization(BasketItem existing, AddToBasketDto incoming) =>
+    private bool IsSameCustomization(BasketItem existing, AddToBasketDto incoming) =>
         (existing.SpecialInstructions ?? "") == (incoming.SpecialInstructions ?? "")
         && SameGuidSet(existing.SelectedIngredients, incoming.SelectedIngredients)
-        && SameGuidSet(existing.ExcludedIngredients, incoming.ExcludedIngredients)
         && SameGuidSet(existing.AddedIngredients, incoming.AddedIngredients)
-        && SameSideItems(existing.SelectedSideItemsJson, incoming.SelectedSideItems)
-        && SameSelectedQuantities(incoming.SelectedIngredients, existing.IngredientQuantitiesJson, incoming.IngredientQuantities);
+        && SameSideItems(existing.SelectedSideItemsJson, incoming.SelectedSideItems, existing.Id)
+        && SameSelectedQuantities(incoming.SelectedIngredients, existing.IngredientQuantitiesJson, incoming.IngredientQuantities, existing.Id);
+
+    /// <summary>
+    /// The dedup path reads the same JSON columns the READ path reads, and the read path has
+    /// guarded them since #169 (<c>BasketMappingService</c> catches <c>JsonException</c> and
+    /// logs). Here they were bare, so one malformed value turned add-to-basket into a 500 —
+    /// the codebase disagreeing with itself about the same two columns (issue #188).
+    ///
+    /// Returns false ONLY when the JSON could not be parsed. A literal <c>null</c> parses fine
+    /// and yields <c>true</c> with a null <paramref name="value"/>, which callers already treat
+    /// as "no stored selection" — collapsing the two into one nullable return would silently
+    /// turn that pre-existing, legitimate case into a dedup miss.
+    /// </summary>
+    private bool TryDeserialize<T>(string json, Guid basketItemId, string what, out T? value)
+        where T : class
+    {
+        try
+        {
+            value = JsonSerializer.Deserialize<T>(json);
+            return true;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to deserialize {What} JSON for basket item {BasketItemId}", what, basketItemId);
+            value = null;
+            return false;
+        }
+    }
 
     private static bool SameGuidSet(List<Guid>? a, List<Guid>? b)
     {
@@ -307,7 +336,7 @@ public class BasketService : IBasketService
         return la.Count == lb.Count && la.OrderBy(x => x).SequenceEqual(lb.OrderBy(x => x));
     }
 
-    private static bool SameSideItems(string? existingJson, List<SelectedSideItemDto>? incoming)
+    private bool SameSideItems(string? existingJson, List<SelectedSideItemDto>? incoming, Guid existingId)
     {
         // Mirror BuildRegularItemAsync: only positive-quantity sides are persisted.
         var incomingSides = (incoming ?? new List<SelectedSideItemDto>())
@@ -319,7 +348,15 @@ public class BasketService : IBasketService
         var existingSides = new List<(Guid Id, int Quantity)>();
         if (!string.IsNullOrEmpty(existingJson))
         {
-            var parsed = JsonSerializer.Deserialize<List<SelectedSideItemDto>>(existingJson);
+            if (!TryDeserialize<List<SelectedSideItemDto>>(existingJson, existingId, "side items", out var parsed))
+            {
+                // Unreadable customization on the stored row. Answering "same" would merge the
+                // incoming add into it — discarding what THIS customer chose and charging them
+                // twice for a line nobody can read. Answering "not same" costs a duplicate line
+                // and loses nothing, so an undecidable comparison resolves to not-equal.
+                return false;
+            }
+
             if (parsed != null)
             {
                 // OfType filters out any null array elements (corrupt/hand-edited JSON) without a
@@ -331,7 +368,11 @@ public class BasketService : IBasketService
         return incomingSides.SequenceEqual(existingSides);
     }
 
-    private static bool SameSelectedQuantities(List<Guid>? selectedIngredients, string? existingJson, Dictionary<Guid, int>? incoming)
+    private bool SameSelectedQuantities(
+        List<Guid>? selectedIngredients,
+        string? existingJson,
+        Dictionary<Guid, int>? incoming,
+        Guid existingId)
     {
         var selected = selectedIngredients ?? new List<Guid>();
         if (selected.Count == 0)
@@ -339,9 +380,12 @@ public class BasketService : IBasketService
             return true; // no selected ingredients → nothing to compare (the selection sets already matched)
         }
 
-        Dictionary<Guid, int>? existing = string.IsNullOrEmpty(existingJson)
-            ? null
-            : JsonSerializer.Deserialize<Dictionary<Guid, int>>(existingJson);
+        Dictionary<Guid, int>? existing = null;
+        if (!string.IsNullOrEmpty(existingJson)
+            && !TryDeserialize<Dictionary<Guid, int>>(existingJson, existingId, "ingredient quantities", out existing))
+        {
+            return false; // undecidable — see the note in SameSideItems
+        }
 
         // A selected ingredient's effective quantity is its map value when > 0, else 1. This
         // ignores the backfilled 0-entries for deselected ingredients (already captured by the
