@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos;
@@ -105,6 +106,55 @@ public class BasketDedupTests : IntegrationTestBase
         });
 
         PizzaLineCount(basket).Should().Be(2, "the two lines differ by their side item");
+    }
+
+    // Issue #188. The dedup helpers deserialized the basket's own JSON columns UNGUARDED while
+    // the read path (BasketMappingService, since #169) has always caught JsonException on the
+    // very same columns — so one malformed value turned add-to-basket into a 500 on the write
+    // path and a logged warning on the read path. These corrupt the stored JSON directly, which
+    // is the only way to reach the branch: nothing in the API can write a malformed value, and
+    // that is exactly why it went unnoticed.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MalformedStoredJson_DoesNotFailTheAdd_AndDoesNotMergeIntoTheUnreadableLine(bool corruptSideItems)
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        AddToBasketDto Payload() => new()
+        {
+            ProductId = _pizza.Id,
+            Quantity = 1,
+            SelectedIngredients = new List<Guid> { _cheese.Id },
+            SelectedSideItems = new List<SelectedSideItemDto> { new() { Id = _fries.Id, Quantity = 1 } },
+            IngredientQuantities = new Dictionary<Guid, int> { [_cheese.Id] = 2 },
+        };
+
+        await AddAsync(Payload());
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var stored = await context.BasketItems.FirstAsync(i => i.ProductId == _pizza.Id);
+            if (corruptSideItems)
+            {
+                stored.SelectedSideItemsJson = "{ not json";
+            }
+            else
+            {
+                stored.IngredientQuantitiesJson = "{ not json";
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        // The bug: this call used to throw JsonException -> 500. AddAsync asserts 200.
+        var basket = await AddAsync(Payload());
+
+        // And the answer to "is this the same customization?" is not-equal, deliberately.
+        // Merging would increment a line whose customization nobody can read, discarding what
+        // this customer actually chose while charging them for two of it.
+        PizzaLineCount(basket).Should().Be(2, "an unreadable stored customization cannot be judged equal");
     }
 
     [Fact]
