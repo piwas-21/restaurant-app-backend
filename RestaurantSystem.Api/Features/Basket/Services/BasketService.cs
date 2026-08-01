@@ -298,7 +298,6 @@ public class BasketService : IBasketService
     private bool IsSameCustomization(BasketItem existing, AddToBasketDto incoming) =>
         (existing.SpecialInstructions ?? "") == (incoming.SpecialInstructions ?? "")
         && SameGuidSet(existing.SelectedIngredients, incoming.SelectedIngredients)
-        && SameGuidSet(existing.ExcludedIngredients, incoming.ExcludedIngredients)
         && SameGuidSet(existing.AddedIngredients, incoming.AddedIngredients)
         && SameSideItems(existing.SelectedSideItemsJson, incoming.SelectedSideItems, existing.Id)
         && SameSelectedQuantities(incoming.SelectedIngredients, existing.IngredientQuantitiesJson, incoming.IngredientQuantities, existing.Id);

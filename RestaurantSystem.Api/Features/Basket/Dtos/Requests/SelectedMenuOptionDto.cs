@@ -9,6 +9,5 @@ public record SelectedMenuOptionDto
     // Nested customization for this item
     public string? SpecialInstructions { get; set; }
     public List<Guid>? SelectedIngredients { get; set; }
-    public List<Guid>? ExcludedIngredients { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; }
 }

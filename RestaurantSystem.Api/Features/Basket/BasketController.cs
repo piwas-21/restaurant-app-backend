@@ -66,7 +66,6 @@ public class BasketController : BasketControllerBase
             request.Quantity,
             request.SpecialInstructions,
             request.SelectedIngredients,
-            request.ExcludedIngredients,
             request.AddedIngredients,
             request.IngredientQuantities,
             request.SelectedSideItems,

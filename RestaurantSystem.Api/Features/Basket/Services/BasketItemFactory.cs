@@ -46,7 +46,7 @@ public class BasketItemFactory : IBasketItemFactory
         // regular and bundle-child paths can never diverge on a new field. Regular items keep the
         // "explicit client map persisted verbatim" precedence (preferProvidedQuantities: true).
         var customization = _lineCustomizationBuilder.Build(
-            product.DetailedIngredients, item.SelectedIngredients, item.ExcludedIngredients,
+            product.DetailedIngredients, item.SelectedIngredients,
             item.IngredientQuantities, preferProvidedQuantities: true);
         decimal customizationPrice = customization.CustomizationPrice;
 
@@ -108,7 +108,6 @@ public class BasketItemFactory : IBasketItemFactory
             ItemTotal = (unitPrice + customizationPrice) * item.Quantity,
             SpecialInstructions = item.SpecialInstructions,
             SelectedIngredients = customization.SelectedIngredients,
-            ExcludedIngredients = customization.ExcludedIngredients,
             AddedIngredients = item.AddedIngredients,
             IngredientQuantitiesJson = customization.IngredientQuantitiesJson,
             CustomizationPrice = customizationPrice,
@@ -260,7 +259,7 @@ public class BasketItemFactory : IBasketItemFactory
             // deselected optional's "NO xxx" reaches the kitchen ticket (issue #150), while an
             // explicit client quantity still wins inside the backfill.
             var childCustomization = _lineCustomizationBuilder.Build(
-                childProduct.DetailedIngredients, option.SelectedIngredients, option.ExcludedIngredients,
+                childProduct.DetailedIngredients, option.SelectedIngredients,
                 option.IngredientQuantities, preferProvidedQuantities: false);
 
             // Add child customization price to total
@@ -277,7 +276,6 @@ public class BasketItemFactory : IBasketItemFactory
                 CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child
                 SpecialInstructions = option.SpecialInstructions,
                 SelectedIngredients = childCustomization.SelectedIngredients,
-                ExcludedIngredients = childCustomization.ExcludedIngredients,
                 IngredientQuantitiesJson = childCustomization.IngredientQuantitiesJson,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
