@@ -62,9 +62,12 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
         var fidelityPointsDiscounts = salesOrders.Sum(o => o.FidelityPointsDiscount);
 
         // --- Refunds (from payments across all orders for the day) ---
+        // Keyed on the amount given back, NOT on IsRefunded: that flag is only
+        // set for a FULL refund, so filtering on it dropped every partial
+        // refund out of the day's refund total.
         var refundedPayments = allOrders
             .SelectMany(o => o.Payments)
-            .Where(p => p.IsRefunded && p.RefundedAmount.HasValue)
+            .Where(p => p.RefundedAmount > 0)
             .ToList();
         var refundCount = refundedPayments.Count;
         var totalRefundedAmount = refundedPayments.Sum(p => p.RefundedAmount ?? 0);
@@ -73,12 +76,10 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
         var cancelledOrdersCount = cancelledOrders.Count;
         var cancelledOrdersTotal = cancelledOrders.Sum(o => o.Total);
 
-        // --- Payment method breakdown (completed payments from sales orders) ---
+        // --- Payment method breakdown (captured payments from sales orders) ---
         var paymentsByMethod = salesOrders
             .SelectMany(o => o.Payments)
-            .Where(p => p.Status == PaymentStatus.Completed
-                     || p.Status == PaymentStatus.Refunded
-                     || p.Status == PaymentStatus.PartiallyRefunded)
+            .Where(p => p.Status.IsCaptured())
             .GroupBy(p => p.PaymentMethod)
             .Select(g => new ZReportPaymentMethodDto
             {
