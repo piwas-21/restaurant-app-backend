@@ -6,11 +6,16 @@ namespace RestaurantSystem.Api.Common.Validation;
 /// The password STRENGTH rules, in one place.
 ///
 /// Separated from "a password is required" on purpose. The two were fused into a single copied
-/// chain in three validators, and <c>UpdateStaffCommandValidator</c> — where the password is
+/// chain in four validators, and <c>UpdateStaffCommandValidator</c> — where the password is
 /// OPTIONAL — inherited the <c>NotEmpty()</c> along with the strength rules. The result was that an
 /// admin editing a staff member's name, email, phone or role without touching the password had the
-/// update refused by all six rules at once, so the edit could not be saved at all (issue #290).
+/// update refused outright, so the edit could not be saved at all (issue #290).
 /// Requiredness now belongs to the callsite; strength lives here and is identical everywhere.
+///
+/// What the refusal actually looked like, since it is easy to guess wrong: the strength rules all
+/// PASS on a null value, and the client omits the key entirely rather than sending <c>""</c>, so
+/// the response carried exactly ONE message — "Password is required". (An empty string would have
+/// produced six and a whitespace-only one five, but no client sends either.)
 ///
 /// The messages are load-bearing beyond this project: the frontend routes them onto form fields by
 /// matching their text (<c>apiFormErrors.ts</c>'s <c>STAFF_REGISTRATION_MATCHERS</c>), and

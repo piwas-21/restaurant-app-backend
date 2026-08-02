@@ -3,6 +3,7 @@ using FluentValidation;
 using RestaurantSystem.Api.Common.Behaviors;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.User.Commands.RegisterStaffCommand;
 using RestaurantSystem.Api.Features.User.Commands.UpdateStaffCommand;
@@ -14,12 +15,15 @@ namespace RestaurantSystem.IntegrationTests.Features.User;
 /// Issue #290. <c>UpdateStaffCommandValidator</c> required <c>Password</c> unconditionally while the
 /// handler changed it only <c>if (!string.IsNullOrWhiteSpace(command.Password))</c> and the command
 /// declared it <c>string?</c>. An admin editing a staff member's name, email, phone or role — which
-/// is what the member-management screen sends when "Change Password" is not ticked — was refused by
-/// all six password rules at once, so a staff edit could not be saved at all.
+/// is what the member-management screen sends when "Change Password" is not ticked — had the whole
+/// update refused, so a staff edit could not be saved at all.
+///
+/// The refusal was ONE message, "Password is required", not the six it is tempting to assume: the
+/// five strength rules all pass on a null value, and the client omits the key rather than sending
+/// <c>""</c>. <see cref="NullPasswordProducedExactlyOneError_TheOriginalDefect"/> keeps that
+/// measured rather than remembered.
 ///
 /// No host and no database: the defect is entirely in the validator, and these run in milliseconds.
-/// The end-to-end half is covered by <see cref="UpdateStaffValidationContractTests"/>, which pins
-/// what the 400 body actually looks like.
 /// </summary>
 public class UpdateStaffCommandValidatorTests
 {
@@ -34,13 +38,14 @@ public class UpdateStaffCommandValidatorTests
         Password: password,
         Role: UserRole.Server);
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void NoPasswordSupplied_IsValid(string? password)
+    /// <summary>
+    /// The whole point of #290: an OMITTED password means "leave it unchanged". `null` is what the
+    /// client sends for that — `JSON.stringify` drops an undefined key entirely.
+    /// </summary>
+    [Fact]
+    public void OmittedPassword_IsValid()
     {
-        var result = Validator.Validate(Command(password));
+        var result = Validator.Validate(Command(null));
 
         result.IsValid.Should().BeTrue(
             "the handler only touches the password when one is supplied, so an ordinary profile edit " +
@@ -49,15 +54,41 @@ public class UpdateStaffCommandValidatorTests
     }
 
     /// <summary>
-    /// The whitespace case is the one a `.When(x => x.Password != null)` guard would get wrong: the
-    /// handler's own condition is `IsNullOrWhiteSpace`, so "   " is NOT a password change, and
-    /// validating it as one would refuse the edit for a value the handler is going to ignore.
+    /// A blank password is a mistake, not an omission, and is refused rather than ignored.
+    ///
+    /// This is where the guard deliberately does NOT mirror the handler. The handler skips on
+    /// `IsNullOrWhiteSpace`, so a guard copying that condition would let "   " through validation,
+    /// skip the update, and still answer "User updated successfully" — the admin types a new
+    /// password, is told it was set, and it was not. `is not null` keeps the #290 fix (an omitted
+    /// key is untouched) without inheriting that.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void BlankPassword_IsRefusedRatherThanSilentlyIgnored(string password)
+    {
+        var result = Validator.Validate(Command(password));
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Select(e => e.ErrorMessage).Should().Contain("Password is required");
+    }
+
+    /// <summary>
+    /// The original defect, measured rather than described — and the reason the PR text no longer
+    /// says "refused by all six password rules". `MinimumLength` and every `Matches` PASS on null,
+    /// so the old chain produced exactly one message for the request the client actually sends.
     /// </summary>
     [Fact]
-    public void WhitespacePassword_MatchesTheHandlersOwnCondition()
+    public void NullPasswordProducedExactlyOneError_TheOriginalDefect()
     {
-        Validator.Validate(Command("   ")).IsValid.Should().BeTrue();
-        string.IsNullOrWhiteSpace("   ").Should().BeTrue("the guard and the handler must agree");
+        var old = new InlineValidator<UpdateStaffCommand>();
+        old.RuleFor(x => x.Password)
+            .NotEmpty().WithMessage("Password is required")
+            .MeetsPasswordPolicy();
+
+        var errors = old.Validate(Command(null)).Errors.Select(e => e.ErrorMessage).ToList();
+
+        errors.Should().ContainSingle().Which.Should().Be("Password is required");
     }
 
     [Theory]
@@ -162,6 +193,12 @@ public class RegisterStaffPasswordRulesTests
 /// The consequence is not cosmetic: the frontend routes per-rule messages onto individual form
 /// fields by matching each entry, and with one blob it matches the first field and files the whole
 /// string there. Pinning it here so the next person reads the behaviour instead of the legend.
+///
+/// Scope, stated because an earlier version of this comment overreached: these run host-free, so
+/// they pin the two ends that are reachable without one — what `ValidationBehavior` throws, and
+/// what `ApiResponse.Failure` makes of it. The middleware hop between them
+/// (`ExceptionHandlingMiddleware.cs:74-78,104-107`) is read, not executed, and in Development it
+/// substitutes `exception.ToString()` for the message.
 /// </summary>
 public class UpdateStaffValidationContractTests
 {
@@ -191,6 +228,12 @@ public class UpdateStaffValidationContractTests
         thrown.Which.Message.Should().Contain("; ");
         thrown.Which.Message.Should().Contain("Password must be at least 8 characters long");
         thrown.Which.Message.Should().Contain("Password must contain at least one uppercase letter");
+
+        // …and the other end of the mapping: that single message becomes a single-element errors[],
+        // which is the fact the frontend's field routing actually depends on.
+        var body = ApiResponse<object>.Failure(thrown.Which.Message, thrown.Which.Message);
+        body.Errors.Should().ContainSingle("per-rule entries never survive to the client — issue #291");
+        body.Errors![0].Should().Contain("; ");
     }
 
     [Fact]

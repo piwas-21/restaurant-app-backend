@@ -89,21 +89,38 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         existingUser.PhoneNumber = command.PhoneNumber;
         existingUser.Role = command.Role;
 
-        // Update email if changed
+        // Every `IdentityResult` below used to be discarded, so a refused change was reported as a
+        // successful one. That is not theoretical for the password: `StrongPasswordValidator`
+        // (Program.cs:173) adds a repeated-character rule and a common-password list that the
+        // FluentValidation rules do NOT have, so e.g. "Aa1!aaaa" passes every rule in
+        // `PasswordRules`, is rejected by Identity for the "aaaa" run, and the admin was told the
+        // password had been changed while it stayed as it was.
         if (existingUser.Email != command.Email)
         {
             var emailToken = await _userManager.GenerateChangeEmailTokenAsync(existingUser, command.Email);
-            await _userManager.ChangeEmailAsync(existingUser, command.Email, emailToken);
+            var emailResult = await _userManager.ChangeEmailAsync(existingUser, command.Email, emailToken);
+            if (!emailResult.Succeeded)
+            {
+                return IdentityFailure(emailResult, "Email could not be updated");
+            }
         }
 
         // Update password only if provided
         if (!string.IsNullOrWhiteSpace(command.Password))
         {
             string resetToken = await _userManager.GeneratePasswordResetTokenAsync(existingUser);
-            await _userManager.ResetPasswordAsync(existingUser, resetToken, command.Password);
+            var passwordResult = await _userManager.ResetPasswordAsync(existingUser, resetToken, command.Password);
+            if (!passwordResult.Succeeded)
+            {
+                return IdentityFailure(passwordResult, "Password could not be updated");
+            }
         }
 
-        await _userManager.UpdateAsync(existingUser);
+        var updateResult = await _userManager.UpdateAsync(existingUser);
+        if (!updateResult.Succeeded)
+        {
+            return IdentityFailure(updateResult, "Update failed");
+        }
 
         // Rotate tokens so the caller gets a fresh, usable pair
         var accessToken = _tokenService.GenerateAccessToken(existingUser);
@@ -128,4 +145,15 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         // the server's own success text told the admin they had just created the user they edited.
         return ApiResponse<AuthResponse>.SuccessWithData(authResponse, $"User updated successfully with role {command.Role}");
     }
+
+    /// <summary>
+    /// Identity's own reasons, as a list — the shape that reaches the client as a real
+    /// multi-entry <c>errors[]</c> (`RegisterStaffCommand` does the same). Note this is NOT the
+    /// shape a FluentValidation failure takes: those are joined into one string long before here
+    /// (issue #291).
+    /// </summary>
+    private static ApiResponse<AuthResponse> IdentityFailure(IdentityResult result, string message) =>
+        ApiResponse<AuthResponse>.Failure(
+            result.Errors.Select(e => e.Description).ToList(),
+            message);
 }
