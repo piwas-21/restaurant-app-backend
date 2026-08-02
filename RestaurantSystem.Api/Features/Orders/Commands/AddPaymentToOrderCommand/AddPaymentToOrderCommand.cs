@@ -127,11 +127,14 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
             return ApiResponse<OrderDto>.Failure("Order not found after payment");
         }
 
-        // Now calculate from the fresh data
-        var completedPayments = order.Payments.Where(p => p.Status == PaymentStatus.Completed).Sum(p => p.Amount);
+        // Now calculate from the fresh data. Captured, not Completed: an order
+        // can already carry a refunded payment when a new tender is added, and
+        // subtracting its refund from a sum it was excluded from would push
+        // TotalPaid below what the till actually holds.
+        var capturedPayments = order.Payments.Where(p => p.Status.IsCaptured()).Sum(p => p.Amount);
         var refundedAmounts = order.Payments.Where(p => p.RefundedAmount.HasValue).Sum(p => p.RefundedAmount ?? 0);
 
-        order.TotalPaid = completedPayments - refundedAmounts;
+        order.TotalPaid = capturedPayments - refundedAmounts;
         order.RemainingAmount = order.Total - order.TotalPaid;
 
         // Update payment status with proper tolerance for floating point precision

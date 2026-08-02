@@ -101,7 +101,7 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
                 total: 50m,
                 payments: new[]
                 {
-                    BuildRefundedPayment(PaymentMethod.CreditCard, 50m, refundedAmount: 20m),
+                    BuildFullyRefundedPayment(PaymentMethod.CreditCard, 50m),
                 }));
             await seed.SaveChangesAsync();
         }
@@ -112,7 +112,7 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
         report.TotalTransactions.Should().Be(1);
 
         report.Refunds.RefundCount.Should().Be(1);
-        report.Refunds.TotalRefundedAmount.Should().Be(20m);
+        report.Refunds.TotalRefundedAmount.Should().Be(50m);
 
         report.PaymentsByMethod.Should().ContainSingle();
         var card = report.PaymentsByMethod[0];
@@ -120,6 +120,71 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
         card.TransactionCount.Should().Be(1);
         card.TotalAmount.Should().Be(50m,
             "PaymentsByMethod uses Payment.Amount (gross), Refunds uses RefundedAmount — same payment, different facets");
+    }
+
+    [Fact]
+    public async Task PartiallyRefundedPayment_AppearsInBothPaymentsByMethodAndRefunds()
+    {
+        // Issue #286, READER half only. Seeding the status the corrected writer
+        // stores, the Refunds assertion below is the one that fails without the
+        // fix — it used to filter on IsRefunded, which is set only for a FULL
+        // refund, so the CHF 20 that left the till was never counted.
+        //
+        // The PaymentsByMethod assertion does NOT fail without the fix and is
+        // not claimed to: the old filter listed PartiallyRefunded explicitly,
+        // so it is the same set IsCaptured() names. That half of the defect
+        // lived entirely in the WRITER, which stored PartiallyPaid instead —
+        // see RefundPaymentCommandHandlerTests for the seam test that pins the
+        // two ends agreeing.
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.Orders.Add(BuildOrder(
+                "ZR-PARTREF",
+                StartOfDay.AddHours(12),
+                OrderStatus.Completed,
+                subTotal: 50m,
+                total: 50m,
+                payments: new[]
+                {
+                    BuildPartiallyRefundedPayment(PaymentMethod.CreditCard, 50m, refundedAmount: 20m),
+                }));
+            await seed.SaveChangesAsync();
+        }
+
+        var report = await RunHandlerAsync();
+
+        report.Refunds.RefundCount.Should().Be(1);
+        report.Refunds.TotalRefundedAmount.Should().Be(20m);
+
+        report.PaymentsByMethod.Should().ContainSingle();
+        report.PaymentsByMethod[0].PaymentMethod.Should().Be(nameof(PaymentMethod.CreditCard));
+        report.PaymentsByMethod[0].TotalAmount.Should().Be(50m, "the gross charge is unchanged by a refund");
+    }
+
+    [Fact]
+    public async Task PendingPayment_ExcludedFromPaymentsByMethod()
+    {
+        // The other side of IsCaptured: cash stays Pending until a cashier
+        // completes it, and money not yet taken must not appear in the day's
+        // takings. Pinned because the captured set is now shared with the
+        // order's TotalPaid arithmetic, where the same mistake would overstate
+        // what the till holds.
+        await using (var seed = _fixture.CreateContext())
+        {
+            seed.Orders.Add(BuildOrder(
+                "ZR-PEND",
+                StartOfDay.AddHours(9),
+                OrderStatus.Confirmed,
+                subTotal: 30m,
+                total: 30m,
+                payments: new[] { BuildPayment(PaymentMethod.Cash, 30m, PaymentStatus.Pending) }));
+            await seed.SaveChangesAsync();
+        }
+
+        var report = await RunHandlerAsync();
+
+        report.TotalTransactions.Should().Be(1, "the order is still a sale");
+        report.PaymentsByMethod.Should().BeEmpty("a Pending tender has not been taken");
     }
 
     [Fact]
@@ -402,7 +467,12 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             CreatedBy = "GetZReportQueryHandlerTests",
         };
 
-    private static OrderPayment BuildRefundedPayment(PaymentMethod method, decimal amount, decimal refundedAmount)
+    /// <summary>
+    /// A payment refunded in full — the shape <c>RefundPaymentCommand</c>
+    /// writes when <c>RefundAmount == Amount</c>: <c>IsRefunded</c> set,
+    /// <c>RefundedAmount</c> equal to the charge, status <c>Refunded</c>.
+    /// </summary>
+    private static OrderPayment BuildFullyRefundedPayment(PaymentMethod method, decimal amount)
         => new()
         {
             Id = Guid.NewGuid(),
@@ -411,6 +481,28 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             Status = PaymentStatus.Refunded,
             PaymentDate = DateTime.UtcNow,
             IsRefunded = true,
+            RefundedAmount = amount,
+            RefundDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "GetZReportQueryHandlerTests",
+        };
+
+    /// <summary>
+    /// A payment refunded in part. <c>IsRefunded</c> stays <b>false</b> — the
+    /// writer only sets it when the whole charge goes back — which is exactly
+    /// why the Refunds aggregate keys on <c>RefundedAmount</c> and not on that
+    /// flag. Note this fixture is reachable: it is byte-for-byte what
+    /// <c>RefundPaymentCommand</c> now persists for a partial refund.
+    /// </summary>
+    private static OrderPayment BuildPartiallyRefundedPayment(PaymentMethod method, decimal amount, decimal refundedAmount)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            PaymentMethod = method,
+            Amount = amount,
+            Status = PaymentStatus.PartiallyRefunded,
+            PaymentDate = DateTime.UtcNow,
+            IsRefunded = false,
             RefundedAmount = refundedAmount,
             RefundDate = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
