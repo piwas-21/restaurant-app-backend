@@ -124,6 +124,8 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
             Expiration = _tokenService.GetAccessTokenExpiration()
         };
 
-        return ApiResponse<AuthResponse>.SuccessWithData(authResponse, $"User registered successfully with role {command.Role}");
+        // Said "registered" on an UPDATE — copied from RegisterStaffCommand. Any client that shows
+        // the server's own success text told the admin they had just created the user they edited.
+        return ApiResponse<AuthResponse>.SuccessWithData(authResponse, $"User updated successfully with role {command.Role}");
     }
 }

@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+using FluentValidation;
+using RestaurantSystem.Api.Common.Validation;
 
 namespace RestaurantSystem.Api.Features.User.Commands.UpdateStaffCommand;
 
@@ -18,13 +19,16 @@ public class UpdateStaffCommandValidator : AbstractValidator<UpdateStaffCommand>
             .NotEmpty().WithMessage("Email is required")
             .EmailAddress().WithMessage("Email must be a valid email address");
 
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters long")
-            .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter")
-            .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter")
-            .Matches("[0-9]").WithMessage("Password must contain at least one digit")
-            .Matches("[^a-zA-Z0-9]").WithMessage("Password must contain at least one special character");
+        // The password is OPTIONAL on an update — `UpdateStaffCommand.Password` is `string?` and the
+        // handler changes it only `if (!string.IsNullOrWhiteSpace(command.Password))`. This validator
+        // required it anyway (a `NotEmpty()` copied in with the strength chain), so an admin editing
+        // only a name, email, phone or role was refused by all six password rules at once and the
+        // edit could not be saved at all (issue #290). Strength is still enforced on a password that
+        // IS supplied — the guard mirrors the handler's condition exactly so the two cannot disagree.
+        When(x => !string.IsNullOrWhiteSpace(x.Password), () =>
+        {
+            RuleFor(x => x.Password).MeetsPasswordPolicy();
+        });
 
         RuleFor(x => x.Role)
             .IsInEnum().WithMessage("Invalid role specified");
