@@ -62,8 +62,10 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
 
         var previousStatus = order.Status.ToString();
 
-        // Validate status transition
-        if (!IsValidStatusTransition(order.Status, command.NewStatus))
+        // Validate status transition. The table lives in the Domain layer —
+        // OrderStatusTransitions — because it is a pure rule about the enum and
+        // it is what the frontend mirrors.
+        if (!OrderStatusTransitions.IsValid(order.Status, command.NewStatus))
         {
             return ApiResponse<OrderDto>.Failure($"Cannot transition from {order.Status} to {command.NewStatus}");
         }
@@ -179,21 +181,5 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
             order.OrderNumber, statusHistory.FromStatus, statusHistory.ToStatus, _currentUserService.UserId);
 
         return ApiResponse<OrderDto>.SuccessWithData(orderDto, "Order status updated successfully");
-    }
-
-    private bool IsValidStatusTransition(OrderStatus currentStatus, OrderStatus newStatus)
-    {
-        return currentStatus switch
-        {
-            OrderStatus.Pending => newStatus is OrderStatus.Confirmed or OrderStatus.Cancelled or OrderStatus.PendingApproval,
-            OrderStatus.PendingApproval => newStatus is OrderStatus.Confirmed or OrderStatus.Cancelled,
-            OrderStatus.Confirmed => newStatus is OrderStatus.Preparing or OrderStatus.Cancelled,
-            OrderStatus.Preparing => newStatus is OrderStatus.Ready or OrderStatus.Cancelled,
-            OrderStatus.Ready => newStatus is OrderStatus.OutForDelivery or OrderStatus.Completed or OrderStatus.Cancelled,
-            OrderStatus.OutForDelivery => newStatus is OrderStatus.Completed or OrderStatus.Cancelled,
-            OrderStatus.Completed => false, // Cannot change from completed
-            OrderStatus.Cancelled => false, // Cannot change from cancelled
-            _ => false
-        };
     }
 }
