@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+using FluentValidation;
+using RestaurantSystem.Api.Common.Validation;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ResetPasswordCommand;
 
@@ -13,13 +14,14 @@ public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordComm
         RuleFor(x => x.Token)
             .NotEmpty().WithMessage("Reset token is required");
 
+        // The strength messages here were already byte-identical to the shared ones, so this is a
+        // pure extraction. Only the "required" message differs, and it stays at the callsite where
+        // requiredness belongs. `ChangePasswordCommandValidator` is the one copy NOT swept up — its
+        // wording has already drifted and it carries a MaximumLength(100) nothing else enforces, so
+        // unifying it changes user-facing text (issue #292).
         RuleFor(x => x.NewPassword)
             .NotEmpty().WithMessage("New password is required")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters long")
-            .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter")
-            .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter")
-            .Matches("[0-9]").WithMessage("Password must contain at least one digit")
-            .Matches("[^a-zA-Z0-9]").WithMessage("Password must contain at least one special character");
+            .MeetsPasswordPolicy();
 
         RuleFor(x => x.ConfirmPassword)
             .NotEmpty().WithMessage("Confirm password is required")
