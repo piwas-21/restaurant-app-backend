@@ -51,10 +51,18 @@ public class UpdateBasketItemCommandHandler : ICommandHandler<UpdateBasketItemCo
             _logger.LogWarning(ex, "Failed to update basket item");
             return ApiResponse<BasketDto>.Failure(ex.Message);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error updating basket item");
-            return ApiResponse<BasketDto>.Failure("An error occurred while updating basket item");
-        }
+
+        // NOTE: there is deliberately no catch-all handler for Exception below this point — the same
+        // removal `AddToBasketCommandHandler` already carries, and for the same reason. The one that
+        // used to sit here turned EVERY failure into HTTP 200 plus success:false and replaced the
+        // message with "An error occurred while updating basket item", so the two 404s this endpoint
+        // can raise — "Basket not found" (the row is gone: reaped by BasketCleanupService, or an
+        // expired session) and "Basket item not found" (the guest removed it in another tab) —
+        // arrived at the client as one indistinguishable generic string. The client could not tell
+        // them apart, so it could not resync on the benign one or report the real one; its
+        // already-gone recovery was dead code, because `getErrorMessage` returns null for a 200.
+        // Both now reach the exception middleware and carry ErrorCodes.BasketNotFound /
+        // BasketItemNotFound (frontend issue #415), and genuinely unexpected failures surface as
+        // 500 instead of masquerading as a handled one.
     }
 }

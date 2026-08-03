@@ -41,10 +41,11 @@ public class RemoveFromBasketCommandHandler : ICommandHandler<RemoveFromBasketCo
             _logger.LogWarning(ex, "Failed to remove item from basket");
             return ApiResponse<BasketDto>.Failure(ex.Message);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error removing item from basket");
-            return ApiResponse<BasketDto>.Failure("An error occurred while removing item from basket");
-        }
+
+        // NOTE: no catch-all for Exception, for the reason spelled out in
+        // `UpdateBasketItemCommandHandler` — the two endpoints share one client code path
+        // (`useCartItemMutations`), so a catch-all on either one alone would leave that path unable
+        // to tell a reaped basket from an item removed in another tab. See ErrorCodes.BasketNotFound
+        // / BasketItemNotFound and frontend issue #415.
     }
 }

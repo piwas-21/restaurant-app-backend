@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -154,14 +155,14 @@ public class BasketService : IBasketService
         var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
 
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
             .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
 
         if (basketItem == null)
-            throw new NotFoundException("Basket item not found");
+            throw new NotFoundException("Basket item not found", ErrorCodes.BasketItemNotFound);
 
         basketItem.Quantity = update.Quantity;
         basketItem.ItemTotal = basketItem.Quantity * basketItem.UnitPrice;
@@ -182,7 +183,7 @@ public class BasketService : IBasketService
         var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
 
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
@@ -190,7 +191,7 @@ public class BasketService : IBasketService
             .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
 
         if (basketItem == null)
-            throw new NotFoundException("Basket item not found");
+            throw new NotFoundException("Basket item not found", ErrorCodes.BasketItemNotFound);
 
         var basketId = basketItem.BasketId;
 
@@ -218,7 +219,7 @@ public class BasketService : IBasketService
         var userId = _currentUserService.UserId;
         var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
 
         _context.BasketItems.RemoveRange(basket.Items);
         basket.Items.Clear();
@@ -255,7 +256,7 @@ public class BasketService : IBasketService
     {
         var basket = await _basketRepository.FindBasketAsync(sessionId, _currentUserService.UserId);
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
 
         basket.PromoCode = null;
         basket.Discount = 0;

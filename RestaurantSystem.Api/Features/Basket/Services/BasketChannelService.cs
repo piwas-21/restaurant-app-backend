@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -69,7 +70,7 @@ public class BasketChannelService : IBasketChannelService
         {
             await _basketRepository.GetOrCreateBasketAsync(sessionId, userId);
             basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId)
-                ?? throw new NotFoundException("Basket not found");
+                ?? throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
         }
 
         var conflicts = await FindConflictsAsync(basket, orderType, cancellationToken);
