@@ -22,9 +22,17 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// 404 either way — so the code on the wire is the only thing worth pinning here.
 /// <para>
 /// Asserted on the RAW JSON as well as the parsed envelope, because the camelCase spelling is the
-/// contract: <c>ApiResponse.ErrorCode</c> carries <c>[JsonIgnore(WhenWritingNull)]</c> and
-/// <c>Program.cs</c> sets no global ignore condition, so serialization is what makes the field
-/// reach the client at all.
+/// contract and the exception path does NOT go through <c>Program.cs</c>'s <c>AddJsonOptions</c>:
+/// <c>ExceptionHandlingMiddleware</c> builds its own <c>JsonSerializerOptions</c> with only
+/// <c>PropertyNamingPolicy = CamelCase</c> and serializes with that. A deserialize-and-assert alone
+/// would pass on any spelling, since the test's own reader is case-insensitive.
+/// </para>
+/// <para>
+/// Every request here is ANONYMOUS. That is load-bearing, not hygiene: <c>TestAuthHandler</c>
+/// authenticates as the default Customer otherwise, and <c>BasketRepository.ApplyOwnerFilter</c>
+/// keys the lookup on UserId alone whenever a user is present — so the <c>X-Session-Id</c> header
+/// would satisfy the controller's guard and then be ignored, and the guest-with-a-reaped-session
+/// scenario these codes exist for would never be exercised.
 /// </para>
 /// </remarks>
 public class BasketNotFoundErrorCodeTests : IntegrationTestBase
@@ -39,7 +47,7 @@ public class BasketNotFoundErrorCodeTests : IntegrationTestBase
     [Fact]
     public async Task Updating_an_item_when_the_whole_basket_is_gone_is_coded_BasketNotFound()
     {
-        UseFreshSession();
+        UseFreshGuestSession();
 
         var response = await PutAsJsonAsync(
             $"/api/Basket/items/{AbsentItemId}",
@@ -51,7 +59,7 @@ public class BasketNotFoundErrorCodeTests : IntegrationTestBase
     [Fact]
     public async Task Removing_an_item_when_the_whole_basket_is_gone_is_coded_BasketNotFound()
     {
-        UseFreshSession();
+        UseFreshGuestSession();
 
         var response = await Client.DeleteAsync($"/api/Basket/items/{AbsentItemId}");
 
@@ -61,7 +69,7 @@ public class BasketNotFoundErrorCodeTests : IntegrationTestBase
     [Fact]
     public async Task Updating_an_absent_item_in_a_LIVE_basket_is_coded_BasketItemNotFound()
     {
-        UseFreshSession();
+        UseFreshGuestSession();
         await CreateBasketForSessionAsync();
 
         var response = await PutAsJsonAsync(
@@ -74,7 +82,7 @@ public class BasketNotFoundErrorCodeTests : IntegrationTestBase
     [Fact]
     public async Task Removing_an_absent_item_from_a_LIVE_basket_is_coded_BasketItemNotFound()
     {
-        UseFreshSession();
+        UseFreshGuestSession();
         await CreateBasketForSessionAsync();
 
         var response = await Client.DeleteAsync($"/api/Basket/items/{AbsentItemId}");
@@ -82,8 +90,13 @@ public class BasketNotFoundErrorCodeTests : IntegrationTestBase
         await AssertNotFoundWithCode(response, ErrorCodes.BasketItemNotFound, "Basket item not found");
     }
 
-    private void UseFreshSession()
+    /// <summary>
+    /// An anonymous guest holding a brand-new session id — the identity the whole feature is about.
+    /// See the note on the class: authenticated requests never consult the session id at all.
+    /// </summary>
+    private void UseFreshGuestSession()
     {
+        AuthenticateAsAnonymous();
         Client.DefaultRequestHeaders.Remove("X-Session-Id");
         Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString());
     }
@@ -91,7 +104,8 @@ public class BasketNotFoundErrorCodeTests : IntegrationTestBase
     /// <summary>
     /// Creates the basket ROW without needing a seeded product: §9.13 made the order-type endpoint
     /// upsert an empty basket, which is the only way to reach "basket exists, item does not"
-    /// without going through the add path and its product fixtures.
+    /// without going through the add path and its product fixtures. Keyed to the session id, since
+    /// the caller is anonymous.
     /// </summary>
     private async Task CreateBasketForSessionAsync()
     {

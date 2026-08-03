@@ -218,8 +218,13 @@ public class BasketService : IBasketService
         // that FindBasketAsync eager-loads would be discarded immediately here.
         var userId = _currentUserService.UserId;
         var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
+        // Deliberately UNCODED: `ClearBasketCommandHandler` still has the catch-all this change
+        // removed from update/remove, so DELETE /api/Basket answers 200 + success:false and no code
+        // could reach a client from here anyway. Tagging it would put a promise in ErrorCodes that
+        // the wire does not keep. Left alone on purpose — clearing an already-gone basket ends with
+        // the cart empty, which is what the caller asked for, so it is not the #415 failure.
         if (basket == null)
-            throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
+            throw new NotFoundException("Basket not found");
 
         _context.BasketItems.RemoveRange(basket.Items);
         basket.Items.Clear();
@@ -255,8 +260,10 @@ public class BasketService : IBasketService
     public async Task<BasketDto> RemovePromoCodeAsync(string sessionId)
     {
         var basket = await _basketRepository.FindBasketAsync(sessionId, _currentUserService.UserId);
+        // Deliberately UNCODED: unreachable. The only route here, DELETE /api/Basket/promo-code, is
+        // a hard-coded 400 stub in BasketController — this method is never entered.
         if (basket == null)
-            throw new NotFoundException("Basket not found", ErrorCodes.BasketNotFound);
+            throw new NotFoundException("Basket not found");
 
         basket.PromoCode = null;
         basket.Discount = 0;

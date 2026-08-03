@@ -62,7 +62,13 @@ public class UpdateBasketItemCommandHandler : ICommandHandler<UpdateBasketItemCo
         // them apart, so it could not resync on the benign one or report the real one; its
         // already-gone recovery was dead code, because `getErrorMessage` returns null for a 200.
         // Both now reach the exception middleware and carry ErrorCodes.BasketNotFound /
-        // BasketItemNotFound (frontend issue #415), and genuinely unexpected failures surface as
-        // 500 instead of masquerading as a handled one.
+        // BasketItemNotFound (frontend issue #415), and an unexpected failure surfaces as a 500
+        // instead of masquerading as a handled one.
+        //
+        // The `InvalidOperationException` catch above is NOT part of that and still answers 200 +
+        // success:false with `ex.Message`: EF raises it for tracking conflicts and "Sequence
+        // contains no elements", and ObjectDisposedException derives from it. So the 200 shape
+        // survives for those, and the client still reads them through `!response.data` rather than
+        // as an ApiError — the same residual case `basketService.ts` documents on the add path.
     }
 }

@@ -43,9 +43,10 @@ public class RemoveFromBasketCommandHandler : ICommandHandler<RemoveFromBasketCo
         }
 
         // NOTE: no catch-all for Exception, for the reason spelled out in
-        // `UpdateBasketItemCommandHandler` — the two endpoints share one client code path
-        // (`useCartItemMutations`), so a catch-all on either one alone would leave that path unable
-        // to tell a reaped basket from an item removed in another tab. See ErrorCodes.BasketNotFound
-        // / BasketItemNotFound and frontend issue #415.
+        // `UpdateBasketItemCommandHandler` — including what the `InvalidOperationException` catch
+        // above still does. Leaving one here would have cost REMOVE the ability to tell a reaped
+        // basket from an item removed in another tab; update would have been unaffected. The two
+        // endpoints share one client path (`useCartItemMutations`), which is the blast radius, not
+        // the mechanism. See ErrorCodes.BasketNotFound / BasketItemNotFound and frontend #415.
     }
 }
