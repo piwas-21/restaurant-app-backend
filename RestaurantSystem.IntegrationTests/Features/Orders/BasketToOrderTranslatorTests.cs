@@ -78,6 +78,53 @@ public class BasketToOrderTranslatorTests
         child.SpecialInstructions.Should().Be("No ice");
     }
 
+    // Issue #150 — the last untested link in the bundle-child customization chain.
+    //
+    // #150's coverage was written against the FRONTEND util that built childItems with explicit-0
+    // removals; slice 5 deleted that util and moved the job here, so the producer those tests
+    // pinned no longer exists. What was left pinned the zeroing on a TOP-LEVEL item only
+    // (BuildIngredientQuantities_ZeroesDeselected_AndOmitsWhenEmpty) and pinned a bundle child's
+    // price and instructions but never its IngredientQuantities
+    // (MapsBundleChild_ForcesZeroCustomizationPrice_AndKeepsInstructions). Neither holds the
+    // combination the issue is actually about.
+    //
+    // An explicit 0 is the whole mechanism: OrderMappingService derives IsRemoved from quantity == 0,
+    // which is what makes the kitchen ticket print "NO Cheese" for a bundle child. Dropping the key
+    // instead of zeroing it reads as "not customized" and the removal never reaches the kitchen.
+    [Fact]
+    public void MapsBundleChild_ZeroesItsOwnDeselectedIngredients()
+    {
+        var kept = Guid.NewGuid();
+        var removed = Guid.NewGuid();
+        var basketItems = new List<BasketItemDto>
+        {
+            new()
+            {
+                ProductId = Guid.NewGuid(),
+                Quantity = 1,
+                UnitPrice = 12.98m,
+                ChildItems = new List<BasketItemDto>
+                {
+                    new()
+                    {
+                        ProductId = Guid.NewGuid(),
+                        Quantity = 1,
+                        UnitPrice = 1.99m,
+                        IngredientQuantities = new Dictionary<Guid, int> { [kept] = 2, [removed] = 1 },
+                        SelectedIngredients = new List<Guid> { kept },
+                    }
+                }
+            }
+        };
+
+        var child = _translator.Translate(basketItems).Single().ChildItems!.Single();
+
+        child.IngredientQuantities.Should().NotBeNull("a child's customizations must survive the hop");
+        child.IngredientQuantities![kept].Should().Be(2);
+        child.IngredientQuantities[removed].Should().Be(
+            0, "a deselected ingredient on a CHILD is zeroed, not dropped — that 0 is what OrderMappingService turns into IsRemoved");
+    }
+
     [Fact]
     public void BuildIngredientQuantities_ZeroesDeselected_AndOmitsWhenEmpty()
     {
