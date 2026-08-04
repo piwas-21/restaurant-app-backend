@@ -255,14 +255,19 @@ public class BasketRemovedIngredientNamesTests : IntegrationTestBase
     }
 
     // THE RE-ORDER PAYLOAD. `useReorder` posts product + quantity and NOTHING else — no
-    // selectedIngredients, no ingredientQuantities. LineCustomizationBuilder's regular-item branch
-    // backfills anyway (it guards only on the product having ingredients, unlike its bundle-child
-    // branch), and with an empty selection set that writes 0 for every active base-recipe
-    // ingredient. So the saved line looks identical to one where the guest stripped the pizza bare.
+    // selectedIngredients, no ingredientQuantities.
     //
-    // Without the SelectedIngredients gate, a guest re-ordering their usual Margherita would be
-    // told they had removed the cheese and the basil. This is the one payload where the saved
-    // zeroes are not evidence of anything.
+    // This test used to assert, as its premise, that LineCustomizationBuilder backfilled a 0 for
+    // every unselected active optional-or-included ingredient regardless — which it did, because its regular-item
+    // branch guarded only on the product having ingredients while its bundle-child branch guarded
+    // on the selection. The cart was honest only because BuildRemovedIngredientNames refused to
+    // read a selection-less map. Those zeroes still reached the ORDER, so the kitchen ticket
+    // printed "NO Cheese" for a re-ordered Margherita (#303, fixed at the builder).
+    //
+    // So the premise is inverted, not dropped: nothing is written at all now. The gate this test
+    // was named for is no longer what saves the re-order payload — see
+    // QuantitiesWithoutASelection_ReportNoRemovals for what still exercises it, and
+    // ReorderKitchenTicketTests for the order/kitchen-ticket leg.
     [Fact]
     public async Task ReorderStyleAdd_WithNoSelection_ReportsNoRemovals()
     {
@@ -278,14 +283,64 @@ public class BasketRemovedIngredientNamesTests : IntegrationTestBase
         var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(response);
         var line = basket!.Data!.Items.Single(i => i.ProductId == _testPizza.Id);
 
-        // The premise, asserted rather than assumed: the backfill really did write zeroes for
-        // base-recipe ingredients. Without this the test could pass because nothing was saved at
-        // all, which would prove nothing about the gate.
+        // THE PREMISE, and it has to be measured rather than echoed: both assertions below are
+        // "nothing is there", so they hold just as well for a pizza with no ingredients at all.
+        // Counting the rows a backfill WOULD have zeroed is what makes a null answer meaningful.
+        //
+        // It does NOT rule out the other way this could go quietly vacuous — the add path dropping
+        // its `.Include(p => p.DetailedIngredients)`, which would starve the backfill of input
+        // while this count, on its own DbContext, still reported 3. The sibling
+        // UnselectedPaidAddOn_IsNotReportedAsRemoved is what would fail then, because it asserts a
+        // backfilled 0 is present in the response.
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var backfillable = await context.ProductIngredients.CountAsync(pi =>
+                pi.ProductId == _testPizza.Id && pi.IsActive && (pi.IsOptional || pi.IsIncludedInBasePrice));
+            backfillable.Should().BeGreaterThan(0,
+                "otherwise there is nothing the builder could have fabricated and this proves nothing");
+        }
+
+        line.IngredientQuantities.Should().BeNull(
+            "a payload that expressed no ingredient choice must not be given one (#303)");
+        line.RemovedIngredientNames.Should().BeNull("the guest expressed no selection, so nothing was removed");
+    }
+
+    // The gate itself, on the one payload that can still reach it: an explicit quantity map posted
+    // WITHOUT a selection list. That is persisted verbatim by the builder's first arm — #303 gated
+    // the backfill, not this — so the cart really does hold a zero-for-a-base-recipe-ingredient
+    // here, and declines to call it a removal because no selection vouches for it.
+    //
+    // Pinned because it is the divergence: the ORDER view reads the same saved 0 as a removal
+    // (ReorderKitchenTicketTests.ExplicitQuantityMap_WithoutASelection_StillReachesTheOrder). No
+    // live producer posts this shape — the customization sheet always sends a selection — and
+    // which of the two is right is the standing cart-vs-order question in IngredientRecipeRules'
+    // remarks, not something to settle here.
+    [Fact]
+    public async Task QuantitiesWithoutASelection_ReportNoRemovals()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        var response = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _testPizza.Id,
+            Quantity = 1,
+            IngredientQuantities = new Dictionary<Guid, int> { [_cheese.Id] = 0 }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(response);
+        var line = basket!.Data!.Items.Single(i => i.ProductId == _testPizza.Id);
+
+        // The premise: the map really is on the line, and it really does carry a 0 for an
+        // ingredient the base-recipe rule would otherwise call removed.
         line.IngredientQuantities.Should().NotBeNull();
         line.IngredientQuantities![_cheese.Id].Should().Be(0);
-        line.IngredientQuantities[_basil.Id].Should().Be(0);
+        // BeNull, not BeNullOrEmpty: the gate tests for null specifically, and an EMPTY selection
+        // would fall straight through it and report ["Cheese"].
+        line.SelectedIngredients.Should().BeNull();
 
-        line.RemovedIngredientNames.Should().BeNull("the guest expressed no selection, so a saved 0 is not a removal");
+        line.RemovedIngredientNames.Should().BeNull("no selection vouches for the saved 0");
     }
 
     // A line nobody customized says nothing, rather than adding an empty array to every plain item

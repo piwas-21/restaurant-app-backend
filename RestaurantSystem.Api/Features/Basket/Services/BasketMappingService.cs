@@ -244,16 +244,20 @@ public class BasketMappingService : IBasketMappingService
     /// (They are not yet identical: the order view ALSO reports a required ingredient that is
     /// absent from the map, and this does not. That gap is tracked separately.)
     ///
-    /// <para><b><paramref name="selectedIngredients"/> is the gate, and it is not defensive.</b>
-    /// A saved quantity map is not evidence of a choice. When a line arrives with no selection at
-    /// all — which is exactly what re-order does, posting only product/quantity
-    /// (<c>useReorder.ts</c>) — <c>LineCustomizationBuilder</c>'s regular-item branch still
-    /// backfills, and with an empty selection set that writes 0 for EVERY active base-recipe
-    /// ingredient. Reading those back would tell a guest re-ordering a Margherita that they had
-    /// removed the cheese and the basil. The bundle-child branch of that builder already guards on
-    /// the same signal; the regular branch does not, which is a defect on the kitchen-ticket path
-    /// older and wider than this field, so it is not fixed here — but this field must not repeat
-    /// it.</para>
+    /// <para><b><paramref name="selectedIngredients"/> is the gate.</b> A saved quantity map is not
+    /// evidence of a choice, so a line that arrives with no selection at all has nothing to report.
+    /// This was load-bearing when it was written: re-order posts only product/quantity
+    /// (<c>useReorder.ts</c>) and <c>LineCustomizationBuilder</c>'s regular-item branch backfilled a
+    /// 0 for every unselected active optional-or-included ingredient anyway, so reading those back
+    /// would have told a guest re-ordering a Margherita that they had removed the cheese. (That set
+    /// is not the base recipe and is not meant to be: it is too broad by the paid add-ons, and too
+    /// narrow by the required ingredients that are NOT flagged included-in-base, which get no entry
+    /// at all and reach the order view only through its separate required-absent branch.) That
+    /// defect is now fixed at
+    /// the source (#303 — the builder's two branches gate alike), which makes this gate redundant
+    /// for the re-order payload but not dead: an explicit quantity map posted WITHOUT a selection
+    /// is still persisted verbatim, and this rule declines to read it. Keeping the gate also keeps
+    /// the cart's answer independent of which producer wrote the map.</para>
     ///
     /// <para>Null when there is nothing to say, empty when there is something to say and the answer
     /// is "nothing was removed". Both ship as JSON (no global
