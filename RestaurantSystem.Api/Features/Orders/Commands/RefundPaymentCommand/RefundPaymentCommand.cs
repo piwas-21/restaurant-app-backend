@@ -69,15 +69,18 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         payment.RefundedAmount = command.RefundAmount;
         payment.RefundDate = DateTime.UtcNow;
         payment.RefundReason = command.RefundReason;
-        payment.Status = command.RefundAmount == payment.Amount ? PaymentStatus.Refunded : PaymentStatus.PartiallyPaid;
+        payment.Status = command.RefundAmount == payment.Amount ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded;
         payment.UpdatedAt = DateTime.UtcNow;
         payment.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         // TODO: Process actual refund through payment gateway
         // This would involve calling the payment provider's API
 
-        // Update order payment summary
-        order.TotalPaid = order.Payments.Where(p => p.Status == PaymentStatus.Completed).Sum(p => p.Amount)
+        // Update order payment summary. The gross sum spans every CAPTURED
+        // tender, not just Completed ones — a payment we just refunded is no
+        // longer Completed, and summing only Completed would subtract its
+        // refund without ever having added the payment.
+        order.TotalPaid = order.Payments.Where(p => p.Status.IsCaptured()).Sum(p => p.Amount)
                           - order.Payments.Where(p => p.RefundedAmount.HasValue).Sum(p => p.RefundedAmount ?? 0);
         order.RemainingAmount = order.Total - order.TotalPaid;
 

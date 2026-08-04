@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
@@ -204,51 +205,23 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             menuDef.UpdatedAt = DateTime.UtcNow;
             menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-            // Update Sections
-            if (command.MenuDefinition.Sections != null)
-            {
-                // Remove existing sections
-                if (menuDef.Sections != null)
-                {
-                    _context.MenuSections.RemoveRange(menuDef.Sections);
-                }
+            // Update Sections — a full replace, like every other field on this PUT.
+            //
+            // The null-check on Sections that used to wrap this block was DEAD (#191):
+            // MenuDefinitionDto.Sections carried an initializer, so an omitted key
+            // deserialized to `[]` and took the wipe branch — the RemoveRange ran and the loop
+            // re-added nothing. Every payload except an explicit JSON `null` (which no client
+            // sends) therefore erased every section.
+            //
+            // Fixed at the contract instead of the branch: the property lost its initializer and
+            // MenuBundleCommandValidatorBase now requires the key, so an omission is a 400. That
+            // makes null unreachable here — but the throw is what keeps it unreachable SAFELY. A
+            // `?? []` would silently restore the exact wipe this fixes, and a `!` would trade a
+            // 400 for a 500.
+            var sections = command.MenuDefinition.Sections
+                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 
-                foreach (var sectionDto in command.MenuDefinition.Sections)
-                {
-                    var section = new MenuSection
-                    {
-                        MenuDefinition = menuDef, // EF Core will handle the ID link
-                        Name = sectionDto.Name,
-                        Description = sectionDto.Description,
-                        DisplayOrder = sectionDto.DisplayOrder,
-                        IsRequired = sectionDto.IsRequired,
-                        MinSelection = sectionDto.MinSelection,
-                        MaxSelection = sectionDto.MaxSelection,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-
-                    _context.MenuSections.Add(section);
-
-                    if (sectionDto.Items != null)
-                    {
-                        foreach (var itemDto in sectionDto.Items)
-                        {
-                            var item = new MenuSectionItem
-                            {
-                                MenuSection = section,
-                                ProductId = itemDto.ProductId,
-                                AdditionalPrice = itemDto.AdditionalPrice,
-                                DisplayOrder = itemDto.DisplayOrder,
-                                IsDefault = itemDto.IsDefault,
-                                CreatedAt = DateTime.UtcNow,
-                                CreatedBy = _currentUserService.GetAuditIdentifier()
-                            };
-                            _context.MenuSectionItems.Add(item);
-                        }
-                    }
-                }
-            }
+            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

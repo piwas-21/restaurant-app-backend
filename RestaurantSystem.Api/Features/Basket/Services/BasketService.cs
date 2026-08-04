@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -13,6 +14,20 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 
 public class BasketService : IBasketService
 {
+    /// <summary>
+    /// The sentence for a basket row that is not there, used by all four throw sites below.
+    /// </summary>
+    /// <remarks>
+    /// A constant for the TEXT only — it is not the discriminator. Two of the four sites pair it
+    /// with <see cref="ErrorCodes.BasketNotFound"/> and two deliberately do not (see the comment at
+    /// each), so sharing the string must not be read as sharing the contract. Clients branch on the
+    /// code; this literal is free to change or be localised.
+    /// </remarks>
+    private const string BasketNotFoundMessage = "Basket not found";
+
+    /// <summary>The sentence for an addressed item that is not in an existing basket.</summary>
+    private const string BasketItemNotFoundMessage = "Basket item not found";
+
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly IBasketMappingService _basketMappingService;
@@ -154,14 +169,14 @@ public class BasketService : IBasketService
         var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
 
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException(BasketNotFoundMessage, ErrorCodes.BasketNotFound);
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
             .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
 
         if (basketItem == null)
-            throw new NotFoundException("Basket item not found");
+            throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
 
         basketItem.Quantity = update.Quantity;
         basketItem.ItemTotal = basketItem.Quantity * basketItem.UnitPrice;
@@ -182,7 +197,7 @@ public class BasketService : IBasketService
         var basket = await _basketRepository.FindBasketAsync(sessionId, userId);
 
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException(BasketNotFoundMessage, ErrorCodes.BasketNotFound);
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
@@ -190,7 +205,7 @@ public class BasketService : IBasketService
             .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
 
         if (basketItem == null)
-            throw new NotFoundException("Basket item not found");
+            throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
 
         var basketId = basketItem.BasketId;
 
@@ -217,8 +232,13 @@ public class BasketService : IBasketService
         // that FindBasketAsync eager-loads would be discarded immediately here.
         var userId = _currentUserService.UserId;
         var basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId);
+        // Deliberately UNCODED: `ClearBasketCommandHandler` still has the catch-all this change
+        // removed from update/remove, so DELETE /api/Basket answers 200 + success:false and no code
+        // could reach a client from here anyway. Tagging it would put a promise in ErrorCodes that
+        // the wire does not keep. Left alone on purpose — clearing an already-gone basket ends with
+        // the cart empty, which is what the caller asked for, so it is not the #415 failure.
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException(BasketNotFoundMessage);
 
         _context.BasketItems.RemoveRange(basket.Items);
         basket.Items.Clear();
@@ -254,8 +274,10 @@ public class BasketService : IBasketService
     public async Task<BasketDto> RemovePromoCodeAsync(string sessionId)
     {
         var basket = await _basketRepository.FindBasketAsync(sessionId, _currentUserService.UserId);
+        // Deliberately UNCODED: unreachable. The only route here, DELETE /api/Basket/promo-code, is
+        // a hard-coded 400 stub in BasketController — this method is never entered.
         if (basket == null)
-            throw new NotFoundException("Basket not found");
+            throw new NotFoundException(BasketNotFoundMessage);
 
         basket.PromoCode = null;
         basket.Discount = 0;

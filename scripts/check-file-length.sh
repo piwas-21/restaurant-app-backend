@@ -33,8 +33,11 @@ BASELINE_PATH="scripts/file-length-baseline.txt"
 limit_for_path() {
   local p="$1"
   case "$p" in
-    # Validators are also Commands/Queries — match validators first.
-    *Validator.cs)                                                   echo 60 ;;
+    # Validators are also Commands/Queries — match validators first. *ValidatorBase.cs is matched
+    # explicitly for the same reason *ControllerBase.cs is below: a shared validator base holds
+    # validation rules by every measure the limit cares about, but `*Validator.cs` does not match
+    # it, so it could grow without bound while the validators deriving from it stayed compliant.
+    *Validator.cs|*ValidatorBase.cs)                                 echo 60 ;;
     # DTOs (path contains /Dtos/)
     */Dtos/*.cs)                                                     echo 60 ;;
     # Configuration / settings classes

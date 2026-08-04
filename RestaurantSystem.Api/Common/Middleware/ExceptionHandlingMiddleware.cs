@@ -77,9 +77,10 @@ public class ExceptionHandlingMiddleware
                 errorCode = badRequestEx.ErrorCode;
                 break;
 
-            case NotFoundException:
+            case NotFoundException notFoundEx:
                 statusCode = HttpStatusCode.NotFound;
                 message = exception.Message;
+                errorCode = notFoundEx.ErrorCode;
                 break;
 
             case ArgumentException:

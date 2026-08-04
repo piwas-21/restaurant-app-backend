@@ -1,5 +1,7 @@
 using FluentValidation;
 using RestaurantSystem.Api.Common.Validation;
+using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 
@@ -23,5 +25,26 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
                 !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
             .WithMessage("Primary category must be one of the selected categories");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
+
+        // Mirrors MenuBundleCommandValidatorBase (#191). MenuDefinition itself stays optional here
+        // — absent means "no menu instruction" — but once one IS sent for a Menu, its sections are
+        // a full replace like every other field on it, so the key is required and `[]` alone
+        // clears them.
+        //
+        // The rule is deliberately WIDER than the code it protects: the handler's section block
+        // additionally sits inside a detailed-ingredients null check (see #296), so a Menu-type
+        // payload that omits detailedIngredients now 400s where it previously 200'd without
+        // touching sections. Unreachable from the admin editor, which always sends the array — and
+        // narrowing this rule to match would make it silently stop protecting the moment that
+        // nesting is corrected.
+        //
+        // Written as a Must on MenuDefinition itself, with the null case passing INSIDE the
+        // predicate, so no null-forgiving operator is needed and no accessor can dereference a
+        // null: MenuDefinition stays optional here (absent = "no menu instruction"), and only a
+        // definition that IS sent must carry its sections.
+        RuleFor(x => x.MenuDefinition)
+            .Must(menuDefinition => menuDefinition is null || menuDefinition.Sections != null)
+            .WithMessage(MenuDefinitionDto.SectionsRequiredMessage)
+            .When(x => x.Type == ProductType.Menu);
     }
 }

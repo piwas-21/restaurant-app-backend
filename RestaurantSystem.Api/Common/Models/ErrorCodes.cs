@@ -34,4 +34,29 @@ public static class ErrorCodes
     /// apart from "that reservation id does not exist" — both are 404 on the wire.
     /// </summary>
     public const string ModuleNotEnabled = "ModuleNotEnabled";
+
+    /// <summary>
+    /// Returned by <c>PUT|DELETE /api/Basket/items/{id}</c> with a 404 when the BASKET ROW itself is
+    /// gone — the cleanup service reaped it, or the session id expired — so the request never got as
+    /// far as looking at an item. A real failure the guest must be told about: the client cannot
+    /// silently resync, because <c>GetBasketQuery</c> answers a missing basket with an empty basket
+    /// and a SUCCESS, so resyncing here replaces the whole cart with "Your cart is empty".
+    /// </summary>
+    /// <remarks>
+    /// Scoped to those two endpoints on purpose. <c>BasketService</c> raises the same
+    /// "Basket not found" from <c>ClearBasketAsync</c> and <c>RemovePromoCodeAsync</c>, and both are
+    /// left UNCODED: the first is still wrapped by a catch-all handler that answers 200, and the
+    /// second sits behind a stub route, so a code on either could never reach a client. Each throw
+    /// site carries a comment saying so. Tag them when that stops being true, not before.
+    /// </remarks>
+    public const string BasketNotFound = "BasketNotFound";
+
+    /// <summary>
+    /// Returned by <c>PUT|DELETE /api/Basket/items/{id}</c> with a 404 when the basket exists but
+    /// the addressed ITEM does not — normally because the guest already removed it in another tab.
+    /// This is the one basket 404 a client may treat as benign and recover from by resyncing.
+    /// Paired with <see cref="BasketNotFound"/>: both are a 404 on the same endpoint, and telling
+    /// them apart is the entire reason these two codes exist (frontend issue #415).
+    /// </summary>
+    public const string BasketItemNotFound = "BasketItemNotFound";
 }

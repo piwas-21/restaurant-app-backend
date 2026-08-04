@@ -61,9 +61,17 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
     {
         // Pending Cash payments don't count toward TotalPaid until they're
         // explicitly completed.
+        //
+        // Captured-minus-refunded is the one definition of "money we hold",
+        // shared with the refund and add-payment handlers. Today this method is
+        // only ever called at order CREATION, where no payment can carry a
+        // refund and the refund term is always zero — but it is the method
+        // named for recomputing the summary, so the next caller must not find a
+        // third formula here. Issue #286 was that divergence.
         var totalPaid = order.Payments
-            .Where(p => p.Status == PaymentStatus.Completed)
-            .Sum(p => p.Amount);
+            .Where(p => p.Status.IsCaptured())
+            .Sum(p => p.Amount)
+            - order.Payments.Sum(p => p.RefundedAmount ?? 0);
 
         order.TotalPaid = totalPaid;
         order.RemainingAmount = order.Total - totalPaid;

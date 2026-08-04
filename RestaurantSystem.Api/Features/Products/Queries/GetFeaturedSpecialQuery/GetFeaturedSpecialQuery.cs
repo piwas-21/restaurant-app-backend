@@ -79,6 +79,9 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                 .Select(img => UrlJoin.Join(_baseUrl, img.Url))
                 .FirstOrDefault() ?? featuredProduct.ImageUrl,
             Availability = OrderTypeAvailability.Resolve(featuredProduct, query.RequestedOrderType),
+            // A combo can be the featured item — nothing in SetFeaturedSpecialCommand prevents it —
+            // and a client cannot tell one from a plain product without this.
+            Type = featuredProduct.Type,
             FeaturedDate = featuredProduct.FeaturedDate ?? DateTime.UtcNow,
             PreparationTimeMinutes = featuredProduct.PreparationTimeMinutes,
             Ingredients = featuredProduct.Ingredients,
