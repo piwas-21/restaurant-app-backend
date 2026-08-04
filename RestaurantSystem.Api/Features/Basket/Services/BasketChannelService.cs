@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -69,6 +70,11 @@ public class BasketChannelService : IBasketChannelService
         {
             await _basketRepository.GetOrCreateBasketAsync(sessionId, userId);
             basket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, userId)
+                // Deliberately UNCODED. ErrorCodes.BasketNotFound means "the row was reaped or the
+                // session expired — tell the guest their cart is gone", and neither can be true one
+                // line after GetOrCreateBasketAsync returned: this is the create-did-not-land
+                // invariant the comment above describes, a 500-class condition. Coding it would
+                // tell the client to show a guest-facing "your basket is gone" for an internal bug.
                 ?? throw new NotFoundException("Basket not found");
         }
 
