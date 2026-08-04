@@ -1,5 +1,6 @@
 using FluentValidation;
 using RestaurantSystem.Api.Common.Validation;
+using RestaurantSystem.Api.Features.Products.Dtos;
 
 namespace RestaurantSystem.Api.Features.Menus.Commands;
 
@@ -30,6 +31,10 @@ public abstract class MenuBundleCommandValidatorBase<T> : AbstractValidator<T> w
 
         RuleFor(x => x.MenuDefinition)
             .NotNull().WithMessage("Menu definition is required");
+
+        // Required, and the .When() is load-bearing rather than defensive — MenuDefinitionDto.Sections (#191).
+        RuleFor(x => x.MenuDefinition.Sections).NotNull()
+            .WithMessage(MenuDefinitionDto.SectionsRequiredMessage).When(x => x.MenuDefinition != null);
 
         RuleFor(x => x.CategoryIds)
             .Must(x => x == null || x.Distinct().Count() == x.Count).WithMessage("Duplicate categories are not allowed");

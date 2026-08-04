@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
@@ -129,44 +130,15 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             _context.MenuDefinitions.Add(menuDef);
 
-            if (command.MenuDefinition.Sections != null)
-            {
-                foreach (var sectionDto in command.MenuDefinition.Sections)
-                {
-                    var section = new MenuSection
-                    {
-                        MenuDefinition = menuDef,
-                        Name = sectionDto.Name,
-                        Description = sectionDto.Description,
-                        DisplayOrder = sectionDto.DisplayOrder,
-                        IsRequired = sectionDto.IsRequired,
-                        MinSelection = sectionDto.MinSelection,
-                        MaxSelection = sectionDto.MaxSelection,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
+            // Absent sections were always harmless on a create — there is nothing to erase — so
+            // this guard never cost anyone data the way its update-path twins did (#191). It is
+            // rewritten anyway because the shared MenuDefinitionDto lost its initializer and the
+            // shared MenuBundleCommandValidatorBase now requires the key on BOTH bundle commands:
+            // leaving create silently tolerant would put a second, quieter contract on one DTO.
+            var sections = command.MenuDefinition.Sections
+                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 
-                    _context.MenuSections.Add(section);
-
-                    if (sectionDto.Items != null)
-                    {
-                        foreach (var itemDto in sectionDto.Items)
-                        {
-                            var item = new MenuSectionItem
-                            {
-                                MenuSection = section,
-                                ProductId = itemDto.ProductId,
-                                AdditionalPrice = itemDto.AdditionalPrice,
-                                DisplayOrder = itemDto.DisplayOrder,
-                                IsDefault = itemDto.IsDefault,
-                                CreatedAt = DateTime.UtcNow,
-                                CreatedBy = _currentUserService.GetAuditIdentifier()
-                            };
-                            _context.MenuSectionItems.Add(item);
-                        }
-                    }
-                }
-            }
+            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
