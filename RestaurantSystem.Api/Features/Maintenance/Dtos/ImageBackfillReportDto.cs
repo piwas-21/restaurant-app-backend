@@ -21,8 +21,18 @@ public class ImageBackfillReportDto
     public long TotalNewBytes { get; set; }
     public long TotalBytesSaved { get; set; }
 
-    /// <summary>True when the scan stopped at the requested cap — re-run to continue.</summary>
+    /// <summary>True when the scan stopped at the cap. Continue with <see cref="NextCursor"/>.</summary>
     public bool Truncated { get; set; }
+
+    /// <summary>
+    /// Where to resume: pass it back as <c>continueFrom</c> to process the next window. Non-null
+    /// exactly when <see cref="Truncated"/> is true; null means the walk finished.
+    ///
+    /// <para>A bare re-run does NOT continue, which is what #280 was: the scan restarts from the
+    /// first file every time and the cap counts skips, so without this the images past the first
+    /// window were unreachable however often the endpoint was called.</para>
+    /// </summary>
+    public string? NextCursor { get; set; }
 
     public List<ImageBackfillEntryDto> Entries { get; set; } = [];
 }

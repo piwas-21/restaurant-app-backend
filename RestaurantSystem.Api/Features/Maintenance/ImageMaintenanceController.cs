@@ -17,8 +17,11 @@ public class ImageMaintenanceController : ControllerBase
 {
     /// <summary>
     /// Ceiling on <c>maxFiles</c>. The work is synchronous, so one call must stay inside a sane
-    /// request duration; a larger library is covered by re-running (already-optimised files are
-    /// skipped in a few ms each, so repeat runs converge).
+    /// request duration. A larger library is covered by paging with <c>continueFrom</c>, NOT by
+    /// re-running — this used to claim the opposite, and it was wrong twice over (#280). A bare
+    /// re-run restarts from the first file, and a "skip" is not cheap: <c>skipped-no-gain</c> is
+    /// decided only AFTER a full decode and re-encode, so a skipped file costs almost what a
+    /// rewritten one does and counts against this cap just the same.
     /// </summary>
     private const int MaxFilesPerRun = 500;
 
@@ -41,15 +44,23 @@ public class ImageMaintenanceController : ControllerBase
     public async Task<ApiResponse<ImageBackfillReportDto>> Backfill(
         [FromQuery] bool apply = false,
         [FromQuery] int maxFiles = MaxFilesPerRun,
+        [FromQuery] string? continueFrom = null,
         CancellationToken cancellationToken = default)
     {
         var capped = Math.Clamp(maxFiles, 1, MaxFilesPerRun);
-        var report = await _backfill.RunAsync(apply, capped, cancellationToken);
+        var report = await _backfill.RunAsync(apply, capped, continueFrom, cancellationToken);
 
         var message = apply
             ? $"Rewrote {report.FilesChanged} image(s), saving {report.TotalBytesSaved / 1024} KB."
             : $"Dry run: {report.FilesChanged} image(s) would shrink, saving {report.TotalBytesSaved / 1024} KB. "
               + "Compare previewUrl against originalUrl, then re-run with apply=true.";
+
+        // Said plainly, because the truncation message is what the previous behaviour got wrong:
+        // it invited a re-run that could not reach any further.
+        if (report.Truncated)
+        {
+            message += $" Stopped at the {capped}-image cap; continue with continueFrom={report.NextCursor}.";
+        }
 
         return ApiResponse<ImageBackfillReportDto>.SuccessWithData(report, message);
     }

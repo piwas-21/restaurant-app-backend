@@ -22,8 +22,6 @@ public class ImageBackfillService : IImageBackfillService
     /// </summary>
     public const string PreviewFolder = "_resize-preview";
 
-    private static readonly string[] ScannedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
-
     /// <summary>
     /// How much less dense (bytes per pixel) the output may be than the source before we stop
     /// trusting it. A silently-failed decode yields a near-empty image, which is *tiny* — so a
@@ -55,7 +53,7 @@ public class ImageBackfillService : IImageBackfillService
     }
 
     public async Task<ImageBackfillReportDto> RunAsync(
-        bool apply, int maxFiles, CancellationToken cancellationToken = default)
+        bool apply, int maxFiles, string? continueFrom = null, CancellationToken cancellationToken = default)
     {
         if (!string.Equals(_settings.Provider, "Local", StringComparison.OrdinalIgnoreCase))
         {
@@ -75,7 +73,7 @@ public class ImageBackfillService : IImageBackfillService
             return report;
         }
 
-        foreach (var path in EnumerateImages())
+        foreach (var (path, relativePath) in ImageBackfillScanner.EnumerateImages(_uploadsRoot, PreviewFolder, continueFrom))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -86,9 +84,22 @@ public class ImageBackfillService : IImageBackfillService
             }
 
             report.FilesScanned++;
-            var entry = await ProcessOneAsync(path, apply, cancellationToken);
+            var entry = await ProcessOneAsync(path, relativePath, apply, cancellationToken);
             report.Entries.Add(entry);
             Tally(report, entry);
+
+            // Advanced on EVERY processed file, skips and failures included, because the cap counts
+            // them too. A cursor that only advanced past changed files would hand back a resume
+            // point already behind the cap, and the next run would re-walk the same window forever
+            // — which is #280 with extra steps.
+            report.NextCursor = relativePath;
+        }
+
+        // Only meaningful as a resume point, and only when there is something left to resume. On a
+        // completed walk it would read as "there is more", which is the false promise this fixes.
+        if (!report.Truncated)
+        {
+            report.NextCursor = null;
         }
 
         report.TotalBytesSaved = report.TotalOriginalBytes - report.TotalNewBytes;
@@ -109,20 +120,9 @@ public class ImageBackfillService : IImageBackfillService
         return removed;
     }
 
-    private IEnumerable<string> EnumerateImages()
-    {
-        var previewRoot = Path.Combine(_uploadsRoot, PreviewFolder);
-        return Directory
-            .EnumerateFiles(_uploadsRoot, "*", SearchOption.AllDirectories)
-            .Where(p => !p.StartsWith(previewRoot, StringComparison.Ordinal))
-            .Where(p => ScannedExtensions.Contains(Path.GetExtension(p), StringComparer.OrdinalIgnoreCase))
-            .OrderBy(p => p, StringComparer.Ordinal);
-    }
-
     private async Task<ImageBackfillEntryDto> ProcessOneAsync(
-        string path, bool apply, CancellationToken cancellationToken)
+        string path, string relativePath, bool apply, CancellationToken cancellationToken)
     {
-        var relativePath = Path.GetRelativePath(_uploadsRoot, path).Replace('\\', '/');
         var originalBytes = new FileInfo(path).Length;
         var entry = new ImageBackfillEntryDto
         {

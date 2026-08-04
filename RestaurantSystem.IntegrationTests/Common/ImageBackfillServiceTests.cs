@@ -164,6 +164,134 @@ public class ImageBackfillServiceTests : IDisposable
 
         report.FilesScanned.Should().Be(1);
         report.Truncated.Should().BeTrue();
+        // The resume point, which is what makes the truncation actionable rather than terminal.
+        report.NextCursor.Should().Be("products/a.jpg");
+    }
+
+    // ---- #280: paging, i.e. whether the library is reachable at all -------------------------
+
+    // A bare re-run does NOT continue — it restarts from the first file and the cap counts every
+    // file processed, so image maxFiles+1 was unreachable however often the endpoint was called.
+    // This is the defect stated as a test: the SAME call twice sees the same image both times.
+    [Fact]
+    public async Task RunAsync_WithoutACursor_RestartsFromTheBeginning()
+    {
+        WriteImage("products/a.jpg", 2000, 2000);
+        WriteImage("products/b.jpg", 2000, 2000);
+        var service = CreateService();
+
+        var first = await service.RunAsync(apply: false, maxFiles: 1);
+        var second = await service.RunAsync(apply: false, maxFiles: 1);
+
+        first.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+        second.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+    }
+
+    [Fact]
+    public async Task RunAsync_WithACursor_ResumesStrictlyAfterIt()
+    {
+        WriteImage("products/a.jpg", 2000, 2000);
+        WriteImage("products/b.jpg", 2000, 2000);
+
+        var report = await CreateService().RunAsync(apply: false, maxFiles: 1, continueFrom: "products/a.jpg");
+
+        // STRICTLY after: including the cursor would re-process one image per call, and at
+        // maxFiles = 1 the walk would never advance at all.
+        report.Entries.Single().RelativePath.Should().Be("products/b.jpg");
+    }
+
+    // The point of the whole change: every image is reachable by paging, including one past the
+    // cap. Walks a 5-image library one file at a time and asserts it saw all five exactly once —
+    // the property the issue says is impossible today, not a proxy for it.
+    [Fact]
+    public async Task RunAsync_PagedByCursor_ReachesEveryImageExactlyOnce()
+    {
+        var expected = new[] { "a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg" };
+        foreach (var name in expected)
+        {
+            WriteImage($"products/{name}", 900, 900);
+        }
+
+        var service = CreateService();
+        var seen = new List<string>();
+        string? cursor = null;
+
+        // Bounded well above the 5 pages needed, so a non-advancing cursor ends the loop by
+        // exhausting the budget rather than hanging the suite — and fails on the count below.
+        for (var page = 0; page < 20; page++)
+        {
+            var report = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: cursor);
+            seen.AddRange(report.Entries.Select(e => e.RelativePath));
+
+            if (!report.Truncated)
+            {
+                // A finished walk reports no resume point; anything else would read as "there is
+                // more" forever.
+                report.NextCursor.Should().BeNull();
+                break;
+            }
+
+            report.NextCursor.Should().NotBeNull();
+            cursor = report.NextCursor;
+        }
+
+        seen.Should().Equal(expected.Select(n => $"products/{n}"));
+    }
+
+    // A skipped file must still advance the cursor. Skips count against the cap — `skipped-no-gain`
+    // is decided only AFTER a full decode and re-encode — so a cursor that advanced only past
+    // CHANGED files would hand back a resume point already behind the cap and re-walk the same
+    // window forever. Every image here is tiny enough that re-encoding cannot beat the original.
+    [Fact]
+    public async Task RunAsync_AdvancesThroughSkippedFilesToo()
+    {
+        WriteImage("products/a.jpg", 8, 8);
+        WriteImage("products/b.jpg", 8, 8);
+
+        var service = CreateService();
+        var first = await service.RunAsync(apply: false, maxFiles: 1);
+
+        first.FilesChanged.Should().Be(0, "a tiny image cannot be shrunk further");
+        first.FilesSkipped.Should().Be(1);
+        first.NextCursor.Should().Be("products/a.jpg");
+
+        var second = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: first.NextCursor);
+        second.Entries.Single().RelativePath.Should().Be("products/b.jpg");
+    }
+
+    // Ordering and resumption must share one string space. These two names straddle the boundary
+    // that exposes a mismatch — 'products-1.jpg' vs 'products/a.jpg', where '-' (0x2D) sorts before
+    // '/' (0x2F) — so resuming against absolute paths while sorting on relative ones loses the
+    // second file here on any platform.
+    //
+    // What this canNOT reach on Linux CI is the narrower Windows form of the same bug: there the
+    // absolute path is '\'-separated (0x5C) and sorts AFTER '/', so absolute and relative orderings
+    // genuinely diverge. On POSIX they coincide, so that half rests on the scanner keeping the two
+    // as one string rather than on this test.
+    [Fact]
+    public async Task RunAsync_OrdersAndResumesOnTheSamePathForm()
+    {
+        WriteImage("products-1.jpg", 900, 900);
+        WriteImage("products/a.jpg", 900, 900);
+
+        var service = CreateService();
+        var first = await service.RunAsync(apply: false, maxFiles: 1);
+        var second = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: first.NextCursor);
+
+        first.Entries.Single().RelativePath.Should().Be("products-1.jpg");
+        second.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+        second.Truncated.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RunAsync_CompletedWalk_ReportsNoResumePoint()
+    {
+        WriteImage("products/only.jpg", 900, 900);
+
+        var report = await CreateService().RunAsync(apply: false, maxFiles: 100);
+
+        report.Truncated.Should().BeFalse();
+        report.NextCursor.Should().BeNull();
     }
 
     [Fact]

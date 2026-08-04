@@ -18,7 +18,17 @@ public interface IImageBackfillService
     /// </summary>
     /// <param name="apply">Overwrite the originals. Irreversible short of a restore from backup.</param>
     /// <param name="maxFiles">Stop after this many images, so one call can't run unbounded.</param>
-    Task<ImageBackfillReportDto> RunAsync(bool apply, int maxFiles, CancellationToken cancellationToken = default);
+    /// <param name="continueFrom">
+    /// Resume point: process only images ordering strictly AFTER this relative path. Pass the
+    /// previous report's <c>NextCursor</c> to walk a library larger than <paramref name="maxFiles"/>.
+    /// Null starts from the beginning.
+    ///
+    /// <para>Without it the scan is not merely slow but INCAPABLE (#280): it always restarted from
+    /// the first file, and the cap counts every file it processes, so image
+    /// <paramref name="maxFiles"/>+1 could never be reached however many times it was called.</para>
+    /// </param>
+    Task<ImageBackfillReportDto> RunAsync(
+        bool apply, int maxFiles, string? continueFrom = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Delete the dry-run preview folder. Previews are full-size copies, so they should not be
