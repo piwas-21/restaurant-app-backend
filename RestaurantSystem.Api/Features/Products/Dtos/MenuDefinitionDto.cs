@@ -32,12 +32,16 @@ public record MenuDefinitionDto
     /// Response mappers (ProductDtoMapper, GetProductByIdQuery) always assign it, so the serialized
     /// contract is unchanged — this nullability describes the REQUEST direction only.
     ///
-    /// Both rules enforcing it guard the accessor with <c>.When(x =&gt; x.MenuDefinition != null)</c>
-    /// — the product one additionally requires <c>x.Type == ProductType.Menu</c>, so a non-Menu
-    /// product carrying a menu definition is exempt. That <c>.When()</c> is load-bearing, not defensive:
-    /// MenuDefinition is declared non-nullable on the bundle commands but STJ still leaves it null
-    /// when the key is absent, and without the guard the rule's accessor NREs — measured as a 500,
-    /// pinned by <c>MenuDefinitionSectionsRequiredTests.OmittedMenuDefinition_Is400_NotServerError</c>.
+    /// The two rules enforcing it keep a null definition away from the accessor in DIFFERENT ways,
+    /// and the difference is easy to misread. The bundle rule guards with
+    /// <c>.When(x =&gt; x.MenuDefinition != null)</c>; the product rule's <c>.When()</c> carries only
+    /// <c>x.Type == ProductType.Menu</c> — so a non-Menu product carrying a menu definition is
+    /// exempt there — and handles the null case INSIDE its <c>Must</c> predicate instead, which is
+    /// why it needs no null-forgiving operator. Either way the accessor is unreachable on null, and
+    /// that is load-bearing rather than defensive: MenuDefinition is declared non-nullable on the
+    /// bundle commands but STJ still leaves it null when the key is absent, so an unguarded
+    /// accessor NREs — measured as a 500, pinned by
+    /// <c>MenuDefinitionSectionsRequiredTests.OmittedMenuDefinition_Is400_NotServerError</c>.
     /// </summary>
     public List<MenuSectionDto>? Sections { get; init; }
 }
