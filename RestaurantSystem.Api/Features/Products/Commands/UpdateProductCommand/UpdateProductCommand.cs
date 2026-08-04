@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 using RestaurantSystem.Domain.Common.Enums;
@@ -320,6 +322,22 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             // Update Menu Definition
             if (command.Type == ProductType.Menu && command.MenuDefinition != null)
             {
+                // Resolved FIRST, before any query or mutation — the same dead guard, and the same
+                // wipe, as the bundle handler carried (#191). Fixing only
+                // UpdateMenuBundleCommandHandler would have left this path able to erase a bundle's
+                // sections: `PUT /api/Products` on a Menu-type product reaches here, and
+                // MenuDefinitionDto is the same shared DTO. UpdateProductCommandValidator now
+                // requires the key whenever a menu definition is sent for a Menu-type product, so
+                // null cannot arrive; the throw keeps that true loudly rather than defaulting back
+                // into the wipe.
+                //
+                // Hoisted above the assignments rather than left beside its use because this
+                // handler runs in NO transaction: throwing after the schedule fields were written
+                // would still be safe today (the single SaveChangesAsync is further down), but
+                // failing before touching the entity at all does not depend on that staying true.
+                var sections = command.MenuDefinition.Sections
+                    ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+
                 var menuDef = await _context.MenuDefinitions
                     .Include(m => m.Sections)
                         .ThenInclude(s => s.Items)
@@ -351,48 +369,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 menuDef.UpdatedAt = DateTime.UtcNow;
                 menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-                // Update sections
-                if (command.MenuDefinition.Sections != null)
-                {
-                    // Remove existing sections (simplest approach for now, can be optimized)
-                    _context.MenuSections.RemoveRange(menuDef.Sections);
-
-                    foreach (var sectionDto in command.MenuDefinition.Sections)
-                    {
-                        var section = new MenuSection
-                        {
-                            MenuDefinition = menuDef,
-                            Name = sectionDto.Name,
-                            Description = sectionDto.Description,
-                            DisplayOrder = sectionDto.DisplayOrder,
-                            IsRequired = sectionDto.IsRequired,
-                            MinSelection = sectionDto.MinSelection,
-                            MaxSelection = sectionDto.MaxSelection,
-                            CreatedAt = DateTime.UtcNow,
-                            CreatedBy = _currentUserService.GetAuditIdentifier()
-                        };
-
-                        _context.MenuSections.Add(section);
-
-                        if (sectionDto.Items != null)
-                        {
-                            foreach (var itemDto in sectionDto.Items)
-                            {
-                                var item = new MenuSectionItem
-                                {
-                                    MenuSection = section,
-                                    ProductId = itemDto.ProductId,
-                                    AdditionalPrice = itemDto.AdditionalPrice,
-                                    DisplayOrder = itemDto.DisplayOrder,
-                                    IsDefault = itemDto.IsDefault,
-                                    CreatedAt = DateTime.UtcNow,
-                                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                                };
-                                _context.MenuSectionItems.Add(item);
-                            }
-                        }
-                    }
-                }
+                MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
             }
             else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
             {
