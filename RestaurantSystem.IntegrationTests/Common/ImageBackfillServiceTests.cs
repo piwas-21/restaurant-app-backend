@@ -259,28 +259,64 @@ public class ImageBackfillServiceTests : IDisposable
         second.Entries.Single().RelativePath.Should().Be("products/b.jpg");
     }
 
-    // Ordering and resumption must share one string space. These two names straddle the boundary
-    // that exposes a mismatch — 'products-1.jpg' vs 'products/a.jpg', where '-' (0x2D) sorts before
-    // '/' (0x2F) — so resuming against absolute paths while sorting on relative ones loses the
-    // second file here on any platform.
+    // Ordering and resumption must share one string space, and these two names are chosen to be
+    // the pair that can tell: 'products/a.jpg' precedes 'products1.jpg' as RELATIVE paths
+    // ('/' 0x2F < '1' 0x31) and follows it as WINDOWS ABSOLUTE ones ('1' 0x31 < '\' 0x5C). A digit
+    // is required — a name like 'products-1.jpg' sorts first either way ('-' is 0x2D, below both
+    // separators) and would prove nothing.
     //
-    // What this canNOT reach on Linux CI is the narrower Windows form of the same bug: there the
-    // absolute path is '\'-separated (0x5C) and sorts AFTER '/', so absolute and relative orderings
-    // genuinely diverge. On POSIX they coincide, so that half rests on the scanner keeping the two
-    // as one string rather than on this test.
+    // Honest limit: on Linux CI the absolute path is '/'-separated too, so the two orderings
+    // COINCIDE and sorting on the wrong one is undetectable here. Verified, not assumed — a mutant
+    // that orders by the absolute path leaves this suite fully green on POSIX. What the assertion
+    // does pin on every platform is the relative-path order itself, and on Windows it would also
+    // catch that mutant. The rest rests on the scanner keeping sort key and cursor as one string.
     [Fact]
     public async Task RunAsync_OrdersAndResumesOnTheSamePathForm()
     {
-        WriteImage("products-1.jpg", 900, 900);
+        WriteImage("products1.jpg", 900, 900);
         WriteImage("products/a.jpg", 900, 900);
 
         var service = CreateService();
         var first = await service.RunAsync(apply: false, maxFiles: 1);
         var second = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: first.NextCursor);
 
-        first.Entries.Single().RelativePath.Should().Be("products-1.jpg");
-        second.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+        first.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+        second.Entries.Single().RelativePath.Should().Be("products1.jpg");
         second.Truncated.Should().BeFalse();
+    }
+
+    // An entry that is listed by the scan but cannot be read must cost ONE entry, not the page —
+    // the property paging depends on, since a full walk is now many requests over minutes or hours
+    // and a losing page discards its work AND its NextCursor.
+    //
+    // What this does NOT do, stated because the obvious reading is wrong: it does not pin the
+    // placement of `new FileInfo(path).Length` inside the try. Measured, not assumed — with that
+    // line moved back outside, this test still passes. A dangling symlink satisfies FileInfo.Length
+    // here and fails later at File.OpenRead, which was always inside the try. Reproducing the real
+    // FileNotFoundException needs a delete interleaved with a decode, which is timing-dependent.
+    // So this guards the surrounding behaviour, and the placement rests on reading the code.
+    [Fact]
+    public async Task RunAsync_UnreadableEntry_FailsThatEntryAndKeepsGoing()
+    {
+        WriteImage("products/a.jpg", 900, 900);
+        WriteImage("products/c.jpg", 900, 900);
+
+        var dangling = Path.Combine(UploadsRoot, "products", "b.jpg");
+        File.CreateSymbolicLink(dangling, Path.Combine(UploadsRoot, "products", "nonexistent-target.jpg"));
+
+        var report = await CreateService().RunAsync(apply: false, maxFiles: 100);
+
+        // The premise: the scan really did hand the unreadable entry to the processor. Without
+        // this the test could pass because it was never listed, proving nothing.
+        report.FilesScanned.Should().Be(3);
+        report.Entries.Select(e => e.RelativePath)
+            .Should().Equal("products/a.jpg", "products/b.jpg", "products/c.jpg");
+
+        report.Entries.Single(e => e.RelativePath == "products/b.jpg").Outcome.Should().Be("failed");
+        report.FilesFailed.Should().Be(1);
+        // The walk continued past it and finished, rather than dying at the second file.
+        report.Truncated.Should().BeFalse();
+        report.NextCursor.Should().BeNull();
     }
 
     [Fact]

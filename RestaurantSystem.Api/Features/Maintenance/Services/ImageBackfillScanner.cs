@@ -16,11 +16,15 @@ internal static class ImageBackfillScanner
     ///
     /// <para><b>Ordered and resumed on the RELATIVE path, never the absolute one.</b> They are not
     /// interchangeable: the relative form is separator-normalized to '/' (0x2F) while a Windows
-    /// absolute path carries '\' (0x5C), so the two orderings diverge the moment a subdirectory is
-    /// involved — <c>a/b.jpg</c> vs <c>a-1.jpg</c> sort one way as relative paths and the other way
-    /// as Windows absolute ones. Sorting by one and resuming on the other would skip or repeat
-    /// files at directory boundaries, on Windows only. Keeping the sort key and the cursor as the
-    /// same string is what makes that impossible rather than merely unlikely.</para>
+    /// absolute path carries '\' (0x5C), so two names can sort in opposite orders depending on
+    /// which form is compared. It takes a sibling whose next character falls strictly BETWEEN the
+    /// two separators — a digit, or an uppercase letter — so <c>products/a.jpg</c> precedes
+    /// <c>products1.jpg</c> as relative paths ('/' 0x2F &lt; '1' 0x31) and follows it as Windows
+    /// absolute ones ('1' 0x31 &lt; '\' 0x5C). (A name like <c>products-1.jpg</c> does NOT show
+    /// this: '-' is 0x2D, below both separators, so it sorts first either way.) Sorting by one form
+    /// and resuming on the other would skip or repeat files at exactly those boundaries, on Windows
+    /// only. Keeping the sort key and the cursor as the same string makes that impossible rather
+    /// than merely unlikely.</para>
     ///
     /// <para>The preview folder is excluded so repeat runs never recurse into their own output.</para>
     /// </summary>
@@ -47,6 +51,6 @@ internal static class ImageBackfillScanner
     }
 
     /// <summary>The '/'-normalized path under the uploads root — the id a caller sees and resumes on.</summary>
-    public static string ToRelativePath(string uploadsRoot, string path) =>
+    private static string ToRelativePath(string uploadsRoot, string path) =>
         Path.GetRelativePath(uploadsRoot, path).Replace('\\', '/');
 }

@@ -25,8 +25,10 @@ public class ImageBackfillReportDto
     public bool Truncated { get; set; }
 
     /// <summary>
-    /// Where to resume: pass it back as <c>continueFrom</c> to process the next window. Non-null
-    /// exactly when <see cref="Truncated"/> is true; null means the walk finished.
+    /// Where to resume: pass it back as <c>continueFrom</c> to process the next window. Null means
+    /// there is nothing to resume from — either the walk finished, or it was capped at zero and
+    /// stopped before processing anything, in which case a resume IS a fresh start. Non-null
+    /// otherwise, and only ever when <see cref="Truncated"/> is true.
     ///
     /// <para>A bare re-run does NOT continue, which is what #280 was: the scan restarts from the
     /// first file every time and the cap counts skips, so without this the images past the first

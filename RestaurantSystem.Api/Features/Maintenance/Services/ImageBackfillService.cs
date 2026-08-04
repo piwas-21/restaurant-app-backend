@@ -123,18 +123,36 @@ public class ImageBackfillService : IImageBackfillService
     private async Task<ImageBackfillEntryDto> ProcessOneAsync(
         string path, string relativePath, bool apply, CancellationToken cancellationToken)
     {
-        var originalBytes = new FileInfo(path).Length;
         var entry = new ImageBackfillEntryDto
         {
             RelativePath = relativePath,
             OriginalUrl = $"{_baseUrl}/{relativePath}",
-            OriginalBytes = originalBytes,
-            NewBytes = originalBytes,
             Outcome = "failed",
         };
 
         try
         {
+            // Inside the try, because the candidate list is materialised up front (the scanner's
+            // OrderBy forces full enumeration) and a file can be deleted between then and now.
+            // FileInfo.Length throws FileNotFoundException on a file that no longer exists, and
+            // outside the try that came straight out of RunAsync — losing the whole page: its
+            // report, its completed work, and the NextCursor needed to resume. The catch below
+            // records a failed entry instead, and the cursor advances past it.
+            //
+            // Paging is what makes this worth moving: the window used to be one request long, and
+            // a full walk is now N requests over minutes or hours, so a product-image delete
+            // landing mid-walk is ordinary rather than unlucky.
+            //
+            // NOT covered by a discriminating test, and the nearest one is honest about it:
+            // RunAsync_UnreadableEntry_FailsThatEntryAndKeepsGoing passes with this line in EITHER
+            // position (measured), because a dangling symlink satisfies FileInfo.Length and fails
+            // later at File.OpenRead, which was always inside the try. Reproducing the real race
+            // needs a delete interleaved with a decode — timing-dependent, and not worth a flaky
+            // test for a one-line move.
+            var originalBytes = new FileInfo(path).Length;
+            entry.OriginalBytes = originalBytes;
+            entry.NewBytes = originalBytes;
+
             await using var source = File.OpenRead(path);
             var info = await Image.IdentifyAsync(source, cancellationToken);
             entry.OriginalWidth = info.Width;
