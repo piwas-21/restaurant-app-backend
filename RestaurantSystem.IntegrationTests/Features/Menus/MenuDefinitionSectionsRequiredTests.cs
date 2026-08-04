@@ -488,9 +488,9 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    // The new product rule is scoped to `MenuDefinition != null && Type == Menu`, so the ordinary
-    // product update — no menu definition at all — must not have gained a 400. This is the payload
-    // every non-bundle save in the admin editor sends.
+    // The new product rule only binds a menu definition that is actually sent, on a Menu-type
+    // product, so the ordinary product update — no menu definition at all — must not have gained a
+    // 400. This is the payload every non-bundle save in the admin editor sends.
     [Fact]
     public async Task Product_WithoutMenuDefinition_StillSucceeds()
     {
@@ -513,6 +513,14 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
             detailedIngredients = Array.Empty<object>()
         }, JsonOptions);
 
-        response.EnsureSuccessStatusCode();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Asserting the rename landed proves the update was really applied, not merely accepted —
+        // a 200 alone is also what a handler that refused the command returns, since the controller
+        // wraps an ApiResponse failure in Ok().
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var product = await context.Products.AsNoTracking().FirstAsync(p => p.Id == _componentProductId);
+        product.Name.Should().Be("Renamed Component");
     }
 }

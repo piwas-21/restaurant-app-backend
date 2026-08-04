@@ -207,8 +207,8 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
 
             // Update Sections — a full replace, like every other field on this PUT.
             //
-            // The `if (command.MenuDefinition.Sections != null)` that used to wrap this block was
-            // DEAD (#191): MenuDefinitionDto.Sections carried an initializer, so an omitted key
+            // The null-check on Sections that used to wrap this block was DEAD (#191):
+            // MenuDefinitionDto.Sections carried an initializer, so an omitted key
             // deserialized to `[]` and took the wipe branch — the RemoveRange ran and the loop
             // re-added nothing. Every payload except an explicit JSON `null` (which no client
             // sends) therefore erased every section.

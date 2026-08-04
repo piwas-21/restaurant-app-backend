@@ -31,17 +31,20 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         // a full replace like every other field on it, so the key is required and `[]` alone
         // clears them.
         //
-        // The condition is deliberately WIDER than the code it protects: the handler's section
-        // block additionally sits inside `if (command.DetailedIngredients != null)` (see #296), so
-        // a Menu-type payload that omits detailedIngredients now 400s where it previously 200'd
-        // without touching sections. Unreachable from the admin editor, which always sends the
-        // array — and narrowing this rule to match would make it silently stop protecting the
-        // moment that nesting is corrected.
+        // The rule is deliberately WIDER than the code it protects: the handler's section block
+        // additionally sits inside a detailed-ingredients null check (see #296), so a Menu-type
+        // payload that omits detailedIngredients now 400s where it previously 200'd without
+        // touching sections. Unreachable from the admin editor, which always sends the array — and
+        // narrowing this rule to match would make it silently stop protecting the moment that
+        // nesting is corrected.
         //
-        // The `!` is the .When() guard restated for the compiler: FluentValidation forces the
-        // property accessor only after the condition passes, so it never dereferences a null.
-        RuleFor(x => x.MenuDefinition!.Sections)
-            .NotNull().WithMessage(MenuDefinitionDto.SectionsRequiredMessage)
-            .When(x => x.MenuDefinition != null && x.Type == ProductType.Menu);
+        // Written as a Must on MenuDefinition itself, with the null case passing INSIDE the
+        // predicate, so no null-forgiving operator is needed and no accessor can dereference a
+        // null: MenuDefinition stays optional here (absent = "no menu instruction"), and only a
+        // definition that IS sent must carry its sections.
+        RuleFor(x => x.MenuDefinition)
+            .Must(menuDefinition => menuDefinition is null || menuDefinition.Sections != null)
+            .WithMessage(MenuDefinitionDto.SectionsRequiredMessage)
+            .When(x => x.Type == ProductType.Menu);
     }
 }
