@@ -35,6 +35,10 @@ public record BasketItemDto
     public List<string>? SelectedIngredientNames { get; set; }
     public List<string>? AddedIngredientNames { get; set; }
 
+    // Base-recipe ingredients the guest removed. Derived, not stored: see IngredientRecipeRules
+    // for why a quantity of 0 alone does not mean "removed".
+    public List<string>? RemovedIngredientNames { get; set; }
+
     // Selected side items (with quantities)
     public List<BasketSideItemDto>? SelectedSideItems { get; set; }
 
