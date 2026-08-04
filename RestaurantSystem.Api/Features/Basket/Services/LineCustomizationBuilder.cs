@@ -21,7 +21,8 @@ public interface ILineCustomizationBuilder
     /// Selects the (historically divergent, behaviour-preserved) quantity-JSON precedence:
     /// <c>true</c> = the regular-item rule (an explicit client map is persisted verbatim, else
     /// backfill from the selection); <c>false</c> = the bundle-child rule (backfill from the
-    /// selection when present, else persist a provided map as-is).
+    /// selection when present, else persist a provided map as-is). Since #303 the two agree on the
+    /// one thing that is not precedence: neither backfills without a selection to backfill FROM.
     /// </param>
     LineCustomization Build(
         ICollection<ProductIngredient>? detailedIngredients,
@@ -45,8 +46,23 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities)
     {
-        var customizationPrice = _basketPricingService.CalculateIngredientCustomizationPrice(
-            detailedIngredients, selectedIngredients, ingredientQuantities);
+        // A payload carrying neither a selection nor a quantity map expressed no ingredient choice
+        // at all, so there is nothing to record and nothing to price (#303). `useReorder` posts
+        // exactly that: product + quantity.
+        //
+        // The price half matters as much as the JSON half. BasketPricingService reads a null
+        // selection as "everything deselected" and therefore DEDUCTS every optional ingredient that
+        // is included in the base price — so a re-ordered pizza was billed as though the cheese had
+        // been taken off it. That rule is correct for a caller that has a selection
+        // (Customization_NullSelected_TreatsAllAsDeselected pins it deliberately); what was wrong
+        // was asking it about a payload that never answered the question. Hence the gate lives
+        // here, at the one call site, and not inside the pricing service.
+        var expressedAnIngredientChoice = selectedIngredients != null || ingredientQuantities is { Count: > 0 };
+
+        var customizationPrice = expressedAnIngredientChoice
+            ? _basketPricingService.CalculateIngredientCustomizationPrice(
+                detailedIngredients, selectedIngredients, ingredientQuantities)
+            : 0m;
 
         var ingredientQuantitiesJson = BuildIngredientQuantitiesJson(
             detailedIngredients, selectedIngredients, ingredientQuantities, preferProvidedQuantities);
@@ -69,7 +85,17 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
                 return JsonSerializer.Serialize(ingredientQuantities);
             }
 
-            if (detailedIngredients is { Count: > 0 })
+            // The selection gate matches the bundle-child branch below, and closes issue #303.
+            // Backfilling with a NULL selection writes an explicit 0 for every unselected active
+            // ingredient that is optional or included in the base price (see BuildIngredientQuantities
+            // — NOT the same set as IngredientRecipeRules' base recipe), which is indistinguishable
+            // from a guest who stripped the dish bare. `useReorder` posts exactly that payload:
+            // product + quantity, no selection, no quantities. Those zeroes reach the order via
+            // BasketToOrderTranslator, and OrderMappingService reads each one that IS in the base
+            // recipe as IsRemoved — so the kitchen ticket printed "NO Cheese" for a re-ordered
+            // Margherita.
+            // An EMPTY selection still backfills: that is a guest who deselected everything.
+            if (selectedIngredients != null && detailedIngredients is { Count: > 0 })
             {
                 var built = BuildIngredientQuantities(detailedIngredients, selectedIngredients, ingredientQuantities);
                 return built.Count > 0 ? JsonSerializer.Serialize(built) : null;
@@ -101,6 +127,9 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
     /// deselected optional / included-in-base ingredient gets an explicit quantity 0, so the
     /// kitchen ticket can print "NO xxx" (OrderMappingService derives IsRemoved from 0).
     /// Non-optional ingredients missing from the selection are implicitly included (no entry).
+    /// <para>Both callers gate this on a non-null selection (#303): every 0 it writes is a
+    /// statement that the guest chose to leave that ingredient out, so it must not run for a
+    /// payload that expressed no choice.</para>
     /// </summary>
     private static Dictionary<Guid, int> BuildIngredientQuantities(
         IEnumerable<ProductIngredient> detailedIngredients,
