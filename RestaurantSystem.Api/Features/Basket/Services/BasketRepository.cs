@@ -43,6 +43,14 @@ public class BasketRepository : IBasketRepository
             .Include(b => b.Items)
                 .ThenInclude(bi => bi.ChildBasketItems)
                     .ThenInclude(c => c.Product)
+                        // Added for #363, and silent if dropped: BasketMappingService needs a
+                        // component's ingredient metadata to say which of its saved zeroes are
+                        // REMOVALS, and an un-included collection reads as EMPTY rather than null —
+                        // so RemovedIngredientNames would simply come back empty on every bundle
+                        // component with nothing thrown. Scope is that one field: the child's
+                        // SelectedIngredients and IngredientQuantities come straight off the entity
+                        // and are unaffected, so #150's round-trip does not depend on this line.
+                        .ThenInclude(p => p!.DetailedIngredients)
             .Include(b => b.Items)
             .Where(b => !b.IsDeleted);
 
