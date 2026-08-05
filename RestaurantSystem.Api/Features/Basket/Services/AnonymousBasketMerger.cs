@@ -211,7 +211,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
     private static Dictionary<Guid, IReadOnlyCollection<Domain.Entities.BasketItem>> ChildrenByParent(
         IEnumerable<Domain.Entities.BasketItem> items) =>
         items.Where(i => i.ParentBasketItemId.HasValue)
-            .GroupBy(i => i.ParentBasketItemId!.Value)
+            .GroupBy(i => i.ParentBasketItemId.GetValueOrDefault())
             .ToDictionary(g => g.Key, g => (IReadOnlyCollection<Domain.Entities.BasketItem>)g.ToList());
 
     private BasketLineCustomization? Customization(

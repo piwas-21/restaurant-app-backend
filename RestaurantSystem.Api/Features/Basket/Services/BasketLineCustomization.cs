@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Domain.Entities;
@@ -178,7 +179,7 @@ public sealed class BasketLineCustomization
                 return null;
             }
 
-            entries.Add(FormattableString.Invariant(
+            entries.Add(string.Create(CultureInfo.InvariantCulture,
                 $"{child.ProductId}|{child.ProductVariationId}|{child.Quantity / parent.Quantity}|{own.Key()}"));
         }
 
@@ -188,14 +189,14 @@ public sealed class BasketLineCustomization
 
     /// <summary>This line's own customization as one canonical string, so a bundle child can take part
     /// in its parent's composition without a second comparison rule.</summary>
-    private string Key() => string.Join('\u001f', [
+    private string Key() => string.Join(
+        '\u001f',
         _instructions,
         string.Join(',', _selected),
         string.Join(',', _added),
-        string.Join(',', _sides.Select(s => FormattableString.Invariant($"{s.Id}:{s.Quantity}"))),
-        string.Join(',', _quantities.Select(q => FormattableString.Invariant($"{q.Id}:{q.Quantity}"))),
-        string.Join('~', _composition),
-    ]);
+        string.Join(',', _sides.Select(s => string.Create(CultureInfo.InvariantCulture, $"{s.Id}:{s.Quantity}"))),
+        string.Join(',', _quantities.Select(q => string.Create(CultureInfo.InvariantCulture, $"{q.Id}:{q.Quantity}"))),
+        string.Join('~', _composition));
 
     /// <summary>The customization an incoming add-to-basket request is asking for. Cannot fail — it
     /// carries objects rather than JSON.</summary>
