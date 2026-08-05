@@ -48,5 +48,11 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
 
         // #306; required: true is CREATE-only — see ProductContentRule.
         RuleFor(x => x.Content).ValidProductContent(required: true);
+
+        // #316; the two NESTED maps. Bounds and rationale in NestedContentRule.
+        this.ValidateNestedContent(x => x.Variations, v => v.Content, c => c.Name, c => c.Description,
+            NestedContentRule.VariationNameMaxLength);
+        this.ValidateNestedContent(x => x.DetailedIngredients, i => i.Content, c => c.Name,
+            c => c.Description, NestedContentRule.IngredientNameMaxLength);
     }
 }
