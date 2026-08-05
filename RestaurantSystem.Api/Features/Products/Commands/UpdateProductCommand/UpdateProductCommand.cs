@@ -133,18 +133,53 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // touch translations); treat that as "no translation changes" rather than NRE-ing.
         var contentMap = command.Content ?? new ProductDescriptionsDto();
 
-        var languageCodes = contentMap.Select(x => x.Key).ToList();
-        var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-
-        if (duplicateLanguageCodes.Any())
-        {
-            return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
-        }
-
-
+        // The duplicate-language-code check that used to stand here was DEAD and has been dropped
+        // (#193), matching UpdateMenuBundleCommandHandler, which dropped its identical copy in #192.
+        //
+        // Dead by the TYPE's invariant, not merely by how requests happen to arrive — but the
+        // invariant needs stating precisely, because the loose version of it is false.
+        // Dictionary<string, …> CAN hold two ordinally-equal keys if it is constructed with a
+        // comparer finer than ordinal (reference equality, say), and the old check grouped with
+        // `GroupBy(x => x)`, i.e. the ordinal default — so such a dictionary would have made it
+        // fire. What closes that door here is that ProductDescriptionsDto declares NO constructor:
+        // C# does not inherit constructors, so the `Dictionary(IEqualityComparer<string>)` overload
+        // is not callable on it and every instance carries the ordinal comparer. Verified by
+        // reflection — exactly one public constructor, zero parameters.
+        //
+        // With the comparer pinned, grouping the keys and keeping groups of size > 1 yields an empty
+        // list for EVERY possible value of `contentMap`, including one built in C# rather than
+        // deserialized. The reachability argument therefore does not depend on the transport:
+        // `[FromBody]` is the only production route today, but a future internal caller constructing
+        // the command directly could not revive this branch either.
+        //
+        // On the transport specifically, and UNDER THE DEFAULT `AllowDuplicateProperties` (true on
+        // .NET 10), System.Text.Json collapses duplicate JSON keys through the indexer, last-wins,
+        // rather than throwing — a duplicate is silently merged, not rejected upstream. That is the
+        // current default, not a property of the serializer: setting it false makes the same body a
+        // JsonException, which only makes this branch more unreachable, but would turn the
+        // last-wins test red. Measured both ways.
+        //
+        // Measured through this endpoint rather than reasoned: a raw body with two "fr" entries
+        // answers 200 and writes ONE French description carrying the second entry's values. Forcing
+        // the old branch to fire made it report `Duplicate language codes found: ` — with an empty
+        // list, because the collection it interpolates was empty even on that body.
+        //
+        // Pinned by ProductUpdateContentTests, which also covers the two guards that are NOT dead
+        // and share this block: the null coalesce above, and the `Any()` below. Both exist so an
+        // edit that does not touch translations cannot wipe them all (#190).
+        //
+        // NOTE: TWO more copies of this same dead check still stand, both on CREATE paths —
+        // CreateProductCommandHandler and CreateMenuBundleCommandHandler. `grep -rn "Duplicate
+        // language codes"` finds both; do not treat this note as naming a single remaining site.
+        //
+        // Left alone because they are create paths with no content coverage of their own, NOT
+        // because their `Content` is declared non-nullable. That distinction would be worthless:
+        // UpdateMenuBundleCommand also declares `ProductDescriptionsDto Content` non-nullable and
+        // still coalesces it, precisely because System.Text.Json binds an omitted JSON property to
+        // null on a positional record parameter whatever the annotation says (#190). Both create
+        // handlers instead dereference `command.Content` unguarded and neither validator requires
+        // it — so an omitted `content` on a POST looks like a separate, pre-existing defect rather
+        // than a safe contract. Tracked with the other content-validation gaps in #306.
         if (contentMap.Any())
         {
             _context.ProductDescriptions.RemoveRange(product.Descriptions);
