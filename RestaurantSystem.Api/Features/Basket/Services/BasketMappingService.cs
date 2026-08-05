@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -113,6 +114,8 @@ public class BasketMappingService : IBasketMappingService
 
             // Deserialize ingredient quantities
             var ingredientQuantities = DeserializeIngredientQuantities(item.IngredientQuantitiesJson, item.Id);
+            var removedNames = BuildRemovedIngredientNames(
+                productIngredients, ingredientQuantities, item.SelectedIngredients);
 
             allItems.Add(new BasketItemDto
             {
@@ -140,23 +143,9 @@ public class BasketMappingService : IBasketMappingService
                 CustomizationPrice = item.CustomizationPrice,
                 SelectedIngredientNames = selectedNames,
                 AddedIngredientNames = addedNames,
+                RemovedIngredientNames = removedNames,
                 SelectedSideItems = selectedSideItems,
-                ChildItems = item.ChildBasketItems.Select(child => new BasketItemDto
-                {
-                    Id = child.Id,
-                    ProductId = child.ProductId,
-                    ProductName = child.Product?.Name,
-                    Quantity = child.Quantity,
-                    UnitPrice = child.UnitPrice,
-                    ItemTotal = child.ItemTotal,
-                    CustomizationPrice = child.CustomizationPrice,
-                    // Per-option ingredient customizations must round-trip through the cart,
-                    // or the checkout payload (and ultimately the kitchen ticket) loses them.
-                    // See issue #150.
-                    SpecialInstructions = child.SpecialInstructions,
-                    SelectedIngredients = child.SelectedIngredients,
-                    IngredientQuantities = DeserializeIngredientQuantities(child.IngredientQuantitiesJson, child.Id),
-                }).ToList()
+                ChildItems = item.ChildBasketItems.Select(MapChildItem).ToList()
             });
         }
 
@@ -207,5 +196,89 @@ public class BasketMappingService : IBasketMappingService
             _logger.LogWarning(ex, "Failed to deserialize ingredient quantities JSON for basket item {BasketItemId}", basketItemId);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Maps one bundle component. Extracted from the inline initializer it used to be so the child
+    /// can carry <see cref="BasketItemDto.RemovedIngredientNames"/> through the same helper the
+    /// root uses — a component's removals were previously unreportable, because the child mapping
+    /// set no name lists at all.
+    ///
+    /// <para><b>It still sets no SelectedIngredientNames, deliberately.</b> That would be the
+    /// ADDED side, not #363's subject, and it is not a free addition: the cart pairs
+    /// <c>selectedIngredientNames[i]</c> with <c>selectedIngredients[i]</c> positionally
+    /// (<c>lineSummary.ts</c> — the only such site since frontend #189 deleted
+    /// <c>CartItemCustomizations.tsx</c>, which this used to name as the second), and the list also labels every
+    /// selection "Added" — including base-recipe ingredients the guest never added. Populating it
+    /// would change checkout copy from a backend-only change with no paired frontend work. Removals
+    /// carry no such contract: the list stands alone and pairs with nothing.</para>
+    /// </summary>
+    private BasketItemDto MapChildItem(BasketItem child)
+    {
+        var childIngredients = child.Product?.DetailedIngredients ?? new List<ProductIngredient>();
+        var childQuantities = DeserializeIngredientQuantities(child.IngredientQuantitiesJson, child.Id);
+
+        return new BasketItemDto
+        {
+            Id = child.Id,
+            ProductId = child.ProductId,
+            ProductName = child.Product?.Name,
+            Quantity = child.Quantity,
+            UnitPrice = child.UnitPrice,
+            ItemTotal = child.ItemTotal,
+            CustomizationPrice = child.CustomizationPrice,
+            // Per-option ingredient customizations must round-trip through the cart,
+            // or the checkout payload (and ultimately the kitchen ticket) loses them.
+            // See issue #150.
+            SpecialInstructions = child.SpecialInstructions,
+            SelectedIngredients = child.SelectedIngredients,
+            IngredientQuantities = childQuantities,
+            RemovedIngredientNames = BuildRemovedIngredientNames(
+                childIngredients, childQuantities, child.SelectedIngredients),
+        };
+    }
+
+    /// <summary>
+    /// The base-recipe ingredients the guest removed, so the cart can show "No onion" the way the
+    /// order view already does (#363). Both read the same channel — a saved quantity of 0 — through
+    /// the same <see cref="IngredientRecipeRules"/> test, so a 0 means the same thing on both.
+    /// (They are not yet identical: the order view ALSO reports a required ingredient that is
+    /// absent from the map, and this does not. That gap is tracked separately.)
+    ///
+    /// <para><b><paramref name="selectedIngredients"/> is the gate.</b> A saved quantity map is not
+    /// evidence of a choice, so a line that arrives with no selection at all has nothing to report.
+    /// This was load-bearing when it was written: re-order posts only product/quantity
+    /// (<c>useReorder.ts</c>) and <c>LineCustomizationBuilder</c>'s regular-item branch backfilled a
+    /// 0 for every unselected active optional-or-included ingredient anyway, so reading those back
+    /// would have told a guest re-ordering a Margherita that they had removed the cheese. (That set
+    /// is not the base recipe and is not meant to be: it is too broad by the paid add-ons, and too
+    /// narrow by the required ingredients that are NOT flagged included-in-base, which get no entry
+    /// at all and reach the order view only through its separate required-absent branch.) That
+    /// defect is now fixed at
+    /// the source (#303 — the builder's two branches gate alike), which makes this gate redundant
+    /// for the re-order payload but not dead: an explicit quantity map posted WITHOUT a selection
+    /// is still persisted verbatim, and this rule declines to read it. Keeping the gate also keeps
+    /// the cart's answer independent of which producer wrote the map.</para>
+    ///
+    /// <para>Null when there is nothing to say, empty when there is something to say and the answer
+    /// is "nothing was removed". Both ship as JSON (no global
+    /// <c>DefaultIgnoreCondition</c> is configured), so a consumer must test <c>.length</c> rather
+    /// than truthiness or it will render an empty "Removed:" label.</para>
+    /// </summary>
+    private static List<string>? BuildRemovedIngredientNames(
+        IEnumerable<ProductIngredient> productIngredients,
+        Dictionary<Guid, int>? ingredientQuantities,
+        List<Guid>? selectedIngredients)
+    {
+        if (selectedIngredients == null || ingredientQuantities == null || ingredientQuantities.Count == 0)
+        {
+            return null;
+        }
+
+        return productIngredients
+            .Where(pi => ingredientQuantities.TryGetValue(pi.Id, out var quantity)
+                && IngredientRecipeRules.IsRemoved(pi, quantity))
+            .Select(pi => pi.Name)
+            .ToList();
     }
 }

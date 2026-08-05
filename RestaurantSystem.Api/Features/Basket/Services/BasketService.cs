@@ -129,10 +129,23 @@ public class BasketService : IBasketService
                     throw new NotFoundException("Product variation not found or unavailable");
             }
 
-            // Check if item with EXACT same customizations already exists in basket
+            // Check if item with EXACT same customizations already exists in basket.
+            //
+            // ROOT ROWS ONLY. Without the ParentBasketItemId filter this matched a menu bundle's
+            // CHILD rows too: a child carries the same BasketId, its component's ProductId, and a
+            // null ProductVariationId, and IsSameCustomization returns true for the ordinary
+            // no-customization case. So ordering a standalone Coke while a bundle containing Coke
+            // sat in the basket merged the standalone quantity INTO the bundle's child row — the
+            // guest got no line of their own, and `exactMatch.ItemTotal = Quantity * UnitPrice`
+            // then broke the children-carry-zero invariant and double-counted into the subtotal.
+            //
+            // The Menu branch above returns before this code, which protects bundle PARENTS from
+            // being merged; it never protected their children. AnonymousBasketMerger has always
+            // filtered on `ParentBasketItemId == null` here for the same reason (#305).
             var existingItem = await _context.BasketItems
                 .Where(bi =>
                     bi.BasketId == basket.Id &&
+                    bi.ParentBasketItemId == null &&
                     bi.ProductId == item.ProductId &&
                     bi.ProductVariationId == item.ProductVariationId)
                 .ToListAsync();
@@ -173,13 +186,42 @@ public class BasketService : IBasketService
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
-            .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
+            // Load-bearing for the rescale below (#305). Without it ChildBasketItems reads as an
+            // EMPTY collection rather than throwing, so a bundle's children would silently keep
+            // their add-time count and every test would still pass.
+            .Include(bi => bi.ChildBasketItems)
+            // ROOT ROWS ONLY, the same invariant the add-path dedup above now enforces. A bundle
+            // child is not independently addressable: its quantity is DERIVED from the parent's,
+            // and its ItemTotal is 0 so it cannot double-count. Updating one directly broke both —
+            // measured before this filter, `PUT` on a child id answered 200, set that row to
+            // quantity 7 with ItemTotal 10.50, and moved the subtotal 13.00 -> 23.50, charging the
+            // component twice (once inside the parent's UnitPrice, once on its own row).
+            //
+            // It is also the in-app way to manufacture a child whose count is no longer a multiple
+            // of its parent's — the exact state BundleChildQuantityScaler has to refuse to rescale.
+            // Closing the producer is what keeps that skip branch a deploy-window concern rather
+            // than a permanent one.
+            //
+            // Answers BasketItemNotFound rather than a new code: from a client's point of view a
+            // child id is not an addressable basket item, which is what that code already means.
+            .FirstOrDefaultAsync(bi =>
+                bi.Id == basketItemId && bi.BasketId == basket.Id && bi.ParentBasketItemId == null);
 
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
 
+        // Captured BEFORE the overwrite: it is the divisor that recovers each child's per-unit
+        // count. Read it after assigning update.Quantity and every child rescales by 1.
+        var previousQuantity = basketItem.Quantity;
+
         basketItem.Quantity = update.Quantity;
         basketItem.ItemTotal = basketItem.Quantity * basketItem.UnitPrice;
+
+        BundleChildQuantityScaler.Rescale(
+            basketItem.ChildBasketItems,
+            previousQuantity,
+            update.Quantity,
+            _currentUserService.GetAuditIdentifier());
         basketItem.SpecialInstructions = update.SpecialInstructions;
         basketItem.UpdatedAt = DateTime.UtcNow;
         basketItem.UpdatedBy = _currentUserService.GetAuditIdentifier();

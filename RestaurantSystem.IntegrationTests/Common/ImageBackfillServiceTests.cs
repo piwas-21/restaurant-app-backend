@@ -164,6 +164,170 @@ public class ImageBackfillServiceTests : IDisposable
 
         report.FilesScanned.Should().Be(1);
         report.Truncated.Should().BeTrue();
+        // The resume point, which is what makes the truncation actionable rather than terminal.
+        report.NextCursor.Should().Be("products/a.jpg");
+    }
+
+    // ---- #280: paging, i.e. whether the library is reachable at all -------------------------
+
+    // A bare re-run does NOT continue — it restarts from the first file and the cap counts every
+    // file processed, so image maxFiles+1 was unreachable however often the endpoint was called.
+    // This is the defect stated as a test: the SAME call twice sees the same image both times.
+    [Fact]
+    public async Task RunAsync_WithoutACursor_RestartsFromTheBeginning()
+    {
+        WriteImage("products/a.jpg", 2000, 2000);
+        WriteImage("products/b.jpg", 2000, 2000);
+        var service = CreateService();
+
+        var first = await service.RunAsync(apply: false, maxFiles: 1);
+        var second = await service.RunAsync(apply: false, maxFiles: 1);
+
+        first.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+        second.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+    }
+
+    [Fact]
+    public async Task RunAsync_WithACursor_ResumesStrictlyAfterIt()
+    {
+        WriteImage("products/a.jpg", 2000, 2000);
+        WriteImage("products/b.jpg", 2000, 2000);
+
+        var report = await CreateService().RunAsync(apply: false, maxFiles: 1, continueFrom: "products/a.jpg");
+
+        // STRICTLY after: including the cursor would re-process one image per call, and at
+        // maxFiles = 1 the walk would never advance at all.
+        report.Entries.Single().RelativePath.Should().Be("products/b.jpg");
+    }
+
+    // The point of the whole change: every image is reachable by paging, including one past the
+    // cap. Walks a 5-image library one file at a time and asserts it saw all five exactly once —
+    // the property the issue says is impossible today, not a proxy for it.
+    [Fact]
+    public async Task RunAsync_PagedByCursor_ReachesEveryImageExactlyOnce()
+    {
+        var expected = new[] { "a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg" };
+        foreach (var name in expected)
+        {
+            WriteImage($"products/{name}", 900, 900);
+        }
+
+        var service = CreateService();
+        var seen = new List<string>();
+        string? cursor = null;
+
+        // Bounded well above the 5 pages needed, so a non-advancing cursor ends the loop by
+        // exhausting the budget rather than hanging the suite — and fails on the count below.
+        for (var page = 0; page < 20; page++)
+        {
+            var report = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: cursor);
+            seen.AddRange(report.Entries.Select(e => e.RelativePath));
+
+            if (!report.Truncated)
+            {
+                // A finished walk reports no resume point; anything else would read as "there is
+                // more" forever.
+                report.NextCursor.Should().BeNull();
+                break;
+            }
+
+            report.NextCursor.Should().NotBeNull();
+            cursor = report.NextCursor;
+        }
+
+        seen.Should().Equal(expected.Select(n => $"products/{n}"));
+    }
+
+    // A skipped file must still advance the cursor. Skips count against the cap — `skipped-no-gain`
+    // is decided only AFTER a full decode and re-encode — so a cursor that advanced only past
+    // CHANGED files would hand back a resume point already behind the cap and re-walk the same
+    // window forever. Every image here is tiny enough that re-encoding cannot beat the original.
+    [Fact]
+    public async Task RunAsync_AdvancesThroughSkippedFilesToo()
+    {
+        WriteImage("products/a.jpg", 8, 8);
+        WriteImage("products/b.jpg", 8, 8);
+
+        var service = CreateService();
+        var first = await service.RunAsync(apply: false, maxFiles: 1);
+
+        first.FilesChanged.Should().Be(0, "a tiny image cannot be shrunk further");
+        first.FilesSkipped.Should().Be(1);
+        first.NextCursor.Should().Be("products/a.jpg");
+
+        var second = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: first.NextCursor);
+        second.Entries.Single().RelativePath.Should().Be("products/b.jpg");
+    }
+
+    // Ordering and resumption must share one string space, and these two names are chosen to be
+    // the pair that can tell: 'products/a.jpg' precedes 'products1.jpg' as RELATIVE paths
+    // ('/' 0x2F < '1' 0x31) and follows it as WINDOWS ABSOLUTE ones ('1' 0x31 < '\' 0x5C). A digit
+    // is required — a name like 'products-1.jpg' sorts first either way ('-' is 0x2D, below both
+    // separators) and would prove nothing.
+    //
+    // Honest limit: on Linux CI the absolute path is '/'-separated too, so the two orderings
+    // COINCIDE and sorting on the wrong one is undetectable here. Verified, not assumed — a mutant
+    // that orders by the absolute path leaves this suite fully green on POSIX. What the assertion
+    // does pin on every platform is the relative-path order itself, and on Windows it would also
+    // catch that mutant. The rest rests on the scanner keeping sort key and cursor as one string.
+    [Fact]
+    public async Task RunAsync_OrdersAndResumesOnTheSamePathForm()
+    {
+        WriteImage("products1.jpg", 900, 900);
+        WriteImage("products/a.jpg", 900, 900);
+
+        var service = CreateService();
+        var first = await service.RunAsync(apply: false, maxFiles: 1);
+        var second = await service.RunAsync(apply: false, maxFiles: 1, continueFrom: first.NextCursor);
+
+        first.Entries.Single().RelativePath.Should().Be("products/a.jpg");
+        second.Entries.Single().RelativePath.Should().Be("products1.jpg");
+        second.Truncated.Should().BeFalse();
+    }
+
+    // An entry that is listed by the scan but cannot be read must cost ONE entry, not the page —
+    // the property paging depends on, since a full walk is now many requests over minutes or hours
+    // and a losing page discards its work AND its NextCursor.
+    //
+    // What this does NOT do, stated because the obvious reading is wrong: it does not pin the
+    // placement of `new FileInfo(path).Length` inside the try. Measured, not assumed — with that
+    // line moved back outside, this test still passes. A dangling symlink satisfies FileInfo.Length
+    // here and fails later at File.OpenRead, which was always inside the try. Reproducing the real
+    // FileNotFoundException needs a delete interleaved with a decode, which is timing-dependent.
+    // So this guards the surrounding behaviour, and the placement rests on reading the code.
+    [Fact]
+    public async Task RunAsync_UnreadableEntry_FailsThatEntryAndKeepsGoing()
+    {
+        WriteImage("products/a.jpg", 900, 900);
+        WriteImage("products/c.jpg", 900, 900);
+
+        var dangling = Path.Combine(UploadsRoot, "products", "b.jpg");
+        File.CreateSymbolicLink(dangling, Path.Combine(UploadsRoot, "products", "nonexistent-target.jpg"));
+
+        var report = await CreateService().RunAsync(apply: false, maxFiles: 100);
+
+        // The premise: the scan really did hand the unreadable entry to the processor. Without
+        // this the test could pass because it was never listed, proving nothing.
+        report.FilesScanned.Should().Be(3);
+        report.Entries.Select(e => e.RelativePath)
+            .Should().Equal("products/a.jpg", "products/b.jpg", "products/c.jpg");
+
+        report.Entries.Single(e => e.RelativePath == "products/b.jpg").Outcome.Should().Be("failed");
+        report.FilesFailed.Should().Be(1);
+        // The walk continued past it and finished, rather than dying at the second file.
+        report.Truncated.Should().BeFalse();
+        report.NextCursor.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RunAsync_CompletedWalk_ReportsNoResumePoint()
+    {
+        WriteImage("products/only.jpg", 900, 900);
+
+        var report = await CreateService().RunAsync(apply: false, maxFiles: 100);
+
+        report.Truncated.Should().BeFalse();
+        report.NextCursor.Should().BeNull();
     }
 
     [Fact]

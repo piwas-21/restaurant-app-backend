@@ -424,10 +424,12 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
         (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 0));
     }
 
-    // Pins the FIRST conjunct of the product rule's .When(). Drop `x.MenuDefinition != null` and
-    // this payload forces the `x.MenuDefinition!.Sections` accessor and 500s — and it is an
-    // explicitly supported shape: UpdateProductCommand.MenuDefinition is nullable and the handler
-    // guards on it. Nothing else in the suite sends type=Menu with no menuDefinition.
+    // Pins the product rule's handling of a NULL menu definition on a Menu-type product. That is
+    // not done by the `.When()` — which carries only `x.Type == ProductType.Menu` — but by the
+    // `menuDefinition is null ||` first term inside the Must predicate. Drop that term and this
+    // payload dereferences null and 500s. It is an explicitly supported shape:
+    // UpdateProductCommand.MenuDefinition is nullable and the handler guards on it. Nothing else in
+    // the suite sends type=Menu with no menuDefinition.
     [Fact]
     public async Task Product_MenuTypeWithoutMenuDefinition_StillSucceeds()
     {
@@ -455,10 +457,11 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
         (await ReadSectionNamesAsync()).Should().Equal("Main", "Drink");
     }
 
-    // Pins the SECOND conjunct. A non-Menu product carrying a menuDefinition is the type-conversion
-    // payload the handler's `else if (… && command.Type != ProductType.Menu)` branch serves — it
-    // discards the definition, so requiring sections on it would be a 400 for a field nothing reads.
-    // The DTO doc states this exemption in prose; without this test nothing holds it.
+    // Pins the product rule's `.When(x => x.Type == ProductType.Menu)` — delete it and this payload
+    // 400s. A non-Menu product carrying a menuDefinition is the type-conversion payload the
+    // handler's `else if (… && command.Type != ProductType.Menu)` branch serves — it discards the
+    // definition, so requiring sections on it would be a 400 for a field nothing reads. The DTO doc
+    // states this exemption in prose; without this test nothing holds it.
     [Fact]
     public async Task Product_NonMenuTypeWithSectionlessMenuDefinition_StillSucceeds()
     {

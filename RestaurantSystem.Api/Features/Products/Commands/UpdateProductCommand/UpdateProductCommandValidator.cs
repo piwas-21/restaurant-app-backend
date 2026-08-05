@@ -31,12 +31,12 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         // a full replace like every other field on it, so the key is required and `[]` alone
         // clears them.
         //
-        // The rule is deliberately WIDER than the code it protects: the handler's section block
-        // additionally sits inside a detailed-ingredients null check (see #296), so a Menu-type
-        // payload that omits detailedIngredients now 400s where it previously 200'd without
-        // touching sections. Unreachable from the admin editor, which always sends the array — and
-        // narrowing this rule to match would make it silently stop protecting the moment that
-        // nesting is corrected.
+        // This rule and the handler's section block now cover exactly the same payloads. They did
+        // not when the rule was written: the block additionally sat inside a detailed-ingredients
+        // null check, so the rule was deliberately WIDER than the code it protected, and #296 has
+        // since lifted the block to statement level. Do NOT narrow this to re-add a
+        // DetailedIngredients condition — the two conditions agreeing is the point, and the rule is
+        // what makes `command.MenuDefinition.Sections` non-null in the handler.
         //
         // Written as a Must on MenuDefinition itself, with the null case passing INSIDE the
         // predicate, so no null-forgiving operator is needed and no accessor can dereference a

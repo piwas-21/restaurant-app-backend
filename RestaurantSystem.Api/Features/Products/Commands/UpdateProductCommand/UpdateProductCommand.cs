@@ -133,18 +133,53 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // touch translations); treat that as "no translation changes" rather than NRE-ing.
         var contentMap = command.Content ?? new ProductDescriptionsDto();
 
-        var languageCodes = contentMap.Select(x => x.Key).ToList();
-        var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-
-        if (duplicateLanguageCodes.Any())
-        {
-            return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
-        }
-
-
+        // The duplicate-language-code check that used to stand here was DEAD and has been dropped
+        // (#193), matching UpdateMenuBundleCommandHandler, which dropped its identical copy in #192.
+        //
+        // Dead by the TYPE's invariant, not merely by how requests happen to arrive — but the
+        // invariant needs stating precisely, because the loose version of it is false.
+        // Dictionary<string, …> CAN hold two ordinally-equal keys if it is constructed with a
+        // comparer finer than ordinal (reference equality, say), and the old check grouped with
+        // `GroupBy(x => x)`, i.e. the ordinal default — so such a dictionary would have made it
+        // fire. What closes that door here is that ProductDescriptionsDto declares NO constructor:
+        // C# does not inherit constructors, so the `Dictionary(IEqualityComparer<string>)` overload
+        // is not callable on it and every instance carries the ordinal comparer. Verified by
+        // reflection — exactly one public constructor, zero parameters.
+        //
+        // With the comparer pinned, grouping the keys and keeping groups of size > 1 yields an empty
+        // list for EVERY possible value of `contentMap`, including one built in C# rather than
+        // deserialized. The reachability argument therefore does not depend on the transport:
+        // `[FromBody]` is the only production route today, but a future internal caller constructing
+        // the command directly could not revive this branch either.
+        //
+        // On the transport specifically, and UNDER THE DEFAULT `AllowDuplicateProperties` (true on
+        // .NET 10), System.Text.Json collapses duplicate JSON keys through the indexer, last-wins,
+        // rather than throwing — a duplicate is silently merged, not rejected upstream. That is the
+        // current default, not a property of the serializer: setting it false makes the same body a
+        // JsonException, which only makes this branch more unreachable, but would turn the
+        // last-wins test red. Measured both ways.
+        //
+        // Measured through this endpoint rather than reasoned: a raw body with two "fr" entries
+        // answers 200 and writes ONE French description carrying the second entry's values. Forcing
+        // the old branch to fire made it report `Duplicate language codes found: ` — with an empty
+        // list, because the collection it interpolates was empty even on that body.
+        //
+        // Pinned by ProductUpdateContentTests, which also covers the two guards that are NOT dead
+        // and share this block: the null coalesce above, and the `Any()` below. Both exist so an
+        // edit that does not touch translations cannot wipe them all (#190).
+        //
+        // NOTE: TWO more copies of this same dead check still stand, both on CREATE paths —
+        // CreateProductCommandHandler and CreateMenuBundleCommandHandler. `grep -rn "Duplicate
+        // language codes"` finds both; do not treat this note as naming a single remaining site.
+        //
+        // Left alone because they are create paths with no content coverage of their own, NOT
+        // because their `Content` is declared non-nullable. That distinction would be worthless:
+        // UpdateMenuBundleCommand also declares `ProductDescriptionsDto Content` non-nullable and
+        // still coalesces it, precisely because System.Text.Json binds an omitted JSON property to
+        // null on a positional record parameter whatever the annotation says (#190). Both create
+        // handlers instead dereference `command.Content` unguarded and neither validator requires
+        // it — so an omitted `content` on a POST looks like a separate, pre-existing defect rather
+        // than a safe contract. Tracked with the other content-validation gaps in #306.
         if (contentMap.Any())
         {
             _context.ProductDescriptions.RemoveRange(product.Descriptions);
@@ -318,64 +353,65 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     }
                 }
             }
+        }
 
-            // Update Menu Definition
-            if (command.Type == ProductType.Menu && command.MenuDefinition != null)
-            {
-                // Resolved FIRST, before any query or mutation — the same dead guard, and the same
-                // wipe, as the bundle handler carried (#191). Fixing only
-                // UpdateMenuBundleCommandHandler would have left this path able to erase a bundle's
-                // sections: `PUT /api/Products` on a Menu-type product reaches here, and
-                // MenuDefinitionDto is the same shared DTO. UpdateProductCommandValidator now
-                // requires the key whenever a menu definition is sent for a Menu-type product, so
-                // null cannot arrive; the throw keeps that true loudly rather than defaulting back
-                // into the wipe.
-                //
-                // Hoisted above the assignments rather than left beside its use because this
-                // handler runs in NO transaction: throwing after the schedule fields were written
-                // would still be safe today (the single SaveChangesAsync is further down), but
-                // failing before touching the entity at all does not depend on that staying true.
-                var sections = command.MenuDefinition.Sections
-                    ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+        // Update Menu Definition.
+        //
+        // At STATEMENT level, not inside the detailed-ingredients branch above (#296). It used to
+        // sit one level deeper — brace-verified, since the indentation agreed and made the nesting
+        // read as intentional — so `PUT /api/Products/{id}` carrying a menuDefinition but no
+        // `detailedIngredients` key returned 200 having silently discarded the entire menu half of
+        // the request: no schedule fields, no sections, and no orphan cleanup on a type change away
+        // from Menu.
+        //
+        // No browser payload could reach it, for two independent reasons — worth separating,
+        // because only the first is about this branch. (1) `submitEditProductForm` dispatches on
+        // `data.menuDefinition`: truthy goes to `updateMenuBundle` (PUT /api/Menus), falsy sends
+        // `toMenuDefinitionPayload(undefined)` — which returns undefined, so the key is absent. A
+        // menuDefinition therefore never arrives HERE from the admin editor at all. (2) The same
+        // form always sends `detailedIngredients` (empty at worst), so the orphan `else if`, which
+        // needs no menuDefinition in the command, ran correctly for every payload the editor
+        // produces. The defect was reachable only by an API client that omits detailedIngredients —
+        // a supported shape, since the field is nullable on the command and means "no ingredient
+        // instruction", not "no menu instruction".
+        if (command.Type == ProductType.Menu && command.MenuDefinition != null)
+        {
+            // Resolved FIRST, before any query or mutation — the same dead guard, and the same
+            // wipe, as the bundle handler carried (#191). Fixing only
+            // UpdateMenuBundleCommandHandler would have left this path able to erase a bundle's
+            // sections: `PUT /api/Products` on a Menu-type product reaches here, and
+            // MenuDefinitionDto is the same shared DTO. UpdateProductCommandValidator requires the
+            // key whenever a menu definition is sent for a Menu-type product, so null cannot
+            // arrive; the throw keeps that true loudly rather than defaulting back into the wipe.
+            //
+            // Hoisted above the assignments rather than left beside its use because this handler
+            // runs in NO transaction: throwing after the schedule fields were written would still
+            // be safe today (the single SaveChangesAsync is further down), but failing before
+            // touching the entity at all does not depend on that staying true.
+            var sections = command.MenuDefinition.Sections
+                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 
-                var menuDef = await _context.MenuDefinitions
-                    .Include(m => m.Sections)
-                        .ThenInclude(s => s.Items)
-                    .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
+            // A SECOND query, deliberately: the product query above includes MenuDefinition but not
+            // its Sections, and ReplaceSections reads an un-included collection as empty rather
+            // than null — it would append instead of replacing, with no exception anywhere. The
+            // bundle handler gets the same guarantee from its own ThenInclude. EF returns the
+            // already-tracked instance here, so this populates the navigation rather than
+            // producing a second entity.
+            var existing = await _context.MenuDefinitions
+                .Include(m => m.Sections)
+                    .ThenInclude(s => s.Items)
+                .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
 
-                if (menuDef == null)
-                {
-                    // Create new if not exists
-                    menuDef = new MenuDefinition
-                    {
-                        ProductId = product.Id,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-                    _context.MenuDefinitions.Add(menuDef);
-                }
+            var auditIdentifier = _currentUserService.GetAuditIdentifier();
+            var menuDef = MenuDefinitionWriter.Upsert(
+                _context, existing, product.Id, command.MenuDefinition, auditIdentifier);
 
-                // Update properties
-                menuDef.IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable;
-                menuDef.StartTime = command.MenuDefinition.StartTime;
-                menuDef.EndTime = command.MenuDefinition.EndTime;
-                menuDef.AvailableMonday = command.MenuDefinition.AvailableMonday;
-                menuDef.AvailableTuesday = command.MenuDefinition.AvailableTuesday;
-                menuDef.AvailableWednesday = command.MenuDefinition.AvailableWednesday;
-                menuDef.AvailableThursday = command.MenuDefinition.AvailableThursday;
-                menuDef.AvailableFriday = command.MenuDefinition.AvailableFriday;
-                menuDef.AvailableSaturday = command.MenuDefinition.AvailableSaturday;
-                menuDef.AvailableSunday = command.MenuDefinition.AvailableSunday;
-                menuDef.UpdatedAt = DateTime.UtcNow;
-                menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-                MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
-            }
-            else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
-            {
-                // If type changed from Menu to something else, remove definition
-                _context.MenuDefinitions.Remove(product.MenuDefinition);
-            }
+            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
+        }
+        else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
+        {
+            // If type changed from Menu to something else, remove definition
+            _context.MenuDefinitions.Remove(product.MenuDefinition);
         }
 
         await _context.SaveChangesAsync(cancellationToken);

@@ -179,31 +179,18 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 _context.ProductDescriptions.Add(productDescription);
             }
 
-            // Update Menu Definition
-            var menuDef = product.MenuDefinition;
-            if (menuDef == null)
-            {
-                menuDef = new MenuDefinition
-                {
-                    ProductId = product.Id,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-                _context.MenuDefinitions.Add(menuDef);
-            }
-
-            menuDef.IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable;
-            menuDef.StartTime = command.MenuDefinition.StartTime;
-            menuDef.EndTime = command.MenuDefinition.EndTime;
-            menuDef.AvailableMonday = command.MenuDefinition.AvailableMonday;
-            menuDef.AvailableTuesday = command.MenuDefinition.AvailableTuesday;
-            menuDef.AvailableWednesday = command.MenuDefinition.AvailableWednesday;
-            menuDef.AvailableThursday = command.MenuDefinition.AvailableThursday;
-            menuDef.AvailableFriday = command.MenuDefinition.AvailableFriday;
-            menuDef.AvailableSaturday = command.MenuDefinition.AvailableSaturday;
-            menuDef.AvailableSunday = command.MenuDefinition.AvailableSunday;
-            menuDef.UpdatedAt = DateTime.UtcNow;
-            menuDef.UpdatedBy = _currentUserService.GetAuditIdentifier();
+            // Update Menu Definition.
+            //
+            // product.MenuDefinition is safe to hand straight over because the product query above
+            // loads it WITH its sections (ThenInclude) — which is what ReplaceSections below
+            // requires. The product handler does not pass its navigation, because its own query
+            // omits that ThenInclude; it re-queries instead. See MenuDefinitionWriter.Upsert.
+            var menuDef = MenuDefinitionWriter.Upsert(
+                _context,
+                product.MenuDefinition,
+                product.Id,
+                command.MenuDefinition,
+                _currentUserService.GetAuditIdentifier());
 
             // Update Sections — a full replace, like every other field on this PUT.
             //
