@@ -26,11 +26,14 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
             .WithMessage("Primary category must be one of the selected categories");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
 
-        // #306; rationale in ProductContentRule. Covers the TOP-LEVEL map only — the variation and
-        // ingredient maps in this same handler are still open (#316), and their
-        // `IsNullOrWhiteSpace(content.Name)` guard is weaker than it looks: it dereferences the
-        // entry before testing it, so it covers a null name and nothing else.
+        // #306; rationale in ProductContentRule. Covers the TOP-LEVEL map only.
         RuleFor(x => x.Content).ValidProductContent(required: false);
+
+        // #316; the two NESTED maps. Bounds and rationale in NestedContentRule.
+        this.ValidateNestedContent(x => x.Variations, v => v.Content, c => c.Name, c => c.Description,
+            NestedContentRule.VariationNameMaxLength);
+        this.ValidateNestedContent(x => x.DetailedIngredients, i => i.Content, c => c.Name,
+            c => c.Description, NestedContentRule.IngredientNameMaxLength);
 
         // Mirrors MenuBundleCommandValidatorBase (#191). MenuDefinition itself stays optional here
         // — absent means "no menu instruction" — but once one IS sent for a Menu, its sections are
