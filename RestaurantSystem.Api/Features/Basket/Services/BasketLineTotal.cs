@@ -25,8 +25,16 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 ///
 /// Children are NOT covered: a child carries <c>ItemTotal = 0</c> by design so it cannot
 /// double-count against its parent (see <see cref="BundleChildQuantityScaler"/>). This is for root
-/// rows in a BASKET only — <c>OrderItemFactory</c> has its own, different convention, and the two
-/// do not currently agree (tracked separately).
+/// rows in a BASKET only. <c>OrderItemFactory</c> keeps its own convention —
+/// <c>(UnitPrice * Quantity) + CustomizationPrice</c>, where the customization is line-absolute
+/// rather than per-unit — and the two are reconciled at the seam by
+/// <c>BasketToOrderTranslator.LineAbsoluteCustomization</c>, which derives that field from the line
+/// total this rule produces (#312). So an order line equals its basket line wherever
+/// <c>OrderItemFactory</c> echoes the DTO's <c>UnitPrice</c> — which needs BOTH a null <c>MenuId</c>
+/// (<c>AddItemAsync</c> dispatches on it before <c>ResolvePricing</c> is ever reached) AND
+/// <c>UnitPrice &gt; 0</c>. Neither condition is reachable from a basket today; see
+/// <c>LineAbsoluteCustomization</c>'s remarks for both. Changing either formula without the other
+/// reopens the divergence.
 /// </summary>
 public static class BasketLineTotal
 {
