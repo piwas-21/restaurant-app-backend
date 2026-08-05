@@ -181,7 +181,9 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var rows = await context.BasketItems
-            .Where(bi => bi.ParentBasketItemId != null && bi.ParentBasketItem!.ProductId == _menuProduct.Id)
+            .Where(bi => bi.Basket!.SessionId == _sessionId
+                         && bi.ParentBasketItemId != null
+                         && bi.ParentBasketItem!.ProductId == _menuProduct.Id)
             .Select(bi => new { bi.ProductId, bi.Quantity })
             .ToListAsync();
 
@@ -319,6 +321,124 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
             "children carry ItemTotal 0 by design so they cannot double-count against the parent");
     }
 
+    // A quantity change that changes nothing must touch nothing. Pins the early return, which is
+    // the difference between "no-op" and "rewrite every child row with the same number and a fresh
+    // audit stamp".
+    [Fact]
+    public async Task SettingTheSameQuantity_LeavesChildRowsAndTheirAuditStampUntouched()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        (await AddBundleAsync(2)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var (parentId, _) = await ReadParentAsync();
+
+        var before = await ReadChildAuditAsync();
+
+        (await PutAsJsonAsync($"/api/basket/items/{parentId}",
+            new UpdateBasketItemDto { Quantity = 2 })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await ReadChildAuditAsync()).Should().BeEquivalentTo(before);
+    }
+
+    private async Task<List<(Guid Product, int Qty, DateTime? UpdatedAt)>> ReadChildAuditAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var rows = await context.BasketItems
+            .Where(bi => bi.Basket!.SessionId == _sessionId && bi.ParentBasketItemId != null)
+            .Select(bi => new { bi.ProductId, bi.Quantity, bi.UpdatedAt })
+            .ToListAsync();
+
+        return rows
+            .Select(r => (r.ProductId!.Value, r.Quantity, r.UpdatedAt))
+            .OrderBy(r => r.Item1)
+            .ToList();
+    }
+
+    // The SKIP branch: a child whose count is not an exact multiple of the old line quantity must be
+    // LEFT ALONE, because its per-unit factor is not recoverable from the row.
+    //
+    // This test exists because the branch was measured to be completely unpinned — deleting the
+    // `child.Quantity % previousQuantity != 0` guard passed all 119 basket tests. It carries the
+    // longest comment in the scaler and is the one decision that changed during review, which makes
+    // it exactly the code a later reader would "simplify".
+    //
+    // The corrupt state is seeded directly rather than through the API, deliberately: the two
+    // in-app producers are now both closed (the add-path dedup and the child-id update), so the
+    // only remaining source is a basket that was already live when this shipped. Seeding is
+    // therefore the honest reproduction of the real case, not a shortcut around a guard.
+    [Fact]
+    public async Task AChildThatIsNotAMultipleOfTheLineQuantity_IsLeftAlone()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        (await AddBundleAsync(4)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var (parentId, _) = await ReadParentAsync();
+
+        // Force the cola child to 5 — not a multiple of the line quantity 4, so its per-unit count
+        // cannot be divided back out.
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var cola = await context.BasketItems.SingleAsync(bi =>
+                bi.ParentBasketItemId == parentId && bi.ProductId == _testCola.Id);
+            cola.Quantity = 5;
+            await context.SaveChangesAsync();
+        }
+
+        var response = await PutAsJsonAsync($"/api/basket/items/{parentId}",
+            new UpdateBasketItemDto { Quantity = 2 });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var children = await ReadChildQuantitiesAsync();
+
+        // Untouched — NOT 5*2/4 = 2 (a lossy guess) and NOT 1 (what the rejected Math.Max clamp
+        // produced). The pizza child beside it is a clean multiple and rescales normally, which is
+        // what proves the skip is per-row rather than an early exit from the whole loop.
+        children[_testCola.Id].Should().Be(5, "a non-multiple child must be left exactly as found");
+        children[_testPizza.Id].Should().Be(2, "its clean sibling must still rescale");
+
+        // And the line's money still tracks the new quantity — the skip must not abort the update.
+        var (_, total) = await ReadParentAsync();
+        total.Should().BeGreaterThan(0m);
+    }
+
+    // The sibling half of the root-row invariant, in the method this PR edits. A bundle child is not
+    // independently addressable, and before the filter `PUT` on one answered 200, set its ItemTotal
+    // and double-counted the component into the subtotal (measured 13.00 -> 23.50).
+    [Fact]
+    public async Task UpdatingABundleChildDirectly_IsRefused()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        (await AddBundleAsync(1)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var (parentId, _) = await ReadParentAsync();
+
+        Guid childId;
+        decimal subTotalBefore;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            childId = (await context.BasketItems.SingleAsync(bi =>
+                bi.ParentBasketItemId == parentId && bi.ProductId == _testCola.Id)).Id;
+            subTotalBefore = (await context.Baskets.SingleAsync(b => b.SessionId == _sessionId)).SubTotal;
+        }
+
+        var response = await PutAsJsonAsync($"/api/basket/items/{childId}",
+            new UpdateBasketItemDto { Quantity = 7 });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // The row and the money are both untouched — a 404 that still wrote would be worse than a 200.
+        (await ReadChildQuantitiesAsync())[_testCola.Id].Should().Be(DrinksPerBundle);
+
+        using var verify = Factory.Services.CreateScope();
+        var db = verify.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await db.Baskets.SingleAsync(b => b.SessionId == _sessionId)).SubTotal.Should().Be(subTotalBefore);
+        (await db.BasketItems.SingleAsync(bi => bi.Id == childId)).ItemTotal.Should().Be(0m);
+    }
+
     // ---- Site 2: logging in with the same bundle in both baskets ------------------------------
 
     private async Task AddBundleViaServiceAsync(string? sessionId, Guid? userId, int quantity)
@@ -424,9 +544,10 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
 
     // ---- Bundle parents still never merge -----------------------------------------------------
 
-    // Adding the same bundle twice must create a SECOND parent, not merge into the first. This is
-    // what keeps `exactMatch.Quantity +=` out of scope: the Menu branch of AddItemToBasketAsync
-    // returns before that code. If this ever starts merging, the merge path needs the rescale too.
+    // Adding the same bundle twice must create a SECOND parent, not merge into the first — the
+    // Menu branch returns before the exact-match code. This pins the half of that claim which IS
+    // true; the half that was NOT (child rows are matched by the same query) is the header's site 3
+    // and is fixed above. If bundle parents ever start merging, that path needs the rescale too.
     [Fact]
     public async Task AddingTheSameBundleTwice_CreatesASecondLine_RatherThanMerging()
     {
