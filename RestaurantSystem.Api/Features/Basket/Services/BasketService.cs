@@ -129,10 +129,23 @@ public class BasketService : IBasketService
                     throw new NotFoundException("Product variation not found or unavailable");
             }
 
-            // Check if item with EXACT same customizations already exists in basket
+            // Check if item with EXACT same customizations already exists in basket.
+            //
+            // ROOT ROWS ONLY. Without the ParentBasketItemId filter this matched a menu bundle's
+            // CHILD rows too: a child carries the same BasketId, its component's ProductId, and a
+            // null ProductVariationId, and IsSameCustomization returns true for the ordinary
+            // no-customization case. So ordering a standalone Coke while a bundle containing Coke
+            // sat in the basket merged the standalone quantity INTO the bundle's child row — the
+            // guest got no line of their own, and `exactMatch.ItemTotal = Quantity * UnitPrice`
+            // then broke the children-carry-zero invariant and double-counted into the subtotal.
+            //
+            // The Menu branch above returns before this code, which protects bundle PARENTS from
+            // being merged; it never protected their children. AnonymousBasketMerger has always
+            // filtered on `ParentBasketItemId == null` here for the same reason (#305).
             var existingItem = await _context.BasketItems
                 .Where(bi =>
                     bi.BasketId == basket.Id &&
+                    bi.ParentBasketItemId == null &&
                     bi.ProductId == item.ProductId &&
                     bi.ProductVariationId == item.ProductVariationId)
                 .ToListAsync();
@@ -173,13 +186,27 @@ public class BasketService : IBasketService
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
+            // Load-bearing for the rescale below (#305). Without it ChildBasketItems reads as an
+            // EMPTY collection rather than throwing, so a bundle's children would silently keep
+            // their add-time count and every test would still pass.
+            .Include(bi => bi.ChildBasketItems)
             .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
 
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
 
+        // Captured BEFORE the overwrite: it is the divisor that recovers each child's per-unit
+        // count. Read it after assigning update.Quantity and every child rescales by 1.
+        var previousQuantity = basketItem.Quantity;
+
         basketItem.Quantity = update.Quantity;
         basketItem.ItemTotal = basketItem.Quantity * basketItem.UnitPrice;
+
+        BundleChildQuantityScaler.Rescale(
+            basketItem.ChildBasketItems,
+            previousQuantity,
+            update.Quantity,
+            _currentUserService.GetAuditIdentifier());
         basketItem.SpecialInstructions = update.SpecialInstructions;
         basketItem.UpdatedAt = DateTime.UtcNow;
         basketItem.UpdatedBy = _currentUserService.GetAuditIdentifier();
