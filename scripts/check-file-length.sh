@@ -57,6 +57,26 @@ limit_for_path() {
     # Services (catch-all *Service.cs in the API project)
     RestaurantSystem.Api/*Service.cs)                                echo 300 ;;
     RestaurantSystem.Api/**/*Service.cs)                             echo 300 ;;
+    # Anything else living in a Services/ directory. Matching services only by the `*Service.cs`
+    # suffix left a hole: a class in Services/ named anything else fell through to `echo 0` and was
+    # skipped in silence. That is not hypothetical — AnonymousBasketMerger.cs reached 279 committed
+    # LOC (at 0a8fe28) with NO limit applied at any size, because its name does not end in `Service`;
+    # it went past 300 in the working tree during #313 and this gate still printed nothing. A file's
+    # directory says what it is at least as reliably as its suffix, so gate on the directory too.
+    #
+    # `*Services/` and not `*/Services/`: in a case pattern `*` matches `/`, so `*/Services/` needs
+    # at least one intervening segment and would MISS the two Services dirs that sit directly under
+    # the project root — `RestaurantSystem.Api/Services/` and `RestaurantSystem.Api/BackgroundServices/`
+    # (the latter is the data-loss class of §9). With `*Services/` the `*` may also match the empty
+    # string, so depth 0 and any deeper nesting are both covered.
+    RestaurantSystem.Api/*Services/*.cs)                             echo 300 ;;
+    # Shared validation rule classes. These are what a validator at its 60-line limit extracts INTO
+    # (ProductContentRule for #306, NestedContentRule for #321), so leaving them ungated made the
+    # validator limit trivially escapable — move the rule out and it is unbounded again. 60 is the
+    # wrong number here: it would fail both existing rule classes on sight and undo the very pattern
+    # those extractions established. §4 has no row for this kind, so they are gated as the service
+    # classes they most resemble, pending a §4 decision (#315).
+    RestaurantSystem.Api/Common/Validation/*.cs)                     echo 300 ;;
     *)                                                               echo 0 ;;
   esac
 }
@@ -78,26 +98,62 @@ list_all_files() {
     -not -path "*/bin/*" -not -path "*/obj/*" -not -path "*/Migrations/*" 2>/dev/null
 }
 
+# Tallies, so a passing run can say what it actually looked at. A gate that prints nothing on
+# success is indistinguishable from a gate that examined nothing, and this one has a live example
+# of exactly that: a 279-LOC file passed in silence because no rule matched its name.
+n_walked=0; n_gated=0; n_ungated=0; n_exempt=0; n_baselined=0; n_failed=0
+
+# Every rule in limit_for_path is anchored on a literal `RestaurantSystem.Api/` or
+# `RestaurantSystem.Domain/`, so a path given as absolute or `./`-prefixed matches NOTHING and is
+# waved through at limit 0 — the same file by relative path exits 1. Normalise to repo-relative
+# first. The script has already cd'd to the repo root, so $PWD is that root.
+normalise_path() {
+  local p="${1#./}"
+  p="${p#"$PWD"/}"
+  echo "${p#./}"
+}
+
+# Hard-fail if the whole-tree walk found nothing. Shared by --all and --regen-baseline: the latter
+# TRUNCATES the baseline before writing, so a run finding no corpus does not merely report a false
+# clean, it un-grandfathers all existing entries and commits that.
+# NOTE: this cannot be a wrong-cwd guard — line 29 cd's to the repo root unconditionally. It fires
+# only when the project directories are genuinely absent: renamed, deleted, or a sparse checkout.
+assert_corpus() {
+  [[ "$(list_all_files | head -n 1)" != "" ]] && return 0
+  echo "File-length gate ERROR: found 0 .cs files under RestaurantSystem.Api / RestaurantSystem.Domain." >&2
+  echo "  Those project directories must exist under $PWD." >&2
+  exit 2
+}
+
 check_one() {
-  local path="$1"
+  local path
+  path="$(normalise_path "$1")"
   [[ -f "$path" ]] || return 0
+  case "$path" in *.cs) ;; *) return 0 ;; esac   # count only what the message claims to count
+  n_walked=$((n_walked + 1))
   local limit
   limit=$(limit_for_path "$path")
-  [[ "$limit" -gt 0 ]] || return 0
+  if [[ "$limit" -le 0 ]]; then
+    n_ungated=$((n_ungated + 1))
+    return 0
+  fi
+  n_gated=$((n_gated + 1))
 
   local actual
   actual=$(wc -l < "$path" | tr -d ' ')
   [[ "$actual" -le "$limit" ]] && return 0
 
   # Over limit. Check exemptions.
-  is_exempt "$path"  && return 0
-  is_baselined "$path" && return 0
+  if is_exempt "$path"; then n_exempt=$((n_exempt + 1)); return 0; fi
+  if is_baselined "$path"; then n_baselined=$((n_baselined + 1)); return 0; fi
 
+  n_failed=$((n_failed + 1))
   echo "FAIL  $path  ($actual LOC > $limit)"
   return 1
 }
 
 if [[ "${1:-}" == "--regen-baseline" ]]; then
+  assert_corpus
   cat > "$BASELINE_PATH" <<'HEADER'
 # Backend file-length baseline.
 # Files listed here exceed the CLAUDE.md §4 limit and are tracked
@@ -118,20 +174,40 @@ HEADER
     is_exempt "$f" && continue
     echo "$f" >> "$BASELINE_PATH"
   done < <(list_all_files)
-  echo "Wrote $BASELINE_PATH ($(grep -cv '^#\|^$' "$BASELINE_PATH" || true) entries)."
+  echo "Wrote $BASELINE_PATH from $(list_all_files | wc -l | tr -d ' ') walked .cs file(s) — $(grep -cv '^#\|^$' "$BASELINE_PATH" || true) entries."
   exit 0
 fi
 
 failed=0
+mode=""
 if [[ "${1:-}" == "--all" || $# -eq 0 ]]; then
+  mode="whole-tree"
+  # Assert the corpus BEFORE walking. A whole-tree run that found no files is a broken gate, not a
+  # clean tree — a renamed project directory would otherwise report success having examined nothing.
+  assert_corpus
   while IFS= read -r f; do
     check_one "$f" || failed=1
   done < <(list_all_files)
 else
+  mode="$# path(s)"
   for f in "$@"; do
     check_one "$f" || failed=1
   done
+  # Same principle for pre-commit's path mode, which is where the gate actually blocks commits:
+  # being handed paths and examining none of them is a broken invocation, not a pass. Unreachable
+  # via .pre-commit-config.yaml, whose `files: \.cs$` filter only ever passes existing .cs files
+  # (and which skips the hook entirely when that list is empty), so this cannot false-block a commit.
+  if [[ "$n_walked" -eq 0 ]]; then
+    echo "File-length gate ERROR: given $# path(s), examined 0 — no argument was an existing .cs file." >&2
+    printf '  given: %s\n' "$*" >&2
+    exit 2
+  fi
 fi
+
+# Say what was examined, pass or fail. Counts are the evidence that the gate ran over a real corpus.
+# gated + no-rule = walked. The second group is a breakdown of the over-limit files only: baselined
+# and exempt files ARE over their limit, they are excused; $n_failed is what actually blocks.
+echo "File-length gate ($mode): walked $n_walked .cs file(s) — $n_gated gated, $n_ungated with no matching rule. Over limit: $n_baselined baselined, $n_exempt exempt, $n_failed blocking."
 
 if [[ "$failed" -ne 0 ]]; then
   echo ""

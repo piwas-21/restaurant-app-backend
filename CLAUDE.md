@@ -112,6 +112,19 @@ All soft-delete-aware entities use `IsDeleted` with a global query filter in `Ap
 
 Enforced (blocking) by `scripts/check-file-length.sh` (pre-commit + CI) and warned in-loop by the PostToolUse checker. Max LOC: **Controller 150 · Command/Query/Handler 200 · Service 300 · Entity 100 · DTO 60 · Validator 60 · `*Settings.cs` 50**. Over the limit ⇒ decompose (controllers dispatch, one service = one concern). Existing violations are baselined in `scripts/file-length-baseline.txt`; opt a file out with `// FILE_LENGTH_EXEMPT: <reason>` in the first 5 lines; after a refactor drops a file under its limit run `bash scripts/check-file-length.sh --regen-baseline` and commit the baseline.
 
+**Kind is matched by directory as well as by suffix** (#315). The case patterns `RestaurantSystem.Api/*Services/*.cs` and `RestaurantSystem.Api/Common/Validation/*.cs` are gated at **300**. Before this, only `*Service.cs` matched, so a class in `Services/` named anything else had *no limit at all* at any size — `AnonymousBasketMerger.cs` reached 279 committed LOC, and went past 300 in the working tree during #313, with the gate silent throughout. `Common/Validation/` is included because it is what a validator at its 60-line limit extracts into (`ProductContentRule` for #306, `NestedContentRule` for #321); ungated, it made the validator limit trivially escapable.
+
+Two things to keep in mind when editing those patterns:
+
+- **`*Services/`, not `*/Services/`.** In a `case` pattern `*` matches `/`, so `*/Services/` requires an intervening segment and silently misses `RestaurantSystem.Api/Services/` and `RestaurantSystem.Api/BackgroundServices/` — both real, the latter a §9 data-loss class. Writing `*Services/` lets `*` also match the empty string, covering depth 0 and any nesting.
+- **Suffix rules are listed first and therefore win**, so "300 whatever it is called" is not quite true: `Common/Validation/StrongPasswordValidator.cs` stays at **60**, and a `*Settings.cs` / `*Controller.cs` / `*Command.cs` inside a `Services/` dir resolves to 50 / 150 / 200. Note a `*Dto.cs` there resolves to **300**, not 60 — the DTO rule is `*/Dtos/*.cs` (a directory), not a suffix. Check the ordering before adding a rule.
+
+**A shared validation rule class has no §4 row of its own** — 300 is a stand-in pending that decision (#315).
+
+The gate **prints what it examined** (`walked N .cs file(s) — N gated, N with no matching rule. Over limit: …`), and **exits 2 rather than 0 when it examined nothing**: a whole-tree or `--regen-baseline` run that finds no project files, or a path-mode run handed arguments of which none is an existing `.cs` file. Silence on success cannot be told apart from having examined nothing — and for `--regen-baseline`, which truncates the baseline before rewriting it, a zero-file run would have un-grandfathered all 29 entries.
+
+The in-loop PostToolUse checker honours **both** of the gate's escape hatches (the baseline and `FILE_LENGTH_EXEMPT`), so it never warns about a file pre-commit would accept. The two rule sets are still not identical — the in-loop checker additionally gates `*Handler.cs`, `*Configuration.cs` and `*Dto.cs`, which the blocking gate does not — so treat it as a superset that warns early, never as the authority.
+
 ---
 
 ## §5 — Backend rules (hard)
