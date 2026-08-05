@@ -26,6 +26,12 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
             .WithMessage("Primary category must be one of the selected categories");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
 
+        // #306; rationale in ProductContentRule. Covers the TOP-LEVEL map only — the variation and
+        // ingredient maps in this same handler are still open (#316), and their
+        // `IsNullOrWhiteSpace(content.Name)` guard is weaker than it looks: it dereferences the
+        // entry before testing it, so it covers a null name and nothing else.
+        RuleFor(x => x.Content).ValidProductContent(required: false);
+
         // Mirrors MenuBundleCommandValidatorBase (#191). MenuDefinition itself stays optional here
         // — absent means "no menu instruction" — but once one IS sent for a Menu, its sections are
         // a full replace like every other field on it, so the key is required and `[]` alone
