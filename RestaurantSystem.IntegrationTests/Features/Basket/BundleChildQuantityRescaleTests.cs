@@ -687,10 +687,21 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
     // add-path dedup, which is where a type-based rule would price it as a regular item and add its
     // customization a second time: 38.00 instead of 32.00 on a 2 x 16.00 line.
     //
-    // This is the test that fails if the `.Include(bi => bi.ChildBasketItems)` on the dedup query is
-    // dropped, or if the type is ever reintroduced as an operand.
+    // WHAT THIS ASSERTS CHANGED IN #313, DELIBERATELY. It used to assert the plain add DEDUPS into the
+    // bundle row (quantity 2 at 2 x 16.00). That was the #313 defect on the add path: the request
+    // configured nothing, and merging it into a configured bundle charged 16.00 for a plain add of a
+    // product whose BasePrice is 8.00, and told the kitchen to make a second full bundle. Now that the
+    // shared line rule compares a bundle's COMPOSITION — which lives on the child rows, since
+    // BuildMenuItemAsync writes none of it on the parent — a childless request is no longer the same
+    // line as a bundle, and the plain add gets its own row.
+    //
+    // The guard this test exists for is unchanged and still exact: drop the
+    // `.Include(bi => bi.ChildBasketItems)` on the dedup query and the stored row's composition reads
+    // EMPTY rather than throwing, so it matches the plain request, merges, and the bundle parent's
+    // quantity moves off 1 — failing the first assertion below. Reintroduce `Product.Type` as an
+    // operand and the pricing assertion goes with it.
     [Fact]
-    public async Task AddingAgainAfterTheBundlesProductIsRetyped_StillPricesItAsABundle()
+    public async Task AddingAgainAfterTheBundlesProductIsRetyped_DoesNotAbsorbThePlainAdd()
     {
         Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
 
@@ -713,12 +724,20 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
 
         using var verifyScope = Factory.Services.CreateScope();
         var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var parent = await verifyContext.BasketItems.SingleAsync(bi =>
-            bi.ParentBasketItemId == null && bi.ProductId == _menuProduct.Id);
+        var roots = await verifyContext.BasketItems
+            .Where(bi => bi.Basket!.SessionId == _sessionId && bi.ParentBasketItemId == null)
+            .ToListAsync();
 
-        parent.Quantity.Should().Be(2, "the retyped row dedups instead of returning early");
-        parent.ItemTotal.Should().Be(CustomisedBundleUnitPrice * 2,
+        roots.Should().HaveCount(2, "a plain add is not the configured bundle, whatever the product is now called");
+
+        var bundle = roots.Single(r => r.CustomizationPrice != 0m);
+        bundle.Quantity.Should().Be(1, "the retyped row must NOT absorb the plain add");
+        bundle.ItemTotal.Should().Be(CustomisedBundleUnitPrice,
             "its UnitPrice still contains the customization regardless of what the product now says it is");
+
+        var plain = roots.Single(r => r.CustomizationPrice == 0m);
+        plain.Quantity.Should().Be(1);
+        plain.ItemTotal.Should().Be(MenuBasePrice, "a plain add is priced as the regular item it asked for");
     }
 
     // ---- Bundle parents still never merge -----------------------------------------------------

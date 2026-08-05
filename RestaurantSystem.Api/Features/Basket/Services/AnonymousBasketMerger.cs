@@ -26,9 +26,11 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// When a duplicate's quantity is merged into an existing user item, the now-redundant anonymous
 /// row is hard-deleted — but ONLY for standalone leaf items. BasketItem is not soft-delete-aware,
 /// so a Remove is a real DELETE, and the self-referencing parent/child FK is Restrict; deleting a
-/// menu-bundle parent (or a child whose parent is being moved) would break that FK. Bundle
-/// duplicates are therefore left under the soft-deleted anonymous basket (invisible, not
-/// double-counted) pending the bundle-aware merge redesign tracked separately.
+/// menu-bundle parent (or a child whose parent is being moved) would break that FK. A merged bundle's
+/// rows are therefore left under the soft-deleted anonymous basket — invisible and not double-counted.
+/// Since #313 that only happens for a bundle the guest built IDENTICALLY on both sides, because
+/// <see cref="BasketLineCustomization"/> compares composition and a differing build no longer matches;
+/// it re-homes as its own line instead of being abandoned.
 /// </summary>
 public class AnonymousBasketMerger : IAnonymousBasketMerger
 {
@@ -94,6 +96,11 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
 
         // Items that are menu-bundle parents within the anonymous basket (some other item
         // points at them). Used to keep the duplicate-removal below to safe standalone leaves.
+        // Children by parent, for both sides. A bundle PARENT stores none of its own composition, so
+        // the comparison below cannot see what the guest chose without them (#313).
+        var anonymousChildren = ChildrenByParent(anonymousItems);
+        var userChildren = ChildrenByParent(userBasket.Items);
+
         var parentItemIds = anonymousItems
             .Where(i => i.ParentBasketItemId.HasValue)
             .Select(i => i.ParentBasketItemId!.Value)
@@ -105,10 +112,25 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         // re-homed explicitly below.
         foreach (var item in anonymousItems.Where(i => i.ParentBasketItemId == null))
         {
+            // Identity AND customization (#313) — the rule and the measurements are in
+            // BasketLineCustomization. Worth naming HERE is the consequence unique to this method: a
+            // row that does not match re-homes, and a re-homed row enters `rehomed`, so it now reaches
+            // ResetOrderTypeIfMergedItemsConflictAsync — which clears the basket's order type on an
+            // unreadable side-item column. Previously such a row was merged and hard-deleted, so it
+            // never reached the scan. An unreadable line therefore costs the guest a re-pick of
+            // DineIn/Takeaway on top of a duplicate row, which is still better than the old behaviour
+            // of destroying the row silently.
+            //
+            // `incoming is not null` sits FIRST in the predicate: without it an unreadable USER row is
+            // re-parsed, and its warning re-logged, once per anonymous root for an answer already known.
+            var incoming = Customization(item, anonymousChildren);
+
             var existingItem = userBasket.Items.FirstOrDefault(bi =>
                 bi.ParentBasketItemId == null &&
                 bi.ProductId == item.ProductId &&
-                bi.ProductVariationId == item.ProductVariationId);
+                bi.ProductVariationId == item.ProductVariationId &&
+                incoming is not null &&
+                BasketLineCustomization.AreSame(Customization(bi, userChildren), incoming));
 
             if (existingItem != null)
             {
@@ -177,7 +199,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         anonymousBasket.DeletedAt = DateTime.UtcNow;
         anonymousBasket.DeletedBy = _currentUserService.GetAuditIdentifier();
 
-        await ResetOrderTypeIfMergedItemsConflictAsync(userBasket, rehomed, anonymousItems);
+        await MergedBasketChannelReset.ApplyAsync(_context, _logger, userBasket, rehomed, anonymousItems);
 
         await _context.SaveChangesAsync();
         await _basketRepository.RecalculateTotalsAsync(userBasket.Id);
@@ -186,89 +208,22 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
             ?? throw new BadRequestException("Failed to retrieve basket");
     }
 
-    /// <summary>
-    /// Merging re-homes rows by direct assignment, so it bypasses the add-to-basket channel guard —
-    /// a Takeaway anonymous basket merging into a DineIn user basket could land lines that are
-    /// invalid for the surviving channel (ORDER-TYPE-AVAILABILITY-PLAN G11).
-    /// </summary>
-    /// <remarks>
-    /// The rule: never drop a line (the guest chose it) and never keep an invalid line under a
-    /// channel. So on conflict the CHANNEL is cleared instead — the guest re-picks, and the normal
-    /// two-phase switch (IBasketChannelService) then shows a proper itemized confirm. Clearing a
-    /// channel is always safe: null is the permissive browse state.
-    /// </remarks>
-    private async Task ResetOrderTypeIfMergedItemsConflictAsync(
-        Domain.Entities.Basket userBasket,
-        List<Domain.Entities.BasketItem> rehomed,
-        IReadOnlyCollection<Domain.Entities.BasketItem> anonymousItems)
-    {
-        if (userBasket.OrderType is null || rehomed.Count == 0)
-        {
-            return;
-        }
+    private static Dictionary<Guid, IReadOnlyCollection<Domain.Entities.BasketItem>> ChildrenByParent(
+        IEnumerable<Domain.Entities.BasketItem> items) =>
+        items.Where(i => i.ParentBasketItemId.HasValue)
+            .GroupBy(i => i.ParentBasketItemId!.Value)
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<Domain.Entities.BasketItem>)g.ToList());
 
-        // Inspect the EXPLICIT re-homed list, not userBasket.Items. The merge loop re-homes rows by
-        // scalar FK assignment (item.BasketId = ...), and EF only fixes up the Items navigation
-        // during DetectChanges/SaveChanges — which happens AFTER this runs. Reading
-        // userBasket.Items here would see only the user's pre-existing lines, every one of which was
-        // already validated by BasketChannelGuard when it was added, so the check would be a no-op
-        // for exactly the scenario it exists to catch.
-        //
-        // §9.15: `rehomed` holds ROOTS only (the merge loop iterates roots and re-homes each one's
-        // children alongside it), so the descendants are resolved from `anonymousItems` — the same
-        // snapshot the loop walked. Scanning roots alone let a bundle whose COMPONENT the surviving
-        // channel forbids merge in silently, which is this method's own failure mode one level down.
-        List<string> conflicting;
-        try
-        {
-            var productIds = BasketLineChannelScan.CollectProductIds(rehomed, anonymousItems);
-            if (productIds.Count == 0)
-            {
-                return;
-            }
-
-            var products = await BasketLineChannelScan.LoadProductsAsync(_context, productIds, CancellationToken.None);
-
-            conflicting = rehomed
-                .Where(root => !OrderChannelMap.Allows(
-                    BasketLineChannelScan.LineMask(root, anonymousItems, products), userBasket.OrderType.Value))
-                .Select(root => root.ProductId is { } id && products.TryGetValue(id, out var p) ? p.Name : "(unknown item)")
-                .ToList();
-        }
-        catch (JsonException ex)
-        {
-            // Caught HERE and nowhere else. BasketLineChannelScan deliberately lets a corrupt
-            // SelectedSideItemsJson throw, because a swallowed parse failure makes the scan silently
-            // permissive — but on THIS path a throw is worse than the bug it guards. It would escape
-            // before SaveChangesAsync, abandoning the adopt, the re-home AND the soft-delete, and
-            // BasketMergeService catches everything out of here on purpose ("basket merge should not
-            // break login flow") — so the guest would log in and watch their whole basket vanish,
-            // silently. The switch path has no such swallow: there the throw surfaces as a 500 the
-            // guest can retry, and the cart still renders.
-            //
-            // Clearing the channel is the fail-safe this method already has: it is what a genuine
-            // conflict does, it never drops a line, and null is the permissive browse state. So an
-            // unreadable line is treated as conflicting rather than as fine.
-            _logger.LogError(ex,
-                "Unreadable side-item JSON while merging into basket {BasketId}; clearing order type {OrderType} "
-                + "rather than assuming the merged lines are orderable",
-                userBasket.Id, userBasket.OrderType);
-
-            userBasket.OrderType = null;
-            return;
-        }
-
-        if (conflicting.Count == 0)
-        {
-            return;
-        }
-
-        _logger.LogInformation(
-            "Cleared order type {OrderType} on merged basket {BasketId}: {Count} line(s) unavailable ({Names})",
-            userBasket.OrderType, userBasket.Id, conflicting.Count, string.Join(", ", conflicting));
-
-        userBasket.OrderType = null;
-    }
+    private BasketLineCustomization? Customization(
+        Domain.Entities.BasketItem row,
+        Dictionary<Guid, IReadOnlyCollection<Domain.Entities.BasketItem>> childrenByParent) =>
+        BasketLineCustomization.FromRow(
+            row,
+            childrenByParent.TryGetValue(row.Id, out var children)
+                ? children
+                : Array.Empty<Domain.Entities.BasketItem>(),
+            (ex, what) => _logger.LogWarning(
+                ex, "Failed to deserialize {What} JSON for basket item {BasketItemId}", what, row.Id));
 
     // Re-loads the user's basket with the full item graph (FindBasketAsync) and maps it.
     private async Task<BasketDto?> MapByUserAsync(Guid userId)
