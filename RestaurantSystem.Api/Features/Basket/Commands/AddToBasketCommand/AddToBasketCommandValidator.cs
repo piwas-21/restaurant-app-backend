@@ -26,16 +26,22 @@ public class AddToBasketCommandValidator : AbstractValidator<AddToBasketCommand>
         {
             option.RuleFor(o => o.SpecialInstructions)
                 .MaximumLength(500).WithMessage("Special instructions cannot exceed 500 characters");
+
+            // The rule above binds the LINE quantity; an option's own had no ceiling anywhere
+            // (#308), so 30,000,000 was accepted and overflowed the decimal price column later.
+            option.RuleFor(o => o.Quantity)
+                .GreaterThan(0).WithMessage("Menu option quantity must be greater than 0")
+                .LessThanOrEqualTo(100).WithMessage("Menu option quantity cannot exceed 100");
         });
 
-        //RuleForEach(x => x.SideItems).ChildRules(sideItem =>
-        //{
-        //    sideItem.RuleFor(si => si.SideItemProductId)
-        //        .NotEmpty().WithMessage("Side item product ID is required");
-
-        //    sideItem.RuleFor(si => si.Quantity)
-        //        .GreaterThan(0).WithMessage("Side item quantity must be greater than 0")
-        //        .LessThanOrEqualTo(10).WithMessage("Side item quantity cannot exceed 10");
-        //});
+        // The command's other client-supplied quantity, same hole (#308), measured at 500 on the
+        // INSERT. UPPER BOUND ONLY — the asymmetry with the option rule is deliberate and is
+        // explained, with what breaks if it is "tidied" into symmetry, in
+        // AddToBasketCommandValidatorTests.
+        RuleForEach(x => x.SelectedSideItems).ChildRules(sideItem =>
+        {
+            sideItem.RuleFor(si => si.Quantity)
+                .LessThanOrEqualTo(100).WithMessage("Side item quantity cannot exceed 100");
+        });
     }
 }

@@ -132,9 +132,15 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
                     _currentUserService.GetAuditIdentifier());
 
                 existingItem.Quantity += item.Quantity;
-                // ItemTotal must include CustomizationPrice — the factory sets
-                // ItemTotal = (unitPrice + customizationPrice) * quantity.
-                existingItem.ItemTotal = (existingItem.UnitPrice + existingItem.CustomizationPrice) * existingItem.Quantity;
+
+                // THE MONEY (#308). This was a flat `(UnitPrice + CustomizationPrice) * Quantity`,
+                // justified in a comment from BuildRegularItemAsync — true of a regular item, and a
+                // DOUBLE CHARGE for a bundle, whose UnitPrice already contains its customization.
+                // Measured at 57.00 where 48.00 is correct: 9.00 on one line, at every login where
+                // the same bundle sits in both baskets. Rule and rationale: BasketLineTotal.
+                // `existingChildren` is read from the flat Items list just above, so this does not
+                // depend on EF relationship fix-up having populated the navigation.
+                existingItem.ItemTotal = BasketLineTotal.ForRoot(existingItem, existingChildren.Count);
                 existingItem.UpdatedAt = DateTime.UtcNow;
                 existingItem.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
