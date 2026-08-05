@@ -143,6 +143,13 @@ public class BasketService : IBasketService
             // being merged; it never protected their children. AnonymousBasketMerger has always
             // filtered on `ParentBasketItemId == null` here for the same reason (#305).
             var existingItem = await _context.BasketItems
+                // Load-bearing for the line total below (#308). A row that reaches this branch is
+                // normally a regular item — the Menu branch returns above — but "normally" is doing
+                // real work there: `product.Type` is mutable, so a bundle parent whose product was
+                // retyped away from Menu DOES fall through to here, and pricing it as a regular item
+                // double-charges its customization. Un-included, children read as empty, not as an
+                // error, so the count would silently say "regular" for every row.
+                .Include(bi => bi.ChildBasketItems)
                 .Where(bi =>
                     bi.BasketId == basket.Id &&
                     bi.ParentBasketItemId == null &&
@@ -158,7 +165,10 @@ public class BasketService : IBasketService
             {
                 // Update quantity of existing item with same customizations
                 exactMatch.Quantity += item.Quantity;
-                exactMatch.ItemTotal = exactMatch.Quantity * exactMatch.UnitPrice;
+                // `Quantity * UnitPrice` here DROPPED the customization (#308): a regular item's
+                // UnitPrice excludes it, so re-ordering the same customised dish billed the second
+                // one without its extras — measured 25.98 for two 15.98 lines.
+                exactMatch.ItemTotal = BasketLineTotal.ForRoot(exactMatch, exactMatch.ChildBasketItems.Count);
                 exactMatch.UpdatedAt = DateTime.UtcNow;
                 exactMatch.UpdatedBy = _currentUserService.GetAuditIdentifier();
             }
@@ -189,6 +199,8 @@ public class BasketService : IBasketService
             // Load-bearing for the rescale below (#305). Without it ChildBasketItems reads as an
             // EMPTY collection rather than throwing, so a bundle's children would silently keep
             // their add-time count and every test would still pass.
+            // ...and load-bearing a second time, for the line total below (#308): the child count is
+            // what says whether UnitPrice already contains the customization.
             .Include(bi => bi.ChildBasketItems)
             // ROOT ROWS ONLY, the same invariant the add-path dedup above now enforces. A bundle
             // child is not independently addressable: its quantity is DERIVED from the parent's,
@@ -215,7 +227,12 @@ public class BasketService : IBasketService
         var previousQuantity = basketItem.Quantity;
 
         basketItem.Quantity = update.Quantity;
-        basketItem.ItemTotal = basketItem.Quantity * basketItem.UnitPrice;
+        // Recomputed AFTER the assignment above — the helper reads the row's current Quantity.
+        // `Quantity * UnitPrice` is the bundle rule and was applied to every row (#308), so the
+        // stepper dropped a regular item's customization: measured 38.97 against 47.94 on a 1 -> 3
+        // change, and it did not even need a change to bite — re-submitting the quantity the line
+        // already held rewrote 15.98 to 12.99.
+        basketItem.ItemTotal = BasketLineTotal.ForRoot(basketItem, basketItem.ChildBasketItems.Count);
 
         BundleChildQuantityScaler.Rescale(
             basketItem.ChildBasketItems,
@@ -244,7 +261,21 @@ public class BasketService : IBasketService
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
             .Include(bi => bi.ChildBasketItems) // Include child items for cascade deletion
-            .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
+                                                // ROOT ROWS ONLY — the fourth member of the family in #308's header, and the same filter
+                                                // #310 put on the update path. A child carries its parent's BasketId and its component's
+                                                // ProductId, so an id-only lookup accepted it: DELETE on a child removed that component
+                                                // while the parent's UnitPrice and CustomizationPrice still included it, so the guest
+                                                // kept paying for something that had left the kitchen ticket.
+                                                //
+                                                // It is also load-bearing for BasketLineTotal: individually deleting a bundle's children
+                                                // was the ONLY way to manufacture a parent with CustomizationPrice > 0 and no children,
+                                                // which is the single state the child-count rule prices wrongly. Removing this filter
+                                                // reopens that.
+                                                //
+                                                // Answers BasketItemNotFound rather than a new code, matching the update path: to a
+                                                // client, a child id is not an addressable basket item.
+            .FirstOrDefaultAsync(bi =>
+                bi.Id == basketItemId && bi.BasketId == basket.Id && bi.ParentBasketItemId == null);
 
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
