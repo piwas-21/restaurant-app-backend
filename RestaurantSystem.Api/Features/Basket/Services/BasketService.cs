@@ -190,7 +190,22 @@ public class BasketService : IBasketService
             // EMPTY collection rather than throwing, so a bundle's children would silently keep
             // their add-time count and every test would still pass.
             .Include(bi => bi.ChildBasketItems)
-            .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
+            // ROOT ROWS ONLY, the same invariant the add-path dedup above now enforces. A bundle
+            // child is not independently addressable: its quantity is DERIVED from the parent's,
+            // and its ItemTotal is 0 so it cannot double-count. Updating one directly broke both —
+            // measured before this filter, `PUT` on a child id answered 200, set that row to
+            // quantity 7 with ItemTotal 10.50, and moved the subtotal 13.00 -> 23.50, charging the
+            // component twice (once inside the parent's UnitPrice, once on its own row).
+            //
+            // It is also the in-app way to manufacture a child whose count is no longer a multiple
+            // of its parent's — the exact state BundleChildQuantityScaler has to refuse to rescale.
+            // Closing the producer is what keeps that skip branch a deploy-window concern rather
+            // than a permanent one.
+            //
+            // Answers BasketItemNotFound rather than a new code: from a client's point of view a
+            // child id is not an addressable basket item, which is what that code already means.
+            .FirstOrDefaultAsync(bi =>
+                bi.Id == basketItemId && bi.BasketId == basket.Id && bi.ParentBasketItemId == null);
 
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
