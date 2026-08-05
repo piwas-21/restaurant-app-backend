@@ -42,10 +42,11 @@ esac
 # documented opt-out. A warning no pre-commit run will ever reproduce is not early feedback, it is
 # a standing false positive — and this checker's whole contract is "quiet on success".
 is_excused() {
+  local file="$1"
   local root rel
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  rel="${1#./}"; rel="${rel#"$root"/}"; rel="${rel#./}"     # -> repo-relative, whatever form came in
-  head -n 5 "$1" 2>/dev/null | grep -q "FILE_LENGTH_EXEMPT" && return 0
+  rel="${file#./}"; rel="${rel#"$root"/}"; rel="${rel#./}"  # -> repo-relative, whatever form came in
+  head -n 5 "$file" 2>/dev/null | grep -q "FILE_LENGTH_EXEMPT" && return 0
   [[ -f "$root/scripts/file-length-baseline.txt" ]] || return 1
   grep -Fxq "$rel" "$root/scripts/file-length-baseline.txt"
 }

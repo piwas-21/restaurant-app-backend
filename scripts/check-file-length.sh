@@ -126,8 +126,9 @@ assert_corpus() {
 }
 
 check_one() {
+  local raw="$1"
   local path
-  path="$(normalise_path "$1")"
+  path="$(normalise_path "$raw")"
   [[ -f "$path" ]] || return 0
   case "$path" in *.cs) ;; *) return 0 ;; esac   # count only what the message claims to count
   n_walked=$((n_walked + 1))
