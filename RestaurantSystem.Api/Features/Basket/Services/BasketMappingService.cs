@@ -207,7 +207,8 @@ public class BasketMappingService : IBasketMappingService
     /// <para><b>It still sets no SelectedIngredientNames, deliberately.</b> That would be the
     /// ADDED side, not #363's subject, and it is not a free addition: the cart pairs
     /// <c>selectedIngredientNames[i]</c> with <c>selectedIngredients[i]</c> positionally
-    /// (<c>lineSummary.ts</c>, <c>CartItemCustomizations.tsx</c>), and the list also labels every
+    /// (<c>lineSummary.ts</c> — the only such site since frontend #189 deleted
+    /// <c>CartItemCustomizations.tsx</c>, which this used to name as the second), and the list also labels every
     /// selection "Added" — including base-recipe ingredients the guest never added. Populating it
     /// would change checkout copy from a backend-only change with no paired frontend work. Removals
     /// carry no such contract: the list stands alone and pairs with nothing.</para>

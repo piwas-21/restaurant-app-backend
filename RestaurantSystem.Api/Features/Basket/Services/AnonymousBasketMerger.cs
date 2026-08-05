@@ -112,6 +112,25 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
 
             if (existingItem != null)
             {
+                // The SECOND site where a bundle parent's quantity moves (#305). The match above
+                // keys on ProductId + variation and excludes only CHILD rows, so a bundle the guest
+                // holds in both baskets lands here exactly like a standalone product — and the user
+                // basket's children would otherwise keep the count they were built with.
+                //
+                // Children come from the flat Items list, not from existingItem.ChildBasketItems:
+                // FindTrackedBasketWithItemsAsync includes `b.Items` only, which already contains
+                // every child row, and reading them this way does not depend on EF relationship
+                // fix-up having populated the navigation.
+                var existingChildren = userBasket.Items
+                    .Where(i => i.ParentBasketItemId == existingItem.Id)
+                    .ToList();
+
+                BundleChildQuantityScaler.Rescale(
+                    existingChildren,
+                    existingItem.Quantity,
+                    existingItem.Quantity + item.Quantity,
+                    _currentUserService.GetAuditIdentifier());
+
                 existingItem.Quantity += item.Quantity;
                 // ItemTotal must include CustomizationPrice — the factory sets
                 // ItemTotal = (unitPrice + customizationPrice) * quantity.
