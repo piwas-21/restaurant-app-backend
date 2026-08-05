@@ -39,22 +39,14 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
                 !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
             .WithMessage("Primary category must be one of the selected categories");
 
-        RuleForEach(x => x.Variations).ChildRules(variation =>
-        {
-            variation.RuleFor(v => v.Name)
-                .NotEmpty().WithMessage("Variation name is required")
-                .MaximumLength(50).WithMessage("Variation name cannot exceed 50 characters");
-
-            variation.RuleFor(v => v.Description)
-                .MaximumLength(200).WithMessage("Variation description cannot exceed 200 characters");
-
-            variation.RuleFor(v => v.DisplayOrder)
-                .GreaterThanOrEqualTo(0).WithMessage("Variation display order cannot be negative");
-        });
+        RuleForEach(x => x.Variations).ChildRules(CreateProductVariationRules.Apply);
 
         RuleFor(x => x.SuggestedSideItemIds)
             .Must(x => x == null || x.Distinct().Count() == x.Count)
             .WithMessage("Duplicate side items are not allowed");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
+
+        // #306; required: true is CREATE-only — see ProductContentRule.
+        RuleFor(x => x.Content).ValidProductContent(required: true);
     }
 }
