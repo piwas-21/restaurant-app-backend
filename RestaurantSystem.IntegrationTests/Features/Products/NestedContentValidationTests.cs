@@ -69,6 +69,32 @@ public class NestedContentValidationTests : IntegrationTestBase
             $"/api/Products/{_productId}",
             new StringContent(json, Encoding.UTF8, "application/json"));
 
+    private Task<HttpResponseMessage> PostRawAsync(string json) =>
+        Client.PostAsync("/api/Products", new StringContent(json, Encoding.UTF8, "application/json"));
+
+    /// <summary>
+    /// The create counterpart of <see cref="BuildPayload"/>. It carries a top-level <c>content</c>
+    /// where the update payload does not, because <c>CreateProductCommandValidator</c> passes
+    /// <c>required: true</c> — omitting it would 400 for a reason that has nothing to do with #323.
+    /// </summary>
+    private string BuildCreatePayload(string nestedFragment) => $$"""
+    {
+      "name": "Created Nested Content Product",
+      "basePrice": 12,
+      "isActive": true,
+      "isAvailable": true,
+      "isSpecial": false,
+      "preparationTimeMinutes": 10,
+      "type": "mainItem",
+      "kitchenType": "none",
+      "displayOrder": 0,
+      "categoryIds": ["{{_categoryId}}"],
+      "primaryCategoryId": "{{_categoryId}}",
+      "content": { "en": { "name": "Created", "description": "d" } },
+      {{nestedFragment}}
+    }
+    """;
+
     private string BuildPayload(string nestedFragment) => $$"""
     {
       "id": "{{_productId}}",
@@ -196,6 +222,95 @@ public class NestedContentValidationTests : IntegrationTestBase
         // a row no locale will ever match, and which a status-only test calls a success.
         (await ReadNestedRowsAsync()).Should().BeEmpty(
             $"'{shape}' must not persist a translation row");
+    }
+
+    // ---- #323: a blank nested NAME, on all four write paths ------------------------------------
+    //
+    // Three handler guards used to decide this instead of the validator, with three different
+    // policies across four paths, all answering 200: variations dropped a blank-named entry on both
+    // paths, ingredients-create dropped one only if the description was ALSO blank, and
+    // ingredients-update had no guard and persisted `name="" desc=""`. The live bug was the first of
+    // those — `{"en":{"name":"","description":"Grande portion"}}` answered 200 and stored NOTHING.
+    //
+    // The guards are deleted and the rule refuses a blank name. This fires every payload from #323's
+    // table at every one of the four paths rather than asserting the guards are now unreachable:
+    // twelve cases, each of which must be a 400 carrying THIS rule's message, with nothing persisted.
+    // Whitespace is included because `name="   "` used to reach the database — the reason the rule
+    // tests IsNullOrWhiteSpace and not IsNullOrEmpty.
+    public static TheoryData<string, string, string> BlankNestedNames()
+    {
+        var data = new TheoryData<string, string, string>();
+        string[] shapes =
+        [
+            """{"en": {"name": "", "description": "Sauce piquante"}}""",
+            """{"en": {"name": "", "description": ""}}""",
+            """{"en": {"name": "   ", "description": "Sauce"}}""",
+        ];
+
+        foreach (var verb in new[] { "POST", "PUT" })
+        {
+            foreach (var kind in new[] { "ingredient", "variation" })
+            {
+                foreach (var shape in shapes)
+                {
+                    data.Add(verb, kind, shape);
+                }
+            }
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(BlankNestedNames))]
+    public async Task ABlankNestedName_IsRefused_AndPersistsNothing(string verb, string kind, string content)
+    {
+        AuthenticateAsAdmin();
+
+        var fragment = kind == "ingredient" ? Ingredient(content) : Variation(content);
+        var response = verb == "POST"
+            ? await PostRawAsync(BuildCreatePayload(fragment))
+            : await PutRawAsync(BuildPayload(fragment));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            $"{verb} {kind} {content} answered 200 before #323");
+
+        // Must be THIS rule's refusal, and ONLY it. Without that the POST half of this theory would
+        // pass for the wrong reason if the create payload were malformed in some unrelated way —
+        // every case would 400 and the test would read as proof.
+        //
+        // ContainSingle, not Contain, and the reason is sharp: NestedContentRule.NameRequiredMessage
+        // and ProductContentRule.NameRequiredMessage are the IDENTICAL literal, so a substring match
+        // cannot tell the nested rule's refusal from the top-level rule's. A lone error whose text is
+        // that message, against a payload whose top-level content is well-formed, can only be the
+        // nested one. AWellFormedNestedName_IsAccepted_AndPersisted_OnCreate is the other half.
+        (await ReadErrorsAsync(response)).Should().ContainSingle(
+            $"{verb} {kind} must be refused by NestedContentRule alone, not by model binding or another rule")
+            .Which.Should().Contain(NestedContentRule.NameRequiredMessage);
+
+        // The assertion the status code cannot make: three of these twelve used to answer 200 AND
+        // write a row, and three others answered 200 having silently dropped what was sent.
+        (await ReadNestedRowsAsync()).Should().BeEmpty(
+            $"{verb} {kind} {content} must not persist a translation row");
+    }
+
+    // The positive control for the POST half above, and the over-strictness guard for the create
+    // path: a well-formed nested name must still be accepted AND persisted. Without this, a create
+    // payload broken for an unrelated reason would make all six POST cases pass vacuously.
+    [Theory]
+    [InlineData("ingredient")]
+    [InlineData("variation")]
+    public async Task AWellFormedNestedName_IsAccepted_AndPersisted_OnCreate(string kind)
+    {
+        AuthenticateAsAdmin();
+
+        var content = """{"fr": {"name": "Fromage", "description": "d"}}""";
+        var fragment = kind == "ingredient" ? Ingredient(content) : Variation(content);
+
+        var response = await PostRawAsync(BuildCreatePayload(fragment));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadNestedRowsAsync()).Should().ContainSingle().Which.Should().Be($"{kind}:fr:Fromage");
     }
 
     // ---- One test per COLUMN BOUND, because a bound read wrong is invisible ---------------------
