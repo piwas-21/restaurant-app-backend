@@ -61,7 +61,7 @@ public static class NestedContentRule
 
     /// <summary>
     /// Every entry must carry a language code that is non-blank and fits its column, a non-null value,
-    /// and a non-null <c>Name</c> that fits its column. A <c>null</c> map passes — an absent
+    /// and a NON-BLANK <c>Name</c> that fits its column. A <c>null</c> map passes — an absent
     /// <c>content</c> on a nested item legitimately means "no translations", exactly as on the update
     /// path's top-level map.
     /// </summary>
@@ -83,9 +83,42 @@ public static class NestedContentRule
     /// stop; the oversize-key case is new here and is why the length rules are part of this fix
     /// rather than a follow-up. Fixing only the nulls would leave two of the six 500s standing.
     ///
-    /// EMPTY <c>Name</c> is allowed and only null is refused, matching the top-level rule's reasoning:
-    /// the admin UI posts empty strings for untouched fields, so rejecting them would turn a routine,
-    /// currently-working save into a 400.
+    /// A BLANK <c>Name</c> is refused, not just a null one (#323), and the empty/whitespace cases are
+    /// refused by the same <c>IsNullOrWhiteSpace</c> test: <c>name="   "</c> used to persist.
+    ///
+    /// An earlier version of this rule allowed an empty name, on the reasoning that the admin UI posts
+    /// empty strings for untouched fields and rejecting them would 400 a routine save. THAT REASONING
+    /// WAS CORRECT ABOUT THE FACTS — measured, not assumed: the product editor sent all ten languages
+    /// as <c>{"name":"","description":""}</c> for every variation (its inputs live inside a
+    /// <c>&lt;details&gt;</c>, which hides children without unmounting them, so they register unopened)
+    /// and seven such entries for every newly added ingredient. What made the empty name ALLOWABLE was
+    /// three unstated handler guards that silently dropped those entries again, and that silence is
+    /// the defect: <c>{"en": {"name":"", "description":"Grande portion"}}</c> answered 200 and stored
+    /// NOTHING. The guards are gone.
+    ///
+    /// THIS RULE THEREFORE HAS A RELEASE ORDER. It is only safe once the admin editor stops sending the
+    /// entries it never touched — frontend PR #450, "stop sending translation entries the admin never
+    /// touched". That must reach an environment BEFORE this does, `develop` included, since staging
+    /// tracks it; the other way round, every product save carrying a variation or a newly added
+    /// ingredient answers 400.
+    ///
+    /// THE TOP-LEVEL RULE DELIBERATELY DOES NOT FOLLOW, and the divergence is stated rather than silent
+    /// (#323 asked for one or the other). Two reasons that survive measurement, and one correction:
+    /// every read site resolves a name as <c>content[lang]?.name || content.en?.name || product.name</c>
+    /// — all eleven of them, checked, none using <c>??</c> — so a blank top-level name falls through the
+    /// chain and is inert rather than shadowing; and <see cref="ProductContentRule"/>'s permissiveness is
+    /// pinned by two tests whose stated reason (the form posts <c>description: data.description || ''</c>)
+    /// stays true of Description, which is unchanged either way.
+    ///
+    /// The correction: an earlier draft of this paragraph claimed the top-level path has NO silent
+    /// discard. That is wrong, and an adversarial review measured it. A whitespace-only top-level name
+    /// persists (200), the admin editor's payload builder then omits that row from the NEXT save, and
+    /// <c>UpdateProductCommandHandler</c>'s <c>if (contentMap.Any()) RemoveRange(...)</c> full-replace
+    /// deletes it — description text included. So the same silent-discard class does exist at top level;
+    /// it lives in the client filter plus the full replace rather than in a handler guard, which is why
+    /// it is not what #323 measured and not what this rule closes. Tracked separately; tightening the
+    /// top-level rule here would not fix it and would be an unmeasured behaviour change on four live
+    /// write paths.
     /// </remarks>
     /// <param name="name">Reads the entry's <c>Name</c> — the one required field the two DTOs share
     /// under different types.</param>
@@ -128,7 +161,7 @@ public static class NestedContentRule
                 }
 
                 var entryName = name(entry);
-                if (entryName is null)
+                if (string.IsNullOrWhiteSpace(entryName))
                 {
                     context.AddFailure($"{NameRequiredMessage} ('{languageCode}')");
                 }

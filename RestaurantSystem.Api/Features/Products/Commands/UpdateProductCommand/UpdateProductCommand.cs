@@ -271,8 +271,6 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 {
                     foreach (var (languageCode, content) in variationDto.Content)
                     {
-                        if (string.IsNullOrWhiteSpace(content.Name)) continue;
-
                         var description = new ProductVariationDescription
                         {
                             ProductVariation = variation,

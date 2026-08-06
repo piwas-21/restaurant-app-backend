@@ -166,8 +166,6 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     {
                         foreach (var (languageCode, content) in variationDto.Content)
                         {
-                            if (string.IsNullOrWhiteSpace(content.Name)) continue;
-
                             var description = new ProductVariationDescription
                             {
                                 ProductVariation = variation,
@@ -225,36 +223,17 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     _context.ProductIngredients.Add(ingredient);
                     product.DetailedIngredients.Add(ingredient);
 
-                    // Add ingredient descriptions (only non-empty ones)
+                    // Add ingredient descriptions (the validator has already refused a blank name)
                     if (ingredientDto.Content != null)
                     {
-                        // KEPT, after an attempt to remove it was measured and reverted (#316).
-                        //
-                        // The `&&` is not the bug the issue took it for. It reads "skip only an
-                        // ENTIRELY blank entry", and the null-name-with-a-description case it was
-                        // faulted for is now refused by the validator before this loop runs — so the
-                        // guard has no null left to mishandle. Turning it into `||` would be worse
-                        // still: it would silently DROP a translation the client sent, the failure
-                        // mode #196 proposed and #306 rejected.
-                        //
-                        // Deleting it outright was measured through POST /api/Products and writes
-                        // junk: `{"en":{"name":"","description":""}}` persists a row with
-                        // language_code 'en' and an EMPTY name, which the `en` locale then matches,
-                        // shadowing the ingredient's real name with nothing. That is worse than the
-                        // blank-KEY rows this fix exists to stop, because language_code '' matches no
-                        // locale at all. The validator deliberately allows an empty name (the admin UI
-                        // posts empty strings for untouched fields), so only this skip stops the row.
-                        //
-                        // The asymmetries it leaves — update has no such skip, and the VARIATION loops
-                        // in both handlers keep their own weaker guard — are real and out of scope
-                        // here; tracked separately rather than fixed blind.
+                        // The blank-entry skip that used to stand here is GONE (#323). It was kept in
+                        // #316 because deleting it alone persisted junk — an `{"name":"","description":""}`
+                        // row whose `en` language code the `en` locale then matches, shadowing the
+                        // ingredient's real name with nothing. What has changed is that the validator now
+                        // refuses a blank Name outright, so no such entry reaches this loop, and the
+                        // three-policies-across-four-paths asymmetry that skip left behind is closed.
                         foreach (var (languageCode, content) in ingredientDto.Content)
                         {
-                            if (string.IsNullOrWhiteSpace(content.Name) && string.IsNullOrWhiteSpace(content.Description))
-                            {
-                                continue;
-                            }
-
                             var description = new ProductIngredientDescription
                             {
                                 ProductIngredient = ingredient,
