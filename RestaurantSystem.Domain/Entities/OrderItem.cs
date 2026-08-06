@@ -1,4 +1,5 @@
 ﻿using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -9,6 +10,12 @@ public class OrderItem : Entity
     public Guid? ProductVariationId { get; set; }
     public Guid? MenuId { get; set; }
     public Guid? ParentOrderItemId { get; set; }
+
+    /// <summary>
+    /// What this CHILD row is — see <see cref="OrderItemKind"/>. Null on a top-level line and on
+    /// every row written before the column existed; readers must keep a fallback for those (#318).
+    /// </summary>
+    public OrderItemKind? Kind { get; set; }
 
     public string ProductName { get; set; } = null!; // Snapshot at order time
     public string? VariationName { get; set; } // Snapshot at order time

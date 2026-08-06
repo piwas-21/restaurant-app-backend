@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -40,6 +41,12 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
         var childItems = new List<CreateOrderItemDto>();
 
         // Top-level side items → child rows (pre-existing behaviour, unchanged).
+        //
+        // Quantity stays PER UNIT, deliberately: it is what the client sent and what
+        // BasketMappingService serves, so the basket, the cart and the order agree. #318's fix is in
+        // the RENDERER, not here — scaling it at this point would make the order disagree with the
+        // basket the guest actually saw. Kind is what lets the renderer tell it apart from a bundle
+        // child, whose quantity is already line-absolute.
         if (item.SelectedSideItems is { Count: > 0 })
         {
             childItems.AddRange(item.SelectedSideItems.Select(side => new CreateOrderItemDto
@@ -48,6 +55,7 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
                 Quantity = side.Quantity,
                 UnitPrice = side.Price,
                 CustomizationPrice = 0m,
+                Kind = OrderItemKind.SideItem,
             }));
         }
 
@@ -138,11 +146,16 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
         {
             ProductId = child.ProductId,
             ProductVariationId = child.ProductVariationId,
+            // Already LINE-ABSOLUTE when it was written: BuildMenuItemAsync stores
+            // `item.Quantity * option.Quantity` and BundleChildQuantityScaler keeps it that way when
+            // the parent's quantity moves (#305). The renderer must therefore NOT scale it again —
+            // double-scaling a bundle child is the obvious way to get #318 wrong.
             Quantity = child.Quantity,
             UnitPrice = child.UnitPrice,
             CustomizationPrice = 0m,
             SpecialInstructions = child.SpecialInstructions,
             IngredientQuantities = BuildIngredientQuantities(child),
+            Kind = OrderItemKind.BundleChild,
         };
 
         if (child.ChildItems is { Count: > 0 })

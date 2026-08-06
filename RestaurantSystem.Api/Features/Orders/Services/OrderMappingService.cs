@@ -130,10 +130,10 @@ public class OrderMappingService : IOrderMappingService
         string? kitchenType = item.Product?.KitchenType.ToString()
             ?? item.Menu?.MenuItems?.FirstOrDefault()?.Product?.KitchenType.ToString();
 
-        // Map child items. A child of a bundle/combo (ProductType.Menu parent) is a bundle
-        // component; a child of a regular item is a true add-on side. The Kind discriminator
-        // (DTO-only, derived from the parent's product type) lets the kitchen ticket and the
-        // order UI tell the two apart — they otherwise share the SideItems collection (#158).
+        // Map child items. A bundle component and a true add-on side share the SideItems
+        // collection (#158) and are told apart by Kind — now READ FROM THE CHILD ROW rather than
+        // derived from the parent's mutable product type, and used to reconcile the two different
+        // things a child's stored Quantity means. See ResolveChildKind and LineQuantity (#318).
         // ChildOrderItems is initialized non-null on the entity, so no null guard here — an
         // unpopulated navigation is an EMPTY collection, which is exactly why #234 failed
         // silently rather than throwing. See MapToOrderItemDto for when this branch applies.
@@ -144,12 +144,12 @@ public class OrderMappingService : IOrderMappingService
         List<OrderItemDto>? sideItems = null;
         if (childItems.Any())
         {
-            var childKind = item.Product?.Type == ProductType.Menu ? ItemKind.BundleChild : ItemKind.SideItem;
             sideItems = childItems
                 .Select(child =>
                 {
                     var childDto = MapOrderItem(child, childrenByParent);
-                    childDto.Kind = childKind;
+                    childDto.Kind = OrderChildRendering.DisplayKind(child, item);
+                    childDto.Quantity = OrderChildRendering.LineQuantity(child, item);
                     return childDto;
                 })
                 .ToList();
