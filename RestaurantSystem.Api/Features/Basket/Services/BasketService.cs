@@ -143,6 +143,13 @@ public class BasketService : IBasketService
             // being merged; it never protected their children. AnonymousBasketMerger has always
             // filtered on `ParentBasketItemId == null` here for the same reason (#305).
             var existingItem = await _context.BasketItems
+                // Load-bearing for the line total below (#308). A row that reaches this branch is
+                // normally a regular item — the Menu branch returns above — but "normally" is doing
+                // real work there: `product.Type` is mutable, so a bundle parent whose product was
+                // retyped away from Menu DOES fall through to here, and pricing it as a regular item
+                // double-charges its customization. Un-included, children read as empty, not as an
+                // error, so the count would silently say "regular" for every row.
+                .Include(bi => bi.ChildBasketItems)
                 .Where(bi =>
                     bi.BasketId == basket.Id &&
                     bi.ParentBasketItemId == null &&
@@ -150,15 +157,19 @@ public class BasketService : IBasketService
                     bi.ProductVariationId == item.ProductVariationId)
                 .ToListAsync();
 
-            // Find exact match including customizations (instructions, selected/excluded
-            // ingredients, per-ingredient quantities, AND top-level side items).
+            // Find exact match including customizations (instructions, selected/added
+            // ingredients, per-ingredient quantities, top-level side items, AND — for a row that
+            // turns out to have children — its bundle composition).
             var exactMatch = existingItem.FirstOrDefault(bi => IsSameCustomization(bi, item));
 
             if (exactMatch != null)
             {
                 // Update quantity of existing item with same customizations
                 exactMatch.Quantity += item.Quantity;
-                exactMatch.ItemTotal = exactMatch.Quantity * exactMatch.UnitPrice;
+                // `Quantity * UnitPrice` here DROPPED the customization (#308): a regular item's
+                // UnitPrice excludes it, so re-ordering the same customised dish billed the second
+                // one without its extras — measured 25.98 for two 15.98 lines.
+                exactMatch.ItemTotal = BasketLineTotal.ForRoot(exactMatch, exactMatch.ChildBasketItems.Count);
                 exactMatch.UpdatedAt = DateTime.UtcNow;
                 exactMatch.UpdatedBy = _currentUserService.GetAuditIdentifier();
             }
@@ -189,6 +200,8 @@ public class BasketService : IBasketService
             // Load-bearing for the rescale below (#305). Without it ChildBasketItems reads as an
             // EMPTY collection rather than throwing, so a bundle's children would silently keep
             // their add-time count and every test would still pass.
+            // ...and load-bearing a second time, for the line total below (#308): the child count is
+            // what says whether UnitPrice already contains the customization.
             .Include(bi => bi.ChildBasketItems)
             // ROOT ROWS ONLY, the same invariant the add-path dedup above now enforces. A bundle
             // child is not independently addressable: its quantity is DERIVED from the parent's,
@@ -215,7 +228,12 @@ public class BasketService : IBasketService
         var previousQuantity = basketItem.Quantity;
 
         basketItem.Quantity = update.Quantity;
-        basketItem.ItemTotal = basketItem.Quantity * basketItem.UnitPrice;
+        // Recomputed AFTER the assignment above — the helper reads the row's current Quantity.
+        // `Quantity * UnitPrice` is the bundle rule and was applied to every row (#308), so the
+        // stepper dropped a regular item's customization: measured 38.97 against 47.94 on a 1 -> 3
+        // change, and it did not even need a change to bite — re-submitting the quantity the line
+        // already held rewrote 15.98 to 12.99.
+        basketItem.ItemTotal = BasketLineTotal.ForRoot(basketItem, basketItem.ChildBasketItems.Count);
 
         BundleChildQuantityScaler.Rescale(
             basketItem.ChildBasketItems,
@@ -244,7 +262,21 @@ public class BasketService : IBasketService
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
             .Include(bi => bi.ChildBasketItems) // Include child items for cascade deletion
-            .FirstOrDefaultAsync(bi => bi.Id == basketItemId && bi.BasketId == basket.Id);
+                                                // ROOT ROWS ONLY — the fourth member of the family in #308's header, and the same filter
+                                                // #310 put on the update path. A child carries its parent's BasketId and its component's
+                                                // ProductId, so an id-only lookup accepted it: DELETE on a child removed that component
+                                                // while the parent's UnitPrice and CustomizationPrice still included it, so the guest
+                                                // kept paying for something that had left the kitchen ticket.
+                                                //
+                                                // It is also load-bearing for BasketLineTotal: individually deleting a bundle's children
+                                                // was the ONLY way to manufacture a parent with CustomizationPrice > 0 and no children,
+                                                // which is the single state the child-count rule prices wrongly. Removing this filter
+                                                // reopens that.
+                                                //
+                                                // Answers BasketItemNotFound rather than a new code, matching the update path: to a
+                                                // client, a child id is not an addressable basket item.
+            .FirstOrDefaultAsync(bi =>
+                bi.Id == basketItemId && bi.BasketId == basket.Id && bi.ParentBasketItemId == null);
 
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
@@ -354,109 +386,19 @@ public class BasketService : IBasketService
 
     /// <summary>
     /// Two adds dedup onto one basket line only when their full customization matches: special
-    /// instructions, selected/excluded ingredients, per-selected-ingredient quantities, AND
-    /// top-level side items. The last two were previously ignored, so two otherwise-identical
-    /// lines that differed only by their sides or ingredient quantity silently merged into one
-    /// (menu-bundles redesign #155).
+    /// instructions, selected/added ingredients, per-selected-ingredient quantities, AND top-level
+    /// side items (menu-bundles redesign #155).
+    ///
+    /// The rule itself now lives in <see cref="BasketLineCustomization"/>, shared with
+    /// <c>AnonymousBasketMerger</c>. It was private here, and the merge did not have it — so logging
+    /// in collapsed lines this method exists to keep apart (#313).
     /// </summary>
     private bool IsSameCustomization(BasketItem existing, AddToBasketDto incoming) =>
-        (existing.SpecialInstructions ?? "") == (incoming.SpecialInstructions ?? "")
-        && SameGuidSet(existing.SelectedIngredients, incoming.SelectedIngredients)
-        && SameGuidSet(existing.AddedIngredients, incoming.AddedIngredients)
-        && SameSideItems(existing.SelectedSideItemsJson, incoming.SelectedSideItems, existing.Id)
-        && SameSelectedQuantities(incoming.SelectedIngredients, existing.IngredientQuantitiesJson, incoming.IngredientQuantities, existing.Id);
-
-    /// <summary>
-    /// The dedup path reads the same JSON columns the READ path reads, and the read path has
-    /// guarded them since #169 (<c>BasketMappingService</c> catches <c>JsonException</c> and
-    /// logs). Here they were bare, so one malformed value turned add-to-basket into a 500 —
-    /// the codebase disagreeing with itself about the same two columns (issue #188).
-    ///
-    /// Returns false ONLY when the JSON could not be parsed. A literal <c>null</c> parses fine
-    /// and yields <c>true</c> with a null <paramref name="value"/>, which callers already treat
-    /// as "no stored selection" — collapsing the two into one nullable return would silently
-    /// turn that pre-existing, legitimate case into a dedup miss.
-    /// </summary>
-    private bool TryDeserialize<T>(string json, Guid basketItemId, string what, out T? value)
-        where T : class
-    {
-        try
-        {
-            value = JsonSerializer.Deserialize<T>(json);
-            return true;
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogWarning(ex, "Failed to deserialize {What} JSON for basket item {BasketItemId}", what, basketItemId);
-            value = null;
-            return false;
-        }
-    }
-
-    private static bool SameGuidSet(List<Guid>? a, List<Guid>? b)
-    {
-        var la = a ?? new List<Guid>();
-        var lb = b ?? new List<Guid>();
-        return la.Count == lb.Count && la.OrderBy(x => x).SequenceEqual(lb.OrderBy(x => x));
-    }
-
-    private bool SameSideItems(string? existingJson, List<SelectedSideItemDto>? incoming, Guid existingId)
-    {
-        // Mirror BuildRegularItemAsync: only positive-quantity sides are persisted.
-        var incomingSides = (incoming ?? new List<SelectedSideItemDto>())
-            .Where(s => s.Quantity > 0)
-            .Select(s => (s.Id, s.Quantity))
-            .OrderBy(s => s.Id)
-            .ToList();
-
-        var existingSides = new List<(Guid Id, int Quantity)>();
-        if (!string.IsNullOrEmpty(existingJson))
-        {
-            if (!TryDeserialize<List<SelectedSideItemDto>>(existingJson, existingId, "side items", out var parsed))
-            {
-                // Unreadable customization on the stored row. Answering "same" would merge the
-                // incoming add into it — discarding what THIS customer chose and charging them
-                // twice for a line nobody can read. Answering "not same" costs a duplicate line
-                // and loses nothing, so an undecidable comparison resolves to not-equal.
-                return false;
-            }
-
-            if (parsed != null)
-            {
-                // OfType filters out any null array elements (corrupt/hand-edited JSON) without a
-                // nullable-reference warning, so the projection below can't NRE.
-                existingSides = parsed.OfType<SelectedSideItemDto>().Select(s => (s.Id, s.Quantity)).OrderBy(s => s.Id).ToList();
-            }
-        }
-
-        return incomingSides.SequenceEqual(existingSides);
-    }
-
-    private bool SameSelectedQuantities(
-        List<Guid>? selectedIngredients,
-        string? existingJson,
-        Dictionary<Guid, int>? incoming,
-        Guid existingId)
-    {
-        var selected = selectedIngredients ?? new List<Guid>();
-        if (selected.Count == 0)
-        {
-            return true; // no selected ingredients → nothing to compare (the selection sets already matched)
-        }
-
-        Dictionary<Guid, int>? existing = null;
-        if (!string.IsNullOrEmpty(existingJson)
-            && !TryDeserialize<Dictionary<Guid, int>>(existingJson, existingId, "ingredient quantities", out existing))
-        {
-            return false; // undecidable — see the note in SameSideItems
-        }
-
-        // A selected ingredient's effective quantity is its map value when > 0, else 1. This
-        // ignores the backfilled 0-entries for deselected ingredients (already captured by the
-        // selection-set comparison), so a client that omits defaults still dedups correctly.
-        return selected.All(id => EffectiveQuantity(incoming, id) == EffectiveQuantity(existing, id));
-    }
-
-    private static int EffectiveQuantity(Dictionary<Guid, int>? quantities, Guid ingredientId) =>
-        quantities != null && quantities.TryGetValue(ingredientId, out var q) && q > 0 ? q : 1;
+        BasketLineCustomization.AreSame(
+            // ChildBasketItems is loaded by the dedup query above and is load-bearing here, for the
+            // same reason it is in BasketLineTotal: un-included, it reads as empty rather than
+            // throwing, and every bundle would compare as a customization-free regular line.
+            BasketLineCustomization.FromRow(existing, existing.ChildBasketItems.ToList(), (ex, what) => _logger.LogWarning(
+                ex, "Failed to deserialize {What} JSON for basket item {BasketItemId}", what, existing.Id)),
+            BasketLineCustomization.FromRequest(incoming));
 }

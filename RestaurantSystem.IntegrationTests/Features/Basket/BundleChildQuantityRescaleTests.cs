@@ -50,10 +50,20 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
     private Product _menuProduct = null!;
     private MenuSection _mainSection = null!;
     private MenuSection _drinkSection = null!;
+    private Guid _colaExtraShotId;
 
     private const decimal MenuBasePrice = 8.00m;
     private const decimal MainAdditional = 2.00m;
     private const decimal DrinkAdditional = 1.50m;
+    private const decimal ExtraShotPrice = 1.50m;
+
+    // What BuildMenuItemAsync stores on the parent of a bundle added by AddBundleViaServiceAsync:
+    //   UnitPrice = 8.00 base + 2.00 main + (1.50 drink x 2) + (1.50 extra shot x 2) = 16.00
+    //   CustomizationPrice = 1.50 x 2 = 3.00, ALREADY counted inside UnitPrice above
+    // so the line total is UnitPrice * Quantity, and adding CustomizationPrice again charges the
+    // extra shots twice (#308).
+    private const decimal CustomisedBundleUnitPrice = 16.00m;
+    private const decimal CustomisedBundleCustomizationPrice = ExtraShotPrice * DrinksPerBundle;
 
     // The drink option is taken TWICE per bundle, deliberately. With a per-unit count of 1 the
     // rescale is indistinguishable from "copy the parent's quantity onto the child", which is a
@@ -74,6 +84,28 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
 
         _testPizza = await context.Products.FirstAsync(p => p.Name == "Test Pizza");
         _testCola = await context.Products.FirstAsync(p => p.Name == "Test Cola");
+
+        // A priced optional extra on the drink, selected only by AddBundleViaServiceAsync. Without a
+        // customization the bundle's CustomizationPrice is 0 and the two candidate ItemTotal formulas
+        // AGREE, so the money assertion on the merge test below would pass against the unfixed code —
+        // the "a test for a bug fix must fail without the fix" trap. Priced, optional and NOT included
+        // in the base price is the one shape CalculateIngredientCustomizationPrice charges for.
+        var extraShot = new ProductIngredient
+        {
+            Id = Guid.NewGuid(),
+            ProductId = _testCola.Id,
+            Name = "Extra Shot",
+            IsOptional = true,
+            IsIncludedInBasePrice = false,
+            Price = ExtraShotPrice,
+            MaxQuantity = 5,
+            IsActive = true,
+            DisplayOrder = 1,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        context.ProductIngredients.Add(extraShot);
+        _colaExtraShotId = extraShot.Id;
 
         var menuProduct = new Product
         {
@@ -168,6 +200,31 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
                 new() { SectionId = _mainSection.Id, ItemId = _testPizza.Id, Quantity = 1 },
                 new() { SectionId = _drinkSection.Id, ItemId = _testCola.Id, Quantity = DrinksPerBundle }
             }
+        });
+
+    /// <summary>
+    /// The same bundle as <see cref="AddBundleAsync"/> but with the drink's priced optional extra
+    /// selected, so the parent carries a non-zero CustomizationPrice folded into its UnitPrice —
+    /// the only shape on which the two candidate line-total formulas disagree (#308).
+    /// </summary>
+    private List<SelectedMenuOptionDto> CustomisedBundleOptions() => new()
+    {
+        new() { SectionId = _mainSection.Id, ItemId = _testPizza.Id, Quantity = 1 },
+        new()
+        {
+            SectionId = _drinkSection.Id,
+            ItemId = _testCola.Id,
+            Quantity = DrinksPerBundle,
+            SelectedIngredients = new List<Guid> { _colaExtraShotId }
+        }
+    };
+
+    private Task<HttpResponseMessage> AddCustomisedBundleAsync(int quantity) =>
+        PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _menuProduct.Id,
+            Quantity = quantity,
+            SelectedMenuOptions = CustomisedBundleOptions()
         });
 
     /// <summary>
@@ -449,11 +506,9 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
         {
             ProductId = _menuProduct.Id,
             Quantity = quantity,
-            SelectedMenuOptions = new List<SelectedMenuOptionDto>
-            {
-                new() { SectionId = _mainSection.Id, ItemId = _testPizza.Id, Quantity = 1 },
-                new() { SectionId = _drinkSection.Id, ItemId = _testCola.Id, Quantity = DrinksPerBundle }
-            }
+            // Carries the bundle's CustomizationPrice above 0, which is what makes the money
+            // assertion in the merge test below able to fail. See ExtraShotPrice.
+            SelectedMenuOptions = CustomisedBundleOptions()
         });
     }
 
@@ -496,13 +551,55 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
             [_testCola.Id] = DrinksPerBundle * 3
         });
 
-        // parent.ItemTotal is deliberately NOT asserted here, and that is not an oversight: on this
-        // path it is currently WRONG. The merge recomputes it as
-        // `(UnitPrice + CustomizationPrice) * Quantity`, which is right for a regular item but
-        // double-charges a bundle, because BuildMenuItemAsync already folds the customization into
-        // UnitPrice. Measured at 57.00 against an expected 48.00 on a 3 x 16.00 line. That is a
-        // money defect with its own fix and its own test — issue #308 — and #305 is a displayed-count
-        // fix that must not quietly change a charge. Add the assertion together with that fix.
+        // THE MONEY (#308). The merge used to recompute this as
+        // `(UnitPrice + CustomizationPrice) * Quantity` — right for a regular item, and a double
+        // charge for a bundle, because BuildMenuItemAsync already folds the customization into
+        // UnitPrice. Measured at 57.00 against the 48.00 below, i.e. 9.00 overcharged on one line,
+        // on a path that runs at every login where the same bundle sits in both baskets.
+        //
+        // The two operands are asserted alongside the total on purpose: they are what makes 48.00
+        // the right answer rather than a number that happens to match, and CustomizationPrice
+        // staying 3.00 is what says the fix changed the FORMULA rather than zeroing the input.
+        parent.UnitPrice.Should().Be(CustomisedBundleUnitPrice);
+        parent.CustomizationPrice.Should().Be(CustomisedBundleCustomizationPrice,
+            "the customization must still be recorded for display — it is only counted once");
+        parent.ItemTotal.Should().Be(CustomisedBundleUnitPrice * 3,
+            "a bundle's UnitPrice already contains its customization, so the line total is UnitPrice * Quantity");
+    }
+
+    // The other end of the same asymmetry, on the stepper. `Quantity * UnitPrice` is already the
+    // correct rule for a bundle, so this passed before #308 and must keep passing: it is the case a
+    // fix that applied the regular-item formula everywhere would break, turning the merge's
+    // overcharge into an identical overcharge one route over.
+    [Fact]
+    public async Task ChangingACustomisedBundlesQuantity_DoesNotDoubleChargeItsCustomization()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        (await AddCustomisedBundleAsync(1)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Guid parentId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var parent = await context.BasketItems.SingleAsync(bi =>
+                bi.ParentBasketItemId == null && bi.ProductId == _menuProduct.Id);
+            parent.UnitPrice.Should().Be(CustomisedBundleUnitPrice);
+            parent.ItemTotal.Should().Be(CustomisedBundleUnitPrice, "add-time total at quantity 1");
+            parentId = parent.Id;
+        }
+
+        var response = await PutAsJsonAsync($"/api/basket/items/{parentId}",
+            new UpdateBasketItemDto { Quantity = 2 });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var verifyScope = Factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var updated = await verifyContext.BasketItems.SingleAsync(bi => bi.Id == parentId);
+
+        updated.Quantity.Should().Be(2);
+        updated.CustomizationPrice.Should().Be(CustomisedBundleCustomizationPrice);
+        updated.ItemTotal.Should().Be(CustomisedBundleUnitPrice * 2, "32.00, not (16.00 + 3.00) * 2 = 38.00");
     }
 
     // ---- Site 3: the exact-match merge, which DOES reach a bundle's children -------------------
@@ -540,6 +637,107 @@ public class BundleChildQuantityRescaleTests : IntegrationTestBase
         var child = items.Single(i => i.ParentBasketItemId == parent.Id && i.ProductId == _testCola.Id);
         child.Quantity.Should().Be(DrinksPerBundle, "the standalone add must not land on the child row");
         child.ItemTotal.Should().Be(0m, "children carry ItemTotal 0 so they cannot double-count");
+    }
+
+    // ---- The delete path, and what depends on it ----------------------------------------------
+
+    // The fourth site in #308's header. DELETE looked a row up by id and basket with no
+    // ParentBasketItemId filter, so a bundle CHILD was addressable: the component vanished from the
+    // line while the parent's UnitPrice and CustomizationPrice still contained it, and the guest
+    // went on paying for it.
+    //
+    // This also guards BasketLineTotal. Deleting children one at a time was the only way to reach a
+    // bundle parent with CustomizationPrice > 0 and NO children — the single state the child-count
+    // rule gets wrong. If this test ever goes red, that rule is no longer total.
+    [Fact]
+    public async Task DeletingABundleChildDirectly_IsRefused_AndLeavesTheLineIntact()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        (await AddCustomisedBundleAsync(1)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Guid childId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            childId = (await context.BasketItems.FirstAsync(bi =>
+                bi.ParentBasketItemId != null && bi.ProductId == _testCola.Id)).Id;
+        }
+
+        var response = await Client.DeleteAsync($"/api/basket/items/{childId}");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var verifyScope = Factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var items = await verifyContext.BasketItems
+            .Where(bi => bi.Basket!.SessionId == _sessionId)
+            .ToListAsync();
+
+        items.Should().HaveCount(3, "the bundle parent and BOTH children survive the refused delete");
+        var parent = items.Single(i => i.ParentBasketItemId == null);
+        parent.ItemTotal.Should().Be(CustomisedBundleUnitPrice);
+        parent.CustomizationPrice.Should().Be(CustomisedBundleCustomizationPrice);
+    }
+
+    // ---- The discriminator must NOT consult Product.Type ---------------------------------------
+
+    // `Product.Type` is mutable — UpdateProductCommand assigns it with nothing checking for live
+    // basket rows — so it cannot be used to decide how an EXISTING row was built. Retyped away from
+    // Menu, this bundle parent stops returning early in AddItemToBasketAsync and falls into the
+    // add-path dedup, which is where a type-based rule would price it as a regular item and add its
+    // customization a second time: 38.00 instead of 32.00 on a 2 x 16.00 line.
+    //
+    // WHAT THIS ASSERTS CHANGED IN #313, DELIBERATELY. It used to assert the plain add DEDUPS into the
+    // bundle row (quantity 2 at 2 x 16.00). That was the #313 defect on the add path: the request
+    // configured nothing, and merging it into a configured bundle charged 16.00 for a plain add of a
+    // product whose BasePrice is 8.00, and told the kitchen to make a second full bundle. Now that the
+    // shared line rule compares a bundle's COMPOSITION — which lives on the child rows, since
+    // BuildMenuItemAsync writes none of it on the parent — a childless request is no longer the same
+    // line as a bundle, and the plain add gets its own row.
+    //
+    // The guard this test exists for is unchanged and still exact: drop the
+    // `.Include(bi => bi.ChildBasketItems)` on the dedup query and the stored row's composition reads
+    // EMPTY rather than throwing, so it matches the plain request, merges, and the bundle parent's
+    // quantity moves off 1 — failing the first assertion below. Reintroduce `Product.Type` as an
+    // operand and the pricing assertion goes with it.
+    [Fact]
+    public async Task AddingAgainAfterTheBundlesProductIsRetyped_DoesNotAbsorbThePlainAdd()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+
+        (await AddCustomisedBundleAsync(1)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var product = await context.Products.SingleAsync(p => p.Id == _menuProduct.Id);
+            product.Type = ProductType.MainItem;
+            await context.SaveChangesAsync();
+        }
+
+        var response = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _menuProduct.Id,
+            Quantity = 1
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var verifyScope = Factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var roots = await verifyContext.BasketItems
+            .Where(bi => bi.Basket!.SessionId == _sessionId && bi.ParentBasketItemId == null)
+            .ToListAsync();
+
+        roots.Should().HaveCount(2, "a plain add is not the configured bundle, whatever the product is now called");
+
+        var bundle = roots.Single(r => r.CustomizationPrice != 0m);
+        bundle.Quantity.Should().Be(1, "the retyped row must NOT absorb the plain add");
+        bundle.ItemTotal.Should().Be(CustomisedBundleUnitPrice,
+            "its UnitPrice still contains the customization regardless of what the product now says it is");
+
+        var plain = roots.Single(r => r.CustomizationPrice == 0m);
+        plain.Quantity.Should().Be(1);
+        plain.ItemTotal.Should().Be(MenuBasePrice, "a plain add is priced as the regular item it asked for");
     }
 
     // ---- Bundle parents still never merge -----------------------------------------------------

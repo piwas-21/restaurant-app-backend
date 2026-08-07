@@ -102,9 +102,11 @@ public class OrderItemFactory : IOrderItemFactory
         // (BasketService.cs:215, 243-245). OrderItem has no CustomizationPrice
         // column, so we add the child's CustomizationPrice contribution
         // directly to the parent's ItemTotal here. (DTO contract: per
-        // CreateOrderItemDto.cs:11, CustomizationPrice is already "total for all
-        // quantities", so no extra Quantity multiplier — consistent with the
-        // top-level branch below and the menu path on line 61.)
+        // CreateOrderItemDto.cs:11-14, CustomizationPrice is "for the WHOLE line,
+        // not per unit", so no extra Quantity multiplier — consistent with the
+        // top-level branch below and the menu path on line 61. BasketToOrderTranslator
+        // sends 0 here for both child kinds, so no basket-sourced DTO reaches this
+        // line at all; it exists for a caller that hand-builds POST /api/orders.)
         decimal itemTotal;
         if (parentItem != null)
         {
@@ -143,6 +145,9 @@ public class OrderItemFactory : IOrderItemFactory
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
             ParentOrderItem = parentItem,
+            // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
+            // column cannot come to mean two things (#318).
+            Kind = parentItem != null ? itemDto.Kind : null,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
         };

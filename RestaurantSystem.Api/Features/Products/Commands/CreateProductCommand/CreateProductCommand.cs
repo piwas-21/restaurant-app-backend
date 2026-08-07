@@ -166,8 +166,6 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     {
                         foreach (var (languageCode, content) in variationDto.Content)
                         {
-                            if (string.IsNullOrWhiteSpace(content.Name)) continue;
-
                             var description = new ProductVariationDescription
                             {
                                 ProductVariation = variation,
@@ -225,17 +223,17 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     _context.ProductIngredients.Add(ingredient);
                     product.DetailedIngredients.Add(ingredient);
 
-                    // Add ingredient descriptions (only non-empty ones)
+                    // Add ingredient descriptions (the validator has already refused a blank name)
                     if (ingredientDto.Content != null)
                     {
+                        // The blank-entry skip that used to stand here is GONE (#323). It was kept in
+                        // #316 because deleting it alone persisted junk — an `{"name":"","description":""}`
+                        // row whose `en` language code the `en` locale then matches, shadowing the
+                        // ingredient's real name with nothing. What has changed is that the validator now
+                        // refuses a blank Name outright, so no such entry reaches this loop, and the
+                        // three-policies-across-four-paths asymmetry that skip left behind is closed.
                         foreach (var (languageCode, content) in ingredientDto.Content)
                         {
-                            // Skip empty content entries
-                            if (string.IsNullOrWhiteSpace(content.Name) && string.IsNullOrWhiteSpace(content.Description))
-                            {
-                                continue;
-                            }
-
                             var description = new ProductIngredientDescription
                             {
                                 ProductIngredient = ingredient,

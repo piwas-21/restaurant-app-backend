@@ -26,6 +26,15 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
             .WithMessage("Primary category must be one of the selected categories");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
 
+        // #306; rationale in ProductContentRule. Covers the TOP-LEVEL map only.
+        RuleFor(x => x.Content).ValidProductContent(required: false);
+
+        // #316; the two NESTED maps. Bounds and rationale in NestedContentRule.
+        this.ValidateNestedContent(x => x.Variations, v => v.Content, c => c.Name, c => c.Description,
+            NestedContentRule.VariationNameMaxLength);
+        this.ValidateNestedContent(x => x.DetailedIngredients, i => i.Content, c => c.Name,
+            c => c.Description, NestedContentRule.IngredientNameMaxLength);
+
         // Mirrors MenuBundleCommandValidatorBase (#191). MenuDefinition itself stays optional here
         // — absent means "no menu instruction" — but once one IS sent for a Menu, its sections are
         // a full replace like every other field on it, so the key is required and `[]` alone

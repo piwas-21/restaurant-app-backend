@@ -7,6 +7,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace RestaurantSystem.IntegrationTests.Features.Products;
 
@@ -149,6 +150,15 @@ public class ProductUpdateContentTests : IntegrationTestBase
             .Where(p => p.Id == _productId)
             .Select(p => p.Name)
             .SingleAsync();
+    }
+
+    /// <summary>The <c>errors</c> array of an ApiResponse body, JSON-decoded (#306).</summary>
+    private static async Task<List<string>> ReadErrorsAsync(HttpResponseMessage response)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return document.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array
+            ? errors.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToList()
+            : new List<string>();
     }
 
     private Task<HttpResponseMessage> PutRawAsync(string json) =>
@@ -336,5 +346,88 @@ public class ProductUpdateContentTests : IntegrationTestBase
             ("FR", "UPPER FR", "UPPER FR Description"),
             ("fr", "lower FR", "lower FR Description")
         });
+    }
+
+    // ---- #306: the content map is now validated -----------------------------------------------
+
+    // The handler writes this map straight into required, non-nullable columns, and NOTHING checked
+    // it. Every shape below was measured through this endpoint before the rule existed:
+    //
+    //   missing "description"  -> 500        missing "name"      -> 500
+    //   "en": null             -> 500        "": {...}           -> 200, junk row with Lang = ''
+    //                                        "   ": {...}        -> 200, junk row with Lang = '   '
+    //
+    // The 500s violate §5.4 (user-facing errors are BadRequestException). They were ATOMIC — the
+    // single SaveChangesAsync is what threw, after the RemoveRange was staged but before it was
+    // committed — so nothing was ever lost, which is why `descriptions unchanged` is asserted on
+    // every case rather than treated as the point. The blank-key cases are the opposite failure:
+    // accepted silently, and the ONLY ones that actually wrote anything.
+    //
+    // The two seeded rows are the control. BOTH must survive every rejection, and for the blank-key
+    // cases that also proves the write was refused BEFORE the RemoveRange rather than after — a fix
+    // that validated too late would leave the product with no translations at all.
+    [Theory]
+    [InlineData("""
+        "content": { "en": { "name": "Only Name" } }
+        """, "A translation's description is required ('en')")]
+    [InlineData("""
+        "content": { "en": { "description": "Only Description" } }
+        """, "A translation's name is required ('en')")]
+    [InlineData("""
+        "content": { "en": null }
+        """, "A translation entry cannot be null ('en')")]
+    [InlineData("""
+        "content": { "": { "name": "blank", "description": "d" } }
+        """, "A translation's language code is required")]
+    [InlineData("""
+        "content": { "   ": { "name": "whitespace", "description": "d" } }
+        """, "A translation's language code is required")]
+    public async Task MalformedContentEntry_IsRefusedAsABadRequest_AndChangesNothing(
+        string contentFragment, string expectedMessage)
+    {
+        AuthenticateAsAdmin();
+
+        var response = await PutRawAsync(BuildPayload(contentFragment));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Read the errors array rather than substring-matching the raw body: System.Text.Json escapes
+        // the apostrophes in these messages, so a naive Contain() on the response string fails against
+        // a response that is actually correct.
+        //
+        // ContainMatch, not exact element equality: ValidationBehavior joins every failure into ONE
+        // string with "; ", so an exact match only holds while these payloads trip exactly one rule.
+        // Any rule added to this validator later that also fires here would turn all five red for a
+        // reason that has nothing to do with what they test.
+        (await ReadErrorsAsync(response)).Should().ContainMatch($"*{expectedMessage}*");
+
+        // The rename is the signal that the handler was refused OUTRIGHT rather than partially run.
+        // Every payload here sends RenamedProduct, so a rule that fired too late — after the
+        // product's own fields were written — would leave this changed.
+        (await ReadProductNameAsync()).Should().Be("Translated Product");
+
+        (await ReadDescriptionsAsync()).Should().Equal(
+            ("en", "Seeded EN Name", "Seeded EN Description"),
+            ("fr", "Seeded FR Name", "Seeded FR Description"));
+    }
+
+    // The counterpart the rule must NOT catch. An empty name or description is a legitimate
+    // translation — the admin form posts `description: data.description || ''` on every save, so a
+    // product with no description text sends "" rather than omitting the key. Only NULL is refused,
+    // and this is what says so; tightening the rule to NotEmpty would 400 an ordinary edit.
+    [Fact]
+    public async Task EmptyButPresentNameAndDescription_AreAccepted()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await PutRawAsync(BuildPayload("""
+        "content": { "en": { "name": "", "description": "" } }
+        """));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadProductNameAsync()).Should().Be(RenamedProduct);
+        // A full REPLACE, so the seeded "fr" is gone — the same contract ContentMap_ReplacesEveryDescription
+        // pins. The point here is only that empty strings were ACCEPTED rather than refused.
+        (await ReadDescriptionsAsync()).Should().Equal(("en", "", ""));
     }
 }
