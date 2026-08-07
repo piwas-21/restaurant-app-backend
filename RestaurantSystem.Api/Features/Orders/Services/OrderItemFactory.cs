@@ -145,6 +145,9 @@ public class OrderItemFactory : IOrderItemFactory
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
             ParentOrderItem = parentItem,
+            // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
+            // column cannot come to mean two things (#318).
+            Kind = parentItem != null ? itemDto.Kind : null,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
         };

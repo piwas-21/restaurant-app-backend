@@ -337,7 +337,7 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
             .FirstOrDefault(i => i.ProductId == _testCola.Id);
         orderColaChild.Should().NotBeNull();
         orderColaChild!.ProductName.Should().Be("Test Cola");
-        orderColaChild.Kind.Should().Be(ItemKind.BundleChild);
+        orderColaChild.Kind.Should().Be(OrderItemKind.BundleChild);
 
         // Verify Order Totals
         //

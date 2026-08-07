@@ -64,7 +64,7 @@ public class PrinterFeedIncludeTests : IntegrationTestBase
         child.ProductName.Should().Be("Fries");
         child.Quantity.Should().Be(2);
         // Parent is ProductType.Menu, so its children are bundle components, not add-on sides.
-        child.Kind.Should().Be(ItemKind.BundleChild);
+        child.Kind.Should().Be(OrderItemKind.BundleChild);
     }
 
     /// <summary>

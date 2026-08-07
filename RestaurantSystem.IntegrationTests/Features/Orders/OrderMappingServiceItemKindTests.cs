@@ -8,12 +8,17 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
-// Issue #158 (menu-bundles redesign slice 2): OrderItemDto.SideItems holds every child
-// order item — a bundle/combo component AND a true add-on side item are otherwise
-// indistinguishable. MapToOrderItemDto now stamps each child with a Kind derived from the
-// parent's product type (ProductType.Menu => BundleChild, otherwise SideItem), a DTO-only
-// discriminator. MapToOrderItemDto is a pure in-memory projection, so these drive the
-// entity graph directly (no DB round-trip needed).
+// Issue #158 (menu-bundles redesign slice 2): OrderItemDto.SideItems holds every child order item —
+// a bundle/combo component AND a true add-on side item are otherwise indistinguishable, so
+// MapToOrderItemDto stamps each child with a Kind. MapToOrderItemDto is a pure in-memory
+// projection, so these drive the entity graph directly (no DB round-trip needed).
+//
+// WHAT THESE NOW COVER IS THE FALLBACK, not the primary path (#318). The Kind is persisted on the
+// child row at write time; deriving it from the parent's product type was wrong, because
+// Product.Type is mutable and retyping a product relabelled the children of orders already placed.
+// These fixtures leave the child's Kind unset, which is exactly the shape of every order placed
+// before that column existed — so they pin that historical orders keep rendering as they always
+// did. The persisted path, and the precedence between the two, live in OrderChildQuantityTests.
 public class OrderMappingServiceItemKindTests : IntegrationTestBase
 {
     public OrderMappingServiceItemKindTests(DatabaseFixture databaseFixture)
@@ -28,7 +33,7 @@ public class OrderMappingServiceItemKindTests : IntegrationTestBase
 
         dto.Kind.Should().BeNull("the top-level line item is neither a bundle child nor a side");
         dto.SideItems.Should().ContainSingle();
-        dto.SideItems!.Single().Kind.Should().Be(ItemKind.BundleChild);
+        dto.SideItems!.Single().Kind.Should().Be(OrderItemKind.BundleChild);
     }
 
     [Fact]
@@ -37,7 +42,7 @@ public class OrderMappingServiceItemKindTests : IntegrationTestBase
         var dto = Map(ProductType.MainItem);
 
         dto.SideItems.Should().ContainSingle();
-        dto.SideItems!.Single().Kind.Should().Be(ItemKind.SideItem);
+        dto.SideItems!.Single().Kind.Should().Be(OrderItemKind.SideItem);
     }
 
     private OrderItemDto Map(ProductType parentType)
