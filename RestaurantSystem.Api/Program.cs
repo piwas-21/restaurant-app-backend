@@ -282,6 +282,12 @@ builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("Pr
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
+// Order-level pricing. DeliveryFee defaults to 0 so an absent section preserves what every live
+// tenant charges today — see OrderSettings for why that is not the old 5.00 constant. A tenant
+// opts in per box via OrderSettings__DeliveryFee.
+builder.Services.Configure<RestaurantSystem.Api.Settings.OrderSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.OrderSettings.SectionName));
+
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.
 // Per-tenant provisioning injects SeedSettings__AdminEmail/__AdminPassword env

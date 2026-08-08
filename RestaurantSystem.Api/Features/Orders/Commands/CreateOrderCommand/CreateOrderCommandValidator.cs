@@ -14,6 +14,15 @@ public class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
             .NotEmpty()
             .WithMessage("Order must contain at least one item.");
 
+        // A tip is money the customer ADDS, and it is the last request-controlled term that reaches
+        // order.Total (S0b). The zero-clamp in RecalculateTotal sits before the tip, so a negative
+        // one drives Total to 0 → RemainingAmount 0 → PaymentStatus.Completed → fidelity points
+        // awarded on an order nobody paid for. Order creation is anonymous, so this rule is a money
+        // control, not input tidiness.
+        RuleFor(c => c.Tip)
+            .GreaterThanOrEqualTo(0)
+            .WithMessage("Tip cannot be negative.");
+
         // Per-item rules — guard against tampered payloads with non-positive
         // quantities (would manipulate totals or bypass payment) and items
         // missing both ProductId and MenuId (would silently no-op in the

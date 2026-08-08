@@ -397,6 +397,39 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             .Which.TotalAmount.Should().Be(expected);
     }
 
+    /// <summary>
+    /// Net sales is revenue, and a tip is not revenue — it is money in transit to the staff. Since
+    /// S0b <c>order.Total</c> is what the customer was charged and therefore reliably includes the
+    /// tip, so summing <c>Total</c> unadjusted would overstate the day's turnover by every franc
+    /// tipped. That is also the direction Swiss VAT cares about: a voluntary tip only stays outside
+    /// taxable consideration while it is disclosed separately and carries no tax
+    /// (ESTV MWST-Branchen-Info 08 §8.3), which <c>TotalTips</c> is here to do.
+    ///
+    /// <para>
+    /// The two figures are asserted together deliberately. Subtracting the tip from net sales while
+    /// also dropping it from <c>TotalTips</c> would make the money vanish from the report entirely,
+    /// and an assertion on either line alone would not notice.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Tips_are_reported_beside_net_sales_and_not_inside_it()
+    {
+        await using (var seed = _fixture.CreateContext())
+        {
+            // Charged 46.00: 40.00 of food and a 6.00 tip.
+            seed.Orders.Add(BuildOrder("Z-TIP-1", StartOfDay.AddHours(9), OrderStatus.Completed,
+                subTotal: 40.00m, total: 46.00m, tip: 6.00m));
+            seed.Orders.Add(BuildOrder("Z-TIP-2", StartOfDay.AddHours(10), OrderStatus.Completed,
+                subTotal: 20.00m, total: 20.00m));
+            await seed.SaveChangesAsync();
+        }
+
+        var report = await RunHandlerAsync();
+
+        report.NetSales.Should().Be(60.00m, "the 6.00 tip is not the restaurant's sales revenue");
+        report.TotalTips.Should().Be(6.00m, "it is disclosed on its own line, not discarded");
+    }
+
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
@@ -423,6 +456,7 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
         decimal subTotal = 0m,
         decimal total = 0m,
         decimal discount = 0m,
+        decimal tip = 0m,
         IEnumerable<OrderPayment>? payments = null)
     {
         var orderId = Guid.NewGuid();
@@ -436,6 +470,7 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
             SubTotal = subTotal,
             Total = total,
             Discount = discount,
+            Tip = tip,
             OrderDate = DateTime.SpecifyKind(orderDateUtc, DateTimeKind.Utc),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "GetZReportQueryHandlerTests",

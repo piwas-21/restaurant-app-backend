@@ -289,7 +289,12 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
     [Fact]
     public async Task CreateOrder_ChildItemIngredientQuantities_PersistAndDeriveIsRemoved()
     {
-        AuthenticateAsTestUser();
+        // Staff, not a customer. S0b stopped an untrusted caller hand-building a composed line at
+        // all (its price lives in the menu definition, so the catalogue cannot reprice it), which
+        // makes this payload a TILL payload now. What it still pins — child ingredient quantities
+        // round-tripping into IsRemoved — is identical on both paths; the customer equivalent goes
+        // through /from-basket and is covered by BasketToOrderIntegrationTest.
+        AuthenticateAsAdmin();
 
         // The checkout payload the (fixed) frontend builds from the basket child:
         // cheese explicitly 0 (deselected), mushrooms doubled, sauce untouched.

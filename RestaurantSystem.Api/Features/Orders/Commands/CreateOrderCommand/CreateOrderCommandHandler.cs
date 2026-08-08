@@ -125,17 +125,17 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             foreach (var itemDto in command.Items)
             {
-                var error = await _itemFactory.AddItemAsync(order, itemDto, cancellationToken);
+                var error = await _itemFactory.AddItemAsync(
+                    order, itemDto, command.ItemsAreServerPriced, cancellationToken);
                 if (error != null)
                 {
                     return ApiResponse<OrderDto>.Failure(error);
                 }
             }
 
-            // Aggregate item totals and apply pricing (tax, discounts, total).
-            // FidelityPointsDiscount is 0 here; redemption (after SaveChangesAsync)
-            // updates it separately and the persisted Total is not recomputed —
-            // pre-existing behaviour, preserved verbatim.
+            // Every money field is derived from these server-resolved items, never from the request
+            // body (S0b). FidelityPointsDiscount is still 0 — redemption needs the order to exist,
+            // so Total is recomputed after the save below.
             var itemsTotal = order.Items.Sum(i => i.ItemTotal);
             await _pricingService.ApplyAsync(order, itemsTotal, command, userId, cancellationToken);
 
@@ -162,9 +162,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             // DB until the save above.
             await _fidelity.RedeemAsync(order, command.PointsToRedeem, userId, cancellationToken);
 
-            // Gates on order.PaymentStatus, NOT on tender status — so "every tender
-            // is Pending" does NOT make this inert: a client-declared BasketTotal of
-            // 0 still reaches Completed and awards points here. See S0b.
+            // Gated on order.PaymentStatus, now derived from a server-computed Total, so a caller
+            // can no longer declare itself paid into an award.
             await _fidelity.AwardEarnedPointsAsync(order, userId, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
@@ -196,5 +195,4 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             throw;
         }
     }
-
 }

@@ -33,12 +33,9 @@ public record CreateOrderFromBasketCommand : ICommand<ApiResponse<OrderDto>>
 
     public string? PromoCode { get; set; }
 
-    // Pre-calculated values from basket (optional - if provided, use these instead of recalculating)
-    public decimal? BasketSubTotal { get; set; }
-    public decimal? BasketTax { get; set; }
-    public decimal? BasketDiscount { get; set; }
-    public decimal? BasketCustomerDiscount { get; set; }
-    public decimal? BasketTotal { get; set; }
+    // The basket totals this used to carry are GONE — the server recomputes every money field from
+    // the persisted basket's items (S0b). Clients that still post basketSubTotal/basketTotal/etc.
+    // are unaffected: unknown JSON members are ignored on bind, so the fields are simply not read.
 
     // Fidelity Points
     public int? PointsToRedeem { get; set; }

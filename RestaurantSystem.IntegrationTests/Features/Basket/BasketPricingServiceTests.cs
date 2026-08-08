@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using DomainBasket = RestaurantSystem.Domain.Entities.Basket;
 
@@ -14,8 +17,13 @@ public class BasketPricingServiceTests
 {
     private readonly Mock<ICustomerDiscountService> _discount = new(MockBehavior.Strict);
 
-    private BasketPricingService CreateSut() =>
-        new(_discount.Object, NullLogger<BasketPricingService>.Instance);
+    // The delivery fee is no longer a value a caller writes onto the basket — the service derives
+    // it from OrderSettings and the basket's own OrderType, so that the fee the checkout page shows
+    // is the one order pricing charges. Tests therefore configure the tenant's fee here.
+    private BasketPricingService CreateSut(decimal deliveryFee = 0m) =>
+        new(_discount.Object,
+            Options.Create(new OrderSettings { DeliveryFee = deliveryFee }),
+            NullLogger<BasketPricingService>.Instance);
 
     private static DomainBasket NewBasket(
         Guid? userId = null,
@@ -29,7 +37,9 @@ public class BasketPricingServiceTests
             SessionId = "s",
             UserId = userId,
             Discount = manualDiscount,
-            DeliveryFee = deliveryFee,
+            // Only a Delivery basket attracts the fee; NewBasket infers the channel from it so each
+            // test states one thing rather than two that must be kept in step.
+            OrderType = deliveryFee > 0 ? OrderType.Delivery : null,
             CreatedBy = "test",
         };
         foreach (var t in itemTotals)
@@ -172,7 +182,7 @@ public class BasketPricingServiceTests
     public async Task DeliveryFee_AddedToTotal()
     {
         var basket = NewBasket(deliveryFee: 4.50m, itemTotals: new[] { 10.00m });
-        await CreateSut().ApplyTotalsAsync(basket);
+        await CreateSut(deliveryFee: 4.50m).ApplyTotalsAsync(basket);
 
         Assert.Equal(14.50m, basket.Total);
     }
@@ -184,7 +194,7 @@ public class BasketPricingServiceTests
         SetupNoDiscount(userId);
         var basket = NewBasket(userId: userId, deliveryFee: 2m, manualDiscount: 1m, itemTotals: new[] { 30m });
 
-        await CreateSut().ApplyTotalsAsync(basket);
+        await CreateSut(deliveryFee: 2m).ApplyTotalsAsync(basket);
 
         Assert.Equal(0m, basket.Tax);
     }
@@ -196,7 +206,7 @@ public class BasketPricingServiceTests
         SetupNoDiscount(userId);
         var basket = NewBasket(userId: userId, manualDiscount: 5.00m, deliveryFee: 2.00m, itemTotals: new[] { 40.00m });
 
-        await CreateSut().ApplyTotalsAsync(basket);
+        await CreateSut(deliveryFee: 2.00m).ApplyTotalsAsync(basket);
 
         // The best-discount lookup must be keyed on the raw subtotal (40.00),
         // before manual discount / delivery fee are applied.

@@ -9,15 +9,21 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 public class OrderFidelityCoordinator : IOrderFidelityCoordinator
 {
     private readonly IFidelityPointsService _fidelityPointsService;
+    private readonly IOrderPricingService _pricingService;
+    private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<OrderFidelityCoordinator> _logger;
 
     public OrderFidelityCoordinator(
         IFidelityPointsService fidelityPointsService,
+        IOrderPricingService pricingService,
+        IOrderPaymentBuilder paymentBuilder,
         ApplicationDbContext context,
         ILogger<OrderFidelityCoordinator> logger)
     {
         _fidelityPointsService = fidelityPointsService;
+        _pricingService = pricingService;
+        _paymentBuilder = paymentBuilder;
         _context = context;
         _logger = logger;
     }
@@ -55,6 +61,13 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
             order.FidelityPointsRedeemed = pointsToRedeem.Value;
             order.FidelityPointsDiscount = discountAmount;
 
+            // The credit only becomes knowable here — redemption FKs the order, so it cannot run
+            // until after the insert, and the Total already persisted does not reflect it. Reprice
+            // from the order's own columns rather than by subtracting a delta, so this is safe to
+            // run more than once.
+            _pricingService.RecalculateTotal(order);
+            _paymentBuilder.UpdatePaymentSummary(order);
+
             _logger.LogInformation(
                 "Redeemed {Points} fidelity points for ${Discount} discount on order {OrderNumber}",
                 pointsToRedeem.Value, discountAmount, order.OrderNumber);
@@ -63,7 +76,23 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         }
         catch (Exception ex)
         {
-            // Best-effort: customer can contact support if redemption failed.
+            // Best-effort: the customer can contact support if redemption failed. The fields above
+            // are set on a TRACKED entity, so leaving them would let the next SaveChangesAsync in
+            // this transaction — AwardEarnedPointsAsync's, for instance — flush a discount for
+            // points that may never have been taken. Roll them back and reprice.
+            //
+            // ⚠️ This makes the ORDER consistent, not necessarily the LEDGER. RedeemPointsAsync
+            // saves inside the handler's ambient transaction, so if IT succeeded and the save on
+            // line 76 threw, the balance decrement is already flushed and gets committed with the
+            // order: the customer pays full price AND loses the points. That is the deliberate
+            // direction — the alternative, leaving the discount in place, gives away food for
+            // points that may not have been taken. A points balance is repairable by support; a
+            // wrong charge is not. If this ever fires in anger, the log below is the audit trail.
+            order.FidelityPointsRedeemed = 0;
+            order.FidelityPointsDiscount = 0;
+            _pricingService.RecalculateTotal(order);
+            _paymentBuilder.UpdatePaymentSummary(order);
+
             _logger.LogError(ex, "Failed to redeem fidelity points for order {OrderNumber}", order.OrderNumber);
         }
     }
@@ -76,14 +105,11 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
             return;
         }
 
-        // The gate is the ORDER's PaymentStatus, not its tenders'. Since every tender
-        // created with an order is Pending, at creation time this normally returns —
-        // but not always: UpdatePaymentSummary derives PaymentStatus from
-        // order.Total, and order.Total is still copied verbatim from the caller's
-        // BasketTotal (OrderPricingService.ApplyTotal). A declared total of 0 leaves
-        // RemainingAmount at 0, which reads as Completed, and points are awarded on
-        // an order nobody paid for. Closing that is S0b — server-authoritative
-        // totals. Do not weaken this gate on the assumption it is unreachable.
+        // The gate is the ORDER's PaymentStatus, not its tenders'. Every tender created with an
+        // order is Pending, and since S0b order.Total is computed server-side from the order's own
+        // items — so a caller can no longer declare `basketTotal: 0`, land RemainingAmount at 0,
+        // and have points awarded for an order nobody paid for. Both halves are load-bearing:
+        // do not weaken this gate, and do not let a client-supplied total back into pricing.
         if (order.PaymentStatus != PaymentStatus.Completed &&
             order.PaymentStatus != PaymentStatus.Overpaid)
         {
