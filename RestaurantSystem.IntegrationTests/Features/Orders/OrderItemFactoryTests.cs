@@ -63,7 +63,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         };
 
         // Act
-        var error = await _factory.AddItemAsync(order, dto, CancellationToken.None);
+        var error = await _factory.AddItemAsync(order, dto, itemsAreServerPriced: true, CancellationToken.None);
 
         // Assert
         error.Should().BeNull();
@@ -106,7 +106,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         };
 
         // Act
-        var error = await _factory.AddItemAsync(order, dto, CancellationToken.None);
+        var error = await _factory.AddItemAsync(order, dto, itemsAreServerPriced: true, CancellationToken.None);
 
         // Assert
         error.Should().BeNull();
@@ -151,7 +151,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         };
 
         // Act
-        await _factory.AddItemAsync(order, dto, CancellationToken.None);
+        await _factory.AddItemAsync(order, dto, itemsAreServerPriced: true, CancellationToken.None);
 
         // Assert
         order.Items.Should().HaveCount(4);
@@ -204,7 +204,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         };
 
         // Act
-        await _factory.AddItemAsync(order, dto, CancellationToken.None);
+        await _factory.AddItemAsync(order, dto, itemsAreServerPriced: true, CancellationToken.None);
 
         // Assert
         order.Items.Should().HaveCount(3);
@@ -252,7 +252,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         };
 
         // Act
-        await _factory.AddItemAsync(order, dto, CancellationToken.None);
+        await _factory.AddItemAsync(order, dto, itemsAreServerPriced: true, CancellationToken.None);
 
         // Assert
         order.Items.Should().HaveCount(2);
@@ -314,7 +314,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         };
 
         // Act
-        await _factory.AddItemAsync(order, dto, CancellationToken.None);
+        await _factory.AddItemAsync(order, dto, itemsAreServerPriced: true, CancellationToken.None);
 
         // Assert
         order.Items.Should().HaveCount(3);

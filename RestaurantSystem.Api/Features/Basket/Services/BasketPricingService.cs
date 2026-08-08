@@ -1,6 +1,9 @@
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using DomainBasket = RestaurantSystem.Domain.Entities.Basket;
 
@@ -15,13 +18,16 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 public class BasketPricingService : IBasketPricingService
 {
     private readonly ICustomerDiscountService _customerDiscountService;
+    private readonly OrderSettings _orderSettings;
     private readonly ILogger<BasketPricingService> _logger;
 
     public BasketPricingService(
         ICustomerDiscountService customerDiscountService,
+        IOptions<OrderSettings> orderSettings,
         ILogger<BasketPricingService> logger)
     {
         _customerDiscountService = customerDiscountService;
+        _orderSettings = orderSettings.Value;
         _logger = logger;
     }
 
@@ -71,6 +77,14 @@ public class BasketPricingService : IBasketPricingService
         // Tax will be calculated later during order creation when order type is known
         // This is important for Swiss tax compliance (different rates for Dine-In vs Takeaway/Delivery)
         basket.Tax = 0;
+
+        // The delivery fee is read from the SAME OrderSettings the order-side pricing uses, so the
+        // total the checkout page shows is the total the server charges. It used to be left at 0
+        // here and applied only in OrderPricingService — harmless while that value was a dead
+        // constant, but the moment a tenant sets OrderSettings:DeliveryFee it would charge a fee the
+        // basket never displayed and the tender never covered. Basket.OrderType is nullable and only
+        // Delivery attracts the fee, so an undecided basket shows none.
+        basket.DeliveryFee = basket.OrderType == OrderType.Delivery ? _orderSettings.DeliveryFee : 0;
 
         // Calculate total before rounding (without tax since order type is not yet known)
         decimal amountAfterDiscount = basket.SubTotal - customerDiscountAmount - basket.Discount;

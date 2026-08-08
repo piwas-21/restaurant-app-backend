@@ -174,7 +174,7 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         });
 
     [Fact]
-    public async Task Should_Add_Product_And_Menu_To_Basket_Then_Create_Order_Successfully()
+    public async Task Should_Add_Product_And_Menu_To_Basket_Then_Refuse_A_Hand_Built_Bundle_Order()
     {
         // Arrange - Work in anonymous mode with session ID only
         // Don't authenticate to avoid user ID foreign key issues
@@ -232,8 +232,19 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
         summary.Data!.ItemCount.Should().Be(3);
         summary.Data.Total.Should().BeGreaterThan(0);
 
-        // Act & Assert - Step 4: Create Order from Basket
-        // Authenticate for order creation as it requires authentication
+        // Act & Assert - Step 4: the legacy hand-built items payload can no longer buy a bundle.
+        //
+        // This step used to POST /api/orders with the combo's rolled-up UnitPrice and its two child
+        // rows, and assert the resulting order. S0b stopped that endpoint honouring a
+        // client-declared UnitPrice — it is ANONYMOUS, so a caller could name its own price — and a
+        // composed line is REFUSED there rather than repriced, because a bundle's true price is the
+        // parent's base plus its selected options' and `product.BasePrice` alone would undercharge
+        // it (8.00 against a true 12.98).
+        //
+        // The success assertions this step used to make have not been dropped: they live in
+        // Should_Create_Order_From_Basket_With_Same_Rows_And_Totals_As_Legacy_Path below, which was
+        // written to pin exactly this basket producing exactly these rows and totals — through
+        // /from-basket, the path the checkout page actually uses.
         AuthenticateAsTestUser();
 
         var createOrderRequest = new CreateOrderCommand
@@ -243,162 +254,37 @@ public class BasketToOrderIntegrationTest : IntegrationTestBase
             CustomerName = "Test Customer",
             CustomerEmail = "test@example.com",
             CustomerPhone = "+1234567890",
-            Notes = "Please prepare quickly",
             Items = new List<CreateOrderItemDto>
             {
-                new()
-                {
-                    ProductId = _testProduct.Id,
-                    Quantity = 2,
-                    UnitPrice = _testProduct.BasePrice,
-                    SpecialInstructions = "Extra cheese please"
-                },
                 new()
                 {
                     ProductId = _menuProduct.Id,
                     Quantity = 1,
                     UnitPrice = ExpectedMenuUnitPrice,
-                    SpecialInstructions = "No ice in drink",
-                    // Realistic shape: the frontend converts basket → order
-                    // DTO and carries each child's per-section additional
-                    // price as UnitPrice (matches BasketService's basket-side
-                    // storage). The assertion below pins the resulting items
-                    // total — see the note next to it about the latent
-                    // OrderItemFactory double-count behavior.
                     ChildItems = new List<CreateOrderItemDto>
                     {
-                        new()
-                        {
-                            ProductId = _pizzaOption.ProductId,
-                            Quantity = 1,
-                            UnitPrice = MainAdditional
-                        },
-                        new()
-                        {
-                            ProductId = _colaOption.ProductId,
-                            Quantity = 1,
-                            UnitPrice = DrinkAdditional
-                        }
+                        new() { ProductId = _pizzaOption.ProductId, Quantity = 1, UnitPrice = MainAdditional },
+                        new() { ProductId = _colaOption.ProductId, Quantity = 1, UnitPrice = DrinkAdditional }
                     }
                 }
             },
             Payments = new List<CreateOrderPaymentDto>
             {
-                new()
-                {
-                    PaymentMethod = PaymentMethod.Cash,
-                    Amount = 100.00m
-                }
+                new() { PaymentMethod = PaymentMethod.Cash, Amount = 100.00m }
             }
         };
 
         var orderResponse = await PostAsJsonAsync("/api/orders", createOrderRequest);
-        orderResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var orderResult = await ReadResponseAsync<ApiResponse<OrderDto>>(orderResponse);
-        orderResult.Should().NotBeNull();
-        orderResult!.Success.Should().BeTrue();
-        orderResult.Data.Should().NotBeNull();
+        orderResult!.Success.Should().BeFalse("a composed line cannot be priced from the catalogue alone");
 
-        // Verify Order Details
-        var createdOrder = orderResult.Data!;
-        createdOrder.OrderNumber.Should().NotBeNullOrEmpty();
-        createdOrder.Type.Should().Be(OrderType.DineIn.ToString());
-        createdOrder.TableNumber.Should().Be(5);
-        createdOrder.CustomerName.Should().Be("Test Customer");
-        createdOrder.Status.Should().Be(OrderStatus.Confirmed.ToString());
-        createdOrder.PaymentStatus.Should().Be(PaymentStatus.Pending.ToString());
-        // OrderDto.Items holds only ROOT rows; child rows hang off their parent's
-        // SideItems (#234 — the flat projection emitted every child twice on the
-        // paths where SideItems was populated, and left it null on the printer
-        // feed). Two roots here: the standalone pizza and the combo parent. The
-        // combo's two child option rows (pizza + cola) are asserted below.
-        createdOrder.Items.Should().HaveCount(2);
-
-        // Verify Order Items - standalone pizza (qty 2, no parent)
-        var orderProductItem = createdOrder.Items
-            .FirstOrDefault(i => i.ProductId == _testProduct.Id && i.Quantity == 2);
-        orderProductItem.Should().NotBeNull();
-        orderProductItem!.ProductName.Should().Be("Test Pizza");
-
-        // Verify Order Items - menu (ProductType.Menu) parent
-        var orderMenuItem = createdOrder.Items
-            .FirstOrDefault(i => i.ProductId == _menuProduct.Id);
-        orderMenuItem.Should().NotBeNull();
-        orderMenuItem!.Quantity.Should().Be(1);
-        orderMenuItem.ProductName.Should().Be("Lunch Special Combo");
-
-        // The combo's children are nested under it, not listed top-level. The combo
-        // parent is ProductType.Menu, so its children are stamped BundleChild.
-        createdOrder.Items.Should().NotContain(i => i.ProductId == _testCola.Id,
-            "child rows belong under their parent's SideItems, not at the top level");
-        orderMenuItem.SideItems.Should().NotBeNull().And.HaveCount(2);
-        var orderColaChild = orderMenuItem.SideItems!
-            .FirstOrDefault(i => i.ProductId == _testCola.Id);
-        orderColaChild.Should().NotBeNull();
-        orderColaChild!.ProductName.Should().Be("Test Cola");
-        orderColaChild.Kind.Should().Be(OrderItemKind.BundleChild);
-
-        // Verify Order Totals
-        //
-        // itemsTotal sums ItemTotal across the root rows. Children carry ItemTotal = 0
-        // (see below), so root-only summing is equivalent to the old flat sum. Pinning
-        // the exact value so this assertion fails loudly if pricing logic ever shifts.
-        //
-        // Per issue #54 (now fixed): OrderItemFactory aligns with
-        // BasketService.AddItemToBasketAsync (BasketService.cs:230-231) —
-        // child OrderItem rows carry UnitPrice for display but
-        // ItemTotal = 0, because the parent menu OrderItem's ItemTotal
-        // already includes the full combo price (ExpectedMenuUnitPrice
-        // rolls up MainAdditional + DrinkAdditional via the frontend's
-        // basket-to-order mapping). Summing children's UnitPrice on top
-        // would double-count those terms — only the standalone pizza and
-        // the menu parent contribute.
-        var expectedItemsTotal =
-            (_testProduct.BasePrice * 2) // standalone pizza (qty 2)
-            + ExpectedMenuUnitPrice;     // menu parent (children contribute 0)
-        createdOrder.Items.Sum(i => i.ItemTotal).Should().Be(expectedItemsTotal);
-        createdOrder.SubTotal.Should().BeGreaterThan(0);
-        createdOrder.SubTotal.Should().BeLessOrEqualTo(expectedItemsTotal);
-        createdOrder.Total.Should().BeGreaterThan(0);
-        createdOrder.Payments.Should().HaveCount(1);
-        createdOrder.Payments.First().PaymentMethod.Should().Be(PaymentMethod.Cash.ToString());
-
-        // Act & Assert - Step 5: Verify Order in Database
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        var orderInDb = await context.Orders
-            .Include(o => o.Items)
-            .Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.Id == createdOrder.Id);
-
-        orderInDb.Should().NotBeNull();
-        // Top-level + child OrderItems are stored flat; both rows persist.
-        orderInDb!.Items.Should().HaveCount(4);
-        orderInDb.Payments.Should().HaveCount(1);
-        orderInDb.OrderNumber.Should().Be(createdOrder.OrderNumber);
-
-        // Issue #54 acceptance: every row with ParentOrderItemId != null
-        // must have ItemTotal == 0, mirroring BasketService's child-zero
-        // convention. Asserted against the DB row (the DTO doesn't carry
-        // ParentOrderItemId, and ProductId alone isn't a reliable
-        // discriminator since menu-option children can reference the same
-        // Product as a standalone item — pizzaOption.ProductId ==
-        // _testProduct.Id in this fixture).
-        orderInDb.Items
-            .Where(i => i.ParentOrderItemId != null)
-            .Should().HaveCount(2);
-        orderInDb.Items
-            .Where(i => i.ParentOrderItemId != null)
-            .Select(i => i.ItemTotal)
-            .Should().OnlyContain(t => t == 0m);
-        // Parent menu row carries the full combo ItemTotal; children
-        // carry UnitPrice (for display) but contribute 0 to the sum.
-        orderInDb.Items
-            .Where(i => i.ParentOrderItemId != null)
-            .Select(i => i.UnitPrice)
-            .Should().BeEquivalentTo(new[] { MainAdditional, DrinkAdditional });
+        // The refusal must leave nothing behind — a guard that ran after the rows were written
+        // would satisfy the assertion above while the order sat in the database underpriced.
+        (await context.Orders.AsNoTracking().AnyAsync()).Should().BeFalse();
     }
 
     // FluentValidation now runs in the CustomMediator pipeline via

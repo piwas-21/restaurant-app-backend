@@ -35,5 +35,13 @@ public interface IOrderItemFactory
     /// products (deeper than the top level) throw
     /// <c>NotFoundException</c> instead, matching the original handler.
     /// </returns>
-    Task<string?> AddItemAsync(Order order, CreateOrderItemDto itemDto, CancellationToken cancellationToken);
+    /// <param name="itemsAreServerPriced">
+    /// <c>true</c> only when the items were derived server-side from the persisted basket. It
+    /// gates whether the DTO's <c>UnitPrice</c> and <c>CustomizationPrice</c> are honoured at all;
+    /// for a hand-built request body they are ignored and the catalogue price is used. Order
+    /// creation is anonymous, so this is a money control, not a convenience — see
+    /// <c>ResolvePricing</c>.
+    /// </param>
+    Task<string?> AddItemAsync(
+        Order order, CreateOrderItemDto itemDto, bool itemsAreServerPriced, CancellationToken cancellationToken);
 }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -20,16 +21,43 @@ public class OrderItemFactory : IOrderItemFactory
         _currentUserService = currentUserService;
     }
 
-    public async Task<string?> AddItemAsync(Order order, CreateOrderItemDto itemDto, CancellationToken cancellationToken)
+    public async Task<string?> AddItemAsync(
+        Order order, CreateOrderItemDto itemDto, bool itemsAreServerPriced, CancellationToken cancellationToken)
     {
+        // Prices in the DTO are honoured from two sources and no others: the persisted basket
+        // (itemsAreServerPriced), and a staff member standing behind the till. Everyone else gets
+        // catalogue pricing. The staff carve-out is the same one OrderPaymentBuilder already draws
+        // for tenders — the POS legitimately hand-builds composed lines, and taking that away in
+        // the name of guarding an anonymous endpoint would break the till instead.
+        var pricesAreTrusted = itemsAreServerPriced || _currentUserService.IsStaff;
+
         if (itemDto.MenuId.HasValue)
         {
-            return await AddMenuItemAsync(order, itemDto, cancellationToken);
+            return await AddMenuItemAsync(order, itemDto, pricesAreTrusted, cancellationToken);
         }
 
         if (itemDto.ProductId.HasValue)
         {
-            await AddProductItemRecursiveAsync(order, itemDto, parentItem: null, cancellationToken);
+            // A composed line is REFUSED on the untrusted path rather than priced from the
+            // catalogue. Its real price is the parent's base plus the selected options', and those
+            // option prices live in the menu definition — `product.BasePrice` alone cannot express
+            // it. Falling back to the base price would silently UNDERCHARGE the bundle (measured:
+            // 8.00 against a true 12.98), trading a large hole for a smaller one. Refusing keeps
+            // the rule honest: this endpoint accepts only what it can price itself.
+            //
+            // The real checkout is unaffected — /from-basket is server-priced, and its bundles are
+            // covered end to end by BasketToOrderIntegrationTest and OrderLineCustomizationPriceTests.
+            // Two shapes are refused, not one. Child rows are the obvious composed line — but a
+            // BUNDLE PARENT POSTED ALONE has no children and would slip through to be priced at
+            // `product.BasePrice`, which is exactly the 8.00-against-a-true-12.98 undercharge this
+            // guard exists to prevent. ProductType.Menu is what makes a product a bundle.
+            if (!pricesAreTrusted &&
+                (itemDto.ChildItems is { Count: > 0 } || await IsBundleAsync(itemDto.ProductId!.Value, cancellationToken)))
+            {
+                return "A composed item cannot be ordered through this endpoint; check out from the basket instead.";
+            }
+
+            await AddProductItemRecursiveAsync(order, itemDto, parentItem: null, pricesAreTrusted, cancellationToken);
         }
 
         // Neither MenuId nor ProductId — silently skip, matching the
@@ -37,7 +65,12 @@ public class OrderItemFactory : IOrderItemFactory
         return null;
     }
 
-    private async Task<string?> AddMenuItemAsync(Order order, CreateOrderItemDto itemDto, CancellationToken cancellationToken)
+    private Task<bool> IsBundleAsync(Guid productId, CancellationToken cancellationToken) =>
+        _context.Products.AnyAsync(
+            p => p.Id == productId && !p.IsDeleted && p.Type == ProductType.Menu, cancellationToken);
+
+    private async Task<string?> AddMenuItemAsync(
+        Order order, CreateOrderItemDto itemDto, bool pricesAreTrusted, CancellationToken cancellationToken)
     {
         var menu = await _context.Menus
             .Include(p => p.MenuItems)
@@ -49,6 +82,7 @@ public class OrderItemFactory : IOrderItemFactory
         }
 
         var unitPrice = menu.BasePrice;
+        var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
         order.Items.Add(new OrderItem
         {
             ProductId = itemDto.ProductId,
@@ -58,7 +92,7 @@ public class OrderItemFactory : IOrderItemFactory
             VariationName = null,
             Quantity = itemDto.Quantity,
             UnitPrice = unitPrice,
-            ItemTotal = (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice,
+            ItemTotal = (unitPrice * itemDto.Quantity) + customization,
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
             CreatedAt = DateTime.UtcNow,
@@ -72,6 +106,7 @@ public class OrderItemFactory : IOrderItemFactory
         Order order,
         CreateOrderItemDto itemDto,
         OrderItem? parentItem,
+        bool pricesAreTrusted,
         CancellationToken cancellationToken)
     {
         var product = await _context.Products
@@ -86,7 +121,8 @@ public class OrderItemFactory : IOrderItemFactory
             throw new NotFoundException($"Product {itemDto.ProductId} not found");
         }
 
-        var (unitPrice, variationName) = ResolvePricing(itemDto, product);
+        var (unitPrice, variationName) = ResolvePricing(itemDto, product, pricesAreTrusted);
+        var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
 
         // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-245):
         // child rows carry UnitPrice for display but ItemTotal = 0, because the
@@ -111,7 +147,7 @@ public class OrderItemFactory : IOrderItemFactory
         if (parentItem != null)
         {
             itemTotal = 0m;
-            if (itemDto.CustomizationPrice != 0m)
+            if (customization != 0m)
             {
                 // Walk up to the top-level root: every intermediate parent's
                 // ItemTotal must stay 0 (BasketService convention — see
@@ -124,12 +160,12 @@ public class OrderItemFactory : IOrderItemFactory
                 {
                     root = root.ParentOrderItem;
                 }
-                root.ItemTotal += itemDto.CustomizationPrice;
+                root.ItemTotal += customization;
             }
         }
         else
         {
-            itemTotal = (unitPrice * itemDto.Quantity) + itemDto.CustomizationPrice;
+            itemTotal = (unitPrice * itemDto.Quantity) + customization;
         }
 
         var orderItem = new OrderItem
@@ -158,18 +194,24 @@ public class OrderItemFactory : IOrderItemFactory
         {
             foreach (var childDto in itemDto.ChildItems)
             {
-                await AddProductItemRecursiveAsync(order, childDto, orderItem, cancellationToken);
+                await AddProductItemRecursiveAsync(order, childDto, orderItem, pricesAreTrusted, cancellationToken);
             }
         }
     }
 
-    // Two paths: either the client passed an explicit UnitPrice (variation
-    // name still resolved for display), or we compute from BasePrice plus
-    // the variation's PriceModifier.
+    // An explicit UnitPrice is honoured ONLY when the price is trusted — the items came from the
+    // persisted basket via IBasketToOrderTranslator (where a bundle's rolled-up unit price and a
+    // variation's modifier are already resolved), or the caller is staff.
+    //
+    // For a hand-built POST /api/orders body the price is taken from the catalogue instead. That
+    // endpoint is ANONYMOUS, so honouring its UnitPrice let a caller name its own price: posting
+    // `unitPrice: 0.01` against a 12.99 product produced a 0.01 order. It is the same defect class
+    // as the client-declared BasketTotal that S0b removed, one level further down — closing only
+    // the total would have left the line items to say the same untrue thing.
     private static (decimal unitPrice, string? variationName) ResolvePricing(
-        CreateOrderItemDto itemDto, Product product)
+        CreateOrderItemDto itemDto, Product product, bool pricesAreTrusted)
     {
-        if (itemDto.UnitPrice > 0)
+        if (pricesAreTrusted && itemDto.UnitPrice > 0)
         {
             string? variationName = null;
             if (itemDto.ProductVariationId.HasValue)
@@ -193,6 +235,12 @@ public class OrderItemFactory : IOrderItemFactory
         }
         return (basePrice, null);
     }
+
+    // CustomizationPrice is added straight to a line's ItemTotal, so it is a price lever in its own
+    // right and is dropped for the same reason as UnitPrice above. A basket-sourced DTO always
+    // sends 0 here for child rows, so this costs the real checkout path nothing.
+    private static decimal ResolveCustomizationPrice(CreateOrderItemDto itemDto, bool pricesAreTrusted) =>
+        pricesAreTrusted ? itemDto.CustomizationPrice : 0m;
 
     private static string? SerializeIngredients(Dictionary<Guid, int>? ingredientQuantities) =>
         ingredientQuantities != null ? JsonSerializer.Serialize(ingredientQuantities) : null;

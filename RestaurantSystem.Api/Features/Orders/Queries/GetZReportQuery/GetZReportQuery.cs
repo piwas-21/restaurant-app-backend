@@ -48,9 +48,15 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
         // --- Totals ---
         var totalTransactions = salesOrders.Count;
         var grossSales = salesOrders.Sum(o => o.SubTotal);
-        var netSales = salesOrders.Sum(o => o.Total);
-        var totalTax = salesOrders.Sum(o => o.Tax);
         var totalTips = salesOrders.Sum(o => o.Tip);
+
+        // Net sales EXCLUDES tips. order.Total is what the customer was charged, and since S0b that
+        // reliably includes the tip — but a tip is not the restaurant's revenue, so reporting it as
+        // sales would overstate turnover and, under Swiss VAT, work against the separate-disclosure
+        // condition that keeps a voluntary tip out of taxable consideration at all (ESTV
+        // MWST-Branchen-Info 08 §8.3). TotalTips below is that separate line.
+        var netSales = salesOrders.Sum(o => o.Total - o.Tip);
+        var totalTax = salesOrders.Sum(o => o.Tax);
         var totalDeliveryFees = salesOrders.Sum(o => o.DeliveryFee);
 
         // --- Discounts ---

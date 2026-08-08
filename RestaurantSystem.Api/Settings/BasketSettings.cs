@@ -8,5 +8,4 @@ public class BasketSettings
     public int MaxQuantityPerItem { get; set; } = 100;
     public bool EnableAutoMergeOnLogin { get; set; } = true;
     public decimal TaxRate { get; set; } = 0.08m;
-    public decimal DefaultDeliveryFee { get; set; } = 5.00m;
 }
