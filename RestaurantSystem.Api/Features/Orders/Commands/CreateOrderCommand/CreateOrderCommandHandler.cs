@@ -162,9 +162,9 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             // DB until the save above.
             await _fidelity.RedeemAsync(order, command.PointsToRedeem, userId, cancellationToken);
 
-            // Cash payments stay Pending; points are awarded at
-            // payment-completion time, not order-creation time. The
-            // coordinator gates on PaymentStatus internally.
+            // Gates on order.PaymentStatus, NOT on tender status — so "every tender
+            // is Pending" does NOT make this inert: a client-declared BasketTotal of
+            // 0 still reaches Completed and awards points here. See S0b.
             await _fidelity.AwardEarnedPointsAsync(order, userId, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);

@@ -76,8 +76,14 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
             return;
         }
 
-        // Cash payments stay Pending until explicitly completed; points are
-        // awarded at payment-completion time, not at order-creation time.
+        // The gate is the ORDER's PaymentStatus, not its tenders'. Since every tender
+        // created with an order is Pending, at creation time this normally returns —
+        // but not always: UpdatePaymentSummary derives PaymentStatus from
+        // order.Total, and order.Total is still copied verbatim from the caller's
+        // BasketTotal (OrderPricingService.ApplyTotal). A declared total of 0 leaves
+        // RemainingAmount at 0, which reads as Completed, and points are awarded on
+        // an order nobody paid for. Closing that is S0b — server-authoritative
+        // totals. Do not weaken this gate on the assumption it is unreachable.
         if (order.PaymentStatus != PaymentStatus.Completed &&
             order.PaymentStatus != PaymentStatus.Overpaid)
         {

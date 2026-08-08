@@ -57,8 +57,18 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         await TestDataSeeder.SeedBasicDataAsync(context);
     }
 
+    /// <summary>
+    /// Authenticates as Admin. Clears the role and anonymous headers for the same reason
+    /// <see cref="AuthenticateAsUser"/> does — and this one was the exception: it used to set
+    /// <c>X-Test-Admin</c> without clearing <see cref="TestAuthHandler.AnonymousHeader"/>, so
+    /// <c>AuthenticateAsAnonymous()</c> followed by this stayed anonymous. A test that asserts a
+    /// guest is refused and then checks staff still get through would have had its control silently
+    /// run as a guest too, passing while proving nothing.
+    /// </summary>
     protected void AuthenticateAsAdmin()
     {
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.RoleHeader);
+        Client.DefaultRequestHeaders.Remove(TestAuthHandler.AnonymousHeader);
         Client.DefaultRequestHeaders.Remove("X-Test-Admin");
         Client.DefaultRequestHeaders.Add("X-Test-Admin", "true");
     }
