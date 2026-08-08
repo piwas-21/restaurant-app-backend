@@ -52,7 +52,7 @@ public class OrderItemFactory : IOrderItemFactory
             // `product.BasePrice`, which is exactly the 8.00-against-a-true-12.98 undercharge this
             // guard exists to prevent. ProductType.Menu is what makes a product a bundle.
             if (!pricesAreTrusted &&
-                (itemDto.ChildItems is { Count: > 0 } || await IsBundleAsync(itemDto.ProductId!.Value, cancellationToken)))
+                (itemDto.ChildItems is { Count: > 0 } || await IsBundleAsync(itemDto.ProductId.Value, cancellationToken)))
             {
                 return "A composed item cannot be ordered through this endpoint; check out from the basket instead.";
             }
