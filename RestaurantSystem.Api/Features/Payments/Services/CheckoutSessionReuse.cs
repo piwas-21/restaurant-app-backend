@@ -47,7 +47,9 @@ public class CheckoutSessionReuse : ICheckoutSessionReuse
             throw new BadRequestException("A payment for this order is already in progress.");
         }
 
-        if (remote?.IsOpen == true)
+        // Destructured rather than `remote?.IsOpen == true` + `remote.Url!`: IsOpen already implies a
+        // URL, but only the pattern makes that visible to the compiler instead of asserted at it.
+        if (remote is { IsOpen: true, Url: { } liveUrl })
         {
             // A live session cannot be cancelled from here, so a mismatch must REFUSE rather than
             // mint a replacement — a second page while the first is still payable is the double-pay
@@ -61,7 +63,7 @@ public class CheckoutSessionReuse : ICheckoutSessionReuse
             // Currency and amount are read back from OUR row, never Stripe's echo: that row is what
             // S5 asserts against, so describing the charge any other way describes a different one.
             return CheckoutSessionDto.From(
-                live.SessionId, remote.Url!, live.ExpiresAt, live.Currency, live.AmountMinor);
+                live.SessionId, liveUrl, live.ExpiresAt, live.Currency, live.AmountMinor);
         }
 
         // Neither open nor complete: expired, or an id Stripe does not recognise (a key or account

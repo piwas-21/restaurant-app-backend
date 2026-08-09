@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
@@ -21,6 +22,14 @@ namespace RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionC
 /// </summary>
 public record CreateCheckoutSessionCommand : ICommand<ApiResponse<CheckoutSessionDto>>
 {
+    /// <summary>
+    /// <c>[JsonRequired]</c> for the reason the codebase already applies it elsewhere
+    /// (<c>CreateOrderFromBasketCommand</c>, <c>SetBasketOrderTypeCommand</c>): a non-nullable
+    /// value type binds an OMITTED field to <c>Guid.Empty</c>, so under-posting would arrive here
+    /// as a well-formed request for an order that cannot exist. This makes the omission a 400 at
+    /// model binding; the validator's <c>NotEmpty</c> still covers an all-zeros id sent on purpose.
+    /// </summary>
+    [JsonRequired]
     public Guid OrderId { get; set; }
 }
 
@@ -150,7 +159,7 @@ public class CreateCheckoutSessionCommandHandler
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        if (!usable)
+        if (string.IsNullOrWhiteSpace(session.Url))
         {
             throw new BadRequestException("Online payment could not be started. Please try again.");
         }
@@ -160,8 +169,6 @@ public class CreateCheckoutSessionCommandHandler
             session.Id, order.OrderNumber, amount.Minor, amount.Currency);
 
         return ApiResponse<CheckoutSessionDto>.SuccessWithData(
-            // Non-null: `usable` is exactly the "Url is present" test, and the throw above is
-            // unconditional when it is false.
-            CheckoutSessionDto.From(session.Id, session.Url!, expiresAt, amount.Currency, amount.Minor));
+            CheckoutSessionDto.From(session.Id, session.Url, expiresAt, amount.Currency, amount.Minor));
     }
 }
