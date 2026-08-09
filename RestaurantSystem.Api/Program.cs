@@ -288,6 +288,15 @@ builder.Services.AddSingleton<ITenantModules, TenantModules>();
 builder.Services.Configure<RestaurantSystem.Api.Settings.OrderSettings>(
     builder.Configuration.GetSection(RestaurantSystem.Api.Settings.OrderSettings.SectionName));
 
+// Tenant→diner Stripe Connect (ADR-011 Job B). Registered unconditionally and INERT unless a tenant
+// has Stripe__Enabled plus a platform key plus a connected account — which is no tenant today, so
+// this ships safe to the whole fleet. Singleton because the answer is fixed for the process
+// lifetime, matching ITenantModules above: a change lands via re-provision + restart.
+builder.Services.Configure<RestaurantSystem.Api.Settings.StripeSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeSettings.SectionName));
+builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway,
+    RestaurantSystem.Api.Features.Payments.Services.StripeGateway>();
+
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.
 // Per-tenant provisioning injects SeedSettings__AdminEmail/__AdminPassword env
