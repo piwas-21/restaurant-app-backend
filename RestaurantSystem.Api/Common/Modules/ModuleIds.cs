@@ -12,11 +12,11 @@ namespace RestaurantSystem.Api.Common.Modules;
 /// <c>extra-languages</c> is a PRICING rule rather than a gated surface — it is part
 /// of the vocabulary so an entry carrying it is recognised, but nothing gates on it.
 ///
-/// <c>online-payments</c> gates no ROUTE either, which is why it has no
-/// <c>ROUTE_MODULE_ENTRIES</c> row on the frontend: it turns a payment METHOD on inside
-/// the existing checkout rather than revealing a page. What enforces it is the
-/// availability endpoint (S8), which ANDs this flag with an actually-configured Stripe
-/// account — both halves matter, because both module gates fail OPEN.
+/// <c>online-payments</c> gates <c>PaymentsController</c> at the class level (S4), but it
+/// still has no <c>ROUTE_MODULE_ENTRIES</c> row on the frontend: it reveals no PAGE, it
+/// turns a payment METHOD on inside the existing checkout. The gate is therefore only half
+/// the enforcement — the availability endpoint (S8) ANDs this flag with an actually-
+/// configured Stripe account, and both halves matter because both module gates fail OPEN.
 /// </summary>
 public static class ModuleIds
 {
