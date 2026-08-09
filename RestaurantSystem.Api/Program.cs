@@ -302,6 +302,8 @@ builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ISt
     RestaurantSystem.Api.Features.Payments.Services.StripeCheckoutClient>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSettlementWriter,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutSettlementWriter>();
 
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.

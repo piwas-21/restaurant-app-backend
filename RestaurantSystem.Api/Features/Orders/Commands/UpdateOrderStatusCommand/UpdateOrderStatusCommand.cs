@@ -70,6 +70,20 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
             return ApiResponse<OrderDto>.Failure($"Cannot transition from {order.Status} to {command.NewStatus}");
         }
 
+        // The one deliberate exception to keeping payment state and order state decoupled.
+        //
+        // An online tender sits in Processing for the ~30 minutes the diner is on Stripe's hosted
+        // page, and PrinterFeedQuery puts any Confirmed order in front of the kitchen. Without this,
+        // a cashier clicking "Confirm" on an order that is mid-redirect hands the kitchen an unpaid
+        // ticket — undoing the exact protection that holding online orders at Pending buys. The
+        // settle path is what confirms these, and it completes the tender before it does.
+        if (command.NewStatus == OrderStatus.Confirmed &&
+            order.Payments.Any(p => p.Status == PaymentStatus.Processing))
+        {
+            return ApiResponse<OrderDto>.Failure(
+                "This order is awaiting an online payment and cannot be confirmed yet.");
+        }
+
         // Add status history
         var statusHistory = new OrderStatusHistory
         {

@@ -70,6 +70,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             var userId = command.UserId ?? _currentUserService.UserId;
             var auditId = _currentUserService.GetAuditIdentifier();
             var now = DateTime.UtcNow;
+            // Holds Dine-in at Pending so an unpaid order never reaches the kitchen feed.
+            var paysOnline = OnlinePaymentIntent.IsDeclaredIn(command.Payments);
 
             var order = new Order
             {
@@ -103,8 +105,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 Notes = command.Notes,
                 OrderDate = now,
                 Tip = command.Tip,
-                // Auto-confirm Dine-in orders, keep others as Pending.
-                Status = command.Type == OrderType.DineIn ? OrderStatus.Confirmed : OrderStatus.Pending,
+                Status = OnlinePaymentIntent.InitialStatus(command.Type, paysOnline),
                 PaymentStatus = PaymentStatus.Pending,
                 EstimatedDeliveryTime = command.Type == OrderType.Delivery ? now.AddMinutes(45) : null,
                 CreatedAt = now,
@@ -148,7 +149,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             {
                 FromStatus = OrderStatus.Pending,
                 ToStatus = order.Status,
-                Notes = command.Type == OrderType.DineIn ? "Order created and auto-confirmed (Dine-in)" : "Order created",
+                Notes = OnlinePaymentIntent.InitialStatusNote(command.Type, paysOnline),
                 ChangedAt = now,
                 ChangedBy = auditId,
                 CreatedAt = now,
@@ -162,8 +163,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             // DB until the save above.
             await _fidelity.RedeemAsync(order, command.PointsToRedeem, userId, cancellationToken);
 
-            // Gated on order.PaymentStatus, now derived from a server-computed Total, so a caller
-            // can no longer declare itself paid into an award.
+            // Gated on the server-computed order.PaymentStatus: a caller cannot declare itself paid
+            // into an award, and an online order is not paid yet — the settle path awards instead.
             await _fidelity.AwardEarnedPointsAsync(order, userId, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
@@ -173,9 +174,10 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             await _notifications.NotifyOrderCreatedAsync(orderDto);
             await _notifications.NotifyFocusOrderUpdateAsync(orderDto);
 
-            // Dine-in auto-confirms, so the confirmed-email goes synchronously.
-            // Takeaway/Delivery defer to the /send-confirmation-email endpoint.
-            if (command.Type == OrderType.DineIn)
+            // Dine-in auto-confirms, so the confirmed-email goes synchronously; Takeaway/Delivery
+            // defer to /send-confirmation-email. An online order confirms at neither — it was held
+            // Pending above, and the settle path sends this same email once Stripe reports payment.
+            if (command.Type == OrderType.DineIn && !paysOnline)
             {
                 await _notifications.SendOrderConfirmedAsync(
                     order, OrderNotificationService.DefaultDineInPreparationMinutes, cancellationToken);

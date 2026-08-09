@@ -83,4 +83,12 @@ public record StripeCheckoutSession
 
     /// <summary>Money has been taken. Settling on it is S5's job; S4 only refuses to mint a second.</summary>
     public bool IsPaid => PaymentStatus == "paid";
+
+    /// <summary>
+    /// Stripe says this session is over unpaid. Tested EXPLICITLY rather than as "not open and not
+    /// complete", because expiry is what eventually lets the reconciler cancel the order: a status
+    /// this code has never seen must fall through to "check again later", never to "give up". The
+    /// conservative reading costs one more poll; the permissive one cancels a live order.
+    /// </summary>
+    public bool IsExpired => Status == "expired";
 }
