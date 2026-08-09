@@ -28,17 +28,20 @@ public class SettleCheckoutSessionCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly IStripeCheckoutClient _checkout;
     private readonly ICheckoutSettlementWriter _writer;
+    private readonly ICheckoutSessionRetirement _retirement;
     private readonly ILogger<SettleCheckoutSessionCommandHandler> _logger;
 
     public SettleCheckoutSessionCommandHandler(
         ApplicationDbContext context,
         IStripeCheckoutClient checkout,
         ICheckoutSettlementWriter writer,
+        ICheckoutSessionRetirement retirement,
         ILogger<SettleCheckoutSessionCommandHandler> logger)
     {
         _context = context;
         _checkout = checkout;
         _writer = writer;
+        _retirement = retirement;
         _logger = logger;
     }
 
@@ -136,28 +139,17 @@ public class SettleCheckoutSessionCommandHandler
     }
 
     /// <summary>
-    /// Moves the row to a terminal status, but only if it is still <c>Created</c>.
+    /// Ends the session and releases the tender it was holding, then reports where that leaves the
+    /// order. Delegated, because failing the tender is what stops an abandoned payment blocking the
+    /// order forever — see <see cref="ICheckoutSessionRetirement"/>.
     /// </summary>
-    /// <remarks>
-    /// The same conditional-UPDATE shape as the settle claim, and for the same reason: a settle
-    /// running concurrently must win. Without the condition, a reconciler sweep that read "expired"
-    /// a moment before the return trip settled could overwrite a Completed row — losing the only
-    /// local record of a payment that Stripe has already taken.
-    /// </remarks>
     private async Task<ApiResponse<CheckoutSettlementDto>> RetireAsync(
         OrderCheckoutSession session,
         CheckoutSessionStatus status,
         string reason,
         CancellationToken cancellationToken)
     {
-        await _context.OrderCheckoutSessions
-            .Where(s => s.Id == session.Id && s.Status == CheckoutSessionStatus.Created)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(x => x.Status, status).SetProperty(x => x.LastError, reason),
-                cancellationToken);
-
-        _logger.LogWarning(
-            "Checkout session {SessionId} retired as {Status}: {Reason}", session.SessionId, status, reason);
+        await _retirement.RetireAsync(session, status, reason, cancellationToken);
 
         return await DescribeAsync(session, cancellationToken);
     }
@@ -166,9 +158,13 @@ public class SettleCheckoutSessionCommandHandler
     private async Task<ApiResponse<CheckoutSettlementDto>> DescribeAsync(
         OrderCheckoutSession session, CancellationToken cancellationToken)
     {
+        // FirstOrDefault, not First: an order soft-deleted while the diner was at Stripe would
+        // otherwise throw InvalidOperationException — a 500 on a path a diner reaches, and against
+        // §5.4. NotFound is the honest answer, and it is diagnosable rather than a stack trace.
         var order = await _context.Orders
             .AsNoTracking()
-            .FirstAsync(o => o.Id == session.OrderId, cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == session.OrderId, cancellationToken)
+            ?? throw new NotFoundException("Order not found");
 
         return ApiResponse<CheckoutSettlementDto>.SuccessWithData(CheckoutSettlementDto.From(order));
     }

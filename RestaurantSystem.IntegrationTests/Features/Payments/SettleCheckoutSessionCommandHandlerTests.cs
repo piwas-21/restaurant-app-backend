@@ -284,6 +284,81 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Retiring a session must also release the tender it was holding, or the order is trapped.
+    /// </summary>
+    /// <remarks>
+    /// <c>Processing</c> has exactly two ways out: settlement completes it, or this fails it. Nothing
+    /// else touches it — <c>AddPaymentToOrder</c> sweeps only <c>Pending</c> tenders and refunds
+    /// refuse anything that is not <c>Completed</c>. Leave it behind and
+    /// <c>UpdateOrderStatusCommand</c> goes on refusing to confirm an order awaiting a payment that
+    /// can never arrive.
+    ///
+    /// <para>
+    /// <c>Failed</c> rather than deleting the row: the diner did start a payment, and like
+    /// <c>Processing</c> it is not <c>IsCaptured()</c>, so it stays out of every money total.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("expired")]
+    [InlineData("open")]
+    public async Task Retiring_a_session_releases_the_tender_it_was_holding(string stripeStatus)
+    {
+        var seeded = await SeedAsync(total: 42.50m);
+
+        // "open" reaches retirement by the OTHER route: Stripe no longer recognising the id.
+        var stripe = stripeStatus == "open"
+            ? StripeSaysUnknownSession()
+            : StripeSays(stripeStatus, "unpaid", 4250);
+
+        await HandleAsync(seeded.SessionId, stripe);
+
+        await using var verify = _fixture.CreateContext();
+        var payment = await verify.OrderPayments.AsNoTracking().SingleAsync();
+
+        payment.Status.Should().Be(PaymentStatus.Failed);
+        payment.Status.IsCaptured().Should().BeFalse("an abandoned attempt is not money the restaurant holds");
+
+        var order = await verify.Orders.AsNoTracking().SingleAsync();
+        order.TotalPaid.Should().Be(0m);
+    }
+
+    /// <summary>
+    /// The guard on that release. If a second session is still live for the same order, the tender
+    /// is covering THAT one — voiding it would mark a payment currently in progress as failed, and
+    /// settlement would then find nothing to complete.
+    /// </summary>
+    [Fact]
+    public async Task A_tender_is_not_released_while_another_session_is_still_live()
+    {
+        var seeded = await SeedAsync(total: 42.50m);
+
+        await using (var second = _fixture.CreateContext())
+        {
+            second.OrderCheckoutSessions.Add(new OrderCheckoutSession
+            {
+                OrderId = seeded.OrderId,
+                SessionId = $"cs_test_{Guid.NewGuid():N}",
+                Status = CheckoutSessionStatus.Created,
+                Currency = "chf",
+                AmountMinor = 4250,
+                IdempotencyKey = $"checkout:{seeded.OrderId}:2",
+                ExpiresAt = DateTime.UtcNow.AddMinutes(31),
+                ConnectedAccountId = ConnectedAccount,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = nameof(SettleCheckoutSessionCommandHandlerTests),
+            });
+            await second.SaveChangesAsync();
+        }
+
+        await HandleAsync(seeded.SessionId, StripeSays("expired", "unpaid", 4250));
+
+        await using var verify = _fixture.CreateContext();
+        var payment = await verify.OrderPayments.AsNoTracking().SingleAsync();
+
+        payment.Status.Should().Be(PaymentStatus.Processing, "the other session may still be paid");
+    }
+
+    /// <summary>
     /// Only an explicit <c>expired</c> retires a row. A status this code has never seen — Stripe
     /// adding one, or a typo in a fake — must fall through to "ask again later", because retiring
     /// is what leads to the order being cancelled. Written as its own case because the obvious
@@ -351,10 +426,46 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             Times.Never);
     }
 
+    /// <summary>
+    /// A cashier cancelled the order while the diner was still on Stripe's page.
+    /// </summary>
+    /// <remarks>
+    /// The tender must still be RECORDED — money genuinely moved and the restaurant owes a refund,
+    /// so a ledger that omits it is the worse lie. What must not happen is a fidelity award:
+    /// <c>AwardEarnedPointsAsync</c> gates only on <c>order.PaymentStatus</c>, which settlement has
+    /// just set to <c>Completed</c>, so the cancelled order would earn points — and
+    /// <c>RefundPaymentCommand</c> does not take them back.
+    /// </remarks>
+    [Fact]
+    public async Task Settling_a_cancelled_order_records_the_money_but_awards_no_points()
+    {
+        var seeded = await SeedAsync(
+            total: 42.50m, withUser: true, status: OrderStatus.Cancelled);
+
+        var fidelity = new Mock<IOrderFidelityCoordinator>();
+
+        await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250), fidelity);
+
+        await using var verify = _fixture.CreateContext();
+        var payment = await verify.OrderPayments.AsNoTracking().SingleAsync();
+        var order = await verify.Orders.AsNoTracking().SingleAsync();
+
+        payment.Status.Should().Be(PaymentStatus.Completed,
+            "the money moved — hiding it would leave a refund nobody knows to make");
+        order.Status.Should().Be(OrderStatus.Cancelled, "settling must not resurrect a cancelled order");
+
+        fidelity.Verify(
+            f => f.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private sealed record Seeded(Guid OrderId, string SessionId, Guid? UserId);
 
     private async Task<Seeded> SeedAsync(
-        decimal total, OrderType type = OrderType.Takeaway, bool withUser = false)
+        decimal total,
+        OrderType type = OrderType.Takeaway,
+        bool withUser = false,
+        OrderStatus status = OrderStatus.Pending)
     {
         await using var seed = _fixture.CreateContext();
 
@@ -383,7 +494,7 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             OrderNumber = $"S5-{Guid.NewGuid():N}"[..12],
             Type = type,
             // Pending for both types — that is what an online order looks like at creation.
-            Status = OrderStatus.Pending,
+            Status = status,
             PaymentStatus = PaymentStatus.Pending,
             UserId = userId,
             FidelityPointsEarned = withUser ? 42 : 0,
@@ -450,11 +561,17 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         return mock;
     }
 
-    private static CheckoutSettlementWriter NewWriter(
-        ApplicationDbContext ctx, Mock<IOrderFidelityCoordinator>? fidelity = null)
+    private static ICurrentUserService CurrentUser()
     {
         var currentUser = new Mock<ICurrentUserService>();
         currentUser.Setup(u => u.GetAuditIdentifier()).Returns("System");
+        return currentUser.Object;
+    }
+
+    private static CheckoutSettlementWriter NewWriter(
+        ApplicationDbContext ctx, Mock<IOrderFidelityCoordinator>? fidelity = null)
+    {
+        var currentUser = CurrentUser();
 
         var mapping = new Mock<IOrderMappingService>();
         mapping.Setup(m => m.MapToOrderDtoAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
@@ -464,13 +581,26 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             ctx,
             // The REAL payment builder: TotalPaid/RemainingAmount/PaymentStatus are the money
             // assertions in this file, and a stub would compute them in the test instead.
-            new OrderPaymentBuilder(currentUser.Object),
+            new OrderPaymentBuilder(currentUser),
             (fidelity ?? new Mock<IOrderFidelityCoordinator>()).Object,
             new Mock<IOrderNotificationService>().Object,
             new Mock<IOrderEventService>().Object,
             mapping.Object,
-            currentUser.Object,
+            currentUser,
             NullLogger<CheckoutSettlementWriter>.Instance);
+    }
+
+    /// <summary>
+    /// Stripe not recognising the id — `resource_missing`, which <c>StripeCheckoutClient</c> narrows
+    /// to a null. Every other Stripe failure still throws.
+    /// </summary>
+    private static Mock<IStripeCheckoutClient> StripeSaysUnknownSession()
+    {
+        var mock = new Mock<IStripeCheckoutClient>();
+        mock.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StripeCheckoutSession?)null);
+
+        return mock;
     }
 
     private async Task<ApiResponse<CheckoutSettlementDto>> HandleAsync(
@@ -482,6 +612,9 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
 
         var handler = new SettleCheckoutSessionCommandHandler(
             ctx, stripe.Object, NewWriter(ctx, fidelity),
+            // The REAL retirement service: failing the abandoned tender is what stops an order
+            // being trapped, so stubbing it would delete the property those cases exist for.
+            new CheckoutSessionRetirement(ctx, CurrentUser(), NullLogger<CheckoutSessionRetirement>.Instance),
             NullLogger<SettleCheckoutSessionCommandHandler>.Instance);
 
         return await handler.Handle(

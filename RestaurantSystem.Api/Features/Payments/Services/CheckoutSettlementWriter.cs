@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Payments.Dtos;
@@ -12,11 +13,6 @@ namespace RestaurantSystem.Api.Features.Payments.Services;
 /// <inheritdoc />
 public class CheckoutSettlementWriter : ICheckoutSettlementWriter
 {
-    /// <summary>Written to <c>OrderPayment.PaymentGateway</c>, the column that already names one.</summary>
-    private const string GatewayName = "Stripe";
-
-    private const int MinorUnitsPerMajor = 100;
-
     private readonly ApplicationDbContext _context;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly IOrderFidelityCoordinator _fidelity;
@@ -66,13 +62,21 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         // tender that was never minted if anything below threw — a dead run that reads as done, and
         // that no retry would ever pick up again. Rolled back, the row returns to Created and the
         // next caller settles it properly.
+        var now = DateTime.UtcNow;
+        var auditId = _currentUser.GetAuditIdentifier();
+
         var claimed = await _context.OrderCheckoutSessions
             .Where(s => s.Id == session.Id && s.Status == CheckoutSessionStatus.Created)
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(x => x.Status, CheckoutSessionStatus.Completed)
                     .SetProperty(x => x.PaymentIntentId, paymentIntentId)
-                    .SetProperty(x => x.AmountReceivedMinor, amountReceivedMinor),
+                    .SetProperty(x => x.AmountReceivedMinor, amountReceivedMinor)
+                    // ExecuteUpdate never reaches ApplicationDbContext's IAuditable stamper, so
+                    // these are set by hand. WHEN a session settled and WHICH caller settled it are
+                    // exactly what support and the reconciler need from the money claim ticket.
+                    .SetProperty(x => x.UpdatedAt, now)
+                    .SetProperty(x => x.UpdatedBy, auditId),
                 cancellationToken);
 
         if (claimed == 0)
@@ -86,7 +90,26 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
 
         var order = await LoadOrderAsync(session.OrderId, cancellationToken);
 
-        var tender = CompleteTender(order, session, paymentIntentId, amountReceivedMinor);
+        // The order was purged while the diner was at Stripe. Money HAS moved, so this needs a human
+        // either way; what it must not do is throw InvalidOperationException from FirstAsync (§5.4)
+        // and hand a diner a 500 on every retry forever.
+        if (order is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            _logger.LogError(
+                "Checkout session {SessionId} settled at Stripe but order {OrderId} no longer exists — "
+                + "the payment must be reconciled by hand", session.SessionId, session.OrderId);
+
+            throw new NotFoundException("Order not found");
+        }
+
+        // Captured BEFORE the confirm below moves it. Dine-in also reaches Confirmed from
+        // PendingApproval, so hard-coding Pending here would broadcast a transition that never
+        // happened — the StatusHistory row would say one thing and the SSE payload another.
+        var previousStatus = order.Status;
+
+        var tender = OnlineTenderCompletion.Apply(
+            order, session, paymentIntentId, amountReceivedMinor, auditId, now);
         _paymentBuilder.UpdatePaymentSummary(order);
 
         var confirmed = ConfirmIfDeferred(order);
@@ -110,67 +133,18 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
 
         // Deliberately after the commit. These are email and SSE — I/O that must neither hold a
         // database transaction open nor be able to roll the money back by failing.
-        await NotifyAsync(order, confirmed, cancellationToken);
+        await NotifyAsync(order, confirmed, previousStatus, cancellationToken);
 
         return CheckoutSettlementDto.From(order);
     }
 
-    private async Task<Order> LoadOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
+    private async Task<Order?> LoadOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         await _context.Orders
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Include(o => o.Items)
-            .FirstAsync(o => o.Id == orderId, cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
-    /// <summary>
-    /// Completes the tender that order creation minted, or mints one if there is none.
-    /// </summary>
-    /// <remarks>
-    /// Reusing the <c>Processing</c> tender is the normal path — it is the record that has been
-    /// telling every other surface "money is in flight" since the order was placed. Creating one
-    /// when it is absent keeps settlement independent of how the order was placed: a staff-created
-    /// order, or a future caller that skipped the declared tender, still gets an accurate ledger
-    /// rather than a silently unrecorded payment.
-    /// </remarks>
-    private OrderPayment CompleteTender(
-        Order order, OrderCheckoutSession session, string? paymentIntentId, long? amountReceivedMinor)
-    {
-        var now = DateTime.UtcNow;
-        var auditId = _currentUser.GetAuditIdentifier();
-
-        var tender = order.Payments.FirstOrDefault(
-            p => p.PaymentMethod == PaymentMethod.OnlinePayment && p.Status == PaymentStatus.Processing);
-
-        if (tender is null)
-        {
-            tender = new OrderPayment
-            {
-                OrderId = order.Id,
-                PaymentMethod = PaymentMethod.OnlinePayment,
-                PaymentDate = now,
-                CreatedAt = now,
-                CreatedBy = auditId,
-            };
-
-            order.Payments.Add(tender);
-        }
-        else
-        {
-            tender.UpdatedAt = now;
-            tender.UpdatedBy = auditId;
-        }
-
-        // What STRIPE says it took, not what the order said it wanted. The two are asserted equal
-        // before this runs, so they agree today — but if that assertion is ever relaxed, the ledger
-        // must record the money that actually moved.
-        tender.Amount = (amountReceivedMinor ?? session.AmountMinor) / (decimal)MinorUnitsPerMajor;
-        tender.Currency = session.Currency;
-        tender.TransactionId = paymentIntentId;
-        tender.PaymentGateway = GatewayName;
-        tender.Status = PaymentStatus.Completed;
-
-        return tender;
-    }
 
     /// <summary>
     /// Performs the confirm that order creation deferred, and reports whether it did.
@@ -230,6 +204,19 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
             return;
         }
 
+        // Never on an order that is over. A cashier can cancel while the diner is still at Stripe,
+        // and AwardEarnedPointsAsync gates only on order.PaymentStatus — which settlement has just
+        // set to Completed — so without this a cancelled order earns points, and refunding it does
+        // not take them back. Asked of the transition table, the same way EnsurePayable asks "is
+        // this order finished", rather than listing terminal statuses a second time.
+        if (!OrderStatusTransitions.IsValid(order.Status, OrderStatus.Cancelled))
+        {
+            _logger.LogWarning(
+                "Settled a payment on order {OrderNumber}, which is already {Status} — no points awarded",
+                order.OrderNumber, order.Status);
+            return;
+        }
+
         var alreadyAwarded = await _context.FidelityPointsTransactions.AnyAsync(
             t => t.OrderId == order.Id && t.TransactionType == TransactionType.Earned, cancellationToken);
 
@@ -241,7 +228,8 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         await _fidelity.AwardEarnedPointsAsync(order, order.UserId, cancellationToken);
     }
 
-    private async Task NotifyAsync(Order order, bool confirmed, CancellationToken cancellationToken)
+    private async Task NotifyAsync(
+        Order order, bool confirmed, OrderStatus previousStatus, CancellationToken cancellationToken)
     {
         if (!confirmed)
         {
@@ -252,7 +240,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
 
         try
         {
-            await _events.NotifyOrderStatusChanged(dto, nameof(OrderStatus.Pending));
+            await _events.NotifyOrderStatusChanged(dto, previousStatus.ToString());
         }
         catch (Exception ex)
         {
@@ -267,7 +255,9 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
 
     private async Task<CheckoutSettlementDto> DescribeAsync(Guid orderId, CancellationToken cancellationToken)
     {
-        var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId, cancellationToken);
+        var order = await _context.Orders.AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken)
+            ?? throw new NotFoundException("Order not found");
 
         return CheckoutSettlementDto.From(order);
     }
