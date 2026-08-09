@@ -13,8 +13,9 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 public interface IOrderPaymentBuilder
 {
     /// <summary>
-    /// For each payment DTO: build a new <see cref="OrderPayment"/> with status
-    /// <c>Pending</c> and append it to <c>order.Payments</c>.
+    /// For each payment DTO: build a new un-captured <see cref="OrderPayment"/> and
+    /// append it to <c>order.Payments</c> — <c>Processing</c> for an online tender,
+    /// <c>Pending</c> for everything else.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -31,11 +32,18 @@ public interface IOrderPaymentBuilder
     /// tender allow-list lives here rather than in a validator a third caller could
     /// bypass.
     /// </para>
+    /// <para>
+    /// <b>An online tender's <c>Amount</c> is taken from the order, not the DTO.</b> It
+    /// is the last money field a caller still controlled on an anonymous endpoint. What
+    /// is actually charged is decided later still, from the persisted total, and the
+    /// settle path overwrites <c>Amount</c> with what Stripe reports it took.
+    /// </para>
     /// </remarks>
     /// <exception cref="Common.Exceptions.BadRequestException">
-    /// A non-staff caller declared a tender other than Cash. This throw IS the
-    /// security control: order creation is anonymous, so the declared tender is a
-    /// claim, and Cash is the only one that settles somewhere a human verifies it.
+    /// A non-staff caller declared a tender other than Cash or OnlinePayment. This throw
+    /// IS the security control: order creation is anonymous, so the declared tender is a
+    /// claim, and those two are the only ones that settle somewhere a human or a gateway
+    /// verifies them.
     /// </exception>
     void AddPayments(Order order, IReadOnlyCollection<CreateOrderPaymentDto> payments);
 

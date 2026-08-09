@@ -47,16 +47,22 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Every tender a guest is not allowed to assert. <c>OnlinePayment</c> is in this list on
-    /// purpose: when the online-payments module lands it becomes selectable, but its tender will be
-    /// created <c>Processing</c> and completed by the gateway callback — never by the request that
-    /// names it. If a future change makes this case pass, it must be because the allow-list widened
-    /// deliberately, not because the guard was dropped.
+    /// Every tender a guest is not allowed to assert.
     /// </summary>
+    /// <remarks>
+    /// <c>OnlinePayment</c> USED to be in this list, with a note saying that if a future change ever
+    /// made its case pass, it had to be because the allow-list widened deliberately rather than
+    /// because the guard was dropped. S5 is that deliberate widening, and the note did its job — the
+    /// case failed the moment the allow-list changed. What makes it safe is not the method name but
+    /// where it settles: an online tender is created <c>Processing</c>, counts for nothing, and can
+    /// only be completed by the settle path, which re-fetches from Stripe before it writes. The
+    /// properties that replace this row are in
+    /// <see cref="A_guest_may_declare_an_online_tender_and_it_is_not_paid"/> and
+    /// <see cref="The_amount_of_an_online_tender_is_the_orders_not_the_callers"/>.
+    /// </remarks>
     [Theory]
     [InlineData(PaymentMethod.CreditCard)]
     [InlineData(PaymentMethod.DebitCard)]
-    [InlineData(PaymentMethod.OnlinePayment)]
     [InlineData(PaymentMethod.MobilePayment)]
     [InlineData(PaymentMethod.BankTransfer)]
     public async Task A_guest_cannot_declare_a_non_cash_tender_when_placing_an_order(PaymentMethod method)
@@ -150,6 +156,154 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         payment.Status.Should().Be(PaymentStatus.Pending, "cash is counted at the till, not on the wire");
         order.TotalPaid.Should().Be(0m, "a Pending tender is not captured, so it cannot count as money held");
         order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    /// <summary>
+    /// The widening S5 made, and the reason it is safe. A guest may now say "I will pay online",
+    /// but saying it moves no money: the tender lands <c>Processing</c>, which
+    /// <c>PaymentStatus.IsCaptured()</c> excludes, so <c>TotalPaid</c> stays 0 and the order is
+    /// still unpaid. Only the settle path — which asks Stripe first — can complete it.
+    /// </summary>
+    [Fact]
+    public async Task A_guest_may_declare_an_online_tender_and_it_is_not_paid()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.OnlinePayment, 12.99m));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var payment = await context.OrderPayments.AsNoTracking().SingleAsync();
+        var order = await context.Orders.AsNoTracking().SingleAsync();
+
+        payment.Status.Should().Be(PaymentStatus.Processing,
+            "Processing, not Pending — AddPaymentToOrder deletes every Pending tender on an order, "
+            + "so a cashier taking cash would otherwise erase the record that money is live at Stripe");
+        payment.Status.IsCaptured().Should().BeFalse();
+        order.TotalPaid.Should().Be(0m, "declaring an intent to pay is not paying");
+        order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    /// <summary>
+    /// The declared amount is the last money field a caller still controlled on this anonymous
+    /// endpoint. A tender for 0.01 against a 12.99 order would settle as <c>PartiallyPaid</c>
+    /// against a Stripe charge that took the full total — so the amount comes from the order.
+    /// </summary>
+    [Fact]
+    public async Task The_amount_of_an_online_tender_is_the_orders_not_the_callers()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.OnlinePayment, 0.01m));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var payment = await context.OrderPayments.AsNoTracking().SingleAsync();
+        var order = await context.Orders.AsNoTracking().SingleAsync();
+
+        payment.Amount.Should().Be(order.Total).And.Be(12.99m,
+            "the server priced this order; the request only named a method");
+    }
+
+    /// <summary>
+    /// The kitchen-feed property, and the reason the tender has to exist at CREATION rather than
+    /// being minted at settle. Dine-in normally auto-confirms here, and <c>PrinterFeedQuery</c>
+    /// prints any <c>Confirmed</c> order — so without this the ticket for an unpaid order is on the
+    /// pass before Stripe is ever called, and no later code can un-print it.
+    /// </summary>
+    [Fact]
+    public async Task A_dine_in_order_paying_online_does_not_auto_confirm()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync("/api/orders", NewOrder(
+            PaymentMethod.OnlinePayment, 12.99m, OrderType.DineIn));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var order = await context.Orders.AsNoTracking().SingleAsync();
+        order.Status.Should().Be(OrderStatus.Pending, "an unpaid order must not reach the kitchen feed");
+    }
+
+    /// <summary>
+    /// The control for the case above. Suppressing the dine-in auto-confirm for EVERY order would
+    /// satisfy it while silently changing how every cash dine-in order in the restaurant behaves.
+    /// </summary>
+    [Fact]
+    public async Task A_dine_in_cash_order_still_auto_confirms()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync("/api/orders", NewOrder(
+            PaymentMethod.Cash, 12.99m, OrderType.DineIn));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var order = await context.Orders.AsNoTracking().SingleAsync();
+        order.Status.Should().Be(OrderStatus.Confirmed);
+    }
+
+    /// <summary>
+    /// The diner abandons Stripe and pays cash instead — the single likeliest way an online payment
+    /// ends in a restaurant.
+    /// </summary>
+    /// <remarks>
+    /// The order must still be confirmable. <c>UpdateOrderStatusCommand</c> refuses <c>Confirmed</c>
+    /// while a tender is <c>Processing</c>, and <c>AddPaymentToOrder</c> sweeps only <c>Pending</c>
+    /// tenders — so the abandoned online tender outlives the cash payment that replaced it. Without
+    /// something retiring it, a fully-paid order is stuck: <c>Pending</c> leads only to
+    /// <c>Confirmed</c>, <c>Cancelled</c> or <c>PendingApproval</c>, and <c>PendingApproval</c> only
+    /// back to the first two — so Confirm is blocked forever and Cancel is the only move left on an
+    /// order the restaurant has already been paid for.
+    /// </remarks>
+    [Fact]
+    public async Task An_abandoned_online_order_paid_in_cash_can_still_be_confirmed()
+    {
+        AuthenticateAsAnonymous();
+        var created = await PostAsJsonAsync("/api/orders", NewOrder(
+            PaymentMethod.OnlinePayment, 12.99m, OrderType.DineIn));
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Guid orderId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
+        }
+
+        AuthenticateAsAdmin();
+        var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
+        {
+            paymentMethod = nameof(PaymentMethod.Cash),
+            amount = 12.99m
+        });
+        paid.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var confirmed = await PutAsJsonAsync($"/api/Orders/{orderId}/status", new
+        {
+            orderId,
+            newStatus = nameof(OrderStatus.Confirmed)
+        });
+
+        confirmed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await confirmed.Content.ReadAsStringAsync())
+            .Should().NotContain("awaiting an online payment",
+                "the money is in — the guard exists to stop confirming an UNPAID order");
+
+        using var after = Factory.Services.CreateScope();
+        var afterContext = after.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var order = await afterContext.Orders.AsNoTracking().SingleAsync();
+
+        order.PaymentStatus.Should().Be(PaymentStatus.Completed);
+        order.Status.Should().Be(OrderStatus.Confirmed, "a paid order must be able to reach the kitchen");
     }
 
     /// <summary>
@@ -291,13 +445,15 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         order.TotalPaid.Should().Be(0m);
     }
 
-    private CreateOrderCommand NewOrder(PaymentMethod method, decimal amount) => new()
-    {
-        Type = OrderType.Takeaway,
-        CustomerName = "Guest",
-        Items = [new CreateOrderItemDto { ProductId = _pizzaId, Quantity = 1, UnitPrice = 12.99m }],
-        Payments = [new CreateOrderPaymentDto { PaymentMethod = method, Amount = amount }]
-    };
+    private CreateOrderCommand NewOrder(
+        PaymentMethod method, decimal amount, OrderType type = OrderType.Takeaway) => new()
+        {
+            Type = type,
+            CustomerName = "Guest",
+            TableNumber = type == OrderType.DineIn ? 1 : null,
+            Items = [new CreateOrderItemDto { ProductId = _pizzaId, Quantity = 1, UnitPrice = 12.99m }],
+            Payments = [new CreateOrderPaymentDto { PaymentMethod = method, Amount = amount }]
+        };
 
     protected override async Task SeedTestData()
     {
