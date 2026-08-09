@@ -12,6 +12,14 @@ public class OrderPayment : Entity
 
     // Transaction details
     public string? TransactionId { get; set; }
+
+    // ISO-4217, lower-case as Stripe returns it. Null on every tender created before online
+    // payments existed, and on cash — the till has no currency of its own.
+    //
+    // Deliberately NOT surfaced on OrderPaymentDto in this slice: that DTO is mirrored by
+    // printer-app/Models and pinned by printer-feed.golden.json, so exposing it churns a snapshot
+    // and a second repo for a field nothing renders yet. Add it there when a surface needs it.
+    public string? Currency { get; set; }
     public string? ReferenceNumber { get; set; }
     public DateTime PaymentDate { get; set; }
 
