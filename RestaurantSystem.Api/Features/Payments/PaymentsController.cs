@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
@@ -47,6 +48,11 @@ public class PaymentsController : ControllerBase
     /// </para>
     /// </remarks>
     [HttpPost("checkout-session")]
+    // Explicit, though `AddAuthorization()` registers no fallback policy today so an unmarked
+    // endpoint is already anonymous. Stating it matches the sibling guest endpoint
+    // (OrderEmailController's send-confirmation-email) and, more to the point, means a future
+    // fallback policy cannot silently 401 the diners this exists to serve.
+    [AllowAnonymous]
     [EnableRateLimiting("checkout-session")]
     public async Task<ActionResult<ApiResponse<CheckoutSessionDto>>> CreateCheckoutSession(
         [FromBody] CreateCheckoutSessionCommand command)

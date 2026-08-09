@@ -81,7 +81,11 @@ public class CreateCheckoutSessionCommandHandler
             throw new BadRequestException("Online payment is not available for this restaurant.");
         }
 
+        // AsNoTracking: the order is read for its price and its status and is never written here.
+        // Online payment does not touch the order — the tender, the deferred confirm and the
+        // fidelity award are all S5's, on the settle path.
         var order = await _context.Orders
+            .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == command.OrderId && !o.IsDeleted, cancellationToken)
             ?? throw new NotFoundException("Order not found");
 
