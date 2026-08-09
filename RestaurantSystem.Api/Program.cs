@@ -304,6 +304,8 @@ builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICh
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSettlementWriter,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSettlementWriter>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ISettlementNotifier,
+    RestaurantSystem.Api.Features.Payments.Services.SettlementNotifier>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionRetirement,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionRetirement>();
 

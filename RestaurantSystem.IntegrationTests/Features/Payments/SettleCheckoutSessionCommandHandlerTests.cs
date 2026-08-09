@@ -193,8 +193,9 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     public async Task Settling_performs_the_confirm_that_creation_deferred()
     {
         var seeded = await SeedAsync(total: 42.50m, type: OrderType.DineIn);
+        var notifier = new Mock<ISettlementNotifier>();
 
-        await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250));
+        await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250), notifier: notifier);
 
         await using var verify = _fixture.CreateContext();
         var order = await verify.Orders.AsNoTracking().Include(o => o.StatusHistory).SingleAsync();
@@ -202,6 +203,14 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         order.Status.Should().Be(OrderStatus.Confirmed);
         order.StatusHistory.Should().Contain(h => h.ToStatus == OrderStatus.Confirmed,
             "the confirm must leave the same audit trail a cashier's would");
+
+        // The kitchen and the diner both have to hear about it — a confirm nobody is told about
+        // leaves the ticket invisible on the pass and the diner without a confirmation email.
+        // Pending is asserted rather than ignored: the previous status is read from the order, not
+        // hard-coded, because dine-in also reaches Confirmed from PendingApproval.
+        notifier.Verify(
+            n => n.NotifyConfirmedAsync(It.IsAny<Order>(), OrderStatus.Pending, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     /// <summary>
@@ -213,14 +222,20 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     public async Task Settling_a_takeaway_order_does_not_confirm_it()
     {
         var seeded = await SeedAsync(total: 42.50m, type: OrderType.Takeaway);
+        var notifier = new Mock<ISettlementNotifier>();
 
-        await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250));
+        await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250), notifier: notifier);
 
         await using var verify = _fixture.CreateContext();
         var order = await verify.Orders.AsNoTracking().SingleAsync();
 
         order.Status.Should().Be(OrderStatus.Pending);
         order.PaymentStatus.Should().Be(PaymentStatus.Completed, "paid, but not yet accepted");
+
+        notifier.Verify(
+            n => n.NotifyConfirmedAsync(It.IsAny<Order>(), It.IsAny<OrderStatus>(), It.IsAny<CancellationToken>()),
+            Times.Never,
+            "nothing was confirmed, so there is no confirmation to announce");
     }
 
     /// <summary>
@@ -569,13 +584,11 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     private static CheckoutSettlementWriter NewWriter(
-        ApplicationDbContext ctx, Mock<IOrderFidelityCoordinator>? fidelity = null)
+        ApplicationDbContext ctx,
+        Mock<IOrderFidelityCoordinator>? fidelity = null,
+        Mock<ISettlementNotifier>? notifier = null)
     {
         var currentUser = CurrentUser();
-
-        var mapping = new Mock<IOrderMappingService>();
-        mapping.Setup(m => m.MapToOrderDtoAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new OrderDto());
 
         return new CheckoutSettlementWriter(
             ctx,
@@ -583,9 +596,7 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             // assertions in this file, and a stub would compute them in the test instead.
             new OrderPaymentBuilder(currentUser),
             (fidelity ?? new Mock<IOrderFidelityCoordinator>()).Object,
-            new Mock<IOrderNotificationService>().Object,
-            new Mock<IOrderEventService>().Object,
-            mapping.Object,
+            (notifier ?? new Mock<ISettlementNotifier>()).Object,
             currentUser,
             NullLogger<CheckoutSettlementWriter>.Instance);
     }
@@ -606,12 +617,13 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     private async Task<ApiResponse<CheckoutSettlementDto>> HandleAsync(
         string sessionId,
         Mock<IStripeCheckoutClient> stripe,
-        Mock<IOrderFidelityCoordinator>? fidelity = null)
+        Mock<IOrderFidelityCoordinator>? fidelity = null,
+        Mock<ISettlementNotifier>? notifier = null)
     {
         await using var ctx = _fixture.CreateContext();
 
         var handler = new SettleCheckoutSessionCommandHandler(
-            ctx, stripe.Object, NewWriter(ctx, fidelity),
+            ctx, stripe.Object, NewWriter(ctx, fidelity, notifier),
             // The REAL retirement service: failing the abandoned tender is what stops an order
             // being trapped, so stubbing it would delete the property those cases exist for.
             new CheckoutSessionRetirement(ctx, CurrentUser(), NullLogger<CheckoutSessionRetirement>.Instance),

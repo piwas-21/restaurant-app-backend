@@ -16,9 +16,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     private readonly ApplicationDbContext _context;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly IOrderFidelityCoordinator _fidelity;
-    private readonly IOrderNotificationService _notifications;
-    private readonly IOrderEventService _events;
-    private readonly IOrderMappingService _mapping;
+    private readonly ISettlementNotifier _notifier;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<CheckoutSettlementWriter> _logger;
 
@@ -26,18 +24,14 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         ApplicationDbContext context,
         IOrderPaymentBuilder paymentBuilder,
         IOrderFidelityCoordinator fidelity,
-        IOrderNotificationService notifications,
-        IOrderEventService events,
-        IOrderMappingService mapping,
+        ISettlementNotifier notifier,
         ICurrentUserService currentUser,
         ILogger<CheckoutSettlementWriter> logger)
     {
         _context = context;
         _paymentBuilder = paymentBuilder;
         _fidelity = fidelity;
-        _notifications = notifications;
-        _events = events;
-        _mapping = mapping;
+        _notifier = notifier;
         _currentUser = currentUser;
         _logger = logger;
     }
@@ -131,9 +125,12 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
             "Settled checkout session {SessionId} for order {OrderNumber}: payment {PaymentStatus}, order {OrderStatus}",
             session.SessionId, order.OrderNumber, order.PaymentStatus, order.Status);
 
-        // Deliberately after the commit. These are email and SSE — I/O that must neither hold a
-        // database transaction open nor be able to roll the money back by failing.
-        await NotifyAsync(order, confirmed, previousStatus, cancellationToken);
+        // Deliberately after the commit. Email and SSE are I/O that must neither hold a database
+        // transaction open nor be able to roll the money back by failing.
+        if (confirmed)
+        {
+            await _notifier.NotifyConfirmedAsync(order, previousStatus, cancellationToken);
+        }
 
         return CheckoutSettlementDto.From(order);
     }
@@ -143,6 +140,11 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Include(o => o.Items)
+            // Three collections in one query is a Cartesian product — items × status history ×
+            // payments — and this runs on every settle. Split, so each collection is its own SELECT.
+            // Safe here in a way it is not everywhere: the whole method runs inside the settle
+            // transaction, so the several reads still see one consistent snapshot.
+            .AsSplitQuery()
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
 
@@ -226,31 +228,6 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         }
 
         await _fidelity.AwardEarnedPointsAsync(order, order.UserId, cancellationToken);
-    }
-
-    private async Task NotifyAsync(
-        Order order, bool confirmed, OrderStatus previousStatus, CancellationToken cancellationToken)
-    {
-        if (!confirmed)
-        {
-            return;
-        }
-
-        var dto = await _mapping.MapToOrderDtoAsync(order, cancellationToken);
-
-        try
-        {
-            await _events.NotifyOrderStatusChanged(dto, previousStatus.ToString());
-        }
-        catch (Exception ex)
-        {
-            // The money is committed; a broadcast failure must not surface as a failed payment.
-            _logger.LogError(
-                ex, "Failed to broadcast confirmation for order {OrderNumber}", order.OrderNumber);
-        }
-
-        await _notifications.SendOrderConfirmedAsync(
-            order, OrderNotificationService.DefaultDineInPreparationMinutes, cancellationToken);
     }
 
     private async Task<CheckoutSettlementDto> DescribeAsync(Guid orderId, CancellationToken cancellationToken)
