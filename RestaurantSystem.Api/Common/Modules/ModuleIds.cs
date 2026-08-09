@@ -11,6 +11,12 @@ namespace RestaurantSystem.Api.Common.Modules;
 ///
 /// <c>extra-languages</c> is a PRICING rule rather than a gated surface — it is part
 /// of the vocabulary so an entry carrying it is recognised, but nothing gates on it.
+///
+/// <c>online-payments</c> gates no ROUTE either, which is why it has no
+/// <c>ROUTE_MODULE_ENTRIES</c> row on the frontend: it turns a payment METHOD on inside
+/// the existing checkout rather than revealing a page. What enforces it is the
+/// availability endpoint (S8), which ANDs this flag with an actually-configured Stripe
+/// account — both halves matter, because both module gates fail OPEN.
 /// </summary>
 public static class ModuleIds
 {
@@ -21,12 +27,14 @@ public static class ModuleIds
     public const string Reservations = "reservations";
     public const string Loyalty = "loyalty";
     public const string Printing = "printing";
+    public const string OnlinePayments = "online-payments";
     public const string ExtraLanguages = "extra-languages";
 
     /// <summary>Every id above, in catalog order. Case-insensitive membership.</summary>
     public static readonly IReadOnlyList<string> All = new[]
     {
-        Core, KitchenBoard, Cashier, Server, Reservations, Loyalty, Printing, ExtraLanguages,
+        Core, KitchenBoard, Cashier, Server, Reservations, Loyalty, Printing, OnlinePayments,
+        ExtraLanguages,
     };
 
     private static readonly HashSet<string> Lookup =
