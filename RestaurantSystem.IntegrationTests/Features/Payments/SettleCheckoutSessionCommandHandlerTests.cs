@@ -143,6 +143,49 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The atomic claim, which the test above does NOT reach.
+    /// </summary>
+    /// <remarks>
+    /// A second SEQUENTIAL settle never gets as far as the claim: by then the row is no longer
+    /// <c>Created</c> and the handler returns early on that alone. Removing the
+    /// <c>WHERE Status = Created</c> condition therefore leaves
+    /// <see cref="Settling_twice_does_not_pay_the_order_twice"/> green — verified by mutation, which
+    /// is why this case exists.
+    ///
+    /// <para>
+    /// The state that matters is two callers that have BOTH read the row as <c>Created</c> before
+    /// either writes — the return trip and the reconciler overlapping, which is the normal case with
+    /// no webhook to order them. Each holds its own <c>AsNoTracking</c> snapshot, so passing the same
+    /// snapshot to the writer twice is exactly that situation: the database, not the snapshot, has to
+    /// be what refuses the second one.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Two_callers_that_both_saw_an_unclaimed_session_settle_it_once()
+    {
+        var seeded = await SeedAsync(total: 42.50m);
+
+        await using var ctx = _fixture.CreateContext();
+        var snapshot = await ctx.OrderCheckoutSessions.AsNoTracking()
+            .SingleAsync(s => s.SessionId == seeded.SessionId);
+
+        var first = await NewWriter(ctx).SettleAsync(snapshot, PaymentIntent, 4250, CancellationToken.None);
+        var second = await NewWriter(ctx).SettleAsync(snapshot, PaymentIntent, 4250, CancellationToken.None);
+
+        first.PaymentStatus.Should().Be(nameof(PaymentStatus.Completed));
+        second.PaymentStatus.Should().Be(nameof(PaymentStatus.Completed),
+            "the loser must still report the truth, not an error");
+
+        await using var verify = _fixture.CreateContext();
+        var payments = await verify.OrderPayments.AsNoTracking().ToListAsync();
+        var order = await verify.Orders.AsNoTracking().SingleAsync();
+
+        payments.Should().ContainSingle("the claim, not the caller's stale snapshot, decides who writes");
+        order.TotalPaid.Should().Be(42.50m);
+        order.PaymentStatus.Should().Be(PaymentStatus.Completed, "not Overpaid");
+    }
+
+    /// <summary>
     /// The deferred confirm. Dine-in gives up its creation-time auto-confirm while payment is in
     /// flight, so settling is what finally hands the ticket to the kitchen.
     /// </summary>
@@ -407,13 +450,9 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         return mock;
     }
 
-    private async Task<ApiResponse<CheckoutSettlementDto>> HandleAsync(
-        string sessionId,
-        Mock<IStripeCheckoutClient> stripe,
-        Mock<IOrderFidelityCoordinator>? fidelity = null)
+    private static CheckoutSettlementWriter NewWriter(
+        ApplicationDbContext ctx, Mock<IOrderFidelityCoordinator>? fidelity = null)
     {
-        await using var ctx = _fixture.CreateContext();
-
         var currentUser = new Mock<ICurrentUserService>();
         currentUser.Setup(u => u.GetAuditIdentifier()).Returns("System");
 
@@ -421,7 +460,7 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         mapping.Setup(m => m.MapToOrderDtoAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OrderDto());
 
-        var writer = new CheckoutSettlementWriter(
+        return new CheckoutSettlementWriter(
             ctx,
             // The REAL payment builder: TotalPaid/RemainingAmount/PaymentStatus are the money
             // assertions in this file, and a stub would compute them in the test instead.
@@ -432,9 +471,18 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             mapping.Object,
             currentUser.Object,
             NullLogger<CheckoutSettlementWriter>.Instance);
+    }
+
+    private async Task<ApiResponse<CheckoutSettlementDto>> HandleAsync(
+        string sessionId,
+        Mock<IStripeCheckoutClient> stripe,
+        Mock<IOrderFidelityCoordinator>? fidelity = null)
+    {
+        await using var ctx = _fixture.CreateContext();
 
         var handler = new SettleCheckoutSessionCommandHandler(
-            ctx, stripe.Object, writer, NullLogger<SettleCheckoutSessionCommandHandler>.Instance);
+            ctx, stripe.Object, NewWriter(ctx, fidelity),
+            NullLogger<SettleCheckoutSessionCommandHandler>.Instance);
 
         return await handler.Handle(
             new SettleCheckoutSessionCommand { SessionId = sessionId }, CancellationToken.None);
