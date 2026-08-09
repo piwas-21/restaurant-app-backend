@@ -6,8 +6,9 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 /// <para>
 /// Deliberately narrow. The endpoint that returns this is ANONYMOUS (a guest checkout has no
 /// account — ADR-004), so anything on it is readable by anyone holding an order id. Amount and
-/// currency are here because Stripe's own page shows them anyway; the customer's name, email,
-/// items and address are not.
+/// currency are here because Stripe's own page shows them anyway; the customer's name, items and
+/// address are not. Note the scope of that claim: <see cref="Url"/> leads to a Stripe page, so
+/// what it displays is exposed too — which is why <c>customer_email</c> is not prefilled there.
 /// </para>
 /// </summary>
 public record CheckoutSessionDto

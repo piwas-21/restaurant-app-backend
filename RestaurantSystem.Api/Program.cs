@@ -300,6 +300,8 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.
 // return URLs, and holds no connection of its own — SessionService is constructed per call.
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeCheckoutClient,
     RestaurantSystem.Api.Features.Payments.Services.StripeCheckoutClient>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
 
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.

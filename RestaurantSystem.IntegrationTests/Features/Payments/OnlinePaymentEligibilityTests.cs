@@ -58,18 +58,35 @@ public class OnlinePaymentEligibilityTests
     {
         var act = () => OnlinePaymentEligibility.EnsurePayable(Order(OrderStatus.Pending, paymentStatus));
 
-        act.Should().Throw<BadRequestException>().WithMessage("*already been paid*");
+        act.Should().Throw<BadRequestException>().WithMessage("*already been*paid*");
     }
 
     /// <summary>
-    /// The control. A partly-paid order is explicitly still payable — split payment is a real
-    /// counter case, and lumping PartiallyPaid in with the refused set would break it.
+    /// PartiallyPaid is refused, and this is the test that says so on purpose rather than by
+    /// omission. The charge is <c>order.Total</c> — the WHOLE order — so admitting a part-paid
+    /// order would redirect a diner who already handed over CHF 20 at the till to a page for the
+    /// full CHF 50, and S5's <c>amount_total == AmountMinor</c> assertion would agree with it,
+    /// because both numbers are the gross. Charging the balance instead needs that balance frozen
+    /// for the 30 minutes the session is live; until then, refusing is the honest answer.
     /// </summary>
     [Fact]
-    public void A_partly_paid_order_may_still_be_paid()
+    public void A_partly_paid_order_is_refused_rather_than_charged_the_gross()
     {
         var act = () => OnlinePaymentEligibility.EnsurePayable(
             Order(OrderStatus.Pending, PaymentStatus.PartiallyPaid));
+
+        act.Should().Throw<BadRequestException>().WithMessage("*partly*");
+    }
+
+    /// <summary>
+    /// The control for the two tests above: an untouched order IS payable. Without it, refusing
+    /// everything would satisfy every other assertion in this file.
+    /// </summary>
+    [Fact]
+    public void An_unpaid_order_may_be_paid()
+    {
+        var act = () => OnlinePaymentEligibility.EnsurePayable(
+            Order(OrderStatus.Pending, PaymentStatus.Pending));
 
         act.Should().NotThrow();
     }

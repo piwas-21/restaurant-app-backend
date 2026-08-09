@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Settings;
+using Stripe;
 using Stripe.Checkout;
 
 namespace RestaurantSystem.Api.Features.Payments.Services;
@@ -71,8 +72,10 @@ public class StripeCheckoutClient : IStripeCheckoutClient
             // support question maps back to an order without a lookup table.
             ClientReferenceId = request.OrderId.ToString(),
 
-            CustomerEmail = string.IsNullOrWhiteSpace(request.CustomerEmail) ? null : request.CustomerEmail,
-
+            // CustomerEmail is deliberately NOT set. Stripe renders it prefilled and read-only, and
+            // the endpoint that reaches here is anonymous — so prefilling would turn a scraped order
+            // id into a public page displaying that diner's email address. The customer types it at
+            // Stripe instead; the receipt is worth less than the disclosure.
             ExpiresAt = request.ExpiresAt,
 
             // The success trip carries the session id — it is what S9 settles on. The cancel trip
@@ -91,10 +94,22 @@ public class StripeCheckoutClient : IStripeCheckoutClient
 
     public async Task<StripeCheckoutSession?> GetAsync(string sessionId, CancellationToken cancellationToken)
     {
-        var session = await new SessionService(_gateway.Client)
-            .GetAsync(sessionId, options: null, _gateway.BuildRequestOptions(), cancellationToken);
+        try
+        {
+            var session = await new SessionService(_gateway.Client)
+                .GetAsync(sessionId, options: null, _gateway.BuildRequestOptions(), cancellationToken);
 
-        return session is null ? null : Map(session);
+            return Map(session);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
+        {
+            // Narrow on purpose. Stripe.net THROWS for a session it does not recognise rather than
+            // returning null, so without this an id the current key/account cannot see — a live/test
+            // key swap, a database restored across environments — is a 500 on every retry and the
+            // order becomes permanently unpayable. Every other StripeException still propagates: a
+            // 401 from a revoked key must not read as "no such session".
+            return null;
+        }
     }
 
     private static StripeCheckoutSession Map(Session session) => new()

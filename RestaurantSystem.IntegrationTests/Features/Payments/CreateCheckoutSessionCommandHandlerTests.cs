@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
+using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -73,12 +74,13 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// 30 minutes, the documented Stripe minimum rather than the 24 h default: the reconciler (S7)
-    /// cancels an order on expiry, and a full day of a diner's order sitting un-cancelled while
-    /// they have plainly walked away is not a useful state for the kitchen.
+    /// Just over Stripe's documented 30-minute minimum, rather than the 24 h default: the
+    /// reconciler (S7) cancels an order on expiry, and a full day of an abandoned order sitting
+    /// un-cancelled is not a useful state for the kitchen. The extra minute absorbs the round trip
+    /// — Stripe evaluates the minimum against ITS clock, after the request arrives.
     /// </summary>
     [Fact]
-    public async Task A_session_expires_in_thirty_minutes()
+    public async Task A_session_expires_just_past_the_stripe_minimum()
     {
         var orderId = await SeedOrderAsync(total: 10m);
         var checkout = FakeCheckout(out var captured);
@@ -86,8 +88,11 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         var before = DateTime.UtcNow;
         var result = await HandleAsync(orderId, checkout);
 
-        result.Data!.ExpiresAt.Should().BeCloseTo(before.AddMinutes(30), TimeSpan.FromMinutes(1));
-        captured[0].ExpiresAt.Should().BeCloseTo(before.AddMinutes(30), TimeSpan.FromMinutes(1));
+        result.Data!.ExpiresAt.Should().BeCloseTo(before.AddMinutes(31), TimeSpan.FromSeconds(30));
+        captured[0].ExpiresAt.Should().BeCloseTo(before.AddMinutes(31), TimeSpan.FromSeconds(30));
+        // The margin is the point: an exact 30:00 stamped before the round trip arrives at Stripe
+        // as 29:59 and the whole session is rejected.
+        captured[0].ExpiresAt.Should().BeAfter(before.AddMinutes(30));
     }
 
     /// <summary>
@@ -164,35 +169,103 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// If Stripe says the money is already taken, S4 refuses and changes nothing. Settling belongs
-    /// to S5 — half-settling here would put a second writer on the one transition that must happen
+    /// If Stripe says Checkout was completed, S4 refuses and changes nothing. Settling belongs to
+    /// S5 — half-settling here would put a second writer on the one transition that must happen
     /// exactly once.
     /// </summary>
-    [Fact]
-    public async Task A_paid_session_is_refused_and_left_for_the_settle_path()
+    /// <remarks>
+    /// The <c>complete</c>/<c>unpaid</c> row is the one that matters. A delayed-notification method
+    /// — SEPA, Klarna, Sofort, all reachable because <c>PaymentMethodTypes</c> is deliberately left
+    /// unset so Stripe picks dynamically — completes with <c>payment_status</c> still
+    /// <c>unpaid</c> while funds clear. Keyed off "paid" alone, the handler would read that as
+    /// unpaid, expire a session the diner has already been through, mint a second one for the same
+    /// amount, and the diner would pay twice.
+    /// </remarks>
+    [Theory]
+    [InlineData("complete", "paid")]
+    [InlineData("complete", "unpaid")]
+    public async Task A_completed_session_is_refused_and_left_for_the_settle_path(
+        string status, string paymentStatus)
     {
         var orderId = await SeedOrderAsync(total: 10m);
-        var checkout = FakeCheckout(out _);
+        var checkout = FakeCheckout(out var captured);
         var first = await HandleAsync(orderId, checkout);
 
         checkout.Setup(c => c.GetAsync(first.Data!.SessionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StripeCheckoutSession
             {
                 Id = first.Data!.SessionId,
-                Status = "complete",
-                PaymentStatus = "paid",
+                Status = status,
+                PaymentStatus = paymentStatus,
                 PaymentIntentId = "pi_test_1",
                 AmountTotalMinor = 1000,
             });
 
         var act = async () => await HandleAsync(orderId, checkout);
 
-        await act.Should().ThrowAsync<BadRequestException>().WithMessage("*already been paid*");
+        await act.Should().ThrowAsync<BadRequestException>().WithMessage("*already in progress*");
+        captured.Should().ContainSingle("a completed session must never be replaced with a second one");
 
         await using var verify = _fixture.CreateContext();
         var row = await verify.OrderCheckoutSessions.SingleAsync(s => s.SessionId == first.Data!.SessionId);
         row.Status.Should().Be(CheckoutSessionStatus.Created, "S5 owns that transition, not S4");
         row.OrderPaymentId.Should().BeNull();
+    }
+
+    /// <summary>
+    /// A <c>Created</c> row whose session Stripe no longer recognises — a key or connected account
+    /// swapped underneath us, a database restored across environments. The row is retired and a
+    /// fresh session minted, because the alternative is an order nobody can ever pay.
+    /// </summary>
+    [Fact]
+    public async Task A_session_stripe_does_not_recognise_is_retired_not_fatal()
+    {
+        var orderId = await SeedOrderAsync(total: 10m);
+        var checkout = FakeCheckout(out var captured);
+        var first = await HandleAsync(orderId, checkout);
+
+        checkout.Setup(c => c.GetAsync(first.Data!.SessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StripeCheckoutSession?)null);
+
+        var second = await HandleAsync(orderId, checkout);
+
+        second.Data!.SessionId.Should().NotBe(first.Data!.SessionId);
+        captured.Should().HaveCount(2);
+
+        await using var verify = _fixture.CreateContext();
+        var dead = await verify.OrderCheckoutSessions.SingleAsync(s => s.SessionId == first.Data!.SessionId);
+        dead.Status.Should().Be(CheckoutSessionStatus.Expired);
+        dead.LastError.Should().Contain("unknown");
+    }
+
+    /// <summary>
+    /// Stripe answering with no hosted-page URL. The refusal is the easy half; the half worth
+    /// pinning is that the session is still RECORDED, so the attempt counter advances. Without the
+    /// row, the next call replays idempotency key 1, Stripe hands back the same unusable session,
+    /// and the order can never be paid.
+    /// </summary>
+    [Fact]
+    public async Task A_session_with_no_url_is_recorded_as_failed_so_the_next_attempt_is_fresh()
+    {
+        var orderId = await SeedOrderAsync(total: 10m);
+        var checkout = FakeCheckout(out var captured, urlless: true);
+
+        var act = async () => await HandleAsync(orderId, checkout);
+        await act.Should().ThrowAsync<BadRequestException>();
+
+        await using (var verify = _fixture.CreateContext())
+        {
+            var row = await verify.OrderCheckoutSessions.SingleAsync(s => s.OrderId == orderId);
+            row.Status.Should().Be(CheckoutSessionStatus.Failed);
+            row.LastError.Should().NotBeNullOrWhiteSpace();
+        }
+
+        // The next attempt must NOT replay key 1 — that is what would wedge the order.
+        var recovered = FakeCheckout(out var second);
+        await HandleAsync(orderId, recovered);
+
+        captured[0].IdempotencyKey.Should().Be($"checkout:{orderId}:1");
+        second[0].IdempotencyKey.Should().Be($"checkout:{orderId}:2");
     }
 
     [Fact]
@@ -266,21 +339,27 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
     /// than asserting on a response is deliberate: what matters is the number that leaves this
     /// codebase, not the one Stripe echoes back.
     /// </summary>
-    private static Mock<IStripeCheckoutClient> FakeCheckout(out List<CheckoutSessionRequest> captured)
+    private static Mock<IStripeCheckoutClient> FakeCheckout(
+        out List<CheckoutSessionRequest> captured, bool urlless = false)
     {
         var requests = new List<CheckoutSessionRequest>();
         captured = requests;
+
+        // Per-INSTANCE, because a test that builds a second fake is standing in for a second
+        // Stripe call, and Stripe never mints one session id twice. Without this the ids collide
+        // on the unique index and the test fails for a reason the product does not have.
+        var instance = Guid.NewGuid().ToString("N")[..6];
 
         var mock = new Mock<IStripeCheckoutClient>();
         mock.Setup(c => c.CreateAsync(It.IsAny<CheckoutSessionRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((CheckoutSessionRequest request, CancellationToken _) =>
             {
                 requests.Add(request);
-                var id = $"cs_test_{requests.Count}_{request.OrderId:N}";
+                var id = $"cs_test_{instance}_{requests.Count}_{request.OrderId:N}";
                 return new StripeCheckoutSession
                 {
                     Id = id,
-                    Url = $"https://checkout.stripe.com/c/pay/{id}",
+                    Url = urlless ? null : $"https://checkout.stripe.com/c/pay/{id}",
                     Status = "open",
                     PaymentStatus = "unpaid",
                     AmountTotalMinor = request.AmountMinor,
@@ -319,6 +398,9 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             ctx,
             gateway.Object,
             checkout.Object,
+            // The REAL reuse service, not a stub. It is what stands between a diner and paying
+            // twice, so faking it here would delete the property most of these tests exist for.
+            new CheckoutSessionReuse(ctx, checkout.Object),
             currentUser.Object,
             Options.Create(new LocalizationSettings { Currency = "CHF" }),
             NullLogger<CreateCheckoutSessionCommandHandler>.Instance);

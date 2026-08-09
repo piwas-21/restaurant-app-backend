@@ -20,12 +20,28 @@ public class CheckoutAmountTests
     [InlineData(12.99, 1299)]
     [InlineData(0.01, 1)]
     [InlineData(40.00, 4000)]
-    // The two-decimal assumption is load-bearing, so a value with trailing precision is pinned
-    // too: order.Total is decimal(10,2) in the schema, so this is what a round trip looks like.
-    [InlineData(5.50, 550)]
     public void A_total_becomes_minor_units(decimal total, long expected)
     {
         CheckoutAmount.From(total, "CHF").Minor.Should().Be(expected);
+    }
+
+    /// <summary>
+    /// The rounding line, pinned on its own. <c>order.Total</c> is <c>decimal(10,2)</c> so a third
+    /// decimal should never arrive — but "should never" is exactly what the rounding call is there
+    /// for, and without a case carrying real sub-cent precision that call is unexercised: dropping
+    /// it, or switching it to banker's rounding, leaves the rest of this file green.
+    /// </summary>
+    /// <remarks>
+    /// Written as a Fact with <c>decimal</c> literals rather than a Theory, because xUnit's
+    /// <c>InlineData</c> stores <c>10.005</c> as a DOUBLE and converts on the way in — so the case
+    /// would be testing the double→decimal conversion, not the rounding under test.
+    /// </remarks>
+    [Fact]
+    public void Sub_cent_precision_rounds_away_from_zero()
+    {
+        CheckoutAmount.From(10.005m, "CHF").Minor.Should().Be(1001);
+        CheckoutAmount.From(10.004m, "CHF").Minor.Should().Be(1000);
+        CheckoutAmount.From(0.015m, "CHF").Minor.Should().Be(2);
     }
 
     /// <summary>

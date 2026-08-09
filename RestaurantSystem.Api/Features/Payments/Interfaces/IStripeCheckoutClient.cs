@@ -16,7 +16,12 @@ public interface IStripeCheckoutClient
     /// <summary>Mints a hosted Checkout session on the connected account.</summary>
     Task<StripeCheckoutSession> CreateAsync(CheckoutSessionRequest request, CancellationToken cancellationToken);
 
-    /// <summary>Re-reads a session by id. Null when Stripe does not know it.</summary>
+    /// <summary>
+    /// Re-reads a session by id. Null <b>only</b> when Stripe does not know the id — which is a
+    /// real state (a key or connected account swapped underneath us, a database restored across
+    /// environments) and must be recoverable rather than fatal. Every other Stripe failure still
+    /// throws: a 401 from a revoked key must not be indistinguishable from "no such session".
+    /// </summary>
     Task<StripeCheckoutSession?> GetAsync(string sessionId, CancellationToken cancellationToken);
 }
 
@@ -35,9 +40,6 @@ public record CheckoutSessionRequest
     public required long AmountMinor { get; init; }
     public required DateTime ExpiresAt { get; init; }
     public required string IdempotencyKey { get; init; }
-
-    /// <summary>Pre-fills the Stripe receipt when the diner gave one. Guests often have not.</summary>
-    public string? CustomerEmail { get; init; }
 }
 
 /// <summary>
@@ -69,6 +71,15 @@ public record StripeCheckoutSession
     /// caller can do anything with.
     /// </summary>
     public bool IsOpen => Status == "open" && !string.IsNullOrWhiteSpace(Url);
+
+    /// <summary>
+    /// The customer finished Checkout. Terminal, and deliberately independent of
+    /// <see cref="IsPaid"/>: a delayed-notification method — SEPA, Klarna, Sofort, all reachable
+    /// because we let Stripe choose methods dynamically — completes with <c>payment_status</c>
+    /// still <c>unpaid</c> while the funds clear. Treating that as "not paid, so mint another
+    /// session" is how a diner pays twice.
+    /// </summary>
+    public bool IsComplete => Status == "complete";
 
     /// <summary>Money has been taken. Settling on it is S5's job; S4 only refuses to mint a second.</summary>
     public bool IsPaid => PaymentStatus == "paid";

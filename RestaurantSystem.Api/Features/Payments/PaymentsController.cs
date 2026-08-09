@@ -32,12 +32,19 @@ public class PaymentsController : ControllerBase
     /// </summary>
     /// <remarks>
     /// ANONYMOUS by necessity — guest checkout has no account (ADR-004), and the diner who just
-    /// placed the order is the one who needs to pay for it. The exposure that buys is narrow: the
-    /// order id is required, nothing about the money is accepted from the caller, and the handler
-    /// refuses an order that is closed or already paid. What is left — an attacker holding a
-    /// scraped order id could mint a payment page for someone else's order, and see its total — is
-    /// capped by the per-IP policy below, the same shape <c>send-confirmation-email</c> uses for
-    /// the same reason.
+    /// placed the order is the one who needs to pay for it. Nothing about the money is accepted
+    /// from the caller, and the handler refuses an order that is closed or already (part-)paid.
+    ///
+    /// <para>
+    /// What is left, stated plainly: an attacker holding a scraped order id can mint a Stripe page
+    /// for someone else's open order and read its ORDER NUMBER and TOTAL from it. The diner's
+    /// email is deliberately not prefilled so it is not also on that page. The per-IP policy below
+    /// raises the cost — the same shape <c>send-confirmation-email</c> uses — but it is not a hard
+    /// cap: <c>ForwardedHeaders</c> is configured to trust any upstream, so <c>X-Forwarded-For</c>
+    /// is caller-controlled and the partition key with it. That is a pre-existing fleet-wide
+    /// property, not something this endpoint introduced, and it is why the disclosure above is
+    /// kept to fields Stripe's own page shows anyway.
+    /// </para>
     /// </remarks>
     [HttpPost("checkout-session")]
     [EnableRateLimiting("checkout-session")]

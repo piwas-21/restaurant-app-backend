@@ -65,7 +65,9 @@ public readonly record struct CheckoutAmount
     {
         var currency = (currencyLabel ?? string.Empty).Trim();
 
-        if (currency.Length != 3 || !currency.All(char.IsAsciiLetter) || !SupportedCurrencies.Contains(currency))
+        // The allow-list IS the whole check — a length or alphabet test in front of it could never
+        // decide the outcome, since every member is already three ASCII letters.
+        if (!SupportedCurrencies.Contains(currency))
         {
             // Names the value: this is an operator-facing misconfiguration, and a tenant whose
             // currency is simply not supported yet needs to be able to tell that apart from a bug.

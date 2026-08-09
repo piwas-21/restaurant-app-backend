@@ -29,13 +29,23 @@ public static class OnlinePaymentEligibility
             throw new BadRequestException("This order is closed and can no longer be paid online.");
         }
 
-        // Overpaid and the two refund states are here as well as Completed: each one means money
-        // has already moved on this order, and taking more without a human deciding is worse than
-        // refusing a diner who is probably retrying a payment that already worked.
+        // Any state where money has already moved on this order. Taking more without a human
+        // deciding is worse than refusing a diner who is most likely retrying a payment that
+        // already worked.
+        //
+        // PartiallyPaid is in this list, and that is the deliberate part. Online payment charges
+        // order.Total — the whole order — so letting a part-paid order through would redirect a
+        // diner who already handed over CHF 20 at the till to a page for the full CHF 50. Charging
+        // the BALANCE instead is not a smaller change than it looks: the balance would have to be
+        // frozen for the 30 minutes the Stripe session is live, or a second till payment lands
+        // mid-redirect and the diner overpays anyway. Settling a partial online payment is S5/S11
+        // territory; refusing here is the honest v1 answer.
         if (order.PaymentStatus is PaymentStatus.Completed or PaymentStatus.Overpaid
-            or PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded)
+            or PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded
+            or PaymentStatus.PartiallyPaid)
         {
-            throw new BadRequestException("This order has already been paid.");
+            throw new BadRequestException(
+                "This order has already been partly or fully paid. Please settle it at the restaurant.");
         }
     }
 }
