@@ -33,6 +33,9 @@ public class ModuleGateCoverageTests
         { "GroupDiscountController", ModuleIds.Loyalty },
         { "PrinterFeedController", ModuleIds.Printing },
         { "DevicesController", ModuleIds.Printing },
+        // Class-level, unlike the order controllers: every route on PaymentsController exists only
+        // because the tenant bought online payments, so there is no core surface to take away.
+        { "PaymentsController", ModuleIds.OnlinePayments },
     };
 
     public static TheoryData<string, string, string> GatedActions() => new()
@@ -106,20 +109,10 @@ public class ModuleGateCoverageTests
             .SelectMany(a => a.ModuleIdsRequired)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // `online-payments` is exempt ONLY until S4 lands. It is in the vocabulary now so a
-        // registry entry carrying it is recognised and provisioning accepts it (S10), but the
-        // surface it gates — POST /api/payments/checkout-session — does not exist yet. When S4
-        // adds PaymentsController with [RequireModule(ModuleIds.OnlinePayments)], DELETE this
-        // entry: leaving it would re-open exactly the hole this test exists to close, on the one
-        // module where the unenforced surface is a money path.
-        //
-        // The exemption is safe in the meantime for a reason that is not "we'll remember": nothing
-        // can buy it yet either. There is no endpoint to leave ungated.
-        var notYetBuilt = new[] { ModuleIds.OnlinePayments };
-
+        // `online-payments` was exempt here until S4. PaymentsController now carries the gate, so
+        // the exemption is gone and the module is held to the same bar as every other paid one.
         var owed = ModuleIds.All
             .Except(new[] { ModuleIds.Core, ModuleIds.ExtraLanguages })
-            .Except(notYetBuilt)
             .Where(id => !gated.Contains(id))
             .ToArray();
 

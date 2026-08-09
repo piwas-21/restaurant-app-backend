@@ -27,4 +27,15 @@ public class StripeSettings
     /// pass through Sofra.
     /// </summary>
     public string ConnectedAccountId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Where Stripe returns the diner, appended to <c>EmailSettings.FrontendBaseUrl</c>. Deliberately
+    /// PATHS, not URLs: a full URL here would let a misconfigured tenant send the return trip — which
+    /// carries the session id — to another origin. The success path also receives Stripe's
+    /// <c>{CHECKOUT_SESSION_ID}</c> placeholder, and that return trip is what triggers settlement (S9).
+    /// </summary>
+    public string SuccessPath { get; set; } = "/checkout/confirmation";
+
+    /// <summary>Where an abandoned Checkout lands. The basket is deliberately still intact (S8).</summary>
+    public string CancelPath { get; set; } = "/checkout/review";
 }

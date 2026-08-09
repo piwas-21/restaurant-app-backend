@@ -296,6 +296,10 @@ builder.Services.Configure<RestaurantSystem.Api.Settings.StripeSettings>(
     builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeSettings.SectionName));
 builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway,
     RestaurantSystem.Api.Features.Payments.Services.StripeGateway>();
+// Scoped, unlike the gateway: this one reads EmailSettings/StripeSettings per request to build the
+// return URLs, and holds no connection of its own — SessionService is constructed per call.
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeCheckoutClient,
+    RestaurantSystem.Api.Features.Payments.Services.StripeCheckoutClient>();
 
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.
@@ -411,6 +415,18 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = rateLimiter.ConfirmationEmailPermitLimit,
             Window = TimeSpan.FromMinutes(rateLimiter.ConfirmationEmailWindowMinutes),
+            QueueLimit = 0
+        }));
+
+    // /api/Payments/checkout-session — anonymous for guest checkout (ADR-004). Its own
+    // partition so a burst here cannot drain another endpoint's bucket, and vice versa:
+    // every permit spends a Stripe API call on the tenant's connected account.
+    options.AddPolicy("checkout-session", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.CheckoutSessionPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.CheckoutSessionWindowMinutes),
             QueueLimit = 0
         }));
 });
