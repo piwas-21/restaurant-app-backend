@@ -110,11 +110,13 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         foreach (var payment in gatewayHeld)
         {
             _logger.LogWarning(
+                // One {Gateway} placeholder, not two: a repeated name in a message template binds
+                // unreliably across sinks (S6677), so the sentence names the gateway once and then
+                // refers back to it.
                 "Order {OrderNumber} was cancelled holding {Amount} captured by {Gateway} "
                 + "(transaction {TransactionId}). It was NOT booked as refunded — issue the refund "
-                + "from the {Gateway} dashboard",
-                order.OrderNumber, payment.Amount, payment.PaymentGateway, payment.TransactionId,
-                payment.PaymentGateway);
+                + "from that gateway's own dashboard",
+                order.OrderNumber, payment.Amount, payment.PaymentGateway, payment.TransactionId);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
