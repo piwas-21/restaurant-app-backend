@@ -61,13 +61,19 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             return ApiResponse<OrderDto>.Failure("Order is already cancelled");
         }
 
+        // Computed BEFORE the status-history row is built, because the row's Notes carry it: the
+        // cancellation and the money still owed on it are one audit entry, not two.
+        var gatewayHeld = order.Payments
+            .Where(p => p.Status == PaymentStatus.Completed && !p.IsRefunded && TenderCustody.IsHeldByGateway(p))
+            .ToList();
+
         // Add status history
         var statusHistory = new OrderStatusHistory
         {
             OrderId = order.Id,
             FromStatus = order.Status,
             ToStatus = OrderStatus.Cancelled,
-            Notes = $"Cancellation reason: {command.CancellationReason}",
+            Notes = CancellationNotes.Build(command.CancellationReason, gatewayHeld),
             ChangedAt = DateTime.UtcNow,
             ChangedBy = _currentUserService.GetAuditIdentifier(),
             CreatedAt = DateTime.UtcNow,
@@ -82,8 +88,15 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-        // Process refunds for completed payments
-        foreach (var payment in order.Payments.Where(p => p.Status == PaymentStatus.Completed && !p.IsRefunded))
+        // Give back every payment the restaurant is actually holding. A gateway-held tender is
+        // SKIPPED rather than booked back, because this handler moves no money — it writes down
+        // that money moved, and for a Stripe capture nothing did (TenderCustody). Cancelling is
+        // still allowed: the order is a real service record and staff must be able to close it.
+        // What that leaves is an honest, visible debt — a cancelled order whose TotalPaid still
+        // reports the charge — which is the same call CheckoutClearanceSweep makes when it corrects
+        // money and refuses to touch the order. A wrong number nobody can see is the worse failure.
+        foreach (var payment in order.Payments.Where(p =>
+                     p.Status == PaymentStatus.Completed && !p.IsRefunded && !TenderCustody.IsHeldByGateway(p)))
         {
             payment.IsRefunded = true;
             payment.RefundedAmount = payment.Amount;
@@ -92,7 +105,16 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             payment.Status = PaymentStatus.Refunded;
             payment.UpdatedAt = DateTime.UtcNow;
             payment.UpdatedBy = _currentUserService.GetAuditIdentifier();
-            // TODO: Process actual refund through payment gateway
+        }
+
+        foreach (var payment in gatewayHeld)
+        {
+            _logger.LogWarning(
+                "Order {OrderNumber} was cancelled holding {Amount} captured by {Gateway} "
+                + "(transaction {TransactionId}). It was NOT booked as refunded — issue the refund "
+                + "from the {Gateway} dashboard",
+                order.OrderNumber, payment.Amount, payment.PaymentGateway, payment.TransactionId,
+                payment.PaymentGateway);
         }
 
         await _context.SaveChangesAsync(cancellationToken);

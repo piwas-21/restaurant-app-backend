@@ -20,7 +20,8 @@ public record AddPaymentToOrderCommand : ICommand<ApiResponse<OrderDto>>
     public string? ReferenceNumber { get; set; }
     public string? CardLastFourDigits { get; set; }
     public string? CardType { get; set; }
-    public string? PaymentGateway { get; set; }
+    // `PaymentGateway` used to live here, copied verbatim into the ledger. Removed in S11 — see
+    // TenderCustody for why a caller-settable gateway name locks a till payment out of refunds.
     public string? PaymentNotes { get; set; }
 }
 
@@ -93,7 +94,6 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
             ReferenceNumber = command.ReferenceNumber,
             CardLastFourDigits = command.CardLastFourDigits,
             CardType = command.CardType,
-            PaymentGateway = command.PaymentGateway,
             PaymentNotes = command.PaymentNotes,
             PaymentDate = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
