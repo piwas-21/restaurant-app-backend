@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Dtos;
+using RestaurantSystem.Api.Features.Payments.Queries.GetOnlinePaymentAvailabilityQuery;
 
 namespace RestaurantSystem.Api.Features.Payments;
 
@@ -27,6 +28,25 @@ public class PaymentsController : ControllerBase
     private readonly CustomMediator _mediator;
 
     public PaymentsController(CustomMediator mediator) => _mediator = mediator;
+
+    /// <summary>
+    /// Whether the checkout page may offer online payment at all (S8).
+    /// </summary>
+    /// <remarks>
+    /// Anonymous for the same reason as <see cref="CreateCheckoutSession"/> below, and it discloses
+    /// strictly less: one boolean about the restaurant, with no order id involved.
+    ///
+    /// <para>
+    /// A caller that cannot reach this route must read that as UNAVAILABLE, never as unknown. Two
+    /// non-answers are expected in normal operation and both mean "do not offer it": a tenant that
+    /// did not buy the module gets the class gate's <b>404</b>, and a tenant still running a backend
+    /// from before this slice gets a 404 because the route does not exist yet.
+    /// </para>
+    /// </remarks>
+    [HttpGet("availability")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<OnlinePaymentAvailabilityDto>>> GetAvailability()
+        => Ok(await _mediator.SendQuery(new GetOnlinePaymentAvailabilityQuery()));
 
     /// <summary>
     /// Mints (or re-hands out) the Stripe hosted-Checkout page for an order.
