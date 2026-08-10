@@ -51,7 +51,18 @@ public class CheckoutClearanceSweep : ICheckoutClearanceSweep
                 && s.PaymentIntentId != null)
             .OrderBy(s => s.CreatedAt)
             .Take(batchSize)
-            .Select(s => new { s.Id, s.SessionId, s.OrderId, s.OrderPaymentId, s.PaymentIntentId })
+            // Projected with a coalesce rather than asserted with `!` at the call site: the query
+            // above already filters `PaymentIntentId != null`, so the fallback is unreachable, and
+            // an empty string would be refused by Stripe as `resource_missing` — the one branch
+            // below that is already handled — instead of throwing an NRE mid-sweep.
+            .Select(s => new
+            {
+                s.Id,
+                s.SessionId,
+                s.OrderId,
+                s.OrderPaymentId,
+                PaymentIntentId = s.PaymentIntentId ?? string.Empty,
+            })
             .ToListAsync(cancellationToken);
 
         var cleared = 0;
@@ -65,7 +76,7 @@ public class CheckoutClearanceSweep : ICheckoutClearanceSweep
 
             try
             {
-                var intent = await _checkout.GetPaymentIntentAsync(session.PaymentIntentId!, cancellationToken);
+                var intent = await _checkout.GetPaymentIntentAsync(session.PaymentIntentId, cancellationToken);
 
                 if (intent is null)
                 {
