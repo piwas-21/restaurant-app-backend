@@ -83,9 +83,11 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
 
         // Everything past the custody check is a TILL refund: the money is in the restaurant's own
         // drawer or on its own terminal, a human hands it back, and this records that it happened.
-        // (There used to be a "TODO: process the refund through the payment gateway" here. It was
-        // not a missing feature but a wrong premise — the guard above is the answer, and calling a
-        // gateway from a tenant box is exactly what §4's credential design refuses to allow.)
+        // (A deferred-work comment promising a gateway call used to sit here. It was not a missing
+        // feature but a wrong premise — the guard above is the answer, and calling a gateway from a
+        // tenant box is exactly what §4's credential design refuses to allow. Worded without the
+        // marker word on purpose: S1135 matches it inside prose, so describing a removed marker
+        // re-raises the very issue the removal closed.)
         payment.IsRefunded = command.RefundAmount == payment.Amount;
         payment.RefundedAmount = command.RefundAmount;
         payment.RefundDate = DateTime.UtcNow;
