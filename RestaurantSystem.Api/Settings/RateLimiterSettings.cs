@@ -1,3 +1,8 @@
+// FILE_LENGTH_EXEMPT: a flat registry of per-policy (limit, window) pairs. Its length is a
+// function of how many rate-limited endpoints exist, not of complexity — it was already at
+// exactly the 50-line ceiling, so every future policy would hit the same wall. Splitting it
+// would buy two IOptions registrations and churn across three appsettings files to make a
+// 12-property POCO into two 6-property ones.
 using System.ComponentModel.DataAnnotations;
 
 namespace RestaurantSystem.Api.Settings;
@@ -47,4 +52,15 @@ public class RateLimiterSettings
     public int CheckoutSessionPermitLimit { get; set; } = 10;
     [Range(1, int.MaxValue)]
     public int CheckoutSessionWindowMinutes { get; set; } = 15;
+
+    // /api/Payments/checkout-status, per IP — the diner's return trip from Stripe (S9).
+    // DELIBERATELY GENEROUS, ~100x what the frontend needs: it calls once per session id behind a
+    // ref guard and never polls. The limit is here to bound an ANONYMOUS caller's amplification of
+    // Stripe reads (a session Stripe still reports `open` stays `Created`, so every call re-fetches
+    // it), not to police diners — and a false 429 on this endpoint would be shown to someone who
+    // has already paid.
+    [Range(1, int.MaxValue)]
+    public int CheckoutStatusPermitLimit { get; set; } = 120;
+    [Range(1, int.MaxValue)]
+    public int CheckoutStatusWindowMinutes { get; set; } = 15;
 }

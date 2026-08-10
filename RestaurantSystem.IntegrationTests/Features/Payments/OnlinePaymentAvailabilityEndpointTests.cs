@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using FluentAssertions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.IntegrationTests.Common;
@@ -20,34 +19,13 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// page offering a payment method the restaurant cannot take.
 /// </para>
 /// </summary>
-public abstract class OnlinePaymentAvailabilityEndpointTestsBase : IAsyncLifetime
+public abstract class OnlinePaymentAvailabilityEndpointTestsBase : SettingsDrivenEndpointTest
 {
-    private readonly DatabaseFixture _databaseFixture;
-    private TestWebApplicationFactory _factory = null!;
-    protected HttpClient Client = null!;
+    protected OnlinePaymentAvailabilityEndpointTestsBase(DatabaseFixture fixture) : base(fixture) { }
 
-    protected OnlinePaymentAvailabilityEndpointTestsBase(DatabaseFixture databaseFixture)
-    {
-        _databaseFixture = databaseFixture ?? throw new ArgumentNullException(nameof(databaseFixture));
-    }
-
-    protected abstract IReadOnlyDictionary<string, string> Settings { get; }
-
-    public Task InitializeAsync()
-    {
-        _factory = new TestWebApplicationFactory(_databaseFixture.ConnectionString, Settings);
-        Client = _factory.CreateClient();
-        // A guest checkout has no account (ADR-004), so this is the caller that matters.
-        Client.DefaultRequestHeaders.Add(TestAuthHandler.AnonymousHeader, "true");
-        return Task.CompletedTask;
-    }
-
-    public Task DisposeAsync()
-    {
-        Client?.Dispose();
-        _factory?.Dispose();
-        return Task.CompletedTask;
-    }
+    // No database state is read or written by this endpoint — it answers from configuration alone —
+    // so the reset the base does by default is pure cost here.
+    protected override bool ResetDatabase => false;
 
     /// <summary>A configured tenant, as an inline settings block. Fake key, no network is made.</summary>
     protected static Dictionary<string, string> StripeConfigured() => new()
@@ -60,16 +38,8 @@ public abstract class OnlinePaymentAvailabilityEndpointTestsBase : IAsyncLifetim
     protected async Task<HttpResponseMessage> Ask() =>
         await Client.GetAsync("/api/payments/availability");
 
-    protected static async Task<bool> ReadAvailable(HttpResponseMessage response)
-    {
-        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return doc.RootElement.GetProperty("data").GetProperty("available").GetBoolean();
-    }
-
-    protected static async Task<string?> ReadErrorCode(HttpResponseMessage response) =>
-        JsonSerializer.Deserialize<ApiResponse<object>>(
-            await response.Content.ReadAsStringAsync(),
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })?.ErrorCode;
+    protected static async Task<bool> ReadAvailable(HttpResponseMessage response) =>
+        (await ReadData(response)).GetProperty("available").GetBoolean();
 }
 
 /// <summary>

@@ -441,6 +441,19 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(rateLimiter.CheckoutSessionWindowMinutes),
             QueueLimit = 0
         }));
+
+    // /api/Payments/checkout-status — the return trip (S9). Its OWN partition, so a diner who
+    // spent their minting permits retrying can still be told whether the money arrived. Sized
+    // generously for the same reason: the control exists to bound an anonymous caller's
+    // amplification of Stripe reads, not to police a diner who has already paid.
+    options.AddPolicy("checkout-status", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.CheckoutStatusPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.CheckoutStatusWindowMinutes),
+            QueueLimit = 0
+        }));
 });
 
 builder.Services.AddInfrastructureRegistration();
