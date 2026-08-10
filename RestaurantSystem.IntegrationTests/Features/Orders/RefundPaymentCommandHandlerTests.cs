@@ -5,6 +5,7 @@ using Moq;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.RefundPaymentCommand;
 using RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
+using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -120,6 +121,59 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
             .Which.TotalAmount.Should().Be(50m);
     }
 
+    [Fact]
+    public async Task Refund_OnAStripeSettledTender_IsRefusedAndWritesNothing()
+    {
+        // S11. Booking this would put a returned amount in the ledger, on the order and in the
+        // Z-report against a charge still sitting at Stripe — the platform key carries no refunds
+        // write, so nothing here can actually move it (SOFRA-PAYMENTS-PLAN §4).
+        var (orderId, paymentId) = await SeedStripeSettledOrderAsync(total: 50m);
+
+        var response = await RefundAsync(orderId, paymentId, amount: 50m);
+
+        response.Success.Should().BeFalse();
+
+        // The reason is in Errors[0], NOT Message — `ApiResponse.Failure` leaves Message at the
+        // constant "Operation failed" and the controller serves the whole thing as a 200. That is
+        // also where the frontend's `throwServerRefusal` reads it from, so asserting on Message
+        // here would pin a field no caller ever sees.
+        response.Message.Should().Be("Operation failed");
+        response.Errors.Should().ContainSingle()
+            .Which.Should().Contain("Stripe", "the refusal must say WHERE the refund is made");
+
+        // The refusal is only worth anything if nothing was written. A message plus a mutated row
+        // is the same false ledger with an apology attached.
+        await using var ctx = _fixture.CreateContext();
+        var payment = await ctx.OrderPayments.SingleAsync(p => p.Id == paymentId);
+        var order = await ctx.Orders.SingleAsync(o => o.Id == orderId);
+
+        payment.Status.Should().Be(PaymentStatus.Completed);
+        payment.IsRefunded.Should().BeFalse();
+        payment.RefundedAmount.Should().BeNull();
+        payment.RefundDate.Should().BeNull();
+        payment.RefundReason.Should().BeNull();
+        order.TotalPaid.Should().Be(50m, "no money was given back, so none may leave the total");
+        order.PaymentStatus.Should().Be(PaymentStatus.Completed);
+    }
+
+    [Fact]
+    public async Task Refund_OnATillTender_IsStillAllowed()
+    {
+        // The control. Without it the guard above is satisfied by a handler that refuses every
+        // refund, which would be a regression dressed as a fix — the till path is the one this
+        // command exists for and it must keep working.
+        var (orderId, paymentId) = await SeedPaidOrderAsync(total: 50m);
+
+        var response = await RefundAsync(orderId, paymentId, amount: 50m);
+
+        response.Success.Should().BeTrue();
+
+        await using var ctx = _fixture.CreateContext();
+        var payment = await ctx.OrderPayments.SingleAsync(p => p.Id == paymentId);
+        payment.Status.Should().Be(PaymentStatus.Refunded);
+        payment.RefundedAmount.Should().Be(50m);
+    }
+
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
@@ -195,5 +249,62 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
 
         await seed.SaveChangesAsync();
         return (orderId, paymentId);
+    }
+
+    /// <summary>
+    /// The same order, but paid through Stripe hosted Checkout.
+    /// </summary>
+    /// <remarks>
+    /// The tender is built by <see cref="OnlineTenderCompletion"/> — the real settle-path writer —
+    /// rather than hand-assembled with <c>PaymentGateway = "Stripe"</c>. That is the whole point of
+    /// the fixture: <c>TenderCustody</c> keys off the gateway name, and a hand-built row would
+    /// certify a shape instead of the chain. Delete the one line in <c>OnlineTenderCompletion</c>
+    /// that stamps the name and this test goes red, which is exactly when it should.
+    /// </remarks>
+    private async Task<(Guid OrderId, Guid PaymentId)> SeedStripeSettledOrderAsync(decimal total)
+    {
+        var orderId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using var seed = _fixture.CreateContext();
+
+        var order = new Order
+        {
+            Id = orderId,
+            OrderNumber = $"SR-{orderId:N}".Substring(0, 12),
+            Type = OrderType.Takeaway,
+            Status = OrderStatus.Confirmed,
+            PaymentStatus = PaymentStatus.Completed,
+            SubTotal = total,
+            Total = total,
+            TotalPaid = total,
+            RemainingAmount = 0m,
+            OrderDate = now,
+            CreatedAt = now,
+            CreatedBy = nameof(RefundPaymentCommandHandlerTests),
+        };
+
+        var session = new OrderCheckoutSession
+        {
+            OrderId = orderId,
+            SessionId = $"cs_test_{orderId:N}",
+            Currency = "chf",
+            AmountMinor = (long)(total * 100),
+            IdempotencyKey = $"checkout:{orderId}:1",
+            ExpiresAt = now.AddMinutes(31),
+            ConnectedAccountId = "acct_test",
+            Status = CheckoutSessionStatus.Completed,
+            CreatedAt = now,
+            CreatedBy = nameof(RefundPaymentCommandHandlerTests),
+        };
+
+        var tender = OnlineTenderCompletion.Apply(
+            order, session, "pi_test_s11", session.AmountMinor, nameof(RefundPaymentCommandHandlerTests), now);
+
+        seed.Orders.Add(order);
+        seed.OrderCheckoutSessions.Add(session);
+
+        await seed.SaveChangesAsync();
+        return (orderId, tender.Id);
     }
 }
