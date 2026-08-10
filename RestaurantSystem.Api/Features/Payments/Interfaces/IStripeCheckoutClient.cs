@@ -23,6 +23,46 @@ public interface IStripeCheckoutClient
     /// throws: a 401 from a revoked key must not be indistinguishable from "no such session".
     /// </summary>
     Task<StripeCheckoutSession?> GetAsync(string sessionId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Re-reads a PaymentIntent by id, for sessions already settled. Null on the same narrow
+    /// condition as <see cref="GetAsync"/> — Stripe does not know the id — and throws on everything
+    /// else for the same reason.
+    /// </summary>
+    /// <remarks>
+    /// A session's <c>complete</c> is terminal independently of whether the money cleared, so a
+    /// delayed-notification method is booked as captured while its funds are still in flight
+    /// (plan §6c). The session tells us nothing more after that point; the PaymentIntent is the only
+    /// thing that ever reports the outcome.
+    /// </remarks>
+    Task<StripePaymentIntent?> GetPaymentIntentAsync(string paymentIntentId, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// The subset of a Stripe PaymentIntent this codebase acts on. Our own record for the same reason
+/// <see cref="StripeCheckoutSession"/> is: a Stripe.net rename becomes a compile error here.
+/// </summary>
+public record StripePaymentIntent
+{
+    public required string Id { get; init; }
+
+    /// <summary>
+    /// <c>requires_payment_method</c> · <c>requires_confirmation</c> · <c>requires_action</c> ·
+    /// <c>processing</c> · <c>requires_capture</c> · <c>succeeded</c> · <c>canceled</c>.
+    /// </summary>
+    public required string Status { get; init; }
+
+    /// <summary>The funds cleared. Terminal, and the only status that settles the question.</summary>
+    public bool IsSucceeded => Status == "succeeded";
+
+    /// <summary>
+    /// The payment will not arrive. Tested as an EXPLICIT allow-list, never as "not succeeded":
+    /// acting on this un-books money on an order the kitchen may already have cooked, so a status
+    /// this code has never seen must fall through to "ask again later". <c>requires_payment_method</c>
+    /// is Stripe's terminal state for a delayed method that bounced — the intent is asking for a
+    /// different card, which for an abandoned Checkout session nobody will ever supply.
+    /// </summary>
+    public bool HasFailed => Status is "canceled" or "requires_payment_method";
 }
 
 /// <summary>

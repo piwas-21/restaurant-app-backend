@@ -308,6 +308,10 @@ builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ISe
     RestaurantSystem.Api.Features.Payments.Services.SettlementNotifier>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionRetirement,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionRetirement>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutExpirySweep,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutExpirySweep>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutClearanceSweep,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutClearanceSweep>();
 
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.
@@ -535,6 +539,8 @@ builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
 builder.Services.Configure<ReservationRetentionSettings>(builder.Configuration.GetSection("ReservationRetention"));
+builder.Services.Configure<CheckoutReconciliationSettings>(
+    builder.Configuration.GetSection(CheckoutReconciliationSettings.SectionName));
 builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configuration.GetSection("DeviceTelemetryRetention"));
 builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();
@@ -543,6 +549,7 @@ builder.Services.AddHostedService<TableReservationCleanupService>();
 builder.Services.AddHostedService<ReservationRetentionService>();
 builder.Services.AddHostedService<DeviceTelemetryRetentionService>();
 builder.Services.AddHostedService<FleetSummaryPushService>();
+builder.Services.AddHostedService<CheckoutReconciliationService>();
 
 // Register OrderEventService as singleton - both interface and concrete type share same instance
 builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();
