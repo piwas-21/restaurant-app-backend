@@ -41,9 +41,14 @@ public class OrderCheckoutSessionConfiguration : IEntityTypeConfiguration<OrderC
         builder.Property(s => s.LastError)
             .HasMaxLength(500);
 
-        // The reconciler's sweep is "still Created and past ExpiresAt", so it reads on exactly these
-        // two columns; without the index it table-scans every session ever created on a timer.
-        builder.HasIndex(s => new { s.Status, s.ExpiresAt });
+        // Both reconciler sweeps filter on Status and order by CreatedAt, so that is the pair worth
+        // indexing; without it they table-scan every session ever created, on a timer.
+        //
+        // This deliberately does NOT index ExpiresAt, which an earlier comment here assumed it
+        // would: the shipped expiry sweep polls EVERY live session rather than only expired ones,
+        // because a diner who paid and closed the tab is otherwise invisible until the 31-minute
+        // window elapses. Nothing filters on ExpiresAt at all.
+        builder.HasIndex(s => new { s.Status, s.CreatedAt });
 
         builder.HasOne(s => s.Order)
             .WithMany()

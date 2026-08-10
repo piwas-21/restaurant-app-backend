@@ -112,6 +112,23 @@ public class StripeCheckoutClient : IStripeCheckoutClient
         }
     }
 
+    public async Task<StripePaymentIntent?> GetPaymentIntentAsync(
+        string paymentIntentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var intent = await new PaymentIntentService(_gateway.Client)
+                .GetAsync(paymentIntentId, options: null, _gateway.BuildRequestOptions(), cancellationToken);
+
+            return new StripePaymentIntent { Id = intent.Id, Status = intent.Status ?? string.Empty };
+        }
+        catch (StripeException ex) when (ex.StripeError?.Code == "resource_missing")
+        {
+            // Same narrowing, and the same reason, as GetAsync above.
+            return null;
+        }
+    }
+
     private static StripeCheckoutSession Map(Session session) => new()
     {
         Id = session.Id,

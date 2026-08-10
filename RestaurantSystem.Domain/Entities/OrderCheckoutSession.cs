@@ -54,5 +54,18 @@ public class OrderCheckoutSession : Entity
     /// <summary>Last failure reason, for the reconciler and for support. Never shown to a diner.</summary>
     public string? LastError { get; set; }
 
+    /// <summary>
+    /// When the reconciler last established that this session's outcome is final at Stripe — the
+    /// PaymentIntent either cleared or will not.
+    /// </summary>
+    /// <remarks>
+    /// A settled session is <c>Completed</c> whether the money arrived or is still in flight, so
+    /// <see cref="Status"/> alone cannot say which rows are still worth asking Stripe about. Without
+    /// this marker the clearance sweep re-reads every session ever settled, on every pass, forever.
+    /// Null on rows predating it, which reads correctly as "never confirmed" — they are swept once
+    /// and then marked.
+    /// </remarks>
+    public DateTime? ReconciledAt { get; set; }
+
     public virtual Order Order { get; set; } = null!;
 }
