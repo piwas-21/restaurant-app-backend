@@ -26,7 +26,9 @@
 		<PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
 		<PackageReference Include="Aspire.Hosting.JavaScript" Version="13.4.6" />
 		<PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
 	</ItemGroup>
 
 	<ItemGroup>
