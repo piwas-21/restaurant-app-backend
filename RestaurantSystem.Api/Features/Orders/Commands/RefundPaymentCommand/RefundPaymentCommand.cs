@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -54,6 +55,22 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure("Can only refund completed payments");
         }
 
+        // Before anything is written. Every check below this line assumes the refund is ours to
+        // make; this one asks whether the money is even here. See TenderCustody — the platform's
+        // Stripe key has no refunds write by design, so "book it and move on" would put a returned
+        // amount in the ledger, the Z-report and the order, against a charge still sitting at
+        // Stripe. Refusing is the honest answer, and it is deliberately NOT overridable: an admin
+        // who could force it through would be re-creating the same false record by hand.
+        if (TenderCustody.IsHeldByGateway(payment))
+        {
+            _logger.LogWarning(
+                "Refund refused on order {OrderId} payment {PaymentId}: captured by {Gateway} "
+                + "(transaction {TransactionId}), which only that gateway can reverse",
+                command.OrderId, command.PaymentId, payment.PaymentGateway, payment.TransactionId);
+
+            return ApiResponse<OrderPaymentDto>.Failure(TenderCustody.RefusalMessage(payment));
+        }
+
         if (payment.IsRefunded)
         {
             return ApiResponse<OrderPaymentDto>.Failure("Payment has already been refunded");
@@ -64,7 +81,13 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure($"Refund amount cannot exceed payment amount of {payment.Amount}");
         }
 
-        // Process refund
+        // Everything past the custody check is a TILL refund: the money is in the restaurant's own
+        // drawer or on its own terminal, a human hands it back, and this records that it happened.
+        // (A deferred-work comment promising a gateway call used to sit here. It was not a missing
+        // feature but a wrong premise — the guard above is the answer, and calling a gateway from a
+        // tenant box is exactly what §4's credential design refuses to allow. Worded without the
+        // marker word on purpose: S1135 matches it inside prose, so describing a removed marker
+        // re-raises the very issue the removal closed.)
         payment.IsRefunded = command.RefundAmount == payment.Amount;
         payment.RefundedAmount = command.RefundAmount;
         payment.RefundDate = DateTime.UtcNow;
@@ -72,9 +95,6 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         payment.Status = command.RefundAmount == payment.Amount ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded;
         payment.UpdatedAt = DateTime.UtcNow;
         payment.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-        // TODO: Process actual refund through payment gateway
-        // This would involve calling the payment provider's API
 
         // Update order payment summary. The gross sum spans every CAPTURED
         // tender, not just Completed ones — a payment we just refunded is no

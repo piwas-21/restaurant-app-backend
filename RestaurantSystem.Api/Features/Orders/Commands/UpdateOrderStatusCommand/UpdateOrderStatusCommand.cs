@@ -70,6 +70,16 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
             return ApiResponse<OrderDto>.Failure($"Cannot transition from {order.Status} to {command.NewStatus}");
         }
 
+        // The one deliberate exception to keeping payment state and order state decoupled: a cashier
+        // clicking "Confirm" on an order mid-redirect would hand the kitchen an unpaid ticket.
+        // OnlinePaymentIntent owns the test, beside the rule that held the order Pending in the
+        // first place.
+        if (command.NewStatus == OrderStatus.Confirmed && OnlinePaymentIntent.IsAwaitingPayment(order))
+        {
+            return ApiResponse<OrderDto>.Failure(
+                "This order is awaiting an online payment and cannot be confirmed yet.");
+        }
+
         // Add status history
         var statusHistory = new OrderStatusHistory
         {

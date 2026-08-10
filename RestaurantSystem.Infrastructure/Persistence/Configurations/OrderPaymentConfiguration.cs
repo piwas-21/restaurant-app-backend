@@ -28,6 +28,9 @@ public class OrderPaymentConfiguration : IEntityTypeConfiguration<OrderPayment>
         builder.Property(p => p.TransactionId)
             .HasMaxLength(100);
 
+        builder.Property(p => p.Currency)
+            .HasMaxLength(3);
+
         builder.Property(p => p.ReferenceNumber)
             .HasMaxLength(50);
 

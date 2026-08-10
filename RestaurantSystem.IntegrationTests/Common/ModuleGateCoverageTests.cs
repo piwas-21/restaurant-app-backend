@@ -33,6 +33,9 @@ public class ModuleGateCoverageTests
         { "GroupDiscountController", ModuleIds.Loyalty },
         { "PrinterFeedController", ModuleIds.Printing },
         { "DevicesController", ModuleIds.Printing },
+        // Class-level, unlike the order controllers: every route on PaymentsController exists only
+        // because the tenant bought online payments, so there is no core surface to take away.
+        { "PaymentsController", ModuleIds.OnlinePayments },
     };
 
     public static TheoryData<string, string, string> GatedActions() => new()
@@ -106,6 +109,8 @@ public class ModuleGateCoverageTests
             .SelectMany(a => a.ModuleIdsRequired)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // `online-payments` was exempt here until S4. PaymentsController now carries the gate, so
+        // the exemption is gone and the module is held to the same bar as every other paid one.
         var owed = ModuleIds.All
             .Except(new[] { ModuleIds.Core, ModuleIds.ExtraLanguages })
             .Where(id => !gated.Contains(id))

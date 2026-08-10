@@ -139,8 +139,12 @@ public class TenantModulesTests
         // These exact strings also live in sofra lib/module-catalog.ts (MODULE_IDS) and
         // deploy provision-tenant.sh (KNOWN_MODULES). Drift here silently changes what a
         // tenant's registry entry means, so the list is asserted rather than assumed.
+        // Order is asserted, not just membership: EnabledModules_keeps_catalog_order above
+        // guarantees callers see catalog order, so a reshuffle here is a visible change.
+        // `online-payments` sits before `extra-languages` because that one is a pricing rule and
+        // conventionally trails the real modules.
         ModuleIds.All.Should().Equal(
             "core", "kitchen-board", "cashier", "server",
-            "reservations", "loyalty", "printing", "extra-languages");
+            "reservations", "loyalty", "printing", "online-payments", "extra-languages");
     }
 }

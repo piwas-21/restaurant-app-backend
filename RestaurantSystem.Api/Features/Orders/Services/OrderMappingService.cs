@@ -249,6 +249,17 @@ public class OrderMappingService : IOrderMappingService
             Status = payment.Status.ToString(),
             TransactionId = payment.TransactionId,
             PaymentDate = payment.PaymentDate,
+
+            // Declared on the DTO since it was written, populated by nobody until now — so every
+            // read surface saw null and could not tell a Stripe capture from cash. The cashier and
+            // admin refund dialogs need exactly this to stop offering a refund the server refuses
+            // (TenderCustody); a gate keyed on a field the mapper drops is a gate that never fires.
+            //
+            // Only this one of the mapper's five dropped fields is added. ReferenceNumber,
+            // CardLastFourDigits, CardType, PaymentNotes and IsRefunded stay dropped — nothing
+            // reads them, and surfacing card metadata to every order consumer is a privacy
+            // decision, not a mapping oversight to fix in passing.
+            PaymentGateway = payment.PaymentGateway,
             RefundedAmount = payment.RefundedAmount,
             RefundDate = payment.RefundDate,
             RefundReason = payment.RefundReason,

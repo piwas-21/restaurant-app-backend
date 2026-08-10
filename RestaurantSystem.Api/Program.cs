@@ -282,6 +282,37 @@ builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("Pr
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
+// Order-level pricing. DeliveryFee defaults to 0 so an absent section preserves what every live
+// tenant charges today — see OrderSettings for why that is not the old 5.00 constant. A tenant
+// opts in per box via OrderSettings__DeliveryFee.
+builder.Services.Configure<RestaurantSystem.Api.Settings.OrderSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.OrderSettings.SectionName));
+
+// Tenant→diner Stripe Connect (ADR-011 Job B). Registered unconditionally and INERT unless a tenant
+// has Stripe__Enabled plus a platform key plus a connected account — which is no tenant today, so
+// this ships safe to the whole fleet. Singleton because the answer is fixed for the process
+// lifetime, matching ITenantModules above: a change lands via re-provision + restart.
+builder.Services.Configure<RestaurantSystem.Api.Settings.StripeSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeSettings.SectionName));
+builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway,
+    RestaurantSystem.Api.Features.Payments.Services.StripeGateway>();
+// Scoped, unlike the gateway: this one reads EmailSettings/StripeSettings per request to build the
+// return URLs, and holds no connection of its own — SessionService is constructed per call.
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeCheckoutClient,
+    RestaurantSystem.Api.Features.Payments.Services.StripeCheckoutClient>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSettlementWriter,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutSettlementWriter>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ISettlementNotifier,
+    RestaurantSystem.Api.Features.Payments.Services.SettlementNotifier>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionRetirement,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionRetirement>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutExpirySweep,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutExpirySweep>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutClearanceSweep,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutClearanceSweep>();
+
 // Startup-seed credentials, consumed by UserSeeder in Infrastructure. An empty
 // section means admin seeding is skipped (roles still seed) — see issue #116.
 // Per-tenant provisioning injects SeedSettings__AdminEmail/__AdminPassword env
@@ -398,6 +429,31 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(rateLimiter.ConfirmationEmailWindowMinutes),
             QueueLimit = 0
         }));
+
+    // /api/Payments/checkout-session — anonymous for guest checkout (ADR-004). Its own
+    // partition so a burst here cannot drain another endpoint's bucket, and vice versa:
+    // every permit spends a Stripe API call on the tenant's connected account.
+    options.AddPolicy("checkout-session", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.CheckoutSessionPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.CheckoutSessionWindowMinutes),
+            QueueLimit = 0
+        }));
+
+    // /api/Payments/checkout-status — the return trip (S9). Its OWN partition, so a diner who
+    // spent their minting permits retrying can still be told whether the money arrived. Sized
+    // generously for the same reason: the control exists to bound an anonymous caller's
+    // amplification of Stripe reads, not to police a diner who has already paid.
+    options.AddPolicy("checkout-status", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.CheckoutStatusPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.CheckoutStatusWindowMinutes),
+            QueueLimit = 0
+        }));
 });
 
 builder.Services.AddInfrastructureRegistration();
@@ -496,6 +552,8 @@ builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
 builder.Services.Configure<ReservationRetentionSettings>(builder.Configuration.GetSection("ReservationRetention"));
+builder.Services.Configure<CheckoutReconciliationSettings>(
+    builder.Configuration.GetSection(CheckoutReconciliationSettings.SectionName));
 builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configuration.GetSection("DeviceTelemetryRetention"));
 builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();
@@ -504,6 +562,7 @@ builder.Services.AddHostedService<TableReservationCleanupService>();
 builder.Services.AddHostedService<ReservationRetentionService>();
 builder.Services.AddHostedService<DeviceTelemetryRetentionService>();
 builder.Services.AddHostedService<FleetSummaryPushService>();
+builder.Services.AddHostedService<CheckoutReconciliationService>();
 
 // Register OrderEventService as singleton - both interface and concrete type share same instance
 builder.Services.AddSingleton<ISseActivityLog, SseActivityLog>();

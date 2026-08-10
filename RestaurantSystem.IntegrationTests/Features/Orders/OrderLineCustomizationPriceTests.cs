@@ -35,14 +35,15 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // sum of the ROOT totals only because a child is pinned at ItemTotal = 0. The order side mirrors that
 // pin (#54), which is why the child rows are asserted to be zero below rather than assumed.
 //
-// BOTH PRICING PATHS ARE EXERCISED, because only one of them is protected. When the caller sends
-// BasketSubTotal/BasketTax/BasketTotal, OrderPricingService.TryUsePreCalculatedBasketValues wins and
-// the header is right while the ROWS are wrong — so everything derived from the rows reads wrong in
-// whichever direction that line's shape errs: LOW on a regular line, HIGH on a customised bundle.
-// Three surfaces are row-derived and were verified to be: GetZReportQuery's TotalAmount/TotalRevenue,
-// the itemsTotal CreateOrderCommandHandler feeds to the fidelity calculation, and the per-line figure
-// OrderMappingService puts on the order screen. Omit the totals and the legacy branch prices the
-// order from those same rows, which made it a real mischarge of the customer.
+// THERE IS NOW ONE PRICING PATH, and it is the row-derived one. Until S0b a caller could send
+// BasketSubTotal/BasketTax/BasketTotal and TryUsePreCalculatedBasketValues would win, leaving the
+// header right while the ROWS were wrong; today every money field is computed from these rows, so
+// a row error IS a mischarge — there is no longer a client-supplied total papering over it. That
+// makes the invariant below stricter than when it was written, not weaker.
+//
+// Four surfaces are row-derived and were verified to be: GetZReportQuery's TotalAmount/TotalRevenue,
+// the itemsTotal CreateOrderCommandHandler feeds to the fidelity calculation, the per-line figure
+// OrderMappingService puts on the order screen, and — since S0b — order.Total itself.
 public class OrderLineCustomizationPriceTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();
@@ -246,11 +247,12 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Checks out the current basket. <paramref name="sendBasketTotals"/> selects which of the two
-    /// pricing paths runs: supplied ⇒ <c>TryUsePreCalculatedBasketValues</c> wins and the header is
-    /// the basket's own; omitted ⇒ the legacy branch prices the order from the item rows.
+    /// Checks out the current basket. This used to take a <c>sendBasketTotals</c> flag selecting
+    /// between two pricing paths — client-supplied totals vs computed. S0b removed the first, so
+    /// there is one path and the flag is gone; the pairs of tests below still differ in what they
+    /// assert (the stored row arithmetic vs the customer's bill), which is why both survive.
     /// </summary>
-    private async Task<OrderDto> CheckoutAsync(BasketDto basket, bool sendBasketTotals)
+    private async Task<OrderDto> CheckoutAsync()
     {
         var request = new CreateOrderFromBasketCommand
         {
@@ -259,9 +261,6 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
             CustomerName = "Test Customer",
             CustomerEmail = "test@example.com",
             CustomerPhone = "+1234567890",
-            BasketSubTotal = sendBasketTotals ? basket.SubTotal : null,
-            BasketTax = sendBasketTotals ? basket.Tax : null,
-            BasketTotal = sendBasketTotals ? basket.Total : null,
         };
 
         var response = await PostAsJsonAsync("/api/orders/from-basket", request);
@@ -300,7 +299,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         var expectedLine = (_testPizza.BasePrice + _testCola.BasePrice) * RegularQuantity;
         basket.SubTotal.Should().Be(expectedLine, "the basket side is already correct (#308)");
 
-        var order = await CheckoutAsync(basket, sendBasketTotals: true);
+        var order = await CheckoutAsync();
         var rows = await ReadOrderRowsAsync(order.Id);
 
         var root = rows.Single(r => r.ParentOrderItemId == null);
@@ -319,7 +318,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         (await AddCustomisedPizzaAsync(RegularQuantity)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var basket = await ReadBasketAsync();
-        var order = await CheckoutAsync(basket, sendBasketTotals: false);
+        var order = await CheckoutAsync();
 
         order.Total.Should().Be(basket.SubTotal,
             "with no basket totals supplied the order is priced from its own rows — 41.96 billed against a 47.94 basket");
@@ -340,7 +339,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         basket.Items.Single().CustomizationPrice.Should().Be(ExtraShotPrice * DrinksPerBundle,
             "the fixture is only meaningful while the bundle carries a non-zero customization");
 
-        var order = await CheckoutAsync(basket, sendBasketTotals: true);
+        var order = await CheckoutAsync();
         var rows = await ReadOrderRowsAsync(order.Id);
 
         var root = rows.Single(r => r.ParentOrderItemId == null);
@@ -363,7 +362,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         (await AddCustomisedBundleAsync(BundleQuantity)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var basket = await ReadBasketAsync();
-        var order = await CheckoutAsync(basket, sendBasketTotals: false);
+        var order = await CheckoutAsync();
 
         order.Total.Should().Be(CustomisedBundleUnitPrice * BundleQuantity);
         order.Total.Should().Be(basket.SubTotal);
@@ -420,7 +419,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         basket.Items.Should().OnlyContain(i => i.MenuId == null,
             "so the translator has nothing to copy into CreateOrderItemDto.MenuId");
 
-        var order = await CheckoutAsync(basket, sendBasketTotals: true);
+        var order = await CheckoutAsync();
         var rows = await ReadOrderRowsAsync(order.Id);
 
         rows.Should().OnlyContain(r => r.MenuId == null);
@@ -440,7 +439,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         (await AddCustomisedBundleAsync(BundleQuantity)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var basket = await ReadBasketAsync();
-        var order = await CheckoutAsync(basket, sendBasketTotals: true);
+        var order = await CheckoutAsync();
         var rows = await ReadOrderRowsAsync(order.Id);
 
         // Root rows keyed by product, against the basket's own lines. Asserted per line rather than
@@ -481,7 +480,7 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         var basket = await ReadBasketAsync();
         basket.Items.Should().OnlyContain(i => i.CustomizationPrice == 0m);
 
-        var order = await CheckoutAsync(basket, sendBasketTotals: false);
+        var order = await CheckoutAsync();
         var rows = await ReadOrderRowsAsync(order.Id);
 
         rows.Single(r => r.ParentOrderItemId == null && r.ProductId == _testPizza.Id)

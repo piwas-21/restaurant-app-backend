@@ -168,9 +168,14 @@ public class BasketChannelService : IBasketChannelService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Totals are deliberately NOT recalculated. RecalculateTotalsAsync sums LINE totals, and
-        // clearing removes no lines — unlike the set path, which calls it because it may have
-        // deleted some. Tax and delivery are resolved per order type at checkout, not stored here.
+        // Totals ARE recalculated, unlike the line-count reasoning that used to sit here. That
+        // reasoning ended "delivery is resolved per order type at checkout, not stored here", and
+        // S0b made the second half false: BasketPricingService now stores basket.DeliveryFee, keyed
+        // on this very OrderType, so the basket shows the same fee the order will charge. Clearing
+        // the channel without repricing would leave a Delivery fee on a basket that no longer has a
+        // channel — and hand it straight to the client below.
+        await _basketRepository.RecalculateTotalsAsync(basket.Id);
+
         _logger.LogInformation(
             "Basket {BasketId} order type cleared (was {PreviousOrderType})", basket.Id, previous);
 

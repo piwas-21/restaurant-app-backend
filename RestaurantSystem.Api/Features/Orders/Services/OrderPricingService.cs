@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
-using RestaurantSystem.Api.Features.Settings.Interfaces;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,25 +13,20 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <inheritdoc />
 public class OrderPricingService : IOrderPricingService
 {
-    // Fixed delivery fee. Promote to config (e.g. OrderSettings:DeliveryFee
-    // or distance-based via ITaxConfigurationService-style provider) if
-    // dynamic pricing is ever needed.
-    private const decimal FlatDeliveryFee = 5.00m;
-
     private readonly ApplicationDbContext _context;
     private readonly ICustomerDiscountService _customerDiscountService;
-    private readonly ITaxConfigurationService _taxConfigurationService;
+    private readonly OrderSettings _orderSettings;
     private readonly ILogger<OrderPricingService> _logger;
 
     public OrderPricingService(
         ApplicationDbContext context,
         ICustomerDiscountService customerDiscountService,
-        ITaxConfigurationService taxConfigurationService,
+        IOptions<OrderSettings> orderSettings,
         ILogger<OrderPricingService> logger)
     {
         _context = context;
         _customerDiscountService = customerDiscountService;
-        _taxConfigurationService = taxConfigurationService;
+        _orderSettings = orderSettings.Value;
         _logger = logger;
     }
 
@@ -41,48 +37,27 @@ public class OrderPricingService : IOrderPricingService
         Guid? userId,
         CancellationToken cancellationToken)
     {
-        if (TryUsePreCalculatedBasketValues(order, command))
-        {
-            // Pre-calculated path: subtotal, tax, discounts already settled
-            // on the basket side. Skip the legacy compute branch.
-        }
-        else
-        {
-            // Legacy compute path. Tax flow: tax is extracted from item
-            // prices for display only — it does NOT affect the final
-            // customer payment (e.g. product 16.90 → tax extracted 0.44 →
-            // SubTotal shown 16.46 → customer pays 16.90).
-            order.Tax = await _taxConfigurationService.CalculateTaxByOrderTypeAsync(
-                itemsTotal, command.Type, cancellationToken);
-            order.SubTotal = itemsTotal - order.Tax;
-            order.DeliveryFee = command.Type == OrderType.Delivery ? FlatDeliveryFee : 0;
+        // TAX IS DELIBERATELY LEFT AT 0 — do not "fix" this by calling ITaxConfigurationService here
+        // without first reading §6 of SOFRA-PAYMENTS-PLAN.
+        //
+        // Tax was 0 on every real order before S0b (the basket path won, and basket.Tax has three
+        // write sites, all literal 0), so the service's arithmetic was dead code. It is also wrong
+        // twice over, which is why switching it on is its own slice and not a side effect of a
+        // security fix:
+        //   1. UNIT. TaxConfiguration.Rate is documented and seeded as a FRACTION (0.08 for 8% —
+        //      Entities/TaxConfiguration.cs:8, TaxConfigurationSeeder.cs:19) while
+        //      TaxConfigurationService.cs:121 divides by 100 again. A seeded box yields 0.08% tax.
+        //   2. DIRECTION. `amount * Rate / 100` adds tax ON TOP. Swiss VAT is price-INCLUSIVE, so
+        //      extracting it needs `amount * Rate / (100 + Rate)`.
+        // Resolving either needs the live `tax_configurations` rows, which cannot be read from here.
+        // Publishing a wrong VAT figure into the Z-report is worse than the honest zero it replaces.
+        order.SubTotal = itemsTotal;
+        order.DeliveryFee = command.Type == OrderType.Delivery ? _orderSettings.DeliveryFee : 0;
 
-            await ApplyUserLimitDiscountAsync(order, command, userId, itemsTotal, cancellationToken);
-            await ApplyCustomerDiscountAsync(order, userId, itemsTotal, cancellationToken);
-        }
+        await ApplyUserLimitDiscountAsync(order, command, userId, itemsTotal, cancellationToken);
+        await ApplyCustomerDiscountAsync(order, userId, itemsTotal, cancellationToken);
 
-        ApplyTotal(order, command, itemsTotal);
-    }
-
-    private bool TryUsePreCalculatedBasketValues(Order order, CreateOrderCommand command)
-    {
-        if (!command.BasketSubTotal.HasValue ||
-            !command.BasketTax.HasValue ||
-            !command.BasketTotal.HasValue)
-        {
-            return false;
-        }
-
-        order.SubTotal = command.BasketSubTotal.Value;
-        order.Tax = command.BasketTax.Value;
-        order.Discount = command.BasketDiscount ?? 0;
-        order.CustomerDiscountAmount = command.BasketCustomerDiscount ?? 0;
-
-        _logger.LogInformation(
-            "Using pre-calculated basket values for order: SubTotal={SubTotal}, Tax={Tax}, Discount={Discount}, CustomerDiscount={CustomerDiscount}",
-            order.SubTotal, order.Tax, order.Discount, order.CustomerDiscountAmount);
-
-        return true;
+        RecalculateTotal(order);
     }
 
     private async Task ApplyUserLimitDiscountAsync(
@@ -153,22 +128,39 @@ public class OrderPricingService : IOrderPricingService
             customerDiscount.Name, discountAmount);
     }
 
-    private void ApplyTotal(Order order, CreateOrderCommand command, decimal itemsTotal)
+    public void RecalculateTotal(Order order)
     {
-        if (command.BasketTotal.HasValue)
-        {
-            order.Total = command.BasketTotal.Value;
-            _logger.LogInformation("Using pre-calculated basket total: {Total}", order.Total);
-            return;
-        }
+        ArgumentNullException.ThrowIfNull(order);
 
-        // Total = items + delivery − discounts − fidelity-points discount.
-        // Tax is intentionally NOT added — see ApplyAsync's tax-flow comment.
-        // FidelityPointsDiscount is 0 here; the handler may update Total
-        // again after redemption sets it.
-        var totalBeforeFidelity = itemsTotal + order.DeliveryFee - order.Discount - order.CustomerDiscountAmount;
-        var calculatedTotal = totalBeforeFidelity - order.FidelityPointsDiscount;
+        // `SubTotal + Tax` recovers the gross item money whichever way tax is handled: Tax is 0
+        // today (see ApplyAsync) and SubTotal is the full items total, and if extraction is ever
+        // switched on SubTotal becomes `itemsTotal − Tax` and the sum still holds. Deriving it back
+        // rather than taking it as a parameter is what lets this run again after redemption, when
+        // the caller no longer holds itemsTotal.
+        var itemsTotal = order.SubTotal + order.Tax;
+
+        // Tax is NOT added on top — it is an extraction for reporting, not a charge.
+        var sale = itemsTotal + order.DeliveryFee - order.Discount - order.CustomerDiscountAmount;
         var hasActiveDiscount = PriceRoundingUtility.HasActiveDiscount(order.CustomerDiscountAmount + order.Discount);
-        order.Total = PriceRoundingUtility.ApplySpecialRounding(calculatedTotal, hasActiveDiscount);
+
+        // Round the SALE, then apply the points credit, then add the tip.
+        //
+        // Order matters twice. The whole-franc courtesy rounding is a discount on the food, so it
+        // must not swallow a points credit the customer already saw deducted, and it must never
+        // reshape a tip — the customer chose that number. This also reproduces exactly what the
+        // checkout page displays, so the amount charged equals the amount shown.
+        var roundedSale = PriceRoundingUtility.ApplySpecialRounding(sale, hasActiveDiscount);
+
+        // Clamped at zero: a points balance worth more than the basket must not mint a negative
+        // total, which UpdatePaymentSummary would read as Overpaid.
+        var payableForFood = Math.Max(0m, roundedSale - order.FidelityPointsDiscount);
+
+        // The tip is floored too, and NOT only because the validator already refuses a negative one.
+        // This is the last term added after the clamp above, so a negative tip would subtract from
+        // an already-clamped total — `tip: -12.99` on a 12.99 order yields Total 0, which
+        // UpdatePaymentSummary reads as Completed and the fidelity coordinator rewards. Two
+        // independent guards, because the validator is a pipeline behaviour a future caller could
+        // bypass while this method is the single place Total is decided.
+        order.Total = payableForFood + Math.Max(0m, order.Tip);
     }
 }
