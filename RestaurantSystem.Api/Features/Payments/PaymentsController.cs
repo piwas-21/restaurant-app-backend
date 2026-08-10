@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
+using RestaurantSystem.Api.Features.Payments.Commands.SettleCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Dtos;
 using RestaurantSystem.Api.Features.Payments.Queries.GetOnlinePaymentAvailabilityQuery;
 
@@ -47,6 +48,53 @@ public class PaymentsController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<OnlinePaymentAvailabilityDto>>> GetAvailability()
         => Ok(await _mediator.SendQuery(new GetOnlinePaymentAvailabilityQuery()));
+
+    /// <summary>
+    /// The diner's return trip from Stripe: settle the session, then say where that leaves the
+    /// order (S9). **This is the PRIMARY settle trigger** — S7's reconciler is the backstop for
+    /// the diner who closed the tab.
+    /// </summary>
+    /// <remarks>
+    /// ANONYMOUS, like its siblings and for the same reason: a guest checkout has no account, and
+    /// the person who just paid is the one who needs to be told it worked. It discloses an order
+    /// NUMBER and two statuses to a holder of the session id — someone who, by holding it, could
+    /// already read Stripe's own page for that payment.
+    ///
+    /// <para>
+    /// <b>A GET that mutates, deliberately.</b> The settle is idempotent by construction (S5: the
+    /// claim is a conditional UPDATE, and a non-<c>Created</c> session returns early without
+    /// touching Stripe), so the usual hazard — a prefetch or a retried GET causing a second effect
+    /// — cannot occur here. The frontend calls it explicitly; nothing prefetches it.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Rate-limited, but on its own generous policy.</b> The Stripe call is bounded per SETTLED
+    /// session, not per session — a session Stripe still reports <c>open</c> is deliberately left
+    /// at <c>Created</c> for the next sweep, so every call on it re-fetches from Stripe. Anyone can
+    /// mint one session and then loop this route, which is an anonymous amplifier of reads against
+    /// the tenant's connected account; Stripe answers a read flood with a <c>rate_limit</c> error,
+    /// which is not <c>resource_missing</c> and so surfaces as a 500 — to real diners settling at
+    /// the same time, and to S7's reconciler on the same key.
+    /// </para>
+    ///
+    /// <para>
+    /// So the limit exists to bound that, NOT to police diners, and it is sized accordingly: ~100x
+    /// what the frontend asks for, which is one call per session id behind a ref guard with no
+    /// polling. Its own partition, so a diner who spent their minting permits retrying can still be
+    /// told whether the money arrived. A false 429 here is uniquely bad — it is shown to someone who
+    /// has ALREADY PAID and says nothing about their money — and a shared restaurant Wi-Fi puts a
+    /// whole room behind one partition key, so a bucket sized for one diner is sized wrong.
+    /// </para>
+    /// </remarks>
+    [HttpGet("checkout-status")]
+    [AllowAnonymous]
+    [EnableRateLimiting("checkout-status")]
+    public async Task<ActionResult<ApiResponse<CheckoutSettlementDto>>> GetCheckoutStatus(
+        // Nullable on purpose: `SuppressImplicitRequiredAttributeForNonNullableReferenceTypes` is
+        // set, so an absent `?sessionId=` binds to null with a VALID ModelState. Declaring it
+        // non-nullable would state a contract the framework does not enforce; the validator does.
+        [FromQuery] string? sessionId)
+        => Ok(await _mediator.SendCommand(new SettleCheckoutSessionCommand { SessionId = sessionId ?? string.Empty }));
 
     /// <summary>
     /// Mints (or re-hands out) the Stripe hosted-Checkout page for an order.
