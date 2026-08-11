@@ -122,9 +122,17 @@ jobs:
 
   # --------------------------------------------------------------------------
   # License compliance -- cheap re-run, catches dependency-license drift.
-  # Mirrors ci.yml's license_compliance job exactly (nuget-license v4.0.0 +
-  # the repo-tracked LICENSES.* files), so a license added to a transitive dep
+  # Mirrors ci.yml's license_compliance job (nuget-license v4.0.0 + the
+  # repo-tracked LICENSES.* files), so a license added to a transitive dep
   # between PRs is caught on schedule.
+  #
+  # KEEP THE nuget-license INVOCATION BELOW BYTE-IDENTICAL TO ci.yml's. It
+  # drifted once and cost the whole workflow: this job omitted
+  # `--override-package-information LICENSES.overrides.json`, so it re-derived
+  # SixLabors.ImageSharp's unclassifiable embedded license file and failed --
+  # every week from 2026-07-27, on a licensing question ci.yml had already
+  # answered in a tracked, version-pinned file. A permanently red alert job
+  # cannot get any redder, so it masked exactly the drift it exists to catch.
   # --------------------------------------------------------------------------
   license_compliance:
     name: license-compliance (transitive NuGet)
@@ -152,9 +160,12 @@ jobs:
             LICENSES.ignored.txt > /tmp/ignored-packages.json
           echo "Ignored packages:"
           cat /tmp/ignored-packages.json
+          echo "License overrides:"
+          cat LICENSES.overrides.json
           nuget-license \
             -i RestaurantSystem.sln \
             -a /tmp/licenses-allowed.json \
             --licenseurl-to-license-mappings LICENSES.urlmap.json \
             --ignored-packages /tmp/ignored-packages.json \
+            --override-package-information LICENSES.overrides.json \
             -o JsonPretty
