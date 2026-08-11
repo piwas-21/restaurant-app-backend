@@ -16,9 +16,9 @@ public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordComm
 
         // The strength messages here were already byte-identical to the shared ones, so this is a
         // pure extraction. Only the "required" message differs, and it stays at the callsite where
-        // requiredness belongs. `ChangePasswordCommandValidator` is the one copy NOT swept up — its
-        // wording has already drifted and it carries a MaximumLength(100) nothing else enforces, so
-        // unifying it changes user-facing text (issue #292).
+        // requiredness belongs. `ChangePasswordCommandValidator` was the one copy NOT swept up by
+        // #290; #292 has since brought it in and dropped the MaximumLength(100) it alone carried,
+        // so all five paths now share exactly these rules.
         RuleFor(x => x.NewPassword)
             .NotEmpty().WithMessage("New password is required")
             .MeetsPasswordPolicy();

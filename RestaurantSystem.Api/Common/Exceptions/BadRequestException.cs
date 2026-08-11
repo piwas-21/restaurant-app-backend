@@ -28,4 +28,32 @@ public class BadRequestException : Exception
     /// uncoded BadRequestException behaves exactly as before.
     /// </remarks>
     public string? ErrorCode { get; init; }
+
+    /// <summary>
+    /// The individual reasons behind this refusal, one entry per broken rule, surfaced as
+    /// <c>ApiResponse.Errors</c>. Default <c>null</c> — an exception without it behaves exactly as
+    /// before, with <c>Errors</c> carrying the single detail string.
+    /// </summary>
+    /// <remarks>
+    /// Exists because <c>Message</c> can only ever be ONE sentence, and validation routinely has
+    /// several. <c>ValidationBehavior</c> joins its failures with "; " into that one sentence, which
+    /// is right for a human reading a banner and wrong for the client: <c>apiFormErrors.ts</c>
+    /// routes each <c>errors[]</c> entry onto its own form field by matching the text, so a single
+    /// joined blob is claimed entirely by the first pattern that matches it — a registration failing
+    /// on BOTH password and email filed the whole string under `password` and left the email field
+    /// silent (issue #291).
+    ///
+    /// <c>Message</c> keeps the joined string, so nothing that reads it loses information; this only
+    /// splits what was always there. Setting it does NOT change the status code or the message.
+    ///
+    /// ⚠️ It is NOT additive at the client, and calling it so was wrong. The frontend prefers
+    /// <c>errors[]</c> over <c>message</c> on purpose (<c>apiFormErrors.ts</c>: a controller's own
+    /// one-argument <c>ApiResponse.Failure</c> leaves <c>message</c> at the literal "Operation
+    /// failed"), and **24 call sites read <c>serverMessages(x)[0]</c> — the first entry only**. On
+    /// those, a multi-rule refusal used to render the whole joined blob and now renders just the
+    /// first rule. Form surfaces that route per-field get strictly better, which is the point;
+    /// those 24 get worse until the frontend joins instead of taking <c>[0]</c>. Tracked in
+    /// frontend #490, and that fix must ship BEFORE OR WITH this backend release.
+    /// </remarks>
+    public IReadOnlyList<string>? Errors { get; init; }
 }

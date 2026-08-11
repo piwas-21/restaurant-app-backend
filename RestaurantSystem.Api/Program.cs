@@ -619,8 +619,6 @@ app.UseRateLimiter();
 
 app.UseMiddleware<SessionMiddleware>();
 
-app.UseValidationExceptionHandling();
-
 app.UseAuthentication();
 app.UseAuthorization();
 

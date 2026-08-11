@@ -10,6 +10,6 @@
     <!-- Domain stays EF-free (Clean Architecture). IdentityUser<TKey> lives in
          the store-abstraction package; the EF Core identity stores
          (IdentityDbContext etc.) belong to Infrastructure. -->
-    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.10" />
   </ItemGroup>
 </Project>
