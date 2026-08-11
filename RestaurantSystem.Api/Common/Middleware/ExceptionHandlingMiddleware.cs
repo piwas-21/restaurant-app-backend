@@ -97,11 +97,11 @@ public class ExceptionHandlingMiddleware
         // other exception keeps the single-detail shape.
         //
         // Scoped claim, because the obvious stronger one is false: this makes only REASON-CARRYING
-        // refusals environment-stable, since they bypass `detail` above. Everything else — every
-        // 500, and every handler-thrown BadRequest/NotFound/Forbidden/Unauthorized — still puts
-        // `exception.ToString()` into errors[] under Development, and the frontend prefers errors[]
-        // over message when displaying. That is pre-existing and deliberately not widened here;
-        // both deployed environments pin Production.
+        // refusals environment-stable, since they bypass the detail above. Everything else — every
+        // 500, and every handler-thrown BadRequest, NotFound, Forbidden or Unauthorized — still
+        // serves the fully-stringified exception as its single error under Development, and the
+        // frontend prefers the errors array over the message when displaying. That is pre-existing
+        // and deliberately not widened here; both deployed environments pin Production.
         var response = (errorCode, reasons) switch
         {
             (null, null) => ApiResponse<object>.Failure(detail, message),
