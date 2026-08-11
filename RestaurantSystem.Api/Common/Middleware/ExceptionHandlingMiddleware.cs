@@ -1,5 +1,4 @@
-﻿using FluentValidation;
-using RestaurantSystem.Api.Common.Exceptions;
+﻿using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using System.Net;
 using System.Text.Json;
@@ -44,23 +43,13 @@ public class ExceptionHandlingMiddleware
         // Set only by exceptions that carry a stable discriminator; null leaves ErrorCode off the
         // wire entirely (JsonIgnore-when-null on ApiResponse.ErrorCode).
         string? errorCode = null;
+        // Per-rule reasons, when the exception carries them. Null keeps the single-detail shape
+        // every other exception has always produced.
+        List<string>? reasons = null;
 
         // Determine status code and message based on exception type
         switch (exception)
         {
-            case ValidationException validationEx:
-                statusCode = HttpStatusCode.BadRequest;
-                message = "Validation failed";
-                var errors = validationEx.Errors.Select(e => e.ErrorMessage).ToList();
-                var validationResponse = ApiResponse<object>.Failure(errors, message);
-                context.Response.ContentType = "application/json";
-                context.Response.StatusCode = (int)statusCode;
-                await JsonSerializer.SerializeAsync(context.Response.Body, validationResponse, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-                return;
-
             case ForbiddenException:
                 statusCode = HttpStatusCode.Forbidden;
                 message = exception.Message;
@@ -75,6 +64,7 @@ public class ExceptionHandlingMiddleware
                 statusCode = HttpStatusCode.BadRequest;
                 message = exception.Message;
                 errorCode = badRequestEx.ErrorCode;
+                reasons = badRequestEx.Errors?.ToList();
                 break;
 
             case NotFoundException notFoundEx:
@@ -103,9 +93,22 @@ public class ExceptionHandlingMiddleware
         }
 
         var detail = _environment.IsDevelopment() ? exception.ToString() : message;
-        var response = errorCode is null
-            ? ApiResponse<object>.Failure(detail, message)
-            : ApiResponse<object>.FailureWithCode(detail, errorCode, message);
+        // A refusal that named its individual reasons keeps them, one entry per broken rule; every
+        // other exception keeps the single-detail shape.
+        //
+        // Scoped claim, because the obvious stronger one is false: this makes only REASON-CARRYING
+        // refusals environment-stable, since they bypass `detail` above. Everything else — every
+        // 500, and every handler-thrown BadRequest/NotFound/Forbidden/Unauthorized — still puts
+        // `exception.ToString()` into errors[] under Development, and the frontend prefers errors[]
+        // over message when displaying. That is pre-existing and deliberately not widened here;
+        // both deployed environments pin Production.
+        var response = (errorCode, reasons) switch
+        {
+            (null, null) => ApiResponse<object>.Failure(detail, message),
+            (null, not null) => ApiResponse<object>.Failure(reasons, message),
+            (not null, null) => ApiResponse<object>.FailureWithCode(detail, errorCode, message),
+            (not null, not null) => ApiResponse<object>.FailureWithCode(reasons, errorCode, message),
+        };
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;

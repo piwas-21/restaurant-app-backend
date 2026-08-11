@@ -183,27 +183,31 @@ public class RegisterStaffPasswordRulesTests
 /// What a validation failure ACTUALLY looks like by the time it leaves the API — pinned because the
 /// documented version was wrong, in this repo and in the frontend that consumes it.
 ///
-/// The story everywhere was: FluentValidation failures become a 400 whose <c>errors[]</c> carries
+/// The story everywhere WAS: FluentValidation failures become a 400 whose <c>errors[]</c> carries
 /// one entry per broken rule, produced by <c>ValidationExceptionHandlingMiddleware</c>. Neither half
-/// holds. <see cref="ValidationBehavior{TRequest,TResponse}"/> joins every message with "; " into a
-/// single <see cref="BadRequestException"/>, which <c>ExceptionHandlingMiddleware</c> maps to a 400
-/// whose <c>errors[]</c> has exactly ONE element. Nothing in the solution throws FluentValidation's
-/// <c>ValidationException</c> at all, so the middleware named after it never runs (issue #291).
+/// held. <see cref="ValidationBehavior{TRequest,TResponse}"/> joined every message with "; " into a
+/// single <see cref="BadRequestException"/>, which <c>ExceptionHandlingMiddleware</c> mapped to a
+/// 400 whose <c>errors[]</c> had exactly ONE element; and nothing in the solution throws
+/// FluentValidation's <c>ValidationException</c> at all, so the middleware named after it never ran.
 ///
-/// The consequence is not cosmetic: the frontend routes per-rule messages onto individual form
-/// fields by matching each entry, and with one blob it matches the first field and files the whole
-/// string there. Pinning it here so the next person reads the behaviour instead of the legend.
+/// #291 closed the gap by making the DOCUMENTED behaviour the real one, rather than by correcting
+/// the documentation down to the code: <c>BadRequestException</c> now carries the failure list
+/// alongside the joined message, and the dead middleware is deleted. So <c>errors[]</c> has one
+/// entry per broken rule and <c>Message</c> keeps the joined sentence — nothing that read the
+/// message loses information, and the frontend's per-field routing (which was always written for
+/// this shape) starts working instead of filing every rule under the first matching field.
 ///
 /// Scope, stated because an earlier version of this comment overreached: these run host-free, so
 /// they pin the two ends that are reachable without one — what `ValidationBehavior` throws, and
-/// what `ApiResponse.Failure` makes of it. The middleware hop between them
-/// (`ExceptionHandlingMiddleware.cs:74-78,104-107`) is read, not executed, and in Development it
-/// substitutes `exception.ToString()` for the message.
+/// what `ApiResponse.Failure` makes of it. The middleware hop between them is read, not executed.
+/// One thing that hop no longer does is worth recording here: it used to substitute
+/// `exception.ToString()` into `errors[]` in Development, so the client's error routing behaved
+/// differently per environment. A refusal carrying reasons now serves the same `errors[]` in both.
 /// </summary>
 public class UpdateStaffValidationContractTests
 {
     [Fact]
-    public async Task EveryBrokenRule_ArrivesAsOneSemicolonJoinedMessage()
+    public async Task EveryBrokenRule_ArrivesAsItsOwnErrorsEntry_WithTheJoinedMessageIntact()
     {
         var behavior = new ValidationBehavior<UpdateStaffCommand, ApiResponse<AuthResponse>>(
             new IValidator<UpdateStaffCommand>[] { new UpdateStaffCommandValidator() });
@@ -224,16 +228,30 @@ public class UpdateStaffValidationContractTests
 
         var thrown = await act.Should().ThrowAsync<BadRequestException>();
 
-        // One message, not a list — the "; " is the backend's own join, not the client's.
+        // Message is UNCHANGED by #291 — still the backend's own "; " join, so nothing that reads
+        // it loses information. This half is what makes the change additive rather than a break.
         thrown.Which.Message.Should().Contain("; ");
         thrown.Which.Message.Should().Contain("Password must be at least 8 characters long");
         thrown.Which.Message.Should().Contain("Password must contain at least one uppercase letter");
 
-        // …and the other end of the mapping: that single message becomes a single-element errors[],
-        // which is the fact the frontend's field routing actually depends on.
-        var body = ApiResponse<object>.Failure(thrown.Which.Message, thrown.Which.Message);
-        body.Errors.Should().ContainSingle("per-rule entries never survive to the client — issue #291");
-        body.Errors![0].Should().Contain("; ");
+        // The new half: the individual reasons ride alongside it, one per broken rule. "weak" trips
+        // four (length, uppercase, digit, special) and satisfies lowercase — asserted exactly, not
+        // as "more than one", so a future change that collapses them cannot pass this.
+        thrown.Which.Errors.Should().BeEquivalentTo(new[]
+        {
+            "Password must be at least 8 characters long",
+            "Password must contain at least one uppercase letter",
+            "Password must contain at least one digit",
+            "Password must contain at least one special character",
+        });
+
+        // …and the other end of the mapping: those reasons become the errors[] the frontend's field
+        // routing has always been written for. Each entry is a single rule, so no entry can be
+        // claimed whole by the first pattern that matches part of it.
+        var body = ApiResponse<object>.Failure(thrown.Which.Errors!.ToList(), thrown.Which.Message);
+        body.Errors.Should().HaveCount(4, "one entry per broken rule — issue #291");
+        body.Errors.Should().OnlyContain(e => !e.Contains("; "));
+        body.Message.Should().Contain("; ");
     }
 
     [Fact]

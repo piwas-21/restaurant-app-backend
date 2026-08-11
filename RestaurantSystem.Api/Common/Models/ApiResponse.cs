@@ -81,5 +81,19 @@ namespace RestaurantSystem.Api.Common.Models
                 ErrorCode = errorCode
             };
         }
+
+        // The list counterpart, for a coded refusal that has SEVERAL reasons — a validation
+        // failure with one entry per broken rule. No overload hazard with the string version
+        // above: the first parameter types differ, so a call can never bind to the wrong one.
+        public static ApiResponse<T> FailureWithCode(List<string> errors, string errorCode, string message = "Operation failed")
+        {
+            return new ApiResponse<T>
+            {
+                Success = false,
+                Message = message,
+                Errors = errors,
+                ErrorCode = errorCode
+            };
+        }
     }
 }
