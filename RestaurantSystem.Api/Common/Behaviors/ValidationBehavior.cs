@@ -43,10 +43,14 @@ namespace RestaurantSystem.Api.Common.Behaviors
                 var result = await _validators[0].ValidateAsync(context, cancellationToken);
                 if (!result.IsValid)
                 {
-                    var singleMessage = string.Join(
-                        "; ",
-                        result.Errors.Where(f => f is not null).Select(f => f.ErrorMessage));
-                    throw new BadRequestException(singleMessage);
+                    var singleMessages = result.Errors
+                        .Where(f => f is not null)
+                        .Select(f => f.ErrorMessage)
+                        .ToList();
+                    throw new BadRequestException(string.Join("; ", singleMessages))
+                    {
+                        Errors = singleMessages,
+                    };
                 }
 
                 return await next();
@@ -63,8 +67,8 @@ namespace RestaurantSystem.Api.Common.Behaviors
 
             if (failures.Count > 0)
             {
-                var message = string.Join("; ", failures.Select(f => f.ErrorMessage));
-                throw new BadRequestException(message);
+                var messages = failures.Select(f => f.ErrorMessage).ToList();
+                throw new BadRequestException(string.Join("; ", messages)) { Errors = messages };
             }
 
             return await next();
