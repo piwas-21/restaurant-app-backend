@@ -33,6 +33,12 @@ public sealed class SmtpEmailSender : IEmailSender
         // before any IDisposable is allocated.
         var from = new MailAddress(_settings.FromEmail, _settings.FromName);
         var to = new MailAddress(email.To);
+        // Built alongside the others for the same reason: MailAddress throws FormatException on
+        // invalid input, and doing it here keeps that throw ahead of the MemoryStreams and
+        // MailMessage below, which are disposed by hand rather than by `using`.
+        var replyTo = string.IsNullOrEmpty(_settings.ReplyToEmail)
+            ? null
+            : new MailAddress(_settings.ReplyToEmail);
 
         var attachments = email.Attachments ?? [];
         var inline = attachments.Where(a => a.ContentId is not null).ToList();
@@ -50,6 +56,8 @@ public sealed class SmtpEmailSender : IEmailSender
                 BodyEncoding = Encoding.UTF8
             };
             message.To.Add(to);
+            if (replyTo is not null)
+                message.ReplyToList.Add(replyTo);
 
             if (!string.IsNullOrEmpty(email.TextBody))
                 message.AlternateViews.Add(
