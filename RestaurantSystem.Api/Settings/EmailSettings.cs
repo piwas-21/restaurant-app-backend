@@ -72,6 +72,25 @@ public class EmailSettings
     public string AdminEmail { get; set; } = string.Empty;
 
     /// <summary>
+    /// Optional Reply-To address. Empty (the default) sends no Reply-To header, so replies
+    /// go to <see cref="FromEmail"/>.
+    /// <para>
+    /// This exists for tenants on the SHARED platform sending domain, where FromEmail is
+    /// <c>&lt;slug&gt;@send.sofrapiwas.com</c> — an address nobody reads. Without a Reply-To, a
+    /// guest answering an order confirmation is talking to a black hole. Point it at the
+    /// restaurant's own contact address.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT defaulted to <see cref="AdminEmail"/>. AdminEmail is the operator's
+    /// alerting inbox and on tenant 1 it is a personal Gmail; defaulting would publish it to
+    /// every guest who receives a confirmation. A tenant whose FromEmail is already a real
+    /// monitored mailbox should leave this empty.
+    /// </para>
+    /// </summary>
+    [EmailAddress]
+    public string ReplyToEmail { get; set; } = string.Empty;
+
+    /// <summary>
     /// Whether to use authentication
     /// </summary>
     public bool UseAuthentication { get; set; } = true;
@@ -139,6 +158,14 @@ public class EmailSettings
         // dropped without any user-visible signal. Fail fast at startup instead.
         if (string.IsNullOrEmpty(AdminEmail))
             throw new InvalidOperationException("Admin Email must be configured");
+
+        // Optional, but a malformed value must not survive to send time. [EmailAddress] only
+        // binds; config binding accepts garbage silently. SmtpEmailSender would then throw
+        // FormatException from the MailAddress ctor on EVERY send, and Resend would 422 the
+        // whole request — turning a one-character typo into a total mail outage discovered by
+        // a customer. Same fail-fast reasoning as the AdminEmail check above.
+        if (!string.IsNullOrEmpty(ReplyToEmail) && !new EmailAddressAttribute().IsValid(ReplyToEmail))
+            throw new InvalidOperationException("Reply-To Email must be a valid email address when configured");
 
         // [Required][Url] on these only binds; config binding silently accepts an
         // empty or malformed value. Both are used to build links in emails, so a
