@@ -45,6 +45,10 @@ public sealed class ResendEmailSender : IEmailSender
             Subject: email.Subject,
             Html: email.HtmlBody,
             Text: email.TextBody,
+            // Null (not empty string) when unconfigured: JsonIgnoreCondition.WhenWritingNull
+            // then drops the property entirely. Sending "reply_to": "" would be a malformed
+            // header rather than an absent one.
+            ReplyTo: string.IsNullOrEmpty(_settings.ReplyToEmail) ? null : _settings.ReplyToEmail,
             Attachments: attachments is { Count: > 0 } ? attachments : null);
 
         using var response = await _http.PostAsJsonAsync("emails", request, JsonOptions, cancellationToken);
@@ -62,6 +66,7 @@ public sealed class ResendEmailSender : IEmailSender
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("html")] string Html,
         [property: JsonPropertyName("text")] string? Text,
+        [property: JsonPropertyName("reply_to")] string? ReplyTo,
         [property: JsonPropertyName("attachments")] IReadOnlyList<ResendAttachment>? Attachments);
 
     private sealed record ResendAttachment(
