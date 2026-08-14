@@ -34,6 +34,23 @@ public class RateLimiterSettings
     [Range(1, int.MaxValue)]
     public int ForgotPasswordWindowHours { get; set; } = 1;
 
+    // /api/Auth/send-email-verification, per IP. Its OWN partition, for the same reason
+    // auth-refresh and checkout-status have theirs: a guest on the restaurant's Wi-Fi who taps
+    // "resend" a few times must not 429 the whole venue's NAT out of PASSWORD RESET. Bombing is
+    // stopped by the per-address cooldown below, not by this bucket, so this one need not be the
+    // tightest in the app — it only has to bound one caller's mail cost.
+    [Range(1, int.MaxValue)]
+    public int EmailVerificationPermitLimit { get; set; } = 5;
+    [Range(1, int.MaxValue)]
+    public int EmailVerificationWindowHours { get; set; } = 1;
+
+    // /api/Auth/send-email-verification, per ADDRESS (not per IP) — the policy above caps one
+    // caller, this caps how often one inbox can be mailed no matter how many IPs ask, which is
+    // the actual email-bombing attack. 0 disables it, which is what Development/E2E use so the
+    // Playwright suite can re-register.
+    [Range(0, int.MaxValue)]
+    public int EmailVerificationCooldownMinutes { get; set; } = 5;
+
     // /api/User/register/customer, per IP.
     [Range(1, int.MaxValue)]
     public int RegisterPermitLimit { get; set; } = 10;

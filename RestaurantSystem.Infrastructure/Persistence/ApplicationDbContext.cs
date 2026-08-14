@@ -121,6 +121,10 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<DeviceOrderReceipt> DeviceOrderReceipts { get; set; }
         public DbSet<DeviceEvent> DeviceEvents { get; set; }
 
+        // Outbound mail claims — the idempotency anchor for every mail the server sends itself
+        // (EMAIL-SPEC-TENANT-APP GAP-11/GAP-12).
+        public DbSet<OutboundEmail> OutboundEmails { get; set; }
+
         // Data Protection Keys
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 

@@ -406,6 +406,18 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         }));
 
+    // /api/Auth/send-email-verification — its OWN partition, deliberately NOT the
+    // "forgot-password" bucket: a venue's guests tapping "resend" must never be able to lock that
+    // venue's IP out of password reset. Bombing one inbox is stopped per-address in the handler.
+    options.AddPolicy("email-verification", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.EmailVerificationPermitLimit,
+            Window = TimeSpan.FromHours(rateLimiter.EmailVerificationWindowHours),
+            QueueLimit = 0
+        }));
+
     // /api/User/register/customer
     options.AddPolicy("register", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -517,6 +529,11 @@ builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();
 builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
+builder.Services.AddScoped<IAdminOrderAlertSender, AdminOrderAlertSender>();
+builder.Services.AddScoped<IGuestOrderReceiptSender, GuestOrderReceiptSender>();
+// Singleton: it resolves its own DI scope per operation, so a claim commits independently of the
+// caller's DbContext — including from the detached task that sends the restaurant's order alert.
+builder.Services.AddSingleton<IOutboundEmailLedger, OutboundEmailLedger>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
 builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationService>();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
