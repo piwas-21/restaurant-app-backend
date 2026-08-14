@@ -173,17 +173,17 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             await _notifications.NotifyOrderCreatedAsync(orderDto);
             await _notifications.NotifyFocusOrderUpdateAsync(orderDto);
+            // Before the mail: mail latency in front of it widens the window in which a process
+            // death leaves a dine-in order with no table.
+            await _tableReservation.ReserveForDineInAsync(order, cancellationToken);
 
-            // The order's mail is a consequence of the order existing, not of the guest's tab
-            // staying open (GAP-11): guest receipt, restaurant alert, and dine-in's confirmed mail
-            // all go from here. An online order is excluded — it was held Pending above and owes
-            // nobody a confirmation until Stripe reports the money, which the settle path does.
+            // The mail is a consequence of the order existing, not of the guest's tab staying
+            // open (GAP-11). An online order is excluded — held Pending above, it owes nobody a
+            // confirmation until Stripe reports the money; the settle path mails it then.
             if (!paysOnline)
             {
                 await _notifications.SendNewOrderMailAsync(order, orderDto, cancellationToken);
             }
-
-            await _tableReservation.ReserveForDineInAsync(order, cancellationToken);
 
             _logger.LogInformation("Order {OrderNumber} created successfully by user {UserId}",
                 order.OrderNumber, _currentUserService.UserId);

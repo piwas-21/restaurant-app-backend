@@ -21,8 +21,14 @@ public class OutboundEmailLedger : IOutboundEmailLedger
 
     /// <summary>
     /// A claim whose send never reported back is presumed dead after this long and may be taken
-    /// over. Comfortably longer than the worst-case send (3 provider attempts, 1 s apart), short
-    /// enough that a restart mid-send does not silence a restaurant's order alert for good.
+    /// over by the next caller. Comfortably longer than the worst-case send (3 provider attempts,
+    /// 1 s apart).
+    /// <para>
+    /// Note what this does and does not buy: nothing sweeps the table, so a take-over only happens
+    /// if something asks for the same mail again later. A process killed between claiming and
+    /// sending therefore still loses that mail unless a resend is triggered. Closing that needs the
+    /// retry job GAP-1 already calls for; this window is what makes the retry safe, not a retry.
+    /// </para>
     /// </summary>
     private const int StaleClaimMinutes = 15;
 
@@ -75,7 +81,11 @@ public class OutboundEmailLedger : IOutboundEmailLedger
             await db.OutboundEmails
                 .Where(e => e.EmailType == emailType && e.EntityId == entityId)
                 .ExecuteUpdateAsync(
-                    s => s.SetProperty(e => e.SentAt, now).SetProperty(e => e.UpdatedAt, now),
+                    s => s.SetProperty(e => e.SentAt, now)
+                        .SetProperty(e => e.UpdatedAt, now)
+                        // ExecuteUpdate bypasses the audit interceptor, so the author is set here
+                        // or the row ends up with a timestamp and no author.
+                        .SetProperty(e => e.UpdatedBy, ClaimAuthor),
                     cancellationToken);
         }
         catch (Exception ex)
@@ -119,7 +129,9 @@ public class OutboundEmailLedger : IOutboundEmailLedger
                 && e.SentAt == null
                 && e.CreatedAt < cutoff)
             .ExecuteUpdateAsync(
-                s => s.SetProperty(e => e.CreatedAt, now).SetProperty(e => e.UpdatedAt, now),
+                s => s.SetProperty(e => e.CreatedAt, now)
+                    .SetProperty(e => e.UpdatedAt, now)
+                    .SetProperty(e => e.UpdatedBy, ClaimAuthor),
                 cancellationToken);
 
         if (takenOver > 0)

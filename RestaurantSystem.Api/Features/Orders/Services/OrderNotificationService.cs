@@ -1,8 +1,5 @@
-using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
-using RestaurantSystem.Api.Settings;
-using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -16,21 +13,21 @@ public class OrderNotificationService : IOrderNotificationService
 
     private readonly IEmailService _emailService;
     private readonly IOrderEventService _orderEventService;
+    private readonly IGuestOrderReceiptSender _receipts;
     private readonly IAdminOrderAlertSender _adminAlerts;
-    private readonly IOutboundEmailLedger _ledger;
     private readonly ILogger<OrderNotificationService> _logger;
 
     public OrderNotificationService(
         IEmailService emailService,
         IOrderEventService orderEventService,
+        IGuestOrderReceiptSender receipts,
         IAdminOrderAlertSender adminAlerts,
-        IOutboundEmailLedger ledger,
         ILogger<OrderNotificationService> logger)
     {
         _emailService = emailService;
         _orderEventService = orderEventService;
+        _receipts = receipts;
         _adminAlerts = adminAlerts;
-        _ledger = ledger;
         _logger = logger;
     }
 
@@ -69,24 +66,19 @@ public class OrderNotificationService : IOrderNotificationService
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(orderDto);
 
+        // Queued first, and separately from the guest's: the restaurant's alert must not share a
+        // failure fate with a mail to an address the guest may well have typed wrong. One diner's
+        // typo silencing the operator is the exact failure GAP-11 exists to remove.
+        _adminAlerts.Queue(orderDto);
+        _receipts.Queue(orderDto);
+
         // Dine-in auto-confirms, so it gets the confirmed mail too — exactly what
-        // CreateOrderCommandHandler did inline before GAP-11 moved the decision in here.
+        // CreateOrderCommandHandler did inline before GAP-11 moved the decision in here. Still
+        // awaited, as it has always been; the two queued mails above are the ones that used to be
+        // the browser's problem and must not become the request's.
         if (order.Type == OrderType.DineIn)
         {
             await SendOrderConfirmedAsync(order, DefaultDineInPreparationMinutes, cancellationToken);
-        }
-
-        try
-        {
-            await SendOrderConfirmationAsync(orderDto);
-        }
-        catch (Exception ex)
-        {
-            // The order is committed by the time this runs, so a mail failure must not turn a
-            // placed order into a 5xx. The failed send released its own claim, so the browser's
-            // legacy call — or a later resend — can still deliver it.
-            _logger.LogError(
-                ex, "Failed to send order-received email for order {OrderNumber}", orderDto.OrderNumber);
         }
     }
 
@@ -94,54 +86,17 @@ public class OrderNotificationService : IOrderNotificationService
     {
         ArgumentNullException.ThrowIfNull(order);
 
-        // Customer email: awaited within the caller's request scope, so the legacy endpoint keeps
-        // reporting its failure. Admin email: queued, never awaited.
-        await SendOrderReceivedAsync(order);
-
-        _adminAlerts.Queue(order);
-    }
-
-    private async Task SendOrderReceivedAsync(OrderDto order)
-    {
-        if (string.IsNullOrWhiteSpace(order.CustomerEmail))
-        {
-            // GAP-13: the old fallback really did post to noemail@example.com. Now that the server
-            // sends this mail unprompted, that would be a guaranteed hard bounce on every emailless
-            // order, charged to the tenant's own sending reputation.
-            _logger.LogInformation(
-                "Order {OrderNumber} has no customer email; skipping the order-received mail",
-                order.OrderNumber);
-            return;
-        }
-
-        if (!await _ledger.TryClaimAsync(OutboundEmailTypes.OrderReceived, order.Id))
-        {
-            _logger.LogInformation(
-                "Order-received mail for order {OrderNumber} is already sent or in flight; skipping",
-                order.OrderNumber);
-            return;
-        }
-
         try
         {
-            await _emailService.SendOrderReceivedEmailAsync(
-                order.CustomerEmail,
-                order.CustomerName ?? FallbackCustomerName,
-                order.OrderNumber,
-                order.Type,
-                order.Total,
-                OrderEmailComposer.ComposeItems(order),
-                order.Notes,
-                OrderEmailComposer.ComposeDeliveryAddress(order));
-
-            await _ledger.MarkSentAsync(OutboundEmailTypes.OrderReceived, order.Id);
+            // Awaited within the caller's request scope, so the resend endpoint still reports a
+            // provider failure to whoever asked for the resend.
+            await _receipts.SendAsync(order);
         }
-        catch
+        finally
         {
-            // Give the claim back so this order's receipt is still sendable; the caller decides
-            // whether the failure is visible (the endpoint 400s, order creation logs it).
-            await _ledger.ReleaseAsync(OutboundEmailTypes.OrderReceived, order.Id);
-            throw;
+            // finally, not after: see SendNewOrderMailAsync. The operator's alert is queued even
+            // when the guest's address is the thing that failed.
+            _adminAlerts.Queue(order);
         }
     }
 

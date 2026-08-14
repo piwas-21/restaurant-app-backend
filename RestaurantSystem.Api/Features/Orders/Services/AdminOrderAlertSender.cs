@@ -52,17 +52,19 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
 
         _ = Task.Run(async () =>
         {
-            // Claimed inside the task rather than before it: a claim taken for a task that never
-            // ran would suppress the restaurant's only email notice of the order for good.
-            if (!await ledger.TryClaimAsync(OutboundEmailTypes.OrderAdminAlert, orderId))
-            {
-                logger.LogInformation(
-                    "Admin alert for order {OrderNumber} is already sent or in flight; skipping", orderNumber);
-                return;
-            }
-
             try
             {
+                // Claimed inside the task rather than before it: a claim taken for a task that
+                // never ran would suppress the restaurant's only email notice of the order for
+                // good. Inside the try as well as inside the task — a database blip here would
+                // otherwise fault a detached task nobody observes, losing even the log line.
+                if (!await ledger.TryClaimAsync(OutboundEmailTypes.OrderAdminAlert, orderId))
+                {
+                    logger.LogInformation(
+                        "Admin alert for order {OrderNumber} is already sent or in flight; skipping", orderNumber);
+                    return;
+                }
+
                 using var scope = scopeFactory.CreateScope();
                 var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var quickActionToken = await ReadQuickActionTokenAsync(scope, orderId, orderNumber, logger);

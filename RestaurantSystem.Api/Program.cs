@@ -518,6 +518,7 @@ builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();
 builder.Services.AddScoped<IOrderNotificationService, OrderNotificationService>();
 builder.Services.AddScoped<IAdminOrderAlertSender, AdminOrderAlertSender>();
+builder.Services.AddScoped<IGuestOrderReceiptSender, GuestOrderReceiptSender>();
 // Singleton: it resolves its own DI scope per operation, so a claim commits independently of the
 // caller's DbContext — including from the detached task that sends the restaurant's order alert.
 builder.Services.AddSingleton<IOutboundEmailLedger, OutboundEmailLedger>();

@@ -106,6 +106,25 @@ public class OutboundEmailLedgerTests : IntegrationTestBase
         (await ledger.TryClaimAsync(EmailType, entityId)).Should().BeTrue();
     }
 
+    /// <summary>
+    /// The take-over is a hand-over, not a free-for-all: it moves the claim's clock forward in the
+    /// same UPDATE whose row count decides the winner, so a second claimant arriving right behind
+    /// the first is refused. This single statement is the subtlest part of the file.
+    /// </summary>
+    [Fact]
+    public async Task A_take_over_re_arms_the_claim_against_the_next_caller()
+    {
+        var ledger = Ledger();
+        var entityId = Guid.NewGuid();
+
+        await ledger.TryClaimAsync(EmailType, entityId);
+        await AgeClaimAsync(entityId, TimeSpan.FromHours(1));
+
+        (await ledger.TryClaimAsync(EmailType, entityId)).Should().BeTrue();
+        (await ledger.TryClaimAsync(EmailType, entityId)).Should().BeFalse(
+            "the take-over reset the staleness clock; the mail is in flight again");
+    }
+
     /// <summary>The take-over must not resurrect a mail that actually went out.</summary>
     [Fact]
     public async Task An_old_but_sent_claim_is_never_taken_over()

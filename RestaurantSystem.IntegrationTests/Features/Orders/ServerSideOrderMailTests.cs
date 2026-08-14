@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Moq;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -23,9 +26,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// </para>
 ///
 /// <para>
-/// Every test below posts an order and NEVER calls the confirmation endpoint — that omission is the
-/// point. The assertions read the <c>outbound_emails</c> claim rows rather than a mock, because the
-/// claim is also what makes GAP-12 idempotency true, and asserting on it pins both at once.
+/// Every test posts an order and NEVER calls the confirmation endpoint — that omission is the
+/// point. Assertions are made against a <b>recording <c>IEmailService</c></b>, not against the
+/// ledger rows: an implementation that mailed the guest without ever consulting the ledger would
+/// satisfy the rows and fail the people. The ledger's own semantics are pinned separately in
+/// <c>Common/OutboundEmailLedgerTests.cs</c>.
 /// </para>
 /// </summary>
 public class ServerSideOrderMailTests : IntegrationTestBase
@@ -33,6 +38,7 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     private const decimal PizzaPrice = 12.99m;
     private const string GuestEmail = "guest@example.com";
 
+    private readonly Mock<IEmailService> _email = new();
     private Guid _pizzaId;
 
     public ServerSideOrderMailTests(DatabaseFixture databaseFixture)
@@ -41,47 +47,79 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// The regression test for the gap itself: no client call, and both mails still go out.
+    /// Singleton, and deliberately not scoped: both mails are dispatched from detached tasks that
+    /// resolve their own scope, so a scoped double would record one set of calls and the assertions
+    /// would read another.
     /// </summary>
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.RemoveAll<IEmailService>();
+        services.AddSingleton(_email.Object);
+    }
+
+    /// <summary>The regression test for the gap: no client call, and both mails still go out.</summary>
     [Fact]
     public async Task Placing_an_order_sends_both_mails_with_no_client_call()
     {
         AuthenticateAsAnonymous();
 
-        var orderId = await PlaceOrderAsync(GuestEmail);
+        var orderId = await PlaceOrderAsync(OrderType.Takeaway, GuestEmail);
 
-        var receipt = await WaitForClaimAsync(OutboundEmailTypes.OrderReceived, orderId);
-        receipt.Should().NotBeNull("the guest's receipt must not depend on their tab staying open");
-        receipt!.SentAt.Should().NotBeNull();
+        await WaitForMailsAsync(orderId);
 
-        var adminAlert = await WaitForClaimAsync(OutboundEmailTypes.OrderAdminAlert, orderId);
-        adminAlert.Should().NotBeNull(
-            "the restaurant's only email notice of a new order must not depend on the guest's browser");
-        adminAlert!.SentAt.Should().NotBeNull();
+        VerifyGuestReceipts(orderId, Times.Once());
+        VerifyAdminAlerts(orderId, Times.Once());
     }
 
     /// <summary>
-    /// GAP-12. The endpoint the browser still calls is now a resend, and a resend of an already
-    /// sent mail is a no-op — whether the client's call is a replay or merely late. Asserted on
-    /// <c>SentAt</c> rather than on a row count: a duplicate send that reused the claim row would
-    /// leave the count at 1 and move the timestamp.
+    /// GAP-12 — the endpoint the browser still calls is a resend, and a resend of an already sent
+    /// mail sends nothing. This is the case that made idempotency a requirement rather than a
+    /// nicety: the old client call still exists in every shipped frontend.
     /// </summary>
     [Fact]
     public async Task The_legacy_confirmation_endpoint_does_not_send_a_second_time()
     {
         AuthenticateAsAnonymous();
 
-        var orderId = await PlaceOrderAsync(GuestEmail);
-        var firstSend = await WaitForClaimAsync(OutboundEmailTypes.OrderReceived, orderId);
-        firstSend!.SentAt.Should().NotBeNull();
+        var orderId = await PlaceOrderAsync(OrderType.Takeaway, GuestEmail);
+        await WaitForMailsAsync(orderId);
 
         var replay = await Client.PostAsync($"/api/orders/{orderId}/send-confirmation-email", content: null);
-
         replay.StatusCode.Should().Be(HttpStatusCode.OK, "an already-sent mail is a no-op, not an error");
+        await SettleDetachedWorkAsync();
 
-        var claims = await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived);
-        claims.Should().HaveCount(1);
-        claims[0].SentAt.Should().Be(firstSend.SentAt, "the mail was not sent a second time");
+        VerifyGuestReceipts(orderId, Times.Once());
+        VerifyAdminAlerts(orderId, Times.Once());
+    }
+
+    /// <summary>
+    /// The claim is not a tombstone. A send that fails gives it back, or the first provider hiccup
+    /// would make an order's mail permanently unsendable — a worse failure than the one being
+    /// fixed. The client's own call is what redeems it here, exactly as it would in production.
+    /// </summary>
+    [Fact]
+    public async Task A_failed_send_leaves_the_mail_still_sendable()
+    {
+        var attempts = 0;
+        _email.Setup(e => e.SendOrderReceivedEmailAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<decimal>(), It.IsAny<IEnumerable<(string, int, decimal)>>(),
+                It.IsAny<string?>(), It.IsAny<string?>()))
+            .Returns(() => Interlocked.Increment(ref attempts) == 1
+                ? Task.FromException(new InvalidOperationException("provider down"))
+                : Task.CompletedTask);
+
+        AuthenticateAsAnonymous();
+        var orderId = await PlaceOrderAsync(OrderType.Takeaway, GuestEmail);
+
+        await WaitUntilAsync(async () => (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived)).Count == 0);
+
+        var resend = await Client.PostAsync($"/api/orders/{orderId}/send-confirmation-email", content: null);
+
+        resend.StatusCode.Should().Be(HttpStatusCode.OK);
+        VerifyGuestReceipts(orderId, Times.Exactly(2), "the first attempt failed, so the resend had to be allowed");
+        (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived))
+            .Single().SentAt.Should().NotBeNull();
     }
 
     /// <summary>
@@ -94,25 +132,83 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     {
         AuthenticateAsAnonymous();
 
-        var orderId = await PlaceOrderAsync(customerEmail: null);
+        var orderId = await PlaceOrderAsync(OrderType.Takeaway, customerEmail: null);
 
         // The admin alert is the control: it is queued for this same order, so its arrival proves
         // the mail path ran at all and the absent receipt is a decision rather than a dead path.
-        (await WaitForClaimAsync(OutboundEmailTypes.OrderAdminAlert, orderId)).Should().NotBeNull();
+        await WaitUntilAsync(async () =>
+            (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderAdminAlert)).Count == 1);
+        await SettleDetachedWorkAsync();
+
+        VerifyGuestReceipts(orderId, Times.Never());
+        VerifyAdminAlerts(orderId, Times.Once());
+    }
+
+    /// <summary>
+    /// Dine-in takes the extra branch: it auto-confirms, so it gets the confirmed mail as well as
+    /// the pair above — the behaviour that used to be inline in the handler.
+    /// </summary>
+    [Fact]
+    public async Task A_dine_in_order_also_gets_its_confirmed_mail()
+    {
+        AuthenticateAsAnonymous();
+
+        var orderId = await PlaceOrderAsync(OrderType.DineIn, GuestEmail);
+        await WaitForMailsAsync(orderId);
+
+        VerifyGuestReceipts(orderId, Times.Once());
+        VerifyAdminAlerts(orderId, Times.Once());
+        _email.Verify(e => e.SendOrderConfirmedEmailAsync(
+            GuestEmail, It.IsAny<string>(), It.IsAny<string>(), nameof(OrderType.DineIn), It.IsAny<int>()),
+            Times.Once());
+    }
+
+    /// <summary>
+    /// The money path, and the one behaviour change worth pinning hardest: an order that declares
+    /// an online payment is held <c>Pending</c> and owes nobody a confirmation until Stripe reports
+    /// the money. It must send NOTHING at creation — the settle path mails it.
+    /// </summary>
+    [Fact]
+    public async Task An_online_payment_order_sends_nothing_at_creation()
+    {
+        AuthenticateAsAnonymous();
+
+        var orderId = await PlaceOrderAsync(OrderType.Takeaway, GuestEmail, PaymentMethod.OnlinePayment);
+        await SettleDetachedWorkAsync();
+
+        VerifyGuestReceipts(orderId, Times.Never());
+        VerifyAdminAlerts(orderId, Times.Never());
         (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived)).Should().BeEmpty();
+        (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderAdminAlert)).Should().BeEmpty();
     }
 
     // ---- Helpers -----------------------------------------------------------------------------
 
-    private async Task<Guid> PlaceOrderAsync(string? customerEmail)
+    private void VerifyGuestReceipts(Guid orderId, Times times, string? because = null) =>
+        _email.Verify(e => e.SendOrderReceivedEmailAsync(
+            GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
+            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            times, because ?? $"order {orderId}");
+
+    private void VerifyAdminAlerts(Guid orderId, Times times) =>
+        _email.Verify(e => e.SendOrderConfirmationAdminEmailAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
+            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), It.IsAny<string?>()),
+            times, $"order {orderId}");
+
+    private async Task<Guid> PlaceOrderAsync(
+        OrderType type, string? customerEmail, PaymentMethod payment = PaymentMethod.Cash)
     {
         var response = await Client.PostAsJsonAsync("/api/orders", new
         {
-            type = nameof(OrderType.Takeaway),
+            type = type.ToString(),
             customerName = "Guest",
             customerEmail,
+            tableNumber = type == OrderType.DineIn ? 1 : (int?)null,
             items = new[] { new { productId = _pizzaId, quantity = 1, unitPrice = PizzaPrice } },
-            payments = new[] { new { paymentMethod = nameof(PaymentMethod.Cash), amount = PizzaPrice } },
+            payments = new[] { new { paymentMethod = payment.ToString(), amount = PizzaPrice } },
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -123,24 +219,33 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Polls, because the admin alert is dispatched on a detached task by design (it must never be
-    /// able to delay or fail a guest's order). The guest receipt is awaited inside the request, so
-    /// for that one the first pass already sees it.
+    /// Both mails are dispatched on detached tasks by design — neither may delay or fail the
+    /// request that places the order — so every assertion has to wait for them first.
     /// </summary>
-    private async Task<OutboundEmail?> WaitForClaimAsync(string emailType, Guid orderId)
+    private Task WaitForMailsAsync(Guid orderId) => WaitUntilAsync(async () =>
+        (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderReceived)).Any(c => c.SentAt != null)
+        && (await ClaimsForAsync(orderId, OutboundEmailTypes.OrderAdminAlert)).Any(c => c.SentAt != null));
+
+    /// <summary>
+    /// Lets any detached mail task finish before the test ends. Without it a task can outlive the
+    /// factory and race the next test's database reset — and a "sent nothing" assertion could pass
+    /// merely by being early.
+    /// </summary>
+    private static Task SettleDetachedWorkAsync() => Task.Delay(500);
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
     {
-        for (var attempt = 0; attempt < 50; attempt++)
+        for (var attempt = 0; attempt < 100; attempt++)
         {
-            var claims = await ClaimsForAsync(orderId, emailType);
-            if (claims.Count > 0 && claims[0].SentAt != null)
+            if (await condition())
             {
-                return claims[0];
+                return;
             }
 
             await Task.Delay(100);
         }
 
-        return null;
+        throw new TimeoutException("The awaited mail state never arrived.");
     }
 
     private async Task<List<OutboundEmail>> ClaimsForAsync(Guid orderId, string emailType)
