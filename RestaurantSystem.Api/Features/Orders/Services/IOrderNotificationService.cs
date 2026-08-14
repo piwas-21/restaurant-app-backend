@@ -25,11 +25,29 @@ public interface IOrderNotificationService
     Task SendOrderConfirmedAsync(Order order, int estimatedPreparationMinutes, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Every mail a newly created order owes, sent by the server the moment the order exists —
+    /// the guest's receipt, the restaurant's alert, and for dine-in the confirmed mail as well.
+    /// Never throws: the order is already committed.
+    /// </summary>
+    /// <remarks>
+    /// This is the GAP-11 fix (EMAIL-SPEC-TENANT-APP). These two mails used to be sent only if the
+    /// guest's browser called <c>POST /orders/{id}/send-confirmation-email</c> after checkout, so a
+    /// closed tab lost both — including the restaurant's only email notice that an order exists.
+    /// The legacy endpoint still works and is now a resend: the <c>IOutboundEmailLedger</c> claim
+    /// makes the pair idempotent whether the client's call is in flight, replayed, or first.
+    /// </remarks>
+    Task SendNewOrderMailAsync(Order order, OrderDto orderDto, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Sends the "order received" email to the customer and the admin
     /// notification email (the latter fire-and-forget against a fresh
     /// DI scope). The customer email is awaited; failures bubble to the
     /// caller. The admin email is fire-and-forget; its failures are
     /// logged inside the lambda.
+    /// <para>
+    /// Both sends are claimed in the <c>IOutboundEmailLedger</c> first, so calling this after
+    /// <see cref="SendNewOrderMailAsync"/> already ran is a no-op rather than a duplicate.
+    /// </para>
     /// </summary>
     Task SendOrderConfirmationAsync(OrderDto order);
 

@@ -15,6 +15,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
     private readonly IReadOnlyDictionary<string, string> _settings;
+    private readonly Action<IServiceCollection>? _configureTestServices;
 
     /// <param name="settings">
     /// Extra configuration keys, per-instance (a process-wide environment variable would
@@ -27,11 +28,19 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     /// ConnectionStrings:restaurantdb above only because appsettings.Test.json declares
     /// `redis` and not `restaurantdb`.)
     /// </param>
+    /// <param name="configureTestServices">
+    /// Applied LAST, after this class's own overrides, so a test can swap a real service for a
+    /// double — e.g. a recording <c>IEmailService</c>, which is the only way to assert that a mail
+    /// was actually sent rather than merely recorded as claimed.
+    /// </param>
     public TestWebApplicationFactory(
-        string connectionString, IReadOnlyDictionary<string, string>? settings = null)
+        string connectionString,
+        IReadOnlyDictionary<string, string>? settings = null,
+        Action<IServiceCollection>? configureTestServices = null)
     {
         _connectionString = connectionString;
         _settings = settings ?? new Dictionary<string, string>();
+        _configureTestServices = configureTestServices;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -79,6 +88,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     .RequireAuthenticatedUser()
                     .Build();
             });
+
+            _configureTestServices?.Invoke(services);
         });
     }
 }

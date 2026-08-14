@@ -30,7 +30,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     public async Task InitializeAsync()
     {
         // Create factory and client after DatabaseFixture is initialized
-        Factory = new TestWebApplicationFactory(DatabaseFixture.ConnectionString);
+        Factory = new TestWebApplicationFactory(
+            DatabaseFixture.ConnectionString, configureTestServices: ConfigureTestServices);
         Client = Factory.CreateClient();
 
         Client.DefaultRequestHeaders.Accept.Clear();
@@ -48,6 +49,14 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         Client?.Dispose();
         Factory?.Dispose();
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Last word on the test host's DI. Empty by default — a test class overrides it to replace a
+    /// service with a double.
+    /// </summary>
+    protected virtual void ConfigureTestServices(IServiceCollection services)
+    {
     }
 
     protected virtual async Task SeedTestData()

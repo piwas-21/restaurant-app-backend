@@ -31,9 +31,16 @@ public class OrderEmailController : ControllerBase
     }
 
     /// <summary>
-    /// Send order confirmation emails to customer and admin.
+    /// Resends the order confirmation emails to customer and admin, if they have not gone out yet.
     /// </summary>
     /// <remarks>
+    /// <para><b>This is no longer how an order's mail gets sent.</b> Since GAP-11
+    /// (EMAIL-SPEC-TENANT-APP §4) <c>CreateOrderCommandHandler</c> sends both mails the moment the
+    /// order commits, because a guest who closed the tab used to cost the restaurant its only
+    /// email notice of a real order. The endpoint stays for the clients that still call it — an
+    /// older frontend image on a tenant box, a support-triggered resend — and is now a no-op
+    /// whenever the mail already went out: <c>IOutboundEmailLedger</c> claims each send, so a
+    /// replay, or a client call racing the server's own, cannot produce a second mail (GAP-12).</para>
     /// <para><b>Auth posture: intentionally [AllowAnonymous]</b>. See ADR-004.</para>
     /// <para>
     /// Called from the checkout review page (<c>frontend/src/app/checkout/review/page.tsx</c>)
@@ -61,7 +68,8 @@ public class OrderEmailController : ControllerBase
     ///     attack is replay against a known order ID.
     ///   </description></item>
     /// </list>
-    /// <para><b>Mitigation:</b> per-IP fixed-window rate limit
+    /// <para><b>Mitigation:</b> the send-once ledger above caps the abuse at zero extra mails per
+    /// order, and behind it a per-IP fixed-window rate limit
     /// (<c>"confirmation-email"</c> policy, see <c>Program.cs</c>). Defaults
     /// to 5 requests / 15 minutes / IP in production. Tune via
     /// <c>RateLimiter:ConfirmationEmail*</c> in <c>appsettings.json</c>.</para>

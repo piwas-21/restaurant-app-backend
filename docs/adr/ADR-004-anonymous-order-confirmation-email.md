@@ -68,3 +68,25 @@ A valid middle path. Rejected for **now** as over-engineering: it adds a token-i
 
 ### Alternative C: Per-order send-once cooldown (`Order.LastConfirmationEmailSentAt` column, 24h cooldown)
 Rejected. Requires an EF migration on the `Orders` table — the costliest entity in the system to migrate — for a benefit (per-order throttle) already covered by per-IP throttling against the realistic attacker. If a single attacker holds many IPs and many order IDs, the cooldown helps; but at that scale the SMTP provider's own per-recipient throttle is the right defence, not the application DB.
+
+---
+
+## Amendment — 2026-08-14: the endpoint is now a resend, and sends at most once
+
+`CreateOrderCommandHandler` now sends both mails itself the moment the order commits
+(EMAIL-SPEC-TENANT-APP GAP-11): a guest who closed the tab mid-checkout used to lose the receipt
+**and** the restaurant's only email notice that an order existed, with nothing recording the debt.
+This ADR's decision — keep `[AllowAnonymous]`, mitigate with a per-IP limit — **stands**; what
+changes is that the endpoint is no longer the trigger, only a fallback for clients that still call
+it (an older frontend image on a tenant box, a support-triggered resend).
+
+**Alternative C is now implemented, in a form that avoided its stated cost.** The send-once guard
+does not live on `Orders`: it is a separate `outbound_emails` table, UNIQUE on
+`(email_type, entity_id)`, claimed before each send and marked after it. No migration on the
+costliest entity in the system, and the same table generalises to the reservation and account mails
+(GAP-12, GAP-18).
+
+This strictly shrinks the threat surface this ADR reasoned about. The replay attack it accepted —
+"spam the customer's inbox and inflate SMTP cost, capped at 5 per 15 minutes per IP" — now yields
+**zero** mails per order beyond the first, because a replay loses its claim in the database rather
+than being merely rate-limited. The per-IP limit remains as the outer bound on request volume.
