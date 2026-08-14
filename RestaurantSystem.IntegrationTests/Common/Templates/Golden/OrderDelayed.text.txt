@@ -1,0 +1,24 @@
+Demo Restaurant - Action Required: Order Delay
+
+Dear Jane Doe,
+
+Thank you for your order. Due to high demand, we need a bit more time to prepare your delicious meal.
+
+Order Number: ORD-1
+
+Proposed Preparation Time:
+We estimate your order will be ready in approximately 25 minutes.
+
+Please let us know if this works for you:
+
+Accept Delay: https://demo.test/approve
+
+Cancel Order: https://demo.test/reject
+
+If you choose to cancel, you will not be charged.
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -84,7 +85,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
         // Send welcome email
         try
         {
-            await _emailService.SendWelcomeEmailAsync(newUser);
+            await _emailService.SendWelcomeEmailAsync(EmailCultures.English, newUser);
         }
         catch (Exception ex)
         {

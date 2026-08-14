@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,17 +9,23 @@ public static partial class EmailTemplates
     /// </summary>
     public static class AccountDeletion
     {
-        public static string GetSubject(EmailBranding brand) => $"Action Required: Account Deletion Request - {brand.Name}";
+        private const string Set = "AccountDeletion";
 
-        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
         {
+            var t = EmailText.For(culture, Set);
+            var scheduled = $"{scheduledDeletionDate:MMMM dd, yyyy}";
+
             return $@"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Account Deletion Request</title>
+    <title>{t["PageTitle"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -32,65 +40,68 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>Account Deletion Request</h1>
+            <h1>{t["PageTitle"]}</h1>
         </div>
         <div class='content'>
-            <h2>Hello {firstName} {lastName},</h2>
-            <p>We received a request to delete your {brand.Name} account. Your account is scheduled for permanent deletion on <strong>{scheduledDeletionDate:MMMM dd, yyyy}</strong>.</p>
+            <h2>{t.Format("HelloFullName", EmailHtml.Encode(firstName), EmailHtml.Encode(lastName))}</h2>
+            <p>{t.Format("Scheduled", brand.Name, $"<strong>{scheduled}</strong>")}</p>
 
-            <p>You have two options:</p>
+            <p>{t["TwoOptions"]}</p>
 
             <div style='text-align: center;'>
-                <p><strong>Option 1: Delete Immediately</strong></p>
-                <p>Click the button below to permanently delete your account right now. This action cannot be undone.</p>
-                <a href='{deleteUrl}' class='button-delete'>Delete Account Immediately</a>
+                <p><strong>{t["Option1Title"]}</strong></p>
+                <p>{t["Option1BodyHtml"]}</p>
+                <a href='{deleteUrl}' class='button-delete'>{t["Option1Button"]}</a>
             </div>
 
             <div style='text-align: center; margin-top: 30px;'>
-                <p><strong>Option 2: Cancel Deletion</strong></p>
-                <p>If you changed your mind, simply log in to your account. This will automatically cancel the deletion request.</p>
-                <a href='{cancelUrl}' class='button-cancel'>Login to Cancel</a>
+                <p><strong>{t["Option2Title"]}</strong></p>
+                <p>{t["Option2Body"]}</p>
+                <a href='{cancelUrl}' class='button-cancel'>{t["Option2Button"]}</a>
             </div>
 
             <div class='warning'>
-                <strong>⚠️ Important:</strong> If you take no action, your account will be automatically deleted on the date shown above.
+                <strong>⚠️ {t["ImportantLabel"]}</strong> {t["NoActionWarning"]}
             </div>
 
-            <p>If you did not request this, please change your password immediately.</p>
+            <p>{t["NotYou"]}</p>
         </div>
         <div class='footer'>
-            <p>This is an automated message, please do not reply to this email.</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{t["AutomatedMessage"]}</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
         {
-            return $@"{brand.Name} - Account Deletion Request
+            var t = EmailText.For(culture, Set);
+            var scheduled = $"{scheduledDeletionDate:MMMM dd, yyyy}";
 
-Hello {firstName} {lastName},
+            return $@"{brand.Name} - {t["PageTitle"]}
 
-We received a request to delete your {brand.Name} account. Your account is scheduled for permanent deletion on {scheduledDeletionDate:MMMM dd, yyyy}.
+{t.Format("HelloFullName", firstName, lastName)}
 
-You have two options:
+{t.Format("Scheduled", brand.Name, scheduled)}
 
-Option 1: Delete Immediately
-Visit the following link to permanently delete your account right now. This action cannot be undone.
+{t["TwoOptions"]}
+
+{t["Option1Title"]}
+{t["Option1BodyText"]}
 {deleteUrl}
 
-Option 2: Cancel Deletion
-If you changed your mind, simply log in to your account. This will automatically cancel the deletion request.
+{t["Option2Title"]}
+{t["Option2Body"]}
 {cancelUrl}
 
-IMPORTANT: If you take no action, your account will be automatically deleted on the date shown above.
+{t["ImportantUpper"]} {t["NoActionWarning"]}
 
-If you did not request this, please change your password immediately.
+{t["NotYou"]}
 
-This is an automated message, please do not reply to this email.
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{t["AutomatedMessage"]}
+{Copyright(t, brand)}";
         }
     }
 }

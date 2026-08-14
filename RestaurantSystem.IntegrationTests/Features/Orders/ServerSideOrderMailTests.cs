@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -102,7 +103,7 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     {
         var attempts = 0;
         _email.Setup(e => e.SendOrderReceivedEmailAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<decimal>(), It.IsAny<IEnumerable<(string, int, decimal)>>(),
                 It.IsAny<string?>(), It.IsAny<string?>()))
             .Returns(() => Interlocked.Increment(ref attempts) == 1
@@ -159,7 +160,7 @@ public class ServerSideOrderMailTests : IntegrationTestBase
         VerifyGuestReceipts(orderId, Times.Once());
         VerifyAdminAlerts(orderId, Times.Once());
         _email.Verify(e => e.SendOrderConfirmedEmailAsync(
-            GuestEmail, It.IsAny<string>(), It.IsAny<string>(), nameof(OrderType.DineIn), It.IsAny<int>()),
+            It.IsAny<CultureInfo>(), GuestEmail, It.IsAny<string>(), It.IsAny<string>(), nameof(OrderType.DineIn), It.IsAny<int>()),
             Times.Once());
     }
 
@@ -186,13 +187,13 @@ public class ServerSideOrderMailTests : IntegrationTestBase
 
     private void VerifyGuestReceipts(Guid orderId, Times times, string? because = null) =>
         _email.Verify(e => e.SendOrderReceivedEmailAsync(
-            GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
+            It.IsAny<CultureInfo>(), GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
             It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
             times, because ?? $"order {orderId}");
 
     private void VerifyAdminAlerts(Guid orderId, Times times) =>
         _email.Verify(e => e.SendOrderConfirmationAdminEmailAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
             It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(),
             It.IsAny<string?>(), It.IsAny<string?>()),

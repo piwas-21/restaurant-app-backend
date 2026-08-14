@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 
@@ -113,7 +114,7 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
         try
         {
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            await _emailService.SendEmailVerificationAsync(user, token);
+            await _emailService.SendEmailVerificationAsync(EmailCultures.English, user, token);
 
             _logger.LogInformation("Email verification sent successfully for user {UserId}", user.Id);
         }

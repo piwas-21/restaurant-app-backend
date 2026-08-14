@@ -1,0 +1,31 @@
+Demo Restaurant - Reservation Confirmed
+
+✅ RESERVATION CONFIRMED!
+
+Dear Jane Doe,
+
+Great news! Your reservation at Demo Restaurant has been confirmed.
+
+Date: Friday, May 17, 2030
+Time: 19:30 - 21:00
+Guests: 4
+Table: T12
+
+Special Requests:
+Window seat
+
+Note from Restaurant:
+See you soon
+
+Important Information:
+- Please arrive on time. Tables are held for 15 minutes past reservation time.
+- If you need to cancel or modify your reservation, please contact us at least 24 hours in advance.
+- Contact us at: admin@demo.test
+
+We look forward to welcoming you!
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

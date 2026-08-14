@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Constants;
 
@@ -52,7 +53,7 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
 
         try
         {
-            await _emailService.SendOrderReceivedEmailAsync(
+            await _emailService.SendOrderReceivedEmailAsync(EmailCultures.English,
                 order.CustomerEmail,
                 order.CustomerName ?? FallbackCustomerName,
                 order.OrderNumber,

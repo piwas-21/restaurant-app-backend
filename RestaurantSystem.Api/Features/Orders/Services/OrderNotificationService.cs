@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -42,7 +43,7 @@ public class OrderNotificationService : IOrderNotificationService
 
         try
         {
-            await _emailService.SendOrderConfirmedEmailAsync(
+            await _emailService.SendOrderConfirmedEmailAsync(EmailCultures.English,
                 order.CustomerEmail,
                 order.CustomerName ?? FallbackCustomerName,
                 order.OrderNumber,

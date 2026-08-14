@@ -1,9 +1,18 @@
-﻿using RestaurantSystem.Domain.Entities;
+﻿using System.Globalization;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Common.Services.Interfaces;
 
 /// <summary>
-/// Interface for email service operations
+/// Interface for email service operations.
+/// <para>
+/// Every templated send takes the recipient's <see cref="CultureInfo"/> as its first argument.
+/// It is explicit, never ambient: most of these are queued from a detached task, a webhook or a
+/// BackgroundService where <see cref="CultureInfo.CurrentUICulture"/> is the server's, not the
+/// guest's (EMAIL-LOCALISATION-PLAN §6.1). Callers currently pass
+/// <see cref="RestaurantSystem.Api.Common.Templates.EmailCultures.English"/>; resolution from the
+/// order/reservation/user row lands in slices S3–S5.
+/// </para>
 /// </summary>
 public interface IEmailService
 {
@@ -14,14 +23,14 @@ public interface IEmailService
     /// <param name="resetToken">The password reset token</param>
     /// <param name="resetUrl">The complete reset URL (optional, will be generated if not provided)</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken, string? resetUrl = null);
+    Task SendPasswordResetEmailAsync(CultureInfo culture, ApplicationUser user, string resetToken, string? resetUrl = null);
 
     /// <summary>
     /// Sends a welcome email to newly registered users
     /// </summary>
     /// <param name="user">The newly registered user</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendWelcomeEmailAsync(ApplicationUser user);
+    Task SendWelcomeEmailAsync(CultureInfo culture, ApplicationUser user);
 
     /// <summary>
     /// Sends an email verification email
@@ -30,14 +39,14 @@ public interface IEmailService
     /// <param name="verificationToken">Email verification token</param>
     /// <param name="verificationUrl">The complete verification URL (optional)</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendEmailVerificationAsync(ApplicationUser user, string verificationToken, string? verificationUrl = null);
+    Task SendEmailVerificationAsync(CultureInfo culture, ApplicationUser user, string verificationToken, string? verificationUrl = null);
 
     /// <summary>
     /// Sends a password changed notification email
     /// </summary>
     /// <param name="user">The user whose password was changed</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendPasswordChangedNotificationAsync(ApplicationUser user);
+    Task SendPasswordChangedNotificationAsync(CultureInfo culture, ApplicationUser user);
 
     /// <summary>
     /// Sends a generic email
@@ -71,7 +80,7 @@ public interface IEmailService
     /// <param name="numberOfGuests">Number of guests</param>
     /// <param name="specialRequests">Special requests</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendReservationConfirmationEmailAsync(string customerEmail, string customerName, string tableNumber,
+    Task SendReservationConfirmationEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
         DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string? specialRequests = null);
 
     /// <summary>
@@ -87,7 +96,7 @@ public interface IEmailService
     /// <param name="specialRequests">Special requests</param>
     /// <param name="notes">Notes from restaurant</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendReservationApprovedEmailAsync(string customerEmail, string customerName, string tableNumber,
+    Task SendReservationApprovedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
         DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests,
         string? specialRequests = null, string? notes = null);
 
@@ -103,7 +112,7 @@ public interface IEmailService
     /// <param name="specialInstructions">Special instructions</param>
     /// <param name="deliveryAddress">Delivery address (if applicable)</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendOrderReceivedEmailAsync(string customerEmail, string customerName, string orderNumber,
+    Task SendOrderReceivedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
         string? specialInstructions = null, string? deliveryAddress = null);
 
@@ -116,19 +125,19 @@ public interface IEmailService
     /// <param name="orderType">Order type</param>
     /// <param name="estimatedPreparationMinutes">Estimated preparation time in minutes</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendOrderConfirmedEmailAsync(string customerEmail, string customerName, string orderNumber,
+    Task SendOrderConfirmedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         string orderType, int estimatedPreparationMinutes);
 
     /// <summary>
     /// Send order cancellation email to customer
     /// </summary>
-    Task SendOrderCancellationEmailAsync(string customerEmail, string customerName, string orderNumber,
+    Task SendOrderCancellationEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         string cancellationReason);
 
     /// <summary>
     /// Send order delayed email to customer with approval options
     /// </summary>
-    Task SendOrderDelayedEmailAsync(string customerEmail, string customerName, string orderNumber,
+    Task SendOrderDelayedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         int delayMinutes, string approveUrl, string rejectUrl);
 
     /// <summary>
@@ -150,7 +159,7 @@ public interface IEmailService
     /// <param name="specialInstructions">Special instructions</param>
     /// <param name="deliveryAddress">Delivery address (if applicable)</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendOrderConfirmationAdminEmailAsync(string adminEmail, string orderNumber, string customerName,
+    Task SendOrderConfirmationAdminEmailAsync(CultureInfo culture, string adminEmail, string orderNumber, string customerName,
         string customerEmail, string customerPhone, string orderType, decimal total,
         IEnumerable<(string name, int quantity, decimal price)> items, string? quickActionToken,
         string? specialInstructions = null, string? deliveryAddress = null);
@@ -168,6 +177,7 @@ public interface IEmailService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task representing the async operation</returns>
     Task SendMembershipConfirmationEmailAsync(
+        CultureInfo culture,
         string toEmail,
         string userName,
         string groupName,
@@ -180,5 +190,5 @@ public interface IEmailService
     /// <summary>
     /// Sends account deletion confirmation email
     /// </summary>
-    Task SendAccountDeletionEmailAsync(string toEmail, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate);
+    Task SendAccountDeletionEmailAsync(CultureInfo culture, string toEmail, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate);
 }

@@ -1,0 +1,29 @@
+Demo Restaurant - New Reservation Request
+
+📅 NEW RESERVATION REQUEST
+
+Reservation ID: 11111111-2222-3333-4444-555555555555
+
+Customer: Jane Doe
+Email: jane@demo.test
+Phone: +41000000
+
+Reservation Details:
+Date: Friday, May 17, 2030
+Time: 19:30 - 21:00
+Guests: 4 people
+Table: T12
+
+Special Requests:
+Window seat
+
+ACTION REQUIRED:
+Please approve or reject this reservation request.
+
+Log in to your admin dashboard to manage this reservation.
+
+Best regards,
+Demo Restaurant
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

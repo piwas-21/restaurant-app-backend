@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Modules;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;

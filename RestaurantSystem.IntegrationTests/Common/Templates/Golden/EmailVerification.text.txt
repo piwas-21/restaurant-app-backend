@@ -1,0 +1,24 @@
+DEMO RESTAURANT - Email Verification
+═══════════════════════════════════════
+
+Welcome to Demo Restaurant! 🎉
+
+Hello Jane Doe,
+
+Thank you for joining the Demo Restaurant family! We're excited to have you experience our culinary journey. To get started, please verify your email address by visiting the following link:
+
+https://demo.test/verify
+
+⏰ Quick Tip: This verification link will expire in 24 hours for security reasons.
+
+If you didn't create an account with Demo Restaurant, you can safely ignore this email.
+
+We can't wait to serve you!
+
+The Demo Restaurant Team
+
+───────────────────────────────────────
+📍 Geneva
+
+This is an automated message, please do not reply to this email.
+© {YEAR} Demo Restaurant. All rights reserved.

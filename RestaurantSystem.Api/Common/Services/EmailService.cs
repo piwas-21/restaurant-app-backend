@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using System.Globalization;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Templates;
@@ -34,7 +35,7 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken, string? resetUrl = null)
+    public async Task SendPasswordResetEmailAsync(CultureInfo culture, ApplicationUser user, string resetToken, string? resetUrl = null)
     {
         try
         {
@@ -45,9 +46,9 @@ public class EmailService : IEmailService
             }
 
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.PasswordReset.GetSubject(brand);
-            var htmlBody = EmailTemplates.PasswordReset.GetHtmlBody(brand, user.FirstName, user.LastName, resetUrl);
-            var textBody = EmailTemplates.PasswordReset.GetTextBody(brand, user.FirstName, user.LastName, resetUrl);
+            var subject = EmailTemplates.PasswordReset.GetSubject(culture, brand);
+            var htmlBody = EmailTemplates.PasswordReset.GetHtmlBody(culture, brand, user.FirstName, user.LastName, resetUrl);
+            var textBody = EmailTemplates.PasswordReset.GetTextBody(culture, brand, user.FirstName, user.LastName, resetUrl);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -60,14 +61,14 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendWelcomeEmailAsync(ApplicationUser user)
+    public async Task SendWelcomeEmailAsync(CultureInfo culture, ApplicationUser user)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.Welcome.GetSubject(brand);
-            var htmlBody = EmailTemplates.Welcome.GetHtmlBody(brand, user.FirstName, user.LastName, user.Role.ToString());
-            var textBody = EmailTemplates.Welcome.GetTextBody(brand, user.FirstName, user.LastName, user.Role.ToString());
+            var subject = EmailTemplates.Welcome.GetSubject(culture, brand);
+            var htmlBody = EmailTemplates.Welcome.GetHtmlBody(culture, brand, user.FirstName, user.LastName, user.Role.ToString());
+            var textBody = EmailTemplates.Welcome.GetTextBody(culture, brand, user.FirstName, user.LastName, user.Role.ToString());
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -80,7 +81,7 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendEmailVerificationAsync(ApplicationUser user, string verificationToken, string? verificationUrl = null)
+    public async Task SendEmailVerificationAsync(CultureInfo culture, ApplicationUser user, string verificationToken, string? verificationUrl = null)
     {
         try
         {
@@ -91,9 +92,9 @@ public class EmailService : IEmailService
             }
 
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.EmailVerification.GetSubject(brand);
-            var htmlBody = EmailTemplates.EmailVerification.GetHtmlBody(brand, user.FirstName, user.LastName, verificationUrl);
-            var textBody = EmailTemplates.EmailVerification.GetTextBody(brand, user.FirstName, user.LastName, verificationUrl);
+            var subject = EmailTemplates.EmailVerification.GetSubject(culture, brand);
+            var htmlBody = EmailTemplates.EmailVerification.GetHtmlBody(culture, brand, user.FirstName, user.LastName, verificationUrl);
+            var textBody = EmailTemplates.EmailVerification.GetTextBody(culture, brand, user.FirstName, user.LastName, verificationUrl);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -106,14 +107,14 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendPasswordChangedNotificationAsync(ApplicationUser user)
+    public async Task SendPasswordChangedNotificationAsync(CultureInfo culture, ApplicationUser user)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.PasswordChanged.GetSubject(brand);
-            var htmlBody = EmailTemplates.PasswordChanged.GetHtmlBody(brand, user.FirstName, user.LastName, DateTime.UtcNow);
-            var textBody = EmailTemplates.PasswordChanged.GetTextBody(brand, user.FirstName, user.LastName, DateTime.UtcNow);
+            var subject = EmailTemplates.PasswordChanged.GetSubject(culture, brand);
+            var htmlBody = EmailTemplates.PasswordChanged.GetHtmlBody(culture, brand, user.FirstName, user.LastName, DateTime.UtcNow);
+            var textBody = EmailTemplates.PasswordChanged.GetTextBody(culture, brand, user.FirstName, user.LastName, DateTime.UtcNow);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -187,17 +188,17 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendReservationConfirmationEmailAsync(string customerEmail, string customerName, string tableNumber,
+    public async Task SendReservationConfirmationEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
         DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string? specialRequests = null)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.ReservationConfirmation.GetSubject(brand);
+            var subject = EmailTemplates.ReservationConfirmation.GetSubject(culture, brand);
             var htmlBody = EmailTemplates.ReservationConfirmation.GetHtmlBody(
-                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
+                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
             var textBody = EmailTemplates.ReservationConfirmation.GetTextBody(
-                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
+                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -211,18 +212,18 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendReservationApprovedEmailAsync(string customerEmail, string customerName, string tableNumber,
+    public async Task SendReservationApprovedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
         DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests,
         string? specialRequests = null, string? notes = null)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.ReservationApproved.GetSubject(brand);
+            var subject = EmailTemplates.ReservationApproved.GetSubject(culture, brand);
             var htmlBody = EmailTemplates.ReservationApproved.GetHtmlBody(
-                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
+                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
             var textBody = EmailTemplates.ReservationApproved.GetTextBody(
-                brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
+                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -236,18 +237,18 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderReceivedEmailAsync(string customerEmail, string customerName, string orderNumber,
+    public async Task SendOrderReceivedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
         string? specialInstructions = null, string? deliveryAddress = null)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.OrderReceived.GetSubject(brand);
+            var subject = EmailTemplates.OrderReceived.GetSubject(culture, brand);
             var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-                brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                culture, brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderReceived.GetTextBody(
-                brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                culture, brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -262,17 +263,17 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderConfirmedEmailAsync(string customerEmail, string customerName, string orderNumber,
+    public async Task SendOrderConfirmedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         string orderType, int estimatedPreparationMinutes)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.OrderConfirmed.GetSubject(brand);
+            var subject = EmailTemplates.OrderConfirmed.GetSubject(culture, brand);
             var htmlBody = EmailTemplates.OrderConfirmed.GetHtmlBody(
-                brand, customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
+                culture, brand, customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderConfirmed.GetTextBody(
-                brand, customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
+                culture, brand, customerName, orderNumber, orderType, estimatedPreparationMinutes, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -287,17 +288,17 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderCancellationEmailAsync(string customerEmail, string customerName, string orderNumber,
+    public async Task SendOrderCancellationEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         string cancellationReason)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.OrderCancelled.GetSubject(brand);
+            var subject = EmailTemplates.OrderCancelled.GetSubject(culture, brand);
             var htmlBody = EmailTemplates.OrderCancelled.GetHtmlBody(
-                brand, customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
+                culture, brand, customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderCancelled.GetTextBody(
-                brand, customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
+                culture, brand, customerName, orderNumber, cancellationReason, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -312,17 +313,17 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderDelayedEmailAsync(string customerEmail, string customerName, string orderNumber,
+    public async Task SendOrderDelayedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
         int delayMinutes, string approveUrl, string rejectUrl)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.OrderDelayed.GetSubject(brand);
+            var subject = EmailTemplates.OrderDelayed.GetSubject(culture, brand);
             var htmlBody = EmailTemplates.OrderDelayed.GetHtmlBody(
-                brand, customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
+                culture, brand, customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderDelayed.GetTextBody(
-                brand, customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
+                culture, brand, customerName, orderNumber, delayMinutes, approveUrl, rejectUrl, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -337,7 +338,7 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderConfirmationAdminEmailAsync(string adminEmail, string orderNumber, string customerName,
+    public async Task SendOrderConfirmationAdminEmailAsync(CultureInfo culture, string adminEmail, string orderNumber, string customerName,
         string customerEmail, string customerPhone, string orderType, decimal total,
         IEnumerable<(string name, int quantity, decimal price)> items, string? quickActionToken,
         string? specialInstructions = null, string? deliveryAddress = null)
@@ -345,15 +346,15 @@ public class EmailService : IEmailService
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.OrderConfirmationAdmin.GetSubject(brand);
+            var subject = EmailTemplates.OrderConfirmationAdmin.GetSubject(culture, brand);
             var baseUrl = _emailSettings.BackendBaseUrl;
             var frontendUrl = _emailSettings.FrontendBaseUrl;
             var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
+                culture, brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
                 baseUrl, frontendUrl, _emailSettings.AdminEmail, quickActionToken,
                 specialInstructions, deliveryAddress);
             var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-                brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
+                culture, brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
                 _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
 
             await SendEmailAsync(adminEmail, subject, htmlBody, textBody);
@@ -370,6 +371,7 @@ public class EmailService : IEmailService
     }
 
     public async Task SendMembershipConfirmationEmailAsync(
+        CultureInfo culture,
         string toEmail,
         string userName,
         string groupName,
@@ -382,77 +384,11 @@ public class EmailService : IEmailService
         try
         {
             var brand = await _brandingProvider.GetAsync(cancellationToken);
-            var subject = $"Welcome to {groupName}!";
-
-            var expiryText = expiryDate.HasValue
-                ? $"<p><strong>Membership Expires:</strong> {expiryDate.Value:MMMM dd, yyyy}</p>"
-                : "";
-
-            var htmlBody = $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=""utf-8"">
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background-color: #4a90e2; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }}
-        .content {{ background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }}
-        .qr-container {{ text-align: center; margin: 30px 0; padding: 20px; background: white; border-radius: 8px; }}
-        .qr-code {{ max-width: 300px; height: auto; }}
-        .button {{ display: inline-block; padding: 12px 24px; margin: 10px 5px; background-color: #4a90e2; color: white; text-decoration: none; border-radius: 6px; }}
-        .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }}
-    </style>
-</head>
-<body>
-    <div class=""container"">
-        <div class=""header"">
-            <h1>Welcome to {groupName}!</h1>
-        </div>
-        <div class=""content"">
-            <p>Hello {userName},</p>
-            <p>You have been successfully added to <strong>{groupName}</strong>.</p>
-            <p>{groupDescription}</p>
-            {expiryText}
-
-            <div class=""qr-container"">
-                <h3>Your Membership QR Code</h3>
-                <img src=""cid:qrcode"" alt=""Membership QR Code"" class=""qr-code"" />
-                <p style=""font-size: 12px; color: #666; margin-top: 10px;"">Show this QR code at the restaurant to receive your member benefits.</p>
-            </div>
-
-            <div style=""text-align: center; margin-top: 30px;"">
-                <p><strong>Add to your wallet for easy access:</strong></p>
-                <a href=""#"" class=""button"" style=""background-color: #000;"">📱 Add to Apple Wallet</a>
-                <a href=""#"" class=""button"" style=""background-color: #4285f4;"">📱 Add to Google Wallet</a>
-                <p style=""font-size: 12px; color: #999; margin-top: 10px;"">Wallet pass functionality coming soon!</p>
-            </div>
-        </div>
-        <div class=""footer"">
-            <p>{brand.Name} | Thank you for being a valued member!</p>
-        </div>
-    </div>
-</body>
-</html>";
-
-            var textBody = $@"Welcome to {groupName}!
-
-Hello {userName},
-
-You have been successfully added to {groupName}.
-
-{groupDescription}
-
-{(expiryDate.HasValue ? $"Membership Expires: {expiryDate.Value:MMMM dd, yyyy}" : "")}
-
-Your membership QR code is attached to this email. Show this QR code at the restaurant to receive your member benefits.
-
-QR Code Data: {qrCodeData}
-
----
-{brand.Name}
-Thank you for being a valued member!";
+            var subject = EmailTemplates.MembershipConfirmation.GetSubject(culture, groupName);
+            var htmlBody = EmailTemplates.MembershipConfirmation.GetHtmlBody(
+                culture, brand, userName, groupName, groupDescription, expiryDate);
+            var textBody = EmailTemplates.MembershipConfirmation.GetTextBody(
+                culture, brand, userName, groupName, groupDescription, qrCodeData, expiryDate);
 
             await SendEmailWithEmbeddedImageAsync(toEmail, subject, htmlBody, textBody, qrCodeImage, "qrcode", cancellationToken);
 
@@ -465,14 +401,14 @@ Thank you for being a valued member!";
         }
     }
 
-    public async Task SendAccountDeletionEmailAsync(string toEmail, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
+    public async Task SendAccountDeletionEmailAsync(CultureInfo culture, string toEmail, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
-            var subject = EmailTemplates.AccountDeletion.GetSubject(brand);
-            var htmlBody = EmailTemplates.AccountDeletion.GetHtmlBody(brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
-            var textBody = EmailTemplates.AccountDeletion.GetTextBody(brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
+            var subject = EmailTemplates.AccountDeletion.GetSubject(culture, brand);
+            var htmlBody = EmailTemplates.AccountDeletion.GetHtmlBody(culture, brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
+            var textBody = EmailTemplates.AccountDeletion.GetTextBody(culture, brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
 
             await SendEmailAsync(toEmail, subject, htmlBody, textBody);
 

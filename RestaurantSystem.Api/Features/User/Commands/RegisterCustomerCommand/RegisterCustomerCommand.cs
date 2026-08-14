@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -93,7 +94,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         // Send verification email
         try
         {
-            await _emailService.SendEmailVerificationAsync(newUser, verificationToken);
+            await _emailService.SendEmailVerificationAsync(EmailCultures.English, newUser, verificationToken);
         }
         catch (Exception ex)
         {

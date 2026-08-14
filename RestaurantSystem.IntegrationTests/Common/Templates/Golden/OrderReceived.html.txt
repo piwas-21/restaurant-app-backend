@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Order Received</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #d4af37; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px 20px; background: #f9f9f9; }
+        .info-box { background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #d4af37; }
+        .order-number { background: linear-gradient(135deg, #d4af37 0%, #f4c430 100%); color: white; padding: 20px; border-radius: 5px; text-align: center; margin: 20px 0; }
+        .order-number-value { font-size: 28px; font-weight: bold; letter-spacing: 2px; }
+        .order-number-label { font-size: 14px; opacity: 0.9; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; }
+        .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+        .pending { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>🍽️ Demo Restaurant</h1>
+        </div>
+        <div class='content'>
+            <h2>Order Received</h2>
+            <p>Dear Jane Doe,</p>
+            <p>Thank you for your order at Demo Restaurant! We have received your order details.</p>
+
+            <div class='order-number'>
+                <div class='order-number-label'>ORDER NUMBER</div>
+                <div class='order-number-value'>ORD-1</div>
+            </div>
+
+            <div class='pending'>
+                <strong>⏳ Pending Confirmation</strong><br>
+                Your order is currently pending confirmation. We will notify you as soon as the restaurant confirms your order.
+            </div>
+
+            <div class='info-box'>
+                <strong>📦 Order Type:</strong> 🚚 Delivery<br>
+                <strong>💰 Total Amount:</strong> CHF 25.00
+            </div>
+
+            <h3>Order Items:</h3>
+            <table>
+                <thead>
+                    <tr style='background: #f5f5f5;'>
+                        <th style='padding: 10px; text-align: left;'>Item</th>
+                        <th style='padding: 10px; text-align: center;'>Qty</th>
+                        <th style='padding: 10px; text-align: right;'>Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>Burger</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: center;'>x2</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: right;'>CHF 12.50</td>
+                </tr><tr>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>Fries</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: center;'>x1</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: right;'>CHF 4.25</td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div class='info-box'>
+                        <strong>📍 Delivery Address:</strong><br>
+                        Rue de Test 1
+                    </div>
+            <div class='info-box'>
+                        <strong>Special Instructions:</strong><br>
+                        No onions
+                    </div>
+
+            <p>You can track your order status in your account. If you have any questions, please contact us at admin@demo.test</p>
+            <p>We look forward to serving you!</p>
+            <p>Best regards,<br>Demo Restaurant Team</p>
+        </div>
+        <div class='footer'>
+            <p>Demo Restaurant | Geneva | admin@demo.test</p>
+            <p>© {YEAR} Demo Restaurant. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

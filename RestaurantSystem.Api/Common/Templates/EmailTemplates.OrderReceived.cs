@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,12 +9,16 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderReceived
     {
-        public static string GetSubject(EmailBranding brand) => $"Order Received - {brand.Name}";
+        private const string Set = "OrderReceived";
 
-        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
             string currency, IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var itemsSection = string.Join("", items.Select(item =>
                 $@"<tr>
@@ -24,24 +30,18 @@ public static partial class EmailTemplates
             var instructionsSection = string.IsNullOrEmpty(specialInstructions)
                 ? ""
                 : $@"<div class='info-box'>
-                        <strong>Special Instructions:</strong><br>
-                        {specialInstructions}
+                        <strong>{t["InstructionsLabel"]}</strong><br>
+                        {EmailHtml.Encode(specialInstructions)}
                     </div>";
 
             var deliverySection = string.IsNullOrEmpty(deliveryAddress)
                 ? ""
                 : $@"<div class='info-box'>
-                        <strong>📍 Delivery Address:</strong><br>
-                        {deliveryAddress}
+                        <strong>📍 {t["DeliveryLabel"]}</strong><br>
+                        {EmailHtml.Encode(deliveryAddress)}
                     </div>";
 
-            var orderTypeEmoji = orderType switch
-            {
-                "DineIn" => "🍽️ Dine In",
-                "Takeaway" => "🛍️ Takeaway",
-                "Delivery" => "🚚 Delivery",
-                _ => orderType
-            };
+            var orderTypeEmoji = OrderTypeLabel(t, orderType, withEmoji: true);
 
             return $@"
 <!DOCTYPE html>
@@ -49,7 +49,7 @@ public static partial class EmailTemplates
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Order Received</title>
+    <title>{t["Heading"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -70,32 +70,32 @@ public static partial class EmailTemplates
             <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
-            <h2>Order Received</h2>
-            <p>Dear {customerName},</p>
-            <p>Thank you for your order at {brand.Name}! We have received your order details.</p>
+            <h2>{t["Heading"]}</h2>
+            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{t.Format("ThankYou", brand.Name)}</p>
 
             <div class='order-number'>
-                <div class='order-number-label'>ORDER NUMBER</div>
+                <div class='order-number-label'>{t["OrderNumberLabel"]}</div>
                 <div class='order-number-value'>{orderNumber}</div>
             </div>
 
             <div class='pending'>
-                <strong>⏳ Pending Confirmation</strong><br>
-                Your order is currently pending confirmation. We will notify you as soon as the restaurant confirms your order.
+                <strong>⏳ {t["PendingTitle"]}</strong><br>
+                {t["PendingBody"]}
             </div>
 
             <div class='info-box'>
-                <strong>📦 Order Type:</strong> {orderTypeEmoji}<br>
-                <strong>💰 Total Amount:</strong> {currency} {total:F2}
+                <strong>📦 {t["OrderTypeLabel"]}</strong> {orderTypeEmoji}<br>
+                <strong>💰 {t["TotalLabel"]}</strong> {currency} {total:F2}
             </div>
 
-            <h3>Order Items:</h3>
+            <h3>{t["ItemsLabel"]}</h3>
             <table>
                 <thead>
                     <tr style='background: #f5f5f5;'>
-                        <th style='padding: 10px; text-align: left;'>Item</th>
-                        <th style='padding: 10px; text-align: center;'>Qty</th>
-                        <th style='padding: 10px; text-align: right;'>Price</th>
+                        <th style='padding: 10px; text-align: left;'>{t["ColumnItem"]}</th>
+                        <th style='padding: 10px; text-align: center;'>{t["ColumnQty"]}</th>
+                        <th style='padding: 10px; text-align: right;'>{t["ColumnPrice"]}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -106,23 +106,24 @@ public static partial class EmailTemplates
             {deliverySection}
             {instructionsSection}
 
-            <p>You can track your order status in your account. If you have any questions, please contact us at {email}</p>
-            <p>We look forward to serving you!</p>
-            <p>Best regards,<br>{brand.Name} Team</p>
+            <p>{t.Format("Track", email)}</p>
+            <p>{t["LookForward"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
             <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, string orderType, decimal total,
             string currency, IEnumerable<(string name, int quantity, decimal price)> items, string contactEmail,
             string? specialInstructions = null, string? deliveryAddress = null)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var itemsSection = string.Join("\n", items.Select(item =>
                 $"{item.name} x{item.quantity} = {currency} {item.price:F2}"));
@@ -131,52 +132,46 @@ public static partial class EmailTemplates
                 ? ""
                 : $@"
 
-Special Instructions:
+{t["InstructionsLabel"]}
 {specialInstructions}";
 
             var deliverySection = string.IsNullOrEmpty(deliveryAddress)
                 ? ""
                 : $@"
 
-Delivery Address:
+{t["DeliveryLabel"]}
 {deliveryAddress}";
 
-            var orderTypeText = orderType switch
-            {
-                "DineIn" => "Dine In",
-                "Takeaway" => "Takeaway",
-                "Delivery" => "Delivery",
-                _ => orderType
-            };
+            var orderTypeText = OrderTypeLabel(t, orderType);
 
-            return $@"{brand.Name} - Order Received
+            return $@"{brand.Name} - {t["Heading"]}
 
-ORDER RECEIVED
+{t["HeadingUpper"]}
 
-Dear {customerName},
+{t.Format("Dear", customerName)}
 
-Thank you for your order at {brand.Name}! We have received your order details.
+{t.Format("ThankYou", brand.Name)}
 
-ORDER NUMBER: {orderNumber}
+{t["OrderNumberLabel"]}: {orderNumber}
 
-PENDING CONFIRMATION
-Your order is currently pending confirmation. We will notify you as soon as the restaurant confirms your order.
+{t["PendingTitleUpper"]}
+{t["PendingBody"]}
 
-Order Type: {orderTypeText}
-Total Amount: {currency} {total:F2}
+{t["OrderTypeLabel"]} {orderTypeText}
+{t["TotalLabel"]} {currency} {total:F2}
 
-Order Items:
+{t["ItemsLabel"]}
 {itemsSection}{deliverySection}{instructionsSection}
 
-You can track your order status in your account. If you have any questions, please contact us at {email}
+{t.Format("Track", email)}
 
-We look forward to serving you!
+{t["LookForward"]}
 
-Best regards,
-{brand.Name} Team
+{t["BestRegards"]}
+{t.Format("BrandTeam", brand.Name)}
 
 {brand.Name} | {brand.City} | {email}
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{Copyright(t, brand)}";
         }
     }
 }

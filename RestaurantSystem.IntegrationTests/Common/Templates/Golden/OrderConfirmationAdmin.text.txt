@@ -1,0 +1,33 @@
+Demo Restaurant - New Order
+
+📦 NEW ORDER RECEIVED
+
+Order Number: ORD-1
+
+Customer: Jane Doe
+Email: jane@demo.test
+Phone: +41000000
+
+Order Type: Delivery
+Total Amount: CHF 25.00
+
+Order Items:
+Burger x2 = CHF 12.50
+Fries x1 = CHF 4.25
+
+Delivery Address:
+Rue de Test 1
+
+Special Instructions:
+No onions
+
+ACTION REQUIRED:
+Please prepare this order for delivery.
+
+Log in to your admin dashboard to manage this order.
+
+Best regards,
+Demo Restaurant
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.
