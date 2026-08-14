@@ -113,8 +113,13 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Send email verification
     /// </summary>
+    /// <remarks>
+    /// Anonymous, and it sends a real mail per call. Own per-IP partition, plus the per-address
+    /// cooldown in <see cref="SendEmailVerificationCommandHandler"/> — see both for why.
+    /// </remarks>
     [HttpPost("send-email-verification")]
     [AllowAnonymous]
+    [EnableRateLimiting("email-verification")]
     public async Task<ActionResult<ApiResponse<string>>> SendEmailVerification([FromBody] SendEmailVerificationCommand command)
     {
         var result = await _mediator.SendCommand(command);
