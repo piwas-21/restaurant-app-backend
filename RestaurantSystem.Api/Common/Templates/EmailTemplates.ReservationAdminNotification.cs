@@ -11,6 +11,9 @@ public static partial class EmailTemplates
     {
         private const string Set = "ReservationAdminNotification";
 
+        /// <summary>The mail's own title, rendered in the head, in both colour schemes and in the text body.</summary>
+        private const string HeadingKey = "Heading";
+
         public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
@@ -42,7 +45,7 @@ public static partial class EmailTemplates
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <meta name='color-scheme' content='light dark'>
-    <title>{t["Heading"]}</title>
+    <title>{t[HeadingKey]}</title>
     <style>
         @media (prefers-color-scheme: dark) {{
             .light-only {{ display: none !important; }}
@@ -60,7 +63,7 @@ public static partial class EmailTemplates
         <!-- Header -->
         <div style='background: linear-gradient(135deg, #d4af37 0%, #f4c430 100%); padding: 32px 24px; text-align: center;'>
             <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t["Heading"]}</p>
+            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t[HeadingKey]}</p>
         </div>
 
         <!-- Content -->
@@ -153,7 +156,7 @@ public static partial class EmailTemplates
         <!-- Header -->
         <div style='background: linear-gradient(135deg, #b8941f 0%, #d4af37 100%); padding: 32px 24px; text-align: center;'>
             <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t["Heading"]}</p>
+            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t[HeadingKey]}</p>
         </div>
 
         <!-- Content -->
@@ -262,7 +265,7 @@ public static partial class EmailTemplates
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
 
-            return $@"{brand.Name} - {t["Heading"]}
+            return $@"{brand.Name} - {t[HeadingKey]}
 
 📅 {t["HeadingUpper"]}
 

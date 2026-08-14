@@ -186,19 +186,26 @@ public class EmailTemplateGoldenTests
     private static string GoldenDirectory([CallerFilePath] string sourceFile = "") =>
         Path.Combine(Path.GetDirectoryName(sourceFile)!, "Golden");
 
+    /// <summary>
+    /// Re-records the snapshots when <c>EMAIL_GOLDEN_UPDATE=1</c>. Without the variable it still
+    /// asserts the one thing that must always hold: the committed snapshots are present, so a
+    /// deleted Golden directory fails here rather than turning the whole suite into a no-op.
+    /// </summary>
     [Fact]
-    public void WriteGoldenFiles()
+    public void GoldenSnapshots_ArePresent_AndCanBeReRecorded()
     {
-        if (!string.Equals(Environment.GetEnvironmentVariable("EMAIL_GOLDEN_UPDATE"), "1", StringComparison.Ordinal))
+        var directory = GoldenDirectory();
+        var expectedCount = Rendered().Count;
+
+        if (string.Equals(Environment.GetEnvironmentVariable("EMAIL_GOLDEN_UPDATE"), "1", StringComparison.Ordinal))
         {
-            return;
+            Directory.CreateDirectory(directory);
+            foreach (var (name, rendered) in Rendered())
+            {
+                File.WriteAllText(Path.Combine(directory, name + ".txt"), Tokenise(rendered) + "\n", new UTF8Encoding(false));
+            }
         }
 
-        var directory = GoldenDirectory();
-        Directory.CreateDirectory(directory);
-        foreach (var (name, rendered) in Rendered())
-        {
-            File.WriteAllText(Path.Combine(directory, name + ".txt"), Tokenise(rendered) + "\n", new UTF8Encoding(false));
-        }
+        Directory.EnumerateFiles(directory, "*.txt").Should().HaveCount(expectedCount);
     }
 }

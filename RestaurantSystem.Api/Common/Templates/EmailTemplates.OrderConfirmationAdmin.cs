@@ -11,6 +11,9 @@ public static partial class EmailTemplates
     {
         private const string Set = "OrderConfirmationAdmin";
 
+        /// <summary>"{0} min" — one preparation-time button, rendered three times per colour scheme.</summary>
+        private const string MinutesShortKey = "MinutesShort";
+
         public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
@@ -163,9 +166,9 @@ public static partial class EmailTemplates
             <p style='text-align: center; margin: 20px 0; color: #6b7280; font-size: 14px; margin-bottom: 12px; font-weight: 600;'>{t["OrConfirmWithTime"]}</p>
 
             <div style='text-align: center; margin: 20px 0;'>
-                <a href='{confirmUrl}15' style='display: inline-block; background: #7fa89bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format("MinutesShort", 15)}</a>
-                <a href='{confirmUrl}30' style='display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format("MinutesShort", 30)}</a>
-                <a href='{confirmUrl}45' style='display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format("MinutesShort", 45)}</a>
+                <a href='{confirmUrl}15' style='display: inline-block; background: #7fa89bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format(MinutesShortKey, 15)}</a>
+                <a href='{confirmUrl}30' style='display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format(MinutesShortKey, 30)}</a>
+                <a href='{confirmUrl}45' style='display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format(MinutesShortKey, 45)}</a>
             </div>
 
             <div style='text-align: center; margin: 24px 0;'>
@@ -272,9 +275,9 @@ public static partial class EmailTemplates
             <p style='text-align: center; margin: 20px 0 12px 0; color: #9ca3af; font-size: 14px; font-weight: 500;'>{t["OrConfirmWithTime"]}</p>
 
             <div style='text-align: center; margin: 12px 0 24px 0;'>
-                <a href='{confirmUrl}15' style='display: inline-block; background: #6b9688; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format("MinutesShort", 15)}</a>
-                <a href='{confirmUrl}30' style='display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format("MinutesShort", 30)}</a>
-                <a href='{confirmUrl}45' style='display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format("MinutesShort", 45)}</a>
+                <a href='{confirmUrl}15' style='display: inline-block; background: #6b9688; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format(MinutesShortKey, 15)}</a>
+                <a href='{confirmUrl}30' style='display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format(MinutesShortKey, 30)}</a>
+                <a href='{confirmUrl}45' style='display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 4px 6px; min-width: 90px;'>{t.Format(MinutesShortKey, 45)}</a>
             </div>
 
             <div style='text-align: center; margin: 24px 0;'>
