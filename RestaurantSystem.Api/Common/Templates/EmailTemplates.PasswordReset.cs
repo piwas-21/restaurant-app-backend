@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,17 +9,23 @@ public static partial class EmailTemplates
     /// </summary>
     public static class PasswordReset
     {
-        public static string GetSubject(EmailBranding brand) => $"Reset Your Password - {brand.Name}";
+        private const string Set = "PasswordReset";
 
-        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
         {
+            var t = EmailText.For(culture, Set);
+            var minutes = expirationMinutes.ToString(CultureInfo.InvariantCulture);
+
             return $@"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Password Reset</title>
+    <title>{t["PageTitle"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -34,50 +42,53 @@ public static partial class EmailTemplates
             <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
-            <h2>Password Reset Request</h2>
-            <p>Hello {firstName} {lastName},</p>
-            <p>We received a request to reset your password for your {brand.Name} account. If you didn't make this request, please ignore this email.</p>
-            <p>To reset your password, click the button below:</p>
+            <h2>{t["Heading"]}</h2>
+            <p>{t.Format("HelloFullName", EmailHtml.Encode(firstName), EmailHtml.Encode(lastName))}</p>
+            <p>{t.Format("Intro", brand.Name)}</p>
+            <p>{t["ClickButton"]}</p>
             <div style='text-align: center;'>
-                <a href='{resetUrl}' class='button'>Reset Password</a>
+                <a href='{resetUrl}' class='button'>{t["ButtonLabel"]}</a>
             </div>
-            <p>Or copy and paste this link into your browser:</p>
+            <p>{t["CopyLink"]}</p>
             <p style='word-break: break-all;'>{resetUrl}</p>
             <div class='warning'>
-                <strong>⚠️ Important:</strong> This link will expire in {expirationMinutes} minutes for security reasons.
+                <strong>⚠️ {t["ImportantLabel"]}</strong> {t.Format("Expiry", minutes)}
             </div>
-            <p>If you have any questions, please contact our support team.</p>
-            <p>Best regards,<br>The {brand.Name} Team</p>
+            <p>{t["Questions"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("TheBrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
-            <p>This is an automated message, please do not reply to this email.</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{t["AutomatedMessage"]}</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string resetUrl, int expirationMinutes = 60)
         {
-            return $@"{brand.Name} - Password Reset Request
+            var t = EmailText.For(culture, Set);
+            var minutes = expirationMinutes.ToString(CultureInfo.InvariantCulture);
 
-Hello {firstName} {lastName},
+            return $@"{brand.Name} - {t["Heading"]}
 
-We received a request to reset your password for your {brand.Name} account. If you didn't make this request, please ignore this email.
+{t.Format("HelloFullName", firstName, lastName)}
 
-To reset your password, visit the following link:
+{t.Format("Intro", brand.Name)}
+
+{t["VisitLink"]}
 {resetUrl}
 
-IMPORTANT: This link will expire in {expirationMinutes} minutes for security reasons.
+{t["ImportantUpper"]} {t.Format("Expiry", minutes)}
 
-If you have any questions, please contact our support team.
+{t["Questions"]}
 
-Best regards,
-The {brand.Name} Team
+{t["BestRegards"]}
+{t.Format("TheBrandTeam", brand.Name)}
 
-This is an automated message, please do not reply to this email.
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{t["AutomatedMessage"]}
+{Copyright(t, brand)}";
         }
     }
 }

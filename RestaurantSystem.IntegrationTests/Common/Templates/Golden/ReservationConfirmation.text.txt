@@ -1,0 +1,26 @@
+Demo Restaurant - Reservation Received
+
+Dear Jane Doe,
+
+Thank you for your reservation request at Demo Restaurant. We have received your booking details:
+
+Date: Friday, May 17, 2030
+Time: 19:30 - 21:00
+Guests: 4
+Table: T12
+
+Special Requests:
+Window seat
+
+PENDING CONFIRMATION
+Your reservation is currently pending. Our team will review your request and send you a confirmation email shortly.
+
+If you need to make any changes or have questions, please contact us at admin@demo.test
+
+We look forward to serving you!
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

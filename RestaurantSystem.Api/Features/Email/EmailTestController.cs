@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -79,7 +80,7 @@ public class EmailTestController : ControllerBase
                 RefreshToken = "test-refresh-token"
             };
 
-            await _emailService.SendPasswordResetEmailAsync(testUser, "test-reset-token");
+            await _emailService.SendPasswordResetEmailAsync(EmailCultures.English, testUser, "test-reset-token");
 
             return Ok(ApiResponse<string>.SuccessWithData("Password reset email test sent successfully"));
         }
@@ -117,7 +118,7 @@ public class EmailTestController : ControllerBase
                 RefreshToken = "test-refresh-token"
             };
 
-            await _emailService.SendWelcomeEmailAsync(testUser);
+            await _emailService.SendWelcomeEmailAsync(EmailCultures.English, testUser);
 
             return Ok(ApiResponse<string>.SuccessWithData("Welcome email test sent successfully"));
         }
@@ -155,7 +156,7 @@ public class EmailTestController : ControllerBase
                 RefreshToken = "test-refresh-token"
             };
 
-            await _emailService.SendPasswordChangedNotificationAsync(testUser);
+            await _emailService.SendPasswordChangedNotificationAsync(EmailCultures.English, testUser);
 
             return Ok(ApiResponse<string>.SuccessWithData("Password changed notification test sent successfully"));
         }
@@ -193,7 +194,7 @@ public class EmailTestController : ControllerBase
                 RefreshToken = "test-refresh-token"
             };
 
-            await _emailService.SendEmailVerificationAsync(testUser, "test-verification-token");
+            await _emailService.SendEmailVerificationAsync(EmailCultures.English, testUser, "test-verification-token");
 
             return Ok(ApiResponse<string>.SuccessWithData("Email verification test sent successfully"));
         }

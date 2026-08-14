@@ -1,0 +1,25 @@
+Demo Restaurant - Reservation Update
+
+Dear Jane Doe,
+
+We regret to inform you that we are unable to accommodate your reservation request at this time.
+
+Requested Reservation:
+Date: Friday, May 17, 2030
+Time: 19:30
+Guests: 4
+
+UNABLE TO CONFIRM
+Unfortunately, we cannot confirm your reservation. This may be due to availability constraints or other factors.
+
+We encourage you to try booking for another date or time. You can make a new reservation on our website or contact us directly.
+
+If you have any questions, please don't hesitate to reach out to us at admin@demo.test or call us.
+
+We hope to welcome you soon!
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

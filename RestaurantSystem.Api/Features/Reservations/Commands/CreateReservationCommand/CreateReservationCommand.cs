@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Api.Features.Settings.FormFields;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
@@ -117,7 +118,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
             try
             {
                 // Send to customer
-                await _emailService.SendReservationConfirmationEmailAsync(
+                await _emailService.SendReservationConfirmationEmailAsync(EmailCultures.English,
                     reservation.CustomerEmail,
                     reservation.CustomerName,
                     table.TableNumber,
@@ -135,8 +136,8 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
 
                 await _emailService.SendEmailAsync(
                     _emailSettings.AdminEmail,
-                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetSubject(brand),
-                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetHtmlBody(
+                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetSubject(EmailCultures.English, brand),
+                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetHtmlBody(EmailCultures.English,
                         brand,
                         reservation.Id,
                         reservation.CustomerName,
@@ -152,7 +153,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                         _emailSettings.AdminEmail,
                         reservation.SpecialRequests
                     ),
-                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetTextBody(
+                    Common.Templates.EmailTemplates.ReservationAdminNotification.GetTextBody(EmailCultures.English,
                         brand,
                         reservation.Id,
                         reservation.CustomerName,

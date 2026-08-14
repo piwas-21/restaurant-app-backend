@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,25 +9,29 @@ public static partial class EmailTemplates
     /// </summary>
     public static class ReservationApproved
     {
-        public static string GetSubject(EmailBranding brand) => $"Reservation Confirmed - {brand.Name}";
+        private const string Set = "ReservationApproved";
 
-        public static string GetHtmlBody(EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
             TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
             string? specialRequests = null, string? notes = null)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"<div class='info-box'>
-                        <strong>Special Requests:</strong><br>
-                        {specialRequests}
+                        <strong>{t["SpecialRequestsLabel"]}</strong><br>
+                        {EmailHtml.Encode(specialRequests)}
                     </div>";
 
             var notesSection = string.IsNullOrEmpty(notes)
                 ? ""
                 : $@"<div class='info-box' style='border-left-color: #27ae60;'>
-                        <strong>Note from Restaurant:</strong><br>
-                        {notes}
+                        <strong>{t["NoteLabel"]}</strong><br>
+                        {EmailHtml.Encode(notes)}
                     </div>";
 
             return $@"
@@ -34,7 +40,7 @@ public static partial class EmailTemplates
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Reservation Confirmed</title>
+    <title>{t["Heading"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -52,85 +58,86 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <div class='confirmed'>
-                <h2 style='margin: 0; color: #27ae60;'>✅ Reservation Confirmed!</h2>
+                <h2 style='margin: 0; color: #27ae60;'>✅ {t["Confirmed"]}</h2>
             </div>
 
-            <p>Dear {customerName},</p>
-            <p>Great news! Your reservation at {brand.Name} has been confirmed.</p>
+            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{t.Format("GoodNews", brand.Name)}</p>
 
             <div class='info-box'>
-                <strong>📅 Date:</strong> {reservationDate:dddd, MMMM dd, yyyy}<br>
-                <strong>🕐 Time:</strong> {startTime:hh':'mm} - {endTime:hh':'mm}<br>
-                <strong>👥 Guests:</strong> {numberOfGuests}<br>
-                <strong>🪑 Table:</strong> {tableNumber}
+                <strong>📅 {t["DateLabel"]}</strong> {reservationDate:dddd, MMMM dd, yyyy}<br>
+                <strong>🕐 {t["TimeLabel"]}</strong> {startTime:hh':'mm} - {endTime:hh':'mm}<br>
+                <strong>👥 {t["GuestsLabel"]}</strong> {numberOfGuests}<br>
+                <strong>🪑 {t["TableLabel"]}</strong> {EmailHtml.Encode(tableNumber)}
             </div>
 
             {requestsSection}
             {notesSection}
 
-            <p><strong>Important Information:</strong></p>
+            <p><strong>{t["ImportantInfoLabel"]}</strong></p>
             <ul>
-                <li>Please arrive on time. Tables are held for 15 minutes past reservation time.</li>
-                <li>If you need to cancel or modify your reservation, please contact us at least 24 hours in advance.</li>
-                <li>Contact us at: {email}</li>
+                <li>{t["Info1"]}</li>
+                <li>{t["Info2"]}</li>
+                <li>{t.Format("Info3", email)}</li>
             </ul>
 
-            <p>We look forward to welcoming you!</p>
-            <p>Best regards,<br>{brand.Name} Team</p>
+            <p>{t["LookForwardWelcoming"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
             <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
             TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
             string? specialRequests = null, string? notes = null)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"
 
-Special Requests:
+{t["SpecialRequestsLabel"]}
 {specialRequests}";
 
             var notesSection = string.IsNullOrEmpty(notes)
                 ? ""
                 : $@"
 
-Note from Restaurant:
+{t["NoteLabel"]}
 {notes}";
 
-            return $@"{brand.Name} - Reservation Confirmed
+            return $@"{brand.Name} - {t["Heading"]}
 
-✅ RESERVATION CONFIRMED!
+✅ {t["ConfirmedUpper"]}
 
-Dear {customerName},
+{t.Format("Dear", customerName)}
 
-Great news! Your reservation at {brand.Name} has been confirmed.
+{t.Format("GoodNews", brand.Name)}
 
-Date: {reservationDate:dddd, MMMM dd, yyyy}
-Time: {startTime:hh':'mm} - {endTime:hh':'mm}
-Guests: {numberOfGuests}
-Table: {tableNumber}{requestsSection}{notesSection}
+{t["DateLabel"]} {reservationDate:dddd, MMMM dd, yyyy}
+{t["TimeLabel"]} {startTime:hh':'mm} - {endTime:hh':'mm}
+{t["GuestsLabel"]} {numberOfGuests}
+{t["TableLabel"]} {tableNumber}{requestsSection}{notesSection}
 
-Important Information:
-- Please arrive on time. Tables are held for 15 minutes past reservation time.
-- If you need to cancel or modify your reservation, please contact us at least 24 hours in advance.
-- Contact us at: {email}
+{t["ImportantInfoLabel"]}
+- {t["Info1"]}
+- {t["Info2"]}
+- {t.Format("Info3", email)}
 
-We look forward to welcoming you!
+{t["LookForwardWelcoming"]}
 
-Best regards,
-{brand.Name} Team
+{t["BestRegards"]}
+{t.Format("BrandTeam", brand.Name)}
 
 {brand.Name} | {brand.City} | {email}
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{Copyright(t, brand)}";
         }
     }
 }

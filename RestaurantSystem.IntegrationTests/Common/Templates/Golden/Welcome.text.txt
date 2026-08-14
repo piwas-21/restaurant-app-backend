@@ -1,0 +1,22 @@
+Welcome to Demo Restaurant!
+
+Welcome aboard, Jane!
+
+Congratulations! Your account has been successfully created with the role of Customer.
+
+Your Account Security:
+Your account is protected with industry-standard security measures. Always keep your password safe and never share it with others.
+
+Getting Started:
+You can now log in to your account and start using all the features available to you based on your role.
+
+Need Help?
+If you have any questions or need assistance, our support team is here to help. Contact us anytime!
+
+Thank you for joining Demo Restaurant. We're excited to have you on board!
+
+Best regards,
+The Demo Restaurant Team
+
+This is an automated message, please do not reply to this email.
+© {YEAR} Demo Restaurant. All rights reserved.

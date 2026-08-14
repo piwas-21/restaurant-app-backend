@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,17 +9,22 @@ public static partial class EmailTemplates
     /// </summary>
     public static class PasswordChanged
     {
-        public static string GetSubject(EmailBranding brand) => $"Password Changed - {brand.Name}";
+        private const string Set = "PasswordChanged";
 
-        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, DateTime changedAt)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, DateTime changedAt)
         {
+            var t = EmailText.For(culture, Set);
+
             return $@"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Password Changed</title>
+    <title>{t["PageTitle"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -33,53 +40,55 @@ public static partial class EmailTemplates
             <h1>🔐 {brand.Name}</h1>
         </div>
         <div class='content'>
-            <h2>Password Changed Successfully</h2>
-            <p>Hello {firstName} {lastName},</p>
+            <h2>{t["Heading"]}</h2>
+            <p>{t.Format("HelloFullName", EmailHtml.Encode(firstName), EmailHtml.Encode(lastName))}</p>
             <div class='alert'>
-                <strong>✅ Your password has been successfully changed.</strong><br>
-                Changed on: {changedAt:F}
+                <strong>✅ {t["Changed"]}</strong><br>
+                {t["ChangedOnLabel"]} {changedAt:F}
             </div>
-            <p>If you made this change, no further action is required.</p>
-            <p><strong>If you didn't change your password:</strong></p>
+            <p>{t["NoAction"]}</p>
+            <p><strong>{t["IfNotYouLabel"]}</strong></p>
             <ul>
-                <li>Someone else may have access to your account</li>
-                <li>Contact our support team immediately</li>
-                <li>Consider changing your password again</li>
+                <li>{t["IfNotYou1"]}</li>
+                <li>{t["IfNotYou2"]}</li>
+                <li>{t["IfNotYou3"]}</li>
             </ul>
-            <p>For your security, always use a strong, unique password and never share it with others.</p>
-            <p>Best regards,<br>The {brand.Name} Team</p>
+            <p>{t["Advice"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("TheBrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
-            <p>This is an automated message, please do not reply to this email.</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{t["AutomatedMessage"]}</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, DateTime changedAt)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, DateTime changedAt)
         {
-            return $@"{brand.Name} - Password Changed
+            var t = EmailText.For(culture, Set);
 
-Hello {firstName} {lastName},
+            return $@"{brand.Name} - {t["PageTitle"]}
 
-Your password has been successfully changed on {changedAt:F}.
+{t.Format("HelloFullName", firstName, lastName)}
 
-If you made this change, no further action is required.
+{t.Format("ChangedOn", $"{changedAt:F}")}
 
-If you didn't change your password:
-- Someone else may have access to your account
-- Contact our support team immediately
-- Consider changing your password again
+{t["NoAction"]}
 
-For your security, always use a strong, unique password and never share it with others.
+{t["IfNotYouLabel"]}
+- {t["IfNotYou1"]}
+- {t["IfNotYou2"]}
+- {t["IfNotYou3"]}
 
-Best regards,
-The {brand.Name} Team
+{t["Advice"]}
 
-This is an automated message, please do not reply to this email.
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{t["BestRegards"]}
+{t.Format("TheBrandTeam", brand.Name)}
+
+{t["AutomatedMessage"]}
+{Copyright(t, brand)}";
         }
     }
 }

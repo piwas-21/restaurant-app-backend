@@ -1,0 +1,35 @@
+Demo Restaurant - Order Received
+
+ORDER RECEIVED
+
+Dear Jane Doe,
+
+Thank you for your order at Demo Restaurant! We have received your order details.
+
+ORDER NUMBER: ORD-1
+
+PENDING CONFIRMATION
+Your order is currently pending confirmation. We will notify you as soon as the restaurant confirms your order.
+
+Order Type: Delivery
+Total Amount: CHF 25.00
+
+Order Items:
+Burger x2 = CHF 12.50
+Fries x1 = CHF 4.25
+
+Delivery Address:
+Rue de Test 1
+
+Special Instructions:
+No onions
+
+You can track your order status in your account. If you have any questions, please contact us at admin@demo.test
+
+We look forward to serving you!
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

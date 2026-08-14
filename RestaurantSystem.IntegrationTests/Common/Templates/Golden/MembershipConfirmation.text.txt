@@ -1,0 +1,17 @@
+Welcome to Gold Club!
+
+Hello Jane Doe,
+
+You have been successfully added to Gold Club.
+
+Members get 10% off.
+
+Membership Expires: May 17, 2030
+
+Your membership QR code is attached to this email. Show this QR code at the restaurant to receive your member benefits.
+
+QR Code Data: MEMBER-123
+
+---
+Demo Restaurant
+Thank you for being a valued member!

@@ -27,7 +27,7 @@ public class OrderConfirmationAdminLinkTests
 
     private static string Render(string? token = Token, string orderNumber = "ORD-1") =>
         EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            Brand, orderNumber, "Jane Doe", "jane@demo.test", "+41000000", "DineIn", 25.00m, "CHF",
+            EmailCultures.English, Brand, orderNumber, "Jane Doe", "jane@demo.test", "+41000000", "DineIn", 25.00m, "CHF",
             Items, ApiBaseUrl, "https://demo.test", "admin@demo.test", token);
 
     [Theory]

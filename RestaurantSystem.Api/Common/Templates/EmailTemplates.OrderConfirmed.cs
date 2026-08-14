@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,18 +9,17 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderConfirmed
     {
-        public static string GetSubject(EmailBranding brand) => $"Order Confirmed - {brand.Name}";
+        private const string Set = "OrderConfirmed";
 
-        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string contactEmail)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            var orderTypeEmoji = orderType switch
-            {
-                "DineIn" => "🍽️ Dine In",
-                "Takeaway" => "🛍️ Takeaway",
-                "Delivery" => "🚚 Delivery",
-                _ => orderType
-            };
+            var orderTypeEmoji = OrderTypeLabel(t, orderType, withEmoji: true);
+            var minutes = estimatedPreparationMinutes.ToString(CultureInfo.InvariantCulture);
 
             return $@"
 <!DOCTYPE html>
@@ -26,7 +27,7 @@ public static partial class EmailTemplates
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Order Confirmed</title>
+    <title>{t["Heading"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -45,65 +46,61 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <div class='confirmed'>
-                <h2 style='margin: 0; color: #27ae60;'>✅ Order Confirmed!</h2>
+                <h2 style='margin: 0; color: #27ae60;'>✅ {t["Confirmed"]}</h2>
             </div>
 
-            <p>Dear {customerName},</p>
-            <p>Great news! Your order <strong>#{orderNumber}</strong> has been confirmed and is being prepared.</p>
+            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{t.Format("GoodNews", $"<strong>#{orderNumber}</strong>")}</p>
 
             <div class='info-box'>
-                <strong>📦 Order Type:</strong> {orderTypeEmoji}<br>
-                <strong>⏱️ Estimated Preparation Time:</strong> {estimatedPreparationMinutes} minutes
+                <strong>📦 {t["OrderTypeLabel"]}</strong> {orderTypeEmoji}<br>
+                <strong>⏱️ {t["PreparationLabel"]}</strong> {t.Format("Minutes", minutes)}
             </div>
 
-            <p>We will do our best to have your order ready as soon as possible.</p>
+            <p>{t["BestEffort"]}</p>
 
-            <p>If you have any questions, please contact us at {email}</p>
-            <p>We look forward to serving you!</p>
-            <p>Best regards,<br>{brand.Name} Team</p>
+            <p>{t.Format("Questions", email)}</p>
+            <p>{t["LookForward"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
             <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string contactEmail)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, string orderType, int estimatedPreparationMinutes, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            var orderTypeText = orderType switch
-            {
-                "DineIn" => "Dine In",
-                "Takeaway" => "Takeaway",
-                "Delivery" => "Delivery",
-                _ => orderType
-            };
+            var orderTypeText = OrderTypeLabel(t, orderType);
+            var minutes = estimatedPreparationMinutes.ToString(CultureInfo.InvariantCulture);
 
-            return $@"{brand.Name} - Order Confirmed
+            return $@"{brand.Name} - {t["Heading"]}
 
-✅ ORDER CONFIRMED!
+✅ {t["ConfirmedUpper"]}
 
-Dear {customerName},
+{t.Format("Dear", customerName)}
 
-Great news! Your order #{orderNumber} has been confirmed and is being prepared.
+{t.Format("GoodNews", $"#{orderNumber}")}
 
-Order Type: {orderTypeText}
-Estimated Preparation Time: {estimatedPreparationMinutes} minutes
+{t["OrderTypeLabel"]} {orderTypeText}
+{t["PreparationLabel"]} {t.Format("Minutes", minutes)}
 
-We will do our best to have your order ready as soon as possible.
+{t["BestEffort"]}
 
-If you have any questions, please contact us at {email}
+{t.Format("Questions", email)}
 
-We look forward to serving you!
+{t["LookForward"]}
 
-Best regards,
-{brand.Name} Team
+{t["BestRegards"]}
+{t.Format("BrandTeam", brand.Name)}
 
 {brand.Name} | {brand.City} | {email}
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{Copyright(t, brand)}";
         }
     }
 }

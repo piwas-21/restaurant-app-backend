@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -93,7 +94,7 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
             {
                 try
                 {
-                    await _emailService.SendReservationApprovedEmailAsync(
+                    await _emailService.SendReservationApprovedEmailAsync(EmailCultures.English,
                         reservation.CustomerEmail,
                         reservation.CustomerName,
                         table.TableNumber,

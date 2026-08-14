@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Groups.Dtos;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
 using RestaurantSystem.Api.Features.Groups.Mapping;
@@ -85,7 +86,7 @@ public class GroupMembershipService : IGroupMembershipService
         try
         {
             var qrCodeImage = _qrCodeService.GenerateQRCode(uniqueQRCode);
-            await _emailService.SendMembershipConfirmationEmailAsync(
+            await _emailService.SendMembershipConfirmationEmailAsync(EmailCultures.English,
                 user.Email!,
                 $"{user.FirstName} {user.LastName}",
                 group.Name,

@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ForgotPasswordCommand;
@@ -36,7 +37,7 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-        await _emailService.SendPasswordResetEmailAsync(user, token);
+        await _emailService.SendPasswordResetEmailAsync(EmailCultures.English, user, token);
 
         return ApiResponse<string>.SuccessWithData(
             "If the email exists in our system, a password reset link has been sent.",

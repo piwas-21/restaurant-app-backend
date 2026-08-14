@@ -1,0 +1,22 @@
+Demo Restaurant - Order Confirmed
+
+✅ ORDER CONFIRMED!
+
+Dear Jane Doe,
+
+Great news! Your order #ORD-1 has been confirmed and is being prepared.
+
+Order Type: Takeaway
+Estimated Preparation Time: 30 minutes
+
+We will do our best to have your order ready as soon as possible.
+
+If you have any questions, please contact us at admin@demo.test
+
+We look forward to serving you!
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

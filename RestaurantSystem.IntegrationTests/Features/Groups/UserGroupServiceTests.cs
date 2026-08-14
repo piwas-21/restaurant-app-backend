@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Moq;
@@ -335,7 +336,7 @@ public class UserGroupServiceTests : IAsyncLifetime
 
         _emailServiceMock.Verify(
             x => x.SendMembershipConfirmationEmailAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -358,7 +359,7 @@ public class UserGroupServiceTests : IAsyncLifetime
         var emailServiceMock = new Mock<IEmailService>();
         emailServiceMock
             .Setup(x => x.SendMembershipConfirmationEmailAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("smtp exploded"));
 
@@ -429,7 +430,7 @@ public class UserGroupServiceTests : IAsyncLifetime
         var group = await SeedGroupAsync();
         _emailServiceMock
             .Setup(x => x.SendMembershipConfirmationEmailAsync(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("SMTP down"));
 

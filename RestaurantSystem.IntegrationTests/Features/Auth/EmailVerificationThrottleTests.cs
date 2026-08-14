@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using FluentAssertions;
@@ -176,7 +177,7 @@ public class EmailVerificationThrottleTests : IntegrationTestBase
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         _email.Verify(
-            e => e.SendEmailVerificationAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>(), It.IsAny<string?>()),
+            e => e.SendEmailVerificationAsync(It.IsAny<CultureInfo>(), It.IsAny<ApplicationUser>(), It.IsAny<string>(), It.IsAny<string?>()),
             Times.Never());
     }
 
@@ -232,7 +233,7 @@ public class EmailVerificationThrottleTests : IntegrationTestBase
     public async Task A_send_that_throws_still_burns_the_cooldown()
     {
         _email.Setup(e => e.SendEmailVerificationAsync(
-                It.IsAny<ApplicationUser>(), It.IsAny<string>(), It.IsAny<string?>()))
+                It.IsAny<CultureInfo>(), It.IsAny<ApplicationUser>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ThrowsAsync(new InvalidOperationException("provider down"));
 
         var user = await SeedUnverifiedCustomerAsync();
@@ -255,7 +256,7 @@ public class EmailVerificationThrottleTests : IntegrationTestBase
     private void VerifyVerificationMails(Guid userId, Times times, string because = "") =>
         _email.Verify(
             e => e.SendEmailVerificationAsync(
-                It.Is<ApplicationUser>(u => u.Id == userId), It.IsAny<string>(), It.IsAny<string?>()),
+                It.IsAny<CultureInfo>(), It.Is<ApplicationUser>(u => u.Id == userId), It.IsAny<string>(), It.IsAny<string?>()),
             times,
             because);
 

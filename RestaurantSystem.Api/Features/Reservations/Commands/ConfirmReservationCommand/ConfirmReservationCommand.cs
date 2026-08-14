@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -59,7 +60,7 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             // Send confirmation email to customer
             try
             {
-                await _emailService.SendReservationApprovedEmailAsync(
+                await _emailService.SendReservationApprovedEmailAsync(EmailCultures.English,
                     reservation.CustomerEmail,
                     reservation.CustomerName,
                     reservation.Table?.TableNumber ?? "N/A",

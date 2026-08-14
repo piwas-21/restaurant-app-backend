@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,17 +9,23 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderDelayed
     {
-        public static string GetSubject(EmailBranding brand) => $"Action Required: Order Delay - {brand.Name}";
+        private const string Set = "OrderDelayed";
 
-        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
+            var minutes = delayMinutes.ToString(CultureInfo.InvariantCulture);
+
             return $@"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Order Delayed</title>
+    <title>{t["PageTitle"]}</title>
     <meta name='color-scheme' content='light dark'>
     <meta name='supported-color-schemes' content='light dark'>
     <style>
@@ -176,70 +184,73 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <div class='status-icon'>⏳</div>
-            <div class='message-title'>Update on Your Order</div>
+            <div class='message-title'>{t["Heading"]}</div>
 
-            <p>Dear {customerName},</p>
-            <p>Thank you for choosing {brand.Name}! We are currently experiencing high demand, and we want to ensure your meal meets our quality standards.</p>
+            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{t.Format("IntroHtml", brand.Name)}</p>
 
             <div class='order-details'>
-                Order #{orderNumber}
+                {t["OrderLabel"]} #{orderNumber}
             </div>
 
             <div class='info-card'>
-                <div>New Estimated Preparation Time</div>
-                <div class='time-display'>{delayMinutes} Minutes</div>
-                <div>Would you like to proceed?</div>
+                <div>{t["NewEstimate"]}</div>
+                <div class='time-display'>{t.Format("MinutesCapitalised", minutes)}</div>
+                <div>{t["Proceed"]}</div>
             </div>
 
             <div class='actions'>
                 <a href='{approveUrl}' class='btn btn-accept'>
-                    ✅ Accept Delay
+                    ✅ {t["AcceptDelay"]}
                 </a>
                 <a href='{rejectUrl}' class='btn btn-reject'>
-                    ❌ Cancel Order
+                    ❌ {t["CancelOrder"]}
                 </a>
             </div>
 
             <p style='font-size: 0.9em; color: #6b7280; text-align: center;'>
-                If you choose to cancel, you will not be charged.
+                {t["NotCharged"]}
             </p>
         </div>
         <div class='footer'>
             <p>{brand.Name} | {brand.City} | {contactEmail}</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, int delayMinutes, string approveUrl, string rejectUrl, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            return $@"{brand.Name} - Action Required: Order Delay
+            var minutes = delayMinutes.ToString(CultureInfo.InvariantCulture);
 
-Dear {customerName},
+            return $@"{brand.Name} - {t["SubjectShort"]}
 
-Thank you for your order. Due to high demand, we need a bit more time to prepare your delicious meal.
+{t.Format("Dear", customerName)}
 
-Order Number: {orderNumber}
+{t["IntroText"]}
 
-Proposed Preparation Time:
-We estimate your order will be ready in approximately {delayMinutes} minutes.
+{t["OrderNumberLabel"]} {orderNumber}
 
-Please let us know if this works for you:
+{t["ProposedTime"]}
+{t.Format("Estimate", minutes)}
 
-Accept Delay: {approveUrl}
+{t["LetUsKnow"]}
 
-Cancel Order: {rejectUrl}
+{t["AcceptDelay"]}: {approveUrl}
 
-If you choose to cancel, you will not be charged.
+{t["CancelOrder"]}: {rejectUrl}
 
-Best regards,
-{brand.Name} Team
+{t["NotCharged"]}
+
+{t["BestRegards"]}
+{t.Format("BrandTeam", brand.Name)}
 
 {brand.Name} | {brand.City} | {email}
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{Copyright(t, brand)}";
         }
     }
 }

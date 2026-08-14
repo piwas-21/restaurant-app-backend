@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -128,7 +129,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         {
             try
             {
-                await _emailService.SendOrderCancellationEmailAsync(
+                await _emailService.SendOrderCancellationEmailAsync(EmailCultures.English,
                     order.CustomerEmail,
                     order.CustomerName ?? "Customer",
                     order.OrderNumber,
