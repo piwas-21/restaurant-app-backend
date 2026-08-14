@@ -42,7 +42,7 @@ public static partial class EmailTemplates
             var cancelUrl = $"{linkBase}/quick-cancel?{tokenParam}";
             var itemsSection = string.Join("", items.Select(item =>
                 $@"<tr>
-                    <td style='padding: 12px; border-bottom: 1px solid #e5e7eb;'>{item.name}</td>
+                    <td style='padding: 12px; border-bottom: 1px solid #e5e7eb;'>{EmailHtml.Encode(item.name)}</td>
                     <td style='padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;'>×{item.quantity}</td>
                     <td style='padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;'>{currency} {item.price:F2}</td>
                 </tr>"));

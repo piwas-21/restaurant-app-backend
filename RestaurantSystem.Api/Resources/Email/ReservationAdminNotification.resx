@@ -81,6 +81,7 @@
   </data>
   <data name="Dashboard" xml:space="preserve">
     <value>Need to modify details? {0} for advanced management</value>
+    <comment>{0} is the DashboardLink text wrapped in an &lt;a&gt; tag by the template. Keep the placeholder; do not add markup of your own.</comment>
   </data>
   <data name="DashboardLink" xml:space="preserve">
     <value>Open dashboard</value>

@@ -111,7 +111,7 @@ public static partial class EmailTemplates
                     </tr>
                     <tr>
                         <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>{t["TableLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{tableNumber}</td>
+                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
                     </tr>
                 </table>
             </div>
@@ -204,7 +204,7 @@ public static partial class EmailTemplates
                     </tr>
                     <tr>
                         <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>{t["TableLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{tableNumber}</td>
+                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
                     </tr>
                 </table>
             </div>

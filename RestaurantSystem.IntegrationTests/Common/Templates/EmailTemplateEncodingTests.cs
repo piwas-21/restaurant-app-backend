@@ -31,6 +31,51 @@ public class EmailTemplateEncodingTests
         html.Should().Contain(Encoded).And.NotContain(Payload);
     }
 
+    /// <summary>
+    /// <see cref="System.Net.WebUtility.HtmlEncode"/> also escapes non-ASCII, so an accented guest
+    /// name becomes a numeric entity. That is intended and renders identically in a mail client —
+    /// pinned here because the golden fixtures are ASCII-only and would never show it, and because
+    /// the obvious "fix" (switching to a smarter encoder) is a change nobody would otherwise catch.
+    /// The plain-text body keeps the real characters.
+    /// </summary>
+    [Fact]
+    public void An_accented_name_is_escaped_in_html_and_left_alone_in_text()
+    {
+        const string Name = "Zoë Müller";
+
+        var html = EmailTemplates.OrderReceived.GetHtmlBody(
+            EmailCultures.English, Brand, Name, "ORD-1", "Delivery", 25.00m, "CHF", Items,
+            "admin@demo.test", null, null);
+        var text = EmailTemplates.OrderReceived.GetTextBody(
+            EmailCultures.English, Brand, Name, "ORD-1", "Delivery", 25.00m, "CHF", Items,
+            "admin@demo.test", null);
+
+        html.Should().Contain("Zo&#235; M&#252;ller").And.NotContain(Name);
+        text.Should().Contain(Name);
+    }
+
+    /// <summary>
+    /// Item names are typed by the restaurant, not the guest, so this is not the injection path the
+    /// slice was written for — but "Fish &amp; Chips" is an ordinary menu item and it reached both
+    /// the guest receipt and the kitchen alert as a bare ampersand.
+    /// </summary>
+    [Fact]
+    public void A_menu_item_name_is_encoded_in_the_html_tables()
+    {
+        (string name, int quantity, decimal price)[] items = [("Fish & Chips <b>", 1, 9.00m)];
+
+        var receipt = EmailTemplates.OrderReceived.GetHtmlBody(
+            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "Delivery", 9.00m, "CHF", items,
+            "admin@demo.test", null, null);
+        var alert = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
+            EmailCultures.English, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000",
+            "Delivery", 9.00m, "CHF", items, "https://api.demo.test", "https://demo.test",
+            "admin@demo.test", "token", null, null);
+
+        receipt.Should().Contain("Fish &amp; Chips &lt;b&gt;").And.NotContain("Fish & Chips <b>");
+        alert.Should().Contain("Fish &amp; Chips &lt;b&gt;").And.NotContain("Fish & Chips <b>");
+    }
+
     [Fact]
     public void Order_received_leaves_the_plain_text_body_unencoded()
     {

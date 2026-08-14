@@ -60,6 +60,7 @@
   </resheader>
   <data name="AccountCreated" xml:space="preserve">
     <value>Congratulations! Your account has been successfully created with the role of {0}.</value>
+    <comment>{0} is the role name wrapped in &lt;strong&gt; markup by the template. Keep the placeholder; do not add markup of your own.</comment>
   </data>
   <data name="GettingStartedBody" xml:space="preserve">
     <value>You can now log in to your account and start using all the features available to you based on your role.</value>

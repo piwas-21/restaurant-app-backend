@@ -22,7 +22,7 @@ public static partial class EmailTemplates
             var email = contactEmail;
             var itemsSection = string.Join("", items.Select(item =>
                 $@"<tr>
-                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>{item.name}</td>
+                    <td style='padding: 10px; border-bottom: 1px solid #eee;'>{EmailHtml.Encode(item.name)}</td>
                     <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: center;'>x{item.quantity}</td>
                     <td style='padding: 10px; border-bottom: 1px solid #eee; text-align: right;'>{currency} {item.price:F2}</td>
                 </tr>"));

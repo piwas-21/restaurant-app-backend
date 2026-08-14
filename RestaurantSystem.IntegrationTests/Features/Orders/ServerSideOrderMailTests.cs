@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -185,15 +186,25 @@ public class ServerSideOrderMailTests : IntegrationTestBase
 
     // ---- Helpers -----------------------------------------------------------------------------
 
+    /// <remarks>
+    /// The culture is asserted CONCRETELY here, not with <c>It.IsAny</c>, and these two are the
+    /// right place for it: both mails are dispatched from a detached task that resolves its own
+    /// scope, which is exactly where an ambient <c>CurrentUICulture</c> would silently be the
+    /// server's rather than the recipient's (EMAIL-LOCALISATION-PLAN §6.1). With `IsAny` everywhere
+    /// the compiler's "an argument must be present" is the only thing holding S1's contract, and a
+    /// future `null` or an ambient lookup would pass the whole suite. S4 will change the expected
+    /// value here to the order's own language — that is the point.
+    /// </remarks>
     private void VerifyGuestReceipts(Guid orderId, Times times, string? because = null) =>
         _email.Verify(e => e.SendOrderReceivedEmailAsync(
-            It.IsAny<CultureInfo>(), GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
+            EmailCultures.English, GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
             It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
             times, because ?? $"order {orderId}");
 
+    /// <inheritdoc cref="VerifyGuestReceipts"/>
     private void VerifyAdminAlerts(Guid orderId, Times times) =>
         _email.Verify(e => e.SendOrderConfirmationAdminEmailAsync(
-            It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            EmailCultures.English, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
             It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(),
             It.IsAny<string?>(), It.IsAny<string?>()),

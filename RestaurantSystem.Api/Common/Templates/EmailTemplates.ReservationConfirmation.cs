@@ -58,7 +58,7 @@ public static partial class EmailTemplates
                 <strong>📅 {t["DateLabel"]}</strong> {reservationDate:dddd, MMMM dd, yyyy}<br>
                 <strong>🕐 {t["TimeLabel"]}</strong> {startTime:hh':'mm} - {endTime:hh':'mm}<br>
                 <strong>👥 {t["GuestsLabel"]}</strong> {numberOfGuests}<br>
-                <strong>🪑 {t["TableLabel"]}</strong> {tableNumber}
+                <strong>🪑 {t["TableLabel"]}</strong> {EmailHtml.Encode(tableNumber)}
             </div>
 
             {requestsSection}

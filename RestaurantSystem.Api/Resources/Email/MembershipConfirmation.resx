@@ -60,6 +60,7 @@
   </resheader>
   <data name="Added" xml:space="preserve">
     <value>You have been successfully added to {0}.</value>
+    <comment>{0} is the group name wrapped in &lt;strong&gt; markup by the template. Keep the placeholder; do not add markup of your own.</comment>
   </data>
   <data name="ExpiresLabel" xml:space="preserve">
     <value>Membership Expires:</value>
@@ -72,6 +73,7 @@
   </data>
   <data name="QrAlt" xml:space="preserve">
     <value>Membership QR Code</value>
+    <comment>Rendered inside an HTML alt="" attribute. A double quote in this value would break the tag — use none.</comment>
   </data>
   <data name="QrAttached" xml:space="preserve">
     <value>Your membership QR code is attached to this email. Show this QR code at the restaurant to receive your member benefits.</value>
