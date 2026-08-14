@@ -174,13 +174,13 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             await _notifications.NotifyOrderCreatedAsync(orderDto);
             await _notifications.NotifyFocusOrderUpdateAsync(orderDto);
 
-            // Dine-in auto-confirms, so the confirmed-email goes synchronously; Takeaway/Delivery
-            // defer to /send-confirmation-email. An online order confirms at neither — it was held
-            // Pending above, and the settle path sends this same email once Stripe reports payment.
-            if (command.Type == OrderType.DineIn && !paysOnline)
+            // The order's mail is a consequence of the order existing, not of the guest's tab
+            // staying open (GAP-11): guest receipt, restaurant alert, and dine-in's confirmed mail
+            // all go from here. An online order is excluded — it was held Pending above and owes
+            // nobody a confirmation until Stripe reports the money, which the settle path does.
+            if (!paysOnline)
             {
-                await _notifications.SendOrderConfirmedAsync(
-                    order, OrderNotificationService.DefaultDineInPreparationMinutes, cancellationToken);
+                await _notifications.SendNewOrderMailAsync(order, orderDto, cancellationToken);
             }
 
             await _tableReservation.ReserveForDineInAsync(order, cancellationToken);
