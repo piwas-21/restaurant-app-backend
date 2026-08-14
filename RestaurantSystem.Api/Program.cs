@@ -406,6 +406,18 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         }));
 
+    // /api/Auth/send-email-verification — its OWN partition, deliberately NOT the
+    // "forgot-password" bucket: a venue's guests tapping "resend" must never be able to lock that
+    // venue's IP out of password reset. Bombing one inbox is stopped per-address in the handler.
+    options.AddPolicy("email-verification", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.EmailVerificationPermitLimit,
+            Window = TimeSpan.FromHours(rateLimiter.EmailVerificationWindowHours),
+            QueueLimit = 0
+        }));
+
     // /api/User/register/customer
     options.AddPolicy("register", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",

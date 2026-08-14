@@ -71,7 +71,21 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         // Generate tokens
         var token = _tokenService.GenerateAccessToken(newUser);
         newUser.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-        await _userManager.UpdateAsync(newUser);
+        // Registration sends the verification mail below, so it opens the per-address cooldown
+        // too (GAP-3) — otherwise register-then-resend would deliver two mails back to back and
+        // the cooldown would only start on the second. Piggy-backs the update already happening.
+        newUser.LastEmailVerificationSentAt = DateTime.UtcNow;
+        var stamped = await _userManager.UpdateAsync(newUser);
+        if (!stamped.Succeeded)
+        {
+            // Not fatal — the account exists and the mail below still goes out — but if this
+            // update is lost so is the cooldown, and the register screen's own resend button then
+            // delivers a second identical mail. Silence here would make that look like a bug in
+            // the cooldown rather than in this write.
+            _logger.LogWarning(
+                "Post-registration update failed for user {UserId}: {Errors}",
+                newUser.Id, string.Join(", ", stamped.Errors.Select(e => e.Code)));
+        }
 
         // Generate email verification token
         var verificationToken = await _userManager.GenerateEmailConfirmationTokenAsync(newUser);

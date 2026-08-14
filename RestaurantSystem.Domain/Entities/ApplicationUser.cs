@@ -34,6 +34,12 @@ namespace RestaurantSystem.Domain.Entities
 
         public DateTime? DeletionScheduledAt { get; set; }
 
+        // When the last email-verification mail was sent to this address (UTC). Enforces the
+        // per-address cooldown on /api/Auth/send-email-verification, which the per-IP rate limit
+        // alone cannot do: an attacker rotating IPs would otherwise still bomb one known inbox.
+        // Stamped on registration and on every accepted resend.
+        public DateTime? LastEmailVerificationSentAt { get; set; }
+
         public virtual ICollection<UserAddress> Addresses { get; set; } = new List<UserAddress>();
     }
 }
