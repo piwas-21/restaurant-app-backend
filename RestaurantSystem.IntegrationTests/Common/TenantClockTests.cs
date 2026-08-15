@@ -59,9 +59,13 @@ public class TenantClockTests
     {
         var clock = Clock();
 
-        clock.ToTenantTime(SummerInstant).Should().Be(
+        // BeExactly, not Be: DateTimeOffset equality compares the INSTANT, so `.Should().Be()`
+        // passes against a clock that does no conversion at all — the version of this test that
+        // did was green with ToTenantTime returning pure UTC, and green again against a
+        // hardcoded +02:00. The offset is the thing under test here.
+        clock.ToTenantTime(SummerInstant).Should().BeExactly(
             new DateTimeOffset(2030, 5, 17, 21, 30, 0, TimeSpan.FromHours(2)));
-        clock.ToTenantTime(WinterInstant).Should().Be(
+        clock.ToTenantTime(WinterInstant).Should().BeExactly(
             new DateTimeOffset(2030, 1, 17, 20, 30, 0, TimeSpan.FromHours(1)));
     }
 
@@ -70,13 +74,23 @@ public class TenantClockTests
     /// UTC. Reading it as a local time would be a no-op on the container (whose own zone is UTC)
     /// and wrong on a developer's machine — a defect that could only ever be seen off production.
     /// </summary>
-    [Fact]
-    public void An_unspecified_kind_is_read_as_UTC()
+    [Theory]
+    [InlineData(DateTimeKind.Utc)]
+    [InlineData(DateTimeKind.Unspecified)]
+    [InlineData(DateTimeKind.Local)]
+    public void Every_kind_lands_on_the_same_wall_clock(DateTimeKind kind)
     {
-        var clock = Clock();
+        var instant = kind == DateTimeKind.Local
+            ? SummerInstant.ToLocalTime()
+            : DateTime.SpecifyKind(SummerInstant, kind);
 
-        clock.ToTenantTime(DateTime.SpecifyKind(SummerInstant, DateTimeKind.Unspecified))
-            .Should().Be(clock.ToTenantTime(SummerInstant));
+        // A LITERAL, not "the same as the Utc case": comparing the two branches to each other is
+        // a tautology on a UTC-clocked host, which is every CI runner and the container itself —
+        // the assertion would then never fire in the one place it runs. Measured: the earlier
+        // version was green on TZ=UTC with the Unspecified branch deliberately broken, and red
+        // only on TZ=Europe/Zurich.
+        Clock().ToTenantTime(instant).Should().BeExactly(
+            new DateTimeOffset(2030, 5, 17, 21, 30, 0, TimeSpan.FromHours(2)));
     }
 
     /// <summary>

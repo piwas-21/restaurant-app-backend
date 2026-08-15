@@ -8,12 +8,18 @@ namespace RestaurantSystem.Api.Common.Services;
 /// <see cref="ITenantClock"/> over <c>Localization:TimeZone</c>.
 /// </summary>
 /// <remarks>
+/// The runtime image (<c>mcr.microsoft.com/dotnet/aspnet</c>, Ubuntu) carries tzdata, verified on
+/// the running production container — if that ever stops being true this type degrades to
+/// <see cref="TimeZoneInfo.Utc"/> at Warning level, which is #363 again, so the log line at
+/// startup is the thing to check after a base-image change.
+/// <para>
 /// An unknown or unusable zone id logs and falls back to the default rather than throwing: a typo
 /// in one tenant's <c>.env</c> must not stop that tenant booting — the same call
 /// <c>EmailLanguageResolver</c> makes about an unusable language list. The fallback is the
 /// PRODUCT default (<c>Europe/Zurich</c>), not UTC, because falling back to UTC would silently
 /// reintroduce exactly the defect this type exists to fix for every tenant in the only market
 /// there is.
+/// </para>
 /// </remarks>
 public sealed class TenantClock : ITenantClock
 {
@@ -44,10 +50,12 @@ public sealed class TenantClock : ITenantClock
 
     public DateTimeOffset ToTenantTime(DateTime instant)
     {
-        // Unspecified is the shape every DateTime read back out of Npgsql arrives in, and in this
-        // database it always means UTC. Naming that here is what keeps `TimeZoneInfo.ConvertTime`
-        // from treating it as a LOCAL time on the container's own zone (which is UTC, so the bug
-        // would be invisible in production and only appear on a developer's machine).
+        // Npgsql returns Kind=Utc for the `timestamp with time zone` columns this schema uses, so
+        // the branch that matters in production is the first one. The other two are defensive, and
+        // Unspecified means UTC here because every write in this system is `DateTime.UtcNow`.
+        // Naming it keeps `TimeZoneInfo.ConvertTime` from reading such a value as a LOCAL time on
+        // the container's own zone — which IS UTC, so that bug would be invisible in production
+        // and appear only on a developer's machine.
         var utc = instant.Kind switch
         {
             DateTimeKind.Utc => instant,

@@ -23,9 +23,11 @@ public interface ITenantClock
     /// the marker that #363 is about.
     /// </summary>
     /// <param name="instant">
-    /// A UTC instant. <see cref="DateTimeKind.Unspecified"/> is READ AS UTC, which is what this
-    /// database stores (every write is <c>DateTime.UtcNow</c>); a <see cref="DateTimeKind.Local"/>
-    /// value is converted from the machine's zone first.
+    /// A UTC instant. Every column here is <c>timestamp with time zone</c> and Npgsql hands those
+    /// back as <see cref="DateTimeKind.Utc"/>, so the other two kinds are defensive:
+    /// <see cref="DateTimeKind.Unspecified"/> is READ AS UTC (every write in this system is
+    /// <c>DateTime.UtcNow</c>) and a <see cref="DateTimeKind.Local"/> value is converted from the
+    /// machine's zone first.
     /// </param>
     DateTimeOffset ToTenantTime(DateTime instant);
 }
