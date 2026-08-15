@@ -73,6 +73,29 @@ public class TranslatedEmailResourceTests
     }
 
     /// <summary>
+    /// A key that EXISTS and says nothing is the one shape of missing translation the parity test
+    /// cannot see: the lookup finds it, so nothing falls back to English, and the recipient simply
+    /// gets a mail with a line torn out of it.
+    /// </summary>
+    /// <remarks>
+    /// Found by review of S8 rather than by this suite: blanking <c>Common.BestRegards</c> in the
+    /// German set left every guest mail ending "…bewirten zu dürfen.", a blank line, then the team
+    /// name — and all 188 tests stayed green, because the key was present, carried no placeholder
+    /// and contained no markup.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(Translations))]
+    public void No_translation_is_blank(string language, string set)
+    {
+        foreach (var (key, value) in EmailResources.Values(set, CultureInfo.GetCultureInfo(language)))
+        {
+            value.Should().NotBeNullOrWhiteSpace(
+                "{0}.{1} is blank in {2} — the key exists, so nothing falls back to English and the "
+                + "recipient gets a mail with a line missing", set, key, language);
+        }
+    }
+
+    /// <summary>
     /// A resource value is TEXT. The templates interpolate it into HTML without encoding it — that is
     /// what lets the English copy carry the mail's own markup — so a stray tag or brace in a
     /// translation is either injected markup or a format crash.

@@ -62,7 +62,7 @@
     <value>Wir bitten um Entschuldigung für die Umstände</value>
   </data>
   <data name="CannotConfirm" xml:space="preserve">
-    <value>Leider können wir Ihre Reservierung nicht bestätigen, da zu dieser Zeit kein Tisch frei ist.</value>
+    <value>Leider können wir Ihre Reservierung nicht bestätigen. Das kann an der Verfügbarkeit oder an anderen Gründen liegen.</value>
   </data>
   <data name="CannotConfirmUpper" xml:space="preserve">
     <value>BESTÄTIGUNG NICHT MÖGLICH</value>

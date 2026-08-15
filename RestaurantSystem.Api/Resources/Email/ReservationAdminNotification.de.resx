@@ -68,10 +68,10 @@
     <value>Reservierung bestätigen</value>
   </data>
   <data name="ApproveOrReject" xml:space="preserve">
-    <value>Bitte bestätigen oder lehnen Sie diese Reservierungsanfrage ab</value>
+    <value>Bitte bestätigen Sie diese Reservierungsanfrage oder lehnen Sie sie ab</value>
   </data>
   <data name="ApproveOrRejectText" xml:space="preserve">
-    <value>Bitte bestätigen oder lehnen Sie diese Reservierungsanfrage ab.</value>
+    <value>Bitte bestätigen Sie diese Reservierungsanfrage oder lehnen Sie sie ab.</value>
   </data>
   <data name="CustomerInfoTitle" xml:space="preserve">
     <value>Kundeninformationen</value>
@@ -80,7 +80,7 @@
     <value>Kunde:</value>
   </data>
   <data name="Dashboard" xml:space="preserve">
-    <value>Details anpassen? {0} für die erweiterte Verwaltung</value>
+    <value>Möchten Sie Details anpassen? {0} für die erweiterte Verwaltung</value>
   </data>
   <data name="DashboardLink" xml:space="preserve">
     <value>Dashboard öffnen</value>

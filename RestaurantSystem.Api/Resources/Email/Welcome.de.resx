@@ -92,6 +92,6 @@
     <value>Willkommen bei {0}! 🍽️</value>
   </data>
   <data name="ThankYou" xml:space="preserve">
-    <value>Danke, dass Sie zu {0} gefunden haben. Wir freuen uns, Sie an Bord zu haben!</value>
+    <value>Danke, dass Sie sich für {0} entschieden haben. Wir freuen uns, Sie an Bord zu haben!</value>
   </data>
 </root>

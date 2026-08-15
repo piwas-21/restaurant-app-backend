@@ -89,7 +89,7 @@
     <value>Kunde:</value>
   </data>
   <data name="Dashboard" xml:space="preserve">
-    <value>Eine andere Zeit nötig? {0} für eine individuelle Zubereitungszeit</value>
+    <value>Brauchen Sie eine andere Zeit? {0} für eine individuelle Zubereitungszeit</value>
   </data>
   <data name="DashboardLink" xml:space="preserve">
     <value>Dashboard öffnen</value>

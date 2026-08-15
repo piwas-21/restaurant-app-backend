@@ -77,7 +77,7 @@
     <value>Bitte seien Sie pünktlich: Wir halten Ihren Tisch 15 Minuten über die reservierte Zeit hinaus frei.</value>
   </data>
   <data name="Info2" xml:space="preserve">
-    <value>Wenn Sie Ihre Reservierung stornieren oder ändern möchten, melden Sie sich bitte mindestens 24 Stunden im Voraus.</value>
+    <value>Wenn Sie Ihre Reservierung stornieren oder ändern möchten, melden Sie sich bitte mindestens 24 Stunden im Voraus bei uns.</value>
   </data>
   <data name="Info3" xml:space="preserve">
     <value>Sie erreichen uns unter: {0}</value>

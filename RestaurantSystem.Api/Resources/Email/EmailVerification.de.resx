@@ -74,10 +74,10 @@
     <value>Falls Sie kein Konto bei {0} erstellt haben, können Sie diese E-Mail einfach ignorieren.</value>
   </data>
   <data name="IntroHtml" xml:space="preserve">
-    <value>Danke, dass Sie Teil von {0} geworden sind! Wir freuen uns, Sie auf unsere kulinarische Reise mitzunehmen. Bestätigen Sie zum Start bitte Ihre E-Mail-Adresse.</value>
+    <value>Danke, dass Sie Teil von {0} geworden sind! Wir freuen uns, Sie auf unsere kulinarische Reise mitzunehmen. Bitte bestätigen Sie zum Start Ihre E-Mail-Adresse.</value>
   </data>
   <data name="IntroText" xml:space="preserve">
-    <value>Danke, dass Sie Teil von {0} geworden sind! Wir freuen uns, Sie auf unsere kulinarische Reise mitzunehmen. Bestätigen Sie zum Start bitte Ihre E-Mail-Adresse, indem Sie den folgenden Link öffnen:</value>
+    <value>Danke, dass Sie Teil von {0} geworden sind! Wir freuen uns, Sie auf unsere kulinarische Reise mitzunehmen. Bitte bestätigen Sie zum Start Ihre E-Mail-Adresse, indem Sie den folgenden Link öffnen:</value>
   </data>
   <data name="QuickTipLabel" xml:space="preserve">
     <value>Tipp:</value>
