@@ -331,6 +331,14 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantIn
 // install unchanged.
 builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.LocalizationSettings>(builder.Configuration.GetSection("Localization"));
 
+// Which language each mail is written in (EMAIL-LOCALISATION-PLAN §1). Singleton for the same
+// reason ITenantModules is: the configured language set is fixed for the process lifetime, and the
+// per-request part is read through IHttpContextAccessor. Inert until S5 wires it into the send
+// paths — nothing calls it yet, and the unconfigured defaults (all ten languages, `en`) are what
+// the legacy RUMI install will always run with.
+builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver,
+    RestaurantSystem.Api.Common.Services.EmailLanguageResolver>();
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
