@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AcceptDelay" xml:space="preserve">
+    <value>Accepter le délai</value>
+  </data>
+  <data name="CancelOrder" xml:space="preserve">
+    <value>Annuler la commande</value>
+  </data>
+  <data name="Estimate" xml:space="preserve">
+    <value>Nous estimons que votre commande sera prête dans environ {0} minutes.</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>Des nouvelles de votre commande</value>
+  </data>
+  <data name="IntroHtml" xml:space="preserve">
+    <value>Merci d'avoir choisi {0} ! Nous connaissons actuellement une forte affluence et tenons à préparer votre repas avec le soin habituel.</value>
+  </data>
+  <data name="IntroText" xml:space="preserve">
+    <value>Merci pour votre commande. En raison d'une forte affluence, nous avons besoin d'un peu plus de temps pour préparer votre repas.</value>
+  </data>
+  <data name="LetUsKnow" xml:space="preserve">
+    <value>Merci de nous indiquer si cela vous convient :</value>
+  </data>
+  <data name="MinutesCapitalised" xml:space="preserve">
+    <value>{0} minutes</value>
+  </data>
+  <data name="NewEstimate" xml:space="preserve">
+    <value>Nouveau temps de préparation estimé</value>
+  </data>
+  <data name="NotCharged" xml:space="preserve">
+    <value>Si vous choisissez d'annuler, aucun montant ne vous sera facturé.</value>
+  </data>
+  <data name="OrderLabel" xml:space="preserve">
+    <value>Commande</value>
+  </data>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>Numéro de commande :</value>
+  </data>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Commande retardée</value>
+  </data>
+  <data name="Proceed" xml:space="preserve">
+    <value>Souhaitez-vous poursuivre ?</value>
+  </data>
+  <data name="ProposedTime" xml:space="preserve">
+    <value>Temps de préparation proposé :</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Action requise : retard sur votre commande - {0}</value>
+  </data>
+  <data name="SubjectShort" xml:space="preserve">
+    <value>Action requise : retard sur votre commande</value>
+  </data>
+</root>

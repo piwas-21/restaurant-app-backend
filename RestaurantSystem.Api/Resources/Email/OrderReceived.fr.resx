@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ColumnItem" xml:space="preserve">
+    <value>Article</value>
+  </data>
+  <data name="ColumnPrice" xml:space="preserve">
+    <value>Prix</value>
+  </data>
+  <data name="ColumnQty" xml:space="preserve">
+    <value>Qté</value>
+  </data>
+  <data name="DeliveryLabel" xml:space="preserve">
+    <value>Adresse de livraison :</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>Commande reçue</value>
+  </data>
+  <data name="HeadingUpper" xml:space="preserve">
+    <value>COMMANDE REÇUE</value>
+  </data>
+  <data name="InstructionsLabel" xml:space="preserve">
+    <value>Instructions particulières :</value>
+  </data>
+  <data name="ItemsLabel" xml:space="preserve">
+    <value>Articles commandés :</value>
+  </data>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>NUMÉRO DE COMMANDE</value>
+  </data>
+  <data name="OrderTypeLabel" xml:space="preserve">
+    <value>Type de commande :</value>
+  </data>
+  <data name="PendingBody" xml:space="preserve">
+    <value>Votre commande est en attente de confirmation. Nous vous préviendrons dès que le restaurant l'aura confirmée.</value>
+  </data>
+  <data name="PendingTitle" xml:space="preserve">
+    <value>En attente de confirmation</value>
+  </data>
+  <data name="PendingTitleUpper" xml:space="preserve">
+    <value>EN ATTENTE DE CONFIRMATION</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Commande reçue - {0}</value>
+  </data>
+  <data name="ThankYou" xml:space="preserve">
+    <value>Merci pour votre commande chez {0} ! Nous avons bien reçu le détail de votre commande.</value>
+  </data>
+  <data name="TotalLabel" xml:space="preserve">
+    <value>Montant total :</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>Vous pouvez suivre l'état de votre commande depuis votre compte. Pour toute question, écrivez-nous à {0}</value>
+  </data>
+</root>

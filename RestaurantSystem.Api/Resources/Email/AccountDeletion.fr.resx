@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ImportantLabel" xml:space="preserve">
+    <value>Important :</value>
+  </data>
+  <data name="ImportantUpper" xml:space="preserve">
+    <value>IMPORTANT :</value>
+  </data>
+  <data name="NoActionWarning" xml:space="preserve">
+    <value>Si vous ne faites rien, votre compte sera automatiquement supprimé à la date indiquée ci-dessus.</value>
+  </data>
+  <data name="NotYou" xml:space="preserve">
+    <value>Si vous n'êtes pas à l'origine de cette demande, veuillez changer votre mot de passe immédiatement.</value>
+  </data>
+  <data name="Option1BodyHtml" xml:space="preserve">
+    <value>Cliquez sur le bouton ci-dessous pour supprimer définitivement votre compte dès maintenant. Cette action est irréversible.</value>
+  </data>
+  <data name="Option1BodyText" xml:space="preserve">
+    <value>Ouvrez le lien suivant pour supprimer définitivement votre compte dès maintenant. Cette action est irréversible.</value>
+  </data>
+  <data name="Option1Button" xml:space="preserve">
+    <value>Supprimer le compte immédiatement</value>
+  </data>
+  <data name="Option1Title" xml:space="preserve">
+    <value>Option 1 : suppression immédiate</value>
+  </data>
+  <data name="Option2Body" xml:space="preserve">
+    <value>Si vous avez changé d'avis, il vous suffit de vous connecter à votre compte. La demande de suppression sera automatiquement annulée.</value>
+  </data>
+  <data name="Option2Button" xml:space="preserve">
+    <value>Se connecter pour annuler</value>
+  </data>
+  <data name="Option2Title" xml:space="preserve">
+    <value>Option 2 : annuler la suppression</value>
+  </data>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Demande de suppression de compte</value>
+  </data>
+  <data name="Scheduled" xml:space="preserve">
+    <value>Nous avons reçu une demande de suppression de votre compte {0}. Votre compte est programmé pour une suppression définitive le {1}.</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Action requise : demande de suppression de compte - {0}</value>
+  </data>
+  <data name="TwoOptions" xml:space="preserve">
+    <value>Vous avez deux possibilités :</value>
+  </data>
+</root>

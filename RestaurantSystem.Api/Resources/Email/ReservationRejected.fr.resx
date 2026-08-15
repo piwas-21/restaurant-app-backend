@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Apology" xml:space="preserve">
+    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  </data>
+  <data name="CannotConfirm" xml:space="preserve">
+    <value>Nous ne pouvons malheureusement pas confirmer votre réservation, faute de disponibilité ou pour une autre raison.</value>
+  </data>
+  <data name="CannotConfirmUpper" xml:space="preserve">
+    <value>CONFIRMATION IMPOSSIBLE</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>Des nouvelles de votre réservation</value>
+  </data>
+  <data name="HopeToWelcome" xml:space="preserve">
+    <value>Nous espérons vous accueillir prochainement !</value>
+  </data>
+  <data name="Questions" xml:space="preserve">
+    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  </data>
+  <data name="Regret" xml:space="preserve">
+    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  </data>
+  <data name="RequestedLabel" xml:space="preserve">
+    <value>Réservation demandée :</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Des nouvelles de votre réservation - {0}</value>
+  </data>
+  <data name="TryAnother" xml:space="preserve">
+    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  </data>
+</root>
