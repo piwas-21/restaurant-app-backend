@@ -39,4 +39,12 @@ public class LocalizationSettings
     /// <c>en</c>, so a tenant that lists only French never gets an English alert by omission.
     /// </summary>
     public string DefaultLanguage { get; set; } = string.Empty;
+
+    /// <summary>
+    /// IANA timezone the restaurant keeps its wall clock in (<c>TENANT_TIMEZONE</c> -&gt;
+    /// <c>Localization__TimeZone</c>). Blank means <c>Europe/Zurich</c>, which
+    /// <c>WorkingHoursService</c> used to hardcode, so an unconfigured tenant is unchanged.
+    /// Read only through <c>ITenantClock</c>, which owns the fallback for an unknown id.
+    /// </summary>
+    public string TimeZone { get; set; } = string.Empty;
 }

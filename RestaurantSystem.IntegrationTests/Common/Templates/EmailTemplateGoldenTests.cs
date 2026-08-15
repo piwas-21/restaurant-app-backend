@@ -36,6 +36,15 @@ public class EmailTemplateGoldenTests
     private static readonly (string name, int quantity, decimal price)[] Items =
         [("Burger", 2, 12.50m), ("Fries", 1, 4.25m)];
     private static readonly DateTime Moment = new(2030, 5, 17, 19, 30, 0, DateTimeKind.Utc);
+
+    /// <summary>
+    /// The same instant on the tenant's wall clock, which is what a mail prints (#363). The offset
+    /// is fixed rather than resolved from <c>Europe/Zurich</c> on purpose: a golden that asked the
+    /// host for a zone would re-record itself twice a year at the DST boundary, and would render
+    /// differently on a machine whose tzdata is missing.
+    /// </summary>
+    private static readonly DateTimeOffset MomentLocal =
+        new(DateTime.SpecifyKind(Moment.AddHours(2), DateTimeKind.Unspecified), TimeSpan.FromHours(2));
     private static readonly TimeSpan StartTime = new(19, 30, 0);
     private static readonly TimeSpan EndTime = new(21, 0, 0);
     private static readonly Guid ReservationId = new("11111111-2222-3333-4444-555555555555");
@@ -86,8 +95,8 @@ public class EmailTemplateGoldenTests
         yield return ("OrderReceived.html", EmailTemplates.OrderReceived.GetHtmlBody(Culture, Brand, CustomerName, OrderNumber, "Delivery", Total, "CHF", Items, ContactEmail, Instructions, DeliveryAddress));
         yield return ("OrderReceived.text", EmailTemplates.OrderReceived.GetTextBody(Culture, Brand, CustomerName, OrderNumber, "Delivery", Total, "CHF", Items, ContactEmail, Instructions, DeliveryAddress));
         yield return ("PasswordChanged.subject", EmailTemplates.PasswordChanged.GetSubject(Culture, Brand));
-        yield return ("PasswordChanged.html", EmailTemplates.PasswordChanged.GetHtmlBody(Culture, Brand, "Jane", "Doe", Moment));
-        yield return ("PasswordChanged.text", EmailTemplates.PasswordChanged.GetTextBody(Culture, Brand, "Jane", "Doe", Moment));
+        yield return ("PasswordChanged.html", EmailTemplates.PasswordChanged.GetHtmlBody(Culture, Brand, "Jane", "Doe", MomentLocal));
+        yield return ("PasswordChanged.text", EmailTemplates.PasswordChanged.GetTextBody(Culture, Brand, "Jane", "Doe", MomentLocal));
         yield return ("PasswordReset.subject", EmailTemplates.PasswordReset.GetSubject(Culture, Brand));
         yield return ("PasswordReset.html", EmailTemplates.PasswordReset.GetHtmlBody(Culture, Brand, "Jane", "Doe", ResetUrl));
         yield return ("PasswordReset.text", EmailTemplates.PasswordReset.GetTextBody(Culture, Brand, "Jane", "Doe", ResetUrl));

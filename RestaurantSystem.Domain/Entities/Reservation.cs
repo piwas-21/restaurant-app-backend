@@ -13,6 +13,12 @@ public class Reservation : Entity
     public Guid TableId { get; set; }
     public virtual Table Table { get; set; } = null!;
 
+    /// <summary>
+    /// The CALENDAR DAY the guest booked, with <see cref="StartTime"/>/<see cref="EndTime"/> as
+    /// wall-clock times on it. NOT an instant: never run it through <c>ITenantClock</c> (#363).
+    /// The frontend sends UTC midnight of the chosen day, so converting it would move a real
+    /// booking to the previous day for any tenant west of UTC.
+    /// </summary>
     public DateTime ReservationDate { get; set; }
     public TimeSpan StartTime { get; set; }
     public TimeSpan EndTime { get; set; }
