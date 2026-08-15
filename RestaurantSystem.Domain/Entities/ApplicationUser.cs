@@ -40,6 +40,11 @@ namespace RestaurantSystem.Domain.Entities
         // Stamped on registration and on every accepted resend.
         public DateTime? LastEmailVerificationSentAt { get; set; }
 
+        // Language this user's account mails are written in (EMAIL-LOCALISATION-PLAN §1 rank 2).
+        // Canonical primary subtag or null; null means "never expressed one" and falls through to
+        // the request header, then the tenant default. Editable, so it follows the user's choice.
+        public string? PreferredLanguage { get; set; }
+
         public virtual ICollection<UserAddress> Addresses { get; set; } = new List<UserAddress>();
     }
 }
