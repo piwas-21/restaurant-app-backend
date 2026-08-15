@@ -51,10 +51,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Configurations
             builder.Property(r => r.DiscountPercentage)
                 .HasColumnType("decimal(5,2)");
 
-            builder.Property(u => u.PreferredLanguage)
-                .HasMaxLength(LanguageCode.MaxLength);
-
-
+            // The whitelist is enforced HERE, not only on the write path: a handler that assigns
+            // a raw header would otherwise store a value S5 feeds to CultureInfo, or blow the
+            // 10-char column and turn a guest's order into a 500 (Npgsql 22001) inside
+            // SaveChangesAsync. EF does not invoke a reference-type converter for null, so the
+            // "no preference recorded" signal survives.
+            builder.Property(r => r.PreferredLanguage)
+                .HasMaxLength(LanguageCode.MaxLength)
+                .HasConversion(value => LanguageCode.Normalize(value), stored => stored);
         }
     }
 }

@@ -87,7 +87,6 @@ public class Order : SoftDeleteEntity
     // the receipt the guest already has (EMAIL-LOCALISATION-PLAN §1 rank 1, §6.5).
     public string? PreferredLanguage { get; set; }
 
-
     // Navigation properties
     public virtual ApplicationUser? User { get; set; }
     public virtual OrderAddress? DeliveryAddress { get; set; } // One-to-one relationship

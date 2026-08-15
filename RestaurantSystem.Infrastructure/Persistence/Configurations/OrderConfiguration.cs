@@ -36,8 +36,11 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CustomerPhone)
             .HasMaxLength(20);
 
+        // See ApplicationUserConfiguration for why the whitelist is enforced at the persistence
+        // boundary and not only on the write path.
         builder.Property(o => o.PreferredLanguage)
-            .HasMaxLength(LanguageCode.MaxLength);
+            .HasMaxLength(LanguageCode.MaxLength)
+            .HasConversion(value => LanguageCode.Normalize(value), stored => stored);
 
         builder.Property(o => o.SubTotal)
             .HasColumnType("decimal(10,2)");

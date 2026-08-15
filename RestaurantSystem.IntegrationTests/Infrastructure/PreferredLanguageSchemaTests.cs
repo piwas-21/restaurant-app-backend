@@ -90,6 +90,35 @@ public class PreferredLanguageSchemaTests : IntegrationTestBase
         }
 
         down.Split("DropColumn").Length.Should().Be(4, "one DropColumn per added column");
+
+        // Without this, a Down that dropped three columns of some OTHER name would satisfy every
+        // assertion above — the tables would match and the count would match.
+        down.Split("name: \"preferred_language\"").Length.Should().Be(4,
+            "each DropColumn must name the column this migration added");
+    }
+
+    /// <summary>
+    /// The whitelist is enforced by the persistence boundary itself, so a future handler that
+    /// assigns a raw header cannot poison the column. Both directions matter: a value the product
+    /// has no copy for becomes NULL (fall through to the next rank) rather than being stored, and
+    /// an over-long one cannot reach a varchar(10) and turn a guest's order into a 500.
+    /// </summary>
+    [Theory]
+    [InlineData("FR-ch", "fr")]
+    [InlineData("klingon", null)]
+    [InlineData("fr,en;q=0.9", null)]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", null)]
+    public async Task The_column_refuses_anything_that_is_not_a_supported_code(string written, string? stored)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var user = await context.Users.FirstAsync();
+        user.PreferredLanguage = written;
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        (await context.Users.FirstAsync(u => u.Id == user.Id)).PreferredLanguage.Should().Be(stored);
     }
 
     private async Task<ColumnShape?> ColumnAsync(string table)

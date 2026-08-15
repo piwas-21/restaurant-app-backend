@@ -44,8 +44,11 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
         builder.Property(r => r.Notes)
             .HasMaxLength(1000);
 
+        // See ApplicationUserConfiguration for why the whitelist is enforced at the persistence
+        // boundary and not only on the write path.
         builder.Property(r => r.PreferredLanguage)
-            .HasMaxLength(LanguageCode.MaxLength);
+            .HasMaxLength(LanguageCode.MaxLength)
+            .HasConversion(value => LanguageCode.Normalize(value), stored => stored);
 
         // Create indexes for common queries
         builder.HasIndex(r => r.ReservationDate);

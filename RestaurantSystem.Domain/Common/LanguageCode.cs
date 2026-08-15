@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace RestaurantSystem.Domain.Common;
 
 /// <summary>
@@ -26,12 +28,25 @@ public static class LanguageCode
     public static IReadOnlyList<string> Supported { get; } =
         ["ar", "de", "en", "es", "fr", "it", "nl", "ru", "tr", "zh"];
 
+    // Ordinal by construction and O(1): the list above is the published order, this is what
+    // Normalize actually tests against, on a path S4 runs per write and S5 per mail.
+    private static readonly FrozenSet<string> SupportedLookup =
+        Supported.ToFrozenSet(StringComparer.Ordinal);
+
     /// <summary>
     /// The canonical code for <paramref name="value"/>, or <c>null</c> when it is blank,
     /// malformed, or a language the product has no copy for. Null means "no preference
     /// recorded" and lets the caller fall through to the next rank of §1 — it is never an
     /// error, so a guest sending a header nobody translated still gets a mail.
     /// </summary>
+    /// <remarks>
+    /// Strictly ONE tag. An <c>Accept-Language</c> header is a weighted <em>list</em> and is
+    /// rejected here rather than half-understood: truncating at the first separator turns
+    /// <c>"fr-CH,fr;q=0.9,en"</c> into <c>fr</c> — which looks right — while <c>"fr,en;q=0.9"</c>,
+    /// the equally common region-less form, would parse as nothing at all and silently lose the
+    /// guest's language. Choosing between the entries of a list is
+    /// <c>IEmailLanguageResolver</c>'s job, because only it knows what the tenant supports.
+    /// </remarks>
     public static string? Normalize(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -41,7 +56,14 @@ public static class LanguageCode
 
         var candidate = value.Trim();
 
-        // "fr-CH", "fr_CH" and the private-use "x-…" forms all reduce to their first subtag.
+        // A list, a quality parameter or embedded whitespace means the caller handed over
+        // something that is not a single language tag. Refuse it whole.
+        if (candidate.Any(character => character is ',' or ';' || char.IsWhiteSpace(character)))
+        {
+            return null;
+        }
+
+        // "fr-CH", "fr_CH" and "zh-Hans-CN" all reduce to their first subtag.
         var separator = candidate.IndexOfAny(['-', '_']);
         if (separator >= 0)
         {
@@ -50,6 +72,6 @@ public static class LanguageCode
 
         candidate = candidate.ToLowerInvariant();
 
-        return Supported.Contains(candidate) ? candidate : null;
+        return SupportedLookup.Contains(candidate) ? candidate : null;
     }
 }
