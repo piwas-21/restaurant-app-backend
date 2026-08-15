@@ -331,6 +331,14 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.RestaurantIn
 // install unchanged.
 builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.LocalizationSettings>(builder.Configuration.GetSection("Localization"));
 
+// Which language each mail is written in (EMAIL-LOCALISATION-PLAN §1). Singleton for the same
+// reason ITenantModules is: the configured language set is fixed for the process lifetime, and the
+// per-request part is read through IHttpContextAccessor. Inert until S5 wires it into the send
+// paths — nothing calls it yet, and the unconfigured defaults (all ten languages, `en`) are what
+// the legacy RUMI install will always run with.
+builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver,
+    RestaurantSystem.Api.Common.Services.EmailLanguageResolver>();
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
@@ -598,6 +606,12 @@ var app = builder.Build();
 // hours after boot or never — and that line is the only operator-visible confirmation that a
 // re-provision + restart actually took effect. It belongs in the startup log where it is read.
 app.Services.GetRequiredService<ITenantModules>();
+
+// Same reasoning for the email language set: a lazy singleton would first be constructed by
+// whichever mail happens to be sent first, so the effective-languages line — and the warning about
+// a mangled Localization__SupportedLanguages — would appear hours after boot or never. That is the
+// wrong place to learn that a tenant is running with all ten languages because its key never bound.
+app.Services.GetRequiredService<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver>();
 
 app.MapDefaultEndpoints();
 
