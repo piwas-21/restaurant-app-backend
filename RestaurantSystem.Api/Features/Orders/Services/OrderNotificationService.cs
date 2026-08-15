@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -17,6 +19,7 @@ public class OrderNotificationService : IOrderNotificationService
     private readonly IOrderEventService _orderEventService;
     private readonly IGuestOrderReceiptSender _receipts;
     private readonly IAdminOrderAlertSender _adminAlerts;
+    private readonly EmailSettings _emailSettings;
     private readonly ILogger<OrderNotificationService> _logger;
 
     public OrderNotificationService(
@@ -25,10 +28,14 @@ public class OrderNotificationService : IOrderNotificationService
         IOrderEventService orderEventService,
         IGuestOrderReceiptSender receipts,
         IAdminOrderAlertSender adminAlerts,
+        IOptions<EmailSettings> emailSettings,
         ILogger<OrderNotificationService> logger)
     {
+        ArgumentNullException.ThrowIfNull(emailSettings);
+
         _emailService = emailService;
         _languages = languages;
+        _emailSettings = emailSettings.Value;
         _orderEventService = orderEventService;
         _receipts = receipts;
         _adminAlerts = adminAlerts;
@@ -67,6 +74,39 @@ public class OrderNotificationService : IOrderNotificationService
             // Order creation must not fail because email did — preserved
             // verbatim from the inline handler block.
             _logger.LogError(ex, "Failed to send order-confirmed email for order {OrderNumber}", order.OrderNumber);
+        }
+    }
+
+    public async Task SendOrderDelayedAsync(Order order, int delayMinutes, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        if (string.IsNullOrEmpty(order.CustomerEmail))
+        {
+            return;
+        }
+
+        try
+        {
+            // The order's own language (§1 rank 1). A delay is announced by staff, so the request
+            // this runs on is the restaurant's, not the guest's (§6.10).
+            var baseUrl = _emailSettings.BackendBaseUrl;
+
+            await _emailService.SendOrderDelayedEmailAsync(
+                _languages.ForGuest(order.PreferredLanguage),
+                order.CustomerEmail,
+                order.CustomerName ?? FallbackCustomerName,
+                order.OrderNumber,
+                delayMinutes,
+                $"{baseUrl}/api/orders/{order.Id}/approve-delay",
+                $"{baseUrl}/api/orders/{order.Id}/reject-delay");
+
+            _logger.LogInformation("Sent order-delayed email for order {OrderNumber}", order.OrderNumber);
+        }
+        catch (Exception ex)
+        {
+            // A status change that is already saved must not fail over a mail.
+            _logger.LogError(ex, "Failed to send order delayed email for order {OrderNumber}", order.OrderNumber);
         }
     }
 
