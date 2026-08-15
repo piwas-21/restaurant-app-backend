@@ -339,6 +339,11 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.Localization
 builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver,
     RestaurantSystem.Api.Common.Services.EmailLanguageResolver>();
 
+// Freezes that language onto the row being created (S4). Scoped, unlike the resolver: it reads the
+// account's stored preference from the request's DbContext.
+builder.Services.AddScoped<RestaurantSystem.Api.Common.Services.Interfaces.IPreferredLanguageCapture,
+    RestaurantSystem.Api.Common.Services.PreferredLanguageCapture>();
+
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
 
@@ -533,6 +538,9 @@ builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
+builder.Services.AddScoped<IOrderFactory, OrderFactory>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationCreatedMailer,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationCreatedMailer>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();

@@ -4,16 +4,25 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.User.Dtos;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.User.Commands.UpdateUserProfileCommand;
 
+/// <param name="PreferredLanguage">
+/// The language this account's mails are written in (§1 rank 2). ABSENT MEANS UNCHANGED — a client
+/// that does not know about this field, which is every client until S6, must not clear a preference
+/// the user set. Validated against the supported set, so a wrong value is a 400 rather than a
+/// silently ignored one: unlike a browser header, this is a deliberate choice and dropping it
+/// quietly would look like the setting does not stick.
+/// </param>
 public record UpdateUserProfileCommand(
     string FirstName,
     string LastName,
     string? PhoneNumber,
-    Dictionary<string, string>? Metadata) : ICommand<ApiResponse<UserDto>>;
+    Dictionary<string, string>? Metadata,
+    string? PreferredLanguage = null) : ICommand<ApiResponse<UserDto>>;
 public class UpdateUserProfileCommandHandler : ICommandHandler<UpdateUserProfileCommand, ApiResponse<UserDto>>
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -57,6 +66,15 @@ public class UpdateUserProfileCommandHandler : ICommandHandler<UpdateUserProfile
         if (!string.IsNullOrEmpty(command.PhoneNumber))
         {
             user.PhoneNumber = command.PhoneNumber;
+        }
+
+        // Pattern-matched rather than assigned straight: Normalize is nullable, and the only thing
+        // keeping an unsupported value from CLEARING a preference here is the validator. An
+        // internal caller that bypasses the pipeline would otherwise null out the very setting this
+        // endpoint exists to keep.
+        if (LanguageCode.Normalize(command.PreferredLanguage) is { } language)
+        {
+            user.PreferredLanguage = language;
         }
 
         if (command.Metadata != null)
@@ -103,7 +121,10 @@ public class UpdateUserProfileCommandHandler : ICommandHandler<UpdateUserProfile
             Metadata = user.Metadata,
             OrderLimitAmount = user.OrderLimitAmount,
             DiscountPercentage = user.DiscountPercentage,
-            IsDiscountActive = user.IsDiscountActive
+            IsDiscountActive = user.IsDiscountActive,
+            // Returned so the write can be confirmed and so a language selector has something to
+            // initialise from — without it the field is write-only over HTTP.
+            PreferredLanguage = user.PreferredLanguage
         };
     }
 }

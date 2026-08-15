@@ -73,7 +73,8 @@ public class GetProductsQueryHandler : IQueryHandler<GetUsersQuery, ApiResponse<
                 Metadata = u.Metadata ?? new Dictionary<string, string>(),
                 OrderLimitAmount = u.OrderLimitAmount,
                 DiscountPercentage = u.DiscountPercentage,
-                IsDiscountActive = u.IsDiscountActive
+                IsDiscountActive = u.IsDiscountActive,
+                PreferredLanguage = u.PreferredLanguage
             }).ToListAsync(cancellationToken);
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);

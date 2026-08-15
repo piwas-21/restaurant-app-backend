@@ -99,7 +99,8 @@ public class UpdateUserDiscountsCommandHandler : ICommandHandler<UpdateUserDisco
             Metadata = user.Metadata,
             OrderLimitAmount = user.OrderLimitAmount,
             DiscountPercentage = user.DiscountPercentage,
-            IsDiscountActive = user.IsDiscountActive
+            IsDiscountActive = user.IsDiscountActive,
+            PreferredLanguage = user.PreferredLanguage
         };
     }
 }

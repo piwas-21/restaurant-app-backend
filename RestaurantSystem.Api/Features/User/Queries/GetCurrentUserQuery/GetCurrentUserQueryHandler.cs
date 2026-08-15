@@ -49,7 +49,8 @@ public class GetCurrentUserQueryHandler : IQueryHandler<GetCurrentUserQuery, Api
                 Metadata = u.Metadata ?? new Dictionary<string, string>(),
                 OrderLimitAmount = u.OrderLimitAmount,
                 DiscountPercentage = u.DiscountPercentage,
-                IsDiscountActive = u.IsDiscountActive
+                IsDiscountActive = u.IsDiscountActive,
+                PreferredLanguage = u.PreferredLanguage
             })
             .FirstOrDefaultAsync(cancellationToken);
 
