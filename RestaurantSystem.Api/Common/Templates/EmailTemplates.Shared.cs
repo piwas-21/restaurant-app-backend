@@ -64,18 +64,34 @@ public static partial class EmailTemplates
     internal static string LongDate(DateTime value, CultureInfo culture) => value.ToString("D", culture);
 
     /// <summary>
-    /// A date and time a guest reads: the localised date, then a 24-hour clock.
+    /// A date and time a guest reads: the localised date, a 24-hour clock, and the offset the
+    /// clock is on — "Friday, 17 May 2030 21:30 (UTC+02:00)".
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The clock is deliberately NOT the culture's short-time pattern, which would render
     /// <c>7:30 PM</c> for English — every other time in the corpus is a 24-hour
     /// <c>19:30 - 21:00</c> built from a <c>TimeSpan</c>, and one mail disagreeing with the rest
     /// about how to write a clock is worse than either convention. The seconds are gone with it:
-    /// "changed at 19:30:00" told a human nothing. There is still no timezone marker — that half of
-    /// the defect is #363.
+    /// "changed at 19:30:00" told a human nothing.
+    /// </para>
+    /// <para>
+    /// The argument is a <see cref="DateTimeOffset"/> and not a <see cref="DateTime"/> BECAUSE of
+    /// #363: this used to be handed <c>DateTime.UtcNow</c>, so a guest in Geneva read a UTC time
+    /// as if it were the time on their own clock, one or two hours out and marked as nothing at
+    /// all. The conversion belongs to <c>ITenantClock</c> at the send site; making the parameter
+    /// an offset is what stops a caller silently passing a bare UTC instant again.
+    /// </para>
+    /// <para>
+    /// The marker is a numeric offset rather than an abbreviation: .NET has no localised "CEST",
+    /// and the English zone names it does have would be a third language inside a German mail.
+    /// <c>zzz</c> is the offset the value carries, so it is already DST-correct for the instant.
+    /// </para>
     /// </remarks>
-    internal static string LongDateTime(DateTime value, CultureInfo culture) =>
-        $"{LongDate(value, culture)} {value.ToString("HH:mm", CultureInfo.InvariantCulture)}";
+    internal static string LongDateTime(DateTimeOffset value, CultureInfo culture) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{LongDate(value.DateTime, culture)} {value:HH:mm} (UTC{value:zzz})");
 
     /// <summary>
     /// Human label for an account role. The argument is a <c>UserRole</c> enum name, so without this

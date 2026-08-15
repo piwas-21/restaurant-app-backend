@@ -19,6 +19,7 @@ public class EmailService : IEmailService
     private readonly LocalizationSettings _localizationSettings;
     private readonly IEmailSender _emailSender;
     private readonly IEmailBrandingProvider _brandingProvider;
+    private readonly ITenantClock _clock;
     private readonly ILogger<EmailService> _logger;
 
     public EmailService(
@@ -26,12 +27,14 @@ public class EmailService : IEmailService
         IOptions<LocalizationSettings> localizationSettings,
         IEmailSender emailSender,
         IEmailBrandingProvider brandingProvider,
+        ITenantClock clock,
         ILogger<EmailService> logger)
     {
         _emailSettings = emailSettings.Value;
         _localizationSettings = localizationSettings.Value;
         _emailSender = emailSender;
         _brandingProvider = brandingProvider;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -112,9 +115,16 @@ public class EmailService : IEmailService
         try
         {
             var brand = await _brandingProvider.GetAsync();
+
+            // ONE reading of the clock for both bodies. Two calls to DateTime.UtcNow can straddle a
+            // minute boundary, which is a mail whose HTML and plain-text halves disagree about when
+            // the password changed — on the one mail whose entire job is to let a user say "that
+            // was not me".
+            var changedAt = _clock.Now;
+
             var subject = EmailTemplates.PasswordChanged.GetSubject(culture, brand);
-            var htmlBody = EmailTemplates.PasswordChanged.GetHtmlBody(culture, brand, user.FirstName, user.LastName, DateTime.UtcNow);
-            var textBody = EmailTemplates.PasswordChanged.GetTextBody(culture, brand, user.FirstName, user.LastName, DateTime.UtcNow);
+            var htmlBody = EmailTemplates.PasswordChanged.GetHtmlBody(culture, brand, user.FirstName, user.LastName, changedAt);
+            var textBody = EmailTemplates.PasswordChanged.GetTextBody(culture, brand, user.FirstName, user.LastName, changedAt);
 
             await SendEmailAsync(user.Email!, subject, htmlBody, textBody);
 
@@ -406,9 +416,16 @@ public class EmailService : IEmailService
         try
         {
             var brand = await _brandingProvider.GetAsync();
+
+            // A DAY, on the restaurant's calendar. The stored value is `DateTime.UtcNow.AddDays(30)`,
+            // so late-evening local requests fall on the NEXT UTC day and the mail named a date one
+            // later than the account actually survives to. No offset marker: a bare date carries a
+            // clock nobody promised, and the sweep is a background job with hours of slack anyway.
+            var deletionDay = _clock.ToTenantTime(scheduledDeletionDate).Date;
+
             var subject = EmailTemplates.AccountDeletion.GetSubject(culture, brand);
-            var htmlBody = EmailTemplates.AccountDeletion.GetHtmlBody(culture, brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
-            var textBody = EmailTemplates.AccountDeletion.GetTextBody(culture, brand, firstName, lastName, deleteUrl, cancelUrl, scheduledDeletionDate);
+            var htmlBody = EmailTemplates.AccountDeletion.GetHtmlBody(culture, brand, firstName, lastName, deleteUrl, cancelUrl, deletionDay);
+            var textBody = EmailTemplates.AccountDeletion.GetTextBody(culture, brand, firstName, lastName, deleteUrl, cancelUrl, deletionDay);
 
             await SendEmailAsync(toEmail, subject, htmlBody, textBody);
 
