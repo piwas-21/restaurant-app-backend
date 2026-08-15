@@ -39,10 +39,15 @@ public static partial class EmailTemplates
     /// <param name="encode">
     /// HTML bodies encode the name (it is guest-supplied, §6.3); text bodies must not.
     /// </param>
-    internal static string Greeting(EmailText text, string key, string? name, bool encode = false) =>
-        string.IsNullOrWhiteSpace(name)
-            ? text["GreetingNoName"]
-            : text.Format(key, encode ? EmailHtml.Encode(name) : name);
+    internal static string Greeting(EmailText text, string key, string? name, bool encode = false)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return text["GreetingNoName"];
+        }
+
+        return text.Format(key, encode ? EmailHtml.Encode(name) : name);
+    }
 
     /// <summary>
     /// A date a guest reads, in the language the mail is written in — "Friday, 21 August 2026" /
