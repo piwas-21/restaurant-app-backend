@@ -14,7 +14,7 @@ public static partial class EmailTemplates
         public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
-        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, DateTime changedAt)
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, DateTimeOffset changedAt)
         {
             var t = EmailText.For(culture, Set);
 
@@ -65,7 +65,7 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, DateTime changedAt)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, DateTimeOffset changedAt)
         {
             var t = EmailText.For(culture, Set);
 

@@ -339,6 +339,11 @@ builder.Services.Configure<RestaurantSystem.Infrastructure.Settings.Localization
 builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver,
     RestaurantSystem.Api.Common.Services.EmailLanguageResolver>();
 
+// Which wall clock a human-readable time is printed on (#363). Singleton for the same reason as the
+// language resolver: one tenant per container, so the zone is fixed for the process lifetime.
+builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.ITenantClock,
+    RestaurantSystem.Api.Common.Services.TenantClock>();
+
 // Freezes that language onto the row being created (S4). Scoped, unlike the resolver: it reads the
 // account's stored preference from the request's DbContext.
 builder.Services.AddScoped<RestaurantSystem.Api.Common.Services.Interfaces.IPreferredLanguageCapture,
@@ -620,6 +625,11 @@ app.Services.GetRequiredService<ITenantModules>();
 // a mangled Localization__SupportedLanguages — would appear hours after boot or never. That is the
 // wrong place to learn that a tenant is running with all ten languages because its key never bound.
 app.Services.GetRequiredService<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver>();
+
+// And the same for the timezone: a mail printing the wrong hour is a support ticket, so the zone the
+// container actually resolved — including the fallback warning for a typo'd id — belongs in the
+// startup log rather than in the first password-change mail of the month.
+app.Services.GetRequiredService<RestaurantSystem.Api.Common.Services.Interfaces.ITenantClock>();
 
 app.MapDefaultEndpoints();
 

@@ -11,13 +11,16 @@ public class WorkingHoursService : IWorkingHoursService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ITenantClock _clock;
 
     public WorkingHoursService(
         ApplicationDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        ITenantClock clock)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _clock = clock;
     }
 
     public async Task<List<WorkingHoursDto>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -92,8 +95,10 @@ public class WorkingHoursService : IWorkingHoursService
 
     public async Task<bool> IsOpenNowAsync(CancellationToken cancellationToken = default)
     {
-        var now = DateTime.UtcNow;
-        var localTime = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Zurich"));
+        // The zone is the tenant's configuration, not a constant: this line used to hardcode
+        // "Europe/Zurich", which answers "are we open" on Geneva's clock for every tenant the
+        // platform ever provisions (#363).
+        var localTime = _clock.Now;
         var currentDay = localTime.DayOfWeek;
         var currentTime = localTime.TimeOfDay;
 
@@ -108,9 +113,7 @@ public class WorkingHoursService : IWorkingHoursService
 
     public async Task<WorkingHoursDto?> GetTodayHoursAsync(CancellationToken cancellationToken = default)
     {
-        var now = DateTime.UtcNow;
-        var localTime = TimeZoneInfo.ConvertTimeFromUtc(now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Zurich"));
-        var currentDay = localTime.DayOfWeek;
+        var currentDay = _clock.Now.DayOfWeek;
 
         return await GetByDayAsync(currentDay, cancellationToken);
     }
