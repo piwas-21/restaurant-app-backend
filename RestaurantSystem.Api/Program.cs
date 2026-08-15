@@ -607,6 +607,12 @@ var app = builder.Build();
 // re-provision + restart actually took effect. It belongs in the startup log where it is read.
 app.Services.GetRequiredService<ITenantModules>();
 
+// Same reasoning for the email language set: a lazy singleton would first be constructed by
+// whichever mail happens to be sent first, so the effective-languages line — and the warning about
+// a mangled Localization__SupportedLanguages — would appear hours after boot or never. That is the
+// wrong place to learn that a tenant is running with all ten languages because its key never bound.
+app.Services.GetRequiredService<RestaurantSystem.Api.Common.Services.Interfaces.IEmailLanguageResolver>();
+
 app.MapDefaultEndpoints();
 
 // Configure the HTTP request pipeline.
