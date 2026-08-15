@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -42,6 +43,9 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
 
         builder.Property(r => r.Notes)
             .HasMaxLength(1000);
+
+        builder.Property(r => r.PreferredLanguage)
+            .HasMaxLength(LanguageCode.MaxLength);
 
         // Create indexes for common queries
         builder.HasIndex(r => r.ReservationDate);

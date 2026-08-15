@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -34,6 +35,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.CustomerPhone)
             .HasMaxLength(20);
+
+        builder.Property(o => o.PreferredLanguage)
+            .HasMaxLength(LanguageCode.MaxLength);
 
         builder.Property(o => o.SubTotal)
             .HasColumnType("decimal(10,2)");
