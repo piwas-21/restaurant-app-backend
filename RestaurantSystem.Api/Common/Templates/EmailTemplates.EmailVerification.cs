@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,10 +9,16 @@ public static partial class EmailTemplates
     /// </summary>
     public static class EmailVerification
     {
-        public static string GetSubject(EmailBranding brand) => $"Verify Your Email - {brand.Name}";
+        private const string Set = "EmailVerification";
 
-        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string verificationUrl)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string verificationUrl)
         {
+            var t = EmailText.For(culture, Set);
+            var fullName = $"{EmailHtml.Encode(firstName)} {EmailHtml.Encode(lastName)}";
+
             return $@"
 <!DOCTYPE html>
 <html lang='en'>
@@ -18,7 +26,7 @@ public static partial class EmailTemplates
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>Verify Your Email - {brand.Name}</title>
+    <title>{t.Format("Subject", brand.Name)}</title>
     <!--[if mso]>
     <style type='text/css'>
         body, table, td {{font-family: Arial, Helvetica, sans-serif !important;}}
@@ -55,15 +63,15 @@ public static partial class EmailTemplates
                             <table role='presentation' cellspacing='0' cellpadding='0' border='0' width='100%'>
                                 <tr>
                                     <td>
-                                        <h2 style='margin: 0 0 20px; color: #1f2937; font-size: 26px; font-weight: 700; line-height: 1.3;'>Welcome to {brand.Name}! 🎉</h2>
-                                        <p style='margin: 0 0 16px; color: #4b5563; font-size: 16px; line-height: 1.6;'>Hello <strong style='color: #c79063;'>{firstName} {lastName}</strong>,</p>
-                                        <p style='margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;'>Thank you for joining the {brand.Name} family! We're excited to have you experience our culinary journey. To get started, please verify your email address.</p>
+                                        <h2 style='margin: 0 0 20px; color: #1f2937; font-size: 26px; font-weight: 700; line-height: 1.3;'>{t.Format("Heading", brand.Name)}</h2>
+                                        <p style='margin: 0 0 16px; color: #4b5563; font-size: 16px; line-height: 1.6;'>{t.Format("Hello", $"<strong style='color: #c79063;'>{fullName}</strong>")}</p>
+                                        <p style='margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;'>{t.Format("IntroHtml", brand.Name)}</p>
 
                                         <!-- Verification Button -->
                                         <table role='presentation' cellspacing='0' cellpadding='0' border='0' width='100%'>
                                             <tr>
                                                 <td style='text-align: center; padding: 30px 0;'>
-                                                    <a href='{verificationUrl}' style='display: inline-block; padding: 16px 48px; background: linear-gradient(135deg, #c79063 0%, #a67c52 100%); color: #ffffff; text-decoration: none; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(199, 144, 99, 0.4); transition: all 0.3s ease;'>✓ Verify My Email</a>
+                                                    <a href='{verificationUrl}' style='display: inline-block; padding: 16px 48px; background: linear-gradient(135deg, #c79063 0%, #a67c52 100%); color: #ffffff; text-decoration: none; border-radius: 50px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(199, 144, 99, 0.4); transition: all 0.3s ease;'>✓ {t["VerifyButton"]}</a>
                                                 </td>
                                             </tr>
                                         </table>
@@ -72,7 +80,7 @@ public static partial class EmailTemplates
                                         <table role='presentation' cellspacing='0' cellpadding='0' border='0' width='100%' style='margin: 30px 0;'>
                                             <tr>
                                                 <td style='border-top: 1px solid #e5e7eb; padding-top: 30px;'>
-                                                    <p style='margin: 0 0 12px; color: #6b7280; font-size: 14px; line-height: 1.5;'><strong>Or copy and paste this link:</strong></p>
+                                                    <p style='margin: 0 0 12px; color: #6b7280; font-size: 14px; line-height: 1.5;'><strong>{t["CopyLink"]}</strong></p>
                                                     <div style='background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; word-break: break-all;'>
                                                         <a href='{verificationUrl}' style='color: #c79063; text-decoration: none; font-size: 13px;'>{verificationUrl}</a>
                                                     </div>
@@ -84,14 +92,14 @@ public static partial class EmailTemplates
                                         <table role='presentation' cellspacing='0' cellpadding='0' border='0' width='100%' style='margin-top: 30px;'>
                                             <tr>
                                                 <td style='background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px;'>
-                                                    <p style='margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;'><strong>⏰ Quick Tip:</strong> This verification link will expire in 24 hours for security reasons. If you didn't create an account with {brand.Name}, you can safely ignore this email.</p>
+                                                    <p style='margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;'><strong>⏰ {t["QuickTipLabel"]}</strong> {t["Expiry"]} {t.Format("IgnoreEmail", brand.Name)}</p>
                                                 </td>
                                             </tr>
                                         </table>
 
                                         <!-- Closing -->
-                                        <p style='margin: 30px 0 0; color: #4b5563; font-size: 16px; line-height: 1.6;'>We can't wait to serve you!</p>
-                                        <p style='margin: 8px 0 0; color: #4b5563; font-size: 16px; line-height: 1.6;'><strong style='color: #c79063;'>The {brand.Name} Team</strong></p>
+                                        <p style='margin: 30px 0 0; color: #4b5563; font-size: 16px; line-height: 1.6;'>{t["Closing"]}</p>
+                                        <p style='margin: 8px 0 0; color: #4b5563; font-size: 16px; line-height: 1.6;'><strong style='color: #c79063;'>{t.Format("TheBrandTeam", brand.Name)}</strong></p>
                                     </td>
                                 </tr>
                             </table>
@@ -105,9 +113,9 @@ public static partial class EmailTemplates
                                 <tr>
                                     <td style='text-align: center;'>
                                         <p style='margin: 0 0 12px; color: #6b7280; font-size: 13px; line-height: 1.5;'>📍 {brand.City}</p>
-                                        <p style='margin: 0 0 20px; color: #9ca3af; font-size: 12px; line-height: 1.5;'>This is an automated message, please do not reply to this email.</p>
+                                        <p style='margin: 0 0 20px; color: #9ca3af; font-size: 12px; line-height: 1.5;'>{t["AutomatedMessage"]}</p>
                                         <div style='border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px;'>
-                                            <p style='margin: 0; color: #9ca3af; font-size: 11px;'>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+                                            <p style='margin: 0; color: #9ca3af; font-size: 11px;'>{Copyright(t, brand)}</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -122,32 +130,34 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string verificationUrl)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string verificationUrl)
         {
-            return $@"{brand.Name.ToUpperInvariant()} - Email Verification
+            var t = EmailText.For(culture, Set);
+
+            return $@"{brand.Name.ToUpperInvariant()} - {t["TextHeading"]}
 ═══════════════════════════════════════
 
-Welcome to {brand.Name}! 🎉
+{t.Format("Heading", brand.Name)}
 
-Hello {firstName} {lastName},
+{t.Format("Hello", $"{firstName} {lastName}")}
 
-Thank you for joining the {brand.Name} family! We're excited to have you experience our culinary journey. To get started, please verify your email address by visiting the following link:
+{t.Format("IntroText", brand.Name)}
 
 {verificationUrl}
 
-⏰ Quick Tip: This verification link will expire in 24 hours for security reasons.
+⏰ {t["QuickTipLabel"]} {t["Expiry"]}
 
-If you didn't create an account with {brand.Name}, you can safely ignore this email.
+{t.Format("IgnoreEmail", brand.Name)}
 
-We can't wait to serve you!
+{t["Closing"]}
 
-The {brand.Name} Team
+{t.Format("TheBrandTeam", brand.Name)}
 
 ───────────────────────────────────────
 📍 {brand.City}
 
-This is an automated message, please do not reply to this email.
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{t["AutomatedMessage"]}
+{Copyright(t, brand)}";
         }
     }
 }

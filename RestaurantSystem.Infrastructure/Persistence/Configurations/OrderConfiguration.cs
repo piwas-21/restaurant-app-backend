@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -34,6 +35,13 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.CustomerPhone)
             .HasMaxLength(20);
+
+        // Safety net for the STORED value, with the same two limits spelled out in
+        // ApplicationUserConfiguration: it rewrites the SQL parameter and not the object in
+        // memory, and it is EF-scoped. S4 still resolves and assigns a canonical code.
+        builder.Property(o => o.PreferredLanguage)
+            .HasMaxLength(LanguageCode.MaxLength)
+            .HasConversion(value => LanguageCode.Normalize(value), stored => stored);
 
         builder.Property(o => o.SubTotal)
             .HasColumnType("decimal(10,2)");

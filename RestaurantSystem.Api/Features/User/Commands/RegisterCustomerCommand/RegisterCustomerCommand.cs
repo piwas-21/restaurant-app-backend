@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -20,17 +21,20 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<RegisterCustomerCommandHandler> _logger;
 
     public RegisterCustomerCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<RegisterCustomerCommandHandler> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
     }
 
@@ -54,6 +58,11 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
             FirstName = command.FirstName,
             LastName = command.LastName,
             Role = UserRole.Customer, // Always customer for public registration
+            // What this request asked for, or nothing. Unlike an order — which must always carry a
+            // language, because its mails are sent from paths with no request — an account records
+            // only what the person actually expressed, so an absent header stays null and every
+            // later mail falls through to the request or the tenant default (§1 rank 2).
+            PreferredLanguage = _languages.FromRequest(),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "System",
             RefreshToken = _tokenService.GenerateRefreshToken()
@@ -93,7 +102,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         // Send verification email
         try
         {
-            await _emailService.SendEmailVerificationAsync(newUser, verificationToken);
+            await _emailService.SendEmailVerificationAsync(EmailCultures.English, newUser, verificationToken);
         }
         catch (Exception ex)
         {

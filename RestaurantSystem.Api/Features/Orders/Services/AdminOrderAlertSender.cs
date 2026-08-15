@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Constants;
@@ -69,7 +70,7 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
                 var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var quickActionToken = await ReadQuickActionTokenAsync(scope, orderId, orderNumber, logger);
 
-                await emailService.SendOrderConfirmationAdminEmailAsync(
+                await emailService.SendOrderConfirmationAdminEmailAsync(EmailCultures.English,
                     adminEmail,
                     orderNumber,
                     order.CustomerName ?? FallbackCustomerName,

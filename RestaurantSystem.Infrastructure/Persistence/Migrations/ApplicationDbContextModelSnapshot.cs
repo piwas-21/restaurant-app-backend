@@ -327,6 +327,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("phone_number_confirmed");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("preferred_language");
+
                     b.Property<string>("RefreshToken")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2130,6 +2135,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("payment_status");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("preferred_language");
+
                     b.Property<string>("PromoCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -3660,6 +3670,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<int>("NumberOfGuests")
                         .HasColumnType("integer")
                         .HasColumnName("number_of_guests");
+
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("preferred_language");
 
                     b.Property<DateTime>("ReservationDate")
                         .HasColumnType("timestamp with time zone")

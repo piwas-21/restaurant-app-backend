@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ActionRequired" xml:space="preserve">
+    <value>Action Required</value>
+  </data>
+  <data name="ActionRequiredUpper" xml:space="preserve">
+    <value>ACTION REQUIRED:</value>
+  </data>
+  <data name="CancelOrder" xml:space="preserve">
+    <value>Cancel Order</value>
+  </data>
+  <data name="ColumnItem" xml:space="preserve">
+    <value>Item</value>
+  </data>
+  <data name="ColumnPrice" xml:space="preserve">
+    <value>Price</value>
+  </data>
+  <data name="ColumnQty" xml:space="preserve">
+    <value>Qty</value>
+  </data>
+  <data name="ConfirmNow" xml:space="preserve">
+    <value>Confirm Now</value>
+  </data>
+  <data name="ConfirmOrCancel" xml:space="preserve">
+    <value>Please confirm or cancel this order</value>
+  </data>
+  <data name="CustomerInfoTitle" xml:space="preserve">
+    <value>Customer Information</value>
+  </data>
+  <data name="CustomerLabel" xml:space="preserve">
+    <value>Customer:</value>
+  </data>
+  <data name="Dashboard" xml:space="preserve">
+    <value>Need a different time? {0} for custom preparation time</value>
+    <comment>{0} is the DashboardLink text wrapped in an &lt;a&gt; tag by the template. Keep the placeholder; do not add markup of your own.</comment>
+  </data>
+  <data name="DashboardLink" xml:space="preserve">
+    <value>Open dashboard</value>
+  </data>
+  <data name="DeliveryLabel" xml:space="preserve">
+    <value>Delivery Address:</value>
+  </data>
+  <data name="EmailLabel" xml:space="preserve">
+    <value>Email:</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>New Order</value>
+  </data>
+  <data name="HeadingUpper" xml:space="preserve">
+    <value>NEW ORDER RECEIVED</value>
+  </data>
+  <data name="InstructionsLabel" xml:space="preserve">
+    <value>Special Instructions:</value>
+  </data>
+  <data name="ItemsTitle" xml:space="preserve">
+    <value>Order Items</value>
+  </data>
+  <data name="LogIn" xml:space="preserve">
+    <value>Log in to your admin dashboard to manage this order.</value>
+  </data>
+  <data name="MinutesShort" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="NameLabel" xml:space="preserve">
+    <value>Name:</value>
+  </data>
+  <data name="Notification" xml:space="preserve">
+    <value>New Order Notification</value>
+  </data>
+  <data name="NotifiedAutomatically" xml:space="preserve">
+    <value>The customer will be notified automatically after you take action.</value>
+  </data>
+  <data name="OrConfirmWithTime" xml:space="preserve">
+    <value>Or confirm with preparation time:</value>
+  </data>
+  <data name="OrderDetailsTitle" xml:space="preserve">
+    <value>Order Details</value>
+  </data>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>Order Number</value>
+  </data>
+  <data name="OrderTypeLabel" xml:space="preserve">
+    <value>Order Type:</value>
+  </data>
+  <data name="PhoneLabel" xml:space="preserve">
+    <value>Phone:</value>
+  </data>
+  <data name="PleasePrepare" xml:space="preserve">
+    <value>Please prepare this order for {0}.</value>
+  </data>
+  <data name="PrepareForDelivery" xml:space="preserve">
+    <value>delivery</value>
+  </data>
+  <data name="PrepareForServing" xml:space="preserve">
+    <value>serving</value>
+  </data>
+  <data name="PrepareForTakeaway" xml:space="preserve">
+    <value>takeaway</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>New Order - {0}</value>
+  </data>
+  <data name="TotalAmountLabel" xml:space="preserve">
+    <value>Total Amount:</value>
+  </data>
+  <data name="TotalLabel" xml:space="preserve">
+    <value>Total:</value>
+  </data>
+  <data name="TypeLabel" xml:space="preserve">
+    <value>Type:</value>
+  </data>
+</root>

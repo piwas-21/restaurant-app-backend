@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,10 +9,14 @@ public static partial class EmailTemplates
     /// </summary>
     public static class ReservationRejected
     {
-        public static string GetSubject(EmailBranding brand) => $"Reservation Update - {brand.Name}";
+        private const string Set = "ReservationRejected";
 
-        public static string GetHtmlBody(EmailBranding brand, string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
 
@@ -20,7 +26,7 @@ public static partial class EmailTemplates
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Reservation Update</title>
+    <title>{t["Heading"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -37,65 +43,66 @@ public static partial class EmailTemplates
             <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
-            <h2>Reservation Update</h2>
-            <p>Dear {customerName},</p>
-            <p>We regret to inform you that we are unable to accommodate your reservation request at this time.</p>
+            <h2>{t["Heading"]}</h2>
+            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{t["Regret"]}</p>
 
             <div class='info-box'>
-                <strong>📅 Date:</strong> {formattedDate}<br>
-                <strong>🕐 Time:</strong> {startTime:hh\:mm}<br>
-                <strong>👥 Guests:</strong> {numberOfGuests}
+                <strong>📅 {t["DateLabel"]}</strong> {formattedDate}<br>
+                <strong>🕐 {t["TimeLabel"]}</strong> {startTime:hh\:mm}<br>
+                <strong>👥 {t["GuestsLabel"]}</strong> {numberOfGuests}
             </div>
 
             <div class='notice'>
-                <strong>❌ We apologize for the inconvenience</strong><br>
-                Unfortunately, we cannot confirm your reservation. This may be due to availability constraints or other factors.
+                <strong>❌ {t["Apology"]}</strong><br>
+                {t["CannotConfirm"]}
             </div>
 
-            <p>We encourage you to try booking for another date or time. You can make a new reservation on our website or contact us directly.</p>
-            <p>If you have any questions, please don't hesitate to reach out to us at {email} or call us.</p>
-            <p>We hope to welcome you soon!</p>
-            <p>Best regards,<br>{brand.Name} Team</p>
+            <p>{t["TryAnother"]}</p>
+            <p>{t.Format("Questions", email)}</p>
+            <p>{t["HopeToWelcome"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
             <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, DateTime reservationDate, TimeSpan startTime, int numberOfGuests, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
 
-            return $@"{brand.Name} - Reservation Update
+            return $@"{brand.Name} - {t["Heading"]}
 
-Dear {customerName},
+{t.Format("Dear", customerName)}
 
-We regret to inform you that we are unable to accommodate your reservation request at this time.
+{t["Regret"]}
 
-Requested Reservation:
-Date: {formattedDate}
-Time: {startTime:hh\:mm}
-Guests: {numberOfGuests}
+{t["RequestedLabel"]}
+{t["DateLabel"]} {formattedDate}
+{t["TimeLabel"]} {startTime:hh\:mm}
+{t["GuestsLabel"]} {numberOfGuests}
 
-UNABLE TO CONFIRM
-Unfortunately, we cannot confirm your reservation. This may be due to availability constraints or other factors.
+{t["CannotConfirmUpper"]}
+{t["CannotConfirm"]}
 
-We encourage you to try booking for another date or time. You can make a new reservation on our website or contact us directly.
+{t["TryAnother"]}
 
-If you have any questions, please don't hesitate to reach out to us at {email} or call us.
+{t.Format("Questions", email)}
 
-We hope to welcome you soon!
+{t["HopeToWelcome"]}
 
-Best regards,
-{brand.Name} Team
+{t["BestRegards"]}
+{t.Format("BrandTeam", brand.Name)}
 
 {brand.Name} | {brand.City} | {email}
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{Copyright(t, brand)}";
         }
     }
 }

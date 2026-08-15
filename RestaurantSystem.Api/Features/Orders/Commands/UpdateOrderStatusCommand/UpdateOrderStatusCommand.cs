@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -114,7 +115,7 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                 {
                     try
                     {
-                        await _emailService.SendOrderConfirmedEmailAsync(
+                        await _emailService.SendOrderConfirmedEmailAsync(EmailCultures.English,
                             order.CustomerEmail,
                             order.CustomerName ?? "Customer",
                             order.OrderNumber,
@@ -154,7 +155,7 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                         _logger.LogInformation("Sending order delay email for {OrderNumber}. BackendBaseUrl from config: {BaseUrl}",
                             order.OrderNumber, baseUrl);
 
-                        await _emailService.SendOrderDelayedEmailAsync(
+                        await _emailService.SendOrderDelayedEmailAsync(EmailCultures.English,
                             order.CustomerEmail,
                             order.CustomerName ?? "Customer",
                             order.OrderNumber,

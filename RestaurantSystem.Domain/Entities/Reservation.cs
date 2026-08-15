@@ -23,6 +23,11 @@ public class Reservation : Entity
     public string? SpecialRequests { get; set; }
     public string? Notes { get; set; } // Admin notes
 
+    // Language of this reservation's guest mails, frozen at creation (EMAIL-LOCALISATION-PLAN §1
+    // rank 1). The quick-action links carry no request language at all, so on that path this
+    // column is the only source there is.
+    public string? PreferredLanguage { get; set; }
+
     // Navigation property for customer (if registered user)
     public virtual ApplicationUser? Customer { get; set; }
 }

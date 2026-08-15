@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,17 +9,25 @@ public static partial class EmailTemplates
     /// </summary>
     public static class Welcome
     {
-        public static string GetSubject(EmailBranding brand) => $"Welcome to {brand.Name}! 🍽️";
+        private const string Set = "Welcome";
 
-        public static string GetHtmlBody(EmailBranding brand, string firstName, string lastName, string role)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string role)
         {
+            var t = EmailText.For(culture, Set);
+            var greeting = t.Format("Greeting", EmailHtml.Encode(firstName));
+            var accountCreated = t.Format("AccountCreated", $"<strong>{EmailHtml.Encode(role)}</strong>");
+            var thankYou = t.Format("ThankYou", brand.Name);
+
             return $@"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Welcome</title>
+    <title>{t["PageTitle"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -30,63 +40,65 @@ public static partial class EmailTemplates
 <body>
     <div class='container'>
         <div class='header'>
-            <h1>🍽️ Welcome to {brand.Name}!</h1>
+            <h1>🍽️ {t.Format("Header", brand.Name)}</h1>
         </div>
         <div class='content'>
-            <h2>Welcome aboard, {firstName}!</h2>
-            <p>Congratulations! Your account has been successfully created with the role of <strong>{role}</strong>.</p>
+            <h2>{greeting}</h2>
+            <p>{accountCreated}</p>
 
             <div class='feature'>
-                <h3>🔐 Your Account Security</h3>
-                <p>Your account is protected with industry-standard security measures. Always keep your password safe and never share it with others.</p>
+                <h3>🔐 {t["SecurityTitle"]}</h3>
+                <p>{t["SecurityBody"]}</p>
             </div>
 
             <div class='feature'>
-                <h3>🚀 Getting Started</h3>
-                <p>You can now log in to your account and start using all the features available to you based on your role.</p>
+                <h3>🚀 {t["GettingStartedTitle"]}</h3>
+                <p>{t["GettingStartedBody"]}</p>
             </div>
 
             <div class='feature'>
-                <h3>💡 Need Help?</h3>
-                <p>If you have any questions or need assistance, our support team is here to help. Contact us anytime!</p>
+                <h3>💡 {t["HelpTitle"]}</h3>
+                <p>{t["HelpBody"]}</p>
             </div>
 
-            <p>Thank you for joining {brand.Name}. We're excited to have you on board!</p>
-            <p>Best regards,<br>The {brand.Name} Team</p>
+            <p>{thankYou}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("TheBrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
-            <p>This is an automated message, please do not reply to this email.</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{t["AutomatedMessage"]}</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string firstName, string lastName, string role)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string role)
         {
-            return $@"Welcome to {brand.Name}!
+            var t = EmailText.For(culture, Set);
 
-Welcome aboard, {firstName}!
+            return $@"{t.Format("Header", brand.Name)}
 
-Congratulations! Your account has been successfully created with the role of {role}.
+{t.Format("Greeting", firstName)}
 
-Your Account Security:
-Your account is protected with industry-standard security measures. Always keep your password safe and never share it with others.
+{t.Format("AccountCreated", role)}
 
-Getting Started:
-You can now log in to your account and start using all the features available to you based on your role.
+{t["SecurityTitle"]}:
+{t["SecurityBody"]}
 
-Need Help?
-If you have any questions or need assistance, our support team is here to help. Contact us anytime!
+{t["GettingStartedTitle"]}:
+{t["GettingStartedBody"]}
 
-Thank you for joining {brand.Name}. We're excited to have you on board!
+{t["HelpTitle"]}
+{t["HelpBody"]}
 
-Best regards,
-The {brand.Name} Team
+{t.Format("ThankYou", brand.Name)}
 
-This is an automated message, please do not reply to this email.
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{t["BestRegards"]}
+{t.Format("TheBrandTeam", brand.Name)}
+
+{t["AutomatedMessage"]}
+{Copyright(t, brand)}";
         }
     }
 }

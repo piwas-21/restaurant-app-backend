@@ -4,6 +4,9 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<!-- The email .resx sets under Resources/Email are neutral English (EMAIL-LOCALISATION-PLAN §5 S1);
+		     translations ship as satellite assemblies from *.<lang>.resx. -->
+		<NeutralLanguage>en</NeutralLanguage>
 		<UserSecretsId>acbd70e3-5dc2-4f83-bc4f-b3a365b647fe</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>

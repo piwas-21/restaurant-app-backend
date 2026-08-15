@@ -11,6 +11,11 @@ namespace RestaurantSystem.IntegrationTests.Common.Templates;
 /// tenant supplies its own currency via Localization__Currency (mapped from
 /// TENANT_CURRENCY by the deploy repo) and that value — not a hardcoded "CHF" —
 /// must flow into both the admin and customer order-confirmation email bodies.
+///
+/// Still true after the culture parameter landed (EMAIL-LOCALISATION-PLAN §6.2): the culture
+/// selects wording only. Amounts keep their ambient F2 formatting and the currency label keeps
+/// coming from <see cref="LocalizationSettings.Currency"/> — a culture must never derive a
+/// currency, or a French-speaking guest of a Swiss restaurant is quoted in euros.
 /// </summary>
 public class EmailTemplatesCurrencyTests
 {
@@ -48,9 +53,9 @@ public class EmailTemplatesCurrencyTests
     public void OrderReceived_HtmlAndTextBody_UseConfiguredCurrency_NotHardcodedChf(string currency)
     {
         var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-            Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
         var textBody = EmailTemplates.OrderReceived.GetTextBody(
-            Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
 
         AssertCurrencyRendered(htmlBody, textBody, currency);
     }
@@ -61,10 +66,10 @@ public class EmailTemplatesCurrencyTests
     public void OrderConfirmationAdmin_HtmlAndTextBody_UseConfiguredCurrency_NotHardcodedChf(string currency)
     {
         var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
+            EmailCultures.English, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
             "https://api.demo.test", "https://demo.test", "admin@demo.test", "test-quick-action-token");
         var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-            Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
+            EmailCultures.English, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
             "admin@demo.test");
 
         AssertCurrencyRendered(htmlBody, textBody, currency);

@@ -17,37 +17,34 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateOrderCommandHandler> _logger;
     private readonly IOrderMappingService _mappingService;
-    private readonly IOrderAddressFactory _addressFactory;
     private readonly IOrderItemFactory _itemFactory;
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly IOrderTableReservationService _tableReservation;
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderNotificationService _notifications;
-    private readonly IOrderChannelGuard _channelGuard;
-    private readonly IOrderNumberGenerator _orderNumbers;
+    private readonly IOrderFactory _orderFactory;
+    private readonly IPreferredLanguageCapture _languages;
 
     public CreateOrderCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
         IOrderMappingService mappingService,
-        IOrderAddressFactory addressFactory,
         IOrderItemFactory itemFactory,
         IOrderPricingService pricingService,
         IOrderPaymentBuilder paymentBuilder,
         IOrderTableReservationService tableReservation,
         IOrderFidelityCoordinator fidelity,
         IOrderNotificationService notifications,
-        IOrderChannelGuard channelGuard,
-        IOrderNumberGenerator orderNumbers,
+        IOrderFactory orderFactory,
+        IPreferredLanguageCapture languages,
         ILogger<CreateOrderCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
-        _channelGuard = channelGuard;
-        _orderNumbers = orderNumbers;
+        _orderFactory = orderFactory;
+        _languages = languages;
         _mappingService = mappingService;
-        _addressFactory = addressFactory;
         _itemFactory = itemFactory;
         _pricingService = pricingService;
         _paymentBuilder = paymentBuilder;
@@ -59,68 +56,28 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
     public async Task<ApiResponse<OrderDto>> Handle(CreateOrderCommand command, CancellationToken cancellationToken)
     {
+        // Before the transaction on purpose: everything after this line runs behind the order-number
+        // generator's day-wide advisory lock, and a failed statement inside a transaction poisons it,
+        // so a lookup for a cosmetic field would become a way to lose an order (GAP-2 S4 review).
+        var ownerId = command.UserId ?? _currentUserService.UserId;
+        var language = await _languages.ForUserAsync(ownerId, cancellationToken);
+
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            // Non-null only when a staff member was warned and allowed through anyway (§9.6).
-            var channelOverride = await _channelGuard.EnsureOrderableAsync(command.Items, command.Type, cancellationToken);
+            var draft = await _orderFactory.CreateAsync(command, ownerId, language, cancellationToken);
 
-            var orderNumber = await _orderNumbers.GenerateAsync(cancellationToken);
-            var userId = command.UserId ?? _currentUserService.UserId;
-            var auditId = _currentUserService.GetAuditIdentifier();
-            var now = DateTime.UtcNow;
-            // Holds Dine-in at Pending so an unpaid order never reaches the kitchen feed.
-            var paysOnline = OnlinePaymentIntent.IsDeclaredIn(command.Payments);
-
-            var order = new Order
+            if (draft.IsFailed)
             {
-                OrderNumber = orderNumber,
-                // Minted for every order, not just the ones that trigger an admin email: which
-                // orders get mailed is a runtime decision made later and elsewhere, and an order
-                // that reaches the template without a token would render dead links.
-                QuickActionToken = QuickActionTokens.Generate(),
-                UserId = userId,
-                CustomerName = command.CustomerName,
-                CustomerEmail = command.CustomerEmail,
-                CustomerPhone = command.CustomerPhone,
-                Type = command.Type,
-                TableNumber = command.TableNumber,
-                PromoCode = command.PromoCode,
-                HasUserLimitDiscount = command.HasUserLimitDiscount,
-                UserLimitAmount = command.UserLimitAmount,
-                // Priority and FocusReason used to be copied in unconditionally, so an unfocused
-                // order could carry both; they now travel with the focus record or not at all.
-                Focus = command.IsFocusOrder
-                    ? new OrderFocus
-                    {
-                        Priority = command.Priority,
-                        Reason = command.FocusReason,
-                        FocusedAt = now,
-                        FocusedBy = userId?.ToString()
-                    }
-                    : null,
-                OrderTypeOverrideBy = channelOverride?.By,
-                OrderTypeOverrideItems = channelOverride?.Items,
-                Notes = command.Notes,
-                OrderDate = now,
-                Tip = command.Tip,
-                Status = OnlinePaymentIntent.InitialStatus(command.Type, paysOnline),
-                PaymentStatus = PaymentStatus.Pending,
-                EstimatedDeliveryTime = command.Type == OrderType.Delivery ? now.AddMinutes(45) : null,
-                CreatedAt = now,
-                CreatedBy = auditId,
-            };
-
-            if (command.Type == OrderType.Delivery)
-            {
-                var orderAddress = await _addressFactory.CreateAsync(command.DeliveryAddress, order.Id, userId, cancellationToken);
-                if (orderAddress == null)
-                {
-                    return ApiResponse<OrderDto>.Failure("Delivery address is required for delivery orders");
-                }
-                order.DeliveryAddress = orderAddress;
+                return ApiResponse<OrderDto>.Failure(draft.Error);
             }
+
+            var order = draft.Order;
+            var userId = draft.UserId;
+            var auditId = draft.AuditId;
+            var now = draft.Now;
+            var paysOnline = draft.PaysOnline;
 
             _context.Orders.Add(order);
 

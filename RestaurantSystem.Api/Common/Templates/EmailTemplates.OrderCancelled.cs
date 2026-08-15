@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace RestaurantSystem.Api.Common.Templates;
 
 public static partial class EmailTemplates
@@ -7,10 +9,14 @@ public static partial class EmailTemplates
     /// </summary>
     public static class OrderCancelled
     {
-        public static string GetSubject(EmailBranding brand) => $"Order Cancelled - {brand.Name}";
+        private const string Set = "OrderCancelled";
 
-        public static string GetHtmlBody(EmailBranding brand, string customerName, string orderNumber, string cancellationReason, string contactEmail)
+        public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
+            EmailText.For(culture, Set).Format("Subject", brand.Name);
+
+        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, string cancellationReason, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
             return $@"
 <!DOCTYPE html>
@@ -18,7 +24,7 @@ public static partial class EmailTemplates
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Order Cancelled</title>
+    <title>{t["Heading"]}</title>
     <style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
@@ -37,56 +43,57 @@ public static partial class EmailTemplates
             <h1>🍽️ {brand.Name}</h1>
         </div>
         <div class='content'>
-            <h2>Order Cancelled</h2>
-            <p>Dear {customerName},</p>
-            <p>We regret to inform you that your order has been cancelled.</p>
+            <h2>{t["Heading"]}</h2>
+            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{t["Regret"]}</p>
 
             <div class='order-number'>
-                <div class='order-number-label'>ORDER NUMBER</div>
+                <div class='order-number-label'>{t["OrderNumberLabelUpper"]}</div>
                 <div class='order-number-value'>{orderNumber}</div>
             </div>
 
             <div class='info-box'>
-                <strong>Cancellation Reason:</strong><br>
-                {cancellationReason}
+                <strong>{t["ReasonLabel"]}</strong><br>
+                {EmailHtml.Encode(cancellationReason)}
             </div>
 
-            <p>If you have any questions or concerns, please don't hesitate to contact us at {email} or call us.</p>
-            <p>We apologize for any inconvenience and hope to serve you again soon.</p>
-            <p>Best regards,<br>{brand.Name} Team</p>
+            <p>{t.Format("Questions", email)}</p>
+            <p>{t["Apology"]}</p>
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
         </div>
         <div class='footer'>
             <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.</p>
+            <p>{Copyright(t, brand)}</p>
         </div>
     </div>
 </body>
 </html>";
         }
 
-        public static string GetTextBody(EmailBranding brand, string customerName, string orderNumber, string cancellationReason, string contactEmail)
+        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, string orderNumber, string cancellationReason, string contactEmail)
         {
+            var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            return $@"{brand.Name} - Order Cancelled
+            return $@"{brand.Name} - {t["Heading"]}
 
-Dear {customerName},
+{t.Format("Dear", customerName)}
 
-We regret to inform you that your order has been cancelled.
+{t["Regret"]}
 
-Order Number: {orderNumber}
+{t["OrderNumberLabel"]} {orderNumber}
 
-Cancellation Reason:
+{t["ReasonLabel"]}
 {cancellationReason}
 
-If you have any questions or concerns, please don't hesitate to contact us at {email} or call us.
+{t.Format("Questions", email)}
 
-We apologize for any inconvenience and hope to serve you again soon.
+{t["Apology"]}
 
-Best regards,
-{brand.Name} Team
+{t["BestRegards"]}
+{t.Format("BrandTeam", brand.Name)}
 
 {brand.Name} | {brand.City} | {email}
-© {DateTime.UtcNow.Year} {brand.Name}. All rights reserved.";
+{Copyright(t, brand)}";
         }
     }
 }

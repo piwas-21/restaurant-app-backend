@@ -1,0 +1,22 @@
+Demo Restaurant - Account Deletion Request
+
+Hello Jane Doe,
+
+We received a request to delete your Demo Restaurant account. Your account is scheduled for permanent deletion on May 17, 2030.
+
+You have two options:
+
+Option 1: Delete Immediately
+Visit the following link to permanently delete your account right now. This action cannot be undone.
+https://demo.test/delete
+
+Option 2: Cancel Deletion
+If you changed your mind, simply log in to your account. This will automatically cancel the deletion request.
+https://demo.test/cancel
+
+IMPORTANT: If you take no action, your account will be automatically deleted on the date shown above.
+
+If you did not request this, please change your password immediately.
+
+This is an automated message, please do not reply to this email.
+© {YEAR} Demo Restaurant. All rights reserved.

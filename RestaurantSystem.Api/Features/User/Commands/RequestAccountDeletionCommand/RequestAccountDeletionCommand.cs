@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using Microsoft.Extensions.Options;
@@ -51,7 +52,7 @@ public class RequestAccountDeletionCommandHandler : ICommandHandler<RequestAccou
         // Send email (non-fatal — deletion is already scheduled in the DB)
         try
         {
-            await _emailService.SendAccountDeletionEmailAsync(
+            await _emailService.SendAccountDeletionEmailAsync(EmailCultures.English,
                 user.Email!,
                 user.FirstName,
                 user.LastName,

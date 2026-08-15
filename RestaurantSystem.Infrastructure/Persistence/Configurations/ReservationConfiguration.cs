@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -42,6 +43,13 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
 
         builder.Property(r => r.Notes)
             .HasMaxLength(1000);
+
+        // Safety net for the STORED value, with the same two limits spelled out in
+        // ApplicationUserConfiguration: it rewrites the SQL parameter and not the object in
+        // memory, and it is EF-scoped. S4 still resolves and assigns a canonical code.
+        builder.Property(r => r.PreferredLanguage)
+            .HasMaxLength(LanguageCode.MaxLength)
+            .HasConversion(value => LanguageCode.Normalize(value), stored => stored);
 
         // Create indexes for common queries
         builder.HasIndex(r => r.ReservationDate);

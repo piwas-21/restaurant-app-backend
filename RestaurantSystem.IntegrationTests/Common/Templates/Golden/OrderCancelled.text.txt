@@ -1,0 +1,20 @@
+Demo Restaurant - Order Cancelled
+
+Dear Jane Doe,
+
+We regret to inform you that your order has been cancelled.
+
+Order Number: ORD-1
+
+Cancellation Reason:
+Kitchen closed unexpectedly
+
+If you have any questions or concerns, please don't hesitate to contact us at admin@demo.test or call us.
+
+We apologize for any inconvenience and hope to serve you again soon.
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

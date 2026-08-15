@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -66,8 +67,8 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 
                 await _emailService.SendEmailAsync(
                     reservation.CustomerEmail,
-                    Common.Templates.EmailTemplates.ReservationRejected.GetSubject(brand),
-                    Common.Templates.EmailTemplates.ReservationRejected.GetHtmlBody(
+                    Common.Templates.EmailTemplates.ReservationRejected.GetSubject(EmailCultures.English, brand),
+                    Common.Templates.EmailTemplates.ReservationRejected.GetHtmlBody(EmailCultures.English,
                         brand,
                         reservation.CustomerName,
                         reservation.ReservationDate,
@@ -75,7 +76,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
                         reservation.NumberOfGuests,
                         _emailSettings.AdminEmail
                     ),
-                    Common.Templates.EmailTemplates.ReservationRejected.GetTextBody(
+                    Common.Templates.EmailTemplates.ReservationRejected.GetTextBody(EmailCultures.English,
                         brand,
                         reservation.CustomerName,
                         reservation.ReservationDate,

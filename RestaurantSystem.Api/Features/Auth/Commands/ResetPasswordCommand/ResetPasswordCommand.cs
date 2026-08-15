@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ResetPasswordCommand;
@@ -56,7 +57,7 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
         // Send password changed notification email
         try
         {
-            await _emailService.SendPasswordChangedNotificationAsync(user);
+            await _emailService.SendPasswordChangedNotificationAsync(EmailCultures.English, user);
         }
         catch (Exception ex)
         {
