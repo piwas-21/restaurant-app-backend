@@ -83,4 +83,10 @@ public class UserDto
     /// </summary>
     public bool IsDiscountActive { get; set; }
 
+    /// <summary>
+    /// Language this account's mails are written in (EMAIL-LOCALISATION-PLAN §1 rank 2), or null
+    /// when the user has never chosen one — in which case each mail follows the request it is sent
+    /// in, then the tenant default.
+    /// </summary>
+    public string? PreferredLanguage { get; set; }
 }
