@@ -23,7 +23,7 @@
             <p>Hello Jane Doe,</p>
             <p>You have been successfully added to <strong>Gold Club</strong>.</p>
             <p>Members get 10% off.</p>
-            <p><strong>Membership Expires:</strong> May 17, 2030</p>
+            <p><strong>Membership Expires:</strong> Friday, May 17, 2030</p>
 
             <div class="qr-container">
                 <h3>Your Membership QR Code</h3>

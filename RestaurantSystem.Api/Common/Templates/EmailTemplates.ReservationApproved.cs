@@ -61,11 +61,11 @@ public static partial class EmailTemplates
                 <h2 style='margin: 0; color: #27ae60;'>✅ {t["Confirmed"]}</h2>
             </div>
 
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t.Format("GoodNews", brand.Name)}</p>
 
             <div class='info-box'>
-                <strong>📅 {t["DateLabel"]}</strong> {reservationDate:dddd, MMMM dd, yyyy}<br>
+                <strong>📅 {t["DateLabel"]}</strong> {LongDate(reservationDate, culture)}<br>
                 <strong>🕐 {t["TimeLabel"]}</strong> {startTime:hh':'mm} - {endTime:hh':'mm}<br>
                 <strong>👥 {t["GuestsLabel"]}</strong> {numberOfGuests}<br>
                 <strong>🪑 {t["TableLabel"]}</strong> {EmailHtml.Encode(tableNumber)}
@@ -117,11 +117,11 @@ public static partial class EmailTemplates
 
 ✅ {t["ConfirmedUpper"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t.Format("GoodNews", brand.Name)}
 
-{t["DateLabel"]} {reservationDate:dddd, MMMM dd, yyyy}
+{t["DateLabel"]} {LongDate(reservationDate, culture)}
 {t["TimeLabel"]} {startTime:hh':'mm} - {endTime:hh':'mm}
 {t["GuestsLabel"]} {numberOfGuests}
 {t["TableLabel"]} {tableNumber}{requestsSection}{notesSection}

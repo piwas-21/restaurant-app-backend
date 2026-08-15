@@ -58,70 +58,37 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="AutomatedMessage" xml:space="preserve">
-    <value>This is an automated message, please do not reply to this email.</value>
+  <data name="Added" xml:space="preserve">
+    <value>Votre inscription à {0} a bien été enregistrée.</value>
   </data>
-  <data name="BestRegards" xml:space="preserve">
-    <value>Best regards,</value>
+  <data name="ExpiresLabel" xml:space="preserve">
+    <value>Adhésion valable jusqu'au :</value>
   </data>
-  <data name="BrandTeam" xml:space="preserve">
-    <value>{0} Team</value>
+  <data name="ExpiresLine" xml:space="preserve">
+    <value>Adhésion valable jusqu'au {0}</value>
   </data>
-  <data name="Copyright" xml:space="preserve">
-    <value>© {0} {1}. All rights reserved.</value>
+  <data name="Heading" xml:space="preserve">
+    <value>Bienvenue dans {0} !</value>
   </data>
-  <data name="DateLabel" xml:space="preserve">
-    <value>Date:</value>
+  <data name="QrAlt" xml:space="preserve">
+    <value>Code QR d'adhésion</value>
   </data>
-  <data name="Dear" xml:space="preserve">
-    <value>Dear {0},</value>
+  <data name="QrAttached" xml:space="preserve">
+    <value>Votre code QR d'adhésion est joint à cet e-mail. Présentez-le au restaurant pour bénéficier de vos avantages membre.</value>
   </data>
-  <data name="GreetingNoName" xml:space="preserve">
-    <value>Hello,</value>
+  <data name="QrDataLabel" xml:space="preserve">
+    <value>Données du code QR :</value>
   </data>
-  <data name="GuestsLabel" xml:space="preserve">
-    <value>Guests:</value>
+  <data name="QrHint" xml:space="preserve">
+    <value>Présentez ce code QR au restaurant pour bénéficier de vos avantages membre.</value>
   </data>
-  <data name="Hello" xml:space="preserve">
-    <value>Hello {0},</value>
+  <data name="QrTitle" xml:space="preserve">
+    <value>Votre code QR d'adhésion</value>
   </data>
-  <data name="HelloFullName" xml:space="preserve">
-    <value>Hello {0} {1},</value>
+  <data name="Subject" xml:space="preserve">
+    <value>Bienvenue dans {0} !</value>
   </data>
-  <data name="LabelColon" xml:space="preserve">
-    <value>:</value>
-  </data>
-  <data name="LookForward" xml:space="preserve">
-    <value>We look forward to serving you!</value>
-  </data>
-  <data name="OrderTypeDelivery" xml:space="preserve">
-    <value>Delivery</value>
-  </data>
-  <data name="OrderTypeDineIn" xml:space="preserve">
-    <value>Dine In</value>
-  </data>
-  <data name="OrderTypeTakeaway" xml:space="preserve">
-    <value>Takeaway</value>
-  </data>
-  <data name="RoleAdmin" xml:space="preserve">
-    <value>Admin</value>
-  </data>
-  <data name="RoleCustomer" xml:space="preserve">
-    <value>Customer</value>
-  </data>
-  <data name="RoleStaff" xml:space="preserve">
-    <value>Staff</value>
-  </data>
-  <data name="SpecialRequestsLabel" xml:space="preserve">
-    <value>Special Requests:</value>
-  </data>
-  <data name="TableLabel" xml:space="preserve">
-    <value>Table:</value>
-  </data>
-  <data name="TheBrandTeam" xml:space="preserve">
-    <value>The {0} Team</value>
-  </data>
-  <data name="TimeLabel" xml:space="preserve">
-    <value>Time:</value>
+  <data name="ValuedMember" xml:space="preserve">
+    <value>Merci de votre fidélité !</value>
   </data>
 </root>

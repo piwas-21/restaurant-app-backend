@@ -58,70 +58,40 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="AutomatedMessage" xml:space="preserve">
-    <value>This is an automated message, please do not reply to this email.</value>
+  <data name="AccountCreated" xml:space="preserve">
+    <value>Félicitations ! Votre compte a bien été créé avec le rôle {0}.</value>
   </data>
-  <data name="BestRegards" xml:space="preserve">
-    <value>Best regards,</value>
+  <data name="GettingStartedBody" xml:space="preserve">
+    <value>Vous pouvez dès maintenant vous connecter à votre compte et utiliser toutes les fonctionnalités associées à votre rôle.</value>
   </data>
-  <data name="BrandTeam" xml:space="preserve">
-    <value>{0} Team</value>
+  <data name="GettingStartedTitle" xml:space="preserve">
+    <value>Premiers pas</value>
   </data>
-  <data name="Copyright" xml:space="preserve">
-    <value>© {0} {1}. All rights reserved.</value>
+  <data name="Greeting" xml:space="preserve">
+    <value>Bienvenue à bord, {0} !</value>
   </data>
-  <data name="DateLabel" xml:space="preserve">
-    <value>Date:</value>
+  <data name="Header" xml:space="preserve">
+    <value>Bienvenue chez {0} !</value>
   </data>
-  <data name="Dear" xml:space="preserve">
-    <value>Dear {0},</value>
+  <data name="HelpBody" xml:space="preserve">
+    <value>Si vous avez des questions ou besoin d'aide, notre équipe d'assistance est à votre disposition. Écrivez-nous à tout moment !</value>
   </data>
-  <data name="GreetingNoName" xml:space="preserve">
-    <value>Hello,</value>
+  <data name="HelpTitle" xml:space="preserve">
+    <value>Besoin d'aide ?</value>
   </data>
-  <data name="GuestsLabel" xml:space="preserve">
-    <value>Guests:</value>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Bienvenue</value>
   </data>
-  <data name="Hello" xml:space="preserve">
-    <value>Hello {0},</value>
+  <data name="SecurityBody" xml:space="preserve">
+    <value>Votre compte est protégé par des mesures de sécurité conformes aux standards du secteur. Gardez toujours votre mot de passe en lieu sûr et ne le communiquez à personne.</value>
   </data>
-  <data name="HelloFullName" xml:space="preserve">
-    <value>Hello {0} {1},</value>
+  <data name="SecurityTitle" xml:space="preserve">
+    <value>La sécurité de votre compte</value>
   </data>
-  <data name="LabelColon" xml:space="preserve">
-    <value>:</value>
+  <data name="Subject" xml:space="preserve">
+    <value>Bienvenue chez {0} ! 🍽️</value>
   </data>
-  <data name="LookForward" xml:space="preserve">
-    <value>We look forward to serving you!</value>
-  </data>
-  <data name="OrderTypeDelivery" xml:space="preserve">
-    <value>Delivery</value>
-  </data>
-  <data name="OrderTypeDineIn" xml:space="preserve">
-    <value>Dine In</value>
-  </data>
-  <data name="OrderTypeTakeaway" xml:space="preserve">
-    <value>Takeaway</value>
-  </data>
-  <data name="RoleAdmin" xml:space="preserve">
-    <value>Admin</value>
-  </data>
-  <data name="RoleCustomer" xml:space="preserve">
-    <value>Customer</value>
-  </data>
-  <data name="RoleStaff" xml:space="preserve">
-    <value>Staff</value>
-  </data>
-  <data name="SpecialRequestsLabel" xml:space="preserve">
-    <value>Special Requests:</value>
-  </data>
-  <data name="TableLabel" xml:space="preserve">
-    <value>Table:</value>
-  </data>
-  <data name="TheBrandTeam" xml:space="preserve">
-    <value>The {0} Team</value>
-  </data>
-  <data name="TimeLabel" xml:space="preserve">
-    <value>Time:</value>
+  <data name="ThankYou" xml:space="preserve">
+    <value>Merci d'avoir rejoint {0}. Nous sommes ravis de vous compter parmi nous !</value>
   </data>
 </root>

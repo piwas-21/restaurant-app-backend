@@ -59,69 +59,69 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="AutomatedMessage" xml:space="preserve">
-    <value>This is an automated message, please do not reply to this email.</value>
+    <value>Ceci est un message automatique, merci de ne pas y répondre.</value>
   </data>
   <data name="BestRegards" xml:space="preserve">
-    <value>Best regards,</value>
+    <value>Cordialement,</value>
   </data>
   <data name="BrandTeam" xml:space="preserve">
-    <value>{0} Team</value>
+    <value>L'équipe {0}</value>
   </data>
   <data name="Copyright" xml:space="preserve">
-    <value>© {0} {1}. All rights reserved.</value>
+    <value>© {0} {1}. Tous droits réservés.</value>
   </data>
   <data name="DateLabel" xml:space="preserve">
-    <value>Date:</value>
+    <value>Date :</value>
   </data>
   <data name="Dear" xml:space="preserve">
-    <value>Dear {0},</value>
+    <value>Bonjour {0},</value>
   </data>
   <data name="GreetingNoName" xml:space="preserve">
-    <value>Hello,</value>
+    <value>Bonjour,</value>
   </data>
   <data name="GuestsLabel" xml:space="preserve">
-    <value>Guests:</value>
+    <value>Convives :</value>
   </data>
   <data name="Hello" xml:space="preserve">
-    <value>Hello {0},</value>
+    <value>Bonjour {0},</value>
   </data>
   <data name="HelloFullName" xml:space="preserve">
-    <value>Hello {0} {1},</value>
+    <value>Bonjour {0} {1},</value>
   </data>
   <data name="LabelColon" xml:space="preserve">
-    <value>:</value>
+    <value> :</value>
   </data>
   <data name="LookForward" xml:space="preserve">
-    <value>We look forward to serving you!</value>
+    <value>Au plaisir de vous servir !</value>
   </data>
   <data name="OrderTypeDelivery" xml:space="preserve">
-    <value>Delivery</value>
+    <value>Livraison</value>
   </data>
   <data name="OrderTypeDineIn" xml:space="preserve">
-    <value>Dine In</value>
+    <value>Sur place</value>
   </data>
   <data name="OrderTypeTakeaway" xml:space="preserve">
-    <value>Takeaway</value>
+    <value>À emporter</value>
   </data>
   <data name="RoleAdmin" xml:space="preserve">
-    <value>Admin</value>
+    <value>administrateur</value>
   </data>
   <data name="RoleCustomer" xml:space="preserve">
-    <value>Customer</value>
+    <value>client</value>
   </data>
   <data name="RoleStaff" xml:space="preserve">
-    <value>Staff</value>
+    <value>membre du personnel</value>
   </data>
   <data name="SpecialRequestsLabel" xml:space="preserve">
-    <value>Special Requests:</value>
+    <value>Demandes particulières :</value>
   </data>
   <data name="TableLabel" xml:space="preserve">
-    <value>Table:</value>
+    <value>Table :</value>
   </data>
   <data name="TheBrandTeam" xml:space="preserve">
-    <value>The {0} Team</value>
+    <value>L'équipe {0}</value>
   </data>
   <data name="TimeLabel" xml:space="preserve">
-    <value>Time:</value>
+    <value>Heure :</value>
   </data>
 </root>

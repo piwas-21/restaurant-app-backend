@@ -186,7 +186,7 @@ public static partial class EmailTemplates
             <div class='status-icon'>⏳</div>
             <div class='message-title'>{t["Heading"]}</div>
 
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t.Format("IntroHtml", brand.Name)}</p>
 
             <div class='order-details'>
@@ -229,7 +229,7 @@ public static partial class EmailTemplates
 
             return $@"{brand.Name} - {t["SubjectShort"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t["IntroText"]}
 
@@ -240,9 +240,9 @@ public static partial class EmailTemplates
 
 {t["LetUsKnow"]}
 
-{t["AcceptDelay"]}: {approveUrl}
+{Labelled(t, t["AcceptDelay"], approveUrl)}
 
-{t["CancelOrder"]}: {rejectUrl}
+{Labelled(t, t["CancelOrder"], rejectUrl)}
 
 {t["NotCharged"]}
 

@@ -8,7 +8,6 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <inheritdoc />
 public class GuestOrderReceiptSender : IGuestOrderReceiptSender
 {
-    private const string FallbackCustomerName = "Valued Customer";
 
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
@@ -67,7 +66,7 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
             await _emailService.SendOrderReceivedEmailAsync(
                 _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
-                order.CustomerName ?? FallbackCustomerName,
+                order.CustomerName ?? string.Empty,
                 order.OrderNumber,
                 order.Type,
                 order.Total,

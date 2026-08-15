@@ -34,7 +34,7 @@ public static partial class EmailTemplates
                         <span style='color: #78350f; margin-top: 8px; display: block; white-space: pre-line;'>{EmailHtml.Encode(specialRequests)}</span>
                     </div>";
 
-            var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
+            var formattedDate = LongDate(reservationDate, culture);
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
 
@@ -261,7 +261,7 @@ public static partial class EmailTemplates
 {t["SpecialRequestsLabel"]}
 {specialRequests}";
 
-            var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
+            var formattedDate = LongDate(reservationDate, culture);
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
 
@@ -269,13 +269,13 @@ public static partial class EmailTemplates
 
 📅 {t["HeadingUpper"]}
 
-{t["ReservationIdLabel"]}: {reservationId}
+{Labelled(t, t["ReservationIdLabel"], reservationId.ToString())}
 
 {t["CustomerLabel"]} {customerName}
 {t["EmailLabel"]} {customerEmail}
 {t["PhoneLabel"]} {customerPhone}
 
-{t["DetailsTitle"]}:
+{Heading(t, t["DetailsTitle"])}
 {t["DateLabel"]} {formattedDate}
 {t["TimeLabel"]} {formattedStartTime} - {formattedEndTime}
 {t["GuestsLabel"]} {t.Format("GuestCount", numberOfGuests)}

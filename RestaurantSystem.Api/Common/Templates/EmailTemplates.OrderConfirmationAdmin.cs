@@ -341,7 +341,7 @@ public static partial class EmailTemplates
 
 📦 {t["HeadingUpper"]}
 
-{t["OrderNumberLabel"]}: {orderNumber}
+{Labelled(t, t["OrderNumberLabel"], orderNumber)}
 
 {t["CustomerLabel"]} {customerName}
 {t["EmailLabel"]} {customerEmail}
@@ -350,7 +350,7 @@ public static partial class EmailTemplates
 {t["OrderTypeLabel"]} {orderTypeText}
 {t["TotalAmountLabel"]} {currency} {total:F2}
 
-{t["ItemsTitle"]}:
+{Heading(t, t["ItemsTitle"])}
 {itemsSection}{deliverySection}{instructionsSection}
 
 {t["ActionRequiredUpper"]}

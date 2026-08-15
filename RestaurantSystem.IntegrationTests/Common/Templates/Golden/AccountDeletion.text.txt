@@ -2,7 +2,7 @@ Demo Restaurant - Account Deletion Request
 
 Hello Jane Doe,
 
-We received a request to delete your Demo Restaurant account. Your account is scheduled for permanent deletion on May 17, 2030.
+We received a request to delete your Demo Restaurant account. Your account is scheduled for permanent deletion on Friday, May 17, 2030.
 
 You have two options:
 

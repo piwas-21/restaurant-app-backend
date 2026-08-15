@@ -17,7 +17,7 @@ public static partial class EmailTemplates
         public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
         {
             var t = EmailText.For(culture, Set);
-            var scheduled = $"{scheduledDeletionDate:MMMM dd, yyyy}";
+            var scheduled = LongDate(scheduledDeletionDate, culture);
 
             return $@"
 <!DOCTYPE html>
@@ -78,7 +78,7 @@ public static partial class EmailTemplates
         public static string GetTextBody(CultureInfo culture, EmailBranding brand, string firstName, string lastName, string deleteUrl, string cancelUrl, DateTime scheduledDeletionDate)
         {
             var t = EmailText.For(culture, Set);
-            var scheduled = $"{scheduledDeletionDate:MMMM dd, yyyy}";
+            var scheduled = LongDate(scheduledDeletionDate, culture);
 
             return $@"{brand.Name} - {t["PageTitle"]}
 
