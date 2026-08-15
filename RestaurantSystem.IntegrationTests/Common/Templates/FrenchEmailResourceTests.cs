@@ -28,12 +28,13 @@ namespace RestaurantSystem.IntegrationTests.Common.Templates;
 /// S8+ generalise this over a list of locales; with one translated language the list is one entry.
 /// </para>
 /// </remarks>
-public class FrenchEmailResourceTests
+public partial class FrenchEmailResourceTests
 {
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr");
 
     /// <summary>Every numbered placeholder in a value, e.g. <c>{0}</c>. Nothing else may use braces.</summary>
-    private static readonly Regex Placeholder = new(@"\{(\d+)\}", RegexOptions.Compiled);
+    [GeneratedRegex(@"\{(\d+)\}")]
+    private static partial Regex Placeholder();
 
     private static readonly EmailBranding Brand = new("Demo Restaurant", "Geneva", "contact@demo.test");
 
@@ -70,11 +71,15 @@ public class FrenchEmailResourceTests
     [MemberData(nameof(Sets))]
     public void Every_translation_carries_exactly_the_placeholders_the_english_does(string set)
     {
+        var french = Values(set, French);
+
         foreach (var (key, english) in Values(set, CultureInfo.InvariantCulture))
         {
-            var french = Values(set, French)[key];
+            french.TryGetValue(key, out var translated).Should().BeTrue(
+                "{0}.{1} must exist in French — the parity test says which key, this one says why it matters",
+                set, key);
 
-            Indexes(french).Should().BeEquivalentTo(Indexes(english),
+            Indexes(translated!).Should().BeEquivalentTo(Indexes(english),
                 "{0}.{1} must format with the arguments its caller passes", set, key);
         }
     }
@@ -91,7 +96,8 @@ public class FrenchEmailResourceTests
         foreach (var (key, french) in Values(set, French))
         {
             french.Should().NotContain("<", "{0}.{1} is text, and the template owns the markup", set, key);
-            Placeholder.Replace(french, string.Empty).Should().NotContainAny("{", "}",
+            french.Should().NotContain("&", "{0}.{1} would emit a bare ampersand into the HTML body (§6.3)", set, key);
+            Placeholder().Replace(french, string.Empty).Should().NotContainAny("{", "}",
                 "a brace outside a numbered placeholder makes string.Format throw at send time");
         }
     }
@@ -161,6 +167,77 @@ public class FrenchEmailResourceTests
         }
     }
 
+
+    /// <summary>
+    /// The TEXT body, which the marker test above does not reach — and which is where the label
+    /// punctuation lives. A French mail writes a space before its colon; nine of these lines used to
+    /// glue it on in C#, so the resources were spaced correctly and the rendered mail was not.
+    /// </summary>
+    [Fact]
+    public void The_french_text_bodies_punctuate_their_labels_the_way_french_does()
+    {
+        var receipt = EmailTemplates.OrderReceived.GetTextBody(
+            French, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
+            [("Burger", 2, 12.50m)], "admin@demo.test");
+
+        receipt.Should().Contain("NUMÉRO DE COMMANDE : ORD-1").And.NotContain("COMMANDE: ");
+        receipt.Should().NotContainAny("Order Received", "Order Items", "Best regards");
+    }
+
+    /// <summary>
+    /// A date is not a string in the resources, so every assertion above passes on a French mail
+    /// that says "Friday, 21 August 2026". The ambient culture is pinned to invariant because that is
+    /// what the container runs as — the point is that the CULTURE ARGUMENT is what decides now.
+    /// </summary>
+    [Fact]
+    public void A_french_mail_writes_its_dates_in_french()
+    {
+        var ambient = CultureInfo.CurrentCulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+
+            var body = EmailTemplates.ReservationConfirmation.GetTextBody(
+                French, Brand, "Jane Doe", "T12", new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc),
+                new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 2, "admin@demo.test");
+
+            body.Should().Contain("vendredi 21 août 2026");
+            body.Should().NotContainAny("Friday", "August", "Monday", "Tuesday", "Wednesday", "Thursday");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = ambient;
+        }
+    }
+
+    /// <summary>
+    /// An order can have no customer name — a QR or counter order nobody typed one into — and the
+    /// three order senders used to substitute the literal "Valued Customer", which a French guest
+    /// read verbatim. The fixture passes what production now passes: nothing.
+    /// </summary>
+    [Fact]
+    public void A_nameless_guest_is_greeted_in_french_rather_than_in_english()
+    {
+        var receipt = EmailTemplates.OrderReceived.GetTextBody(
+            French, Brand, string.Empty, "ORD-1", "DineIn", 25.00m, "CHF",
+            [("Burger", 2, 12.50m)], "admin@demo.test");
+
+        receipt.Should().Contain("Bonjour,").And.NotContain("Valued Customer");
+    }
+
+    /// <summary>
+    /// A specific culture must reach its parent's resources: <c>fr-CH</c> is French. Production
+    /// normalises to the primary subtag before it gets here, so this pins the layer BELOW that —
+    /// the dev-only test controller and any future caller hand over whatever they like.
+    /// </summary>
+    [Fact]
+    public void A_regional_french_culture_resolves_to_the_french_resources()
+    {
+        EmailText.For(CultureInfo.GetCultureInfo("fr-CH"), "OrderReceived")["Heading"]
+            .Should().Be("Commande reçue");
+    }
+
     private static IEnumerable<string> EmailResourceSets() =>
         typeof(EmailText).Assembly.GetManifestResourceNames()
             .Where(name => name.StartsWith("RestaurantSystem.Api.Resources.Email.", StringComparison.Ordinal)
@@ -189,7 +266,7 @@ public class FrenchEmailResourceTests
         Values(set, culture).Keys;
 
     private static IEnumerable<int> Indexes(string value) =>
-        Placeholder.Matches(value).Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture))
+        Placeholder().Matches(value).Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture))
             .Distinct()
             .OrderBy(index => index);
 }

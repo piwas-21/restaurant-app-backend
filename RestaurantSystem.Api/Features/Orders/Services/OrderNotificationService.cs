@@ -11,7 +11,6 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <inheritdoc />
 public class OrderNotificationService : IOrderNotificationService
 {
-    private const string FallbackCustomerName = "Valued Customer";
     private const int DineInDefaultPrepMinutes = 15;
 
     private readonly IEmailService _emailService;
@@ -59,7 +58,7 @@ public class OrderNotificationService : IOrderNotificationService
             await _emailService.SendOrderConfirmedEmailAsync(
                 _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
-                order.CustomerName ?? FallbackCustomerName,
+                order.CustomerName ?? string.Empty,
                 order.OrderNumber,
                 order.Type.ToString(),
                 estimatedPreparationMinutes);
@@ -95,7 +94,7 @@ public class OrderNotificationService : IOrderNotificationService
             await _emailService.SendOrderDelayedEmailAsync(
                 _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
-                order.CustomerName ?? FallbackCustomerName,
+                order.CustomerName ?? string.Empty,
                 order.OrderNumber,
                 delayMinutes,
                 $"{baseUrl}/api/orders/{order.Id}/approve-delay",

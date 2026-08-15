@@ -68,7 +68,7 @@
     <value>COMMANDE CONFIRMÉE !</value>
   </data>
   <data name="GoodNews" xml:space="preserve">
-    <value>Bonne nouvelle ! Votre commande {0} a été confirmée et est en cours de préparation.</value>
+    <value>Bonne nouvelle ! Votre commande {0} est confirmée et en cours de préparation.</value>
   </data>
   <data name="Heading" xml:space="preserve">
     <value>Commande confirmée</value>

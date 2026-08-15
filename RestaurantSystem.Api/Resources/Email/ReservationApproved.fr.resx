@@ -74,13 +74,13 @@
     <value>Informations importantes :</value>
   </data>
   <data name="Info1" xml:space="preserve">
-    <value>Merci d'arriver à l'heure. Les tables sont conservées 15 minutes après l'heure de réservation.</value>
+    <value>Merci d'arriver à l'heure : nous gardons votre table 15 minutes au-delà de l'heure réservée.</value>
   </data>
   <data name="Info2" xml:space="preserve">
     <value>Pour annuler ou modifier votre réservation, merci de nous contacter au moins 24 heures à l'avance.</value>
   </data>
   <data name="Info3" xml:space="preserve">
-    <value>Contactez-nous à : {0}</value>
+    <value>Nous contacter : {0}</value>
   </data>
   <data name="LookForwardWelcoming" xml:space="preserve">
     <value>Nous nous réjouissons de vous accueillir !</value>

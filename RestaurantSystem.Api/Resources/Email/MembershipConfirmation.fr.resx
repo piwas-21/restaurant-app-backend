@@ -59,13 +59,13 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Added" xml:space="preserve">
-    <value>Vous avez bien été ajouté à {0}.</value>
+    <value>Votre inscription à {0} a bien été enregistrée.</value>
   </data>
   <data name="ExpiresLabel" xml:space="preserve">
-    <value>Fin de l'adhésion :</value>
+    <value>Adhésion valable jusqu'au :</value>
   </data>
   <data name="ExpiresLine" xml:space="preserve">
-    <value>Fin de l'adhésion : {0}</value>
+    <value>Adhésion valable jusqu'au {0}</value>
   </data>
   <data name="Heading" xml:space="preserve">
     <value>Bienvenue dans {0} !</value>

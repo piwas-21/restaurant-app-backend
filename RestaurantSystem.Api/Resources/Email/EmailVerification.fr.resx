@@ -71,7 +71,7 @@
     <value>Bienvenue chez {0} ! 🎉</value>
   </data>
   <data name="IgnoreEmail" xml:space="preserve">
-    <value>Si vous n'avez pas créé de compte chez {0}, vous pouvez ignorer cet e-mail.</value>
+    <value>Si vous n'avez pas créé de compte chez {0}, vous pouvez ignorer cet e-mail sans crainte.</value>
   </data>
   <data name="IntroHtml" xml:space="preserve">
     <value>Merci d'avoir rejoint la famille {0} ! Nous sommes ravis de vous faire découvrir notre cuisine. Pour commencer, veuillez vérifier votre adresse e-mail.</value>

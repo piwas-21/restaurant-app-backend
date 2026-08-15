@@ -44,7 +44,7 @@ public static partial class EmailTemplates
             <p>{t.Format("HelloFullName", EmailHtml.Encode(firstName), EmailHtml.Encode(lastName))}</p>
             <div class='alert'>
                 <strong>✅ {t["Changed"]}</strong><br>
-                {t["ChangedOnLabel"]} {changedAt:F}
+                {t["ChangedOnLabel"]} {LongDateTime(changedAt, culture)}
             </div>
             <p>{t["NoAction"]}</p>
             <p><strong>{t["IfNotYouLabel"]}</strong></p>
@@ -73,7 +73,7 @@ public static partial class EmailTemplates
 
 {t.Format("HelloFullName", firstName, lastName)}
 
-{t.Format("ChangedOn", $"{changedAt:F}")}
+{t.Format("ChangedOn", LongDateTime(changedAt, culture))}
 
 {t["NoAction"]}
 

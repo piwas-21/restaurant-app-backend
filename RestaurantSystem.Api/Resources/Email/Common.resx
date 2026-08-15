@@ -76,6 +76,9 @@
   <data name="Dear" xml:space="preserve">
     <value>Dear {0},</value>
   </data>
+  <data name="GreetingNoName" xml:space="preserve">
+    <value>Hello,</value>
+  </data>
   <data name="GuestsLabel" xml:space="preserve">
     <value>Guests:</value>
   </data>
@@ -84,6 +87,9 @@
   </data>
   <data name="HelloFullName" xml:space="preserve">
     <value>Hello {0} {1},</value>
+  </data>
+  <data name="LabelColon" xml:space="preserve">
+    <value>:</value>
   </data>
   <data name="LookForward" xml:space="preserve">
     <value>We look forward to serving you!</value>
@@ -96,6 +102,15 @@
   </data>
   <data name="OrderTypeTakeaway" xml:space="preserve">
     <value>Takeaway</value>
+  </data>
+  <data name="RoleAdmin" xml:space="preserve">
+    <value>Admin</value>
+  </data>
+  <data name="RoleCustomer" xml:space="preserve">
+    <value>Customer</value>
+  </data>
+  <data name="RoleStaff" xml:space="preserve">
+    <value>Staff</value>
   </data>
   <data name="SpecialRequestsLabel" xml:space="preserve">
     <value>Special Requests:</value>

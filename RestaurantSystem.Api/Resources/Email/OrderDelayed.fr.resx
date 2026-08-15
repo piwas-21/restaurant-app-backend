@@ -98,7 +98,7 @@
     <value>Commande retardée</value>
   </data>
   <data name="Proceed" xml:space="preserve">
-    <value>Souhaitez-vous poursuivre ?</value>
+    <value>Souhaitez-vous maintenir votre commande ?</value>
   </data>
   <data name="ProposedTime" xml:space="preserve">
     <value>Temps de préparation proposé :</value>

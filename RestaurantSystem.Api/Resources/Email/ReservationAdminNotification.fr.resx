@@ -92,7 +92,7 @@
     <value>E-mail :</value>
   </data>
   <data name="GuestCount" xml:space="preserve">
-    <value>{0} personnes</value>
+    <value>{0} pers.</value>
   </data>
   <data name="Heading" xml:space="preserve">
     <value>Nouvelle demande de réservation</value>
@@ -116,7 +116,7 @@
     <value>Refuser la réservation</value>
   </data>
   <data name="ReservationIdLabel" xml:space="preserve">
-    <value>Numéro de réservation</value>
+    <value>Référence de réservation</value>
   </data>
   <data name="Subject" xml:space="preserve">
     <value>Nouvelle demande de réservation - {0}</value>

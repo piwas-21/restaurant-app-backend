@@ -122,7 +122,7 @@
     <value>Nom :</value>
   </data>
   <data name="Notification" xml:space="preserve">
-    <value>Notification de nouvelle commande</value>
+    <value>Nouvelle commande</value>
   </data>
   <data name="NotifiedAutomatically" xml:space="preserve">
     <value>Le client sera prévenu automatiquement dès que vous aurez agi.</value>
@@ -143,16 +143,16 @@
     <value>Téléphone :</value>
   </data>
   <data name="PleasePrepare" xml:space="preserve">
-    <value>Merci de préparer cette commande pour {0}.</value>
+    <value>Commande à préparer : {0}.</value>
   </data>
   <data name="PrepareForDelivery" xml:space="preserve">
-    <value>la livraison</value>
+    <value>livraison</value>
   </data>
   <data name="PrepareForServing" xml:space="preserve">
-    <value>le service en salle</value>
+    <value>sur place</value>
   </data>
   <data name="PrepareForTakeaway" xml:space="preserve">
-    <value>la vente à emporter</value>
+    <value>à emporter</value>
   </data>
   <data name="Subject" xml:space="preserve">
     <value>Nouvelle commande - {0}</value>

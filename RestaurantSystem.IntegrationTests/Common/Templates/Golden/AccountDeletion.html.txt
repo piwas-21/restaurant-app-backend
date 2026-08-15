@@ -23,7 +23,7 @@
         </div>
         <div class='content'>
             <h2>Hello Jane Doe,</h2>
-            <p>We received a request to delete your Demo Restaurant account. Your account is scheduled for permanent deletion on <strong>May 17, 2030</strong>.</p>
+            <p>We received a request to delete your Demo Restaurant account. Your account is scheduled for permanent deletion on <strong>Friday, May 17, 2030</strong>.</p>
 
             <p>You have two options:</p>
 

@@ -62,7 +62,7 @@
     <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
   </data>
   <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation, faute de disponibilité ou pour une autre raison.</value>
+    <value>Nous ne pouvons malheureusement pas confirmer votre réservation, faute de disponibilité à cet horaire.</value>
   </data>
   <data name="CannotConfirmUpper" xml:space="preserve">
     <value>CONFIRMATION IMPOSSIBLE</value>

@@ -76,6 +76,9 @@
   <data name="Dear" xml:space="preserve">
     <value>Bonjour {0},</value>
   </data>
+  <data name="GreetingNoName" xml:space="preserve">
+    <value>Bonjour,</value>
+  </data>
   <data name="GuestsLabel" xml:space="preserve">
     <value>Convives :</value>
   </data>
@@ -85,8 +88,11 @@
   <data name="HelloFullName" xml:space="preserve">
     <value>Bonjour {0} {1},</value>
   </data>
+  <data name="LabelColon" xml:space="preserve">
+    <value> :</value>
+  </data>
   <data name="LookForward" xml:space="preserve">
-    <value>Nous nous réjouissons de vous accueillir !</value>
+    <value>Au plaisir de vous servir !</value>
   </data>
   <data name="OrderTypeDelivery" xml:space="preserve">
     <value>Livraison</value>
@@ -96,6 +102,15 @@
   </data>
   <data name="OrderTypeTakeaway" xml:space="preserve">
     <value>À emporter</value>
+  </data>
+  <data name="RoleAdmin" xml:space="preserve">
+    <value>administrateur</value>
+  </data>
+  <data name="RoleCustomer" xml:space="preserve">
+    <value>client</value>
+  </data>
+  <data name="RoleStaff" xml:space="preserve">
+    <value>membre du personnel</value>
   </data>
   <data name="SpecialRequestsLabel" xml:space="preserve">
     <value>Demandes particulières :</value>

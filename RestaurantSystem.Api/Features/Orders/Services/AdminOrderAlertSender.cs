@@ -12,7 +12,6 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <inheritdoc />
 public class AdminOrderAlertSender : IAdminOrderAlertSender
 {
-    private const string FallbackCustomerName = "Valued Customer";
     private const string FallbackCustomerEmail = "noemail@example.com";
     private const string FallbackPhone = "Not provided";
 
@@ -82,7 +81,7 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
                     culture,
                     adminEmail,
                     orderNumber,
-                    order.CustomerName ?? FallbackCustomerName,
+                    order.CustomerName ?? string.Empty,
                     order.CustomerEmail ?? FallbackCustomerEmail,
                     order.CustomerPhone ?? FallbackPhone,
                     order.Type,

@@ -51,11 +51,11 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <h2>{t["Heading"]}</h2>
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t.Format("ThankYou", brand.Name)}</p>
 
             <div class='info-box'>
-                <strong>📅 {t["DateLabel"]}</strong> {reservationDate:dddd, MMMM dd, yyyy}<br>
+                <strong>📅 {t["DateLabel"]}</strong> {LongDate(reservationDate, culture)}<br>
                 <strong>🕐 {t["TimeLabel"]}</strong> {startTime:hh':'mm} - {endTime:hh':'mm}<br>
                 <strong>👥 {t["GuestsLabel"]}</strong> {numberOfGuests}<br>
                 <strong>🪑 {t["TableLabel"]}</strong> {EmailHtml.Encode(tableNumber)}
@@ -96,11 +96,11 @@ public static partial class EmailTemplates
 
             return $@"{brand.Name} - {t["Heading"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t.Format("ThankYou", brand.Name)}
 
-{t["DateLabel"]} {reservationDate:dddd, MMMM dd, yyyy}
+{t["DateLabel"]} {LongDate(reservationDate, culture)}
 {t["TimeLabel"]} {startTime:hh':'mm} - {endTime:hh':'mm}
 {t["GuestsLabel"]} {numberOfGuests}
 {t["TableLabel"]} {tableNumber}{requestsSection}

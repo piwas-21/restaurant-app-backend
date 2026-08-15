@@ -18,7 +18,7 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
+            var formattedDate = LongDate(reservationDate, culture);
 
             return $@"
 <!DOCTYPE html>
@@ -44,7 +44,7 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <h2>{t["Heading"]}</h2>
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t["Regret"]}</p>
 
             <div class='info-box'>
@@ -76,11 +76,11 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            var formattedDate = reservationDate.ToString("dddd, MMMM dd, yyyy");
+            var formattedDate = LongDate(reservationDate, culture);
 
             return $@"{brand.Name} - {t["Heading"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t["Regret"]}
 
