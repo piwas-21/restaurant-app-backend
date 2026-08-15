@@ -26,7 +26,7 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var expiryText = expiryDate.HasValue
-                ? $"<p><strong>{t["ExpiresLabel"]}</strong> {expiryDate.Value:MMMM dd, yyyy}</p>"
+                ? $"<p><strong>{t["ExpiresLabel"]}</strong> {LongDate(expiryDate.Value, culture)}</p>"
                 : "";
 
             return $@"
@@ -51,7 +51,7 @@ public static partial class EmailTemplates
             <h1>{t.Format("Heading", EmailHtml.Encode(groupName))}</h1>
         </div>
         <div class=""content"">
-            <p>{t.Format("Hello", EmailHtml.Encode(userName))}</p>
+            <p>{Greeting(t, "Hello", userName, encode: true)}</p>
             <p>{t.Format("Added", $"<strong>{EmailHtml.Encode(groupName)}</strong>")}</p>
             <p>{EmailHtml.Encode(groupDescription)}</p>
             {expiryText}
@@ -75,12 +75,12 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var expiryLine = expiryDate.HasValue
-                ? t.Format("ExpiresLine", $"{expiryDate.Value:MMMM dd, yyyy}")
+                ? t.Format("ExpiresLine", LongDate(expiryDate.Value, culture))
                 : "";
 
             return $@"{t.Format("Heading", groupName)}
 
-{t.Format("Hello", userName)}
+{Greeting(t, "Hello", userName)}
 
 {t.Format("Added", groupName)}
 

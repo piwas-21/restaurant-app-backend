@@ -58,70 +58,55 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="AutomatedMessage" xml:space="preserve">
-    <value>This is an automated message, please do not reply to this email.</value>
+  <data name="ColumnItem" xml:space="preserve">
+    <value>Article</value>
   </data>
-  <data name="BestRegards" xml:space="preserve">
-    <value>Best regards,</value>
+  <data name="ColumnPrice" xml:space="preserve">
+    <value>Prix</value>
   </data>
-  <data name="BrandTeam" xml:space="preserve">
-    <value>{0} Team</value>
+  <data name="ColumnQty" xml:space="preserve">
+    <value>Qté</value>
   </data>
-  <data name="Copyright" xml:space="preserve">
-    <value>© {0} {1}. All rights reserved.</value>
+  <data name="DeliveryLabel" xml:space="preserve">
+    <value>Adresse de livraison :</value>
   </data>
-  <data name="DateLabel" xml:space="preserve">
-    <value>Date:</value>
+  <data name="Heading" xml:space="preserve">
+    <value>Commande reçue</value>
   </data>
-  <data name="Dear" xml:space="preserve">
-    <value>Dear {0},</value>
+  <data name="HeadingUpper" xml:space="preserve">
+    <value>COMMANDE REÇUE</value>
   </data>
-  <data name="GreetingNoName" xml:space="preserve">
-    <value>Hello,</value>
+  <data name="InstructionsLabel" xml:space="preserve">
+    <value>Instructions particulières :</value>
   </data>
-  <data name="GuestsLabel" xml:space="preserve">
-    <value>Guests:</value>
+  <data name="ItemsLabel" xml:space="preserve">
+    <value>Articles commandés :</value>
   </data>
-  <data name="Hello" xml:space="preserve">
-    <value>Hello {0},</value>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>NUMÉRO DE COMMANDE</value>
   </data>
-  <data name="HelloFullName" xml:space="preserve">
-    <value>Hello {0} {1},</value>
+  <data name="OrderTypeLabel" xml:space="preserve">
+    <value>Type de commande :</value>
   </data>
-  <data name="LabelColon" xml:space="preserve">
-    <value>:</value>
+  <data name="PendingBody" xml:space="preserve">
+    <value>Votre commande est en attente de confirmation. Nous vous préviendrons dès que le restaurant l'aura confirmée.</value>
   </data>
-  <data name="LookForward" xml:space="preserve">
-    <value>We look forward to serving you!</value>
+  <data name="PendingTitle" xml:space="preserve">
+    <value>En attente de confirmation</value>
   </data>
-  <data name="OrderTypeDelivery" xml:space="preserve">
-    <value>Delivery</value>
+  <data name="PendingTitleUpper" xml:space="preserve">
+    <value>EN ATTENTE DE CONFIRMATION</value>
   </data>
-  <data name="OrderTypeDineIn" xml:space="preserve">
-    <value>Dine In</value>
+  <data name="Subject" xml:space="preserve">
+    <value>Commande reçue - {0}</value>
   </data>
-  <data name="OrderTypeTakeaway" xml:space="preserve">
-    <value>Takeaway</value>
+  <data name="ThankYou" xml:space="preserve">
+    <value>Merci pour votre commande chez {0} ! Nous avons bien reçu le détail de votre commande.</value>
   </data>
-  <data name="RoleAdmin" xml:space="preserve">
-    <value>Admin</value>
+  <data name="TotalLabel" xml:space="preserve">
+    <value>Montant total :</value>
   </data>
-  <data name="RoleCustomer" xml:space="preserve">
-    <value>Customer</value>
-  </data>
-  <data name="RoleStaff" xml:space="preserve">
-    <value>Staff</value>
-  </data>
-  <data name="SpecialRequestsLabel" xml:space="preserve">
-    <value>Special Requests:</value>
-  </data>
-  <data name="TableLabel" xml:space="preserve">
-    <value>Table:</value>
-  </data>
-  <data name="TheBrandTeam" xml:space="preserve">
-    <value>The {0} Team</value>
-  </data>
-  <data name="TimeLabel" xml:space="preserve">
-    <value>Time:</value>
+  <data name="Track" xml:space="preserve">
+    <value>Vous pouvez suivre l'état de votre commande depuis votre compte. Pour toute question, écrivez-nous à {0}</value>
   </data>
 </root>

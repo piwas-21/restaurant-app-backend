@@ -71,7 +71,7 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <h2>{t["Heading"]}</h2>
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t.Format("ThankYou", brand.Name)}</p>
 
             <div class='order-number'>
@@ -148,11 +148,11 @@ public static partial class EmailTemplates
 
 {t["HeadingUpper"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t.Format("ThankYou", brand.Name)}
 
-{t["OrderNumberLabel"]}: {orderNumber}
+{Labelled(t, t["OrderNumberLabel"], orderNumber)}
 
 {t["PendingTitleUpper"]}
 {t["PendingBody"]}

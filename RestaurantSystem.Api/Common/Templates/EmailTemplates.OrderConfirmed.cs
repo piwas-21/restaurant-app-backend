@@ -49,7 +49,7 @@ public static partial class EmailTemplates
                 <h2 style='margin: 0; color: #27ae60;'>✅ {t["Confirmed"]}</h2>
             </div>
 
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t.Format("GoodNews", $"<strong>#{orderNumber}</strong>")}</p>
 
             <div class='info-box'>
@@ -83,7 +83,7 @@ public static partial class EmailTemplates
 
 ✅ {t["ConfirmedUpper"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t.Format("GoodNews", $"#{orderNumber}")}
 

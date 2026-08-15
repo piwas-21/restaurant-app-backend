@@ -137,7 +137,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
                 await _emailService.SendOrderCancellationEmailAsync(
                     _languages.ForGuest(order.PreferredLanguage),
                     order.CustomerEmail,
-                    order.CustomerName ?? "Customer",
+                    order.CustomerName ?? string.Empty,
                     order.OrderNumber,
                     command.CancellationReason
                 );

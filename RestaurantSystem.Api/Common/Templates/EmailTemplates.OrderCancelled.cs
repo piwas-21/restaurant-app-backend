@@ -44,7 +44,7 @@ public static partial class EmailTemplates
         </div>
         <div class='content'>
             <h2>{t["Heading"]}</h2>
-            <p>{t.Format("Dear", EmailHtml.Encode(customerName))}</p>
+            <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t["Regret"]}</p>
 
             <div class='order-number'>
@@ -76,7 +76,7 @@ public static partial class EmailTemplates
             var email = contactEmail;
             return $@"{brand.Name} - {t["Heading"]}
 
-{t.Format("Dear", customerName)}
+{Greeting(t, "Dear", customerName)}
 
 {t["Regret"]}
 

@@ -18,7 +18,7 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var greeting = t.Format("Greeting", EmailHtml.Encode(firstName));
-            var accountCreated = t.Format("AccountCreated", $"<strong>{EmailHtml.Encode(role)}</strong>");
+            var accountCreated = t.Format("AccountCreated", $"<strong>{EmailHtml.Encode(RoleLabel(t, role))}</strong>");
             var thankYou = t.Format("ThankYou", brand.Name);
 
             return $@"
@@ -81,12 +81,12 @@ public static partial class EmailTemplates
 
 {t.Format("Greeting", firstName)}
 
-{t.Format("AccountCreated", role)}
+{t.Format("AccountCreated", RoleLabel(t, role))}
 
-{t["SecurityTitle"]}:
+{Heading(t, t["SecurityTitle"])}
 {t["SecurityBody"]}
 
-{t["GettingStartedTitle"]}:
+{Heading(t, t["GettingStartedTitle"])}
 {t["GettingStartedBody"]}
 
 {t["HelpTitle"]}
