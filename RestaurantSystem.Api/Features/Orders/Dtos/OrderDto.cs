@@ -58,6 +58,14 @@ public record OrderDto
 
 
 
+    /// <summary>
+    /// The language this order's mails are written in — frozen at creation from the guest's own
+    /// request (EMAIL-LOCALISATION-PLAN §1 rank 1, S4), <c>null</c> on every order placed before
+    /// that shipped. Read-only, and carried on the DTO because the two mails that need it are sent
+    /// from a detached task and from the anonymous resend endpoint, neither of which has the entity.
+    /// </summary>
+    public string? PreferredLanguage { get; set; }
+
     // Additional Info
     public string? Notes { get; set; }
     public DeliveryAddressDto? DeliveryAddress { get; set; }

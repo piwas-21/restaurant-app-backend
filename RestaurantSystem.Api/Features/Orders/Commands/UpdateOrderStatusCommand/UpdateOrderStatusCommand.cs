@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -26,7 +26,9 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
     private readonly IOrderEventService _orderEventService;
     private readonly ILogger<UpdateOrderStatusCommandHandler> _logger;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderNotificationService _notifications;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly IConfiguration _configuration;
 
     public UpdateOrderStatusCommandHandler(
@@ -34,7 +36,9 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
           ICurrentUserService currentUserService,
           IOrderEventService orderEventService,
           IOrderMappingService mappingService,
+          IOrderNotificationService notifications,
           IEmailService emailService,
+          IEmailLanguageResolver languages,
           ILogger<UpdateOrderStatusCommandHandler> logger,
           IConfiguration configuration)
     {
@@ -42,7 +46,9 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
         _currentUserService = currentUserService;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
+        _notifications = notifications;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
         _configuration = configuration;
     }
@@ -110,24 +116,13 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                 var prepMinutes = command.EstimatedPreparationMinutes ?? 20;
                 order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(prepMinutes);
 
-                // Send confirmation email
-                if (!string.IsNullOrEmpty(order.CustomerEmail))
-                {
-                    try
-                    {
-                        await _emailService.SendOrderConfirmedEmailAsync(EmailCultures.English,
-                            order.CustomerEmail,
-                            order.CustomerName ?? "Customer",
-                            order.OrderNumber,
-                            order.Type.ToString(),
-                            prepMinutes
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to send order confirmed email for order {OrderNumber}", order.OrderNumber);
-                    }
-                }
+                // Delegated rather than repeated: this is the same mail the creation and
+                // settlement paths send (M8 has three triggers), and it now has a language to get
+                // right as well as a body. The service keeps the empty-address guard and the
+                // swallow-and-log this block used to spell out itself; the only visible difference
+                // is the nameless-guest fallback, which becomes the "Valued Customer" every other
+                // order mail already uses.
+                await _notifications.SendOrderConfirmedAsync(order, prepMinutes, cancellationToken);
                 break;
 
             case OrderStatus.Completed:
@@ -155,7 +150,10 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                         _logger.LogInformation("Sending order delay email for {OrderNumber}. BackendBaseUrl from config: {BaseUrl}",
                             order.OrderNumber, baseUrl);
 
-                        await _emailService.SendOrderDelayedEmailAsync(EmailCultures.English,
+                        // The order's own language (§1 rank 1): a delay is announced by staff, so
+                        // this request is the restaurant's, not the guest's.
+                        await _emailService.SendOrderDelayedEmailAsync(
+                            _languages.ForGuest(order.PreferredLanguage),
                             order.CustomerEmail,
                             order.CustomerName ?? "Customer",
                             order.OrderNumber,

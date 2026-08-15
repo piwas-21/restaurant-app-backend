@@ -36,6 +36,7 @@
         "actualDeliveryTime": null,
         "createdAt": "__volatile__",
         "updatedAt": null,
+        "preferredLanguage": null,
         "notes": null,
         "deliveryAddress": null,
         "cancellationReason": null,
@@ -147,6 +148,7 @@
         "actualDeliveryTime": null,
         "createdAt": "__volatile__",
         "updatedAt": null,
+        "preferredLanguage": null,
         "notes": null,
         "deliveryAddress": {
           "id": "__volatile__",

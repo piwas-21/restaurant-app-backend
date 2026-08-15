@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -24,12 +24,14 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
     private readonly ILogger<CancelOrderCommandHandler> _logger;
     private readonly IOrderMappingService _mappingService;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
 
     public CancelOrderCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
         IOrderMappingService mappingService,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<CancelOrderCommandHandler> logger)
     {
         _context = context;
@@ -37,6 +39,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         _logger = logger;
         _mappingService = mappingService;
         _emailService = emailService;
+        _languages = languages;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(CancelOrderCommand command, CancellationToken cancellationToken)
@@ -129,7 +132,10 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         {
             try
             {
-                await _emailService.SendOrderCancellationEmailAsync(EmailCultures.English,
+                // A cancellation is a staff action, so the order's frozen language is the guest's
+                // only voice here (§6.10).
+                await _emailService.SendOrderCancellationEmailAsync(
+                    _languages.ForGuest(order.PreferredLanguage),
                     order.CustomerEmail,
                     order.CustomerName ?? "Customer",
                     order.OrderNumber,

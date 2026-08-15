@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -208,6 +209,7 @@ public class CancelOrderCommandHandlerTests : IAsyncLifetime
             currentUser.Object,
             mapping.Object,
             new Mock<IEmailService>().Object,
+            TestEmailLanguages.Resolver(),
             NullLogger<CancelOrderCommandHandler>.Instance);
 
         return await handler.Handle(

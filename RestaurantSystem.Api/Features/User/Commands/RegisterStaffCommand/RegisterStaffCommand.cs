@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -23,6 +23,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
     private readonly ITokenService _tokenService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<RegisterStaffCommandHandler> _logger;
 
     public RegisterStaffCommandHandler(
@@ -30,12 +31,14 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
         ITokenService tokenService,
         ICurrentUserService currentUserService,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<RegisterStaffCommandHandler> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _currentUserService = currentUserService;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
     }
 
@@ -85,7 +88,10 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
         // Send welcome email
         try
         {
-            await _emailService.SendWelcomeEmailAsync(EmailCultures.English, newUser);
+            // A staff account created BY an admin has expressed no language of its own yet, so this
+            // resolves to the tenant's — deliberately not the admin's browser, which is whose
+            // request this is.
+            await _emailService.SendWelcomeEmailAsync(_languages.ForAccount(newUser), newUser);
         }
         catch (Exception ex)
         {

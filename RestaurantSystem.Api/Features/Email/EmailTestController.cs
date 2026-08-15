@@ -8,6 +8,18 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Email;
 
+/// <summary>
+/// Development-only diagnostic sends (D1–D6, EMAIL-SPEC-TENANT-APP §2). Every endpoint here is
+/// gated on <c>IsDevelopment()</c> and mails a throw-away <c>ApplicationUser</c> that was never
+/// persisted.
+/// </summary>
+/// <remarks>
+/// These are the only senders left naming <see cref="EmailCultures.English"/> after GAP-2 S5, and
+/// deliberately: there is no recipient row to resolve a language from and no tenant preference
+/// worth honouring — what a developer wants from a smoke test is the neutral resource set, the
+/// same output the golden snapshots pin. To preview a translation, render the template directly
+/// with the culture rather than teaching this controller to guess one.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
 public class EmailTestController : ControllerBase

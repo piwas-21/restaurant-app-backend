@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -16,15 +16,18 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<UpdateReservationCommandHandler> _logger;
 
     public UpdateReservationCommandHandler(
         ApplicationDbContext context,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<UpdateReservationCommandHandler> logger)
     {
         _context = context;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
     }
 
@@ -94,7 +97,9 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
             {
                 try
                 {
-                    await _emailService.SendReservationApprovedEmailAsync(EmailCultures.English,
+                    // The guest's, frozen on the booking — this is a STAFF request (§6.10).
+                    await _emailService.SendReservationApprovedEmailAsync(
+                        _languages.ForGuest(reservation.PreferredLanguage),
                         reservation.CustomerEmail,
                         reservation.CustomerName,
                         table.TableNumber,

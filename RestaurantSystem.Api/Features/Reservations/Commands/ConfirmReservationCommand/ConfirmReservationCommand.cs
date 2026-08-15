@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -14,15 +14,18 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<ConfirmReservationCommandHandler> _logger;
 
     public ConfirmReservationCommandHandler(
         ApplicationDbContext context,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<ConfirmReservationCommandHandler> logger)
     {
         _context = context;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
     }
 
@@ -60,7 +63,11 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
             // Send confirmation email to customer
             try
             {
-                await _emailService.SendReservationApprovedEmailAsync(EmailCultures.English,
+                // The booking's own language. This handler also serves the quick-approve link in
+                // the restaurant's alert mail, which the RESTAURANT clicks in ITS browser — rank 3
+                // here would mail the guest in the staff browser's language (§6.10).
+                await _emailService.SendReservationApprovedEmailAsync(
+                    _languages.ForGuest(reservation.PreferredLanguage),
                     reservation.CustomerEmail,
                     reservation.CustomerName,
                     reservation.Table?.TableNumber ?? "N/A",

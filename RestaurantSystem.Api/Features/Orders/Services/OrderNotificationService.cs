@@ -1,5 +1,5 @@
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -13,6 +13,7 @@ public class OrderNotificationService : IOrderNotificationService
     private const int DineInDefaultPrepMinutes = 15;
 
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly IOrderEventService _orderEventService;
     private readonly IGuestOrderReceiptSender _receipts;
     private readonly IAdminOrderAlertSender _adminAlerts;
@@ -20,12 +21,14 @@ public class OrderNotificationService : IOrderNotificationService
 
     public OrderNotificationService(
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         IOrderEventService orderEventService,
         IGuestOrderReceiptSender receipts,
         IAdminOrderAlertSender adminAlerts,
         ILogger<OrderNotificationService> logger)
     {
         _emailService = emailService;
+        _languages = languages;
         _orderEventService = orderEventService;
         _receipts = receipts;
         _adminAlerts = adminAlerts;
@@ -43,16 +46,21 @@ public class OrderNotificationService : IOrderNotificationService
 
         try
         {
-            await _emailService.SendOrderConfirmedEmailAsync(EmailCultures.English,
+            // The order's frozen language. Both callers are staff or machine requests — a status
+            // change made in the restaurant, and the Stripe settlement webhook, whose
+            // Accept-Language is Stripe's (§6.1) — so the row is the only guest voice here.
+            await _emailService.SendOrderConfirmedEmailAsync(
+                _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
                 order.CustomerName ?? FallbackCustomerName,
                 order.OrderNumber,
                 order.Type.ToString(),
                 estimatedPreparationMinutes);
 
-            _logger.LogInformation(
-                "Sent order-confirmed email for order {OrderNumber} to {Email}",
-                order.OrderNumber, order.CustomerEmail);
+            // The order number, not the address: this line now also covers the staff status-change
+            // path, and the recipient's email is PII this log has no need to carry
+            // (docs/privacy/pii-inventory.md).
+            _logger.LogInformation("Sent order-confirmed email for order {OrderNumber}", order.OrderNumber);
         }
         catch (Exception ex)
         {

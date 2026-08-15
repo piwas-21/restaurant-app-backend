@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ForgotPasswordCommand;
@@ -14,13 +14,18 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<ForgotPasswordCommandHandler> _logger;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
 
-
-    public ForgotPasswordCommandHandler(UserManager<ApplicationUser> userManager, ILogger<ForgotPasswordCommandHandler> logger, IEmailService emailService)
+    public ForgotPasswordCommandHandler(
+        UserManager<ApplicationUser> userManager,
+        ILogger<ForgotPasswordCommandHandler> logger,
+        IEmailService emailService,
+        IEmailLanguageResolver languages)
     {
         _userManager = userManager;
         _logger = logger;
         _emailService = emailService;
+        _languages = languages;
     }
 
     public async Task<ApiResponse<string>> Handle(ForgotPasswordCommand command, CancellationToken cancellationToken)
@@ -37,7 +42,10 @@ public class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswordComman
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-        await _emailService.SendPasswordResetEmailAsync(EmailCultures.English, user, token);
+        // The ACCOUNT's language, never this request's: this endpoint is anonymous and takes an
+        // address from anyone, so rank 3 here would let a stranger choose the language a reset
+        // mail arrives in on someone else's inbox.
+        await _emailService.SendPasswordResetEmailAsync(_languages.ForAccount(user), user, token);
 
         return ApiResponse<string>.SuccessWithData(
             "If the email exists in our system, a password reset link has been sent.",
