@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.ResetPasswordCommand;
@@ -17,15 +17,18 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
     public ResetPasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<ResetPasswordCommandHandler> logger)
     {
         _userManager = userManager;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
     }
 
@@ -57,7 +60,7 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
         // Send password changed notification email
         try
         {
-            await _emailService.SendPasswordChangedNotificationAsync(EmailCultures.English, user);
+            await _emailService.SendPasswordChangedNotificationAsync(_languages.ForAccount(user), user);
         }
         catch (Exception ex)
         {

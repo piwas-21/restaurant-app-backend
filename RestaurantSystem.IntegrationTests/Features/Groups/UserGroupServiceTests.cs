@@ -73,6 +73,7 @@ public class UserGroupServiceTests : IAsyncLifetime
             _qrCodeService,
             _currentUserServiceMock.Object,
             _emailServiceMock.Object,
+            TestEmailLanguages.Resolver(),
             NullLogger<GroupMembershipService>.Instance);
         var membershipQrService = new MembershipQrService(_context, _qrCodeService);
 
@@ -368,6 +369,7 @@ public class UserGroupServiceTests : IAsyncLifetime
             _qrCodeService,
             _currentUserServiceMock.Object,
             emailServiceMock.Object,
+            TestEmailLanguages.Resolver(),
             logger.Object);
 
         // Unchanged behaviour: a failed email must never fail membership creation.

@@ -25,6 +25,19 @@ public interface IOrderNotificationService
     Task SendOrderConfirmedAsync(Order order, int estimatedPreparationMinutes, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Sends the "your order is delayed" email (M10), whose two buttons are the only way to reach
+    /// the anonymous approve/reject endpoints. Failures are logged and swallowed — the status
+    /// change has already happened.
+    /// </summary>
+    /// <remarks>
+    /// Lives here rather than in the status handler for the reason M8 does: the mail's language is
+    /// the ORDER's (§1 rank 1), never the staff request's that triggered it, and one place to get
+    /// that right is better than three. The approve/reject links are built from
+    /// <c>EmailSettings.BackendBaseUrl</c>, which start-up validation guarantees.
+    /// </remarks>
+    Task SendOrderDelayedAsync(Order order, int delayMinutes, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every mail a newly created order owes, sent by the server the moment the order exists —
     /// the guest's receipt, the restaurant's alert, and for dine-in the confirmed mail as well.
     /// Never throws: the order is already committed.

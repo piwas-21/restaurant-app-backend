@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -13,19 +15,27 @@ public class OrderNotificationService : IOrderNotificationService
     private const int DineInDefaultPrepMinutes = 15;
 
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly IOrderEventService _orderEventService;
     private readonly IGuestOrderReceiptSender _receipts;
     private readonly IAdminOrderAlertSender _adminAlerts;
+    private readonly EmailSettings _emailSettings;
     private readonly ILogger<OrderNotificationService> _logger;
 
     public OrderNotificationService(
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         IOrderEventService orderEventService,
         IGuestOrderReceiptSender receipts,
         IAdminOrderAlertSender adminAlerts,
+        IOptions<EmailSettings> emailSettings,
         ILogger<OrderNotificationService> logger)
     {
+        ArgumentNullException.ThrowIfNull(emailSettings);
+
         _emailService = emailService;
+        _languages = languages;
+        _emailSettings = emailSettings.Value;
         _orderEventService = orderEventService;
         _receipts = receipts;
         _adminAlerts = adminAlerts;
@@ -43,22 +53,60 @@ public class OrderNotificationService : IOrderNotificationService
 
         try
         {
-            await _emailService.SendOrderConfirmedEmailAsync(EmailCultures.English,
+            // The order's frozen language. Both callers are staff or machine requests — a status
+            // change made in the restaurant, and the Stripe settlement webhook, whose
+            // Accept-Language is Stripe's (§6.1) — so the row is the only guest voice here.
+            await _emailService.SendOrderConfirmedEmailAsync(
+                _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
                 order.CustomerName ?? FallbackCustomerName,
                 order.OrderNumber,
                 order.Type.ToString(),
                 estimatedPreparationMinutes);
 
-            _logger.LogInformation(
-                "Sent order-confirmed email for order {OrderNumber} to {Email}",
-                order.OrderNumber, order.CustomerEmail);
+            // The order number, not the address: this line now also covers the staff status-change
+            // path, and the recipient's email is PII this log has no need to carry
+            // (docs/privacy/pii-inventory.md).
+            _logger.LogInformation("Sent order-confirmed email for order {OrderNumber}", order.OrderNumber);
         }
         catch (Exception ex)
         {
             // Order creation must not fail because email did — preserved
             // verbatim from the inline handler block.
             _logger.LogError(ex, "Failed to send order-confirmed email for order {OrderNumber}", order.OrderNumber);
+        }
+    }
+
+    public async Task SendOrderDelayedAsync(Order order, int delayMinutes, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+
+        if (string.IsNullOrEmpty(order.CustomerEmail))
+        {
+            return;
+        }
+
+        try
+        {
+            // The order's own language (§1 rank 1). A delay is announced by staff, so the request
+            // this runs on is the restaurant's, not the guest's (§6.10).
+            var baseUrl = _emailSettings.BackendBaseUrl;
+
+            await _emailService.SendOrderDelayedEmailAsync(
+                _languages.ForGuest(order.PreferredLanguage),
+                order.CustomerEmail,
+                order.CustomerName ?? FallbackCustomerName,
+                order.OrderNumber,
+                delayMinutes,
+                $"{baseUrl}/api/orders/{order.Id}/approve-delay",
+                $"{baseUrl}/api/orders/{order.Id}/reject-delay");
+
+            _logger.LogInformation("Sent order-delayed email for order {OrderNumber}", order.OrderNumber);
+        }
+        catch (Exception ex)
+        {
+            // A status change that is already saved must not fail over a mail.
+            _logger.LogError(ex, "Failed to send order delayed email for order {OrderNumber}", order.OrderNumber);
         }
     }
 

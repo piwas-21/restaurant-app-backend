@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -21,30 +21,31 @@ public record UpdateOrderStatusCommand : ICommand<ApiResponse<OrderDto>>
 
 public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatusCommand, ApiResponse<OrderDto>>
 {
+    // What the two mailing branches assume when the caller states no estimate. Named rather than
+    // repeated: it was the same literal 20 in both, and a magic number in each.
+    private const int DefaultPreparationMinutes = 20;
+
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly IOrderEventService _orderEventService;
     private readonly ILogger<UpdateOrderStatusCommandHandler> _logger;
     private readonly IOrderMappingService _mappingService;
-    private readonly IEmailService _emailService;
-    private readonly IConfiguration _configuration;
+    private readonly IOrderNotificationService _notifications;
 
     public UpdateOrderStatusCommandHandler(
           ApplicationDbContext context,
           ICurrentUserService currentUserService,
           IOrderEventService orderEventService,
           IOrderMappingService mappingService,
-          IEmailService emailService,
-          ILogger<UpdateOrderStatusCommandHandler> logger,
-          IConfiguration configuration)
+          IOrderNotificationService notifications,
+          ILogger<UpdateOrderStatusCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
-        _emailService = emailService;
+        _notifications = notifications;
         _logger = logger;
-        _configuration = configuration;
     }
 
 
@@ -107,27 +108,16 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
             case OrderStatus.Confirmed:
                 // Set estimated delivery/preparation time
                 // Default to 20 minutes if not specified
-                var prepMinutes = command.EstimatedPreparationMinutes ?? 20;
+                var prepMinutes = command.EstimatedPreparationMinutes ?? DefaultPreparationMinutes;
                 order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(prepMinutes);
 
-                // Send confirmation email
-                if (!string.IsNullOrEmpty(order.CustomerEmail))
-                {
-                    try
-                    {
-                        await _emailService.SendOrderConfirmedEmailAsync(EmailCultures.English,
-                            order.CustomerEmail,
-                            order.CustomerName ?? "Customer",
-                            order.OrderNumber,
-                            order.Type.ToString(),
-                            prepMinutes
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to send order confirmed email for order {OrderNumber}", order.OrderNumber);
-                    }
-                }
+                // Delegated rather than repeated: this is the same mail the creation and
+                // settlement paths send (M8 has three triggers), and it now has a language to get
+                // right as well as a body. The service keeps the empty-address guard and the
+                // swallow-and-log this block used to spell out itself; the only visible difference
+                // is the nameless-guest fallback, which becomes the "Valued Customer" every other
+                // order mail already uses.
+                await _notifications.SendOrderConfirmedAsync(order, prepMinutes, cancellationToken);
                 break;
 
             case OrderStatus.Completed:
@@ -142,33 +132,12 @@ public class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrderStatus
                 }
                 break;
             case OrderStatus.PendingApproval:
-                // Send delayed order email with approval options
-                if (!string.IsNullOrEmpty(order.CustomerEmail))
-                {
-                    try
-                    {
-                        var delayedPrepMinutes = command.EstimatedPreparationMinutes ?? 20;
-                        var baseUrl = _configuration["EmailSettings:BackendBaseUrl"] ?? "http://localhost:5221";
-                        var approveUrl = $"{baseUrl}/api/orders/{order.Id}/approve-delay";
-                        var rejectUrl = $"{baseUrl}/api/orders/{order.Id}/reject-delay";
-
-                        _logger.LogInformation("Sending order delay email for {OrderNumber}. BackendBaseUrl from config: {BaseUrl}",
-                            order.OrderNumber, baseUrl);
-
-                        await _emailService.SendOrderDelayedEmailAsync(EmailCultures.English,
-                            order.CustomerEmail,
-                            order.CustomerName ?? "Customer",
-                            order.OrderNumber,
-                            delayedPrepMinutes,
-                            approveUrl,
-                            rejectUrl
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to send order delayed email for order {OrderNumber}", order.OrderNumber);
-                    }
-                }
+                // Delegated for the same reason the Confirmed branch above is: this mail's language
+                // is the ORDER's, not this staff request's, and the approve/reject links now come
+                // from validated EmailSettings rather than a raw config read with a localhost
+                // fallback that would have shipped dead buttons if the key were ever missing.
+                await _notifications.SendOrderDelayedAsync(
+                    order, command.EstimatedPreparationMinutes ?? DefaultPreparationMinutes, cancellationToken);
                 break;
         }
 

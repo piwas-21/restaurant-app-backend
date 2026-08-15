@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -102,7 +102,10 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
         // Send verification email
         try
         {
-            await _emailService.SendEmailVerificationAsync(EmailCultures.English, newUser, verificationToken);
+            // The language this registration was made in, which the row above just recorded — the
+            // one mail whose recipient asked for it moments ago, in this very request.
+            await _emailService.SendEmailVerificationAsync(
+                _languages.ForAccount(newUser), newUser, verificationToken);
         }
         catch (Exception ex)
         {

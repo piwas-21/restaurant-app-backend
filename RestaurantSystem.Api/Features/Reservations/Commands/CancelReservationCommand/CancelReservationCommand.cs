@@ -4,7 +4,6 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -18,6 +17,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly IEmailBrandingProvider _brandingProvider;
+    private readonly IEmailLanguageResolver _languages;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<CancelReservationCommandHandler> _logger;
 
@@ -25,12 +25,14 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
         ApplicationDbContext context,
         IEmailService emailService,
         IEmailBrandingProvider brandingProvider,
+        IEmailLanguageResolver languages,
         IOptions<EmailSettings> emailSettings,
         ILogger<CancelReservationCommandHandler> logger)
     {
         _context = context;
         _emailService = emailService;
         _brandingProvider = brandingProvider;
+        _languages = languages;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
@@ -65,10 +67,13 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
             {
                 var brand = await _brandingProvider.GetAsync(cancellationToken);
 
+                // A cancellation is always a staff action, so the language is the booking's own.
+                var culture = _languages.ForGuest(reservation.PreferredLanguage);
+
                 await _emailService.SendEmailAsync(
                     reservation.CustomerEmail,
-                    Common.Templates.EmailTemplates.ReservationRejected.GetSubject(EmailCultures.English, brand),
-                    Common.Templates.EmailTemplates.ReservationRejected.GetHtmlBody(EmailCultures.English,
+                    Common.Templates.EmailTemplates.ReservationRejected.GetSubject(culture, brand),
+                    Common.Templates.EmailTemplates.ReservationRejected.GetHtmlBody(culture,
                         brand,
                         reservation.CustomerName,
                         reservation.ReservationDate,
@@ -76,7 +81,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
                         reservation.NumberOfGuests,
                         _emailSettings.AdminEmail
                     ),
-                    Common.Templates.EmailTemplates.ReservationRejected.GetTextBody(EmailCultures.English,
+                    Common.Templates.EmailTemplates.ReservationRejected.GetTextBody(culture,
                         brand,
                         reservation.CustomerName,
                         reservation.ReservationDate,
