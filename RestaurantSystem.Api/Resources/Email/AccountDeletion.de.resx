@@ -58,34 +58,49 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="ImportantLabel" xml:space="preserve">
+    <value>Wichtig:</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="ImportantUpper" xml:space="preserve">
+    <value>WICHTIG:</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="NoActionWarning" xml:space="preserve">
+    <value>Wenn Sie nichts unternehmen, wird Ihr Konto am oben genannten Datum automatisch gelöscht.</value>
   </data>
-  <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+  <data name="NotYou" xml:space="preserve">
+    <value>Falls Sie diese Anfrage nicht gestellt haben, ändern Sie bitte umgehend Ihr Passwort.</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="Option1BodyHtml" xml:space="preserve">
+    <value>Klicken Sie auf die Schaltfläche unten, um Ihr Konto sofort dauerhaft zu löschen. Dieser Schritt kann nicht rückgängig gemacht werden.</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="Option1BodyText" xml:space="preserve">
+    <value>Öffnen Sie den folgenden Link, um Ihr Konto sofort dauerhaft zu löschen. Dieser Schritt kann nicht rückgängig gemacht werden.</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="Option1Button" xml:space="preserve">
+    <value>Konto sofort löschen</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="Option1Title" xml:space="preserve">
+    <value>Option 1: Sofort löschen</value>
+  </data>
+  <data name="Option2Body" xml:space="preserve">
+    <value>Wenn Sie es sich anders überlegt haben, melden Sie sich einfach in Ihrem Konto an. Damit wird die Löschanfrage automatisch aufgehoben.</value>
+  </data>
+  <data name="Option2Button" xml:space="preserve">
+    <value>Zum Abbrechen anmelden</value>
+  </data>
+  <data name="Option2Title" xml:space="preserve">
+    <value>Option 2: Löschung abbrechen</value>
+  </data>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Anfrage zur Kontolöschung</value>
+  </data>
+  <data name="Scheduled" xml:space="preserve">
+    <value>Wir haben eine Anfrage zur Löschung Ihres Kontos bei {0} erhalten. Ihr Konto wird am {1} endgültig gelöscht.</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Aktion erforderlich: Anfrage zur Kontolöschung - {0}</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="TwoOptions" xml:space="preserve">
+    <value>Sie haben zwei Möglichkeiten:</value>
   </data>
 </root>

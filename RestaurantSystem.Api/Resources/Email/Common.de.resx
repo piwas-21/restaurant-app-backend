@@ -58,34 +58,70 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="AutomatedMessage" xml:space="preserve">
+    <value>Dies ist eine automatisch versendete Nachricht, bitte antworten Sie nicht darauf.</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="BestRegards" xml:space="preserve">
+    <value>Freundliche Grüsse,</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="BrandTeam" xml:space="preserve">
+    <value>Team {0}</value>
   </data>
-  <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+  <data name="Copyright" xml:space="preserve">
+    <value>© {0} {1}. Alle Rechte vorbehalten.</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="DateLabel" xml:space="preserve">
+    <value>Datum:</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="Dear" xml:space="preserve">
+    <value>Guten Tag {0},</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="GreetingNoName" xml:space="preserve">
+    <value>Guten Tag,</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="GuestsLabel" xml:space="preserve">
+    <value>Personen:</value>
   </data>
-  <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+  <data name="Hello" xml:space="preserve">
+    <value>Hallo {0},</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="HelloFullName" xml:space="preserve">
+    <value>Hallo {0} {1},</value>
+  </data>
+  <data name="LabelColon" xml:space="preserve">
+    <value>:</value>
+  </data>
+  <data name="LookForward" xml:space="preserve">
+    <value>Wir freuen uns auf Ihren Besuch!</value>
+  </data>
+  <data name="OrderTypeDelivery" xml:space="preserve">
+    <value>Lieferung</value>
+  </data>
+  <data name="OrderTypeDineIn" xml:space="preserve">
+    <value>Vor Ort</value>
+  </data>
+  <data name="OrderTypeTakeaway" xml:space="preserve">
+    <value>Zum Mitnehmen</value>
+  </data>
+  <data name="RoleAdmin" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="RoleCustomer" xml:space="preserve">
+    <value>Kunde</value>
+  </data>
+  <data name="RoleStaff" xml:space="preserve">
+    <value>Mitarbeiter</value>
+  </data>
+  <data name="SpecialRequestsLabel" xml:space="preserve">
+    <value>Besondere Wünsche:</value>
+  </data>
+  <data name="TableLabel" xml:space="preserve">
+    <value>Tisch:</value>
+  </data>
+  <data name="TheBrandTeam" xml:space="preserve">
+    <value>Ihr Team von {0}</value>
+  </data>
+  <data name="TimeLabel" xml:space="preserve">
+    <value>Uhrzeit:</value>
   </data>
 </root>

@@ -59,33 +59,33 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+    <value>Wir bitten um Entschuldigung für die Umstände</value>
   </data>
   <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+    <value>Leider können wir Ihre Reservierung nicht bestätigen. Das kann an der Verfügbarkeit oder an anderen Gründen liegen.</value>
   </data>
   <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+    <value>BESTÄTIGUNG NICHT MÖGLICH</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Neues zu Ihrer Reservierung</value>
   </data>
   <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+    <value>Wir hoffen, Sie bald bei uns begrüssen zu dürfen!</value>
   </data>
   <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+    <value>Bei Fragen erreichen Sie uns jederzeit unter {0} oder telefonisch.</value>
   </data>
   <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+    <value>Leider müssen wir Ihnen mitteilen, dass wir Ihre Reservierungsanfrage derzeit nicht annehmen können.</value>
   </data>
   <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+    <value>Angefragte Reservierung:</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Neues zu Ihrer Reservierung - {0}</value>
   </data>
   <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+    <value>Versuchen Sie es gerne mit einem anderen Datum oder einer anderen Uhrzeit. Sie können auf unserer Website neu reservieren oder uns direkt kontaktieren.</value>
   </data>
 </root>

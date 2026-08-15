@@ -58,34 +58,37 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="Closing" xml:space="preserve">
+    <value>Wir freuen uns darauf, Sie zu bewirten!</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="CopyLink" xml:space="preserve">
+    <value>Oder kopieren Sie diesen Link:</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="Expiry" xml:space="preserve">
+    <value>Aus Sicherheitsgründen läuft dieser Bestätigungslink in 24 Stunden ab.</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Willkommen bei {0}! 🎉</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="IgnoreEmail" xml:space="preserve">
+    <value>Falls Sie kein Konto bei {0} erstellt haben, können Sie diese E-Mail einfach ignorieren.</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="IntroHtml" xml:space="preserve">
+    <value>Danke, dass Sie Teil von {0} geworden sind! Wir freuen uns, Sie auf unsere kulinarische Reise mitzunehmen. Bitte bestätigen Sie zum Start Ihre E-Mail-Adresse.</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="IntroText" xml:space="preserve">
+    <value>Danke, dass Sie Teil von {0} geworden sind! Wir freuen uns, Sie auf unsere kulinarische Reise mitzunehmen. Bitte bestätigen Sie zum Start Ihre E-Mail-Adresse, indem Sie den folgenden Link öffnen:</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="QuickTipLabel" xml:space="preserve">
+    <value>Tipp:</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Bestätigen Sie Ihre E-Mail-Adresse - {0}</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="TextHeading" xml:space="preserve">
+    <value>E-Mail-Bestätigung</value>
+  </data>
+  <data name="VerifyButton" xml:space="preserve">
+    <value>E-Mail-Adresse bestätigen</value>
   </data>
 </root>
