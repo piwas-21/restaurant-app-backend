@@ -118,10 +118,11 @@ public sealed class EmailLanguageResolver : IEmailLanguageResolver
         return header
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(ParseEntry)
-            .Where(entry => entry.Quality > 0 && entry.Language is not null)
+            .Where(entry => entry.Quality > 0)
             .OrderByDescending(entry => entry.Quality)
             .Select(entry => entry.Language)
-            .FirstOrDefault(language => supported.Contains(language!));
+            .OfType<string>()
+            .FirstOrDefault(supported.Contains);
     }
 
     private static (string? Language, double Quality) ParseEntry(string entry)
