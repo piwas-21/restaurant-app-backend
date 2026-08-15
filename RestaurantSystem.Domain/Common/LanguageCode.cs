@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Frozen;
 
 namespace RestaurantSystem.Domain.Common;
@@ -33,6 +34,13 @@ public static class LanguageCode
     private static readonly FrozenSet<string> SupportedLookup =
         Supported.ToFrozenSet(StringComparer.Ordinal);
 
+    // Everything RFC 5646 allows in a tag. Anything else — whitespace, a quality parameter, a
+    // control character — means this is not one tag, whatever else it might be.
+    private static readonly SearchValues<char> TagCharacters = SearchValues.Create(
+        "abcdefghijklmnopqrstuvwxyz" +   // pragma: allowlist secret — an alphabet, not a key
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+        "0123456789-_");
+
     /// <summary>
     /// The canonical code for <paramref name="value"/>, or <c>null</c> when it is blank,
     /// malformed, or a language the product has no copy for. Null means "no preference
@@ -57,8 +65,10 @@ public static class LanguageCode
         var candidate = value.Trim();
 
         // A list, a quality parameter or embedded whitespace means the caller handed over
-        // something that is not a single language tag. Refuse it whole.
-        if (candidate.Any(character => character is ',' or ';' || char.IsWhiteSpace(character)))
+        // something that is not a single language tag. Refuse it whole. (A well-formed RFC 5646
+        // tag is letters, digits and '-' only, so nothing legitimate is rejected here.)
+        var span = candidate.AsSpan();
+        if (span.ContainsAny(',', ';') || span.ContainsAnyExcept(TagCharacters))
         {
             return null;
         }

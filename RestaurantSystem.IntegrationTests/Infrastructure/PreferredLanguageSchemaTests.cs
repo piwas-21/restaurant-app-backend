@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Common;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
@@ -103,22 +104,78 @@ public class PreferredLanguageSchemaTests : IntegrationTestBase
     /// has no copy for becomes NULL (fall through to the next rank) rather than being stored, and
     /// an over-long one cannot reach a varchar(10) and turn a guest's order into a 500.
     /// </summary>
+    /// <remarks>
+    /// Run against all THREE tables. The converter is configured in three separate files, and the
+    /// two that are not the identity table are the ones with the guest-visible failure mode —
+    /// deleting the line from OrderConfiguration or ReservationConfiguration must not leave a green
+    /// suite.
+    /// </remarks>
     [Theory]
     [InlineData("FR-ch", "fr")]
     [InlineData("klingon", null)]
     [InlineData("fr,en;q=0.9", null)]
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", null)]
-    public async Task The_column_refuses_anything_that_is_not_a_supported_code(string written, string? stored)
+    public async Task No_table_stores_anything_that_is_not_a_supported_code(string written, string? stored)
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var user = await context.Users.FirstAsync();
         user.PreferredLanguage = written;
+
+        var orderId = Guid.NewGuid();
+        await TestOrderSeeder.SeedOrderAsync(context, orderId);
+        var order = await context.Orders.FirstAsync(o => o.Id == orderId);
+        order.PreferredLanguage = written;
+
+        var table = new Table { TableNumber = $"T-{Guid.NewGuid():N}"[..8], MaxGuests = 4, CreatedBy = "test" };
+        var reservation = new Reservation
+        {
+            CustomerName = "Ada Lovelace",
+            CustomerEmail = "ada@example.com",
+            CustomerPhone = "+41791112233",
+            Table = table,
+            ReservationDate = DateTime.UtcNow.AddDays(1),
+            StartTime = TimeSpan.FromHours(19),
+            EndTime = TimeSpan.FromHours(21),
+            NumberOfGuests = 2,
+            CreatedBy = "test",
+            PreferredLanguage = written
+        };
+        context.Tables.Add(table);
+        context.Reservations.Add(reservation);
+
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
         (await context.Users.FirstAsync(u => u.Id == user.Id)).PreferredLanguage.Should().Be(stored);
+        (await context.Orders.FirstAsync(o => o.Id == orderId)).PreferredLanguage.Should().Be(stored);
+        (await context.Reservations.FirstAsync(r => r.Id == reservation.Id)).PreferredLanguage.Should().Be(stored);
+    }
+
+    /// <summary>
+    /// The converter's exact reach, pinned because S4 and S5 are about to depend on it: it rewrites
+    /// the SQL parameter, NOT the object in memory. After SaveChangesAsync the entity still holds
+    /// the raw string while the column holds the canonical one — so a handler that assigns a raw
+    /// value and hands the SAME tracked entity to the mail sender would mail under a string the
+    /// database refused, and a later resend would read something else. Hence: S4 must resolve
+    /// through IEmailLanguageResolver and assign a canonical code; this converter is the safety
+    /// net for what gets STORED, never a substitute for that.
+    /// </summary>
+    [Fact]
+    public async Task The_converter_sanitises_the_stored_value_not_the_object_in_memory()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var user = await context.Users.FirstAsync();
+        user.PreferredLanguage = "FR-ch";
+        await context.SaveChangesAsync();
+
+        user.PreferredLanguage.Should().Be("FR-ch", "the CLR property is not written back");
+
+        context.ChangeTracker.Clear();
+        (await context.Users.FirstAsync(u => u.Id == user.Id)).PreferredLanguage.Should().Be("fr");
     }
 
     private async Task<ColumnShape?> ColumnAsync(string table)

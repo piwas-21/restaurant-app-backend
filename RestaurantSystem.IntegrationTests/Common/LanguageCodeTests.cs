@@ -35,10 +35,6 @@ public class LanguageCodeTests
             "null means 'no preference recorded' and falls through to the next rank of §1");
 
     /// <summary>
-    /// The set is the frontend's ten locales (<c>frontend/src/locales/*.json</c>). If a locale is
-    /// added there and not here, a guest's own language silently stops being recordable.
-    /// </summary>
-    /// <summary>
     /// An <c>Accept-Language</c> header is a weighted LIST and must be refused whole, not
     /// half-understood. This is the trap: truncating at the first separator makes
     /// <c>"fr-CH,fr;q=0.9,en;q=0.8"</c> — the Chrome-shaped header — resolve to <c>fr</c> and look
@@ -62,17 +58,25 @@ public class LanguageCodeTests
     /// result to <c>CultureInfo</c> and <c>ResourceManager.GetString</c> without sanitising it.
     /// </summary>
     [Theory]
-    [InlineData("en\0x")]
-    [InlineData("en--US")]
-    [InlineData("fr-")]
-    [InlineData("../../etc/passwd")]
-    [InlineData("<script>alert(1)</script>")]
-    [InlineData("en-US-x-lvariant-POSIX-and-a-very-long-tail")]
-    public void The_output_is_always_null_or_a_supported_code(string hostile)
+    [InlineData("en\0x", null)]
+    [InlineData("../../etc/passwd", null)]
+    [InlineData("<script>alert(1)</script>", null)]
+    // Trailing junk after the primary subtag is a tag, not an attack — accepted on purpose, and
+    // these three also keep the theory from being satisfied by an implementation that returns
+    // null to everything.
+    [InlineData("en--US", "en")]
+    [InlineData("fr-", "fr")]
+    [InlineData("en-US-x-lvariant-POSIX-and-a-very-long-tail", "en")]
+    public void The_output_is_always_null_or_a_supported_code(string hostile, string? expected)
     {
         var result = LanguageCode.Normalize(hostile);
 
-        (result is null || LanguageCode.Supported.Contains(result)).Should().BeTrue();
+        result.Should().Be(expected, "input: {0}", hostile);
+
+        if (result is not null)
+        {
+            LanguageCode.Supported.Should().Contain(result);
+        }
     }
 
     [Fact]
@@ -109,6 +113,10 @@ public class LanguageCodeTests
         }
     }
 
+    /// <summary>
+    /// The set is the frontend's ten locales (<c>frontend/src/locales/*.json</c>). If a locale is
+    /// added there and not here, a guest's own language silently stops being recordable.
+    /// </summary>
     [Fact]
     public void The_supported_set_is_the_products_ten_locales() =>
         LanguageCode.Supported.Should().BeEquivalentTo(
