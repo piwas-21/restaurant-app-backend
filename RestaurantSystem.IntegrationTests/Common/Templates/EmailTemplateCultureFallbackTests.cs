@@ -7,8 +7,9 @@ namespace RestaurantSystem.IntegrationTests.Common.Templates;
 /// <summary>
 /// The fallback contract for the email resource sets (EMAIL-LOCALISATION-PLAN §6.6).
 /// <para>
-/// RUMI's registry lists all ten UI languages while only English and French are translated
-/// (S1, S7), so a resolved culture with no resource set is the NORMAL case, not an edge one.
+/// RUMI's registry lists all ten UI languages while only English, French and German are
+/// translated (S1, S7, S8), so a resolved culture with no resource set is the NORMAL case, not an
+/// edge one.
 /// It must render English — never an empty string, which is what a mis-wired lookup
 /// silently produces and no type check would catch.
 /// <para>
@@ -49,7 +50,7 @@ public class EmailTemplateCultureFallbackTests
 
     [Theory]
     [InlineData("it")]
-    [InlineData("de")]
+    [InlineData("nl")]
     [InlineData("ar")]
     [InlineData("zh-Hans")]
     public void Every_untranslated_culture_falls_back_rather_than_blanking(string language)

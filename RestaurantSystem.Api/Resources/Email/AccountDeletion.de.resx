@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ImportantLabel" xml:space="preserve">
+    <value>Wichtig:</value>
+  </data>
+  <data name="ImportantUpper" xml:space="preserve">
+    <value>WICHTIG:</value>
+  </data>
+  <data name="NoActionWarning" xml:space="preserve">
+    <value>Wenn Sie nichts unternehmen, wird Ihr Konto am oben genannten Datum automatisch gelöscht.</value>
+  </data>
+  <data name="NotYou" xml:space="preserve">
+    <value>Falls Sie diese Anfrage nicht gestellt haben, ändern Sie bitte umgehend Ihr Passwort.</value>
+  </data>
+  <data name="Option1BodyHtml" xml:space="preserve">
+    <value>Klicken Sie auf die Schaltfläche unten, um Ihr Konto sofort dauerhaft zu löschen. Dieser Schritt kann nicht rückgängig gemacht werden.</value>
+  </data>
+  <data name="Option1BodyText" xml:space="preserve">
+    <value>Öffnen Sie den folgenden Link, um Ihr Konto sofort dauerhaft zu löschen. Dieser Schritt kann nicht rückgängig gemacht werden.</value>
+  </data>
+  <data name="Option1Button" xml:space="preserve">
+    <value>Konto sofort löschen</value>
+  </data>
+  <data name="Option1Title" xml:space="preserve">
+    <value>Option 1: Sofort löschen</value>
+  </data>
+  <data name="Option2Body" xml:space="preserve">
+    <value>Wenn Sie es sich anders überlegt haben, melden Sie sich einfach in Ihrem Konto an. Damit wird die Löschanfrage automatisch aufgehoben.</value>
+  </data>
+  <data name="Option2Button" xml:space="preserve">
+    <value>Zum Abbrechen anmelden</value>
+  </data>
+  <data name="Option2Title" xml:space="preserve">
+    <value>Option 2: Löschung abbrechen</value>
+  </data>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Anfrage zur Kontolöschung</value>
+  </data>
+  <data name="Scheduled" xml:space="preserve">
+    <value>Wir haben eine Anfrage zur Löschung Ihres Kontos bei {0} erhalten. Ihr Konto wird am {1} endgültig gelöscht.</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Aktion erforderlich: Anfrage zur Kontolöschung - {0}</value>
+  </data>
+  <data name="TwoOptions" xml:space="preserve">
+    <value>Sie haben zwei Möglichkeiten:</value>
+  </data>
+</root>

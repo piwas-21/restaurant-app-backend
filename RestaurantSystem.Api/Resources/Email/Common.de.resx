@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AutomatedMessage" xml:space="preserve">
+    <value>Dies ist eine automatisch versendete Nachricht, bitte antworten Sie nicht darauf.</value>
+  </data>
+  <data name="BestRegards" xml:space="preserve">
+    <value>Freundliche Grüsse,</value>
+  </data>
+  <data name="BrandTeam" xml:space="preserve">
+    <value>Team {0}</value>
+  </data>
+  <data name="Copyright" xml:space="preserve">
+    <value>© {0} {1}. Alle Rechte vorbehalten.</value>
+  </data>
+  <data name="DateLabel" xml:space="preserve">
+    <value>Datum:</value>
+  </data>
+  <data name="Dear" xml:space="preserve">
+    <value>Guten Tag {0},</value>
+  </data>
+  <data name="GreetingNoName" xml:space="preserve">
+    <value>Guten Tag,</value>
+  </data>
+  <data name="GuestsLabel" xml:space="preserve">
+    <value>Personen:</value>
+  </data>
+  <data name="Hello" xml:space="preserve">
+    <value>Hallo {0},</value>
+  </data>
+  <data name="HelloFullName" xml:space="preserve">
+    <value>Hallo {0} {1},</value>
+  </data>
+  <data name="LabelColon" xml:space="preserve">
+    <value>:</value>
+  </data>
+  <data name="LookForward" xml:space="preserve">
+    <value>Wir freuen uns auf Ihren Besuch!</value>
+  </data>
+  <data name="OrderTypeDelivery" xml:space="preserve">
+    <value>Lieferung</value>
+  </data>
+  <data name="OrderTypeDineIn" xml:space="preserve">
+    <value>Vor Ort</value>
+  </data>
+  <data name="OrderTypeTakeaway" xml:space="preserve">
+    <value>Zum Mitnehmen</value>
+  </data>
+  <data name="RoleAdmin" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="RoleCustomer" xml:space="preserve">
+    <value>Kunde</value>
+  </data>
+  <data name="RoleStaff" xml:space="preserve">
+    <value>Mitarbeiter</value>
+  </data>
+  <data name="SpecialRequestsLabel" xml:space="preserve">
+    <value>Besondere Wünsche:</value>
+  </data>
+  <data name="TableLabel" xml:space="preserve">
+    <value>Tisch:</value>
+  </data>
+  <data name="TheBrandTeam" xml:space="preserve">
+    <value>Ihr Team von {0}</value>
+  </data>
+  <data name="TimeLabel" xml:space="preserve">
+    <value>Uhrzeit:</value>
+  </data>
+</root>

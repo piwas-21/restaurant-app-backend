@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Confirmed" xml:space="preserve">
+    <value>Reservierung bestätigt!</value>
+  </data>
+  <data name="ConfirmedUpper" xml:space="preserve">
+    <value>RESERVIERUNG BESTÄTIGT!</value>
+  </data>
+  <data name="GoodNews" xml:space="preserve">
+    <value>Gute Nachrichten! Ihre Reservierung bei {0} ist bestätigt.</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>Reservierung bestätigt</value>
+  </data>
+  <data name="ImportantInfoLabel" xml:space="preserve">
+    <value>Wichtige Hinweise:</value>
+  </data>
+  <data name="Info1" xml:space="preserve">
+    <value>Bitte seien Sie pünktlich: Wir halten Ihren Tisch 15 Minuten über die reservierte Zeit hinaus frei.</value>
+  </data>
+  <data name="Info2" xml:space="preserve">
+    <value>Wenn Sie Ihre Reservierung stornieren oder ändern möchten, melden Sie sich bitte mindestens 24 Stunden im Voraus.</value>
+  </data>
+  <data name="Info3" xml:space="preserve">
+    <value>Sie erreichen uns unter: {0}</value>
+  </data>
+  <data name="LookForwardWelcoming" xml:space="preserve">
+    <value>Wir freuen uns auf Ihren Besuch!</value>
+  </data>
+  <data name="NoteLabel" xml:space="preserve">
+    <value>Nachricht des Restaurants:</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Reservierung bestätigt - {0}</value>
+  </data>
+</root>
