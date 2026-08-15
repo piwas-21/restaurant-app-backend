@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Groups.Dtos;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
 using RestaurantSystem.Api.Features.Groups.Mapping;
@@ -22,6 +22,7 @@ public class GroupMembershipService : IGroupMembershipService
     private readonly IQRCodeService _qrCodeService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<GroupMembershipService> _logger;
 
     public GroupMembershipService(
@@ -29,12 +30,14 @@ public class GroupMembershipService : IGroupMembershipService
         IQRCodeService qrCodeService,
         ICurrentUserService currentUserService,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         ILogger<GroupMembershipService> logger)
     {
         _context = context;
         _qrCodeService = qrCodeService;
         _currentUserService = currentUserService;
         _emailService = emailService;
+        _languages = languages;
         _logger = logger;
     }
 
@@ -86,7 +89,10 @@ public class GroupMembershipService : IGroupMembershipService
         try
         {
             var qrCodeImage = _qrCodeService.GenerateQRCode(uniqueQRCode);
-            await _emailService.SendMembershipConfirmationEmailAsync(EmailCultures.English,
+            // The MEMBER's language, not the staff member's who added them: this whole method
+            // runs on an admin's request.
+            await _emailService.SendMembershipConfirmationEmailAsync(
+                _languages.ForAccount(user),
                 user.Email!,
                 $"{user.FirstName} {user.LastName}",
                 group.Name,

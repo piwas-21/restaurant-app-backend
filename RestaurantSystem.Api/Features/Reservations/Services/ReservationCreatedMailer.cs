@@ -12,12 +12,14 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
 {
     private readonly IEmailService _emailService;
     private readonly IEmailBrandingProvider _brandingProvider;
+    private readonly IEmailLanguageResolver _languages;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<ReservationCreatedMailer> _logger;
 
     public ReservationCreatedMailer(
         IEmailService emailService,
         IEmailBrandingProvider brandingProvider,
+        IEmailLanguageResolver languages,
         IOptions<EmailSettings> emailSettings,
         ILogger<ReservationCreatedMailer> logger)
     {
@@ -25,6 +27,7 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
 
         _emailService = emailService;
         _brandingProvider = brandingProvider;
+        _languages = languages;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
@@ -40,7 +43,13 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
         {
             ArgumentNullException.ThrowIfNull(reservation);
 
-            await _emailService.SendReservationConfirmationEmailAsync(EmailCultures.English,
+            // Two recipients, two languages, and they must not be the same value: the guest reads
+            // the language frozen on the booking, the restaurant reads its own (§1 rank 4).
+            var guestCulture = _languages.ForGuest(reservation.PreferredLanguage);
+            var operatorCulture = _languages.ForOperator();
+
+            await _emailService.SendReservationConfirmationEmailAsync(
+                guestCulture,
                 reservation.CustomerEmail,
                 reservation.CustomerName,
                 tableNumber,
@@ -54,8 +63,9 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
 
             await _emailService.SendEmailAsync(
                 _emailSettings.AdminEmail,
-                EmailTemplates.ReservationAdminNotification.GetSubject(EmailCultures.English, brand),
-                EmailTemplates.ReservationAdminNotification.GetHtmlBody(EmailCultures.English,
+                EmailTemplates.ReservationAdminNotification.GetSubject(operatorCulture, brand),
+                EmailTemplates.ReservationAdminNotification.GetHtmlBody(
+                    operatorCulture,
                     brand,
                     reservation.Id,
                     reservation.CustomerName,
@@ -70,7 +80,8 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
                     _emailSettings.FrontendBaseUrl,
                     _emailSettings.AdminEmail,
                     reservation.SpecialRequests),
-                EmailTemplates.ReservationAdminNotification.GetTextBody(EmailCultures.English,
+                EmailTemplates.ReservationAdminNotification.GetTextBody(
+                    operatorCulture,
                     brand,
                     reservation.Id,
                     reservation.CustomerName,

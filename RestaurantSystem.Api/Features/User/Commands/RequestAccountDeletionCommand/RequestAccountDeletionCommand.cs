@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using Microsoft.Extensions.Options;
@@ -15,17 +15,20 @@ public class RequestAccountDeletionCommandHandler : ICommandHandler<RequestAccou
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<RequestAccountDeletionCommandHandler> _logger;
 
     public RequestAccountDeletionCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         IOptions<EmailSettings> emailSettings,
         ILogger<RequestAccountDeletionCommandHandler> logger)
     {
         _userManager = userManager;
         _emailService = emailService;
+        _languages = languages;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
@@ -52,7 +55,8 @@ public class RequestAccountDeletionCommandHandler : ICommandHandler<RequestAccou
         // Send email (non-fatal — deletion is already scheduled in the DB)
         try
         {
-            await _emailService.SendAccountDeletionEmailAsync(EmailCultures.English,
+            await _emailService.SendAccountDeletionEmailAsync(
+                _languages.ForAccount(user),
                 user.Email!,
                 user.FirstName,
                 user.LastName,

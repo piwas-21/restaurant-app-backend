@@ -73,6 +73,7 @@ public class OrderMappingService : IOrderMappingService
             EstimatedDeliveryTime = order.EstimatedDeliveryTime,
             ActualDeliveryTime = order.ActualDeliveryTime,
             Notes = order.Notes,
+            PreferredLanguage = order.PreferredLanguage,
             CancellationReason = order.CancellationReason,
             DeliveryAddress = MapToDeliveryAddressDto(order.DeliveryAddress),
             Items = items

@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 
@@ -29,17 +29,20 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly RateLimiterSettings _rateLimiter;
     private readonly ILogger<SendEmailVerificationCommandHandler> _logger;
 
     public SendEmailVerificationCommandHandler(
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         IOptions<RateLimiterSettings> rateLimiter,
         ILogger<SendEmailVerificationCommandHandler> logger)
     {
         _userManager = userManager;
         _emailService = emailService;
+        _languages = languages;
         _rateLimiter = rateLimiter.Value;
         _logger = logger;
     }
@@ -114,7 +117,9 @@ public class SendEmailVerificationCommandHandler : ICommandHandler<SendEmailVeri
         try
         {
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            await _emailService.SendEmailVerificationAsync(EmailCultures.English, user, token);
+            // The account's own preference. This endpoint is anonymous and attacker-drivable
+            // (see the cooldown above), so the caller's Accept-Language is not the recipient's.
+            await _emailService.SendEmailVerificationAsync(_languages.ForAccount(user), user, token);
 
             _logger.LogInformation("Email verification sent successfully for user {UserId}", user.Id);
         }

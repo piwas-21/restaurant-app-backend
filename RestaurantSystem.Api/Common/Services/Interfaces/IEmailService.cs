@@ -9,9 +9,11 @@ namespace RestaurantSystem.Api.Common.Services.Interfaces;
 /// Every templated send takes the recipient's <see cref="CultureInfo"/> as its first argument.
 /// It is explicit, never ambient: most of these are queued from a detached task, a webhook or a
 /// BackgroundService where <see cref="CultureInfo.CurrentUICulture"/> is the server's, not the
-/// guest's (EMAIL-LOCALISATION-PLAN §6.1). Callers currently pass
-/// <see cref="RestaurantSystem.Api.Common.Templates.EmailCultures.English"/>; resolution from the
-/// order/reservation/user row lands in slices S3–S5.
+/// guest's (EMAIL-LOCALISATION-PLAN §6.1). Since S5 every production caller passes what
+/// <see cref="IEmailLanguageResolver"/> resolved for that recipient — the language frozen on the
+/// order or reservation, the account's own preference, or the tenant's for the operator alerts —
+/// resolved BEFORE any task is queued. Only the dev-only <c>EmailTestController</c> still names
+/// <see cref="RestaurantSystem.Api.Common.Templates.EmailCultures.English"/> directly.
 /// </para>
 /// </summary>
 public interface IEmailService

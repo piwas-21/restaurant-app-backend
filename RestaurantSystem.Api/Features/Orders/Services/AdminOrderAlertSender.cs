@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Constants;
@@ -18,17 +18,20 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOutboundEmailLedger _ledger;
+    private readonly IEmailLanguageResolver _languages;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<AdminOrderAlertSender> _logger;
 
     public AdminOrderAlertSender(
         IServiceScopeFactory scopeFactory,
         IOutboundEmailLedger ledger,
+        IEmailLanguageResolver languages,
         IOptions<EmailSettings> emailSettings,
         ILogger<AdminOrderAlertSender> logger)
     {
         _scopeFactory = scopeFactory;
         _ledger = ledger;
+        _languages = languages;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
@@ -51,6 +54,11 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
         var orderNumber = order.OrderNumber;
         var orderId = order.Id;
 
+        // The RESTAURANT's language, and resolved here rather than inside the task: this mail
+        // follows the tenant, never the diner (§1 rank 4). Captured with the rest of the state the
+        // lambda closes over, so the detached task reads no ambient anything.
+        var culture = _languages.ForOperator();
+
         _ = Task.Run(async () =>
         {
             try
@@ -70,7 +78,8 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
                 var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var quickActionToken = await ReadQuickActionTokenAsync(scope, orderId, orderNumber, logger);
 
-                await emailService.SendOrderConfirmationAdminEmailAsync(EmailCultures.English,
+                await emailService.SendOrderConfirmationAdminEmailAsync(
+                    culture,
                     adminEmail,
                     orderNumber,
                     order.CustomerName ?? FallbackCustomerName,

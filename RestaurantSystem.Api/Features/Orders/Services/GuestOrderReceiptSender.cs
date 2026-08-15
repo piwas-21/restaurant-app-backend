@@ -1,5 +1,5 @@
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Constants;
 
@@ -11,17 +11,20 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
     private const string FallbackCustomerName = "Valued Customer";
 
     private readonly IEmailService _emailService;
+    private readonly IEmailLanguageResolver _languages;
     private readonly IOutboundEmailLedger _ledger;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<GuestOrderReceiptSender> _logger;
 
     public GuestOrderReceiptSender(
         IEmailService emailService,
+        IEmailLanguageResolver languages,
         IOutboundEmailLedger ledger,
         IServiceScopeFactory scopeFactory,
         ILogger<GuestOrderReceiptSender> logger)
     {
         _emailService = emailService;
+        _languages = languages;
         _ledger = ledger;
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -53,7 +56,16 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
 
         try
         {
-            await _emailService.SendOrderReceivedEmailAsync(EmailCultures.English,
+            // The order's own frozen language, read off the DTO. Resolved HERE rather than before
+            // the queue — unlike the admin alert — because this method is also the resend endpoint's
+            // synchronous path, which has no queue to be before. That is safe only because ForGuest
+            // is request-free BY CONSTRUCTION (it hard-codes requestLanguage: null and the resolver's
+            // other state is process-fixed): this task's ExecutionContext still carries the queueing
+            // request's HttpContext, so anything here that COULD read the request would mail the
+            // guest in whatever language that request asked for (§6.10). Do not replace this call
+            // with one that takes a request language.
+            await _emailService.SendOrderReceivedEmailAsync(
+                _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
                 order.CustomerName ?? FallbackCustomerName,
                 order.OrderNumber,
