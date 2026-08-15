@@ -58,34 +58,37 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="Added" xml:space="preserve">
+    <value>Sie wurden erfolgreich zu {0} hinzugefügt.</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="ExpiresLabel" xml:space="preserve">
+    <value>Mitgliedschaft gültig bis:</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="ExpiresLine" xml:space="preserve">
+    <value>Mitgliedschaft gültig bis {0}</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Willkommen bei {0}!</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="QrAlt" xml:space="preserve">
+    <value>QR-Code der Mitgliedschaft</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="QrAttached" xml:space="preserve">
+    <value>Der QR-Code Ihrer Mitgliedschaft ist dieser E-Mail angehängt. Zeigen Sie ihn im Restaurant vor, um Ihre Mitgliedervorteile zu erhalten.</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="QrDataLabel" xml:space="preserve">
+    <value>QR-Code-Daten:</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="QrHint" xml:space="preserve">
+    <value>Zeigen Sie diesen QR-Code im Restaurant vor, um Ihre Mitgliedervorteile zu erhalten.</value>
+  </data>
+  <data name="QrTitle" xml:space="preserve">
+    <value>Ihr Mitglieder-QR-Code</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Willkommen bei {0}!</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="ValuedMember" xml:space="preserve">
+    <value>Danke für Ihre Treue!</value>
   </data>
 </root>

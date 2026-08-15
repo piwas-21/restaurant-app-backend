@@ -58,34 +58,40 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="AccountCreated" xml:space="preserve">
+    <value>Herzlichen Glückwunsch! Ihr Konto wurde mit der Rolle {0} erstellt.</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="GettingStartedBody" xml:space="preserve">
+    <value>Sie können sich ab sofort anmelden und alle Funktionen nutzen, die zu Ihrer Rolle gehören.</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="GettingStartedTitle" xml:space="preserve">
+    <value>Erste Schritte</value>
   </data>
-  <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+  <data name="Greeting" xml:space="preserve">
+    <value>Willkommen an Bord, {0}!</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="Header" xml:space="preserve">
+    <value>Willkommen bei {0}!</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="HelpBody" xml:space="preserve">
+    <value>Wenn Sie Fragen haben oder Hilfe brauchen, ist unser Support-Team für Sie da. Melden Sie sich jederzeit!</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="HelpTitle" xml:space="preserve">
+    <value>Brauchen Sie Hilfe?</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Willkommen</value>
+  </data>
+  <data name="SecurityBody" xml:space="preserve">
+    <value>Ihr Konto ist mit branchenüblichen Sicherheitsmassnahmen geschützt. Bewahren Sie Ihr Passwort sicher auf und geben Sie es nie weiter.</value>
+  </data>
+  <data name="SecurityTitle" xml:space="preserve">
+    <value>Die Sicherheit Ihres Kontos</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Willkommen bei {0}! 🍽️</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="ThankYou" xml:space="preserve">
+    <value>Danke, dass Sie sich für {0} entschieden haben. Wir freuen uns, Sie an Bord zu haben!</value>
   </data>
 </root>

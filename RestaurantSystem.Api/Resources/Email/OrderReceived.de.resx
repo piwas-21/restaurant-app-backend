@@ -58,34 +58,55 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="ColumnItem" xml:space="preserve">
+    <value>Artikel</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="ColumnPrice" xml:space="preserve">
+    <value>Preis</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="ColumnQty" xml:space="preserve">
+    <value>Menge</value>
+  </data>
+  <data name="DeliveryLabel" xml:space="preserve">
+    <value>Lieferadresse:</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Bestellung eingegangen</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="HeadingUpper" xml:space="preserve">
+    <value>BESTELLUNG EINGEGANGEN</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="InstructionsLabel" xml:space="preserve">
+    <value>Besondere Hinweise:</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="ItemsLabel" xml:space="preserve">
+    <value>Bestellte Artikel:</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>BESTELLNUMMER</value>
+  </data>
+  <data name="OrderTypeLabel" xml:space="preserve">
+    <value>Bestellart:</value>
+  </data>
+  <data name="PendingBody" xml:space="preserve">
+    <value>Ihre Bestellung wartet noch auf die Bestätigung. Wir melden uns, sobald das Restaurant sie bestätigt hat.</value>
+  </data>
+  <data name="PendingTitle" xml:space="preserve">
+    <value>Warten auf Bestätigung</value>
+  </data>
+  <data name="PendingTitleUpper" xml:space="preserve">
+    <value>WARTEN AUF BESTÄTIGUNG</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Bestellung eingegangen - {0}</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="ThankYou" xml:space="preserve">
+    <value>Vielen Dank für Ihre Bestellung bei {0}! Wir haben Ihre Bestelldetails erhalten.</value>
+  </data>
+  <data name="TotalLabel" xml:space="preserve">
+    <value>Gesamtbetrag:</value>
+  </data>
+  <data name="Track" xml:space="preserve">
+    <value>Den Status Ihrer Bestellung können Sie in Ihrem Konto verfolgen. Bei Fragen erreichen Sie uns unter {0}</value>
   </data>
 </root>

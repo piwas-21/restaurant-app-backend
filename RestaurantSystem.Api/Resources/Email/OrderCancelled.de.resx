@@ -59,33 +59,27 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
-  </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
-  </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+    <value>Wir bitten um Entschuldigung für die Umstände und hoffen, Sie bald wieder bewirten zu dürfen.</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Bestellung storniert</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>Bestellnummer:</value>
+  </data>
+  <data name="OrderNumberLabelUpper" xml:space="preserve">
+    <value>BESTELLNUMMER</value>
   </data>
   <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+    <value>Bei Fragen erreichen Sie uns jederzeit unter {0} oder telefonisch.</value>
+  </data>
+  <data name="ReasonLabel" xml:space="preserve">
+    <value>Stornierungsgrund:</value>
   </data>
   <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
-  </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+    <value>Leider müssen wir Ihnen mitteilen, dass Ihre Bestellung storniert wurde.</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
-  </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+    <value>Bestellung storniert - {0}</value>
   </data>
 </root>

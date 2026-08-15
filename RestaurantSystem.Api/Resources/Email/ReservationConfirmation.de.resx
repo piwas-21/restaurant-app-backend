@@ -58,34 +58,28 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
-  </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
-  </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="Contact" xml:space="preserve">
+    <value>Für Änderungen oder Fragen erreichen Sie uns unter {0}</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Reservierung eingegangen</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Reservierungsbestätigung</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="PendingBody" xml:space="preserve">
+    <value>Ihre Reservierung wartet noch auf die Bestätigung. Unser Team prüft Ihre Anfrage und sendet Ihnen in Kürze eine Bestätigung per E-Mail.</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="PendingTitle" xml:space="preserve">
+    <value>Warten auf Bestätigung</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="PendingTitleUpper" xml:space="preserve">
+    <value>WARTEN AUF BESTÄTIGUNG</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Reservierungsbestätigung - {0}</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="ThankYou" xml:space="preserve">
+    <value>Vielen Dank für Ihre Reservierungsanfrage bei {0}. Wir haben folgende Angaben erhalten:</value>
   </data>
 </root>

@@ -58,34 +58,55 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="AcceptDelay" xml:space="preserve">
+    <value>Verzögerung akzeptieren</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="CancelOrder" xml:space="preserve">
+    <value>Bestellung stornieren</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="Estimate" xml:space="preserve">
+    <value>Ihre Bestellung ist voraussichtlich in etwa {0} Minuten bereit.</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Neues zu Ihrer Bestellung</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="IntroHtml" xml:space="preserve">
+    <value>Danke, dass Sie sich für {0} entschieden haben! Wir haben derzeit sehr viel zu tun und möchten sicherstellen, dass Ihr Essen unseren Qualitätsansprüchen entspricht.</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="IntroText" xml:space="preserve">
+    <value>Vielen Dank für Ihre Bestellung. Wegen des grossen Andrangs brauchen wir etwas mehr Zeit für die Zubereitung Ihres Essens.</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="LetUsKnow" xml:space="preserve">
+    <value>Bitte teilen Sie uns mit, ob das für Sie passt:</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="MinutesCapitalised" xml:space="preserve">
+    <value>{0} Minuten</value>
+  </data>
+  <data name="NewEstimate" xml:space="preserve">
+    <value>Neue voraussichtliche Zubereitungszeit</value>
+  </data>
+  <data name="NotCharged" xml:space="preserve">
+    <value>Wenn Sie stornieren, wird Ihnen nichts berechnet.</value>
+  </data>
+  <data name="OrderLabel" xml:space="preserve">
+    <value>Bestellung</value>
+  </data>
+  <data name="OrderNumberLabel" xml:space="preserve">
+    <value>Bestellnummer:</value>
+  </data>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Bestellung verzögert</value>
+  </data>
+  <data name="Proceed" xml:space="preserve">
+    <value>Möchten Sie Ihre Bestellung beibehalten?</value>
+  </data>
+  <data name="ProposedTime" xml:space="preserve">
+    <value>Vorgeschlagene Zubereitungszeit:</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
+    <value>Aktion erforderlich: Verzögerung Ihrer Bestellung - {0}</value>
   </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+  <data name="SubjectShort" xml:space="preserve">
+    <value>Aktion erforderlich: Verzögerung Ihrer Bestellung</value>
   </data>
 </root>

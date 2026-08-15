@@ -58,34 +58,37 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Apology" xml:space="preserve">
-    <value>Nous vous prions de nous excuser pour la gêne occasionnée</value>
+  <data name="Confirmed" xml:space="preserve">
+    <value>Reservierung bestätigt!</value>
   </data>
-  <data name="CannotConfirm" xml:space="preserve">
-    <value>Nous ne pouvons malheureusement pas confirmer votre réservation. Cela peut tenir à nos disponibilités ou à d'autres raisons.</value>
+  <data name="ConfirmedUpper" xml:space="preserve">
+    <value>RESERVIERUNG BESTÄTIGT!</value>
   </data>
-  <data name="CannotConfirmUpper" xml:space="preserve">
-    <value>CONFIRMATION IMPOSSIBLE</value>
+  <data name="GoodNews" xml:space="preserve">
+    <value>Gute Nachrichten! Ihre Reservierung bei {0} ist bestätigt.</value>
   </data>
   <data name="Heading" xml:space="preserve">
-    <value>Des nouvelles de votre réservation</value>
+    <value>Reservierung bestätigt</value>
   </data>
-  <data name="HopeToWelcome" xml:space="preserve">
-    <value>Nous espérons vous accueillir prochainement !</value>
+  <data name="ImportantInfoLabel" xml:space="preserve">
+    <value>Wichtige Hinweise:</value>
   </data>
-  <data name="Questions" xml:space="preserve">
-    <value>Pour toute question, n'hésitez pas à nous écrire à {0} ou à nous appeler.</value>
+  <data name="Info1" xml:space="preserve">
+    <value>Bitte seien Sie pünktlich: Wir halten Ihren Tisch 15 Minuten über die reservierte Zeit hinaus frei.</value>
   </data>
-  <data name="Regret" xml:space="preserve">
-    <value>Nous avons le regret de vous informer que nous ne pouvons pas donner suite à votre demande de réservation pour le moment.</value>
+  <data name="Info2" xml:space="preserve">
+    <value>Wenn Sie Ihre Reservierung stornieren oder ändern möchten, melden Sie sich bitte mindestens 24 Stunden im Voraus bei uns.</value>
   </data>
-  <data name="RequestedLabel" xml:space="preserve">
-    <value>Réservation demandée :</value>
+  <data name="Info3" xml:space="preserve">
+    <value>Sie erreichen uns unter: {0}</value>
+  </data>
+  <data name="LookForwardWelcoming" xml:space="preserve">
+    <value>Wir freuen uns auf Ihren Besuch!</value>
+  </data>
+  <data name="NoteLabel" xml:space="preserve">
+    <value>Nachricht des Restaurants:</value>
   </data>
   <data name="Subject" xml:space="preserve">
-    <value>Des nouvelles de votre réservation - {0}</value>
-  </data>
-  <data name="TryAnother" xml:space="preserve">
-    <value>Nous vous invitons à essayer une autre date ou un autre horaire. Vous pouvez faire une nouvelle réservation sur notre site ou nous contacter directement.</value>
+    <value>Reservierung bestätigt - {0}</value>
   </data>
 </root>
