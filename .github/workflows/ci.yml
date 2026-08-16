@@ -54,6 +54,13 @@ jobs:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Cache NuGet packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
       - run: dotnet build RestaurantSystem.sln --nologo --verbosity minimal /p:TreatWarningsAsErrors=true
 
   dotnet_test:
@@ -80,6 +87,22 @@ jobs:
       INTEGRATION_TESTS_DB_CONNECTION: "Host=postgres;Port=5432;Database=restaurant_test;Username=test;Password=test"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Cache NuGet packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+      # This job compiles the solution itself (~46s) even though
+      # `dotnet build (warnings as errors)` compiles the same graph in
+      # parallel. Measured (run 31918097670): restore 6s, compile 46s,
+      # tests 850s. Reusing the build job's output via `needs:` +
+      # artifacts would DELAY the tests by ~57s (the test job would only
+      # start after the 108s build job, then re-init its container),
+      # i.e. it trades a 46s compile for a 108s wait — a net LOSS. Do not
+      # "fix" this with `needs:`; the compile stays so the tests always
+      # run against freshly built code from this checkout.
       - name: Run integration tests
         run: |
           dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj \
@@ -174,6 +197,13 @@ jobs:
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: '10.0.x'
+      - name: Cache NuGet packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
       - name: Install nuget-license (pinned)
         # actions/setup-dotnet adds ~/.dotnet/tools to PATH automatically,
         # so --global lands the binary somewhere subsequent steps can find.
