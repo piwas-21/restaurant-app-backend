@@ -21,6 +21,7 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
     private readonly IReservationCreatedMailer _mailer;
     private readonly IFormFieldRequirementService _formFieldRequirements;
     private readonly IPreferredLanguageCapture _languages;
+    private readonly ITenantClock _clock;
     private readonly ILogger<CreateReservationCommandHandler> _logger;
 
     public CreateReservationCommandHandler(
@@ -28,12 +29,14 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
         IReservationCreatedMailer mailer,
         IFormFieldRequirementService formFieldRequirements,
         IPreferredLanguageCapture languages,
+        ITenantClock clock,
         ILogger<CreateReservationCommandHandler> logger)
     {
         _context = context;
         _mailer = mailer;
         _formFieldRequirements = formFieldRequirements;
         _languages = languages;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -60,8 +63,13 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
             // the only thing that can tell the approve/reject mail what to write in.
             var language = await _languages.ForUserAsync(command.CustomerId, cancellationToken);
 
-            // Validate date is not in the past
-            if (data.ReservationDate.Date < DateTime.UtcNow.Date)
+            // "Today" is the restaurant's day, not UTC's. Read against UtcNow this refused a
+            // booking for TONIGHT for any tenant west of UTC after 19:00 local — a zone
+            // TENANT_TIMEZONE now makes settable (#369). Both sides are calendar days here, so
+            // their DateTimeKind is deliberately not part of the comparison.
+            var tenantToday = _clock.Now.Date;
+
+            if (data.ReservationDate.Date < tenantToday)
             {
                 return ApiResponse<ReservationDto>.Failure("Cannot make reservations for past dates");
             }
