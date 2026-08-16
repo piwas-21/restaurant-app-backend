@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -97,7 +98,72 @@ public class ReservationClockTests : IntegrationTestBase
         return (response.StatusCode, await response.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task A_slot_start_exactly_now_is_no_longer_offered()
+    {
+        // 18:30 UTC is exactly 20:30 in Zurich, so the boundary the filter is written on
+        // (`currentTime <= currentTimeSpan`) is actually exercised: a table you would have to sit
+        // down at this second is not a booking, so 20:30 goes and 21:00 stays.
+        _clock.Set(new DateTimeOffset(2030, 5, 17, 18, 30, 0, TimeSpan.Zero), "Europe/Zurich");
+        await SeedFridayAsync(open: new TimeSpan(11, 0, 0), close: new TimeSpan(23, 0, 0));
+
+        var slots = await GetSlotStartsAsync(BookedDay);
+
+        slots.Should().Equal(new[] { "21:00:00" });
+    }
+
+    [Fact]
+    public async Task The_day_the_slot_query_refuses_as_past_is_the_tenant_day()
+    {
+        // Anchored to the REAL instant, deliberately: this is the one assertion that has to tell
+        // `_clock.Now.Date` apart from `DateTime.UtcNow.Date`, and NO literal date can do that —
+        // a far-future day is in the future for both clocks, which is exactly how the sibling
+        // tests leave this guard unpinned. So the tenant's zone is chosen from the current UTC
+        // hour such that the tenant's CALENDAR DAY is never UTC's.
+        var utcNow = DateTimeOffset.UtcNow;
+        var utcToday = utcNow.UtcDateTime.Date;
+
+        // POSIX sign convention: Etc/GMT+12 is UTC-12 and Etc/GMT-12 is UTC+12.
+        var (zoneId, day, refused) = utcNow.Hour < 12
+            ? ("Etc/GMT+12", utcToday.AddDays(-1), false) // tenant has not reached UTC's today yet
+            : ("Etc/GMT-12", utcToday, true);            // tenant has already turned tomorrow
+
+        _clock.Set(utcNow, zoneId);
+        await SeedFridayAsync(open: new TimeSpan(11, 0, 0), close: new TimeSpan(23, 0, 0));
+
+        // The premise, asserted rather than assumed: if the two clocks agreed on the day, the
+        // test below would pass against UTC too and prove nothing.
+        _clock.Now.Date.Should().NotBe(utcToday);
+
+        var (success, body) = await QuerySlotsAsync(day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+        success.Should().Be(!refused, body);
+
+        if (refused)
+        {
+            body.Should().Contain("past dates");
+        }
+    }
+
     private async Task<List<string>> GetSlotStartsAsync(string date)
+    {
+        var (success, body) = await QuerySlotsAsync(date);
+
+        success.Should().BeTrue(body);
+
+        using var payload = JsonDocument.Parse(body);
+
+        return payload.RootElement.GetProperty("data").GetProperty("timeSlots")
+            .EnumerateArray()
+            .Select(slot => slot.GetProperty("startTime").GetString()!)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The endpoint answers a refused query with HTTP 200 and <c>success: false</c>, so the body is
+    /// the only thing that tells the two apart — a status-code assertion alone would pass either way.
+    /// </summary>
+    private async Task<(bool Success, string Body)> QuerySlotsAsync(string date)
     {
         var response = await Client.GetAsync($"/api/reservations/available-slots?date={date}&numberOfGuests=2");
         var body = await response.Content.ReadAsStringAsync();
@@ -105,14 +171,8 @@ public class ReservationClockTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
 
         using var payload = JsonDocument.Parse(body);
-        var root = payload.RootElement;
 
-        root.GetProperty("success").GetBoolean().Should().BeTrue(body);
-
-        return root.GetProperty("data").GetProperty("timeSlots")
-            .EnumerateArray()
-            .Select(slot => slot.GetProperty("startTime").GetString()!)
-            .ToList();
+        return (payload.RootElement.GetProperty("success").GetBoolean(), body);
     }
 
     /// <summary>Seeds Friday's service and the one active table every slot is offered on.</summary>

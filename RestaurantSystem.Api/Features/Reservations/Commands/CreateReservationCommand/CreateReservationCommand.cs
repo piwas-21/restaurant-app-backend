@@ -65,8 +65,11 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
 
             // "Today" is the restaurant's day, not UTC's. Read against UtcNow this refused a
             // booking for TONIGHT for any tenant west of UTC after 19:00 local — a zone
-            // TENANT_TIMEZONE now makes settable (#369).
-            if (data.ReservationDate.Date < _clock.Now.Date)
+            // TENANT_TIMEZONE now makes settable (#369). Both sides are calendar days here, so
+            // their DateTimeKind is deliberately not part of the comparison.
+            var tenantToday = _clock.Now.Date;
+
+            if (data.ReservationDate.Date < tenantToday)
             {
                 return ApiResponse<ReservationDto>.Failure("Cannot make reservations for past dates");
             }
