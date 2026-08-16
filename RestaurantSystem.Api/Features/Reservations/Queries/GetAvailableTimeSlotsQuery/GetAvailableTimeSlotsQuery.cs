@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -15,13 +16,18 @@ public record GetAvailableTimeSlotsQuery(
 public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeSlotsQuery, ApiResponse<AvailableTimeSlotsDto>>
 {
     private readonly ApplicationDbContext _context;
+    private readonly ITenantClock _clock;
     private readonly ILogger<GetAvailableTimeSlotsQueryHandler> _logger;
 
     private static readonly int SlotDurationMinutes = 120; // 2 hours per reservation
 
-    public GetAvailableTimeSlotsQueryHandler(ApplicationDbContext context, ILogger<GetAvailableTimeSlotsQueryHandler> logger)
+    public GetAvailableTimeSlotsQueryHandler(
+        ApplicationDbContext context,
+        ITenantClock clock,
+        ILogger<GetAvailableTimeSlotsQueryHandler> logger)
     {
         _context = context;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -29,8 +35,14 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
     {
         try
         {
+            // The requested date is a CALENDAR DAY on the restaurant's own wall, and so is every
+            // opening hour and generated slot below — so "today" and "now" have to be read on the
+            // tenant's clock too, not on UTC (backend #369). Read once: two reads can straddle
+            // midnight and answer as two different days.
+            var now = _clock.Now;
+
             // Validate date is not in the past
-            if (query.Date.Date < DateTime.UtcNow.Date)
+            if (query.Date.Date < now.Date)
             {
                 return ApiResponse<AvailableTimeSlotsDto>.Failure("Cannot make reservations for past dates");
             }
@@ -75,8 +87,9 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
                            (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed))
                 .ToListAsync(cancellationToken);
 
-            // For today's date, filter out past time slots
-            var now = DateTime.UtcNow;
+            // For today's date, filter out past time slots. `now.TimeOfDay` used to be UTC, which
+            // in Zurich summer still offered the 18:30 slot at 20:00 local — a guest could book a
+            // table two hours in the past (#369).
             var isToday = query.Date.Date == now.Date;
             var currentTimeSpan = isToday ? now.TimeOfDay : TimeSpan.Zero;
 
