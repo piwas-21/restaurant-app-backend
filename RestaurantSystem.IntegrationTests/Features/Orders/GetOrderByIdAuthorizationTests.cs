@@ -26,6 +26,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// </summary>
 public class GetOrderByIdAuthorizationTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: it posts to send-confirmation-email, whose "confirmation-email" per-IP window is host state Respawn cannot reset.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     public GetOrderByIdAuthorizationTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {

@@ -18,6 +18,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Settings;
 
 public class FormFieldConfigurationTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: FormFieldConfigurationService seeds through the IFormFieldSeedState SINGLETON: on a shared host the flag would stay set after Respawn wiped the rows, and the fields would never be re-seeded.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     private const string Endpoint = "/api/FormFieldConfiguration";
 
     public FormFieldConfigurationTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

@@ -17,6 +17,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 /// </summary>
 public class RefreshTokenRateLimitTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: the rate-limiter windows ARE the subject here — a bucket shared with any other class would make the assertions depend on run order.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     public RefreshTokenRateLimitTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {
