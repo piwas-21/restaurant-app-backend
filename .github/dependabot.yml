@@ -1,6 +1,16 @@
-# Dependabot — security + version updates (DEV-PHASES-PLAN W0).
-# Weekly scans (OSV/Trivy/SonarCloud/security-audit.yml) report what's
-# vulnerable; this keeps dependencies current so those reports stay small.
+# Dependabot — SECURITY updates only (workspace CLAUDE.md standing decision:
+# "Dependabot PRs are paused").
+#
+# `open-pull-requests-limit: 0` is the documented way to switch OFF version-update
+# PRs while leaving Dependabot SECURITY updates fully on — which is why the file
+# stays here instead of being deleted. The CVE gates are unchanged (OSV-Scanner,
+# Trivy, npm/nuget audit, SonarCloud all still run on every PR).
+#
+# Why: the decision not to merge these PRs was already taken, but the bot was still
+# being paid to open them — 21 Dependabot/dependabot-branch workflow runs in the
+# last 200 runs on this repo, plus 7 stale PRs open since 2026-07-13, all sitting
+# unmerged and rebasing. This makes the status quo honest rather than changing it.
+# Version drift is the accepted cost; re-enable by restoring the limits below.
 version: 2
 updates:
   - package-ecosystem: nuget
@@ -10,7 +20,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/Amsterdam
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0  # version-update PRs off; security updates unaffected
     groups:
       minor-and-patch:
         patterns: ["*"]
@@ -31,7 +41,7 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/Amsterdam
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0  # version-update PRs off; security updates unaffected
     groups:
       actions-minor-and-patch:
         patterns: ["*"]
