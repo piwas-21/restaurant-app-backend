@@ -92,6 +92,29 @@ Every MR uses [.gitlab/merge_request_templates/Default.md](.gitlab/merge_request
 
 Required sections: summary, sprint-task link, acceptance-criteria coverage, schema/contract verification (for DB/DTO changes), standard checklist, test plan, deploy notes.
 
+## CI gates
+
+The gates are the workflows, not a plan doc: [.github/workflows/ci.yml](.github/workflows/ci.yml) (dotnet format,
+file-length, `dotnet build` warnings-as-errors, sharded integration tests + merged-coverage floors, gitleaks,
+TruffleHog, Trivy fs, license compliance, OSV-Scanner),
+[.github/workflows/security-audit.yml](.github/workflows/security-audit.yml) (weekly full-tree OSV + Trivy fs +
+NuGet vulnerability audit + license compliance), [.pre-commit-config.yaml](.pre-commit-config.yaml) (the same
+format / file-length / build gates locally) and SonarCloud automatic analysis (quality gate enforced by the
+workspace merge gate). Cross-repo gate status lives in the workspace
+[DEV-PHASES-PLAN.md](../docs/plans/DEV-PHASES-PLAN.md) §2 — that table is authoritative.
+
+**Planned but never built** (carried over from the retired GitLab-era hardening plan, still open):
+
+- **Container image scan.** [build-image.yml](.github/workflows/build-image.yml) builds and pushes to GHCR with no
+  `trivy image` step. Trivy fs scans the source tree only, so OS/base-image CVEs in the published image are unscanned.
+- **SBOM artifact.** No SPDX SBOM is produced for a release image (`Microsoft.Sbom.Tool` / Component Detection was
+  the plan). Nothing consumes one today, which is why it stayed unbuilt.
+
+Deliberately dropped from that plan: per-PR affected-test selection (measured and rejected — sharding is faster),
+a hand-written `gitleaks.toml` (default config + `.secrets.baseline` cover it), `sonar-project.properties`
+(SonarCloud autoscan), and the flat "≥70% coverage" gate (superseded by the measured per-metric floors in
+`scripts/merge-coverage.py`).
+
 ## Documentation
 
 | File | Purpose |
@@ -101,5 +124,4 @@ Required sections: summary, sprint-task link, acceptance-criteria coverage, sche
 | [docs/DEVELOPMENT-GUIDELINES.md](docs/DEVELOPMENT-GUIDELINES.md) | Coding conventions |
 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) | Security findings + status |
 | [docs/TEST-COVERAGE-PLAN.md](docs/TEST-COVERAGE-PLAN.md) | Test strategy |
-| [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) | CI / quality / security gate plan |
 | [docs/adr/](docs/adr/) | Architecture Decision Records |

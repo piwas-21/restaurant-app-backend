@@ -25,7 +25,7 @@
 | Any task | This file |
 | Refactoring sprint task | [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) — find the task ID, read its acceptance criteria |
 | File-level audit context (god classes, DRY, design system) | [../docs/plans/RUMI-ANALYSIS-AND-PLAN.md](../docs/plans/RUMI-ANALYSIS-AND-PLAN.md) (workspace meta-repo) |
-| Quality/security gate work | [docs/QUALITY-SECURITY-PLAN.md](docs/QUALITY-SECURITY-PLAN.md) |
+| Quality/security gate work | [../docs/plans/DEV-PHASES-PLAN.md](../docs/plans/DEV-PHASES-PLAN.md) §2 (authoritative gate table) + [README.md](README.md) §CI gates for this repo's enforced/open gates |
 | Test work | [docs/TEST-COVERAGE-PLAN.md](docs/TEST-COVERAGE-PLAN.md) |
 | Security review / threat model | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) |
 | Architectural decisions | [docs/adr/README.md](docs/adr/README.md) — index of ADRs |
