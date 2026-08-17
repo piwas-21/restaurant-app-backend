@@ -74,10 +74,57 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
 
+  # The DB-backed integration suite, SHARDED across runners.
+  #
+  # Shape: the suite already splits its DB-backed classes into four xUnit collections
+  # ("lanes", see DatabaseCollections.cs), each with its own database, so they run in
+  # parallel. On one 2-core runner that parallelism is capped at two lanes at a time —
+  # measured (run 31990710971): 175s of test execution for a summed 142s of per-test
+  # time, i.e. the runner, not the schedule, was the limit. This job therefore also
+  # splits the WORK across two runners, each with its own postgres service container
+  # (services are per-job, so cross-shard contamination is impossible by construction).
+  #
+  # The split is BY NAMESPACE and the two filters are exact complements: shard 2 is
+  # `!~` of every key shard 1 matches. That is what guarantees no test is skipped and
+  # none runs twice, even if a new test lands in a brand-new namespace — it simply
+  # falls into shard 2. The aggregate job below re-verifies this against
+  # `dotnet test --list-tests`, so a mistake here fails CI instead of silently
+  # dropping tests. Groups are balanced on the per-namespace test time in the junit
+  # report — which predicted the first sharded run within 10% (58s/84s predicted,
+  # 62s/89s measured) — and are ~71s each of the 142s total after moving Basket to
+  # shard 1. Rebalance by moving a namespace key between the two filters; the lanes
+  # and the complement property are unaffected.
+  #
+  # TWO shards, not four, and that is MEASURED, not assumed. Four shards (~34s/36s/40s/
+  # 33s of test work each, one runner per shard) were tried on this branch and rejected:
+  # critical path 266s, per-shard test step 111s/134s/164s/195s — no better than two
+  # shards (234s/270s/256s over three runs) for twice the runner time. The reason is the
+  # fixed floor a shard cannot avoid: ~35s container init, ~16s NuGet restore, ~62s
+  # restore+compile, plus the suite's own bootstrap (template migration, four lane
+  # databases, four test hosts) — the floor, not the test work, is what sets a shard's
+  # wall clock once the work per shard is down to ~40s.
+  #
+  # Whole-job measurement, `dotnet test (integration)` critical path:
+  #   single job  289s, 296s   (test step 238s, 246s)
+  #   two shards  234s, 270s, 256s
+  #   four shards 266s
+  # Runner-to-runner variance on the same code is ±20%, which is why every number above
+  # is a real sample and not an average of one.
   dotnet_test:
-    name: dotnet test (integration)
+    name: dotnet test (integration) shard ${{ matrix.shard }}/2
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      # Both shards always run: a red shard must not hide the state of the other one.
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            filter: >-
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.
+          - shard: 2
+            filter: >-
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.
     container:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:
@@ -106,7 +153,7 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
           restore-keys: |
             nuget-${{ runner.os }}-
-      # This job compiles the solution itself (~46s) even though
+      # This job compiles the solution itself (~62s) even though
       # `dotnet build (warnings as errors)` compiles the same graph in
       # parallel. Measured (run 31918097670): restore 6s, compile 46s,
       # tests 850s. Reusing the build job's output via `needs:` +
@@ -115,19 +162,43 @@ jobs:
       # i.e. it trades a 46s compile for a 108s wait — a net LOSS. Do not
       # "fix" this with `needs:`; the compile stays so the tests always
       # run against freshly built code from this checkout.
+      #
+      # Coverage is COLLECTED here but NOT gated here: a shard only exercises its own
+      # slice of the code, so the floors are enforced on the merged report in the
+      # aggregate job (scripts/merge-coverage.py). Do not re-add -p:Threshold here.
       - name: Run integration tests
+        env:
+          TEST_FILTER: ${{ matrix.filter }}
         run: |
           dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj \
             --nologo --verbosity minimal \
+            --filter "$TEST_FILTER" \
             --logger "junit;LogFileName=test-results.xml" \
             --results-directory test-results \
             -p:CollectCoverage=true \
             -p:CoverletOutputFormat=cobertura \
-            -p:CoverletOutput=test-results/coverage.cobertura.xml \
-            -p:Exclude='[*]*.Migrations.*' \
-            -p:Threshold=27%2c18%2c32 \
-            -p:ThresholdType=line%2cbranch%2cmethod \
-            -p:ThresholdStat=total
+            -p:CoverletOutput="$GITHUB_WORKSPACE/test-results/coverage.cobertura.xml" \
+            -p:Exclude='[*]*.Migrations.*'
+      # The completeness guard's input: how many tests THIS shard's filter selects, plus
+      # (shard 1 only) how many the suite has in total. Discovery is cheap — the assembly
+      # is already built — and comparing the sum against the total is what proves the
+      # filters still partition the suite. Counted at discovery, not execution: a [Theory]
+      # whose rows are enumerated at run time counts as one test here and as N in the
+      # junit report, so the two numbers are not comparable (1446 vs 1449 today).
+      - name: Record this shard's discovered test count
+        env:
+          TEST_FILTER: ${{ matrix.filter }}
+        run: |
+          list_count() {
+            dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj \
+              --no-build --nologo --list-tests "$@" | grep -cE '^ {4}\S'
+          }
+          list_count --filter "$TEST_FILTER" > test-results/discovered-shard-count.txt
+          echo "shard ${{ matrix.shard }} discovered: $(cat test-results/discovered-shard-count.txt)"
+          if [ "${{ matrix.shard }}" = "1" ]; then
+            list_count > test-results/discovered-total-count.txt
+            echo "suite total discovered: $(cat test-results/discovered-total-count.txt)"
+          fi
       # Only pushes to main/develop write the cache. A PR branch gets its
       # own cache scope that nothing else can read, so saving there would
       # cost ~38s of upload for a ~6s restore it never gets back; PRs read
@@ -141,8 +212,57 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: test-results
+          name: test-results-shard-${{ matrix.shard }}
           path: test-results/
+
+  # Aggregate for the sharded suite. THIS job carries the required check name
+  # "dotnet test (integration)" — the per-shard jobs are suffixed with their shard
+  # number and are NOT individually required (verify with:
+  # gh api repos/piwas-21/restaurant-app-backend/rulesets). Same shape as the
+  # frontend repo's `screenshots_result` / `playwright_e2e_result` jobs.
+  #
+  # `if: always()` + an explicit equality test on the matrix result is what makes a
+  # cancelled or skipped shard read as FAILURE rather than as green: `result` is
+  # "success" only when every leg succeeded, and any other value exits 1.
+  #
+  # It also owns the two things a split run would otherwise lose:
+  #   1. the coverage floors, enforced on the MERGED report (a single shard sees only
+  #      part of the code, so per-shard floors would be meaningless);
+  #   2. proof that the shards together ran every test exactly once.
+  dotnet_test_result:
+    name: dotnet test (integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: always()
+    needs: dotnet_test
+    steps:
+      - name: Gate on shard results
+        env:
+          RESULT: ${{ needs.dotnet_test.result }}
+        run: |
+          echo "integration shard matrix result: $RESULT"
+          [ "$RESULT" = "success" ] || { echo "::error::an integration-test shard did not pass"; exit 1; }
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: test-results-shard-*
+          path: shards
+      - name: Verify the shards ran every test exactly once
+        run: |
+          total=$(cat shards/*/discovered-total-count.txt)
+          selected=$(cat shards/*/discovered-shard-count.txt | awk '{ s += $1 } END { print s }')
+          executed=$(grep -ho '<testcase ' shards/*/test-results.xml | wc -l | tr -d ' ')
+          unique=$(grep -ho 'classname="[^"]*" name="[^"]*"' shards/*/test-results.xml | sort -u | wc -l | tr -d ' ')
+          echo "discovered in suite=$total  selected by shards=$selected  executed=$executed  unique=$unique"
+          [ "$selected" = "$total" ] || { echo "::error::the shard filters select $selected of $total tests — they no longer partition the suite"; exit 1; }
+          [ "$unique" = "$executed" ] || { echo "::error::a test ran in more than one shard ($unique unique of $executed executed)"; exit 1; }
+      # Floors unchanged from the single-job era (27% line / 18% branch / 32% method);
+      # only the report they are applied to changed, from one shard's to the union.
+      - name: Enforce coverage floors on the merged report
+        run: |
+          python3 scripts/merge-coverage.py \
+            --line 27 --branch 18 --method 32 \
+            shards/*/coverage.cobertura.xml
 
   gitleaks:
     name: gitleaks (secret scan)
