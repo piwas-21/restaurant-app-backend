@@ -71,8 +71,25 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
 
 
+        // Wipe + reseed only when the database is not already sitting in exactly the state this
+        // test would recreate. A test that only read left the previous test's canonical seed
+        // untouched, and re-deleting rows just to re-insert the identical ones costs ~47 ms.
+        // Classes that seed extra data of their own are excluded: their rows are not canonical, and
+        // an instance of such a class typically remembers ids its own seeding produced.
+        var usesDefaultSeedOnly = !OverridesSeedTestData(GetType());
+
+        if (usesDefaultSeedOnly && await DatabaseFixture.IsSeedIntactAsync())
+        {
+            return;
+        }
+
         await DatabaseFixture.ResetDatabaseAsync();
         await SeedTestData();
+
+        if (usesDefaultSeedOnly)
+        {
+            await DatabaseFixture.MarkSeededAsync();
+        }
     }
 
     public Task DisposeAsync()
@@ -82,6 +99,19 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         _ownedFactory?.Dispose();
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Whether a concrete test class overrides <see cref="SeedTestData"/> — cached like
+    /// <see cref="OverridesConfigureTestServices"/>, and asked once per test.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> OverridesSeedCache = new();
+
+    private static bool OverridesSeedTestData(Type type) =>
+        OverridesSeedCache.GetOrAdd(type, static t =>
+            t.GetMethod(
+                nameof(SeedTestData),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+             ?.DeclaringType != typeof(IntegrationTestBase));
 
     private static bool OverridesConfigureTestServices(Type type) =>
         OverridesDiCache.GetOrAdd(type, static t =>
