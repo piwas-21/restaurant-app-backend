@@ -30,6 +30,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// disarming the guard would still fail it.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 4")]
 public class BasketChannelClearTests : IntegrationTestBase
 {
     private const int TakeawayAndDelivery = (int)(OrderChannels.Takeaway | OrderChannels.Delivery);

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace RestaurantSystem.IntegrationTests.Features.Devices;
 
+[Collection("Database Lane 4")]
 public class DeviceHeartbeatTests : IntegrationTestBase
 {
     public DeviceHeartbeatTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

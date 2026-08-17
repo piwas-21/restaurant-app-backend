@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Devices;
 // FleetSummaryPushService composes the per-tenant snapshot (device roster + missed-order/error
 // counts) sofra's /admin/fleet renders. Only the pure BuildPayloadAsync is exercised here — the
 // outbound POST is not (no network in tests).
+[Collection("Database Lane 3")]
 public class FleetSummaryPushServiceTests : IntegrationTestBase
 {
     public FleetSummaryPushServiceTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

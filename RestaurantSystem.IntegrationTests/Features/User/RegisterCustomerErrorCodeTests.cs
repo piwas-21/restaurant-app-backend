@@ -18,6 +18,7 @@ namespace RestaurantSystem.IntegrationTests.Features.User;
 /// envelope to surface an inline hint without substring-matching the
 /// English error string. Closes #63.
 /// </summary>
+[Collection("Database Lane 3")]
 public class RegisterCustomerErrorCodeTests : IntegrationTestBase
 {
     /// <summary>

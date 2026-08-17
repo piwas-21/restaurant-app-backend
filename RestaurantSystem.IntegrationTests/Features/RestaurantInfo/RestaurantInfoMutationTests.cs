@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.RestaurantInfo;
 /// edit; non-admin gets 403; phones round-trip through Add/Update/Delete;
 /// malformed E.164 is rejected with 400.
 /// </summary>
+[Collection("Database Lane 4")]
 public class RestaurantInfoMutationTests : IntegrationTestBase
 {
     public RestaurantInfoMutationTests(DatabaseFixture databaseFixture) : base(databaseFixture)

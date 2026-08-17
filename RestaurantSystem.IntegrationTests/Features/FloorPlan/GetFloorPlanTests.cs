@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.FloorPlan;
 /// default plan — dims, walls (+ openings), items and table geometry — in one
 /// payload, with wall vertices round-tripping out of the jsonb column.
 /// </summary>
+[Collection("Database Lane 4")]
 public class GetFloorPlanTests : IntegrationTestBase
 {
     private const string Endpoint = "/api/floorplan";

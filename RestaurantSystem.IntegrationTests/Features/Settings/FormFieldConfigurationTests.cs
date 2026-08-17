@@ -16,6 +16,7 @@ using Xunit;
 
 namespace RestaurantSystem.IntegrationTests.Features.Settings;
 
+[Collection("Database Lane 4")]
 public class FormFieldConfigurationTests : IntegrationTestBase
 {
     /// <summary>

@@ -26,6 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Menus;
 /// which is exactly the separation §9.15 asked for.
 /// </para>
 /// </summary>
+[Collection("Database Lane 2")]
 public class MenuBundleAvailabilityTests : IntegrationTestBase
 {
     private const string OwnMaskBundleName = "§9.2 Takeaway-Only Combo";

@@ -15,6 +15,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// unless explicitly enabled. A regression here does not fail — it quietly puts "E2E Menu Deal" in
 /// front of a paying guest.
 /// </summary>
+[Collection("Database Lane 1")]
 public class E2EMenuFixtureSeederTests : IntegrationTestBase
 {
     public E2EMenuFixtureSeederTests(DatabaseFixture databaseFixture)

@@ -26,7 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// the constructor that takes <see cref="IAuditIdentityProvider"/>.
 /// </para>
 /// </remarks>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class AuditInterceptorTests : IntegrationTestBase
 {
     private const string Sentinel = "audit-provider-sentinel";

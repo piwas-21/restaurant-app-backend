@@ -17,6 +17,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Categories;
 // Testcontainers Postgres — no mocks. Exercises the RBAC seam ([RequireAdmin]
 // → 403 for the default Customer principal), the "not found" envelope
 // convention (200 + Success:false, not HTTP 404), validation, and soft delete.
+[Collection("Database Lane 3")]
 public class CategoriesControllerTests : IntegrationTestBase
 {
     public CategoriesControllerTests(DatabaseFixture databaseFixture) : base(databaseFixture)

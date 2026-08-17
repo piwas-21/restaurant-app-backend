@@ -31,7 +31,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Groups;
 /// <see cref="IEmailService"/> are mocked. Every assertion here holds identically
 /// before and after the extraction — the split is behavior-preserving.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 1")]
 public class UserGroupServiceTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

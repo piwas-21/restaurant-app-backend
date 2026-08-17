@@ -23,6 +23,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// no DTO changes), so a test that set the value directly would prove nothing about whether the
 /// header reaches the row.
 /// </remarks>
+[Collection("Database Lane 1")]
 public class PreferredLanguageCaptureTests : IntegrationTestBase
 {
     /// <summary>

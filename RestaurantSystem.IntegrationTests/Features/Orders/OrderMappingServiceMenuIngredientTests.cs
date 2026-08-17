@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // checks fell through and IngredientCustomizations came back empty. Same defect
 // class as the Product branch fixed in #152, on the standalone Menu (MenuId)
 // path that no live HTTP flow exercises — hence this direct mapper test.
+[Collection("Database Lane 1")]
 public class OrderMappingServiceMenuIngredientTests : IntegrationTestBase
 {
     public OrderMappingServiceMenuIngredientTests(DatabaseFixture databaseFixture)

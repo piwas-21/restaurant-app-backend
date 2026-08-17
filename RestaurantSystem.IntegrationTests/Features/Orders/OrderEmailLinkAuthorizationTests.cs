@@ -32,6 +32,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// (ORDER-TYPE-AVAILABILITY-PLAN §9.20). The negative cases below are the ones that fail if the
 /// token check is removed or weakened to a non-secret.
 /// </summary>
+[Collection("Database Lane 3")]
 public class OrderEmailLinkAuthorizationTests : IntegrationTestBase
 {
     public OrderEmailLinkAuthorizationTests(DatabaseFixture databaseFixture)

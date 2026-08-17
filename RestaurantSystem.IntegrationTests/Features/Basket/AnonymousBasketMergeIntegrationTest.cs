@@ -13,6 +13,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // mutations (adopt UserId / soft-delete). The original AsNoTracking load silently dropped them.
 // Each operation runs in its own DI scope (separate DbContext) so assertions read freshly from the
 // database — proving persistence, not in-memory tracking.
+[Collection("Database Lane 1")]
 public class AnonymousBasketMergeIntegrationTest : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

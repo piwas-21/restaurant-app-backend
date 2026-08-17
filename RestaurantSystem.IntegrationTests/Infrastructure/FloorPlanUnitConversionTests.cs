@@ -17,6 +17,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// conversion arithmetic, the Width=0 seats-derived fallback, the [0.40, 4.00]
 /// clamp and the shape remap are proven here.
 /// </summary>
+[Collection("Database Lane 4")]
 public class FloorPlanUnitConversionTests : IntegrationTestBase
 {
     public FloorPlanUnitConversionTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

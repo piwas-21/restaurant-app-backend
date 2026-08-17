@@ -19,6 +19,7 @@ namespace RestaurantSystem.IntegrationTests.Common;
 /// against an implementation that has no index at all.
 /// </para>
 /// </summary>
+[Collection("Database Lane 3")]
 public class OutboundEmailLedgerTests : IntegrationTestBase
 {
     private const string EmailType = OutboundEmailTypes.OrderReceived;

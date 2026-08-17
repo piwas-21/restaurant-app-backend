@@ -37,6 +37,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// refusal below and quietly take the cashier's till with it.
 /// </para>
 /// </summary>
+[Collection("Database Lane 4")]
 public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
 {
     private Guid _pizzaId;

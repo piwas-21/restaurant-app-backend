@@ -44,6 +44,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Email;
 /// moment S7 gives two languages different words.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 1")]
 public class MailCultureWiringTests : IntegrationTestBase
 {
     private const decimal PizzaPrice = 12.99m;

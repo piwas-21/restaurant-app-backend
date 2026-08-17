@@ -15,6 +15,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 /// AuthRefreshPermitLimit=3 (and AuthPermitLimit=3) so these assertions are
 /// environment-independent.
 /// </summary>
+[Collection("Database Lane 1")]
 public class RefreshTokenRateLimitTests : IntegrationTestBase
 {
     /// <summary>

@@ -11,6 +11,7 @@ using Xunit;
 
 namespace RestaurantSystem.IntegrationTests.Features.Devices;
 
+[Collection("Database Lane 4")]
 public class DeviceTelemetryTests : IntegrationTestBase
 {
     public DeviceTelemetryTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

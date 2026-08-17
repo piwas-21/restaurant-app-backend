@@ -29,7 +29,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Setup;
 /// every step is entitled — so a test without this would pass against a filter that
 /// does nothing at all.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class SetupChecklistModuleFilterTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _databaseFixture;

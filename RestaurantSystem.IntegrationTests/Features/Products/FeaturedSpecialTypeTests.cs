@@ -26,6 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Products;
 /// with a plain product would pass with the mapping deleted.
 /// </para>
 /// </summary>
+[Collection("Database Lane 4")]
 public class FeaturedSpecialTypeTests : IntegrationTestBase
 {
     public FeaturedSpecialTypeTests(DatabaseFixture databaseFixture)

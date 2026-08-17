@@ -21,7 +21,7 @@ namespace RestaurantSystem.IntegrationTests.Features.User;
 /// row would not even have been hidden, and the unfiltered unique index on the email would have
 /// burned that address permanently.
 /// </remarks>
-[Collection("Database")]
+[Collection("Database Lane 1")]
 public class ConfirmAccountDeletionCommandTests : IntegrationTestBase
 {
     public ConfirmAccountDeletionCommandTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

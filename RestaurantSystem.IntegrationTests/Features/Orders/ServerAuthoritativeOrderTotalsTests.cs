@@ -32,6 +32,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// the compute path only, so switching paths could move a total even when every input agreed).
 /// </para>
 /// </summary>
+[Collection("Database Lane 3")]
 public class ServerAuthoritativeOrderTotalsTests : IntegrationTestBase
 {
     private const decimal PizzaPrice = 12.99m;

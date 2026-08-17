@@ -21,6 +21,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 /// status codes, never a second value computed the same way the code under test computes it.
 /// </para>
 /// </summary>
+[Collection("Database Lane 1")]
 public class ReservationClockTests : IntegrationTestBase
 {
     /// <summary>Friday 2030-05-17, the day both tests book.</summary>

@@ -8,7 +8,11 @@ using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
-[Collection("Database")]
+// No [Collection] here on purpose: the concrete classes carry their own [Collection("Database
+// Lane N")], which is what lets them run in parallel lanes (see DatabaseCollections.cs). An
+// attribute here would be inherited by every subclass and put them all back in one serial
+// collection. A NEW DB-backed test class must therefore declare a lane attribute itself —
+// without one xUnit cannot supply the DatabaseFixture and the class fails loudly at run time.
 public abstract class IntegrationTestBase : IAsyncLifetime
 {
     /// <summary>

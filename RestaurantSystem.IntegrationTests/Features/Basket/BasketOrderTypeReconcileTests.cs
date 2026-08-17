@@ -20,6 +20,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// <b>by construction</b>, because only the add path ever created a basket: a guest who picked a
 /// channel before adding anything had the choice silently dropped.
 /// </remarks>
+[Collection("Database Lane 3")]
 public class BasketOrderTypeReconcileTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

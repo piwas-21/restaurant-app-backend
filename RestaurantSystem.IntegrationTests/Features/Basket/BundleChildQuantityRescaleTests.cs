@@ -42,6 +42,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 //      stopped being 0, and the subtotal double-counted. The rescale then MULTIPLIED the polluted
 //      count. Fixed here by filtering the query to root rows, which is what AnonymousBasketMerger
 //      always did.
+[Collection("Database Lane 4")]
 public class BundleChildQuantityRescaleTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

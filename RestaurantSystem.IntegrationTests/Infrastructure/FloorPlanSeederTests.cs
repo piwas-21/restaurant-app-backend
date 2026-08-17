@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// to that plan. Both are idempotent. The base fixture resets FloorPlans/Tables
 /// between tests, so each starts from empty.
 /// </summary>
+[Collection("Database Lane 1")]
 public class FloorPlanSeederTests : IntegrationTestBase
 {
     public FloorPlanSeederTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

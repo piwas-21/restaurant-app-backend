@@ -35,6 +35,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Categories;
 /// handler's own logic — validation, the include, the mapping — rather than S3.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 1")]
 public class UpdateCategoryImageCommandTests : IntegrationTestBase
 {
     public UpdateCategoryImageCommandTests(DatabaseFixture databaseFixture)

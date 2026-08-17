@@ -27,7 +27,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// been served, and cancelling a real service record to tidy an accounting one is the worse error.
 /// </para>
 /// </remarks>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class CheckoutClearanceSweepTests : IAsyncLifetime
 {
     private const string ConnectedAccount = "acct_test_connected";

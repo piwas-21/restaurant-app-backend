@@ -22,6 +22,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 ///
 /// Google/Apple login carry no password, so they have no lockout path — intentionally not covered.
 /// </summary>
+[Collection("Database Lane 4")]
 public class LoginLockoutTests : IntegrationTestBase
 {
     /// <summary>

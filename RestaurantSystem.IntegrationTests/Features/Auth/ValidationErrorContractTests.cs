@@ -26,6 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 /// `POST /api/user/register/customer` is the vehicle: anonymous, and its validator breaks several
 /// rules at once on a single bad payload. Raw JSON so the request is exactly what a client sends.
 /// </summary>
+[Collection("Database Lane 2")]
 public class ValidationErrorContractTests : IntegrationTestBase
 {
     /// <summary>

@@ -41,6 +41,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// pass against the bug.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 4")]
 public class OrderNumberAllocationTests : IntegrationTestBase
 {
     /// <summary>Upper bound on how long the second allocation is watched for. Only paid on failure.</summary>

@@ -44,6 +44,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // Four surfaces are row-derived and were verified to be: GetZReportQuery's TotalAmount/TotalRevenue,
 // the itemsTotal CreateOrderCommandHandler feeds to the fidelity calculation, the per-line figure
 // OrderMappingService puts on the order screen, and — since S0b — order.Total itself.
+[Collection("Database Lane 1")]
 public class OrderLineCustomizationPriceTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();
