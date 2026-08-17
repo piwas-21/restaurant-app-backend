@@ -23,6 +23,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// branch to everyone — a test suite that only proves "staff can" would not notice.
 /// </para>
 /// </summary>
+[Collection("Database Lane 4")]
 public class StaffOrderTypeOverrideTests : IntegrationTestBase
 {
     private const int TakeawayAndDelivery = (int)(OrderChannels.Takeaway | OrderChannels.Delivery);

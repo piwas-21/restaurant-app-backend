@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // instructions + selected/excluded ingredients but NOT the top-level side items or the
 // per-ingredient quantities — so two otherwise-identical lines that differed only by their
 // sides (or by an ingredient's quantity) silently merged into one. These pin the fix.
+[Collection("Database Lane 2")]
 public class BasketDedupTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

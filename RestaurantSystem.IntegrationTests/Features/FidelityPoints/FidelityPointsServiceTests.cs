@@ -10,7 +10,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
 
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class FidelityPointsServiceTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

@@ -25,6 +25,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // Customization here is a SIDE ITEM rather than an ingredient, following BasketLineTotalTests: it is
 // priced unconditionally by BuildRegularItemAsync, so the fixture does not depend on the ingredient
 // rules and their optional / included-in-base branches.
+[Collection("Database Lane 4")]
 public class LoginMergeCustomizationTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

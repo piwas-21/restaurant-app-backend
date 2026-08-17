@@ -32,6 +32,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 /// address oracle, which is the thing its generic success sentence exists to prevent.
 /// </para>
 /// </summary>
+[Collection("Database Lane 3")]
 public class EmailVerificationThrottleTests : IntegrationTestBase
 {
     private const string Password = "Str0ng!Passw0rd"; // pragma: allowlist secret (test-only)

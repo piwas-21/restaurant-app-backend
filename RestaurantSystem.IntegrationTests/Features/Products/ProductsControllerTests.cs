@@ -12,6 +12,7 @@ using System.Text.Json;
 
 namespace RestaurantSystem.IntegrationTests.Features.Products;
 
+[Collection("Database Lane 3")]
 public class ProductsControllerTests : IntegrationTestBase
 {
     public ProductsControllerTests(DatabaseFixture databaseFixture) : base(databaseFixture)

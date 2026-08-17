@@ -19,6 +19,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // reference navigations in #152 (Product) and #153 (Menu), pushed one level deeper
 // to the GlobalIngredient reference. This test pins the Product (ProductId) branch;
 // its Menu sibling lives in OrderMappingServiceMenuIngredientTests.
+[Collection("Database Lane 3")]
 public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
 {
     public OrderMappingServiceProductIngredientTests(DatabaseFixture databaseFixture)

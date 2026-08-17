@@ -16,7 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// block (via ExecuteUpdate, which bypasses the audit interceptor that would
 /// otherwise re-stamp UpdatedAt).
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class RestaurantInfoSeederTests
 {
     private readonly DatabaseFixture _fixture;

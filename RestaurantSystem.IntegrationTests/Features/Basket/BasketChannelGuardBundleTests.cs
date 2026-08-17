@@ -30,6 +30,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// everything while looking guarded.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 2")]
 public class BasketChannelGuardBundleTests : IntegrationTestBase
 {
     public BasketChannelGuardBundleTests(DatabaseFixture databaseFixture)

@@ -18,6 +18,7 @@ namespace RestaurantSystem.IntegrationTests.Features.FloorPlan;
 /// id (unknown ids ignored) — under optimistic concurrency on UpdatedAt and
 /// Admin-only authorization.
 /// </summary>
+[Collection("Database Lane 1")]
 public class SaveFloorPlanTests : IntegrationTestBase
 {
     private const string Endpoint = "/api/floorplan";

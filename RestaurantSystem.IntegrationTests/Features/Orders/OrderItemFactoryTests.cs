@@ -19,7 +19,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// compute path in OrderPricingService (no command.BasketSubTotal) double-counts
 /// every child's UnitPrice on top of the parent.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class OrderItemFactoryTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

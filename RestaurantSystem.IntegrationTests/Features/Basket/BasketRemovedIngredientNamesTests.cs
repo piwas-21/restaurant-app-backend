@@ -27,6 +27,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // asked for. A plain pizza's saved quantities carry a 0 for mushrooms. Reading that naively puts
 // "No Mushrooms" on a cart line for a topping the guest never touched, so
 // UnselectedPaidAddOn_IsNotReportedAsRemoved is what separates this fix from that one.
+[Collection("Database Lane 1")]
 public class BasketRemovedIngredientNamesTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

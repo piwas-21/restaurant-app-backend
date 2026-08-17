@@ -45,6 +45,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// intended, you have just been saved a silent production incident.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 1")]
 public class PrinterFeedContractSnapshotTests : IntegrationTestBase
 {
     public PrinterFeedContractSnapshotTests(DatabaseFixture databaseFixture)

@@ -14,6 +14,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Devices;
 
 // DeviceTelemetryRetentionService purges DeviceEvents + DeviceOrderReceipts older than the window.
 // Data-loss class — owner-approved 30 days (2026-07-20).
+[Collection("Database Lane 4")]
 public class DeviceTelemetryRetentionServiceTests : IntegrationTestBase
 {
     public DeviceTelemetryRetentionServiceTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

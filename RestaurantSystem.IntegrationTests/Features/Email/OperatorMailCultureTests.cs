@@ -27,6 +27,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Email;
 /// guest orders in French and the restaurant reads German, so one resolved culture shared by both
 /// mails — the regression a restaurant notices first — fails loudly.
 /// </remarks>
+[Collection("Database Lane 2")]
 public class OperatorMailCultureTests : IntegrationTestBase
 {
     private const decimal PizzaPrice = 12.99m;

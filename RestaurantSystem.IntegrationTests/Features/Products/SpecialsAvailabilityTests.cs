@@ -24,6 +24,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Products;
 /// Asserting on the resolver alone would pass with the includes still absent.
 /// </para>
 /// </summary>
+[Collection("Database Lane 1")]
 public class SpecialsAvailabilityTests : IntegrationTestBase
 {
     public SpecialsAvailabilityTests(DatabaseFixture databaseFixture)

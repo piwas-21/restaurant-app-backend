@@ -35,6 +35,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Products;
 // MenuDefinitionSectionsRequiredTests (#191) is the sibling suite and deliberately does the
 // opposite: every payload there sends `detailedIngredients` precisely so it exercises the section
 // code rather than this nesting.
+[Collection("Database Lane 4")]
 public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
 {
     private Guid _bundleId;

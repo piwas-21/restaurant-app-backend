@@ -8,7 +8,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
 
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class PointEarningRuleServiceTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

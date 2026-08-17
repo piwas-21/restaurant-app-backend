@@ -11,6 +11,7 @@ namespace RestaurantSystem.IntegrationTests.Features.RestaurantInfo;
 /// Verifies <c>GET /api/restaurant-info</c> returns the singleton row seeded
 /// by the AddRestaurantInfo migration. Anonymous endpoint — no auth required.
 /// </summary>
+[Collection("Database Lane 2")]
 public class GetRestaurantInfoTests : IntegrationTestBase
 {
     public GetRestaurantInfoTests(DatabaseFixture databaseFixture) : base(databaseFixture)

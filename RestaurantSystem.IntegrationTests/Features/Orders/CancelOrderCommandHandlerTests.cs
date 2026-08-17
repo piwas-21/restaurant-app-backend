@@ -25,7 +25,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// at Stripe.
 /// </para>
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 4")]
 public class CancelOrderCommandHandlerTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

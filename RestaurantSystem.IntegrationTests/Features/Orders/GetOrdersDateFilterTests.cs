@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// Both bounds are inclusive (<c>OrderDate &gt;= StartDate AND OrderDate &lt;= EndDate</c>),
 /// compared verbatim in UTC. See <c>GetOrdersQuery</c> XML doc.
 /// </summary>
+[Collection("Database Lane 3")]
 public class GetOrdersDateFilterTests : IntegrationTestBase
 {
     public GetOrdersDateFilterTests(DatabaseFixture databaseFixture)

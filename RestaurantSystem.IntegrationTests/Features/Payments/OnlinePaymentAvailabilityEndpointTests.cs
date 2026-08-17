@@ -46,7 +46,7 @@ public abstract class OnlinePaymentAvailabilityEndpointTestsBase : SettingsDrive
 /// The live fleet's shape: no module list at all (so the gate is unrestricted and every module
 /// reads as bought) and no Stripe configuration. This is RUMI.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class OnlinePaymentAvailabilityUnconfiguredTests : OnlinePaymentAvailabilityEndpointTestsBase
 {
     public OnlinePaymentAvailabilityUnconfiguredTests(DatabaseFixture databaseFixture)
@@ -77,7 +77,7 @@ public class OnlinePaymentAvailabilityUnconfiguredTests : OnlinePaymentAvailabil
 /// A tenant that bought the module AND has its Stripe credentials. The control: without it,
 /// hardcoding <c>available: false</c> would satisfy every other assertion in this file.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class OnlinePaymentAvailabilityConfiguredTests : OnlinePaymentAvailabilityEndpointTestsBase
 {
     public OnlinePaymentAvailabilityConfiguredTests(DatabaseFixture databaseFixture)
@@ -125,7 +125,7 @@ public class OnlinePaymentAvailabilityConfiguredTests : OnlinePaymentAvailabilit
 /// green.
 /// </para>
 /// </remarks>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class OnlinePaymentAvailabilityMidProvisioningTests : OnlinePaymentAvailabilityEndpointTestsBase
 {
     public OnlinePaymentAvailabilityMidProvisioningTests(DatabaseFixture databaseFixture)
@@ -153,7 +153,7 @@ public class OnlinePaymentAvailabilityMidProvisioningTests : OnlinePaymentAvaila
 /// <summary>
 /// The module leg on its own: Stripe fully configured, but the tenant did not buy the module.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 3")]
 public class OnlinePaymentAvailabilityUnboughtModuleTests : OnlinePaymentAvailabilityEndpointTestsBase
 {
     public OnlinePaymentAvailabilityUnboughtModuleTests(DatabaseFixture databaseFixture)

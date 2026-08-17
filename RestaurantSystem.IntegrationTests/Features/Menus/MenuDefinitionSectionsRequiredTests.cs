@@ -26,6 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Menus;
 // The product path carried the identical dead guard (UpdateProductCommand.cs), so fixing only the
 // bundle handler would have left `PUT /api/Products` on a Menu-type product able to wipe the same
 // rows through the same shared DTO. Both are covered below.
+[Collection("Database Lane 1")]
 public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
 {
     private Guid _bundleId;

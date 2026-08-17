@@ -48,6 +48,7 @@ namespace RestaurantSystem.IntegrationTests.Features.GlobalIngredients;
 /// both by never issuing the DELETE.
 /// </para>
 /// </summary>
+[Collection("Database Lane 2")]
 public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
 {
     private const string UnusedName = "§9.18 Unused Ingredient";

@@ -34,6 +34,7 @@ namespace RestaurantSystem.IntegrationTests.Features.RestaurantInfo;
 /// JavaScript's <c>??</c> does not fire on <c>""</c>, so the fallback would stop running and an
 /// empty <c>src</c> would reach the header.
 /// </remarks>
+[Collection("Database Lane 2")]
 public class RestaurantLogoTests : IntegrationTestBase
 {
     private const string Url = "/api/restaurant-info";

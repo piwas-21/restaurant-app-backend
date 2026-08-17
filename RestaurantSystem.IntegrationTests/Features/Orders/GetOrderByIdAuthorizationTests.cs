@@ -24,6 +24,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// read is answered with the ordinary not-found response so the endpoint cannot be
 /// used to confirm which order ids exist.
 /// </summary>
+[Collection("Database Lane 1")]
 public class GetOrderByIdAuthorizationTests : IntegrationTestBase
 {
     /// <summary>

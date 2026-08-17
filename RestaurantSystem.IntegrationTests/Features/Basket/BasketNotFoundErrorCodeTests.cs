@@ -35,6 +35,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// scenario these codes exist for would never be exercised.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 3")]
 public class BasketNotFoundErrorCodeTests : IntegrationTestBase
 {
     private static readonly Guid AbsentItemId = Guid.Parse("11111111-1111-1111-1111-111111111111");

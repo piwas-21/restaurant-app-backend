@@ -26,6 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// would be invisible to a status-code check.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 4")]
 public class BasketRoutingContractTests : IntegrationTestBase
 {
     private const string SessionRequired = "Session ID is required";

@@ -28,6 +28,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Menus;
 // read `if (command.CategoryIds?.Any() == true)`, i.e. empty already meant "nothing to
 // validate"; the fix simply makes the mutation path agree with it. UpdateProductCommandHandler
 // guards Content identically ("treat that as 'no translation changes'").
+[Collection("Database Lane 1")]
 public class UpdateMenuBundlePreservesAssignmentsTests : IntegrationTestBase
 {
     private Guid _bundleId;

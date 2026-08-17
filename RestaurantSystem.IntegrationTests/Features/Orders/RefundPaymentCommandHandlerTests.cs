@@ -21,7 +21,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// refund came to store an order-level status word on a payment record and to
 /// drive <c>Order.TotalPaid</c> negative. Both are pinned here.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 4")]
 public class RefundPaymentCommandHandlerTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

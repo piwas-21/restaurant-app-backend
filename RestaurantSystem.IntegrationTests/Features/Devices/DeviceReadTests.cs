@@ -12,6 +12,7 @@ using Xunit;
 
 namespace RestaurantSystem.IntegrationTests.Features.Devices;
 
+[Collection("Database Lane 1")]
 public class DeviceReadTests : IntegrationTestBase
 {
     public DeviceReadTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

@@ -9,7 +9,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
 
-[Collection("Database")]
+[Collection("Database Lane 4")]
 public class CustomerDiscountServiceTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;
@@ -26,7 +26,7 @@ public class CustomerDiscountServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         // Reset DB so each test starts clean — the fixture is shared across
-        // tests in [Collection("Database")] but DB state is not implicitly
+        // tests in a shared DB collection but DB state is not implicitly
         // isolated by xunit.
         await _fixture.ResetDatabaseAsync();
 

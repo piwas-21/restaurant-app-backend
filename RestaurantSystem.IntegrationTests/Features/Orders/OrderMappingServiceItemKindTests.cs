@@ -19,6 +19,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // These fixtures leave the child's Kind unset, which is exactly the shape of every order placed
 // before that column existed — so they pin that historical orders keep rendering as they always
 // did. The persisted path, and the precedence between the two, live in OrderChildQuantityTests.
+[Collection("Database Lane 2")]
 public class OrderMappingServiceItemKindTests : IntegrationTestBase
 {
     public OrderMappingServiceItemKindTests(DatabaseFixture databaseFixture)

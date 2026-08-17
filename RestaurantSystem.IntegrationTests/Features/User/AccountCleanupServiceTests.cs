@@ -15,6 +15,7 @@ namespace RestaurantSystem.IntegrationTests.Features.User;
 // after the deletion grace period AND must scrub the denormalized contact
 // snapshots on the retained business records (orders/reservations/addresses) —
 // previously it only nulled the FK, leaving name/email/phone/address behind.
+[Collection("Database Lane 1")]
 public class AccountCleanupServiceTests : IntegrationTestBase
 {
     public AccountCleanupServiceTests(DatabaseFixture databaseFixture) : base(databaseFixture)

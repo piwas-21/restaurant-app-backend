@@ -25,6 +25,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// becomes a WHERE clause or throws at runtime. Only a query that goes to the database tells them
 /// apart. The DTO assertions are here for the other half: the columns moved, the API did not.
 /// </remarks>
+[Collection("Database Lane 2")]
 public class OrderFocusOwnedTypeTests : IntegrationTestBase
 {
     private Guid _productId;

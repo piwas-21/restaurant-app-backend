@@ -23,6 +23,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Setup;
 /// the founder is off the call, a checklist that can be told "you are done" is worse
 /// than no checklist.
 /// </summary>
+[Collection("Database Lane 2")]
 public class SetupChecklistTests : IntegrationTestBase
 {
     public SetupChecklistTests(DatabaseFixture databaseFixture) : base(databaseFixture)

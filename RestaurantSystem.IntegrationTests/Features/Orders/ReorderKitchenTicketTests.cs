@@ -34,6 +34,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // ticket printed from it. It drives the real endpoints (POST /api/basket/items →
 // POST /api/orders/from-basket) rather than the builder in isolation, because the whole claim is
 // about a chain of four services agreeing on what a 0 means.
+[Collection("Database Lane 3")]
 public class ReorderKitchenTicketTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

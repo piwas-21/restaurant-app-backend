@@ -21,6 +21,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// against the mapper alone would pass with the includes still missing.
 /// </para>
 /// </summary>
+[Collection("Database Lane 2")]
 public class PrinterFeedIncludeTests : IntegrationTestBase
 {
     public PrinterFeedIncludeTests(DatabaseFixture databaseFixture)

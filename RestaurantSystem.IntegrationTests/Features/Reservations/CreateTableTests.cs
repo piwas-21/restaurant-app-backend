@@ -22,6 +22,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 /// the legacy "circle" shape to "round". The wire ranges still admit the
 /// still-deployed pixel frontend so it does not start 400-ing (prod-first).
 /// </summary>
+[Collection("Database Lane 3")]
 public class CreateTableTests : IntegrationTestBase
 {
     private const string Endpoint = "/api/tables";

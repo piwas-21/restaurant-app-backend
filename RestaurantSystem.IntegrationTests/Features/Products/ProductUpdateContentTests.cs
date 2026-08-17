@@ -52,6 +52,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Products;
 // (fr + en) and answers 200 rather than "Duplicate language codes found: fr". Forcing the old branch
 // to fire made it print that message with an EMPTY language list, which is the check reporting its
 // own deadness.
+[Collection("Database Lane 3")]
 public class ProductUpdateContentTests : IntegrationTestBase
 {
     private Guid _productId;

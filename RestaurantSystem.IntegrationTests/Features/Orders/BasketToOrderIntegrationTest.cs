@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
@@ -15,6 +15,7 @@ using System.Net;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
+[Collection("Database Lane 3")]
 public class BasketToOrderIntegrationTest : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

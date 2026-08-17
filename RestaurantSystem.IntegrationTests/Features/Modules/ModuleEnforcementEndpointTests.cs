@@ -20,7 +20,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Modules;
 /// <c>[Produces("text/event-stream")]</c>, and the precedence of AuthorizationMiddleware over
 /// MVC filters. This class builds a host with enforcement ON and asserts what a caller sees.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class ModuleEnforcementEndpointTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _databaseFixture;
@@ -219,7 +219,7 @@ public class ModuleEnforcementEndpointTests : IAsyncLifetime
 /// <summary>
 /// The same pipeline with NO module list — the live RUMI shape. Everything must work.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class ModuleEnforcementUnrestrictedTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _databaseFixture;

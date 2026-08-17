@@ -12,6 +12,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// "confirmation-email" per-IP rate-limit policy. These tests fail fast if
 /// either decision is silently reverted.
 /// </summary>
+[Collection("Database Lane 3")]
 public class SendConfirmationEmailAuthTests : IntegrationTestBase
 {
     /// <summary>

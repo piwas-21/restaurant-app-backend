@@ -130,7 +130,7 @@ public class CheckoutStatusRateLimitTests
 }
 
 /// <summary>The ordinary case: the tenant bought the module, so the route is reachable.</summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class CheckoutStatusReachableTests : CheckoutStatusEndpointTestsBase
 {
     public CheckoutStatusReachableTests(DatabaseFixture fixture) : base(fixture) { }
@@ -234,7 +234,7 @@ public class CheckoutStatusReachableTests : CheckoutStatusEndpointTestsBase
 /// The tenant did not buy the module. The class-level gate must refuse BEFORE the handler runs —
 /// asserted with a real, resolvable session seeded, so a 404 here cannot be the lookup missing.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class CheckoutStatusUnboughtModuleTests : CheckoutStatusEndpointTestsBase
 {
     public CheckoutStatusUnboughtModuleTests(DatabaseFixture fixture) : base(fixture) { }

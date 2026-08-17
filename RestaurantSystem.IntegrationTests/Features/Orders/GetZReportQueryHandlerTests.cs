@@ -21,7 +21,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// values are <see cref="DateTimeKind.Utc"/> to match the handler's contract
 /// (UTC day boundaries).
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class GetZReportQueryHandlerTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

@@ -24,6 +24,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 /// omitted field must be a no-op, while a supplied one must still update —
 /// including when it is explicitly zero — and still be range-checked.
 /// </summary>
+[Collection("Database Lane 2")]
 public class UpdateTableGeometryTests : IntegrationTestBase
 {
     private const string Endpoint = "/api/tables";

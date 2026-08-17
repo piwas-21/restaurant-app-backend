@@ -28,6 +28,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// assertion here on its own, and silently break the cashier.
 /// </para>
 /// </summary>
+[Collection("Database Lane 4")]
 public class OrderMutationAuthorizationTests : IntegrationTestBase
 {
     private Guid _orderId;
