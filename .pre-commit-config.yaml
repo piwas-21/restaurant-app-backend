@@ -8,7 +8,7 @@
 # Sprint 3: TreatWarningsAsErrors via Directory.Build.props (verified by
 #          `dotnet build`). Some warning categories are transitionally
 #          excluded — see Directory.Build.props for the list.
-# See docs/QUALITY-SECURITY-PLAN.md.
+# See README.md §CI gates for the full enforced-gate list.
 
 repos:
   # ── General hygiene ──────────────────────────────────────────────────
