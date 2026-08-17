@@ -89,12 +89,16 @@ jobs:
   # none runs twice, even if a new test lands in a brand-new namespace — it simply
   # falls into shard 2. The aggregate job below re-verifies this against
   # `dotnet test --list-tests`, so a mistake here fails CI instead of silently
-  # dropping tests. Groups are balanced on measured cost (per-test time + a flat
-  # per-test overhead for the Respawn wipe), ~177s vs ~168s of the 345s total.
+  # dropping tests. Groups are balanced on the per-namespace test time in the junit
+  # report — which predicted the first sharded run within 10% (58s/84s predicted,
+  # 62s/89s measured) — and are ~71s each of the 142s total after moving Basket to
+  # shard 1. Rebalance by moving a namespace key between the two filters; the lanes
+  # and the complement property are unaffected.
   #
-  # NOT sharded further: the fixed floor per shard is ~114s (container init 31s,
-  # NuGet restore 15s, checkout/setup 6s, compile ~62s) against ~175s of test work,
-  # so every extra shard buys less than it pays for.
+  # NOT sharded further: the fixed floor per shard is ~132s (container init ~43s,
+  # NuGet restore ~16s, checkout/setup ~4s, restore+compile ~62s) against only ~151s
+  # of test work, so a third and fourth shard would each re-pay more than they remove.
+  # Measured on this shape: 289s single job -> 234s (shards 194s + 221s, aggregate 9s).
   dotnet_test:
     name: dotnet test (integration) shard ${{ matrix.shard }}/2
     runs-on: ubuntu-latest
@@ -106,10 +110,10 @@ jobs:
         include:
           - shard: 1
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.
     container:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:
