@@ -20,6 +20,8 @@ public class DatabaseFixture : IAsyncLifetime
 
     private PostgreSqlContainer? _postgres;
     private Respawner _respawner = null!;
+    private readonly Lock _sharedFactoryLock = new();
+    private TestWebApplicationFactory? _sharedFactory;
     // Shared DataSource (one connection pool for the whole test run). Without
     // this, CreateContext() built a fresh DataSource per call and each got its
     // own pool — once enough tests ran, Postgres hit max_connections (53300).
@@ -77,6 +79,37 @@ public class DatabaseFixture : IAsyncLifetime
         });
     }
 
+    /// <summary>
+    /// ONE test host, shared by every <see cref="IntegrationTestBase"/> class that neither
+    /// overrides DI nor opts out via <c>RequiresIsolatedHost</c>.
+    ///
+    /// <para>
+    /// Why: <see cref="IntegrationTestBase"/> used to build a brand-new
+    /// <see cref="TestWebApplicationFactory"/> per TEST — ~800 host boots per run, which measured
+    /// as ~91% of the DB-backed suite's wall clock (340s wall for 31.6s spent inside the test
+    /// methods). Isolation does not come from the host: it comes from the Respawn wipe +
+    /// re-seed that still runs before every single test. What the per-test host bought was
+    /// isolation of in-memory singleton state, and only a handful of classes actually depend on
+    /// that — those keep their own host (see <c>IntegrationTestBase.RequiresIsolatedHost</c>).
+    /// </para>
+    /// <para>
+    /// Note the shared host's startup seeding (<c>MigrateApplicationDatabaseAsync</c>) now runs
+    /// once instead of per test. Nothing regresses: that seed was already wiped by the Respawn
+    /// reset that follows it in <c>InitializeAsync</c>, so no test could ever depend on it.
+    /// </para>
+    /// </summary>
+    public TestWebApplicationFactory SharedFactory
+    {
+        get
+        {
+            lock (_sharedFactoryLock)
+            {
+                return _sharedFactory ??= new TestWebApplicationFactory(
+                    ConnectionString, disableApplicationHostedServices: true);
+            }
+        }
+    }
+
     public ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -95,6 +128,7 @@ public class DatabaseFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        _sharedFactory?.Dispose();
         if (_dataSource is not null)
         {
             await _dataSource.DisposeAsync();

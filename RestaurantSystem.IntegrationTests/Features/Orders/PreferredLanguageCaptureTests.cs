@@ -25,6 +25,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// </remarks>
 public class PreferredLanguageCaptureTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: it registers customers, and the "register" per-IP window is host state Respawn cannot reset.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     private const decimal PizzaPrice = 12.99m;
 
     private Guid _pizzaId;

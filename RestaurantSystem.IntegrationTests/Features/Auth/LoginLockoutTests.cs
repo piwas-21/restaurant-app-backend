@@ -24,6 +24,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 /// </summary>
 public class LoginLockoutTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: the "auth" per-IP fixed window (3 / minute in test config) is host state Respawn cannot reset — a shared bucket would turn these 401 assertions into 429s.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     private const string Password = "Str0ng!Passw0rd"; // pragma: allowlist secret (test-only)
 
     public LoginLockoutTests(DatabaseFixture databaseFixture) : base(databaseFixture)

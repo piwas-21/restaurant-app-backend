@@ -20,6 +20,11 @@ namespace RestaurantSystem.IntegrationTests.Features.User;
 /// </summary>
 public class RegisterCustomerErrorCodeTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: the "register" per-IP fixed window (3 / hour in test config) is host state Respawn cannot reset.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     public RegisterCustomerErrorCodeTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {

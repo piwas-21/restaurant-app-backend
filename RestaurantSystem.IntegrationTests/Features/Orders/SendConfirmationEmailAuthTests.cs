@@ -14,6 +14,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// </summary>
 public class SendConfirmationEmailAuthTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: the "confirmation-email" per-IP fixed window is host state Respawn cannot reset.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     public SendConfirmationEmailAuthTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {
