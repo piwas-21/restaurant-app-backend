@@ -27,6 +27,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // Issue #151 (redesign slice 1): the per-option SelectedSideItems field was removed
 // from SelectedMenuOptionDto (bundle-child sides were never persisted or displayed);
 // the last test pins that a stale client still sending it is tolerated and ignored.
+[Collection("Database Lane 2")]
 public class BundleChildIngredientCustomizationTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

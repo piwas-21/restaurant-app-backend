@@ -19,7 +19,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// the same session. "Settle exactly once" is a database guarantee or it is nothing.
 /// </para>
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 4")]
 public class OrderCheckoutSessionSchemaTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;

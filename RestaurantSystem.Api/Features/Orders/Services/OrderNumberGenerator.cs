@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -52,15 +53,20 @@ public class OrderNumberGenerator : IOrderNumberGenerator
     private const int OrderNumberLockNamespace = 1;
 
     private readonly ApplicationDbContext _context;
+    private readonly ITenantClock _clock;
 
-    public OrderNumberGenerator(ApplicationDbContext context)
+    public OrderNumberGenerator(ApplicationDbContext context, ITenantClock clock)
     {
         _context = context;
+        _clock = clock;
     }
 
     public async Task<string> GenerateAsync(CancellationToken cancellationToken = default)
     {
-        var date = DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        // The day a human reads off the number, so it is the tenant's day (backend #372) — on UTC
+        // the number rolled over at 02:00 local. Uniqueness and the advisory lock below are
+        // unaffected either way: both key on this same string.
+        var date = _clock.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
 
         await LockDayAsync(date, cancellationToken);
 

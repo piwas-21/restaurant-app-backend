@@ -27,7 +27,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// for a caller to declare — these tests are what stop a future edit adding one back.
 /// </para>
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 2")]
 public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
 {
     private const string ConnectedAccount = "acct_test_connected";

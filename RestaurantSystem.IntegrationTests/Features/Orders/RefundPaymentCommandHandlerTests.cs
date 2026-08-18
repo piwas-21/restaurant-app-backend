@@ -9,6 +9,7 @@ using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -21,7 +22,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// refund came to store an order-level status word on a payment record and to
 /// drive <c>Order.TotalPaid</c> negative. Both are pinned here.
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 4")]
 public class RefundPaymentCommandHandlerTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;
@@ -112,7 +113,9 @@ public class RefundPaymentCommandHandlerTests : IAsyncLifetime
         await RefundAsync(orderId, paymentId, amount: 20m);
 
         await using var ctx = _fixture.CreateContext();
-        var report = await new GetZReportQueryHandler(ctx, NullLogger<GetZReportQueryHandler>.Instance)
+        // A clock on the UTC zone keeps this fixture's noon-UTC order inside the reported day
+        // whatever the tenant zone does; the day boundary itself is ZReportTenantDayTests' subject.
+        var report = await new GetZReportQueryHandler(ctx, new FixedTenantClock("UTC"), NullLogger<GetZReportQueryHandler>.Instance)
             .Handle(new GetZReportQuery(reportDate), CancellationToken.None);
 
         report.Data!.Refunds.RefundCount.Should().Be(1);

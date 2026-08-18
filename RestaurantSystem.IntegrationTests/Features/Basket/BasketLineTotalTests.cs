@@ -37,6 +37,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // unconditionally (BuildRegularItemAsync adds `sideItem.BasePrice * quantity`), so the fixture does
 // not depend on the ingredient rules, which have their own optional / included-in-base branches and
 // their own issues. IsSameCustomization compares side items, so the add-path dedup still matches.
+[Collection("Database Lane 1")]
 public class BasketLineTotalTests : IntegrationTestBase
 {
     private readonly string _sessionId = Guid.NewGuid().ToString();

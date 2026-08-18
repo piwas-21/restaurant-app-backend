@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 // ProductName = "" on every line. The success phase re-read the full graph, which is why it looked
 // fine. These are integration tests against a real database on purpose — the bug is entirely in
 // which navigations EF loaded, so a mocked repository would reproduce nothing.
+[Collection("Database Lane 3")]
 public class BasketChannelSwitchPayloadTests : IntegrationTestBase
 {
     private const int TakeawayAndDelivery = (int)(OrderChannels.Takeaway | OrderChannels.Delivery);

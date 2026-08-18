@@ -24,6 +24,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 // EVERY ASSERTION HERE IS ON A CHILD ROW, never on a total, and that is not a stylistic choice:
 // a child carries ItemTotal = 0 (#54) and the root row equals its basket line (#312), so every
 // total in the system reconciles with this defect fully present. A totals-based test cannot see it.
+[Collection("Database Lane 4")]
 public class OrderChildQuantityTests : IntegrationTestBase
 {
     public OrderChildQuantityTests(DatabaseFixture databaseFixture)

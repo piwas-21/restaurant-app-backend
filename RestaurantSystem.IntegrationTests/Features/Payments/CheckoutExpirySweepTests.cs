@@ -34,7 +34,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// Stripe is faked; the database is real. Every property asserted here is about what gets written.
 /// </para>
 /// </remarks>
-[Collection("Database")]
+[Collection("Database Lane 1")]
 public class CheckoutExpirySweepTests : IAsyncLifetime
 {
     private const string ConnectedAccount = "acct_test_connected";

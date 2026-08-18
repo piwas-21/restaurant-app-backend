@@ -15,6 +15,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// all, only a connection, and got a live feed rather than one order. Its sibling streams were
 /// already gated (kitchen, all); this one was the outlier and was missed by both.
 /// </summary>
+[Collection("Database Lane 4")]
 public class OrderEventStreamAuthorizationTests : IntegrationTestBase
 {
     public OrderEventStreamAuthorizationTests(DatabaseFixture databaseFixture)

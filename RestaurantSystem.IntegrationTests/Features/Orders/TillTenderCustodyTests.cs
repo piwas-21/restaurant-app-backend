@@ -28,6 +28,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// would go red.
 /// </para>
 /// </summary>
+[Collection("Database Lane 3")]
 public class TillTenderCustodyTests : IntegrationTestBase
 {
     private Guid _orderId;

@@ -33,6 +33,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Catalog;
 /// "no primary category" already resolves permissively by documented design.
 /// </para>
 /// </summary>
+[Collection("Database Lane 2")]
 public class SoftDeletedCategoryAvailabilityTests : IntegrationTestBase
 {
     private const string ProductName = "§9.14 Orphaned-Primary Product";

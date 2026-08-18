@@ -26,6 +26,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Products;
 //
 // Raw JSON throughout, following ProductUpdateContentTests: `"en": null` and a blank key cannot be
 // expressed as a C# object graph, and those are exactly the shapes under test.
+[Collection("Database Lane 2")]
 public class NestedContentValidationTests : IntegrationTestBase
 {
     private Guid _productId;

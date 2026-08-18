@@ -28,7 +28,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// throughout — stubbing it would delete the half of the slice that touches money.
 /// </para>
 /// </summary>
-[Collection("Database")]
+[Collection("Database Lane 1")]
 public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
 {
     private const string ConnectedAccount = "acct_test_connected";

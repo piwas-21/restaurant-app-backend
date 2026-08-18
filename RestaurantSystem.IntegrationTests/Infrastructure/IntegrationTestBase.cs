@@ -8,12 +8,25 @@ using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
-[Collection("Database")]
+// No [Collection] here on purpose: the concrete classes carry their own [Collection("Database
+// Lane N")], which is what lets them run in parallel lanes (see DatabaseCollections.cs). An
+// attribute here would be inherited by every subclass and put them all back in one serial
+// collection. A NEW DB-backed test class must therefore declare a lane attribute itself —
+// without one xUnit cannot supply the DatabaseFixture and the class fails loudly at run time.
 public abstract class IntegrationTestBase : IAsyncLifetime
 {
+    /// <summary>
+    /// Whether a concrete test class overrides <see cref="ConfigureTestServices"/> — cached, because
+    /// the answer is per-type and the question is asked once per test.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> OverridesDiCache = new();
+
     protected readonly DatabaseFixture DatabaseFixture;
     protected TestWebApplicationFactory Factory = null!;
     protected HttpClient Client = null!;
+
+    /// <summary>The host this instance owns and must dispose. Null when it borrows the shared one.</summary>
+    private TestWebApplicationFactory? _ownedFactory;
 
     protected IntegrationTestBase(DatabaseFixture databaseFixture)
     {
@@ -27,11 +40,33 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <summary>
+    /// Opt out of the shared host. Override to <c>true</c> ONLY for a class whose subject is
+    /// in-memory host state that the per-test Respawn wipe cannot reset — a rate-limiter window,
+    /// a "seeded once" singleton flag, an SSE client registry. Everything else is isolated by the
+    /// database reset alone and should share, because a private host costs ~0.4s per test.
+    /// <para>
+    /// A class that overrides <see cref="ConfigureTestServices"/> gets its own host automatically;
+    /// it does not need this.
+    /// </para>
+    /// </summary>
+    protected virtual bool RequiresIsolatedHost => false;
+
     public async Task InitializeAsync()
     {
-        // Create factory and client after DatabaseFixture is initialized
-        Factory = new TestWebApplicationFactory(
-            DatabaseFixture.ConnectionString, configureTestServices: ConfigureTestServices);
+        // Own host only when this class customises DI or explicitly needs isolated host state;
+        // otherwise borrow the collection-wide one (see DatabaseFixture.SharedFactory).
+        if (RequiresIsolatedHost || OverridesConfigureTestServices(GetType()))
+        {
+            _ownedFactory = new TestWebApplicationFactory(
+                DatabaseFixture.ConnectionString, configureTestServices: ConfigureTestServices);
+            Factory = _ownedFactory;
+        }
+        else
+        {
+            Factory = DatabaseFixture.SharedFactory;
+        }
+
         Client = Factory.CreateClient();
 
         Client.DefaultRequestHeaders.Accept.Clear();
@@ -40,16 +75,54 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
 
 
+        // Wipe + reseed only when the database is not already sitting in exactly the state this
+        // test would recreate. A test that only read left the previous test's canonical seed
+        // untouched, and re-deleting rows just to re-insert the identical ones costs ~47 ms.
+        // Classes that seed extra data of their own are excluded: their rows are not canonical, and
+        // an instance of such a class typically remembers ids its own seeding produced.
+        var usesDefaultSeedOnly = !OverridesSeedTestData(GetType());
+
+        if (usesDefaultSeedOnly && await DatabaseFixture.IsSeedIntactAsync())
+        {
+            return;
+        }
+
         await DatabaseFixture.ResetDatabaseAsync();
         await SeedTestData();
+
+        if (usesDefaultSeedOnly)
+        {
+            await DatabaseFixture.MarkSeededAsync();
+        }
     }
 
     public Task DisposeAsync()
     {
         Client?.Dispose();
-        Factory?.Dispose();
+        // Never the shared host: it outlives this test and belongs to the collection fixture.
+        _ownedFactory?.Dispose();
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Whether a concrete test class overrides <see cref="SeedTestData"/> — cached like
+    /// <see cref="OverridesConfigureTestServices"/>, and asked once per test.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> OverridesSeedCache = new();
+
+    private static bool OverridesSeedTestData(Type type) =>
+        OverridesSeedCache.GetOrAdd(type, static t =>
+            t.GetMethod(
+                nameof(SeedTestData),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+             ?.DeclaringType != typeof(IntegrationTestBase));
+
+    private static bool OverridesConfigureTestServices(Type type) =>
+        OverridesDiCache.GetOrAdd(type, static t =>
+            t.GetMethod(
+                nameof(ConfigureTestServices),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+             ?.DeclaringType != typeof(IntegrationTestBase));
 
     /// <summary>
     /// Last word on the test host's DI. Empty by default — a test class overrides it to replace a

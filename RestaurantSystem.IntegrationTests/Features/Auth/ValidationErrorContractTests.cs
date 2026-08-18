@@ -26,8 +26,14 @@ namespace RestaurantSystem.IntegrationTests.Features.Auth;
 /// `POST /api/user/register/customer` is the vehicle: anonymous, and its validator breaks several
 /// rules at once on a single bad payload. Raw JSON so the request is exactly what a client sends.
 /// </summary>
+[Collection("Database Lane 2")]
 public class ValidationErrorContractTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: the "register" per-IP fixed window (3 / hour in test config) is host state Respawn cannot reset — sharing a host would let another class's registrations 429 these.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     public ValidationErrorContractTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {

@@ -22,6 +22,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// The columns are gone from the model by the time this runs, so the fixture
 /// writes them with raw SQL against the pre-drop shape.
 /// </summary>
+[Collection("Database Lane 2")]
 public class EntranceCarryOverTests : IntegrationTestBase
 {
     public EntranceCarryOverTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }

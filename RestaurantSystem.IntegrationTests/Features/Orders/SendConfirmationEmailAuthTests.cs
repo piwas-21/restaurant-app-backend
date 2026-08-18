@@ -12,8 +12,14 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// "confirmation-email" per-IP rate-limit policy. These tests fail fast if
 /// either decision is silently reverted.
 /// </summary>
+[Collection("Database Lane 3")]
 public class SendConfirmationEmailAuthTests : IntegrationTestBase
 {
+    /// <summary>
+    /// Its OWN host per test: the "confirmation-email" per-IP fixed window is host state Respawn cannot reset.
+    /// </summary>
+    protected override bool RequiresIsolatedHost => true;
+
     public SendConfirmationEmailAuthTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {

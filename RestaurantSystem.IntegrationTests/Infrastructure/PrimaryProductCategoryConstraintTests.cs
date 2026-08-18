@@ -25,6 +25,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// tenant database it was written for — the floor-plan S10 carry-over made the same point, where
 /// the interesting branch could not fire on the test DB at all.
 /// </remarks>
+[Collection("Database Lane 2")]
 public class PrimaryProductCategoryConstraintTests : IntegrationTestBase
 {
     public PrimaryProductCategoryConstraintTests(DatabaseFixture databaseFixture)
@@ -142,7 +143,7 @@ public class PrimaryProductCategoryConstraintTests : IntegrationTestBase
         var keepLinkId = Guid.NewGuid();
         var demoteLinkId = Guid.NewGuid();
         // try/finally: the fixture is ONE container shared by every test class in sequence
-        // (`[Collection("Database")]`, and Respawn resets rows, not schema). Leaving the index
+        // (the lane database outlives the test, and Respawn resets rows, not schema). Leaving the index
         // dropped after a failure here turns one real failure into a confusing cascade in unrelated
         // classes.
         try

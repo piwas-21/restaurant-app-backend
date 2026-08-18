@@ -35,6 +35,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// <c>Common/OutboundEmailLedgerTests.cs</c>.
 /// </para>
 /// </summary>
+[Collection("Database Lane 2")]
 public class ServerSideOrderMailTests : IntegrationTestBase
 {
     private const decimal PizzaPrice = 12.99m;

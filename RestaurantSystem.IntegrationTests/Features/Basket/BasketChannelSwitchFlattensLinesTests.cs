@@ -34,6 +34,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 /// separately from the flattening itself.
 /// </para>
 /// </remarks>
+[Collection("Database Lane 4")]
 public class BasketChannelSwitchFlattensLinesTests : IntegrationTestBase
 {
     private const int TakeawayAndDelivery = (int)(OrderChannels.Takeaway | OrderChannels.Delivery);

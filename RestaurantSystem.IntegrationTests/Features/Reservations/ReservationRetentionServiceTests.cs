@@ -17,6 +17,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Reservations;
 // so ReservationRetentionService anonymizes the contact snapshot on reservations
 // older than the configured window while retaining the row (table/date/guests) for
 // occupancy history. Data-loss class — DISABLED unless ReservationRetention:Enabled.
+[Collection("Database Lane 2")]
 public class ReservationRetentionServiceTests : IntegrationTestBase
 {
     public ReservationRetentionServiceTests(DatabaseFixture databaseFixture) : base(databaseFixture)

@@ -23,6 +23,7 @@ namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
 // only way to reach the "Unknown" email/name fallback — cannot exist in the DB
 // and therefore cannot be produced through HTTP. That defensive fallback is
 // characterized directly in CustomerDiscountRuleMapperTests.
+[Collection("Database Lane 3")]
 public class CustomerDiscountsControllerTests : IntegrationTestBase
 {
     private const string BaseUrl = "/api/admin/customerdiscounts";

@@ -18,6 +18,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Settings;
 /// the previous code read <c>DateTime.UtcNow</c> and would answer "closed" and "Friday" here.
 /// </para>
 /// </summary>
+[Collection("Database Lane 4")]
 public class WorkingHoursClockTests : IntegrationTestBase
 {
     /// <summary>Friday 22:30 UTC — which is already Saturday 00:30 in Zurich.</summary>

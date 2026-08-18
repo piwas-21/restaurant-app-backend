@@ -18,6 +18,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// additive — nullable, no default, no rewrite. A model-level assertion would hold even if the
 /// migration had been written NOT NULL.
 /// </remarks>
+[Collection("Database Lane 1")]
 public class PreferredLanguageSchemaTests : IntegrationTestBase
 {
     public PreferredLanguageSchemaTests(DatabaseFixture databaseFixture)
