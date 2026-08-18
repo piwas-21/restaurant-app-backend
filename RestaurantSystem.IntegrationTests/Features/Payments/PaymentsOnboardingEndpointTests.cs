@@ -3,7 +3,6 @@ using System.Text.Json;
 using FluentAssertions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Payments.Dtos;
-using RestaurantSystem.Api.Features.Payments.Queries.GetPaymentsOnboardingQuery;
 using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
@@ -105,8 +104,10 @@ public class PaymentsOnboardingConfiguredTests : PaymentsOnboardingEndpointTests
         var data = await ReadData(response);
         data.GetProperty("state").GetString().Should().Be(PaymentsOnboardingState.Configured);
         data.GetProperty("connectedAccountId").GetString().Should().Be("acct_onboarding");
-        data.GetProperty("dashboardUrl").GetString()
-            .Should().Be(GetPaymentsOnboardingQueryHandler.StripeDashboardUrl);
+        // The DEFAULT from `StripeSettings`, not an override — this class sets no
+        // `Stripe:DashboardUrl`, so the assertion pins the shipped value a restaurant owner is
+        // actually sent to.
+        data.GetProperty("dashboardUrl").GetString().Should().Be("https://dashboard.stripe.com");
     }
 
     [Theory]

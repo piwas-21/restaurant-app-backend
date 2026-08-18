@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Payments.Dtos;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.Payments.Queries.GetPaymentsOnboardingQuery;
 
@@ -38,25 +40,15 @@ public record GetPaymentsOnboardingQuery : IQuery<ApiResponse<PaymentsOnboarding
 public class GetPaymentsOnboardingQueryHandler
     : IQueryHandler<GetPaymentsOnboardingQuery, ApiResponse<PaymentsOnboardingDto>>
 {
-    /// <summary>
-    /// Stripe's own product URL for a Standard connected account's owner.
-    ///
-    /// <para>
-    /// A constant rather than configuration, on purpose. It is not OUR address — there is no
-    /// deployment of this system in which a tenant's Stripe dashboard lives somewhere else — and
-    /// making it settable would create a way to misconfigure a link that sends a restaurant owner
-    /// to a login page. The sibling <c>StripeSettings.SuccessPath</c> is configuration for the
-    /// opposite reason: it is a path on OUR origin.
-    /// </para>
-    /// </summary>
-    public const string StripeDashboardUrl = "https://dashboard.stripe.com";
-
     private readonly IStripeGateway _gateway;
+    private readonly StripeSettings _settings;
 
-    public GetPaymentsOnboardingQueryHandler(IStripeGateway gateway)
+    public GetPaymentsOnboardingQueryHandler(IStripeGateway gateway, IOptions<StripeSettings> settings)
     {
         ArgumentNullException.ThrowIfNull(gateway);
+        ArgumentNullException.ThrowIfNull(settings);
         _gateway = gateway;
+        _settings = settings.Value;
     }
 
     public Task<ApiResponse<PaymentsOnboardingDto>> Handle(
@@ -71,7 +63,7 @@ public class GetPaymentsOnboardingQueryHandler
         var dto = new PaymentsOnboardingDto(
             configured ? PaymentsOnboardingState.Configured : PaymentsOnboardingState.NotConfigured,
             configured ? _gateway.ConnectedAccountId : null,
-            StripeDashboardUrl);
+            _settings.DashboardUrl);
 
         return Task.FromResult(ApiResponse<PaymentsOnboardingDto>.SuccessWithData(dto));
     }
