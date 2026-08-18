@@ -1,10 +1,12 @@
 using System.Globalization;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -49,6 +51,13 @@ public class OrderNumberAllocationTests : IntegrationTestBase
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(25);
 
+    /// <summary>
+    /// A clock on the UTC zone, so <see cref="Today"/> below still names the day this allocator
+    /// picks and the cases about the LOCK keep asserting the lock. The day the prefix is built from
+    /// is the tenant's since backend #372 and is pinned separately, at the bottom of this file.
+    /// </summary>
+    private static readonly ITenantClock UtcClock = new FixedTenantClock("UTC");
+
     public OrderNumberAllocationTests(DatabaseFixture databaseFixture) : base(databaseFixture)
     {
     }
@@ -60,14 +69,14 @@ public class OrderNumberAllocationTests : IntegrationTestBase
         await using var contextB = DatabaseFixture.CreateContext();
 
         await using var transactionA = await contextA.Database.BeginTransactionAsync();
-        var numberA = await new OrderNumberGenerator(contextA).GenerateAsync();
+        var numberA = await new OrderNumberGenerator(contextA, UtcClock).GenerateAsync();
         AddOrder(contextA, numberA);
         await contextA.SaveChangesAsync();
 
         // B starts while A's row exists but is still uncommitted, so nothing B can read tells it
         // that numberA is taken.
         await using var transactionB = await contextB.Database.BeginTransactionAsync();
-        var allocateB = new OrderNumberGenerator(contextB).GenerateAsync();
+        var allocateB = new OrderNumberGenerator(contextB, UtcClock).GenerateAsync();
 
         var blocked = await WaitUntilBlockedOnTodaysLockAsync(allocateB);
         blocked.Should().BeTrue(
@@ -98,7 +107,7 @@ public class OrderNumberAllocationTests : IntegrationTestBase
         await using var context = DatabaseFixture.CreateContext();
         context.Database.CurrentTransaction.Should().BeNull();
 
-        var allocate = async () => await new OrderNumberGenerator(context).GenerateAsync();
+        var allocate = async () => await new OrderNumberGenerator(context, UtcClock).GenerateAsync();
 
         await allocate.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -112,7 +121,7 @@ public class OrderNumberAllocationTests : IntegrationTestBase
     public async Task Sequential_allocations_keep_the_daily_format_and_increment_by_one()
     {
         await using var context = DatabaseFixture.CreateContext();
-        var generator = new OrderNumberGenerator(context);
+        var generator = new OrderNumberGenerator(context, UtcClock);
 
         var allocated = new List<string>();
         for (var i = 0; i < 3; i++)
@@ -195,5 +204,37 @@ public class OrderNumberAllocationTests : IntegrationTestBase
             CreatedAt = now,
             CreatedBy = nameof(OrderNumberAllocationTests),
         });
+    }
+
+    /// <summary>
+    /// The <c>yyyyMMdd</c> prefix is the day a HUMAN reads off a kitchen ticket, so it is the
+    /// restaurant's day: on UTC the number rolled over at 02:00 local in Zurich summer (backend
+    /// #372, the cosmetic sibling of the Z-report defect — uniqueness and the day lock are keyed on
+    /// this same string either way, so only the printed day was ever wrong).
+    /// <para>
+    /// Anchored to the REAL instant, like the Z-report's default-day test: a literal date cannot
+    /// tell the tenant's day apart from UTC's on a CI runner, so the zone is chosen from the current
+    /// UTC hour to guarantee they differ — and that premise is asserted, not assumed.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task The_daily_prefix_is_the_tenant_day_not_the_UTC_day()
+    {
+        var utcNow = DateTimeOffset.UtcNow;
+
+        // POSIX sign convention: Etc/GMT+12 is UTC-12, Etc/GMT-12 is UTC+12. Both ids are present
+        // in mcr.microsoft.com/dotnet/{sdk,aspnet}:10.0.
+        var clock = new FixedTenantClock(utcNow.Hour < 12 ? "Etc/GMT+12" : "Etc/GMT-12");
+        var tenantDay = clock.Now.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+
+        tenantDay.Should().NotBe(Today, "otherwise a UTC prefix would satisfy this test too");
+
+        await using var context = DatabaseFixture.CreateContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
+        var number = await new OrderNumberGenerator(context, clock).GenerateAsync();
+
+        number.Should().StartWith(tenantDay);
+        await transaction.RollbackAsync();
     }
 }

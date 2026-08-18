@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.AddPaymentToOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CompleteAllTableOrdersCommand;
@@ -26,8 +27,10 @@ namespace RestaurantSystem.Api.Features.Orders;
 public class OrdersController : ControllerBase
 {
     private readonly CustomMediator _mediator;
+    private readonly ITenantClock _clock;
 
-    public OrdersController(CustomMediator mediator) => _mediator = mediator;
+    public OrdersController(CustomMediator mediator, ITenantClock clock)
+        => (_mediator, _clock) = (mediator, clock);
 
     [HttpGet]
     [Authorize]
@@ -36,13 +39,14 @@ public class OrdersController : ControllerBase
 
     // The till's day-close report — the `cashier` module's own surface (sofra ADR-010), so it is
     // module-gated here while the rest of this controller stays core order handling.
-    // Date is interpreted as a calendar day in UTC; the report covers
-    // [date 00:00 UTC, date+1 00:00 UTC). Defaults to today (UTC) if omitted.
+    // Date is a calendar day on the RESTAURANT'S wall clock, and so is the default: DateTime.UtcNow
+    // handed a cashier closing at 00:30 in Geneva YESTERDAY'S report (backend #372). The handler
+    // owns the matching half of that fix — the window it covers.
     [HttpGet("z-report")]
     [RequireAdminOrCashier]
     [RequireModule(ModuleIds.Cashier)]
     public async Task<ActionResult<ApiResponse<ZReportDto>>> GetZReport([FromQuery] DateOnly? date)
-        => Ok(await _mediator.SendQuery(new GetZReportQuery(date ?? DateOnly.FromDateTime(DateTime.UtcNow))));
+        => Ok(await _mediator.SendQuery(new GetZReportQuery(date ?? DateOnly.FromDateTime(_clock.Now.Date))));
 
     [HttpGet("{id}")]
     [Authorize]
