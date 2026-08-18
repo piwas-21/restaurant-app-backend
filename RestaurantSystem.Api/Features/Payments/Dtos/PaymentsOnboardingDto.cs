@@ -14,9 +14,9 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 /// </para>
 /// </summary>
 /// <param name="State">
-/// <c>notConfigured</c> or <c>configured</c> — see <see cref="PaymentsOnboardingState"/>.
-/// A string rather than a bool because P7b adds a third value (<c>awaitingVerification</c>)
-/// and a boolean would have to be replaced rather than extended, breaking a shipped client.
+/// <c>notConfigured</c>, <c>awaitingVerification</c> or <c>configured</c> — see
+/// <see cref="PaymentsOnboardingState"/>. A string rather than a bool, which is what let P7b add
+/// the middle value without replacing anything a shipped client already reads.
 /// </param>
 /// <param name="ConnectedAccountId">
 /// The tenant's own <c>acct_…</c>, or null when there is none. Not a secret — it is a public-side
@@ -27,21 +27,11 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 /// Where the restaurant manages its own account. Their dashboard, not ours: Connect Standard
 /// means the money is theirs and so is the login.
 /// </param>
-public record PaymentsOnboardingDto(string State, string? ConnectedAccountId, string DashboardUrl);
-
-/// <summary>The <see cref="PaymentsOnboardingDto.State"/> vocabulary. Never rename one.</summary>
-public static class PaymentsOnboardingState
-{
-    /// <summary>
-    /// The module is on but Stripe is not usable yet — no platform key, or no connected account,
-    /// or the master switch is off. On the fleet as it stands this is every tenant.
-    /// </summary>
-    public const string NotConfigured = "notConfigured";
-
-    /// <summary>
-    /// Enabled, keyed and bound to an account: this restaurant can mint a Checkout session.
-    /// <b>Not</b> the same as "Stripe has finished verifying them" — that distinction needs a
-    /// call to Stripe and is P7b's whole subject.
-    /// </summary>
-    public const string Configured = "configured";
-}
+/// <param name="RequirementsDue">
+/// How many KYC fields Stripe is still waiting for, or null when we do not know — which covers both
+/// "nothing to ask about" and "the read was refused". A COUNT and never the field list: those names
+/// are the restaurant's own identity data, they are shown them by Stripe on the page where they can
+/// actually act on them, and a number is enough to say "there is still a form to finish".
+/// </param>
+public record PaymentsOnboardingDto(
+    string State, string? ConnectedAccountId, string DashboardUrl, int? RequirementsDue = null);

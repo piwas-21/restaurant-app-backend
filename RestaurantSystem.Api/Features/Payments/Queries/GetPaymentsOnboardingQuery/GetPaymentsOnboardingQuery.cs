@@ -14,7 +14,7 @@ namespace RestaurantSystem.Api.Features.Payments.Queries.GetPaymentsOnboardingQu
 public record GetPaymentsOnboardingQuery : IQuery<ApiResponse<PaymentsOnboardingDto>>;
 
 /// <summary>
-/// Answers from configuration alone — no database, and <b>no call to Stripe</b>.
+/// Answers from configuration, plus at most one CACHED read of the connected account. No database.
 /// </summary>
 /// <remarks>
 /// The checklist step this backs (P5) reads "not done" until money has actually moved, which is
@@ -30,41 +30,65 @@ public record GetPaymentsOnboardingQuery : IQuery<ApiResponse<PaymentsOnboarding
 /// a bare 404 is also what a typo'd route and a backend from before this slice answer.
 /// </para>
 /// <para>
-/// It stops one step short of the question an owner really has — <i>has Stripe finished
-/// verifying us?</i> — because answering that needs <c>GET /v1/accounts/{acct}</c> and the
-/// <c>Accounts → read</c> permission the box key does not hold today. P7b adds exactly that,
-/// behind a cache, and degrades to this answer when the read is refused. Saying the smaller true
-/// thing is the same rule §9 Q1 binds the customer-facing copy to.
+/// <b>P7b:</b> it now also asks Stripe, once and behind a cache, the question an owner really has —
+/// <i>has Stripe finished verifying us?</i> — because a tenant is configured for DAYS before that
+/// is true and "you are set up" is wrong for every one of them. The read needs
+/// <c>Accounts → read</c> on the box key (§9 P0(b) is the decision to grant it), so it is
+/// OPTIONAL by construction: when it is refused, or the account cannot be read for any other
+/// reason, this returns exactly what P7a returned. Saying the smaller true thing is the same rule
+/// §9 Q1 binds the customer-facing copy to.
 /// </para>
 /// </remarks>
 public class GetPaymentsOnboardingQueryHandler
     : IQueryHandler<GetPaymentsOnboardingQuery, ApiResponse<PaymentsOnboardingDto>>
 {
     private readonly IStripeGateway _gateway;
+    private readonly IStripeAccountClient _accounts;
     private readonly StripeSettings _settings;
 
-    public GetPaymentsOnboardingQueryHandler(IStripeGateway gateway, IOptions<StripeSettings> settings)
+    public GetPaymentsOnboardingQueryHandler(
+        IStripeGateway gateway, IStripeAccountClient accounts, IOptions<StripeSettings> settings)
     {
         ArgumentNullException.ThrowIfNull(gateway);
         ArgumentNullException.ThrowIfNull(settings);
         _gateway = gateway;
+        _accounts = accounts;
         _settings = settings.Value;
     }
 
-    public Task<ApiResponse<PaymentsOnboardingDto>> Handle(
+    public async Task<ApiResponse<PaymentsOnboardingDto>> Handle(
         GetPaymentsOnboardingQuery query, CancellationToken cancellationToken)
     {
-        var configured = _gateway.IsConfigured;
-
         // The id is reported ONLY when the gateway is configured. `ConnectedAccountId` is the raw
         // setting and is non-empty on a half-provisioned box whose key never arrived — reporting it
         // there would show an owner an account their restaurant cannot actually transact on, which
         // is the same "one leg answering for both" mistake S8 had to fix on availability.
-        var dto = new PaymentsOnboardingDto(
-            configured ? PaymentsOnboardingState.Configured : PaymentsOnboardingState.NotConfigured,
-            configured ? _gateway.ConnectedAccountId : null,
-            _settings.DashboardUrl);
+        if (!_gateway.IsConfigured)
+        {
+            return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
+                PaymentsOnboardingState.NotConfigured, null, _settings.DashboardUrl));
+        }
 
-        return Task.FromResult(ApiResponse<PaymentsOnboardingDto>.SuccessWithData(dto));
+        // Null means we could not find out — the key may not carry `Accounts → read` at all. Land
+        // on P7a's answer rather than on a worse one: `configured` is the weaker claim, and it is
+        // what configuration alone supports. Blanking the tab or inventing `awaitingVerification`
+        // would both be reporting a Stripe verdict we never obtained.
+        var account = await _accounts.GetConnectedAccountAsync(cancellationToken);
+
+        // The count rides ONLY on the awaiting state, so it is read inside the pattern that
+        // established it — on a verified account Stripe still lists future `currently_due` items
+        // ahead of a deadline, and surfacing those beside "you are set up" reads as a problem where
+        // there is none.
+        if (account is { ChargesEnabled: false } awaitingVerification)
+        {
+            return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
+                PaymentsOnboardingState.AwaitingVerification,
+                _gateway.ConnectedAccountId,
+                _settings.DashboardUrl,
+                awaitingVerification.RequirementsDueCount));
+        }
+
+        return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
+            PaymentsOnboardingState.Configured, _gateway.ConnectedAccountId, _settings.DashboardUrl));
     }
 }
