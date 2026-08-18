@@ -38,4 +38,12 @@ public class StripeSettings
 
     /// <summary>Where an abandoned Checkout lands. The basket is deliberately still intact (S8).</summary>
     public string CancelPath { get; set; } = "/checkout/review";
+
+    /// <summary>
+    /// Where the RESTAURANT manages its own account — their dashboard, not ours (Connect Standard:
+    /// the money is theirs and so is the login). Reported by the admin onboarding endpoint (§9 P7a).
+    /// Unlike <see cref="SuccessPath"/> no deployment should differ; overriding it points a
+    /// restaurant owner at a login page we do not control. Settable only so no URL is compiled in.
+    /// </summary>
+    public string DashboardUrl { get; set; } = "https://dashboard.stripe.com";
 }

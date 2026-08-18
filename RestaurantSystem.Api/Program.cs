@@ -300,6 +300,14 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.
 // return URLs, and holds no connection of its own — SessionService is constructed per call.
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeCheckoutClient,
     RestaurantSystem.Api.Features.Payments.Services.StripeCheckoutClient>();
+// Singleton because it HOLDS the cached account snapshot, and there is exactly one connected
+// account per instance. See StripeAccountClient for why a cache exists on an admin-only read.
+builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeAccountClient,
+    RestaurantSystem.Api.Features.Payments.Services.StripeAccountClient>();
+// The clock, registered for the first time here. StripeAccountClient's cache window is the only
+// thing in this codebase whose EXPIRY needs to be exercised by a test, and a cache that can only be
+// tested by sleeping for five minutes is a cache nobody tests.
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSettlementWriter,
