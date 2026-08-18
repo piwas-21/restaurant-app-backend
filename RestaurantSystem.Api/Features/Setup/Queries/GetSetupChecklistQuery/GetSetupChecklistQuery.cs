@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
+using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Setup.Dtos;
 using RestaurantSystem.Api.Features.Setup.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -21,13 +22,18 @@ public class GetSetupChecklistQueryHandler
     private readonly ApplicationDbContext _context;
     private readonly ITenantModules _modules;
     private readonly ISetupChecklistStore _store;
+    private readonly IStripeGateway _stripe;
 
     public GetSetupChecklistQueryHandler(
-        ApplicationDbContext context, ITenantModules modules, ISetupChecklistStore store)
+        ApplicationDbContext context,
+        ITenantModules modules,
+        ISetupChecklistStore store,
+        IStripeGateway stripe)
     {
         _context = context;
         _modules = modules;
         _store = store;
+        _stripe = stripe;
     }
 
     public async Task<ApiResponse<SetupChecklistDto>> Handle(
@@ -42,9 +48,16 @@ public class GetSetupChecklistQueryHandler
             ? new HashSet<string>(StringComparer.Ordinal)
             : new HashSet<string>(state.AcknowledgedSteps, StringComparer.Ordinal);
 
-        var facts = await ReadFactsAsync(cancellationToken);
+        // Entitlement first, facts second: a tenant without the payments step must not
+        // pay for the query that would tick it. Nothing else here is conditional, so
+        // this is the one fact that gets asked for by name.
+        var entitled = SetupSteps.For(_modules, _stripe.IsConfigured).ToList();
 
-        var steps = SetupSteps.For(_modules)
+        var facts = await ReadFactsAsync(
+            needsPaymentFact: entitled.Any(s => s.Key == SetupSteps.OnlinePayments),
+            cancellationToken);
+
+        var steps = entitled
             .Select(s => new SetupStepDto(
                 s.Key,
                 s.ModuleId,
@@ -61,9 +74,10 @@ public class GetSetupChecklistQueryHandler
     }
 
     /// <summary>What the database actually shows about this restaurant's setup.</summary>
-    private readonly record struct SetupFacts(bool HasMenu, bool HasStaff);
+    private readonly record struct SetupFacts(bool HasMenu, bool HasStaff, bool HasSettledCheckout);
 
-    private async Task<SetupFacts> ReadFactsAsync(CancellationToken cancellationToken)
+    private async Task<SetupFacts> ReadFactsAsync(
+        bool needsPaymentFact, CancellationToken cancellationToken)
     {
         // A product that is actually IN a category, not "some category exists AND some
         // product exists". Those are two independent facts, and an owner who made one
@@ -94,13 +108,27 @@ public class GetSetupChecklistQueryHandler
             .Take(2)
             .CountAsync(cancellationToken);
 
-        return new SetupFacts(hasMenu, staffCount > 1);
+        // MONEY HAVING MOVED, and nothing weaker. `IsConfigured` is true the moment the
+        // env vars land — days before Stripe finishes verifying the business — so a step
+        // derived from it would tick for a tenant who still cannot take a card. A
+        // `Created` session is only a redirect nobody may have completed. `Completed` is
+        // written by the settle path after re-fetching from Stripe, which is the one
+        // event that cannot happen early.
+        //
+        // Short-circuited when the step is not on this tenant's checklist: `false` then
+        // feeds nothing, because IsObservedDone is never asked about a step that was
+        // filtered out.
+        var hasSettledCheckout = needsPaymentFact && await _context.OrderCheckoutSessions
+            .AnyAsync(s => s.Status == CheckoutSessionStatus.Completed, cancellationToken);
+
+        return new SetupFacts(hasMenu, staffCount > 1, hasSettledCheckout);
     }
 
     private static bool IsObservedDone(string key, SetupFacts facts) => key switch
     {
         SetupSteps.Menu => facts.HasMenu,
         SetupSteps.Staff => facts.HasStaff,
+        SetupSteps.OnlinePayments => facts.HasSettledCheckout,
         // A derived step with no observation defined is a bug in the catalog, and the
         // safe answer to "did they do it?" is no. Marking it done would hide the step
         // and with it the bug.

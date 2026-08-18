@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
+using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Setup.Services;
 
 namespace RestaurantSystem.Api.Features.Setup.Commands.AcknowledgeSetupStepCommand;
@@ -21,11 +22,14 @@ public class AcknowledgeSetupStepCommandHandler
 {
     private readonly ISetupChecklistStore _store;
     private readonly ITenantModules _modules;
+    private readonly IStripeGateway _stripe;
 
-    public AcknowledgeSetupStepCommandHandler(ISetupChecklistStore store, ITenantModules modules)
+    public AcknowledgeSetupStepCommandHandler(
+        ISetupChecklistStore store, ITenantModules modules, IStripeGateway stripe)
     {
         _store = store;
         _modules = modules;
+        _stripe = stripe;
     }
 
     public async Task<ApiResponse<bool>> Handle(
@@ -47,7 +51,7 @@ public class AcknowledgeSetupStepCommandHandler
         // A stored acknowledgement for a module the tenant has not bought is invisible
         // today and wrong tomorrow: the day they upgrade, the step arrives already
         // ticked and they are never walked through the thing they just paid for.
-        if (!SetupSteps.IsEntitledTo(command.Key, _modules))
+        if (!SetupSteps.IsEntitledTo(command.Key, _modules, _stripe.IsConfigured))
         {
             throw new BadRequestException(
                 $"'{command.Key}' is not part of this restaurant's setup.");
