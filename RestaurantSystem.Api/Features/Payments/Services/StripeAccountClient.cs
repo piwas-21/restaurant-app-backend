@@ -102,9 +102,14 @@ public class StripeAccountClient : IStripeAccountClient
             // allowed to be in. It is LOGGED because the alternative — a tab that silently reports
             // less than it could, forever — is indistinguishable from the feature not existing.
             //
-            // Only the status and Stripe's error code are logged. The message can quote the account
-            // id and the request, and this line ends up in a tenant's container logs.
+            // The exception is passed, not just its shape: a refusal nobody can diagnose is only
+            // marginally better than a silent one, and Stripe's own message is the fastest way to
+            // tell a missing permission from a revoked key — which the STATUS cannot, because plan
+            // §4 measured an Access-policy block as a 401 rather than a 403. Nothing here is a
+            // credential: the worst it can name is the connected account id, which is a public-side
+            // identifier that appears in Stripe's own dashboard URLs.
             _logger.LogWarning(
+                e,
                 "Stripe account read refused ({Status}/{Code}); reporting configuration only.",
                 (int)e.HttpStatusCode,
                 e.StripeError?.Code ?? "none");

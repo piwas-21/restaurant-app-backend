@@ -75,18 +75,20 @@ public class GetPaymentsOnboardingQueryHandler
         // would both be reporting a Stripe verdict we never obtained.
         var account = await _accounts.GetConnectedAccountAsync(cancellationToken);
 
-        var state = account is { ChargesEnabled: false }
-            ? PaymentsOnboardingState.AwaitingVerification
-            : PaymentsOnboardingState.Configured;
-
-        // The count rides ONLY on the awaiting state. On a verified account Stripe still lists
-        // future `currently_due` items ahead of a deadline, and surfacing those beside "you are set
-        // up" reads as a problem where there is none.
-        var due = state == PaymentsOnboardingState.AwaitingVerification
-            ? account!.RequirementsDueCount
-            : (int?)null;
+        // The count rides ONLY on the awaiting state, so it is read inside the pattern that
+        // established it — on a verified account Stripe still lists future `currently_due` items
+        // ahead of a deadline, and surfacing those beside "you are set up" reads as a problem where
+        // there is none.
+        if (account is { ChargesEnabled: false } awaitingVerification)
+        {
+            return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
+                PaymentsOnboardingState.AwaitingVerification,
+                _gateway.ConnectedAccountId,
+                _settings.DashboardUrl,
+                awaitingVerification.RequirementsDueCount));
+        }
 
         return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
-            state, _gateway.ConnectedAccountId, _settings.DashboardUrl, due));
+            PaymentsOnboardingState.Configured, _gateway.ConnectedAccountId, _settings.DashboardUrl));
     }
 }
