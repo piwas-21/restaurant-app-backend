@@ -41,6 +41,13 @@ public sealed record SetupStep(string Key, string? ModuleId, bool IsDerived);
 /// one admin. Those two steps are therefore derived, and cannot be faked.
 /// </para>
 /// <para>
+/// <c>online-payments</c> is derived too, and on the strictest observation in the
+/// catalog: a SETTLED checkout session. "Stripe is configured" is not the same claim —
+/// a tenant mid-KYC is configured and still cannot take a card, so a step ticked on
+/// configuration would congratulate them for something that has not happened. Money
+/// having moved is the only observation here that cannot be true early.
+/// </para>
+/// <para>
 /// <c>logo</c> is ACKNOWLEDGED even though <c>RestaurantInfo.LogoUrl</c> is a fact the
 /// query could read directly, and provisioning does not seed it — which is normally the
 /// exact profile of a derived step. It is not derived because "we have no logo" is a
@@ -64,6 +71,7 @@ public static class SetupSteps
     public const string Reservations = "reservations";
     public const string Loyalty = "loyalty";
     public const string Printing = "printing";
+    public const string OnlinePayments = "online-payments";
 
     /// <summary>
     /// Every step, in the order an owner should work through them: confirm who you are,
@@ -88,6 +96,9 @@ public static class SetupSteps
         new(Reservations, ModuleIds.Reservations, IsDerived: false),
         new(Loyalty, ModuleIds.Loyalty, IsDerived: false),
         new(Printing, ModuleIds.Printing, IsDerived: false),
+        // Derived, and the observation is deliberately the strictest one available:
+        // a SETTLED checkout session. See IsObservedDone in GetSetupChecklistQuery.
+        new(OnlinePayments, ModuleIds.OnlinePayments, IsDerived: true),
     ];
 
     private static readonly HashSet<string> AcknowledgeableKeys =
@@ -108,8 +119,12 @@ public static class SetupSteps
         !string.IsNullOrWhiteSpace(key) && AcknowledgeableKeys.Contains(key);
 
     /// <summary>The steps this instance's modules entitle the tenant to see.</summary>
-    public static IEnumerable<SetupStep> For(ITenantModules modules) =>
-        All.Where(s => IsEntitled(s, modules));
+    /// <param name="paymentsConfigured">
+    /// <see cref="RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway.IsConfigured"/>
+    /// — see <see cref="IsEntitled"/> for why the module flag alone is not enough here.
+    /// </param>
+    public static IEnumerable<SetupStep> For(ITenantModules modules, bool paymentsConfigured) =>
+        All.Where(s => IsEntitled(s, modules, paymentsConfigured));
 
     /// <summary>
     /// Whether this instance's modules entitle the tenant to <paramref name="key"/>.
@@ -121,13 +136,36 @@ public static class SetupSteps
     /// there invisibly — and then, the day the tenant upgrades and the step finally
     /// appears, it would appear already ticked. The owner would never be walked through
     /// setting up the module they just paid for, and nothing anywhere would look wrong.
+    /// <para>
+    /// <paramref name="paymentsConfigured"/> must be passed here too, and not only on the
+    /// read: the two are one gate, and a gate applied on one side only is the bug above
+    /// with a different name.
+    /// </para>
     /// </remarks>
-    public static bool IsEntitledTo(string key, ITenantModules modules)
+    public static bool IsEntitledTo(string key, ITenantModules modules, bool paymentsConfigured)
     {
         var step = All.FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.Ordinal));
-        return step is not null && IsEntitled(step, modules);
+        return step is not null && IsEntitled(step, modules, paymentsConfigured);
     }
 
-    private static bool IsEntitled(SetupStep step, ITenantModules modules) =>
-        step.ModuleId is null || modules.IsEnabled(step.ModuleId);
+    /// <summary>
+    /// The module gate, plus one extra conjunct for the payments module.
+    /// </summary>
+    /// <remarks>
+    /// The module gate FAILS OPEN by design: <c>TenantModules</c> reads an absent or empty
+    /// <c>Modules:Enabled</c> as unrestricted, because that is the legacy install and
+    /// switching every module off under it would take RUMI's own features away. So on RUMI
+    /// — no module list, no Stripe key — <c>IsEnabled("online-payments")</c> answers true,
+    /// and this step would appear on the checklist of a restaurant that cannot take a card
+    /// at all and has no way to make the row tick. That is the same failure S8 had to fix
+    /// on the availability endpoint, and it gets the same second leg here.
+    /// <para>
+    /// Keyed on the MODULE, not on the step key: the day online payments owns a second
+    /// step, it inherits the gate rather than silently escaping it.
+    /// </para>
+    /// </remarks>
+    private static bool IsEntitled(SetupStep step, ITenantModules modules, bool paymentsConfigured) =>
+        (step.ModuleId is null || modules.IsEnabled(step.ModuleId))
+        && (!string.Equals(step.ModuleId, ModuleIds.OnlinePayments, StringComparison.Ordinal)
+            || paymentsConfigured);
 }
