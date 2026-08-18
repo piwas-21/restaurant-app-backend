@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -18,8 +19,11 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 ///
 /// Each test resets the DB via <see cref="DatabaseFixture.ResetDatabaseAsync"/>
 /// so order state from earlier cases doesn't leak. All <see cref="DateTime"/>
-/// values are <see cref="DateTimeKind.Utc"/> to match the handler's contract
-/// (UTC day boundaries).
+/// values are <see cref="DateTimeKind.Utc"/>, and the handler is driven with a
+/// clock pinned to the UTC zone so those fixtures keep meaning exactly what
+/// they say: the aggregation pipeline is what these cases are about. The day
+/// boundary itself is now the TENANT'S (backend #372) and is pinned next door
+/// in <see cref="ZReportTenantDayTests"/>.
 /// </summary>
 [Collection("Database Lane 2")]
 public class GetZReportQueryHandlerTests : IAsyncLifetime
@@ -439,6 +443,7 @@ public class GetZReportQueryHandlerTests : IAsyncLifetime
         await using var ctx = _fixture.CreateContext();
         var handler = new GetZReportQueryHandler(
             ctx,
+            new FixedTenantClock("UTC"),
             NullLogger<GetZReportQueryHandler>.Instance);
 
         var response = await handler.Handle(new GetZReportQuery(ReportDate), CancellationToken.None);

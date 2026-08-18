@@ -1,15 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
 
-// Date is a calendar day (no time, no timezone). The handler interprets it as
-// the UTC day boundaries [Date 00:00 UTC, Date+1 00:00 UTC). Callers that want
-// "today in restaurant local time" must convert before calling.
+// Date is a calendar day (no time, no timezone) on the RESTAURANT'S wall clock — the day the
+// cashier names when they close the till. The handler converts it to the half-open instant window
+// [local 00:00, local 24:00) through ITenantClock's zone (backend #372); it used to read the day as
+// UTC's, which in Zurich summer is a till that closes at 02:00 and a report naming a day it does
+// not cover. Stored order instants are NOT converted — they are correct as they stand.
 public record GetZReportQuery(DateOnly Date) : IQuery<ApiResponse<ZReportDto>>;
 
 public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse<ZReportDto>>
@@ -19,18 +23,27 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
     private const int TopItemsCount = 10;
 
     private readonly ApplicationDbContext _context;
+    private readonly ITenantClock _clock;
     private readonly ILogger<GetZReportQueryHandler> _logger;
 
-    public GetZReportQueryHandler(ApplicationDbContext context, ILogger<GetZReportQueryHandler> logger)
+    public GetZReportQueryHandler(
+        ApplicationDbContext context,
+        ITenantClock clock,
+        ILogger<GetZReportQueryHandler> logger)
     {
         _context = context;
+        _clock = clock;
         _logger = logger;
     }
 
     public async Task<ApiResponse<ZReportDto>> Handle(GetZReportQuery query, CancellationToken cancellationToken)
     {
-        var startOfDay = query.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var startOfNextDay = startOfDay.AddDays(1);
+        ArgumentNullException.ThrowIfNull(query);
+
+        // The instants the tenant's own calendar day begins and ends at. Not startOfDay.AddDays(1):
+        // a local day is 23 or 25 hours on a DST changeover, and on those two days the till would
+        // otherwise lose or double an hour of takings.
+        var (startOfDay, startOfNextDay) = _clock.TenantDayWindowUtc(query.Date);
 
         // Load all orders for the day with payments and items
         var allOrders = await _context.Orders
@@ -139,7 +152,10 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
 
         var report = new ZReportDto
         {
-            ReportDate = startOfDay,
+            // The calendar day the report is FOR, not the instant it starts at: the cashier UI
+            // renders this as a date, and the tenant-day start (22:00Z the evening before, in
+            // Zurich summer) would print as the previous day in any browser at or west of UTC.
+            ReportDate = query.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
             GeneratedAt = DateTime.UtcNow,
             TotalTransactions = totalTransactions,
             GrossSales = grossSales,
@@ -167,8 +183,16 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             TopSellingItems = topSellingItems
         };
 
-        _logger.LogInformation("Generated Z-Report for {Date}: {Transactions} transactions, {NetSales} net sales",
-            startOfDay.ToString("yyyy-MM-dd"), totalTransactions, netSales);
+        // The window is logged beside the day because they are no longer the same statement, and
+        // comparing the two is how an operator's "this report looks wrong" gets answered.
+        _logger.LogInformation(
+            "Generated Z-Report for {Date} ({ZoneId}, [{StartUtc:o}, {EndUtc:o})): {Transactions} transactions, {NetSales} net sales",
+            query.Date,
+            _clock.TimeZone.Id,
+            startOfDay,
+            startOfNextDay,
+            totalTransactions,
+            netSales);
 
         return ApiResponse<ZReportDto>.SuccessWithData(report);
     }
