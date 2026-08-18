@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Commands.SettleCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Dtos;
 using RestaurantSystem.Api.Features.Payments.Queries.GetOnlinePaymentAvailabilityQuery;
+using RestaurantSystem.Api.Features.Payments.Queries.GetPaymentsOnboardingQuery;
 
 namespace RestaurantSystem.Api.Features.Payments;
 
@@ -48,6 +50,20 @@ public class PaymentsController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<OnlinePaymentAvailabilityDto>>> GetAvailability()
         => Ok(await _mediator.SendQuery(new GetOnlinePaymentAvailabilityQuery()));
+
+    /// <summary>
+    /// Where this restaurant stands on taking card payments, for its own admin (§9 P7a).
+    /// Admin-only, which is what lets it name the connected account that
+    /// <see cref="GetAvailability"/> must not. Refusals:
+    /// <see cref="GetPaymentsOnboardingQueryHandler"/>.
+    /// </summary>
+    [HttpGet("onboarding")]
+    [RequireAdmin]
+    [ProducesResponseType(typeof(ApiResponse<PaymentsOnboardingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<PaymentsOnboardingDto>>> GetOnboarding()
+        => Ok(await _mediator.SendQuery(new GetPaymentsOnboardingQuery()));
 
     /// <summary>
     /// The diner's return trip from Stripe: settle the session, then say where that leaves the
