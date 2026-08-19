@@ -30,8 +30,7 @@ public class GermanEmailResourceTests
     public void A_german_order_receipt_contains_no_english_copy()
     {
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            German, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "admin@demo.test");
+            German, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
 
         html.Should().Contain("Bestellung eingegangen").And.Contain("Vielen Dank für Ihre Bestellung");
         html.Should().NotContainAny(
@@ -48,8 +47,7 @@ public class GermanEmailResourceTests
     public void A_german_order_receipt_is_not_the_french_one()
     {
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            German, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "admin@demo.test");
+            German, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
 
         html.Should().NotContainAny("Commande", "Merci", "Cordialement", "Articles commandés");
     }
@@ -78,8 +76,7 @@ public class GermanEmailResourceTests
         EmailText.For(German, EmailText.CommonSet)["LabelColon"].Should().Be(":");
 
         var receipt = EmailTemplates.OrderReceived.GetTextBody(
-            German, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "admin@demo.test");
+            German, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
 
         receipt.Should().Contain("BESTELLNUMMER: ORD-1").And.NotContain("BESTELLNUMMER : ");
         receipt.Should().NotContainAny("Order Received", "Order Items", "Best regards");
@@ -100,8 +97,7 @@ public class GermanEmailResourceTests
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
             var body = EmailTemplates.ReservationConfirmation.GetTextBody(
-                German, Brand, "Jane Doe", "T12", new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc),
-                new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 2, "admin@demo.test");
+            German, Brand, "Jane Doe", new ReservationMailDetails(new DateTime(2026, 8, 21, 0, 0, 0, DateTimeKind.Utc), new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 2, "T12", null), "admin@demo.test");
 
             body.Should().Contain("Freitag, 21. August 2026");
             body.Should().NotContainAny("Friday", "vendredi", "Monday", "Tuesday", "Wednesday", "Thursday");
@@ -126,8 +122,7 @@ public class GermanEmailResourceTests
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
             var html = EmailTemplates.OrderReceived.GetHtmlBody(
-                German, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
-                [("Burger", 2, 12.50m)], "admin@demo.test");
+            German, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
 
             html.Should().Contain("CHF 25.00").And.NotContain("CHF 25,00",
                 "the amount is the caller's pre-formatted string — culture-formatted money is a "
@@ -147,8 +142,7 @@ public class GermanEmailResourceTests
     public void A_nameless_guest_is_greeted_in_german_rather_than_in_english()
     {
         var receipt = EmailTemplates.OrderReceived.GetTextBody(
-            German, Brand, string.Empty, "ORD-1", "DineIn", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "admin@demo.test");
+            German, Brand, string.Empty, new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
 
         receipt.Should().Contain("Guten Tag,").And.NotContain("Valued Customer");
     }

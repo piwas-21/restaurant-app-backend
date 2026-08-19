@@ -55,9 +55,9 @@ public class EmailTemplatesCurrencyTests
     public void OrderReceived_HtmlAndTextBody_UseConfiguredCurrency_NotHardcodedChf(string currency)
     {
         var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items), "admin@demo.test");
         var textBody = EmailTemplates.OrderReceived.GetTextBody(
-            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "DineIn", Total, currency, Items, "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items), "admin@demo.test");
 
         AssertCurrencyRendered(htmlBody, textBody, currency);
     }
