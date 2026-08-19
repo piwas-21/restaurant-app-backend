@@ -20,6 +20,8 @@ namespace RestaurantSystem.IntegrationTests.Common.Templates;
 public class EmailTemplatesCurrencyTests
 {
     private static readonly EmailBranding Brand = new("Demo Restaurant", "Geneva", "contact@demo.test");
+    private static readonly EmailGuest Guest = new("Jane Doe", "jane@demo.test", "+41000000");
+    private static readonly EmailLinks Links = new("https://api.demo.test", "https://demo.test", "admin@demo.test");
     private static readonly (string name, int quantity, decimal price)[] Items = [("Burger", 2, 12.50m)];
     private const decimal Total = 25.00m;
     private const decimal ItemPrice = 12.50m;
@@ -66,10 +68,12 @@ public class EmailTemplatesCurrencyTests
     public void OrderConfirmationAdmin_HtmlAndTextBody_UseConfiguredCurrency_NotHardcodedChf(string currency)
     {
         var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            EmailCultures.English, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
-            "https://api.demo.test", "https://demo.test", "admin@demo.test", "test-quick-action-token");
+            EmailCultures.English, Brand, Guest,
+            new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items, "test-quick-action-token"),
+            Links);
         var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-            EmailCultures.English, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "DineIn", Total, currency, Items,
+            EmailCultures.English, Brand, Guest,
+            new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items),
             "admin@demo.test");
 
         AssertCurrencyRendered(htmlBody, textBody, currency);

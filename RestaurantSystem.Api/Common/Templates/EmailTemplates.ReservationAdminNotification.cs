@@ -17,15 +17,13 @@ public static partial class EmailTemplates
         public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
-        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, Guid reservationId, string customerName, string customerEmail, string customerPhone,
-            DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string tableNumber,
-            string baseUrl, string frontendBaseUrl, string contactEmail,
-            string? specialRequests = null)
+        public static string GetHtmlBody(
+            CultureInfo culture, EmailBranding brand, EmailGuest guest, ReservationMailDetails reservation, EmailLinks links)
         {
             var t = EmailText.For(culture, Set);
-            var email = contactEmail;
-            var apiBaseUrl = baseUrl;
-            var frontendUrl = frontendBaseUrl;
+            var (customerName, customerEmail, customerPhone) = guest;
+            var (reservationId, reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests) = reservation;
+            var (apiBaseUrl, frontendUrl, email) = links;
 
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
@@ -131,13 +129,13 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(CultureInfo culture, EmailBranding brand, Guid reservationId, string customerName, string customerEmail, string customerPhone,
-            DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string tableNumber,
-            string contactEmail,
-            string? specialRequests = null)
+        public static string GetTextBody(
+            CultureInfo culture, EmailBranding brand, EmailGuest guest, ReservationMailDetails reservation, string contactEmail)
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
+            var (customerName, customerEmail, customerPhone) = guest;
+            var (reservationId, reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests) = reservation;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"
