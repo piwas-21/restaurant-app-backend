@@ -125,22 +125,9 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            var itemsSection = string.Join("\n", items.Select(item =>
-                $"{item.name} x{item.quantity} = {currency} {item.price:F2}"));
+            var (itemsSection, instructionsSection, deliverySection) =
+                OrderTextSections(t, items, currency, specialInstructions, deliveryAddress);
 
-            var instructionsSection = string.IsNullOrEmpty(specialInstructions)
-                ? ""
-                : $@"
-
-{t["InstructionsLabel"]}
-{specialInstructions}";
-
-            var deliverySection = string.IsNullOrEmpty(deliveryAddress)
-                ? ""
-                : $@"
-
-{t["DeliveryLabel"]}
-{deliveryAddress}";
 
             var orderTypeText = OrderTypeLabel(t, orderType);
 
