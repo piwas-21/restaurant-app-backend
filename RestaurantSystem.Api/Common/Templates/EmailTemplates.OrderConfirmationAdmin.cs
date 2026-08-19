@@ -109,23 +109,7 @@ public static partial class EmailTemplates
             </div>
 
             <!-- Customer Info -->
-            <div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: {p.StrongText}; font-size: 16px; font-weight: 600;'>👤 {t["CustomerInfoTitle"]}</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px; width: 80px;'>{t["NameLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(customerName)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["EmailLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px;'>{EmailHtml.Encode(customerEmail)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["PhoneLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px;'>{EmailHtml.Encode(customerPhone)}</td>
-                    </tr>
-                </table>
-            </div>
+            {AdminCustomerCard(t, p, customerName, customerEmail, customerPhone)}
 
             <!-- Order Details -->
             <div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
@@ -184,21 +168,7 @@ public static partial class EmailTemplates
                 <a href='{cancelUrl}' style='display: inline-block; background: #dc2626; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 4px {p.CancelButtonShadow};'>✕ {t["CancelOrder"]}</a>
             </div>
 
-            <p style='text-align: center; margin: 20px 0; padding: 16px; background: {p.FooterBackground}; border-radius: 8px; font-size: 13px; color: {p.MutedText};'>
-                {t.Format("Dashboard", $"<a href='{frontendUrl}/admin/orders-management' style='color: {p.FooterLink}; text-decoration: none; font-weight: 600;'>{t["DashboardLink"]}</a>")}
-            </p>
-
-            <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid {p.SurfaceBorder};'>
-                <p style='margin: 0 0 8px 0; color: {p.MutedText}; font-size: 14px;'>{t["NotifiedAutomatically"]}</p>
-                <p style='margin: 0; color: {p.StrongText}; font-size: 14px;'><strong>{t["BestRegards"]}</strong><br>{brand.Name}</p>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div style='background: {p.SurfaceBackground}; padding: 24px; text-align: center; border-top: 1px solid {p.SurfaceBorder};'>
-            <p style='margin: 0 0 8px 0; color: {p.MutedText}; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
-            <p style='margin: 0; color: {p.FooterText}; font-size: 12px;'>{Copyright(t, brand)}</p>
-        </div>
+            {AdminFooter(t, p, brand, email, frontendUrl, "/admin/orders-management")}
     </div>";
 
             return $@"
@@ -235,22 +205,9 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
-            var itemsSection = string.Join("\n", items.Select(item =>
-                $"{item.name} x{item.quantity} = {currency} {item.price:F2}"));
+            var (itemsSection, instructionsSection, deliverySection) =
+                OrderTextSections(t, items, currency, specialInstructions, deliveryAddress);
 
-            var instructionsSection = string.IsNullOrEmpty(specialInstructions)
-                ? ""
-                : $@"
-
-{t["InstructionsLabel"]}
-{specialInstructions}";
-
-            var deliverySection = string.IsNullOrEmpty(deliveryAddress)
-                ? ""
-                : $@"
-
-{t["DeliveryLabel"]}
-{deliveryAddress}";
 
             var orderTypeText = OrderTypeLabel(t, orderType);
 
