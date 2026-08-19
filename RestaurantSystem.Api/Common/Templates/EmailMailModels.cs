@@ -31,7 +31,12 @@ public readonly record struct EmailLinks(string ApiBaseUrl, string FrontendBaseU
 /// <param name="Number">Human order number, e.g. <c>ORD-1</c>.</param>
 /// <param name="Type"><c>DineIn</c> / <c>Takeaway</c> / <c>Delivery</c>, as the enum names it.</param>
 /// <param name="Total">Order total, in <paramref name="Currency"/>.</param>
-/// <param name="Currency">The tenant's currency label — never derived from the mail's language.</param>
+/// <param name="Currency">
+/// The tenant's currency label — never derived from the mail's language. Optional because
+/// <c>EmailService</c> overwrites it with <c>Localization:Currency</c> before rendering: it is
+/// configuration, so a caller that could pass one could pass a different one. Set it only when
+/// rendering a template directly, as the golden tests do.
+/// </param>
 /// <param name="Items">Line items, already priced.</param>
 /// <param name="QuickActionToken">
 /// The order's <c>QuickActionToken</c> — the bearer secret that authorises the anonymous
@@ -45,8 +50,8 @@ public sealed record OrderMailDetails(
     string Number,
     string Type,
     decimal Total,
-    string Currency,
     IEnumerable<(string name, int quantity, decimal price)> Items,
+    string Currency = "",
     string? QuickActionToken = null,
     string? SpecialInstructions = null,
     string? DeliveryAddress = null);

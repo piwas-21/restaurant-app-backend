@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.ConfirmReservationCommand;
 
@@ -70,12 +71,13 @@ public class ConfirmReservationCommandHandler : ICommandHandler<ConfirmReservati
                     _languages.ForGuest(reservation.PreferredLanguage),
                     reservation.CustomerEmail,
                     reservation.CustomerName,
-                    reservation.Table?.TableNumber ?? "N/A",
-                    reservation.ReservationDate,
-                    reservation.StartTime,
-                    reservation.EndTime,
-                    reservation.NumberOfGuests,
-                    reservation.SpecialRequests,
+                    new ReservationMailDetails(
+                        reservation.ReservationDate,
+                        reservation.StartTime,
+                        reservation.EndTime,
+                        reservation.NumberOfGuests,
+                        reservation.Table?.TableNumber ?? "N/A",
+                        reservation.SpecialRequests),
                     reservation.Notes);
 
                 _logger.LogInformation("Sent confirmation email for reservation {ReservationId} to {Email}",

@@ -105,9 +105,7 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     {
         var attempts = 0;
         _email.Setup(e => e.SendOrderReceivedEmailAsync(
-                It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<decimal>(), It.IsAny<IEnumerable<(string, int, decimal)>>(),
-                It.IsAny<string?>(), It.IsAny<string?>()))
+                It.IsAny<CultureInfo>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<OrderMailDetails>()))
             .Returns(() => Interlocked.Increment(ref attempts) == 1
                 ? Task.FromException(new InvalidOperationException("provider down"))
                 : Task.CompletedTask);
@@ -198,17 +196,13 @@ public class ServerSideOrderMailTests : IntegrationTestBase
     /// </remarks>
     private void VerifyGuestReceipts(Guid orderId, Times times, string? because = null) =>
         _email.Verify(e => e.SendOrderReceivedEmailAsync(
-            EmailCultures.English, GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            EmailCultures.English, GuestEmail, It.IsAny<string>(), It.IsAny<OrderMailDetails>()),
             times, because ?? $"order {orderId}");
 
     /// <inheritdoc cref="VerifyGuestReceipts"/>
     private void VerifyAdminAlerts(Guid orderId, Times times) =>
         _email.Verify(e => e.SendOrderConfirmationAdminEmailAsync(
-            EmailCultures.English, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<string?>()),
+            EmailCultures.English, It.IsAny<string>(), It.IsAny<EmailGuest>(), It.IsAny<OrderMailDetails>()),
             times, $"order {orderId}");
 
     private async Task<Guid> PlaceOrderAsync(

@@ -17,7 +17,7 @@ public static partial class EmailTemplates
         public static string GetHtmlBody(
             CultureInfo culture, EmailBranding brand, string customerName, OrderMailDetails order, string contactEmail)
         {
-            var (orderNumber, orderType, total, currency, items, _, specialInstructions, deliveryAddress) = order;
+            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress) = order;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var itemsSection = string.Join("", items.Select(item =>
@@ -122,7 +122,7 @@ public static partial class EmailTemplates
         public static string GetTextBody(
             CultureInfo culture, EmailBranding brand, string customerName, OrderMailDetails order, string contactEmail)
         {
-            var (orderNumber, orderType, total, currency, items, _, specialInstructions, deliveryAddress) = order;
+            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress) = order;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var (itemsSection, instructionsSection, deliverySection) =

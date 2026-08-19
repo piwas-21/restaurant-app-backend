@@ -31,8 +31,7 @@ public class EmailTemplateColourSchemeTests
     {
         var html = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             Culture, Brand, Guest,
-            new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", [("Burger", 2, 12.50m)],
-                "quick-action-token", "No onions", "Rue de Test 1"),
+            new OrderMailDetails("ORD-1", "Delivery", 25.00m, [("Burger", 2, 12.50m)], "CHF", "quick-action-token", "No onions", "Rue de Test 1"),
             Links);
 
         AssertBothSchemesReadTheSame(html);
@@ -59,7 +58,7 @@ public class EmailTemplateColourSchemeTests
         // itself would pass and the operator on the other scheme would get a blank mail.
         var html = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             Culture, Brand, Guest,
-            new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", [("Burger", 2, 12.50m)]),
+            new OrderMailDetails("ORD-1", "Delivery", 25.00m, [("Burger", 2, 12.50m)], "CHF"),
             Links);
 
         html.Should().Contain("class='light-only'").And.Contain("class='dark-only'");

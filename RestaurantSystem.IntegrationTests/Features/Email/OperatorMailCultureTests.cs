@@ -12,6 +12,7 @@ using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Infrastructure.Settings;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.IntegrationTests.Features.Email;
 
@@ -69,15 +70,11 @@ public class OperatorMailCultureTests : IntegrationTestBase
         await WaitForMailsAsync(orderId);
 
         _email.Verify(e => e.SendOrderReceivedEmailAsync(
-            French, GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            French, GuestEmail, It.IsAny<string>(), It.IsAny<OrderMailDetails>()),
             Times.Once());
 
         _email.Verify(e => e.SendOrderConfirmationAdminEmailAsync(
-            German, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<string?>()),
+            German, It.IsAny<string>(), It.IsAny<EmailGuest>(), It.IsAny<OrderMailDetails>()),
             Times.Once(),
             "the alert follows the tenant even when the diner asked for something else");
     }

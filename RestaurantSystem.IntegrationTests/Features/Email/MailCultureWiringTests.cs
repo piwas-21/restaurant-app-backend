@@ -13,6 +13,7 @@ using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.IntegrationTests.Features.Email;
 
@@ -89,15 +90,11 @@ public class MailCultureWiringTests : IntegrationTestBase
         await WaitForMailsAsync(orderId);
 
         _email.Verify(e => e.SendOrderReceivedEmailAsync(
-            French, GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            French, GuestEmail, It.IsAny<string>(), It.IsAny<OrderMailDetails>()),
             Times.Once());
 
         _email.Verify(e => e.SendOrderConfirmationAdminEmailAsync(
-            English, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-            It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<string?>()),
+            English, It.IsAny<string>(), It.IsAny<EmailGuest>(), It.IsAny<OrderMailDetails>()),
             Times.Once(),
             "the operator alert follows the tenant, never the diner");
     }
@@ -183,8 +180,7 @@ public class MailCultureWiringTests : IntegrationTestBase
         await BookTableAsync();
 
         _email.Verify(e => e.SendReservationConfirmationEmailAsync(
-            Dutch, "ada@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(),
-            It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<string?>()),
+            Dutch, "ada@example.com", It.IsAny<string>(), It.IsAny<ReservationMailDetails>()),
             Times.Once());
     }
 
@@ -207,8 +203,7 @@ public class MailCultureWiringTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
 
         _email.Verify(e => e.SendReservationApprovedEmailAsync(
-            Dutch, "ada@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(),
-            It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            Dutch, "ada@example.com", It.IsAny<string>(), It.IsAny<ReservationMailDetails>(), It.IsAny<string?>()),
             Times.Once());
     }
 
@@ -256,8 +251,7 @@ public class MailCultureWiringTests : IntegrationTestBase
             await WaitForMailsAsync(orderId);
 
             _email.Verify(e => e.SendOrderReceivedEmailAsync(
-                English, GuestEmail, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(),
-                It.IsAny<IEnumerable<(string, int, decimal)>>(), It.IsAny<string?>(), It.IsAny<string?>()),
+            English, GuestEmail, It.IsAny<string>(), It.IsAny<OrderMailDetails>()),
                 Times.Once());
         }
         finally

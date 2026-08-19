@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Constants;
+using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -67,12 +68,13 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
                 _languages.ForGuest(order.PreferredLanguage),
                 order.CustomerEmail,
                 order.CustomerName ?? string.Empty,
-                order.OrderNumber,
-                order.Type,
-                order.Total,
-                OrderEmailComposer.ComposeItems(order),
-                order.Notes,
-                OrderEmailComposer.ComposeDeliveryAddress(order));
+                new OrderMailDetails(
+                    order.OrderNumber,
+                    order.Type,
+                    order.Total,
+                    OrderEmailComposer.ComposeItems(order),
+                    SpecialInstructions: order.Notes,
+                    DeliveryAddress: OrderEmailComposer.ComposeDeliveryAddress(order)));
 
             await _ledger.MarkSentAsync(OutboundEmailTypes.OrderReceived, order.Id);
         }
