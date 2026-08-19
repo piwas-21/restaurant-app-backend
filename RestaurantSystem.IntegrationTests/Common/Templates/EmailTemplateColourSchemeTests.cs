@@ -44,9 +44,9 @@ public class EmailTemplateColourSchemeTests
         var html = EmailTemplates.ReservationAdminNotification.GetHtmlBody(
             Culture, Brand, Guest,
             new ReservationMailDetails(
-                new Guid("11111111-2222-3333-4444-555555555555"),
                 new DateTime(2030, 5, 17, 0, 0, 0, DateTimeKind.Utc),
-                new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", "Window seat"),
+                new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", "Window seat",
+                new Guid("11111111-2222-3333-4444-555555555555")),
             Links);
 
         AssertBothSchemesReadTheSame(html);

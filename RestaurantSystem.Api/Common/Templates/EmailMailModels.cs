@@ -51,19 +51,23 @@ public sealed record OrderMailDetails(
     string? SpecialInstructions = null,
     string? DeliveryAddress = null);
 
-/// <summary>The reservation an operator alert is about.</summary>
-/// <param name="Id">Reservation id — the quick-action links carry it.</param>
+/// <summary>The reservation a mail is about — the operator's alert and the guest's own copy alike.</summary>
 /// <param name="Date">The calendar day booked, on the RESTAURANT's clock. Never converted (#369).</param>
 /// <param name="StartTime">Start of the sitting, wall clock.</param>
 /// <param name="EndTime">End of the sitting, wall clock.</param>
 /// <param name="NumberOfGuests">Party size.</param>
 /// <param name="TableNumber">The table held.</param>
 /// <param name="SpecialRequests">Guest's note, or null.</param>
+/// <param name="Id">
+/// Reservation id, carried by the operator's quick-action links. LAST and optional because the
+/// guest's own mails have no use for it, and a guest call site passing <c>Guid.Empty</c> to satisfy
+/// a signature is exactly the noise a parameter object is supposed to remove.
+/// </param>
 public sealed record ReservationMailDetails(
-    Guid Id,
     DateTime Date,
     TimeSpan StartTime,
     TimeSpan EndTime,
     int NumberOfGuests,
     string TableNumber,
-    string? SpecialRequests = null);
+    string? SpecialRequests = null,
+    Guid Id = default);

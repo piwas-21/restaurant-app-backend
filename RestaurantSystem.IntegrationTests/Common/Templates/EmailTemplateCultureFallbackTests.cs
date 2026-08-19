@@ -39,13 +39,11 @@ public class EmailTemplateCultureFallbackTests
     public void A_culture_without_resources_renders_the_english_body()
     {
         var fallback = EmailTemplates.OrderReceived.GetHtmlBody(
-            NoResources, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "admin@demo.test");
+            NoResources, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
 
         fallback.Should().Contain("Order Received");
         fallback.Should().Be(EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "DineIn", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "admin@demo.test"));
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test"));
     }
 
     [Theory]
