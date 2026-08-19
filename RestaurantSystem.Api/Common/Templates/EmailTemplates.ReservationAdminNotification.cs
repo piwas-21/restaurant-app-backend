@@ -38,6 +38,102 @@ public static partial class EmailTemplates
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
 
+            // ONE block, rendered twice: the light and dark copies differed by nothing but colour,
+            // which is the duplication `sonar.cpd.exclusions` was hiding (#356). A local function
+            // rather than a method: it reads the locals above.
+            string Block(EmailPalette p) => $@"<!-- {p.ModeName} Mode Version -->
+    <div class='{p.ModeClass}' style='max-width: 600px; margin: 0 auto; background: {p.PageBackground};'>
+        <!-- Header -->
+        <div style='background: linear-gradient(135deg, {p.HeaderGradientFrom} 0%, {p.HeaderGradientTo} 100%); padding: 32px 24px; text-align: center;'>
+            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
+            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t[HeadingKey]}</p>
+        </div>
+
+        <!-- Content -->
+        <div style='padding: 32px 24px;'>
+            <!-- Reservation ID Badge -->
+            <div style='background: linear-gradient(135deg, {p.ReservationBadgeGradientFrom} 0%, {p.ReservationBadgeGradientTo} 100%); color: white; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 6px {p.ReservationBadgeShadow};'>
+                <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>{t["ReservationIdLabel"]}</div>
+                <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>{reservationId}</div>
+            </div>
+
+            <!-- Customer Info -->
+            <div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 16px 0; color: {p.StrongText}; font-size: 16px; font-weight: 600;'>👤 {t["CustomerInfoTitle"]}</h3>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px; width: 80px;'>{t["NameLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(customerName)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["EmailLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px;'>{EmailHtml.Encode(customerEmail)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["PhoneLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px;'>{EmailHtml.Encode(customerPhone)}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Reservation Details -->
+            <div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 16px 0; color: {p.StrongText}; font-size: 16px; font-weight: 600;'>📅 {t["DetailsTitle"]}</h3>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px; width: 80px;'>{t["DateLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{formattedDate}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["TimeLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{formattedStartTime} - {formattedEndTime}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["GuestsLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{t.Format("GuestCount", numberOfGuests)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["TableLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
+                    </tr>
+                </table>
+            </div>
+
+            {requestsSection}
+
+            <!-- Action Required Alert -->
+            <div style='background: {p.NoticeBackground}; border: 2px solid {p.NoticeBorder}; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;'>
+                <div style='font-size: 24px; margin-bottom: 8px;'>⚠️</div>
+                <strong style='color: {p.NoticeHeading}; font-size: 16px; display: block; margin-bottom: 4px;'>{t["ActionRequired"]}</strong>
+                <p style='margin: 0; color: {p.NoticeText}; font-size: 14px;'>{t["ApproveOrReject"]}</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style='text-align: center; margin: 24px 0;'>
+                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-approve' style='display: inline-block; background: linear-gradient(135deg, {p.ConfirmGradientFrom} 0%, {p.ConfirmGradientTo} 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px {p.ConfirmButtonShadow}; margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
+            </div>
+
+            <div style='text-align: center; margin: 24px 0;'>
+                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-reject' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px {p.CancelButtonShadow};'>✕ {t["RejectButton"]}</a>
+            </div>
+
+            <p style='text-align: center; margin: 20px 0; padding: 16px; background: {p.FooterBackground}; border-radius: 8px; font-size: 13px; color: {p.MutedText};'>
+                {t.Format("Dashboard", $"<a href='{frontendUrl}/admin/reservations' style='color: {p.FooterLink}; text-decoration: none; font-weight: 600;'>{t["DashboardLink"]}</a>")}
+            </p>
+
+            <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid {p.SurfaceBorder};'>
+                <p style='margin: 0 0 8px 0; color: {p.MutedText}; font-size: 14px;'>{t["NotifiedAutomatically"]}</p>
+                <p style='margin: 0; color: {p.StrongText}; font-size: 14px;'><strong>{t["BestRegards"]}</strong><br>{brand.Name}</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style='background: {p.SurfaceBackground}; padding: 24px; text-align: center; border-top: 1px solid {p.SurfaceBorder};'>
+            <p style='margin: 0 0 8px 0; color: {p.MutedText}; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
+            <p style='margin: 0; color: {p.FooterText}; font-size: 12px;'>{Copyright(t, brand)}</p>
+        </div>
+    </div>";
+
             return $@"
 <!DOCTYPE html>
 <html>
@@ -58,191 +154,9 @@ public static partial class EmailTemplates
     </style>
 </head>
 <body style='margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; line-height: 1.6; background-color: #f3f4f6;'>
-    <!-- Light Mode Version -->
-    <div class='light-only' style='max-width: 600px; margin: 0 auto; background: #ffffff;'>
-        <!-- Header -->
-        <div style='background: linear-gradient(135deg, #d4af37 0%, #f4c430 100%); padding: 32px 24px; text-align: center;'>
-            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t[HeadingKey]}</p>
-        </div>
+    {Block(EmailPalette.Light)}
 
-        <!-- Content -->
-        <div style='padding: 32px 24px;'>
-            <!-- Reservation ID Badge -->
-            <div style='background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(139, 92, 246, 0.2);'>
-                <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>{t["ReservationIdLabel"]}</div>
-                <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>{reservationId}</div>
-            </div>
-
-            <!-- Customer Info -->
-            <div style='background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: #111827; font-size: 16px; font-weight: 600;'>👤 {t["CustomerInfoTitle"]}</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px; width: 80px;'>{t["NameLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(customerName)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>{t["EmailLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px;'>{EmailHtml.Encode(customerEmail)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>{t["PhoneLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px;'>{EmailHtml.Encode(customerPhone)}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Reservation Details -->
-            <div style='background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: #111827; font-size: 16px; font-weight: 600;'>📅 {t["DetailsTitle"]}</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px; width: 80px;'>{t["DateLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{formattedDate}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>{t["TimeLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{formattedStartTime} - {formattedEndTime}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>{t["GuestsLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{t.Format("GuestCount", numberOfGuests)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #6b7280; font-size: 14px;'>{t["TableLabel"]}</td>
-                        <td style='padding: 6px 0; color: #111827; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
-                    </tr>
-                </table>
-            </div>
-
-            {requestsSection}
-
-            <!-- Action Required Alert -->
-            <div style='background: #fef3c7; border: 2px solid #fbbf24; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;'>
-                <div style='font-size: 24px; margin-bottom: 8px;'>⚠️</div>
-                <strong style='color: #92400e; font-size: 16px; display: block; margin-bottom: 4px;'>{t["ActionRequired"]}</strong>
-                <p style='margin: 0; color: #78350f; font-size: 14px;'>{t["ApproveOrReject"]}</p>
-            </div>
-
-            <!-- Action Buttons -->
-            <div style='text-align: center; margin: 24px 0;'>
-                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-approve' style='display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
-            </div>
-
-            <div style='text-align: center; margin: 24px 0;'>
-                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-reject' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);'>✕ {t["RejectButton"]}</a>
-            </div>
-
-            <p style='text-align: center; margin: 20px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; font-size: 13px; color: #6b7280;'>
-                {t.Format("Dashboard", $"<a href='{frontendUrl}/admin/reservations' style='color: #3b82f6; text-decoration: none; font-weight: 600;'>{t["DashboardLink"]}</a>")}
-            </p>
-
-            <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;'>
-                <p style='margin: 0 0 8px 0; color: #6b7280; font-size: 14px;'>{t["NotifiedAutomatically"]}</p>
-                <p style='margin: 0; color: #111827; font-size: 14px;'><strong>{t["BestRegards"]}</strong><br>{brand.Name}</p>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div style='background: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;'>
-            <p style='margin: 0 0 8px 0; color: #6b7280; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
-            <p style='margin: 0; color: #9ca3af; font-size: 12px;'>{Copyright(t, brand)}</p>
-        </div>
-    </div>
-
-    <!-- Dark Mode Version -->
-    <div class='dark-only' style='max-width: 600px; margin: 0 auto; background: #1f2937;'>
-        <!-- Header -->
-        <div style='background: linear-gradient(135deg, #b8941f 0%, #d4af37 100%); padding: 32px 24px; text-align: center;'>
-            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t[HeadingKey]}</p>
-        </div>
-
-        <!-- Content -->
-        <div style='padding: 32px 24px;'>
-            <!-- Reservation ID Badge -->
-            <div style='background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(124, 58, 237, 0.3);'>
-                <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>{t["ReservationIdLabel"]}</div>
-                <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>{reservationId}</div>
-            </div>
-
-            <!-- Customer Info -->
-            <div style='background: #374151; border: 1px solid #4b5563; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: #f9fafb; font-size: 16px; font-weight: 600;'>👤 {t["CustomerInfoTitle"]}</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px; width: 80px;'>{t["NameLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(customerName)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>{t["EmailLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px;'>{EmailHtml.Encode(customerEmail)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>{t["PhoneLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px;'>{EmailHtml.Encode(customerPhone)}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Reservation Details -->
-            <div style='background: #374151; border: 1px solid #4b5563; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: #f9fafb; font-size: 16px; font-weight: 600;'>📅 {t["DetailsTitle"]}</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px; width: 80px;'>{t["DateLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{formattedDate}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>{t["TimeLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{formattedStartTime} - {formattedEndTime}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>{t["GuestsLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{t.Format("GuestCount", numberOfGuests)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: #9ca3af; font-size: 14px;'>{t["TableLabel"]}</td>
-                        <td style='padding: 6px 0; color: #f9fafb; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
-                    </tr>
-                </table>
-            </div>
-
-            {requestsSection}
-
-            <!-- Action Required Alert -->
-            <div style='background: #78350f; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;'>
-                <div style='font-size: 24px; margin-bottom: 8px;'>⚠️</div>
-                <strong style='color: #fef3c7; font-size: 16px; display: block; margin-bottom: 4px;'>{t["ActionRequired"]}</strong>
-                <p style='margin: 0; color: #fde68a; font-size: 14px;'>{t["ApproveOrReject"]}</p>
-            </div>
-
-            <!-- Action Buttons -->
-            <div style='text-align: center; margin: 24px 0;'>
-                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-approve' style='display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(5, 150, 105, 0.4); margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
-            </div>
-
-            <div style='text-align: center; margin: 24px 0;'>
-                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-reject' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.4);'>✕ {t["RejectButton"]}</a>
-            </div>
-
-            <p style='text-align: center; margin: 20px 0; padding: 16px; background: #374151; border-radius: 8px; font-size: 13px; color: #9ca3af;'>
-                {t.Format("Dashboard", $"<a href='{frontendUrl}/admin/reservations' style='color: #60a5fa; text-decoration: none; font-weight: 600;'>{t["DashboardLink"]}</a>")}
-            </p>
-
-            <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid #4b5563;'>
-                <p style='margin: 0 0 8px 0; color: #9ca3af; font-size: 14px;'>{t["NotifiedAutomatically"]}</p>
-                <p style='margin: 0; color: #f9fafb; font-size: 14px;'><strong>{t["BestRegards"]}</strong><br>{brand.Name}</p>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div style='background: #374151; padding: 24px; text-align: center; border-top: 1px solid #4b5563;'>
-            <p style='margin: 0 0 8px 0; color: #9ca3af; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
-            <p style='margin: 0; color: #6b7280; font-size: 12px;'>{Copyright(t, brand)}</p>
-        </div>
-    </div>
+    {Block(EmailPalette.Dark)}
 </body>
 </html>";
         }
