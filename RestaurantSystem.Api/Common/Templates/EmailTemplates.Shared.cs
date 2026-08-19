@@ -118,4 +118,91 @@ public static partial class EmailTemplates
         "Delivery" => (withEmoji ? "🚚 " : string.Empty) + text["OrderTypeDelivery"],
         _ => orderType
     };
+
+    /// <summary>
+    /// The "who ordered / who booked" card the two operator mails both open with — byte-identical
+    /// in both since the light/dark collapse (#356), and therefore extractable rather than merely
+    /// similar. Indented as it appears in the document: the caller supplies only the first line's
+    /// margin, because the fragment lands inside a larger verbatim string.
+    /// </summary>
+    internal static string AdminCustomerCard(
+        EmailText t, EmailPalette p, string customerName, string customerEmail, string customerPhone) =>
+        $@"<div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 16px 0; color: {p.StrongText}; font-size: 16px; font-weight: 600;'>👤 {t["CustomerInfoTitle"]}</h3>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px; width: 80px;'>{t["NameLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(customerName)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["EmailLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px;'>{EmailHtml.Encode(customerEmail)}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["PhoneLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px;'>{EmailHtml.Encode(customerPhone)}</td>
+                    </tr>
+                </table>
+            </div>";
+
+    /// <summary>
+    /// The tail of an operator mail: the "open the dashboard" panel, the sign-off, and the footer
+    /// line. Identical in both but for the dashboard PATH, which is the one thing the two mails
+    /// disagree about (orders vs reservations) and so the one parameter.
+    /// </summary>
+    internal static string AdminFooter(
+        EmailText t, EmailPalette p, EmailBranding brand, string email, string frontendUrl, string dashboardPath) =>
+        $@"<p style='text-align: center; margin: 20px 0; padding: 16px; background: {p.FooterBackground}; border-radius: 8px; font-size: 13px; color: {p.MutedText};'>
+                {t.Format("Dashboard", $"<a href='{frontendUrl}{dashboardPath}' style='color: {p.FooterLink}; text-decoration: none; font-weight: 600;'>{t["DashboardLink"]}</a>")}
+            </p>
+
+            <div style='margin-top: 32px; padding-top: 24px; border-top: 1px solid {p.SurfaceBorder};'>
+                <p style='margin: 0 0 8px 0; color: {p.MutedText}; font-size: 14px;'>{t["NotifiedAutomatically"]}</p>
+                <p style='margin: 0; color: {p.StrongText}; font-size: 14px;'><strong>{t["BestRegards"]}</strong><br>{brand.Name}</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style='background: {p.SurfaceBackground}; padding: 24px; text-align: center; border-top: 1px solid {p.SurfaceBorder};'>
+            <p style='margin: 0 0 8px 0; color: {p.MutedText}; font-size: 13px;'><strong>{brand.Name}</strong> | {brand.City} | {email}</p>
+            <p style='margin: 0; color: {p.FooterText}; font-size: 12px;'>{Copyright(t, brand)}</p>
+        </div>";
+
+    /// <summary>
+    /// The three variable pieces of an order's PLAIN-TEXT body: the item lines, and the optional
+    /// instructions and delivery blocks with the blank lines that separate them.
+    /// </summary>
+    /// <remarks>
+    /// Written out twice — once in the guest's "we got your order" and once in the operator's alert
+    /// — down to the blank lines inside the verbatim strings. That is what a copy-paste detector is
+    /// for, and it was invisible while `EmailTemplates.*.cs` was excluded from one (#356). The
+    /// values are NOT HTML-encoded here, deliberately: this is the text body, and encoding it would
+    /// print `&amp;` at a guest (§6.3 applies to the HTML side only).
+    /// </remarks>
+    internal static (string Items, string Instructions, string Delivery) OrderTextSections(
+        EmailText t,
+        IEnumerable<(string name, int quantity, decimal price)> items,
+        string currency,
+        string? specialInstructions,
+        string? deliveryAddress)
+    {
+        var itemsSection = string.Join("\n", items.Select(item =>
+            $"{item.name} x{item.quantity} = {currency} {item.price:F2}"));
+
+        var instructionsSection = string.IsNullOrEmpty(specialInstructions)
+            ? ""
+            : $@"
+
+{t["InstructionsLabel"]}
+{specialInstructions}";
+
+        var deliverySection = string.IsNullOrEmpty(deliveryAddress)
+            ? ""
+            : $@"
+
+{t["DeliveryLabel"]}
+{deliveryAddress}";
+
+        return (itemsSection, instructionsSection, deliverySection);
+    }
 }
