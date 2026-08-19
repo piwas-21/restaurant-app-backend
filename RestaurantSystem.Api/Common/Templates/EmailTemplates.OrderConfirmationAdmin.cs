@@ -49,15 +49,13 @@ public static partial class EmailTemplates
         /// created before that column existed; their buttons render and then land on
         /// "Order Not Found", which is the intended outcome — the owner uses the dashboard link.
         /// </param>
-        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string orderNumber, string customerName, string customerEmail, string customerPhone,
-            string orderType, decimal total, string currency, IEnumerable<(string name, int quantity, decimal price)> items,
-            string baseUrl, string frontendBaseUrl, string contactEmail, string? quickActionToken,
-            string? specialInstructions = null, string? deliveryAddress = null)
+        public static string GetHtmlBody(
+            CultureInfo culture, EmailBranding brand, EmailGuest guest, OrderMailDetails order, EmailLinks links)
         {
             var t = EmailText.For(culture, Set);
-            var email = contactEmail;
-            var apiBaseUrl = baseUrl;
-            var frontendUrl = frontendBaseUrl;
+            var (customerName, customerEmail, customerPhone) = guest;
+            var (orderNumber, orderType, total, currency, items, quickActionToken, specialInstructions, deliveryAddress) = order;
+            var (apiBaseUrl, frontendUrl, email) = links;
 
             // The light-mode and dark-mode blocks below repeat the same five action links, so the
             // URLs are built once here rather than eight times inline. "&amp;" not "&": these sit
@@ -198,13 +196,13 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string orderNumber, string customerName, string customerEmail, string customerPhone,
-            string orderType, decimal total, string currency, IEnumerable<(string name, int quantity, decimal price)> items,
-            string contactEmail,
-            string? specialInstructions = null, string? deliveryAddress = null)
+        public static string GetTextBody(
+            CultureInfo culture, EmailBranding brand, EmailGuest guest, OrderMailDetails order, string contactEmail)
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
+            var (customerName, customerEmail, customerPhone) = guest;
+            var (orderNumber, orderType, total, currency, items, _, specialInstructions, deliveryAddress) = order;
             var (itemsSection, instructionsSection, deliverySection) =
                 OrderTextSections(t, items, currency, specialInstructions, deliveryAddress);
 

@@ -61,39 +61,29 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
 
             var brand = await _brandingProvider.GetAsync(cancellationToken);
 
+            var guest = new EmailGuest(
+                reservation.CustomerName, reservation.CustomerEmail, reservation.CustomerPhone ?? string.Empty);
+            var details = new ReservationMailDetails(
+                reservation.Id,
+                reservation.ReservationDate,
+                reservation.StartTime,
+                reservation.EndTime,
+                reservation.NumberOfGuests,
+                tableNumber,
+                reservation.SpecialRequests);
+
             await _emailService.SendEmailAsync(
                 _emailSettings.AdminEmail,
                 EmailTemplates.ReservationAdminNotification.GetSubject(operatorCulture, brand),
                 EmailTemplates.ReservationAdminNotification.GetHtmlBody(
                     operatorCulture,
                     brand,
-                    reservation.Id,
-                    reservation.CustomerName,
-                    reservation.CustomerEmail,
-                    reservation.CustomerPhone ?? string.Empty,
-                    reservation.ReservationDate,
-                    reservation.StartTime,
-                    reservation.EndTime,
-                    reservation.NumberOfGuests,
-                    tableNumber,
-                    _emailSettings.BackendBaseUrl,
-                    _emailSettings.FrontendBaseUrl,
-                    _emailSettings.AdminEmail,
-                    reservation.SpecialRequests),
+                    guest,
+                    details,
+                    new EmailLinks(
+                        _emailSettings.BackendBaseUrl, _emailSettings.FrontendBaseUrl, _emailSettings.AdminEmail)),
                 EmailTemplates.ReservationAdminNotification.GetTextBody(
-                    operatorCulture,
-                    brand,
-                    reservation.Id,
-                    reservation.CustomerName,
-                    reservation.CustomerEmail,
-                    reservation.CustomerPhone ?? string.Empty,
-                    reservation.ReservationDate,
-                    reservation.StartTime,
-                    reservation.EndTime,
-                    reservation.NumberOfGuests,
-                    tableNumber,
-                    _emailSettings.AdminEmail,
-                    reservation.SpecialRequests));
+                    operatorCulture, brand, guest, details, _emailSettings.AdminEmail));
 
             _logger.LogInformation("Confirmation emails sent for reservation {ReservationId}", reservation.Id);
         }

@@ -359,13 +359,15 @@ public class EmailService : IEmailService
             var subject = EmailTemplates.OrderConfirmationAdmin.GetSubject(culture, brand);
             var baseUrl = _emailSettings.BackendBaseUrl;
             var frontendUrl = _emailSettings.FrontendBaseUrl;
+            var guest = new EmailGuest(customerName, customerEmail, customerPhone);
+            var order = new OrderMailDetails(
+                orderNumber, orderType, total, _localizationSettings.Currency, items,
+                quickActionToken, specialInstructions, deliveryAddress);
             var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-                culture, brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
-                baseUrl, frontendUrl, _emailSettings.AdminEmail, quickActionToken,
-                specialInstructions, deliveryAddress);
+                culture, brand, guest, order,
+                new EmailLinks(baseUrl, frontendUrl, _emailSettings.AdminEmail));
             var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-                culture, brand, orderNumber, customerName, customerEmail, customerPhone, orderType, total, _localizationSettings.Currency, items,
-                _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                culture, brand, guest, order, _emailSettings.AdminEmail);
 
             await SendEmailAsync(adminEmail, subject, htmlBody, textBody);
 

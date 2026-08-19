@@ -58,6 +58,17 @@ public class EmailTemplateGoldenTests
     private const string Instructions = "No onions";
     private const string DeliveryAddress = "Rue de Test 1";
     private const string SpecialRequests = "Window seat";
+
+    /// <summary>
+    /// The same fixture values, grouped as the templates now take them (#355). Declared once here
+    /// rather than inline per call, which is what a parameter object is for.
+    /// </summary>
+    private static readonly EmailGuest Guest = new(CustomerName, CustomerEmail, CustomerPhone);
+    private static readonly EmailLinks Links = new(ApiBaseUrl, FrontendBaseUrl, ContactEmail);
+    private static readonly OrderMailDetails OrderDetails = new(
+        OrderNumber, "Delivery", Total, "CHF", Items, "quick-action-token", Instructions, DeliveryAddress);
+    private static readonly ReservationMailDetails ReservationDetails = new(
+        ReservationId, Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests);
     private const string RestaurantNote = "See you soon";
     private const string ApiBaseUrl = "https://api.demo.test";
     private const string FrontendBaseUrl = "https://demo.test";
@@ -83,8 +94,8 @@ public class EmailTemplateGoldenTests
         yield return ("OrderCancelled.html", EmailTemplates.OrderCancelled.GetHtmlBody(Culture, Brand, CustomerName, OrderNumber, "Kitchen closed unexpectedly", ContactEmail));
         yield return ("OrderCancelled.text", EmailTemplates.OrderCancelled.GetTextBody(Culture, Brand, CustomerName, OrderNumber, "Kitchen closed unexpectedly", ContactEmail));
         yield return ("OrderConfirmationAdmin.subject", EmailTemplates.OrderConfirmationAdmin.GetSubject(Culture, Brand));
-        yield return ("OrderConfirmationAdmin.html", EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(Culture, Brand, OrderNumber, CustomerName, CustomerEmail, CustomerPhone, "Delivery", Total, "CHF", Items, ApiBaseUrl, FrontendBaseUrl, ContactEmail, "quick-action-token", Instructions, DeliveryAddress));
-        yield return ("OrderConfirmationAdmin.text", EmailTemplates.OrderConfirmationAdmin.GetTextBody(Culture, Brand, OrderNumber, CustomerName, CustomerEmail, CustomerPhone, "Delivery", Total, "CHF", Items, ContactEmail, Instructions, DeliveryAddress));
+        yield return ("OrderConfirmationAdmin.html", EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(Culture, Brand, Guest, OrderDetails, Links));
+        yield return ("OrderConfirmationAdmin.text", EmailTemplates.OrderConfirmationAdmin.GetTextBody(Culture, Brand, Guest, OrderDetails, ContactEmail));
         yield return ("OrderConfirmed.subject", EmailTemplates.OrderConfirmed.GetSubject(Culture, Brand));
         yield return ("OrderConfirmed.html", EmailTemplates.OrderConfirmed.GetHtmlBody(Culture, Brand, CustomerName, OrderNumber, "Takeaway", 30, ContactEmail));
         yield return ("OrderConfirmed.text", EmailTemplates.OrderConfirmed.GetTextBody(Culture, Brand, CustomerName, OrderNumber, "Takeaway", 30, ContactEmail));
@@ -101,8 +112,8 @@ public class EmailTemplateGoldenTests
         yield return ("PasswordReset.html", EmailTemplates.PasswordReset.GetHtmlBody(Culture, Brand, "Jane", "Doe", ResetUrl));
         yield return ("PasswordReset.text", EmailTemplates.PasswordReset.GetTextBody(Culture, Brand, "Jane", "Doe", ResetUrl));
         yield return ("ReservationAdminNotification.subject", EmailTemplates.ReservationAdminNotification.GetSubject(Culture, Brand));
-        yield return ("ReservationAdminNotification.html", EmailTemplates.ReservationAdminNotification.GetHtmlBody(Culture, Brand, ReservationId, CustomerName, CustomerEmail, CustomerPhone, Moment, StartTime, EndTime, 4, TableNumber, ApiBaseUrl, FrontendBaseUrl, ContactEmail, SpecialRequests));
-        yield return ("ReservationAdminNotification.text", EmailTemplates.ReservationAdminNotification.GetTextBody(Culture, Brand, ReservationId, CustomerName, CustomerEmail, CustomerPhone, Moment, StartTime, EndTime, 4, TableNumber, ContactEmail, SpecialRequests));
+        yield return ("ReservationAdminNotification.html", EmailTemplates.ReservationAdminNotification.GetHtmlBody(Culture, Brand, Guest, ReservationDetails, Links));
+        yield return ("ReservationAdminNotification.text", EmailTemplates.ReservationAdminNotification.GetTextBody(Culture, Brand, Guest, ReservationDetails, ContactEmail));
         yield return ("ReservationApproved.subject", EmailTemplates.ReservationApproved.GetSubject(Culture, Brand));
         yield return ("ReservationApproved.html", EmailTemplates.ReservationApproved.GetHtmlBody(Culture, Brand, CustomerName, TableNumber, Moment, StartTime, EndTime, 4, ContactEmail, SpecialRequests, RestaurantNote));
         yield return ("ReservationApproved.text", EmailTemplates.ReservationApproved.GetTextBody(Culture, Brand, CustomerName, TableNumber, Moment, StartTime, EndTime, 4, ContactEmail, SpecialRequests, RestaurantNote));
