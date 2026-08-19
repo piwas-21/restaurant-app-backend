@@ -16,6 +16,7 @@ namespace RestaurantSystem.IntegrationTests.Common.Templates;
 public class EmailTemplateEncodingTests
 {
     private static readonly EmailBranding Brand = new("Demo Restaurant", "Geneva", "contact@demo.test");
+    private static readonly EmailLinks Links = new("https://api.demo.test", "https://demo.test", "admin@demo.test");
     private static readonly (string name, int quantity, decimal price)[] Items = [("Burger", 2, 12.50m)];
 
     private const string Payload = "<script>alert('xss')</script>";
@@ -68,9 +69,10 @@ public class EmailTemplateEncodingTests
             EmailCultures.English, Brand, "Jane Doe", "ORD-1", "Delivery", 9.00m, "CHF", items,
             "admin@demo.test", null, null);
         var alert = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            EmailCultures.English, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000",
-            "Delivery", 9.00m, "CHF", items, "https://api.demo.test", "https://demo.test",
-            "admin@demo.test", "token", null, null);
+            EmailCultures.English, Brand,
+            new EmailGuest("Jane Doe", "jane@demo.test", "+41000000"),
+            new OrderMailDetails("ORD-1", "Delivery", 9.00m, "CHF", items, "token"),
+            Links);
 
         receipt.Should().Contain("Fish &amp; Chips &lt;b&gt;").And.NotContain("Fish & Chips <b>");
         alert.Should().Contain("Fish &amp; Chips &lt;b&gt;").And.NotContain("Fish & Chips <b>");
@@ -90,9 +92,10 @@ public class EmailTemplateEncodingTests
     public void Admin_order_alert_encodes_the_customer_identity_and_the_notes()
     {
         var html = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            EmailCultures.English, Brand, "ORD-1", Payload, Payload, Payload, "Delivery", 25.00m, "CHF",
-            Items, "https://api.demo.test", "https://demo.test", "admin@demo.test", "token",
-            Payload, Payload);
+            EmailCultures.English, Brand,
+            new EmailGuest(Payload, Payload, Payload),
+            new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, "token", Payload, Payload),
+            Links);
 
         html.Should().NotContain(Payload);
         html.Should().Contain(Encoded);
@@ -110,9 +113,11 @@ public class EmailTemplateEncodingTests
             EmailCultures.English, Brand, Payload, "T12", date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4,
             "admin@demo.test", Payload, Payload);
         var adminNotification = EmailTemplates.ReservationAdminNotification.GetHtmlBody(
-            EmailCultures.English, Brand, Guid.Empty, Payload, Payload, Payload, date,
-            new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12",
-            "https://api.demo.test", "https://demo.test", "admin@demo.test", Payload);
+            EmailCultures.English, Brand,
+            new EmailGuest(Payload, Payload, Payload),
+            new ReservationMailDetails(
+                Guid.Empty, date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", Payload),
+            Links);
 
         confirmation.Should().NotContain(Payload).And.Contain(Encoded);
         approved.Should().NotContain(Payload).And.Contain(Encoded);

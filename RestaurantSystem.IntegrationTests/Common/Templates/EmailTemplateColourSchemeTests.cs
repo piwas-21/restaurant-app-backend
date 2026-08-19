@@ -23,14 +23,17 @@ public class EmailTemplateColourSchemeTests
 {
     private static readonly CultureInfo Culture = EmailCultures.English;
     private static readonly EmailBranding Brand = new("Demo Restaurant", "Geneva", "contact@demo.test");
+    private static readonly EmailGuest Guest = new("Jane Doe", "jane@demo.test", "+41000000");
+    private static readonly EmailLinks Links = new("https://api.test", "https://app.test", "admin@demo.test");
 
     [Fact]
     public void The_order_alerts_two_schemes_say_exactly_the_same_thing()
     {
         var html = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            Culture, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "Delivery", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "https://api.test", "https://app.test", "admin@demo.test",
-            "quick-action-token", "No onions", "Rue de Test 1");
+            Culture, Brand, Guest,
+            new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", [("Burger", 2, 12.50m)],
+                "quick-action-token", "No onions", "Rue de Test 1"),
+            Links);
 
         AssertBothSchemesReadTheSame(html);
     }
@@ -39,10 +42,12 @@ public class EmailTemplateColourSchemeTests
     public void The_reservation_alerts_two_schemes_say_exactly_the_same_thing()
     {
         var html = EmailTemplates.ReservationAdminNotification.GetHtmlBody(
-            Culture, Brand, new Guid("11111111-2222-3333-4444-555555555555"), "Jane Doe",
-            "jane@demo.test", "+41000000", new DateTime(2030, 5, 17, 0, 0, 0, DateTimeKind.Utc),
-            new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12",
-            "https://api.test", "https://app.test", "admin@demo.test", "Window seat");
+            Culture, Brand, Guest,
+            new ReservationMailDetails(
+                new Guid("11111111-2222-3333-4444-555555555555"),
+                new DateTime(2030, 5, 17, 0, 0, 0, DateTimeKind.Utc),
+                new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", "Window seat"),
+            Links);
 
         AssertBothSchemesReadTheSame(html);
     }
@@ -53,8 +58,9 @@ public class EmailTemplateColourSchemeTests
         // The premise of the two tests above: if a rename ever left only one block, comparing it to
         // itself would pass and the operator on the other scheme would get a blank mail.
         var html = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-            Culture, Brand, "ORD-1", "Jane Doe", "jane@demo.test", "+41000000", "Delivery", 25.00m, "CHF",
-            [("Burger", 2, 12.50m)], "https://api.test", "https://app.test", "admin@demo.test", null);
+            Culture, Brand, Guest,
+            new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", [("Burger", 2, 12.50m)]),
+            Links);
 
         html.Should().Contain("class='light-only'").And.Contain("class='dark-only'");
         html.Should().Contain("prefers-color-scheme: dark").And.Contain("prefers-color-scheme: light");
