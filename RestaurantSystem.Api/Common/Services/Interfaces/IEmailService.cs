@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using RestaurantSystem.Api.Common.Templates;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Common.Services.Interfaces;
@@ -82,8 +83,8 @@ public interface IEmailService
     /// <param name="numberOfGuests">Number of guests</param>
     /// <param name="specialRequests">Special requests</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendReservationConfirmationEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
-        DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string? specialRequests = null);
+    Task SendReservationConfirmationEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, ReservationMailDetails reservation);
 
     /// <summary>
     /// Sends reservation approved email (when admin approves the reservation)
@@ -98,9 +99,9 @@ public interface IEmailService
     /// <param name="specialRequests">Special requests</param>
     /// <param name="notes">Notes from restaurant</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendReservationApprovedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
-        DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests,
-        string? specialRequests = null, string? notes = null);
+    Task SendReservationApprovedEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, ReservationMailDetails reservation,
+        string? notes = null);
 
     /// <summary>
     /// Sends order received email to customer (when order is placed but not yet confirmed)
@@ -114,9 +115,8 @@ public interface IEmailService
     /// <param name="specialInstructions">Special instructions</param>
     /// <param name="deliveryAddress">Delivery address (if applicable)</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendOrderReceivedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
-        string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
-        string? specialInstructions = null, string? deliveryAddress = null);
+    Task SendOrderReceivedEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, OrderMailDetails order);
 
     /// <summary>
     /// Sends order confirmed email to customer (when admin confirms the order)
@@ -161,10 +161,8 @@ public interface IEmailService
     /// <param name="specialInstructions">Special instructions</param>
     /// <param name="deliveryAddress">Delivery address (if applicable)</param>
     /// <returns>Task representing the async operation</returns>
-    Task SendOrderConfirmationAdminEmailAsync(CultureInfo culture, string adminEmail, string orderNumber, string customerName,
-        string customerEmail, string customerPhone, string orderType, decimal total,
-        IEnumerable<(string name, int quantity, decimal price)> items, string? quickActionToken,
-        string? specialInstructions = null, string? deliveryAddress = null);
+    Task SendOrderConfirmationAdminEmailAsync(
+        CultureInfo culture, string adminEmail, EmailGuest guest, OrderMailDetails order);
 
     /// <summary>
     /// Sends group membership confirmation email with QR code

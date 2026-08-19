@@ -66,7 +66,7 @@ public class EmailTemplateGoldenTests
     private static readonly EmailGuest Guest = new(CustomerName, CustomerEmail, CustomerPhone);
     private static readonly EmailLinks Links = new(ApiBaseUrl, FrontendBaseUrl, ContactEmail);
     private static readonly OrderMailDetails OrderDetails = new(
-        OrderNumber, "Delivery", Total, "CHF", Items, "quick-action-token", Instructions, DeliveryAddress);
+        OrderNumber, "Delivery", Total, Items, "CHF", "quick-action-token", Instructions, DeliveryAddress);
     private static readonly ReservationMailDetails ReservationDetails = new(
         Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests, ReservationId);
     private const string RestaurantNote = "See you soon";
@@ -104,9 +104,9 @@ public class EmailTemplateGoldenTests
         yield return ("OrderDelayed.text", EmailTemplates.OrderDelayed.GetTextBody(Culture, Brand, CustomerName, OrderNumber, 25, ApproveUrl, RejectUrl, ContactEmail));
         yield return ("OrderReceived.subject", EmailTemplates.OrderReceived.GetSubject(Culture, Brand));
         yield return ("OrderReceived.html", EmailTemplates.OrderReceived.GetHtmlBody(
-            Culture, Brand, CustomerName, new OrderMailDetails(OrderNumber, "Delivery", Total, "CHF", Items, SpecialInstructions: Instructions, DeliveryAddress: DeliveryAddress), ContactEmail));
+            Culture, Brand, CustomerName, new OrderMailDetails(OrderNumber, "Delivery", Total, Items, "CHF", SpecialInstructions: Instructions, DeliveryAddress: DeliveryAddress), ContactEmail));
         yield return ("OrderReceived.text", EmailTemplates.OrderReceived.GetTextBody(
-            Culture, Brand, CustomerName, new OrderMailDetails(OrderNumber, "Delivery", Total, "CHF", Items, SpecialInstructions: Instructions, DeliveryAddress: DeliveryAddress), ContactEmail));
+            Culture, Brand, CustomerName, new OrderMailDetails(OrderNumber, "Delivery", Total, Items, "CHF", SpecialInstructions: Instructions, DeliveryAddress: DeliveryAddress), ContactEmail));
         yield return ("PasswordChanged.subject", EmailTemplates.PasswordChanged.GetSubject(Culture, Brand));
         yield return ("PasswordChanged.html", EmailTemplates.PasswordChanged.GetHtmlBody(Culture, Brand, "Jane", "Doe", MomentLocal));
         yield return ("PasswordChanged.text", EmailTemplates.PasswordChanged.GetTextBody(Culture, Brand, "Jane", "Doe", MomentLocal));

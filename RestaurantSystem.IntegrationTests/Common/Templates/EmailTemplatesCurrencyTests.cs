@@ -55,9 +55,9 @@ public class EmailTemplatesCurrencyTests
     public void OrderReceived_HtmlAndTextBody_UseConfiguredCurrency_NotHardcodedChf(string currency)
     {
         var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items), "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", Total, Items, currency), "admin@demo.test");
         var textBody = EmailTemplates.OrderReceived.GetTextBody(
-            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items), "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", Total, Items, currency), "admin@demo.test");
 
         AssertCurrencyRendered(htmlBody, textBody, currency);
     }
@@ -69,11 +69,11 @@ public class EmailTemplatesCurrencyTests
     {
         var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             EmailCultures.English, Brand, Guest,
-            new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items, "test-quick-action-token"),
+            new OrderMailDetails("ORD-1", "DineIn", Total, Items, currency, "test-quick-action-token"),
             Links);
         var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
             EmailCultures.English, Brand, Guest,
-            new OrderMailDetails("ORD-1", "DineIn", Total, currency, Items),
+            new OrderMailDetails("ORD-1", "DineIn", Total, Items, currency),
             "admin@demo.test");
 
         AssertCurrencyRendered(htmlBody, textBody, currency);

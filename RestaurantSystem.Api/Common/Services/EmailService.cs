@@ -198,15 +198,13 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendReservationConfirmationEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
-        DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string? specialRequests = null)
+    public async Task SendReservationConfirmationEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, ReservationMailDetails reservation)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.ReservationConfirmation.GetSubject(culture, brand);
-            var reservation = new ReservationMailDetails(
-                reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests);
             var htmlBody = EmailTemplates.ReservationConfirmation.GetHtmlBody(
                 culture, brand, customerName, reservation, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.ReservationConfirmation.GetTextBody(
@@ -215,7 +213,7 @@ public class EmailService : IEmailService
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
             _logger.LogInformation("Reservation confirmation email sent to {Email} for table {TableNumber} on {Date}",
-                customerEmail, tableNumber, reservationDate);
+                customerEmail, reservation.TableNumber, reservation.Date);
         }
         catch (Exception ex)
         {
@@ -224,16 +222,14 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendReservationApprovedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string tableNumber,
-        DateTime reservationDate, TimeSpan startTime, TimeSpan endTime, int numberOfGuests,
-        string? specialRequests = null, string? notes = null)
+    public async Task SendReservationApprovedEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, ReservationMailDetails reservation,
+        string? notes = null)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.ReservationApproved.GetSubject(culture, brand);
-            var reservation = new ReservationMailDetails(
-                reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests);
             var htmlBody = EmailTemplates.ReservationApproved.GetHtmlBody(
                 culture, brand, customerName, reservation, _emailSettings.AdminEmail, notes);
             var textBody = EmailTemplates.ReservationApproved.GetTextBody(
@@ -242,7 +238,7 @@ public class EmailService : IEmailService
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
             _logger.LogInformation("Reservation approved email sent to {Email} for table {TableNumber} on {Date}",
-                customerEmail, tableNumber, reservationDate);
+                customerEmail, reservation.TableNumber, reservation.Date);
         }
         catch (Exception ex)
         {
@@ -251,31 +247,30 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderReceivedEmailAsync(CultureInfo culture, string customerEmail, string customerName, string orderNumber,
-        string orderType, decimal total, IEnumerable<(string name, int quantity, decimal price)> items,
-        string? specialInstructions = null, string? deliveryAddress = null)
+    public async Task SendOrderReceivedEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, OrderMailDetails order)
     {
         try
         {
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.OrderReceived.GetSubject(culture, brand);
-            var order = new OrderMailDetails(
-                orderNumber, orderType, total, _localizationSettings.Currency, items,
-                SpecialInstructions: specialInstructions, DeliveryAddress: deliveryAddress);
+            // The tenant's currency is the SERVICE's to know, not a caller's: it is configuration
+            // (`Localization:Currency`), and a caller that had to pass it could pass a different one.
+            var priced = order with { Currency = _localizationSettings.Currency };
             var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-                culture, brand, customerName, order, _emailSettings.AdminEmail);
+                culture, brand, customerName, priced, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderReceived.GetTextBody(
-                culture, brand, customerName, order, _emailSettings.AdminEmail);
+                culture, brand, customerName, priced, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
             _logger.LogInformation("Order received email sent to {Email} for order {OrderNumber}",
-                customerEmail, orderNumber);
+                customerEmail, order.Number);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send order received email to {Email} for order {OrderNumber}",
-                customerEmail, orderNumber);
+                customerEmail, order.Number);
             throw;
         }
     }
@@ -355,10 +350,8 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendOrderConfirmationAdminEmailAsync(CultureInfo culture, string adminEmail, string orderNumber, string customerName,
-        string customerEmail, string customerPhone, string orderType, decimal total,
-        IEnumerable<(string name, int quantity, decimal price)> items, string? quickActionToken,
-        string? specialInstructions = null, string? deliveryAddress = null)
+    public async Task SendOrderConfirmationAdminEmailAsync(
+        CultureInfo culture, string adminEmail, EmailGuest guest, OrderMailDetails order)
     {
         try
         {
@@ -366,25 +359,22 @@ public class EmailService : IEmailService
             var subject = EmailTemplates.OrderConfirmationAdmin.GetSubject(culture, brand);
             var baseUrl = _emailSettings.BackendBaseUrl;
             var frontendUrl = _emailSettings.FrontendBaseUrl;
-            var guest = new EmailGuest(customerName, customerEmail, customerPhone);
-            var order = new OrderMailDetails(
-                orderNumber, orderType, total, _localizationSettings.Currency, items,
-                quickActionToken, specialInstructions, deliveryAddress);
+            var priced = order with { Currency = _localizationSettings.Currency };
             var htmlBody = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
-                culture, brand, guest, order,
+                culture, brand, guest, priced,
                 new EmailLinks(baseUrl, frontendUrl, _emailSettings.AdminEmail));
             var textBody = EmailTemplates.OrderConfirmationAdmin.GetTextBody(
-                culture, brand, guest, order, _emailSettings.AdminEmail);
+                culture, brand, guest, priced, _emailSettings.AdminEmail);
 
             await SendEmailAsync(adminEmail, subject, htmlBody, textBody);
 
             _logger.LogInformation("Order notification email sent to admin {Email} for order {OrderNumber}",
-                adminEmail, orderNumber);
+                adminEmail, order.Number);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send order notification email to admin {Email} for order {OrderNumber}",
-                adminEmail, orderNumber);
+                adminEmail, order.Number);
             throw;
         }
     }

@@ -29,7 +29,7 @@ public class OrderConfirmationAdminLinkTests
         EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             EmailCultures.English, Brand,
             new EmailGuest("Jane Doe", "jane@demo.test", "+41000000"),
-            new OrderMailDetails(orderNumber, "DineIn", 25.00m, "CHF", Items, token),
+            new OrderMailDetails(orderNumber, "DineIn", 25.00m, Items, "CHF", token),
             new EmailLinks(ApiBaseUrl, "https://demo.test", "admin@demo.test"));
 
     [Theory]
