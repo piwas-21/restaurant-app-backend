@@ -26,8 +26,7 @@ public class EmailTemplateEncodingTests
     public void Order_received_encodes_the_special_instructions()
     {
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "Delivery", 25.00m, "CHF", Items,
-            "admin@demo.test", Payload, Payload);
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: Payload, DeliveryAddress: Payload), "admin@demo.test");
 
         html.Should().Contain(Encoded).And.NotContain(Payload);
     }
@@ -45,11 +44,9 @@ public class EmailTemplateEncodingTests
         const string Name = "Zoë Müller";
 
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, Name, "ORD-1", "Delivery", 25.00m, "CHF", Items,
-            "admin@demo.test", null, null);
+            EmailCultures.English, Brand, Name, new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: null, DeliveryAddress: null), "admin@demo.test");
         var text = EmailTemplates.OrderReceived.GetTextBody(
-            EmailCultures.English, Brand, Name, "ORD-1", "Delivery", 25.00m, "CHF", Items,
-            "admin@demo.test", null);
+            EmailCultures.English, Brand, Name, new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: null), "admin@demo.test");
 
         html.Should().Contain("Zo&#235; M&#252;ller").And.NotContain(Name);
         text.Should().Contain(Name);
@@ -66,8 +63,7 @@ public class EmailTemplateEncodingTests
         (string name, int quantity, decimal price)[] items = [("Fish & Chips <b>", 1, 9.00m)];
 
         var receipt = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "Delivery", 9.00m, "CHF", items,
-            "admin@demo.test", null, null);
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 9.00m, "CHF", items, SpecialInstructions: null, DeliveryAddress: null), "admin@demo.test");
         var alert = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             EmailCultures.English, Brand,
             new EmailGuest("Jane Doe", "jane@demo.test", "+41000000"),
@@ -82,8 +78,7 @@ public class EmailTemplateEncodingTests
     public void Order_received_leaves_the_plain_text_body_unencoded()
     {
         var text = EmailTemplates.OrderReceived.GetTextBody(
-            EmailCultures.English, Brand, "Jane Doe", "ORD-1", "Delivery", 25.00m, "CHF", Items,
-            "admin@demo.test", Payload);
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: Payload), "admin@demo.test");
 
         text.Should().Contain(Payload).And.NotContain(Encoded);
     }
@@ -107,16 +102,14 @@ public class EmailTemplateEncodingTests
         var date = new DateTime(2030, 5, 17, 19, 30, 0, DateTimeKind.Utc);
 
         var confirmation = EmailTemplates.ReservationConfirmation.GetHtmlBody(
-            EmailCultures.English, Brand, Payload, "T12", date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4,
-            "admin@demo.test", Payload);
+            EmailCultures.English, Brand, Payload, new ReservationMailDetails(date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", Payload), "admin@demo.test");
         var approved = EmailTemplates.ReservationApproved.GetHtmlBody(
-            EmailCultures.English, Brand, Payload, "T12", date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4,
-            "admin@demo.test", Payload, Payload);
+            EmailCultures.English, Brand, Payload, new ReservationMailDetails(date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", Payload), "admin@demo.test", Payload);
         var adminNotification = EmailTemplates.ReservationAdminNotification.GetHtmlBody(
             EmailCultures.English, Brand,
             new EmailGuest(Payload, Payload, Payload),
             new ReservationMailDetails(
-                Guid.Empty, date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", Payload),
+                date, new TimeSpan(19, 30, 0), new TimeSpan(21, 0, 0), 4, "T12", Payload),
             Links);
 
         confirmation.Should().NotContain(Payload).And.Contain(Encoded);

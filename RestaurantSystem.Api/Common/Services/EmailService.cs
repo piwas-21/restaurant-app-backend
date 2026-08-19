@@ -205,10 +205,12 @@ public class EmailService : IEmailService
         {
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.ReservationConfirmation.GetSubject(culture, brand);
+            var reservation = new ReservationMailDetails(
+                reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests);
             var htmlBody = EmailTemplates.ReservationConfirmation.GetHtmlBody(
-                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
+                culture, brand, customerName, reservation, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.ReservationConfirmation.GetTextBody(
-                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests);
+                culture, brand, customerName, reservation, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -230,10 +232,12 @@ public class EmailService : IEmailService
         {
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.ReservationApproved.GetSubject(culture, brand);
+            var reservation = new ReservationMailDetails(
+                reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests);
             var htmlBody = EmailTemplates.ReservationApproved.GetHtmlBody(
-                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
+                culture, brand, customerName, reservation, _emailSettings.AdminEmail, notes);
             var textBody = EmailTemplates.ReservationApproved.GetTextBody(
-                culture, brand, customerName, tableNumber, reservationDate, startTime, endTime, numberOfGuests, _emailSettings.AdminEmail, specialRequests, notes);
+                culture, brand, customerName, reservation, _emailSettings.AdminEmail, notes);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 
@@ -255,10 +259,13 @@ public class EmailService : IEmailService
         {
             var brand = await _brandingProvider.GetAsync();
             var subject = EmailTemplates.OrderReceived.GetSubject(culture, brand);
+            var order = new OrderMailDetails(
+                orderNumber, orderType, total, _localizationSettings.Currency, items,
+                SpecialInstructions: specialInstructions, DeliveryAddress: deliveryAddress);
             var htmlBody = EmailTemplates.OrderReceived.GetHtmlBody(
-                culture, brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                culture, brand, customerName, order, _emailSettings.AdminEmail);
             var textBody = EmailTemplates.OrderReceived.GetTextBody(
-                culture, brand, customerName, orderNumber, orderType, total, _localizationSettings.Currency, items, _emailSettings.AdminEmail, specialInstructions, deliveryAddress);
+                culture, brand, customerName, order, _emailSettings.AdminEmail);
 
             await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
 

@@ -14,10 +14,11 @@ public static partial class EmailTemplates
         public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
-        public static string GetHtmlBody(CultureInfo culture, EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
-            TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
-            string? specialRequests = null, string? notes = null)
+        public static string GetHtmlBody(
+            CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation,
+            string contactEmail, string? notes = null)
         {
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
@@ -93,10 +94,11 @@ public static partial class EmailTemplates
 </html>";
         }
 
-        public static string GetTextBody(CultureInfo culture, EmailBranding brand, string customerName, string tableNumber, DateTime reservationDate,
-            TimeSpan startTime, TimeSpan endTime, int numberOfGuests, string contactEmail,
-            string? specialRequests = null, string? notes = null)
+        public static string GetTextBody(
+            CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation,
+            string contactEmail, string? notes = null)
         {
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)

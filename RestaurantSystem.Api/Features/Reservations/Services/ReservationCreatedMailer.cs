@@ -64,13 +64,13 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
             var guest = new EmailGuest(
                 reservation.CustomerName, reservation.CustomerEmail, reservation.CustomerPhone ?? string.Empty);
             var details = new ReservationMailDetails(
-                reservation.Id,
                 reservation.ReservationDate,
                 reservation.StartTime,
                 reservation.EndTime,
                 reservation.NumberOfGuests,
                 tableNumber,
-                reservation.SpecialRequests);
+                reservation.SpecialRequests,
+                reservation.Id);
 
             await _emailService.SendEmailAsync(
                 _emailSettings.AdminEmail,

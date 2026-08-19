@@ -22,7 +22,7 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var (customerName, customerEmail, customerPhone) = guest;
-            var (reservationId, reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, reservationId) = reservation;
             var (apiBaseUrl, frontendUrl, email) = links;
 
             var requestsSection = string.IsNullOrEmpty(specialRequests)
@@ -135,7 +135,7 @@ public static partial class EmailTemplates
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var (customerName, customerEmail, customerPhone) = guest;
-            var (reservationId, reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, reservationId) = reservation;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"
