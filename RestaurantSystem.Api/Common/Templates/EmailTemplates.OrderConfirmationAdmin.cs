@@ -54,7 +54,7 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var (customerName, customerEmail, customerPhone) = guest;
-            var (orderNumber, orderType, total, currency, items, quickActionToken, specialInstructions, deliveryAddress) = order;
+            var (orderNumber, orderType, total, items, currency, quickActionToken, specialInstructions, deliveryAddress) = order;
             var (apiBaseUrl, frontendUrl, email) = links;
 
             // The light-mode and dark-mode blocks below repeat the same five action links, so the
@@ -202,7 +202,7 @@ public static partial class EmailTemplates
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var (customerName, customerEmail, customerPhone) = guest;
-            var (orderNumber, orderType, total, currency, items, _, specialInstructions, deliveryAddress) = order;
+            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress) = order;
             var (itemsSection, instructionsSection, deliverySection) =
                 OrderTextSections(t, items, currency, specialInstructions, deliveryAddress);
 

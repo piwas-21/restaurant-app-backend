@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -80,16 +81,18 @@ public class AdminOrderAlertSender : IAdminOrderAlertSender
                 await emailService.SendOrderConfirmationAdminEmailAsync(
                     culture,
                     adminEmail,
-                    orderNumber,
-                    order.CustomerName ?? string.Empty,
-                    order.CustomerEmail ?? FallbackCustomerEmail,
-                    order.CustomerPhone ?? FallbackPhone,
-                    order.Type,
-                    order.Total,
-                    items,
-                    quickActionToken,
-                    order.Notes,
-                    deliveryAddress);
+                    new EmailGuest(
+                        order.CustomerName ?? string.Empty,
+                        order.CustomerEmail ?? FallbackCustomerEmail,
+                        order.CustomerPhone ?? FallbackPhone),
+                    new OrderMailDetails(
+                        orderNumber,
+                        order.Type,
+                        order.Total,
+                        items,
+                        QuickActionToken: quickActionToken,
+                        SpecialInstructions: order.Notes,
+                        DeliveryAddress: deliveryAddress));
 
                 await ledger.MarkSentAsync(OutboundEmailTypes.OrderAdminAlert, orderId);
             }

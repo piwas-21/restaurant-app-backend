@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Api.Common.Templates;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.UpdateReservationCommand;
 
@@ -102,12 +103,13 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
                         _languages.ForGuest(reservation.PreferredLanguage),
                         reservation.CustomerEmail,
                         reservation.CustomerName,
-                        table.TableNumber,
-                        reservation.ReservationDate,
-                        reservation.StartTime,
-                        reservation.EndTime,
-                        reservation.NumberOfGuests,
-                        reservation.SpecialRequests,
+                        new ReservationMailDetails(
+                            reservation.ReservationDate,
+                            reservation.StartTime,
+                            reservation.EndTime,
+                            reservation.NumberOfGuests,
+                            table.TableNumber,
+                            reservation.SpecialRequests),
                         reservation.Notes);
 
                     _logger.LogInformation("Approval email sent for reservation {ReservationId}", reservation.Id);

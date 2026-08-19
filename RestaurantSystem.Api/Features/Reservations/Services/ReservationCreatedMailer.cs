@@ -48,19 +48,6 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
             var guestCulture = _languages.ForGuest(reservation.PreferredLanguage);
             var operatorCulture = _languages.ForOperator();
 
-            await _emailService.SendReservationConfirmationEmailAsync(
-                guestCulture,
-                reservation.CustomerEmail,
-                reservation.CustomerName,
-                tableNumber,
-                reservation.ReservationDate,
-                reservation.StartTime,
-                reservation.EndTime,
-                reservation.NumberOfGuests,
-                reservation.SpecialRequests);
-
-            var brand = await _brandingProvider.GetAsync(cancellationToken);
-
             var guest = new EmailGuest(
                 reservation.CustomerName, reservation.CustomerEmail, reservation.CustomerPhone ?? string.Empty);
             var details = new ReservationMailDetails(
@@ -71,6 +58,13 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
                 tableNumber,
                 reservation.SpecialRequests,
                 reservation.Id);
+
+            // One reservation, two mails, ONE description of it — and two different cultures, which
+            // is the thing that must not be shared (§6.10).
+            await _emailService.SendReservationConfirmationEmailAsync(
+                guestCulture, reservation.CustomerEmail, reservation.CustomerName, details);
+
+            var brand = await _brandingProvider.GetAsync(cancellationToken);
 
             await _emailService.SendEmailAsync(
                 _emailSettings.AdminEmail,

@@ -31,7 +31,7 @@ public class FrenchEmailResourceTests
     public void A_french_order_receipt_contains_no_english_copy()
     {
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            French, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
+            French, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, [("Burger", 2, 12.50m)], "CHF"), "admin@demo.test");
 
         html.Should().Contain("Commande reçue").And.Contain("Merci pour votre commande");
         html.Should().NotContainAny(
@@ -73,7 +73,7 @@ public class FrenchEmailResourceTests
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
             var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            French, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
+            French, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, [("Burger", 2, 12.50m)], "CHF"), "admin@demo.test");
 
             html.Should().Contain("CHF 25.00").And.NotContain("CHF 25,00",
                 "a French mail says CHF, not EUR, and formats the amount the way the tenant's server "
@@ -94,7 +94,7 @@ public class FrenchEmailResourceTests
     public void The_french_text_bodies_punctuate_their_labels_the_way_french_does()
     {
         var receipt = EmailTemplates.OrderReceived.GetTextBody(
-            French, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
+            French, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "DineIn", 25.00m, [("Burger", 2, 12.50m)], "CHF"), "admin@demo.test");
 
         receipt.Should().Contain("NUMÉRO DE COMMANDE : ORD-1").And.NotContain("COMMANDE: ");
         receipt.Should().NotContainAny("Order Received", "Order Items", "Best regards");
@@ -135,7 +135,7 @@ public class FrenchEmailResourceTests
     public void A_nameless_guest_is_greeted_in_french_rather_than_in_english()
     {
         var receipt = EmailTemplates.OrderReceived.GetTextBody(
-            French, Brand, string.Empty, new OrderMailDetails("ORD-1", "DineIn", 25.00m, "CHF", [("Burger", 2, 12.50m)]), "admin@demo.test");
+            French, Brand, string.Empty, new OrderMailDetails("ORD-1", "DineIn", 25.00m, [("Burger", 2, 12.50m)], "CHF"), "admin@demo.test");
 
         receipt.Should().Contain("Bonjour,").And.NotContain("Valued Customer");
     }

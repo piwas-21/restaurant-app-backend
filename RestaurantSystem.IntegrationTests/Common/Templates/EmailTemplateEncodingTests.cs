@@ -26,7 +26,7 @@ public class EmailTemplateEncodingTests
     public void Order_received_encodes_the_special_instructions()
     {
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: Payload, DeliveryAddress: Payload), "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 25.00m, Items, "CHF", SpecialInstructions: Payload, DeliveryAddress: Payload), "admin@demo.test");
 
         html.Should().Contain(Encoded).And.NotContain(Payload);
     }
@@ -44,9 +44,9 @@ public class EmailTemplateEncodingTests
         const string Name = "Zoë Müller";
 
         var html = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, Name, new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: null, DeliveryAddress: null), "admin@demo.test");
+            EmailCultures.English, Brand, Name, new OrderMailDetails("ORD-1", "Delivery", 25.00m, Items, "CHF", SpecialInstructions: null, DeliveryAddress: null), "admin@demo.test");
         var text = EmailTemplates.OrderReceived.GetTextBody(
-            EmailCultures.English, Brand, Name, new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: null), "admin@demo.test");
+            EmailCultures.English, Brand, Name, new OrderMailDetails("ORD-1", "Delivery", 25.00m, Items, "CHF", SpecialInstructions: null), "admin@demo.test");
 
         html.Should().Contain("Zo&#235; M&#252;ller").And.NotContain(Name);
         text.Should().Contain(Name);
@@ -63,11 +63,11 @@ public class EmailTemplateEncodingTests
         (string name, int quantity, decimal price)[] items = [("Fish & Chips <b>", 1, 9.00m)];
 
         var receipt = EmailTemplates.OrderReceived.GetHtmlBody(
-            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 9.00m, "CHF", items, SpecialInstructions: null, DeliveryAddress: null), "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 9.00m, items, "CHF", SpecialInstructions: null, DeliveryAddress: null), "admin@demo.test");
         var alert = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             EmailCultures.English, Brand,
             new EmailGuest("Jane Doe", "jane@demo.test", "+41000000"),
-            new OrderMailDetails("ORD-1", "Delivery", 9.00m, "CHF", items, "token"),
+            new OrderMailDetails("ORD-1", "Delivery", 9.00m, items, "CHF", "token"),
             Links);
 
         receipt.Should().Contain("Fish &amp; Chips &lt;b&gt;").And.NotContain("Fish & Chips <b>");
@@ -78,7 +78,7 @@ public class EmailTemplateEncodingTests
     public void Order_received_leaves_the_plain_text_body_unencoded()
     {
         var text = EmailTemplates.OrderReceived.GetTextBody(
-            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, SpecialInstructions: Payload), "admin@demo.test");
+            EmailCultures.English, Brand, "Jane Doe", new OrderMailDetails("ORD-1", "Delivery", 25.00m, Items, "CHF", SpecialInstructions: Payload), "admin@demo.test");
 
         text.Should().Contain(Payload).And.NotContain(Encoded);
     }
@@ -89,7 +89,7 @@ public class EmailTemplateEncodingTests
         var html = EmailTemplates.OrderConfirmationAdmin.GetHtmlBody(
             EmailCultures.English, Brand,
             new EmailGuest(Payload, Payload, Payload),
-            new OrderMailDetails("ORD-1", "Delivery", 25.00m, "CHF", Items, "token", Payload, Payload),
+            new OrderMailDetails("ORD-1", "Delivery", 25.00m, Items, "CHF", "token", Payload, Payload),
             Links);
 
         html.Should().NotContain(Payload);
