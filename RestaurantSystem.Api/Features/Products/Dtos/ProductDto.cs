@@ -15,6 +15,15 @@ public record ProductDto
     public bool IsAvailable { get; init; }
 
     public bool IsSpecial { get; init; } // Is this a special menu (e.g., holiday menu)
+
+    /// <summary>
+    /// When <c>true</c> the base row ("order it with no variation") is not offered — the guest must
+    /// choose a variation. This is the STORED flag, so an admin editor round-trips it unharmed; the
+    /// effective rule is "…and at least one variation is active", which readers apply themselves
+    /// (server-side: <c>BasketBaseProductGuard</c>). Additive — clients that ignore it are unaffected.
+    /// </summary>
+    public bool HideBaseProduct { get; init; }
+
     public int PreparationTimeMinutes { get; init; }
     public ProductType Type { get; init; }
     public KitchenType KitchenType { get; init; } // Front or Back kitchen designation

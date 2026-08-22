@@ -32,7 +32,10 @@ public record CreateProductCommand(
     ProductDescriptionsDto Content,
     // OrderChannels bitmask; null = INHERIT from the primary category. Optional so existing
     // clients keep working (they inherit, which is the pre-feature behaviour).
-    int? AvailableOrderTypes = null
+    int? AvailableOrderTypes = null,
+    // Hide the "no variation" base row so the guest must pick one. Optional and last so existing
+    // callers keep today's behaviour (Track F / F2).
+    bool HideBaseProduct = false
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -90,6 +93,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 BasePrice = command.BasePrice,
                 IsActive = command.IsActive,
                 IsSpecial = command.IsSpecial,
+                HideBaseProduct = command.HideBaseProduct,
                 IsAvailable = command.IsAvailable,
                 AvailableOrderTypes = command.AvailableOrderTypes,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,

@@ -12,6 +12,16 @@ public class Product : SoftDeleteEntity
     public bool IsActive { get; set; } = true;
     public bool IsAvailable { get; set; } = true;
     public bool IsSpecial { get; set; } // Is this a special menu (e.g., holiday menu)
+
+    /// <summary>
+    /// When <c>true</c>, the synthetic "base product" option (ordering with no variation) is not
+    /// offered: the guest must pick one of the variations. Stored as-is; the EFFECTIVE rule adds
+    /// "…and at least one variation is active", so a product whose variations are all deactivated
+    /// stays orderable instead of going silently dead. Read it through
+    /// <c>Api.Features.Catalog.BaseProductVisibility</c>, never bare.
+    /// </summary>
+    public bool HideBaseProduct { get; set; }
+
     public bool IsFeaturedSpecial { get; set; } // Is this the featured/highlighted special of the day
     public DateTime? FeaturedDate { get; set; } // Date when this was set as featured
     public int PreparationTimeMinutes { get; set; }

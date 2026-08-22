@@ -38,6 +38,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.IsSpecial)
             .HasDefaultValue(false);
 
+        builder.Property(p => p.HideBaseProduct)
+            .HasDefaultValue(false);
+
         builder.Property(p => p.PreparationTimeMinutes)
             .IsRequired();
 

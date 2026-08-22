@@ -59,4 +59,12 @@ public static class ErrorCodes
     /// them apart is the entire reason these two codes exist (frontend issue #415).
     /// </summary>
     public const string BasketItemNotFound = "BasketItemNotFound";
+
+    /// <summary>
+    /// Returned with a 400 when an add-to-basket names a product that hides its base row
+    /// (<c>Product.HideBaseProduct</c>) but chooses no variation. The client hides that option, so
+    /// reaching this means a stale tab, the waiter/POS de-select, or a crafted payload; the code is
+    /// what lets the client re-open the picker instead of showing a generic failure.
+    /// </summary>
+    public const string VariationRequired = "VariationRequired";
 }

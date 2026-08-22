@@ -129,6 +129,10 @@ public class BasketService : IBasketService
                     throw new NotFoundException("Product variation not found or unavailable");
             }
 
+            // AFTER the lookup, so an inactive/unknown variation id is still a 404 rather than
+            // being re-reported as "pick an option" — `variation` is null in both cases here.
+            BasketBaseProductGuard.EnsureVariationChosen(product, variation);
+
             // Check if item with EXACT same customizations already exists in basket.
             //
             // ROOT ROWS ONLY. Without the ParentBasketItemId filter this matched a menu bundle's

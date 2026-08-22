@@ -32,6 +32,7 @@ public static class ProductDtoMapper
             BasePrice = product.BasePrice,
             IsActive = product.IsActive,
             IsAvailable = product.IsAvailable,
+            HideBaseProduct = product.HideBaseProduct,
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = product.Type,
             KitchenType = product.KitchenType,
