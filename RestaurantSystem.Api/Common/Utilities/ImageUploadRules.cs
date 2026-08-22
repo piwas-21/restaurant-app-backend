@@ -23,9 +23,13 @@ namespace RestaurantSystem.Api.Common.Utilities;
 /// untouched rather than rejecting it. This is the cheap gate in front of that.
 /// </para>
 /// <para>
-/// <c>UploadMultipleProductImagesCommandHandler</c> keeps its own copy on purpose: it accumulates
-/// a per-file error and continues rather than returning on the first failure, so it needs the
-/// individual predicates, not this all-or-nothing answer.
+/// <c>UploadMultipleProductImagesCommandHandler</c> used to keep its own copy — the third one this
+/// class exists to prevent — on the reasoning that a bulk upload accumulates a per-file error and
+/// continues rather than returning on the first failure. It does, but that needs a reason per file,
+/// which is exactly what <c>rejection</c> is: the bulk handler now calls this per file and prefixes
+/// the answer with the file's name (Track F1b). Its copy had already drifted — the messages named
+/// the file but not the allowlist, and it read the allowlist from <c>IConfiguration</c> with its own
+/// hardcoded fallbacks instead of <see cref="FileStorageSettings"/>.
 /// </para>
 /// </remarks>
 public static class ImageUploadRules
