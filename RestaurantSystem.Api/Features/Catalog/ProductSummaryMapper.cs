@@ -36,6 +36,7 @@ public static class ProductSummaryMapper
             IsActive = product.IsActive,
             IsAvailable = product.IsAvailable,
             IsSpecial = product.IsSpecial,
+            HideBaseProduct = product.HideBaseProduct,
             Type = product.Type,
             Allergens = product.Allergens,
             Ingredients = product.Ingredients,

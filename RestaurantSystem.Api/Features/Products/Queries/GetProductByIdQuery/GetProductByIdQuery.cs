@@ -72,6 +72,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             IsActive = product.IsActive,
             IsAvailable = product.IsAvailable,
             IsSpecial = product.IsSpecial,
+            HideBaseProduct = product.HideBaseProduct,
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = product.Type,
             KitchenType = product.KitchenType,
