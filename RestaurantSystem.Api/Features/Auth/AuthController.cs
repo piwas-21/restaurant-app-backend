@@ -10,8 +10,10 @@ using RestaurantSystem.Api.Features.Auth.Commands.LoginCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.RefreshTokenCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.ResetPasswordCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.SendEmailVerificationCommand;
+using RestaurantSystem.Api.Features.Auth.Commands.SetPasswordCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.VerifyEmailCommand;
 using RestaurantSystem.Api.Features.Auth.Dtos;
+using RestaurantSystem.Api.Features.Auth.Queries.HasPasswordQuery;
 
 namespace RestaurantSystem.Api.Features.Auth;
 
@@ -54,13 +56,28 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Apple login
     /// </summary>
+    /// <remarks>
+    /// The only endpoint in this controller that answers a failure with a non-200: a rejected
+    /// Apple token is a 400 and an unconfigured/unreachable Apple is a 503, both carrying the
+    /// usual <see cref="ApiResponse{T}"/> failure body plus an <c>errorCode</c>. Deliberately not
+    /// 401 — the mobile client refreshes its session on any 401, which would turn a refused login
+    /// into a spurious logout.
+    /// </remarks>
     [HttpPost("apple-login")]
     [AllowAnonymous]
     [EnableRateLimiting("auth")]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> AppleLogin([FromBody] AppleLoginCommand command)
     {
         var result = await _mediator.SendCommand(command);
-        return Ok(result);
+
+        if (result.Success)
+        {
+            return Ok(result);
+        }
+
+        return result.ErrorCode == ErrorCodes.AppleLoginUnavailable
+            ? StatusCode(StatusCodes.Status503ServiceUnavailable, result)
+            : BadRequest(result);
     }
 
     /// <summary>
@@ -105,6 +122,36 @@ public class AuthController : ControllerBase
     [HttpPost("change-password")]
     [Authorize]
     public async Task<ActionResult<ApiResponse<string>>> ChangePassword([FromBody] ChangePasswordCommand command)
+    {
+        var result = await _mediator.SendCommand(command);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Whether the authenticated account has a password at all
+    /// </summary>
+    /// <remarks>
+    /// A Google/Apple account has none, so change-password can never succeed for it. The caller is
+    /// resolved from the bearer token; the query carries no user identifier.
+    /// </remarks>
+    [HttpGet("has-password")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> HasPassword()
+    {
+        var result = await _mediator.SendQuery(new HasPasswordQuery());
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Set a first password on a passwordless (social-login) account
+    /// </summary>
+    /// <remarks>
+    /// Refused with 400 <c>PasswordAlreadySet</c> when the account already has one — that case
+    /// belongs to change-password, which proves knowledge of the current password.
+    /// </remarks>
+    [HttpPost("set-password")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<string>>> SetPassword([FromBody] SetPasswordCommand command)
     {
         var result = await _mediator.SendCommand(command);
         return Ok(result);

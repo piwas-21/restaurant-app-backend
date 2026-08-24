@@ -65,7 +65,11 @@ public class ReservationQuickActionsController : ControllerBase
     {
         try
         {
-            var result = await _mediator.SendCommand(new CancelReservationCommand(id));
+            // EnforceOwnership: false — this link is [AllowAnonymous] and lands from the
+            // restaurant's own alert mail, so there is no caller to own anything. The route is the
+            // documented exception to the ownership default, not a hole in it (GAP-14 tracks the
+            // missing token on the link itself).
+            var result = await _mediator.SendCommand(new CancelReservationCommand(id, EnforceOwnership: false));
             if (result.Success)
             {
                 // TODO: send rejection email via EmailTemplates.ReservationRejected.

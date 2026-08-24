@@ -61,10 +61,76 @@ public static class ErrorCodes
     public const string BasketItemNotFound = "BasketItemNotFound";
 
     /// <summary>
+    /// Returned with a 404 by <c>PUT /api/Reservations/{id}/mine</c> when the reservation does not
+    /// exist, is not owned by the caller, or is a guest booking with no owner at all. One code for
+    /// all three on purpose: a distinct 403 would confirm the id exists and turn the route into an
+    /// oracle for enumerating real reservations (same argument as <c>GetOrderByIdQuery</c>). It is
+    /// also what tells that 404 apart from <see cref="ModuleNotEnabled"/> on the same path.
+    /// </summary>
+    public const string ReservationNotFound = "ReservationNotFound";
+
+    /// <summary>
+    /// Returned with a 400 by <c>PUT /api/Reservations/{id}/mine</c> when the reservation exists and
+    /// is the caller's, but its current state forbids a self-service edit: it is Cancelled,
+    /// Completed or NoShow, or the booked day is already behind the restaurant's own "today".
+    /// The client should stop offering the edit form and offer a new booking instead.
+    /// </summary>
+    public const string ReservationNotEditable = "ReservationNotEditable";
+
+    /// <summary>
+    /// Returned with a 400 by <c>PUT /api/Reservations/{id}/mine</c> when the requested new day is
+    /// before the restaurant's own "today". Distinct from <see cref="ReservationNotEditable"/>: the
+    /// reservation is editable, the submitted date is not — the client re-opens the date picker.
+    /// </summary>
+    public const string ReservationDateInPast = "ReservationDateInPast";
+
+    /// <summary>
+    /// Returned with a 400 by <c>PUT /api/Reservations/{id}/mine</c> when the new party size exceeds
+    /// the capacity of the table the reservation already sits on. Self-service never re-assigns a
+    /// table, so the client's recovery is a smaller party or a phone call — not a retry.
+    /// </summary>
+    public const string ReservationTableCapacityExceeded = "ReservationTableCapacityExceeded";
+
+    /// <summary>
+    /// Returned with a 400 by <c>PUT /api/Reservations/{id}/mine</c> when the new day/time overlaps
+    /// another live booking on the same table. The client's recovery is a different time, so it is
+    /// deliberately NOT the same code as <see cref="ReservationTableCapacityExceeded"/>.
+    /// </summary>
+    public const string ReservationSlotUnavailable = "ReservationSlotUnavailable";
+
+    /// <summary>
     /// Returned with a 400 when an add-to-basket names a product that hides its base row
     /// (<c>Product.HideBaseProduct</c>) but chooses no variation. The client hides that option, so
     /// reaching this means a stale tab, the waiter/POS de-select, or a crafted payload; the code is
     /// what lets the client re-open the picker instead of showing a generic failure.
     /// </summary>
     public const string VariationRequired = "VariationRequired";
+
+    /// <summary>
+    /// Returned with a 400 by <c>POST /api/Auth/apple-login</c> when the Apple identity token
+    /// fails verification — bad signature, wrong issuer or audience, expired, unsigned. One code
+    /// for every cause on purpose: which check failed is a server-log detail, not something to
+    /// tell an unauthenticated caller.
+    /// </summary>
+    public const string InvalidAppleToken = "InvalidAppleToken";
+
+    /// <summary>
+    /// Returned with a 503 by <c>POST /api/Auth/apple-login</c> when the refusal is OURS, not the
+    /// token's: Apple sign-in is unconfigured on this deployment, or Apple's key endpoint could
+    /// not be reached. It is what lets a client say "try again later" instead of "your Apple
+    /// account was rejected", and it is deliberately distinct from a rejected token so a
+    /// misconfigured box is visible rather than silently blaming every user.
+    /// </summary>
+    public const string AppleLoginUnavailable = "AppleLoginUnavailable";
+
+    /// <summary>
+    /// Returned with a 400 by <c>POST /api/Auth/set-password</c> when the signed-in account
+    /// ALREADY has a password. That endpoint exists only for social-login accounts, which have no
+    /// password hash to verify; letting it overwrite an existing password would hand anyone with a
+    /// stolen access token a silent takeover, since <c>change-password</c> deliberately demands the
+    /// current password. The client uses this code to switch the screen to the change-password
+    /// flow instead of showing a generic failure — and it must, because the state it encodes
+    /// ("your account already has one") is not something the user did wrong on the form.
+    /// </summary>
+    public const string PasswordAlreadySet = "PasswordAlreadySet"; // pragma: allowlist secret (an error code, not a credential)
 }

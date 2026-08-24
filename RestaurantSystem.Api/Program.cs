@@ -19,6 +19,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Swagger;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Auth.Handlers;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -136,8 +137,9 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    // Avoid schema ID collisions when two DTOs share the same class name across namespaces
-    c.CustomSchemaIds(t => t.FullName!.Replace("+", "."));
+    // Readable, namespace-free schema ids — see SwaggerSchemaIdGenerator for why the obvious
+    // t => t.Name does not generate at all (mobile feedback item 2).
+    c.CustomSchemaIds(SwaggerSchemaIdGenerator.Generate);
 });
 
 
@@ -270,6 +272,11 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+
+// Sign in with Apple (BACKEND-NOTES §4.1). Registered unconditionally, and REFUSING rather than
+// inert when Authentication:Apple:ClientIds is empty: the endpoint used to decode the identity
+// token without verifying it, so anyone could log in as any email address.
+builder.Services.AddAppleAuthentication(builder.Configuration);
 
 // Product modules this tenant bought (sofra ADR-010 / S11). The deploy repo's tenant
 // compose template maps the registry's `modules:` list onto Modules__Enabled, and
