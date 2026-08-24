@@ -49,10 +49,11 @@ Almost every response is the `ApiResponse<T>` envelope:
 
 ### 0.2 The second failure shape — `ValidationProblemDetails`
 
-Two different validation layers run, and they answer in **two different shapes**:
+Three layers can refuse a body, and between them they answer in **two different shapes**:
 
 | Layer | Where it runs | Response |
 |---|---|---|
+| JSON deserialization (`[JsonRequired]` on a DTO member) | **before** model validation | RFC 7807 `ValidationProblemDetails`, HTTP 400 — but `errors` is keyed **`"$"`**, not by field name |
 | MVC model validation (`DataAnnotations` on a DTO: `[Required]`, `[EmailAddress]`, `[MaxLength]`, `[Range]`) | during model binding, **before** the handler | RFC 7807 `ValidationProblemDetails` — `application/problem+json`, HTTP 400, with `errors` as an **object keyed by field name** |
 | FluentValidation (command validators) | inside the dispatch pipeline | the `ApiResponse` envelope of §0.1, HTTP 400 |
 
@@ -70,6 +71,24 @@ what a client sees. A client must therefore accept both shapes on a 400. Example
 
 Only `PUT /api/Reservations/{id}/mine` in this document carries DataAnnotations. The Apple and password
 endpoints validate through FluentValidation only, so they always answer with the envelope.
+
+The same route is also the only one with `[JsonRequired]` members (`reservationDate`, `startTime`,
+`endTime` — §1.1). **Omitting one of those three is refused before any field-level validation runs**, and
+the refusal names the field inside the message rather than in the key — measured, not guessed:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "$": ["JSON deserialization for type '…UpdateMyReservationDto' was missing required properties including: 'endTime'."]
+  }
+}
+```
+
+A client that reads `errors["endTime"]` will find nothing on this failure. Read `errors["$"]` too, or
+simply always send the three fields.
 
 ### 0.3 Types on the wire
 
@@ -124,9 +143,9 @@ The admin route `PUT /api/Reservations/{id}` is unchanged and stays `[Authorize(
 | `customerName` | string | yes | 1–100 chars (`[Required]`, `[MaxLength(100)]`) |
 | `customerEmail` | string | yes | valid email, ≤ 255 (`[Required]`, `[EmailAddress]`, `[MaxLength(255)]`) |
 | `customerPhone` | string \| null | no by default | ≤ 20. **May be required per tenant** — the admin form-field config (form key `Reservation`) is applied here exactly as on create |
-| `reservationDate` | string (date-time) | yes | a **calendar day at midnight**, e.g. `2030-05-17T00:00:00Z`. See §1.3 |
-| `startTime` | string `HH:mm:ss` | yes | wall-clock time on that day |
-| `endTime` | string `HH:mm:ss` | yes | must be **after** `startTime` |
+| `reservationDate` | string (date-time) | yes (`[JsonRequired]`) | a **calendar day at midnight**, e.g. `2030-05-17T00:00:00Z`. See §1.3. Omitting it is a 400, **not** a silent `0001-01-01` |
+| `startTime` | string `HH:mm:ss` | yes (`[JsonRequired]`) | wall-clock time on that day |
+| `endTime` | string `HH:mm:ss` | yes (`[JsonRequired]`) | must be **after** `startTime`. Omitting it is a 400, **not** a silent `00:00` |
 | `numberOfGuests` | int | yes | `[Range(1, 20)]`, and it must still fit the table already assigned |
 | `specialRequests` | string \| null | no by default | ≤ 1000. May be required per tenant, same mechanism as `customerPhone` |
 
@@ -176,6 +195,7 @@ of `Pending` | `Confirmed` | `Cancelled` | `Completed` | `NoShow`.
 | `400` | `ReservationSlotUnavailable` | `Table T-12 is not available for the selected time slot` | the new day/time overlaps another `Pending`/`Confirmed` booking on the same table |
 | `400` | *(none)* | the broken FluentValidation rules joined with `; ` | `endTime <= startTime`, a `reservationDate` that is not midnight, an empty required tenant form field |
 | `400` | *(no envelope)* | `ValidationProblemDetails` — see §0.2 | a DataAnnotations failure: missing or over-long `customerName`, malformed `customerEmail`, `customerPhone` over 20 chars, `numberOfGuests` outside 1–20 |
+| `400` | *(no envelope)* | `ValidationProblemDetails` with `errors` keyed **`"$"`** — see §0.2 | `reservationDate`, `startTime` or `endTime` **absent from the JSON**. They are `[JsonRequired]`, so the body never binds and the handler never runs |
 | `500` | — | `An error occurred while processing your request` | unexpected server error |
 
 **`404`, never `403`, for a booking that is not yours.** A distinct `403` would confirm that the id exists
