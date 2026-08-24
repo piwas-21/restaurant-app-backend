@@ -10,8 +10,10 @@ using RestaurantSystem.Api.Features.Auth.Commands.LoginCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.RefreshTokenCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.ResetPasswordCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.SendEmailVerificationCommand;
+using RestaurantSystem.Api.Features.Auth.Commands.SetPasswordCommand;
 using RestaurantSystem.Api.Features.Auth.Commands.VerifyEmailCommand;
 using RestaurantSystem.Api.Features.Auth.Dtos;
+using RestaurantSystem.Api.Features.Auth.Queries.HasPasswordQuery;
 
 namespace RestaurantSystem.Api.Features.Auth;
 
@@ -120,6 +122,36 @@ public class AuthController : ControllerBase
     [HttpPost("change-password")]
     [Authorize]
     public async Task<ActionResult<ApiResponse<string>>> ChangePassword([FromBody] ChangePasswordCommand command)
+    {
+        var result = await _mediator.SendCommand(command);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Whether the authenticated account has a password at all
+    /// </summary>
+    /// <remarks>
+    /// A Google/Apple account has none, so change-password can never succeed for it. The caller is
+    /// resolved from the bearer token; the query carries no user identifier.
+    /// </remarks>
+    [HttpGet("has-password")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> HasPassword()
+    {
+        var result = await _mediator.SendQuery(new HasPasswordQuery());
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Set a first password on a passwordless (social-login) account
+    /// </summary>
+    /// <remarks>
+    /// Refused with 400 <c>PasswordAlreadySet</c> when the account already has one — that case
+    /// belongs to change-password, which proves knowledge of the current password.
+    /// </remarks>
+    [HttpPost("set-password")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<string>>> SetPassword([FromBody] SetPasswordCommand command)
     {
         var result = await _mediator.SendCommand(command);
         return Ok(result);

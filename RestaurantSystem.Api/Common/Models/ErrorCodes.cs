@@ -122,4 +122,15 @@ public static class ErrorCodes
     /// misconfigured box is visible rather than silently blaming every user.
     /// </summary>
     public const string AppleLoginUnavailable = "AppleLoginUnavailable";
+
+    /// <summary>
+    /// Returned with a 400 by <c>POST /api/Auth/set-password</c> when the signed-in account
+    /// ALREADY has a password. That endpoint exists only for social-login accounts, which have no
+    /// password hash to verify; letting it overwrite an existing password would hand anyone with a
+    /// stolen access token a silent takeover, since <c>change-password</c> deliberately demands the
+    /// current password. The client uses this code to switch the screen to the change-password
+    /// flow instead of showing a generic failure — and it must, because the state it encodes
+    /// ("your account already has one") is not something the user did wrong on the form.
+    /// </summary>
+    public const string PasswordAlreadySet = "PasswordAlreadySet"; // pragma: allowlist secret (an error code, not a credential)
 }
