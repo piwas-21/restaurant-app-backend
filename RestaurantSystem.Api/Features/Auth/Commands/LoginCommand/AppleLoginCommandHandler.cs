@@ -69,7 +69,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
                     InvalidTokenError, ErrorCodes.InvalidAppleToken, "Invalid token");
         }
 
-        var email = validation.Identity!.Email;
+        var email = validation.Identity?.Email;
         if (string.IsNullOrWhiteSpace(email))
         {
             // "Hide My Email" still releases a relay address, so an absent email means the app
@@ -82,13 +82,13 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
 
         if (user is null)
         {
-            var created = await CreateUserAsync(email, request);
-            if (created.Error is not null)
+            var (createdUser, createError) = await CreateUserAsync(email, request);
+            if (createdUser is null)
             {
-                return created.Error;
+                return ApiResponse<AuthResponse>.Failure(createError, "Registration failed");
             }
 
-            user = created.User!;
+            user = createdUser;
         }
         else
         {
@@ -98,7 +98,12 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         return await IssueTokensAsync(user);
     }
 
-    private async Task<(ApplicationUser? User, ApiResponse<AuthResponse>? Error)> CreateUserAsync(
+    /// <summary>
+    /// Creates the account, or returns the reason it could not be created. The user and the error
+    /// are a pair on purpose: exactly one of them is meaningful, and the caller decides by asking
+    /// whether the user is null — so no call site needs a null-forgiving operator.
+    /// </summary>
+    private async Task<(ApplicationUser? User, string Error)> CreateUserAsync(
         string email, AppleLoginCommand request)
     {
         var user = new ApplicationUser
@@ -117,11 +122,10 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
         var result = await _userManager.CreateAsync(user);
         if (!result.Succeeded)
         {
-            return (null, ApiResponse<AuthResponse>.Failure(
-                string.Join(", ", result.Errors.Select(e => e.Description)), "Registration failed"));
+            return (null, string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
-        return (user, null);
+        return (user, string.Empty);
     }
 
     /// <summary>

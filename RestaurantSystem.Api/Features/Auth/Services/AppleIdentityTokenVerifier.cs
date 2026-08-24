@@ -54,9 +54,10 @@ public sealed class AppleIdentityTokenVerifier : IAppleIdentityTokenVerifier
             // Fail CLOSED. The previous implementation skipped the audience check when the
             // config was absent, which is exactly how "easier testing" became a way in.
             _logger.LogError(
-                "Apple sign-in is not configured: set {Section}:ClientIds and {Section}:Issuer. " +
+                "Apple sign-in is not configured: set {ClientIdsKey} and {IssuerKey}. " +
                 "Every apple-login is refused until then.",
-                AppleAuthSettings.SectionName, AppleAuthSettings.SectionName);
+                $"{AppleAuthSettings.SectionName}:ClientIds",
+                $"{AppleAuthSettings.SectionName}:Issuer");
             return AppleTokenValidationResult.Unavailable("apple sign-in is not configured");
         }
 
@@ -108,20 +109,27 @@ public sealed class AppleIdentityTokenVerifier : IAppleIdentityTokenVerifier
 
     private static AppleTokenValidationResult Describe(ClaimsIdentity? identity)
     {
-        var subject = identity?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+        // A validated token always carries an identity; guarding it here is what lets every
+        // claim read below be a plain dereference instead of a `?.` the flow already ruled out.
+        if (identity is null)
+        {
+            return AppleTokenValidationResult.Invalid("token carries no claims");
+        }
+
+        var subject = identity.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         if (string.IsNullOrWhiteSpace(subject))
         {
             return AppleTokenValidationResult.Invalid("token carries no subject");
         }
 
-        var email = identity?.FindFirst(EmailClaim)?.Value;
+        var email = identity.FindFirst(EmailClaim)?.Value;
 
         return AppleTokenValidationResult.Valid(new AppleIdentity(
             subject,
             string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
             // Apple sends this as the STRING "true" on some tokens and a real boolean on others.
-            IsTrue(identity?.FindFirst(EmailVerifiedClaim)?.Value),
-            identity?.FindFirst(NonceClaim)?.Value));
+            IsTrue(identity.FindFirst(EmailVerifiedClaim)?.Value),
+            identity.FindFirst(NonceClaim)?.Value));
     }
 
     private static bool IsTrue(string? claimValue) =>
