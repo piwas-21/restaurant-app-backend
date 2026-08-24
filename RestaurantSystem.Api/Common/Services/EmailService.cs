@@ -247,6 +247,36 @@ public class EmailService : IEmailService
         }
     }
 
+    public async Task SendReservationChangedEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, ReservationMailDetails reservation,
+        ReservationChangeOutcome outcome)
+    {
+        try
+        {
+            var brand = await _brandingProvider.GetAsync();
+            var subject = EmailTemplates.ReservationChanged.GetSubject(culture, brand);
+            var htmlBody = EmailTemplates.ReservationChanged.GetHtmlBody(
+                culture, brand, customerName, reservation, outcome, _emailSettings.AdminEmail);
+            var textBody = EmailTemplates.ReservationChanged.GetTextBody(
+                culture, brand, customerName, reservation, outcome, _emailSettings.AdminEmail);
+
+            await SendEmailAsync(customerEmail, subject, htmlBody, textBody);
+
+            // The reservation id, never the address: this line is new, and D7 says an operator log
+            // does not need a guest's email to answer "did that mail go?" — the id joins to the row
+            // that holds it. The older sends in this file still print the address (GAP-9/D7 debt).
+            _logger.LogInformation(
+                "Reservation changed email sent for reservation {ReservationId} on {Date} with outcome {Outcome}",
+                reservation.Id, reservation.Date, outcome);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex, "Failed to send reservation changed email for reservation {ReservationId}", reservation.Id);
+            throw;
+        }
+    }
+
     public async Task SendOrderReceivedEmailAsync(
         CultureInfo culture, string customerEmail, string customerName, OrderMailDetails order)
     {

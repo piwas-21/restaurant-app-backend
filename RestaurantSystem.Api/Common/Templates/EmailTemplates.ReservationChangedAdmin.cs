@@ -5,11 +5,17 @@ namespace RestaurantSystem.Api.Common.Templates;
 public static partial class EmailTemplates
 {
     /// <summary>
-    /// Reservation admin notification email template with approve/reject actions
+    /// M17 — the restaurant's alert that a guest changed a booking whose shape it had already been
+    /// asked about, carrying the same approve / reject links as the new-booking alert (M15).
     /// </summary>
-    public static class ReservationAdminNotification
+    /// <remarks>
+    /// Sent ONLY when the day, time or party size moved. A contact-detail fix sends the restaurant
+    /// nothing: it changes no decision, and an alert mail that arrives for a corrected phone number
+    /// is how the alert that matters stops being read (backend #407).
+    /// </remarks>
+    public static class ReservationChangedAdmin
     {
-        private const string Set = "ReservationAdminNotification";
+        private const string Set = "ReservationChangedAdmin";
 
         /// <summary>The mail's own title, rendered in the head, in both colour schemes and in the text body.</summary>
         private const string HeadingKey = "Heading";
@@ -18,7 +24,8 @@ public static partial class EmailTemplates
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
         public static string GetHtmlBody(
-            CultureInfo culture, EmailBranding brand, EmailGuest guest, ReservationMailDetails reservation, EmailLinks links)
+            CultureInfo culture, EmailBranding brand, EmailGuest guest, ReservationMailDetails reservation,
+            ReservationPreviousBooking previous, EmailLinks links)
         {
             var t = EmailText.For(culture, Set);
             var (customerName, customerEmail, customerPhone) = guest;
@@ -26,10 +33,9 @@ public static partial class EmailTemplates
                 reservationId, approveToken, rejectToken) = reservation;
             var (apiBaseUrl, frontendUrl, email) = links;
 
-            // Built once here rather than twice inline: the block below is rendered for both colour
-            // schemes. The token is what authorises the anonymous endpoint (backend #402) — before
-            // it, the reservation id alone was the whole authorisation, and POST /api/Reservations
-            // hands that id to the guest who made the booking.
+            // Signed, and minted for the status the booking is in now (backend #402). The buttons in
+            // the mail this one supersedes were signed over the OLD status, so they are already dead
+            // — which is what makes "the earlier email is out of date" true and not merely polite.
             var (approveUrl, rejectUrl) =
                 ReservationQuickActionUrls(apiBaseUrl, reservationId, approveToken, rejectToken);
 
@@ -38,10 +44,12 @@ public static partial class EmailTemplates
             var formattedDate = LongDate(reservationDate, culture);
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
+            var previousDate = LongDate(previous.Date, culture);
+            var previousTime = $"{previous.StartTime:hh':'mm} - {previous.EndTime:hh':'mm}";
+            var lead = previous.WasConfirmed ? t["WasConfirmed"] : t["WasPending"];
 
-            // ONE block, rendered twice: the light and dark copies differed by nothing but colour,
-            // which is the duplication `sonar.cpd.exclusions` was hiding (#356). A local function
-            // rather than a method: it reads the locals above.
+            // One block, rendered twice — the light and dark copies differ by nothing but colour
+            // (#356). A local function rather than a method: it reads the locals above.
             string Block(EmailPalette p) => $@"<!-- {p.ModeName} Mode Version -->
     <div class='{p.ModeClass}' style='max-width: 600px; margin: 0 auto; background: {p.PageBackground};'>
         <!-- Header -->
@@ -52,11 +60,19 @@ public static partial class EmailTemplates
             <!-- Reservation ID Badge -->
             {AdminReservationBadge(t, p, reservationId)}
 
+            <p style='margin: 0 0 20px 0; color: {p.StrongText}; font-size: 15px;'>{lead}</p>
+
             <!-- Customer Info -->
             {AdminCustomerCard(t, p, customerName, customerEmail, customerPhone)}
 
             <!-- Reservation Details -->
             {AdminReservationDetails(t, p, t["DetailsTitle"], formattedDate, $"{formattedStartTime} - {formattedEndTime}", t.Format("GuestCount", numberOfGuests), tableNumber)}
+
+            <!-- What it used to be -->
+            <div style='background: {p.FooterBackground}; border: 1px dashed {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 12px 0; color: {p.MutedText}; font-size: 14px; font-weight: 600;'>🕘 {t["PreviousTitle"]}</h3>
+                <p style='margin: 0; color: {p.MutedText}; font-size: 14px; text-decoration: line-through;'>{previousDate} · {previousTime} · {t.Format("GuestCount", previous.NumberOfGuests)}</p>
+            </div>
 
             {requestsSection}
 
@@ -65,6 +81,7 @@ public static partial class EmailTemplates
                 <div style='font-size: 24px; margin-bottom: 8px;'>⚠️</div>
                 <strong style='color: {p.NoticeHeading}; font-size: 16px; display: block; margin-bottom: 4px;'>{t["ActionRequired"]}</strong>
                 <p style='margin: 0; color: {p.NoticeText}; font-size: 14px;'>{t["ApproveOrReject"]}</p>
+                <p style='margin: 8px 0 0 0; color: {p.NoticeText}; font-size: 13px;'>{t["EarlierEmail"]}</p>
             </div>
 
             <!-- Action Buttons -->
@@ -77,12 +94,14 @@ public static partial class EmailTemplates
         }
 
         public static string GetTextBody(
-            CultureInfo culture, EmailBranding brand, EmailGuest guest, ReservationMailDetails reservation, string contactEmail)
+            CultureInfo culture, EmailBranding brand, EmailGuest guest, ReservationMailDetails reservation,
+            ReservationPreviousBooking previous, string contactEmail)
         {
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var (customerName, customerEmail, customerPhone) = guest;
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, reservationId, _, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests,
+                reservationId, _, _) = reservation;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"
@@ -90,9 +109,9 @@ public static partial class EmailTemplates
 {t["SpecialRequestsLabel"]}
 {specialRequests}";
 
-            var formattedDate = LongDate(reservationDate, culture);
             var formattedStartTime = startTime.ToString(@"hh\:mm");
             var formattedEndTime = endTime.ToString(@"hh\:mm");
+            var previousTime = $"{previous.StartTime:hh':'mm} - {previous.EndTime:hh':'mm}";
 
             return $@"{brand.Name} - {t[HeadingKey]}
 
@@ -100,18 +119,26 @@ public static partial class EmailTemplates
 
 {Labelled(t, t["ReservationIdLabel"], reservationId.ToString())}
 
+{(previous.WasConfirmed ? t["WasConfirmed"] : t["WasPending"])}
+
 {t["CustomerLabel"]} {customerName}
 {t["EmailLabel"]} {customerEmail}
 {t["PhoneLabel"]} {customerPhone}
 
 {Heading(t, t["DetailsTitle"])}
-{t["DateLabel"]} {formattedDate}
+{t["DateLabel"]} {LongDate(reservationDate, culture)}
 {t["TimeLabel"]} {formattedStartTime} - {formattedEndTime}
 {t["GuestsLabel"]} {t.Format("GuestCount", numberOfGuests)}
 {t["TableLabel"]} {tableNumber}{requestsSection}
 
+{Heading(t, t["PreviousTitle"])}
+{t["DateLabel"]} {LongDate(previous.Date, culture)}
+{t["TimeLabel"]} {previousTime}
+{t["GuestsLabel"]} {t.Format("GuestCount", previous.NumberOfGuests)}
+
 {t["ActionRequiredUpper"]}
 {t["ApproveOrRejectText"]}
+{t["EarlierEmail"]}
 
 {t["LogIn"]}
 

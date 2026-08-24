@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ConfirmedBody" xml:space="preserve">
+    <value>Only your contact details changed, so your table stays confirmed. There is nothing else to do.</value>
+  </data>
+  <data name="ConfirmedTitle" xml:space="preserve">
+    <value>Still confirmed</value>
+  </data>
+  <data name="ConfirmedTitleUpper" xml:space="preserve">
+    <value>STILL CONFIRMED</value>
+  </data>
+  <data name="Heading" xml:space="preserve">
+    <value>Reservation Updated</value>
+  </data>
+  <data name="Intro" xml:space="preserve">
+    <value>We have saved the changes you made to your reservation at {0}. Here is your booking as it now stands:</value>
+  </data>
+  <data name="NotYou" xml:space="preserve">
+    <value>If you did not make this change, please contact us at {0} straight away.</value>
+  </data>
+  <data name="PageTitle" xml:space="preserve">
+    <value>Reservation Updated</value>
+  </data>
+  <data name="PendingBody" xml:space="preserve">
+    <value>Your reservation is still waiting for confirmation. {0} will review your booking and we will email you as soon as they decide.</value>
+  </data>
+  <data name="PendingTitle" xml:space="preserve">
+    <value>Pending Confirmation</value>
+  </data>
+  <data name="PendingTitleUpper" xml:space="preserve">
+    <value>PENDING CONFIRMATION</value>
+  </data>
+  <data name="ReapprovalBody" xml:space="preserve">
+    <value>Your reservation was confirmed for the previous day, time and party size. Now that these have changed, it is no longer confirmed: {0} has to approve the new booking. We will email you as soon as they decide.</value>
+  </data>
+  <data name="ReapprovalTitle" xml:space="preserve">
+    <value>Waiting for confirmation again</value>
+  </data>
+  <data name="ReapprovalTitleUpper" xml:space="preserve">
+    <value>WAITING FOR CONFIRMATION AGAIN</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Your reservation was updated - {0}</value>
+  </data>
+</root>

@@ -8,25 +8,25 @@
 
 ## Release state — read this first
 
-**None of this is live yet.** Every change below sits on an **open pull request against `develop`**. The
-API reaches production only through a `develop` → `main` release, so until that release merges:
+The four audit changes below were **released to production on 2026-08-24** (release PR
+[#409](https://github.com/piwas-21/restaurant-app-backend/pull/409)). The API reaches production only
+through a `develop` → `main` release, so a change listed as *awaiting release* still answers with the
+old behaviour on production and staging.
 
-- production and staging still serve the **old** behaviour;
-- the endpoints marked "new" answer `404`;
-- the swagger document still carries the old schema ids.
-
-| Change | PR | Branch |
+| Change | PR | State |
 |---|---|---|
-| `GET /api/Auth/has-password` + `POST /api/Auth/set-password` | **#403** | `feat/auth-has-password-set-password` |
-| Readable swagger `schemaId`s | **#404** | `fix/swagger-readable-schema-ids` |
-| `PUT /api/Reservations/{id}/mine` + cancel ownership fix | **#405** | `feat/customer-update-own-reservation` |
-| Apple identity-token verification + name refresh | **#406** | `fix/apple-login-token-verification` |
-| Signed reservation quick-action email links (#402) | **#410** | `fix/signed-reservation-quick-actions` |
+| `GET /api/Auth/has-password` + `POST /api/Auth/set-password` | **#403** | released (#409) |
+| Readable swagger `schemaId`s | **#404** | released (#409) |
+| `PUT /api/Reservations/{id}/mine` + cancel ownership fix | **#405** | released (#409) |
+| Apple identity-token verification + name refresh | **#406** | released (#409) |
+| Signed reservation quick-action email links (#402) | **#410** | merged to `develop`, awaiting release |
+| Reservation-changed mails, guest + restaurant (#407) | **#411** | merged to `develop`, awaiting release |
 
-[#402](https://github.com/piwas-21/restaurant-app-backend/issues/402) was raised by the same audit and is now
-**fixed** — see [§4b](#4b-reservation-quick-action-email-links-are-signed--402).
-[#407](https://github.com/piwas-21/restaurant-app-backend/issues/407) is still **open**; see
-[§5](#5-known-gaps-that-are-not-fixed).
+Both problems the audit raised as "known holes" are now **fixed**:
+[#402](https://github.com/piwas-21/restaurant-app-backend/issues/402) — see
+[§4b](#4b-reservation-quick-action-email-links-are-signed--402) — and
+[#407](https://github.com/piwas-21/restaurant-app-backend/issues/407) — see
+[§1.2](#12-behaviour-a-client-must-handle) item 7.
 
 ---
 
@@ -224,7 +224,17 @@ the missing-reservation one.
 5. **Ownership is by `customerId`.** A booking created while signed out has no owner and stays
    uneditable through this route even when the email matches.
 6. **Concurrency: last write wins.** There is no ETag and no row version on a reservation.
-7. **No email is sent on this path — to anybody.** See [§5.1](#51-407--a-guest-edit-sends-no-mail).
+7. **Two emails leave on this path** (#407, PR #411 — awaiting release). They are sent **after** the
+   commit and are swallowed on failure: a mail that fails never turns into a failed edit, and the
+   response says nothing about them.
+   - The **guest** always gets "your reservation was updated", in the language frozen on the booking,
+     showing the booking as it now stands. It ends on one of three sentences: *still confirmed* (a
+     contact-only edit), *waiting for confirmation* (the booking was already `Pending`), or *the
+     restaurant has to approve this again* (a re-shaped `Confirmed` booking — case 1 above).
+   - The **restaurant** is alerted **only when the shape changed**. A contact-details-only edit sends it
+     nothing: no decision changed, and the alert is a request for a decision. The alert carries the same
+     **signed** approve / reject links as the new-booking alert (§4b), minted fresh for the booking's
+     current status, plus the previous day, time and party size.
 
 ### 1.3 `reservationDate` is a calendar day, and this route is strict
 
@@ -732,21 +742,21 @@ template emits a token-less link).
 
 ---
 
-## 5. Known gaps that are NOT fixed
+## 5. Known gaps — both now closed
 
-These are open. Do not build a client that assumes they are closed.
+Kept as a record of what the audit found and what answered it. Nothing in this section is open.
 
-### 5.1 #407 — a guest edit sends no mail
+### 5.1 #407 — a guest edit sends no mail — **CLOSED**
 
-`PUT /api/Reservations/{id}/mine` sends **no email, to nobody**. There is no "reservation changed"
-template for the guest and none for the restaurant, and inventing one was out of scope.
+Was: `PUT /api/Reservations/{id}/mine` sent **no email, to nobody**, so a `Confirmed` booking could drop
+back to `Pending` without the restaurant ever being told.
 
-The consequence matters for the UX: when a guest edits a **`Confirmed`** booking it drops back to
-`Pending` (§1.2.1) and **the restaurant is not told**. Staff see it only in the reservations list. A
-client must therefore say in words that the booking is waiting for approval again — the guest would
-otherwise believe the change was accepted.
+**Fixed in PR #411** (awaiting release): the guest always gets a "your reservation was updated" mail, and
+the restaurant gets a "this needs a new decision" alert whenever the day, time or party size moved. The
+exact rules are in [§1.2](#12-behaviour-a-client-must-handle) item 7.
 
-Tracked as [issue #407](https://github.com/piwas-21/restaurant-app-backend/issues/407).
+A client should **still say in words** that a re-shaped booking is waiting for approval again — the mail
+is a written record, not the UI, and it may arrive after the guest has closed the app.
 
 ---
 
