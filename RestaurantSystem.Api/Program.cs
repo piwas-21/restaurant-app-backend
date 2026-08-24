@@ -19,6 +19,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Swagger;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Auth.Handlers;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -136,8 +137,9 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    // Avoid schema ID collisions when two DTOs share the same class name across namespaces
-    c.CustomSchemaIds(t => t.FullName!.Replace("+", "."));
+    // Readable, namespace-free schema ids — see SwaggerSchemaIdGenerator for why the obvious
+    // t => t.Name does not generate at all (mobile feedback item 2).
+    c.CustomSchemaIds(SwaggerSchemaIdGenerator.Generate);
 });
 
 
