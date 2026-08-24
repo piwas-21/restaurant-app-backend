@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.Api.Features.Reservations.Dtos;
 
@@ -27,13 +28,24 @@ public record UpdateMyReservationDto
     public string? CustomerPhone { get; set; }
 
     /// <summary>The CALENDAR DAY booked — midnight, e.g. <c>2030-05-17T00:00:00Z</c>. Never an instant.</summary>
+    /// <remarks>
+    /// <c>[JsonRequired]</c>, not just <c>[Required]</c>: on a non-nullable value type
+    /// <c>[Required]</c> is satisfied by the DEFAULT, so an omitted date would bind to
+    /// <c>0001-01-01</c> and silently move the booking instead of failing. Same for the two
+    /// times below — an omitted <c>endTime</c> would otherwise read as <c>00:00</c>. The
+    /// codebase already applies <c>[JsonRequired]</c> for exactly this reason
+    /// (<c>UpdateProductPriceRequest.Price</c>, <c>SetBasketOrderTypeCommand</c>).
+    /// </remarks>
     [Required]
+    [JsonRequired]
     public DateTime ReservationDate { get; set; }
 
     [Required]
+    [JsonRequired]
     public TimeSpan StartTime { get; set; }
 
     [Required]
+    [JsonRequired]
     public TimeSpan EndTime { get; set; }
 
     [Required]
