@@ -64,9 +64,12 @@ public static class SwaggerSchemaIdGenerator
             return Generate(underlying);
         }
 
-        if (type.IsArray)
+        // `GetElementType()` is non-null for exactly the array types that reach here; asking it
+        // directly, rather than asserting it with `!`, keeps the null case a branch the compiler
+        // can see instead of a promise it has to take on trust.
+        if (type.IsArray && type.GetElementType() is { } elementType)
         {
-            return Generate(type.GetElementType()!) + ArraySuffix;
+            return Generate(elementType) + ArraySuffix;
         }
 
         // A nested type carries its declaring type so that Inner types of two different Outer
