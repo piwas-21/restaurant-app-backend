@@ -271,6 +271,11 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
+// Sign in with Apple (BACKEND-NOTES §4.1). Registered unconditionally, and REFUSING rather than
+// inert when Authentication:Apple:ClientIds is empty: the endpoint used to decode the identity
+// token without verifying it, so anyone could log in as any email address.
+builder.Services.AddAppleAuthentication(builder.Configuration);
+
 // Product modules this tenant bought (sofra ADR-010 / S11). The deploy repo's tenant
 // compose template maps the registry's `modules:` list onto Modules__Enabled, and
 // Modules__Enforce opts a tenant in; the legacy RUMI install has NEITHER, which

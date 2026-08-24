@@ -4,126 +4,192 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.Auth.Handlers;
+using RestaurantSystem.Api.Features.Auth.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.LoginCommand;
 
+/// <summary>
+/// Signs a user in from a VERIFIED Apple identity token. Verification itself is
+/// <see cref="IAppleIdentityTokenVerifier"/>'s job; nothing here reads a claim the validator
+/// has not vouched for (BACKEND-NOTES §4.1).
+/// </summary>
 public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiResponse<AuthResponse>>
 {
+    /// <summary>
+    /// What an account gets called when Apple released no name — which is every login after an
+    /// Apple ID's FIRST authorisation. Kept rather than left empty on purpose: an empty name
+    /// fails <c>UpdateUserProfileCommandValidator</c>, so a nameless account could not save an
+    /// unrelated profile change (phone, language) without inventing a name first.
+    /// </summary>
+    private const string PlaceholderFirstName = "Apple";
+    private const string PlaceholderLastName = "User";
+
+    /// <summary>One message for every rejected token — the reason goes to the log, not the wire.</summary>
+    private const string InvalidTokenError = "The provided Apple token is invalid.";
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
-    private readonly IConfiguration _configuration;
+    private readonly IAppleIdentityTokenVerifier _tokenVerifier;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<AppleLoginCommandHandler> _logger;
 
     public AppleLoginCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
-        IConfiguration configuration,
+        IAppleIdentityTokenVerifier tokenVerifier,
         LoginEventHandler loginEventHandler,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<AppleLoginCommandHandler> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
-        _configuration = configuration;
+        _tokenVerifier = tokenVerifier;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<AuthResponse>> Handle(AppleLoginCommand request, CancellationToken cancellationToken)
     {
-        try
+        ArgumentNullException.ThrowIfNull(request);
+
+        var validation = await _tokenVerifier.ValidateAsync(request.IdToken, cancellationToken);
+
+        if (!validation.IsValid)
         {
-            // In a production environment, you MUST verify the Apple ID token signature and claims.
-            // For this implementation, we will decode the token to get the email and subject.
-            // You should use a library or manual validation against Apple's public keys.
-
-            var handler = new JwtSecurityTokenHandler();
-            var jsonToken = handler.ReadToken(request.IdToken) as JwtSecurityToken;
-
-            if (jsonToken == null)
-            {
-                return ApiResponse<AuthResponse>.Failure("Invalid token", "The provided Apple token is invalid.");
-            }
-
-            // Verify audience (Client ID)
-            var clientId = _configuration["Authentication:Apple:ClientId"];
-            if (!jsonToken.Audiences.Contains(clientId))
-            {
-                // return ApiResponse<AuthResponse>.Failure("Invalid token", "The token audience does not match.");
-                // Commented out for now to allow easier testing if config is missing
-            }
-
-            var email = jsonToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
-
-            if (string.IsNullOrEmpty(email))
-            {
-                // Apple might not return email on subsequent logins if the user chose "Hide My Email"
-                // In that case, you should rely on 'sub' (Subject) to identify the user.
-                // For this simplified implementation, we require email or we need to look up by 'sub' if we stored it.
-
-                // TODO: Implement lookup by 'sub' (Apple User ID) if email is missing.
-                // For now, we will fail if email is missing, but in reality, we should check if we have a user with this 'sub'.
-
-                // Let's try to find user by a custom claim or just fail for now.
-                return ApiResponse<AuthResponse>.Failure("Email missing", "Could not retrieve email from Apple token.");
-            }
-
-            var user = await _userManager.FindByEmailAsync(email);
-
-            if (user == null)
-            {
-                user = new ApplicationUser
-                {
-                    UserName = email,
-                    Email = email,
-                    FirstName = request.FirstName ?? "Apple",
-                    LastName = request.LastName ?? "User",
-                    EmailConfirmed = true,
-                    Role = UserRole.Customer,
-                    CreatedBy = "AppleAuth",
-                    RefreshToken = string.Empty, // Will be set later
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                var result = await _userManager.CreateAsync(user);
-                if (!result.Succeeded)
-                {
-                    return ApiResponse<AuthResponse>.Failure("Registration failed", string.Join(", ", result.Errors.Select(e => e.Description)));
-                }
-            }
-
-            var token = _tokenService.GenerateAccessToken(user);
-            var rawRefreshToken = _tokenService.GenerateRefreshToken();
-
-            user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-            user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-            await _userManager.UpdateAsync(user);
-
-            // Merge anonymous basket if session ID exists
-            var sessionId = _httpContextAccessor.HttpContext?.Request.Headers["X-Session-Id"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(sessionId))
-            {
-                await _loginEventHandler.HandleUserLogin(user.Id, sessionId);
-            }
-
-            return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
-            {
-                AccessToken = token,
-                RefreshToken = rawRefreshToken,
-                Email = user.Email!,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Role = user.Role,
-                UserId = user.Id,
-                Expiration = _tokenService.GetAccessTokenExpiration()
-            });
+            return validation.IsUnavailable
+                ? ApiResponse<AuthResponse>.FailureWithCode(
+                    "Apple sign-in is temporarily unavailable.",
+                    ErrorCodes.AppleLoginUnavailable,
+                    "Apple login unavailable")
+                : ApiResponse<AuthResponse>.FailureWithCode(
+                    InvalidTokenError, ErrorCodes.InvalidAppleToken, "Invalid token");
         }
-        catch (Exception ex)
+
+        var email = validation.Identity!.Email;
+        if (string.IsNullOrWhiteSpace(email))
         {
-            return ApiResponse<AuthResponse>.Failure("Login failed", ex.Message);
+            // "Hide My Email" still releases a relay address, so an absent email means the app
+            // asked for no email scope. There is no `sub` column to look the account up by yet.
+            return ApiResponse<AuthResponse>.Failure(
+                "Could not retrieve email from Apple token.", "Email missing");
+        }
+
+        var user = await _userManager.FindByEmailAsync(email);
+
+        if (user is null)
+        {
+            var created = await CreateUserAsync(email, request);
+            if (created.Error is not null)
+            {
+                return created.Error;
+            }
+
+            user = created.User!;
+        }
+        else
+        {
+            await RefreshNameAsync(user, request);
+        }
+
+        return await IssueTokensAsync(user);
+    }
+
+    private async Task<(ApplicationUser? User, ApiResponse<AuthResponse>? Error)> CreateUserAsync(
+        string email, AppleLoginCommand request)
+    {
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            FirstName = Clean(request.FirstName) ?? PlaceholderFirstName,
+            LastName = Clean(request.LastName) ?? PlaceholderLastName,
+            EmailConfirmed = true,
+            Role = UserRole.Customer,
+            CreatedBy = "AppleAuth",
+            RefreshToken = string.Empty, // Will be set later
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var result = await _userManager.CreateAsync(user);
+        if (!result.Succeeded)
+        {
+            return (null, ApiResponse<AuthResponse>.Failure(
+                string.Join(", ", result.Errors.Select(e => e.Description)), "Registration failed"));
+        }
+
+        return (user, null);
+    }
+
+    /// <summary>
+    /// BACKEND-NOTES §4.2. Apple hands over <c>fullName</c> only on an Apple ID's FIRST
+    /// authorisation, so an account created without one stayed "Apple User" forever. An
+    /// incoming non-empty name now wins over what is stored.
+    /// </summary>
+    private async Task RefreshNameAsync(ApplicationUser user, AppleLoginCommand request)
+    {
+        var firstName = Clean(request.FirstName);
+        var lastName = Clean(request.LastName);
+
+        var changed = false;
+
+        if (firstName is not null && !string.Equals(user.FirstName, firstName, StringComparison.Ordinal))
+        {
+            user.FirstName = firstName;
+            changed = true;
+        }
+
+        if (lastName is not null && !string.Equals(user.LastName, lastName, StringComparison.Ordinal))
+        {
+            user.LastName = lastName;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                // Never fail a sign-in over a cosmetic field.
+                _logger.LogWarning("Could not refresh the Apple name for {UserId}: {Errors}",
+                    user.Id, string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
         }
     }
+
+    private async Task<ApiResponse<AuthResponse>> IssueTokensAsync(ApplicationUser user)
+    {
+        var token = _tokenService.GenerateAccessToken(user);
+        var rawRefreshToken = _tokenService.GenerateRefreshToken();
+
+        user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
+        user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
+        await _userManager.UpdateAsync(user);
+
+        // Merge anonymous basket if session ID exists
+        var sessionId = _httpContextAccessor.HttpContext?.Request.Headers["X-Session-Id"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            await _loginEventHandler.HandleUserLogin(user.Id, sessionId);
+        }
+
+        return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
+        {
+            AccessToken = token,
+            RefreshToken = rawRefreshToken,
+            Email = user.Email!,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Role = user.Role,
+            UserId = user.Id,
+            Expiration = _tokenService.GetAccessTokenExpiration()
+        });
+    }
+
+    /// <summary>Trimmed name, or null when the client sent nothing usable.</summary>
+    private static string? Clean(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

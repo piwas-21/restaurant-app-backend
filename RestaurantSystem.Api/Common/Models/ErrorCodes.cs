@@ -67,4 +67,21 @@ public static class ErrorCodes
     /// what lets the client re-open the picker instead of showing a generic failure.
     /// </summary>
     public const string VariationRequired = "VariationRequired";
+
+    /// <summary>
+    /// Returned with a 400 by <c>POST /api/Auth/apple-login</c> when the Apple identity token
+    /// fails verification — bad signature, wrong issuer or audience, expired, unsigned. One code
+    /// for every cause on purpose: which check failed is a server-log detail, not something to
+    /// tell an unauthenticated caller.
+    /// </summary>
+    public const string InvalidAppleToken = "InvalidAppleToken";
+
+    /// <summary>
+    /// Returned with a 503 by <c>POST /api/Auth/apple-login</c> when the refusal is OURS, not the
+    /// token's: Apple sign-in is unconfigured on this deployment, or Apple's key endpoint could
+    /// not be reached. It is what lets a client say "try again later" instead of "your Apple
+    /// account was rejected", and it is deliberately distinct from a rejected token so a
+    /// misconfigured box is visible rather than silently blaming every user.
+    /// </summary>
+    public const string AppleLoginUnavailable = "AppleLoginUnavailable";
 }
