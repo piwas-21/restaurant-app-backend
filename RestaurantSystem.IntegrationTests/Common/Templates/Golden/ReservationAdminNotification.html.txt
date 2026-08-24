@@ -90,11 +90,11 @@
 
             <!-- Action Buttons -->
             <div style='text-align: center; margin: 24px 0;'>
-                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-approve' style='display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); margin: 0 8px 12px 8px;'>✓ Approve Reservation</a>
+                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-approve?token=approve-token-fixture' style='display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3); margin: 0 8px 12px 8px;'>✓ Approve Reservation</a>
             </div>
 
             <div style='text-align: center; margin: 24px 0;'>
-                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-reject' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);'>✕ Reject Reservation</a>
+                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-reject?token=reject-token-fixture' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);'>✕ Reject Reservation</a>
             </div>
 
             <p style='text-align: center; margin: 20px 0; padding: 16px; background: #f3f4f6; border-radius: 8px; font-size: 13px; color: #6b7280;'>
@@ -186,11 +186,11 @@
 
             <!-- Action Buttons -->
             <div style='text-align: center; margin: 24px 0;'>
-                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-approve' style='display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(5, 150, 105, 0.4); margin: 0 8px 12px 8px;'>✓ Approve Reservation</a>
+                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-approve?token=approve-token-fixture' style='display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(5, 150, 105, 0.4); margin: 0 8px 12px 8px;'>✓ Approve Reservation</a>
             </div>
 
             <div style='text-align: center; margin: 24px 0;'>
-                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-reject' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.4);'>✕ Reject Reservation</a>
+                <a href='https://api.demo.test/api/Reservations/11111111-2222-3333-4444-555555555555/quick-reject?token=reject-token-fixture' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.4);'>✕ Reject Reservation</a>
             </div>
 
             <p style='text-align: center; margin: 20px 0; padding: 16px; background: #374151; border-radius: 8px; font-size: 13px; color: #9ca3af;'>

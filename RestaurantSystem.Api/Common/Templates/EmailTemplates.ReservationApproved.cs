@@ -18,7 +18,7 @@ public static partial class EmailTemplates
             CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation,
             string contactEmail, string? notes = null)
         {
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _, _, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
@@ -98,7 +98,7 @@ public static partial class EmailTemplates
             CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation,
             string contactEmail, string? notes = null)
         {
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _, _, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)

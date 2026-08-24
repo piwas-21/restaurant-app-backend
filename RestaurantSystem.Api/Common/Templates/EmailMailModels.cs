@@ -68,6 +68,13 @@ public sealed record OrderMailDetails(
 /// guest's own mails have no use for it, and a guest call site passing <c>Guid.Empty</c> to satisfy
 /// a signature is exactly the noise a parameter object is supposed to remove.
 /// </param>
+/// <param name="ApproveToken">
+/// Signature authorising the operator's quick-APPROVE link (backend #402). Minted per mail by
+/// <c>IReservationQuickActionLinks</c>; null on the guest's own mails, which carry no such button.
+/// A button rendered without one lands on "this link can no longer be used" — which is the
+/// intended outcome, since only the alert mail has a button at all.
+/// </param>
+/// <param name="RejectToken">The same, for the quick-REJECT link. Separate because the action is signed.</param>
 public sealed record ReservationMailDetails(
     DateTime Date,
     TimeSpan StartTime,
@@ -75,4 +82,6 @@ public sealed record ReservationMailDetails(
     int NumberOfGuests,
     string TableNumber,
     string? SpecialRequests = null,
-    Guid Id = default);
+    Guid Id = default,
+    string? ApproveToken = null,
+    string? RejectToken = null);
