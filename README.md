@@ -28,7 +28,7 @@ RestaurantSystem.Api/             # Controllers, CQRS handlers, Features
 RestaurantSystem.Domain/          # Pure domain entities + enums (no EF, no ASP.NET)
 RestaurantSystem.Infrastructure/  # EF Core, persistence, migrations
 RestaurantSystem.IntegrationTests/  # xUnit integration tests
-docs/                             # SPRINT-PLAN, ADRs, security audit, dev guidelines
+docs/                             # SPRINT-PLAN, ADRs, API contracts, security audit, dev guidelines
 scripts/                          # Local dev orchestration
 .gitlab/                          # MR templates, CI templates
 ```
@@ -124,4 +124,5 @@ a hand-written `gitleaks.toml` (default config + `.secrets.baseline` cover it), 
 | [docs/DEVELOPMENT-GUIDELINES.md](docs/DEVELOPMENT-GUIDELINES.md) | Coding conventions |
 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) | Security findings + status |
 | [docs/TEST-COVERAGE-PLAN.md](docs/TEST-COVERAGE-PLAN.md) | Test strategy |
+| [docs/api/mobile-client-contracts.md](docs/api/mobile-client-contracts.md) | API contracts for mobile/web clients: reservation self-update, `has-password`/`set-password`, Apple sign-in, swagger schema ids |
 | [docs/adr/](docs/adr/) | Architecture Decision Records |
