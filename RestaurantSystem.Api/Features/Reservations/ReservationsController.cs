@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.Reservations.Commands.CancelReservationComma
 using RestaurantSystem.Api.Features.Reservations.Commands.ConfirmReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.CreateReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.DeleteReservationCommand;
+using RestaurantSystem.Api.Features.Reservations.Commands.UpdateMyReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.UpdateReservationCommand;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Api.Features.Reservations.Queries.GetAvailableTimeSlotsQuery;
@@ -90,11 +91,30 @@ public class ReservationsController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    /// <summary>The signed-in guest edits their OWN booking — no status, no table, no admin notes.</summary>
+    /// <remarks>
+    /// Separate from the admin <c>PUT /api/Reservations/{id}</c> on purpose: that route's DTO
+    /// REQUIRES <c>Status</c> and <c>TableId</c>, so opening it to customers would let them confirm
+    /// their own booking and move themselves onto any table (mobile BACKEND-NOTES item 1). The
+    /// caller is resolved from the token inside the handler and is never taken from the request.
+    /// </remarks>
+    [HttpPut("{id:guid}/mine")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<ReservationDto>>> UpdateMyReservation(
+        Guid id, [FromBody] UpdateMyReservationDto reservationData)
+    {
+        // No Success check: every refusal on this path is an exception carrying its own status and
+        // ErrorCode (404 / 400), so a returned response is always the success one.
+        return Ok(await _mediator.SendCommand(new UpdateMyReservationCommand(id, reservationData)));
+    }
+
     [HttpPost("{id}/cancel")]
     [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> CancelReservation(Guid id)
     {
-        // TODO: enforce non-admins can only cancel their own reservations.
+        // Ownership is enforced inside the handler (EnforceOwnership defaults to true), so the
+        // caller cannot be spoofed from the route and the anonymous email link stays the only
+        // opt-out. It used to be enforced NOWHERE: any signed-in customer could cancel any booking.
         var result = await _mediator.SendCommand(new CancelReservationCommand(id));
         return result.Success ? Ok(result) : BadRequest(result);
     }
