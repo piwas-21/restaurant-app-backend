@@ -21,7 +21,7 @@ API reaches production only through a `develop` → `main` release, so until tha
 | Readable swagger `schemaId`s | **#404** | `fix/swagger-readable-schema-ids` |
 | `PUT /api/Reservations/{id}/mine` + cancel ownership fix | **#405** | `feat/customer-update-own-reservation` |
 | Apple identity-token verification + name refresh | **#406** | `fix/apple-login-token-verification` |
-| Signed reservation quick-action email links (#402) | **#409** | `fix/signed-reservation-quick-actions` |
+| Signed reservation quick-action email links (#402) | **#410** | `fix/signed-reservation-quick-actions` |
 
 [#402](https://github.com/piwas-21/restaurant-app-backend/issues/402) was raised by the same audit and is now
 **fixed** — see [§4b](#4b-reservation-quick-action-email-links-are-signed--402).
