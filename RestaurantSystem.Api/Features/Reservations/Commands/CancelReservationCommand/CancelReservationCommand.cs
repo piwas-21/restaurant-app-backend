@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
@@ -6,15 +7,30 @@ using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Reservations.Commands.CancelReservationCommand;
 
-public record CancelReservationCommand(Guid ReservationId) : ICommand<ApiResponse<bool>>;
+/// <param name="ReservationId">Reservation to cancel.</param>
+/// <param name="EnforceOwnership">
+/// When true (the default, and the only value a user-facing route may use), a non-staff caller may
+/// cancel only a reservation they own; everyone else gets the not-found response. Set to false ONLY
+/// for the [AllowAnonymous] quick-reject link the restaurant's own alert mail carries, which has no
+/// caller at all. Defaulting to true keeps a new route secure unless it explicitly opts out.
+/// [BindNever] on both the parameter and the property so a future [FromQuery]/[FromBody] binding
+/// cannot reopen this from the wire (same guard as GetOrderByIdQuery).
+/// </param>
+public record CancelReservationCommand(
+    Guid ReservationId,
+    [BindNever][property: BindNever] bool EnforceOwnership = true) : ICommand<ApiResponse<bool>>;
 
 public class CancelReservationCommandHandler : ICommandHandler<CancelReservationCommand, ApiResponse<bool>>
 {
+    private const string NotFoundMessage = "Reservation not found";
+
     private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
     private readonly IEmailService _emailService;
     private readonly IEmailBrandingProvider _brandingProvider;
     private readonly IEmailLanguageResolver _languages;
@@ -23,6 +39,7 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 
     public CancelReservationCommandHandler(
         ApplicationDbContext context,
+        ICurrentUserService currentUser,
         IEmailService emailService,
         IEmailBrandingProvider brandingProvider,
         IEmailLanguageResolver languages,
@@ -30,12 +47,20 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
         ILogger<CancelReservationCommandHandler> logger)
     {
         _context = context;
+        _currentUser = currentUser;
         _emailService = emailService;
         _brandingProvider = brandingProvider;
         _languages = languages;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
+
+    // Staff cancel any booking; a customer cancels only their own. Guest reservations
+    // (CustomerId == null) are deliberately unreachable: matching a null owner against a null
+    // caller would hand every guest booking to any signed-in user.
+    private bool CanCurrentUserCancel(Reservation reservation) =>
+        _currentUser.IsStaff
+        || (_currentUser.UserId.HasValue && reservation.CustomerId == _currentUser.UserId.Value);
 
     public async Task<ApiResponse<bool>> Handle(CancelReservationCommand command, CancellationToken cancellationToken)
     {
@@ -46,7 +71,18 @@ public class CancelReservationCommandHandler : ICommandHandler<CancelReservation
 
             if (reservation == null)
             {
-                return ApiResponse<bool>.Failure("Reservation not found");
+                return ApiResponse<bool>.Failure(NotFoundMessage);
+            }
+
+            if (command.EnforceOwnership && !CanCurrentUserCancel(reservation))
+            {
+                // Word for word the missing-reservation answer, on purpose: a distinct 403 would
+                // confirm the id exists and let anyone enumerate other guests' bookings. The real
+                // reason is recorded server-side only.
+                _logger.LogWarning(
+                    "User {UserId} denied cancellation of reservation {ReservationId} they do not own; responding as not-found",
+                    _currentUser.UserId, command.ReservationId);
+                return ApiResponse<bool>.Failure(NotFoundMessage);
             }
 
             if (reservation.Status == ReservationStatus.Cancelled)
