@@ -1,0 +1,56 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Reservation Updated</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #d4af37; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px 20px; background: #f9f9f9; }
+        .info-box { background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #d4af37; }
+        .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+        .pending { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .confirmed { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>🍽️ Demo Restaurant</h1>
+        </div>
+        <div class='content'>
+            <h2>✏️ Reservation Updated</h2>
+            <p>Dear Jane Doe,</p>
+            <p>We have saved the changes you made to your reservation at Demo Restaurant. Here is your booking as it now stands:</p>
+
+            <div class='info-box'>
+                <strong>📅 Date:</strong> Friday, May 17, 2030<br>
+                <strong>🕐 Time:</strong> 19:30 - 21:00<br>
+                <strong>👥 Guests:</strong> 4<br>
+                <strong>🪑 Table:</strong> T12
+            </div>
+
+            <div class='info-box'>
+                        <strong>Special Requests:</strong><br>
+                        Window seat
+                    </div>
+
+            <div class='pending'>
+                <strong>⏳ Waiting for confirmation again</strong><br>
+                Your reservation was confirmed for the previous day, time and party size. Now that these have changed, it is no longer confirmed: Demo Restaurant has to approve the new booking. We will email you as soon as they decide.
+            </div>
+
+            <p>If you did not make this change, please contact us at admin@demo.test straight away.</p>
+            <p>We look forward to serving you!</p>
+            <p>Best regards,<br>Demo Restaurant Team</p>
+        </div>
+        <div class='footer'>
+            <p>Demo Restaurant | Geneva | admin@demo.test</p>
+            <p>© {YEAR} Demo Restaurant. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

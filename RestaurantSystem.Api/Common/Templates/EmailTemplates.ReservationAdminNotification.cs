@@ -30,16 +30,10 @@ public static partial class EmailTemplates
             // schemes. The token is what authorises the anonymous endpoint (backend #402) — before
             // it, the reservation id alone was the whole authorisation, and POST /api/Reservations
             // hands that id to the guest who made the booking.
-            var linkBase = $"{apiBaseUrl}/api/Reservations/{reservationId}";
-            var approveUrl = $"{linkBase}/quick-approve?token={Uri.EscapeDataString(approveToken ?? string.Empty)}";
-            var rejectUrl = $"{linkBase}/quick-reject?token={Uri.EscapeDataString(rejectToken ?? string.Empty)}";
+            var (approveUrl, rejectUrl) =
+                ReservationQuickActionUrls(apiBaseUrl, reservationId, approveToken, rejectToken);
 
-            var requestsSection = string.IsNullOrEmpty(specialRequests)
-                ? ""
-                : $@"<div style='background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 8px;'>
-                        <strong style='color: #92400e; font-size: 14px;'>📝 {t["SpecialRequestsLabel"]}</strong><br>
-                        <span style='color: #78350f; margin-top: 8px; display: block; white-space: pre-line;'>{EmailHtml.Encode(specialRequests)}</span>
-                    </div>";
+            var requestsSection = AdminGuestNote(t["SpecialRequestsLabel"], specialRequests);
 
             var formattedDate = LongDate(reservationDate, culture);
             var formattedStartTime = startTime.ToString(@"hh\:mm");
@@ -51,44 +45,18 @@ public static partial class EmailTemplates
             string Block(EmailPalette p) => $@"<!-- {p.ModeName} Mode Version -->
     <div class='{p.ModeClass}' style='max-width: 600px; margin: 0 auto; background: {p.PageBackground};'>
         <!-- Header -->
-        <div style='background: linear-gradient(135deg, {p.HeaderGradientFrom} 0%, {p.HeaderGradientTo} 100%); padding: 32px 24px; text-align: center;'>
-            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{t[HeadingKey]}</p>
-        </div>
+        {AdminMailHeader(brand, p, t[HeadingKey])}
 
         <!-- Content -->
         <div style='padding: 32px 24px;'>
             <!-- Reservation ID Badge -->
-            <div style='background: linear-gradient(135deg, {p.ReservationBadgeGradientFrom} 0%, {p.ReservationBadgeGradientTo} 100%); color: white; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 6px {p.ReservationBadgeShadow};'>
-                <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>{t["ReservationIdLabel"]}</div>
-                <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>{reservationId}</div>
-            </div>
+            {AdminReservationBadge(t, p, reservationId)}
 
             <!-- Customer Info -->
             {AdminCustomerCard(t, p, customerName, customerEmail, customerPhone)}
 
             <!-- Reservation Details -->
-            <div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: {p.StrongText}; font-size: 16px; font-weight: 600;'>📅 {t["DetailsTitle"]}</h3>
-                <table style='width: 100%; border-collapse: collapse;'>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px; width: 80px;'>{t["DateLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{formattedDate}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["TimeLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{formattedStartTime} - {formattedEndTime}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["GuestsLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{t.Format("GuestCount", numberOfGuests)}</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["TableLabel"]}</td>
-                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
-                    </tr>
-                </table>
-            </div>
+            {AdminReservationDetails(t, p, t["DetailsTitle"], formattedDate, $"{formattedStartTime} - {formattedEndTime}", t.Format("GuestCount", numberOfGuests), tableNumber)}
 
             {requestsSection}
 
@@ -100,42 +68,12 @@ public static partial class EmailTemplates
             </div>
 
             <!-- Action Buttons -->
-            <div style='text-align: center; margin: 24px 0;'>
-                <a href='{approveUrl}' style='display: inline-block; background: linear-gradient(135deg, {p.ConfirmGradientFrom} 0%, {p.ConfirmGradientTo} 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px {p.ConfirmButtonShadow}; margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
-            </div>
-
-            <div style='text-align: center; margin: 24px 0;'>
-                <a href='{rejectUrl}' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px {p.CancelButtonShadow};'>✕ {t["RejectButton"]}</a>
-            </div>
+            {ReservationQuickActions(t, p, approveUrl, rejectUrl)}
 
             {AdminFooter(t, p, brand, email, frontendUrl, "/admin/reservations")}
     </div>";
 
-            return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <meta name='color-scheme' content='light dark'>
-    <title>{t[HeadingKey]}</title>
-    <style>
-        @media (prefers-color-scheme: dark) {{
-            .light-only {{ display: none !important; }}
-            .dark-only {{ display: block !important; }}
-        }}
-        @media (prefers-color-scheme: light) {{
-            .dark-only {{ display: none !important; }}
-            .light-only {{ display: block !important; }}
-        }}
-    </style>
-</head>
-<body style='margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; line-height: 1.6; background-color: #f3f4f6;'>
-    {Block(EmailPalette.Light)}
-
-    {Block(EmailPalette.Dark)}
-</body>
-</html>";
+            return DualSchemeDocument(t[HeadingKey], Block);
         }
 
         public static string GetTextBody(

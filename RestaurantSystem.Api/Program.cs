@@ -569,6 +569,8 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Reservations.Service
     RestaurantSystem.Api.Features.Reservations.Services.ReservationQuickActionLinks>();
 builder.Services.AddSingleton<RestaurantSystem.Api.Features.Reservations.Services.IReservationQuickActionPages,
     RestaurantSystem.Api.Features.Reservations.Services.ReservationQuickActionPages>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationChangedMailer,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationChangedMailer>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();

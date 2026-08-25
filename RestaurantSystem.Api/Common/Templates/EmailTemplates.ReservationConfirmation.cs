@@ -27,30 +27,7 @@ public static partial class EmailTemplates
                         {EmailHtml.Encode(specialRequests)}
                     </div>";
 
-            return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>{t["PageTitle"]}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #d4af37; color: white; padding: 20px; text-align: center; }}
-        .content {{ padding: 30px 20px; background: #f9f9f9; }}
-        .info-box {{ background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #d4af37; }}
-        .footer {{ padding: 20px; text-align: center; color: #666; font-size: 12px; }}
-        .pending {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-    </style>
-</head>
-<body>
-    <div class='container'>
-        <div class='header'>
-            <h1>🍽️ {brand.Name}</h1>
-        </div>
-        <div class='content'>
-            <h2>{t["Heading"]}</h2>
+            var content = $@"<h2>{t["Heading"]}</h2>
             <p>{Greeting(t, "Dear", customerName, encode: true)}</p>
             <p>{t.Format("ThankYou", brand.Name)}</p>
 
@@ -70,15 +47,11 @@ public static partial class EmailTemplates
 
             <p>{t.Format("Contact", email)}</p>
             <p>{t["LookForward"]}</p>
-            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
-        </div>
-        <div class='footer'>
-            <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>{Copyright(t, brand)}</p>
-        </div>
-    </div>
-</body>
-</html>";
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>";
+
+            return GuestMailDocument(
+                t, brand, t["PageTitle"], "#d4af37",
+                @".pending { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }", content, email);
         }
 
         public static string GetTextBody(
