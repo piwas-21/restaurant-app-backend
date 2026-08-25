@@ -1,0 +1,37 @@
+Demo Restaurant - A booking changed and needs a new decision
+
+📅 A BOOKING CHANGED AND NEEDS A NEW DECISION
+
+Reservation ID: 11111111-2222-3333-4444-555555555555
+
+You had already approved this reservation. The guest changed the day, time or party size, so it is pending again and needs your decision.
+
+Customer: Jane Doe
+Email: jane@demo.test
+Phone: +41000000
+
+New Reservation Details:
+Date: Friday, May 17, 2030
+Time: 19:30 - 21:00
+Guests: 4 people
+Table: T12
+
+Special Requests:
+Window seat
+
+Previously booked:
+Date: Thursday, May 16, 2030
+Time: 18:00 - 20:00
+Guests: 2 people
+
+ACTION REQUIRED:
+Please approve or reject the changed reservation.
+The earlier email about this booking is out of date: its buttons now decide these new details.
+
+Log in to your admin dashboard to manage this reservation.
+
+Best regards,
+Demo Restaurant
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

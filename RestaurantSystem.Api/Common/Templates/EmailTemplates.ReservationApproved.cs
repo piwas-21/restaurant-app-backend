@@ -18,7 +18,7 @@ public static partial class EmailTemplates
             CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation,
             string contactEmail, string? notes = null)
         {
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _, _, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
@@ -35,30 +35,7 @@ public static partial class EmailTemplates
                         {EmailHtml.Encode(notes)}
                     </div>";
 
-            return $@"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>{t["Heading"]}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #27ae60; color: white; padding: 20px; text-align: center; }}
-        .content {{ padding: 30px 20px; background: #f9f9f9; }}
-        .info-box {{ background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #27ae60; }}
-        .footer {{ padding: 20px; text-align: center; color: #666; font-size: 12px; }}
-        .confirmed {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center; }}
-    </style>
-</head>
-<body>
-    <div class='container'>
-        <div class='header'>
-            <h1>🍽️ {brand.Name}</h1>
-        </div>
-        <div class='content'>
-            <div class='confirmed'>
+            var content = $@"<div class='confirmed'>
                 <h2 style='margin: 0; color: #27ae60;'>✅ {t["Confirmed"]}</h2>
             </div>
 
@@ -83,22 +60,18 @@ public static partial class EmailTemplates
             </ul>
 
             <p>{t["LookForwardWelcoming"]}</p>
-            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>
-        </div>
-        <div class='footer'>
-            <p>{brand.Name} | {brand.City} | {email}</p>
-            <p>{Copyright(t, brand)}</p>
-        </div>
-    </div>
-</body>
-</html>";
+            <p>{t["BestRegards"]}<br>{t.Format("BrandTeam", brand.Name)}</p>";
+
+            return GuestMailDocument(
+                t, brand, t["Heading"], "#27ae60",
+                @".confirmed { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center; }", content, email);
         }
 
         public static string GetTextBody(
             CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation,
             string contactEmail, string? notes = null)
         {
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _, _, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)

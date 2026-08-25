@@ -1,0 +1,26 @@
+Demo Restaurant - Reservation Updated
+
+Dear Jane Doe,
+
+We have saved the changes you made to your reservation at Demo Restaurant. Here is your booking as it now stands:
+
+Date: Friday, May 17, 2030
+Time: 19:30 - 21:00
+Guests: 4
+Table: T12
+
+Special Requests:
+Window seat
+
+WAITING FOR CONFIRMATION AGAIN
+Your reservation was confirmed for the previous day, time and party size. Now that these have changed, it is no longer confirmed: Demo Restaurant has to approve the new booking. We will email you as soon as they decide.
+
+If you did not make this change, please contact us at admin@demo.test straight away.
+
+We look forward to serving you!
+
+Best regards,
+Demo Restaurant Team
+
+Demo Restaurant | Geneva | admin@demo.test
+© {YEAR} Demo Restaurant. All rights reserved.

@@ -169,6 +169,193 @@ public static partial class EmailTemplates
         </div>";
 
     /// <summary>
+    /// The document a GUEST reservation mail is posted in: the same head, the same 600px card, the
+    /// same header band and the same footer, four times over (received, approved, changed,
+    /// rejected). Only the accent colour, one extra CSS rule and the middle differ.
+    /// </summary>
+    /// <param name="accent">The card's header background and the info-box rule — one colour, two uses.</param>
+    /// <param name="statusBoxCss">
+    /// The one status-box rule this particular mail needs (<c>.pending</c>, <c>.confirmed</c>,
+    /// <c>.notice</c>), as a CSS declaration line. A parameter rather than "ship all of them",
+    /// because a mail carrying rules for boxes it never renders is dead weight in every inbox — and
+    /// because keeping each mail's own rule where it is used kept all four snapshots byte-identical
+    /// through this extraction.
+    /// </param>
+    /// <param name="content">
+    /// The mail's own middle, indented as it appears inside <c>&lt;div class='content'&gt;</c>: the
+    /// shell supplies the first line's margin, exactly as <see cref="AdminCustomerCard"/> does.
+    /// </param>
+    internal static string GuestMailDocument(
+        EmailText t, EmailBranding brand, string title, string accent, string statusBoxCss, string content,
+        string contactEmail) =>
+        $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>{title}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: {accent}; color: white; padding: 20px; text-align: center; }}
+        .content {{ padding: 30px 20px; background: #f9f9f9; }}
+        .info-box {{ background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid {accent}; }}
+        .footer {{ padding: 20px; text-align: center; color: #666; font-size: 12px; }}
+        {statusBoxCss}
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>🍽️ {brand.Name}</h1>
+        </div>
+        <div class='content'>
+            {content}
+        </div>
+        <div class='footer'>
+            <p>{brand.Name} | {brand.City} | {contactEmail}</p>
+            <p>{Copyright(t, brand)}</p>
+        </div>
+    </div>
+</body>
+</html>";
+
+    /// <summary>
+    /// The envelope every operator mail is posted in: one document, the same block rendered once
+    /// per colour scheme, and the two media queries that pick between them (#356).
+    /// </summary>
+    /// <remarks>
+    /// Shared because it is byte-identical in both reservation alerts and carries no decision of
+    /// its own — a second hand-written copy is 25 lines of markup that can silently drift, and a
+    /// mail whose dark-mode query is a character out renders both copies at once.
+    /// </remarks>
+    internal static string DualSchemeDocument(string title, Func<EmailPalette, string> block)
+    {
+        ArgumentNullException.ThrowIfNull(block);
+
+        return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta name='color-scheme' content='light dark'>
+    <title>{title}</title>
+    <style>
+        @media (prefers-color-scheme: dark) {{
+            .light-only {{ display: none !important; }}
+            .dark-only {{ display: block !important; }}
+        }}
+        @media (prefers-color-scheme: light) {{
+            .dark-only {{ display: none !important; }}
+            .light-only {{ display: block !important; }}
+        }}
+    </style>
+</head>
+<body style='margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; line-height: 1.6; background-color: #f3f4f6;'>
+    {block(EmailPalette.Light)}
+
+    {block(EmailPalette.Dark)}
+</body>
+</html>";
+    }
+
+    /// <summary>The restaurant name and the mail's own subtitle, on the gradient band.</summary>
+    internal static string AdminMailHeader(EmailBranding brand, EmailPalette p, string subtitle) =>
+        $@"<div style='background: linear-gradient(135deg, {p.HeaderGradientFrom} 0%, {p.HeaderGradientTo} 100%); padding: 32px 24px; text-align: center;'>
+            <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ {brand.Name}</h1>
+            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>{subtitle}</p>
+        </div>";
+
+    /// <summary>The reservation id, in the badge both reservation alerts open with.</summary>
+    internal static string AdminReservationBadge(EmailText t, EmailPalette p, Guid reservationId) =>
+        $@"<div style='background: linear-gradient(135deg, {p.ReservationBadgeGradientFrom} 0%, {p.ReservationBadgeGradientTo} 100%); color: white; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px; box-shadow: 0 4px 6px {p.ReservationBadgeShadow};'>
+                <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>{t["ReservationIdLabel"]}</div>
+                <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>{reservationId}</div>
+            </div>";
+
+    /// <summary>
+    /// What was booked, as the restaurant reads it: day, hours, party size, table. The values
+    /// arrive already formatted — the caller owns the culture, this owns the markup.
+    /// </summary>
+    internal static string AdminReservationDetails(
+        EmailText t, EmailPalette p, string title, string date, string time, string guests, string tableNumber) =>
+        $@"<div style='background: {p.SurfaceBackground}; border: 1px solid {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 16px 0; color: {p.StrongText}; font-size: 16px; font-weight: 600;'>📅 {title}</h3>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px; width: 80px;'>{t["DateLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{date}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["TimeLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{time}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["GuestsLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{guests}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 6px 0; color: {p.MutedText}; font-size: 14px;'>{t["TableLabel"]}</td>
+                        <td style='padding: 6px 0; color: {p.StrongText}; font-size: 14px; font-weight: 500;'>{EmailHtml.Encode(tableNumber)}</td>
+                    </tr>
+                </table>
+            </div>";
+
+    /// <summary>
+    /// The amber note both operator mails print a guest's own words in — empty when there are
+    /// none, so the caller interpolates it unconditionally.
+    /// </summary>
+    internal static string AdminGuestNote(string label, string? value) =>
+        string.IsNullOrEmpty(value)
+            ? ""
+            : $@"<div style='background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 8px;'>
+                        <strong style='color: #92400e; font-size: 14px;'>📝 {label}</strong><br>
+                        <span style='color: #78350f; margin-top: 8px; display: block; white-space: pre-line;'>{EmailHtml.Encode(value)}</span>
+                    </div>";
+
+    /// <summary>
+    /// The two signed quick-action URLs an operator alert links to (backend #402): the reservation
+    /// route plus the per-action signature that authorises the anonymous endpoint.
+    /// </summary>
+    /// <remarks>
+    /// Shared by both operator alerts, so the shape of the link — and the escaping of the token —
+    /// is decided once. A missing token still renders a button, deliberately: it lands on "this
+    /// link can no longer be used", which is the honest outcome for a mail minted without one.
+    /// </remarks>
+    internal static (string Approve, string Reject) ReservationQuickActionUrls(
+        string apiBaseUrl, Guid reservationId, string? approveToken, string? rejectToken)
+    {
+        var linkBase = $"{apiBaseUrl}/api/Reservations/{reservationId}";
+
+        return ($"{linkBase}/quick-approve?token={Uri.EscapeDataString(approveToken ?? string.Empty)}",
+            $"{linkBase}/quick-reject?token={Uri.EscapeDataString(rejectToken ?? string.Empty)}");
+    }
+
+    /// <summary>
+    /// The approve / reject pair an operator alert about a reservation ends with — the ONLY way to
+    /// reach those endpoints from a mail, and now rendered by two mails (the new-booking alert and
+    /// the changed-booking alert), which is what makes it shared rather than merely similar.
+    /// </summary>
+    /// <remarks>
+    /// One place on purpose: backend #402 made these links SIGNED and expiring, and a second
+    /// hand-written copy of the markup is exactly how one mail keeps emitting the bare form. The
+    /// URLs are built by <see cref="ReservationQuickActionUrls"/>, so a template cannot assemble
+    /// one without a signature even by accident. Indented as it appears in the document — the
+    /// caller supplies the first line's margin.
+    /// </remarks>
+    internal static string ReservationQuickActions(
+        EmailText t, EmailPalette p, string approveUrl, string rejectUrl) =>
+        $@"<div style='text-align: center; margin: 24px 0;'>
+                <a href='{approveUrl}' style='display: inline-block; background: linear-gradient(135deg, {p.ConfirmGradientFrom} 0%, {p.ConfirmGradientTo} 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px {p.ConfirmButtonShadow}; margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
+            </div>
+
+            <div style='text-align: center; margin: 24px 0;'>
+                <a href='{rejectUrl}' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px {p.CancelButtonShadow};'>✕ {t["RejectButton"]}</a>
+            </div>";
+
+    /// <summary>
     /// The three variable pieces of an order's PLAIN-TEXT body: the item lines, and the optional
     /// instructions and delivery blocks with the blank lines that separate them.
     /// </summary>

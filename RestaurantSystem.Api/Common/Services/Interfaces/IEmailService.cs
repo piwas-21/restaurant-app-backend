@@ -104,6 +104,20 @@ public interface IEmailService
         string? notes = null);
 
     /// <summary>
+    /// Sends the "your reservation was updated" email (M16) after the guest edits their own
+    /// booking through <c>PUT /api/Reservations/{id}/mine</c>.
+    /// </summary>
+    /// <param name="outcome">
+    /// What the edit left behind — a confirmation that still stands, a booking that was already
+    /// waiting, or an approval the reshaping withdrew. It selects the mail's status paragraph and
+    /// is a value the CALLER decides, because by the time this runs the reservation row no longer
+    /// remembers that it used to be confirmed.
+    /// </param>
+    Task SendReservationChangedEmailAsync(
+        CultureInfo culture, string customerEmail, string customerName, ReservationMailDetails reservation,
+        ReservationChangeOutcome outcome);
+
+    /// <summary>
     /// Sends order received email to customer (when order is placed but not yet confirmed)
     /// </summary>
     /// <param name="customerEmail">Customer email address</param>

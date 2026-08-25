@@ -5,7 +5,7 @@
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <meta name='color-scheme' content='light dark'>
-    <title>New Reservation Request</title>
+    <title>A booking changed and needs a new decision</title>
     <style>
         @media (prefers-color-scheme: dark) {
             .light-only { display: none !important; }
@@ -23,7 +23,7 @@
         <!-- Header -->
         <div style='background: linear-gradient(135deg, #d4af37 0%, #f4c430 100%); padding: 32px 24px; text-align: center;'>
             <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ Demo Restaurant</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>New Reservation Request</p>
+            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>A booking changed and needs a new decision</p>
         </div>
 
         <!-- Content -->
@@ -33,6 +33,8 @@
                 <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>Reservation ID</div>
                 <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>11111111-2222-3333-4444-555555555555</div>
             </div>
+
+            <p style='margin: 0 0 20px 0; color: #111827; font-size: 15px;'>You had already approved this reservation. The guest changed the day, time or party size, so it is pending again and needs your decision.</p>
 
             <!-- Customer Info -->
             <div style='background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
@@ -55,7 +57,7 @@
 
             <!-- Reservation Details -->
             <div style='background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: #111827; font-size: 16px; font-weight: 600;'>📅 Reservation Details</h3>
+                <h3 style='margin: 0 0 16px 0; color: #111827; font-size: 16px; font-weight: 600;'>📅 New Reservation Details</h3>
                 <table style='width: 100%; border-collapse: collapse;'>
                     <tr>
                         <td style='padding: 6px 0; color: #6b7280; font-size: 14px; width: 80px;'>Date:</td>
@@ -76,6 +78,12 @@
                 </table>
             </div>
 
+            <!-- What it used to be -->
+            <div style='background: #f3f4f6; border: 1px dashed #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 12px 0; color: #6b7280; font-size: 14px; font-weight: 600;'>🕘 Previously booked</h3>
+                <p style='margin: 0; color: #6b7280; font-size: 14px; text-decoration: line-through;'>Thursday, May 16, 2030 · 18:00 - 20:00 · 2 people</p>
+            </div>
+
             <div style='background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 8px;'>
                         <strong style='color: #92400e; font-size: 14px;'>📝 Special Requests:</strong><br>
                         <span style='color: #78350f; margin-top: 8px; display: block; white-space: pre-line;'>Window seat</span>
@@ -85,7 +93,8 @@
             <div style='background: #fef3c7; border: 2px solid #fbbf24; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;'>
                 <div style='font-size: 24px; margin-bottom: 8px;'>⚠️</div>
                 <strong style='color: #92400e; font-size: 16px; display: block; margin-bottom: 4px;'>Action Required</strong>
-                <p style='margin: 0; color: #78350f; font-size: 14px;'>Please approve or reject this reservation request</p>
+                <p style='margin: 0; color: #78350f; font-size: 14px;'>Please approve or reject the changed reservation</p>
+                <p style='margin: 8px 0 0 0; color: #78350f; font-size: 13px;'>The earlier email about this booking is out of date: its buttons now decide these new details.</p>
             </div>
 
             <!-- Action Buttons -->
@@ -119,7 +128,7 @@
         <!-- Header -->
         <div style='background: linear-gradient(135deg, #b8941f 0%, #d4af37 100%); padding: 32px 24px; text-align: center;'>
             <h1 style='margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;'>🍽️ Demo Restaurant</h1>
-            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>New Reservation Request</p>
+            <p style='margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;'>A booking changed and needs a new decision</p>
         </div>
 
         <!-- Content -->
@@ -129,6 +138,8 @@
                 <div style='font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 4px;'>Reservation ID</div>
                 <div style='font-size: 24px; font-weight: 700; letter-spacing: 1px;'>11111111-2222-3333-4444-555555555555</div>
             </div>
+
+            <p style='margin: 0 0 20px 0; color: #f9fafb; font-size: 15px;'>You had already approved this reservation. The guest changed the day, time or party size, so it is pending again and needs your decision.</p>
 
             <!-- Customer Info -->
             <div style='background: #374151; border: 1px solid #4b5563; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
@@ -151,7 +162,7 @@
 
             <!-- Reservation Details -->
             <div style='background: #374151; border: 1px solid #4b5563; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
-                <h3 style='margin: 0 0 16px 0; color: #f9fafb; font-size: 16px; font-weight: 600;'>📅 Reservation Details</h3>
+                <h3 style='margin: 0 0 16px 0; color: #f9fafb; font-size: 16px; font-weight: 600;'>📅 New Reservation Details</h3>
                 <table style='width: 100%; border-collapse: collapse;'>
                     <tr>
                         <td style='padding: 6px 0; color: #9ca3af; font-size: 14px; width: 80px;'>Date:</td>
@@ -172,6 +183,12 @@
                 </table>
             </div>
 
+            <!-- What it used to be -->
+            <div style='background: #374151; border: 1px dashed #4b5563; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
+                <h3 style='margin: 0 0 12px 0; color: #9ca3af; font-size: 14px; font-weight: 600;'>🕘 Previously booked</h3>
+                <p style='margin: 0; color: #9ca3af; font-size: 14px; text-decoration: line-through;'>Thursday, May 16, 2030 · 18:00 - 20:00 · 2 people</p>
+            </div>
+
             <div style='background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 8px;'>
                         <strong style='color: #92400e; font-size: 14px;'>📝 Special Requests:</strong><br>
                         <span style='color: #78350f; margin-top: 8px; display: block; white-space: pre-line;'>Window seat</span>
@@ -181,7 +198,8 @@
             <div style='background: #78350f; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;'>
                 <div style='font-size: 24px; margin-bottom: 8px;'>⚠️</div>
                 <strong style='color: #fef3c7; font-size: 16px; display: block; margin-bottom: 4px;'>Action Required</strong>
-                <p style='margin: 0; color: #fde68a; font-size: 14px;'>Please approve or reject this reservation request</p>
+                <p style='margin: 0; color: #fde68a; font-size: 14px;'>Please approve or reject the changed reservation</p>
+                <p style='margin: 8px 0 0 0; color: #fde68a; font-size: 13px;'>The earlier email about this booking is out of date: its buttons now decide these new details.</p>
             </div>
 
             <!-- Action Buttons -->
