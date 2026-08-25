@@ -17,7 +17,7 @@ public static partial class EmailTemplates
         public static string GetHtmlBody(
             CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation, string contactEmail)
         {
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _, _, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
@@ -84,7 +84,7 @@ public static partial class EmailTemplates
         public static string GetTextBody(
             CultureInfo culture, EmailBranding brand, string customerName, ReservationMailDetails reservation, string contactEmail)
         {
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, _, _, _) = reservation;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var requestsSection = string.IsNullOrEmpty(specialRequests)

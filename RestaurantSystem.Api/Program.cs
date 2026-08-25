@@ -561,6 +561,14 @@ builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationCreatedMailer,
     RestaurantSystem.Api.Features.Reservations.Services.ReservationCreatedMailer>();
+// Signs and checks the anonymous quick-approve / quick-reject email links (backend #402).
+// Singleton: it derives its HMAC key once at construction and holds no per-request state.
+builder.Services.Configure<ReservationQuickActionSettings>(
+    builder.Configuration.GetSection(ReservationQuickActionSettings.SectionName));
+builder.Services.AddSingleton<RestaurantSystem.Api.Features.Reservations.Services.IReservationQuickActionLinks,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationQuickActionLinks>();
+builder.Services.AddSingleton<RestaurantSystem.Api.Features.Reservations.Services.IReservationQuickActionPages,
+    RestaurantSystem.Api.Features.Reservations.Services.ReservationQuickActionPages>();
 builder.Services.AddScoped<IOrderItemFactory, OrderItemFactory>();
 builder.Services.AddScoped<IBasketToOrderTranslator, BasketToOrderTranslator>();
 builder.Services.AddScoped<IOrderPricingService, OrderPricingService>();

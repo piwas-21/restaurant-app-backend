@@ -22,8 +22,17 @@ public static partial class EmailTemplates
         {
             var t = EmailText.For(culture, Set);
             var (customerName, customerEmail, customerPhone) = guest;
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, reservationId) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests,
+                reservationId, approveToken, rejectToken) = reservation;
             var (apiBaseUrl, frontendUrl, email) = links;
+
+            // Built once here rather than twice inline: the block below is rendered for both colour
+            // schemes. The token is what authorises the anonymous endpoint (backend #402) — before
+            // it, the reservation id alone was the whole authorisation, and POST /api/Reservations
+            // hands that id to the guest who made the booking.
+            var linkBase = $"{apiBaseUrl}/api/Reservations/{reservationId}";
+            var approveUrl = $"{linkBase}/quick-approve?token={Uri.EscapeDataString(approveToken ?? string.Empty)}";
+            var rejectUrl = $"{linkBase}/quick-reject?token={Uri.EscapeDataString(rejectToken ?? string.Empty)}";
 
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
@@ -92,11 +101,11 @@ public static partial class EmailTemplates
 
             <!-- Action Buttons -->
             <div style='text-align: center; margin: 24px 0;'>
-                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-approve' style='display: inline-block; background: linear-gradient(135deg, {p.ConfirmGradientFrom} 0%, {p.ConfirmGradientTo} 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px {p.ConfirmButtonShadow}; margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
+                <a href='{approveUrl}' style='display: inline-block; background: linear-gradient(135deg, {p.ConfirmGradientFrom} 0%, {p.ConfirmGradientTo} 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px {p.ConfirmButtonShadow}; margin: 0 8px 12px 8px;'>✓ {t["ApproveButton"]}</a>
             </div>
 
             <div style='text-align: center; margin: 24px 0;'>
-                <a href='{apiBaseUrl}/api/Reservations/{reservationId}/quick-reject' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px {p.CancelButtonShadow};'>✕ {t["RejectButton"]}</a>
+                <a href='{rejectUrl}' style='display: inline-block; background: #dc2626; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px {p.CancelButtonShadow};'>✕ {t["RejectButton"]}</a>
             </div>
 
             {AdminFooter(t, p, brand, email, frontendUrl, "/admin/reservations")}
@@ -135,7 +144,7 @@ public static partial class EmailTemplates
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var (customerName, customerEmail, customerPhone) = guest;
-            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, reservationId) = reservation;
+            var (reservationDate, startTime, endTime, numberOfGuests, tableNumber, specialRequests, reservationId, _, _) = reservation;
             var requestsSection = string.IsNullOrEmpty(specialRequests)
                 ? ""
                 : $@"
