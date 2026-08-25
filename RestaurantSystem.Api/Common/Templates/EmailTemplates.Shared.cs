@@ -169,6 +169,59 @@ public static partial class EmailTemplates
         </div>";
 
     /// <summary>
+    /// The document a GUEST reservation mail is posted in: the same head, the same 600px card, the
+    /// same header band and the same footer, four times over (received, approved, changed,
+    /// rejected). Only the accent colour, one extra CSS rule and the middle differ.
+    /// </summary>
+    /// <param name="accent">The card's header background and the info-box rule — one colour, two uses.</param>
+    /// <param name="statusBoxCss">
+    /// The one status-box rule this particular mail needs (<c>.pending</c>, <c>.confirmed</c>,
+    /// <c>.notice</c>), as a CSS declaration line. A parameter rather than "ship all of them",
+    /// because a mail carrying rules for boxes it never renders is dead weight in every inbox — and
+    /// because keeping each mail's own rule where it is used kept all four snapshots byte-identical
+    /// through this extraction.
+    /// </param>
+    /// <param name="content">
+    /// The mail's own middle, indented as it appears inside <c>&lt;div class='content'&gt;</c>: the
+    /// shell supplies the first line's margin, exactly as <see cref="AdminCustomerCard"/> does.
+    /// </param>
+    internal static string GuestMailDocument(
+        EmailText t, EmailBranding brand, string title, string accent, string statusBoxCss, string content,
+        string contactEmail) =>
+        $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>{title}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: {accent}; color: white; padding: 20px; text-align: center; }}
+        .content {{ padding: 30px 20px; background: #f9f9f9; }}
+        .info-box {{ background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid {accent}; }}
+        .footer {{ padding: 20px; text-align: center; color: #666; font-size: 12px; }}
+        {statusBoxCss}
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>🍽️ {brand.Name}</h1>
+        </div>
+        <div class='content'>
+            {content}
+        </div>
+        <div class='footer'>
+            <p>{brand.Name} | {brand.City} | {contactEmail}</p>
+            <p>{Copyright(t, brand)}</p>
+        </div>
+    </div>
+</body>
+</html>";
+
+    /// <summary>
     /// The envelope every operator mail is posted in: one document, the same block rendered once
     /// per colour scheme, and the two media queries that pick between them (#356).
     /// </summary>
