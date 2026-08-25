@@ -20,6 +20,12 @@ public static partial class EmailTemplates
         /// <summary>The mail's own title, rendered in the head, in both colour schemes and in the text body.</summary>
         private const string HeadingKey = "Heading";
 
+        /// <summary>24-hour wall clock — four sittings are printed, the new one and the old one, twice.</summary>
+        private const string ClockFormat = @"hh\:mm";
+
+        /// <summary>"{0} people" — the party size, printed for both the new booking and the previous one.</summary>
+        private const string GuestCountKey = "GuestCount";
+
         public static string GetSubject(CultureInfo culture, EmailBranding brand) =>
             EmailText.For(culture, Set).Format("Subject", brand.Name);
 
@@ -42,10 +48,11 @@ public static partial class EmailTemplates
             var requestsSection = AdminGuestNote(t["SpecialRequestsLabel"], specialRequests);
 
             var formattedDate = LongDate(reservationDate, culture);
-            var formattedStartTime = startTime.ToString(@"hh\:mm");
-            var formattedEndTime = endTime.ToString(@"hh\:mm");
+            var formattedStartTime = startTime.ToString(ClockFormat);
+            var formattedEndTime = endTime.ToString(ClockFormat);
             var previousDate = LongDate(previous.Date, culture);
-            var previousTime = $"{previous.StartTime:hh':'mm} - {previous.EndTime:hh':'mm}";
+            var previousTime =
+                $"{previous.StartTime.ToString(ClockFormat)} - {previous.EndTime.ToString(ClockFormat)}";
             var lead = previous.WasConfirmed ? t["WasConfirmed"] : t["WasPending"];
 
             // One block, rendered twice — the light and dark copies differ by nothing but colour
@@ -66,12 +73,12 @@ public static partial class EmailTemplates
             {AdminCustomerCard(t, p, customerName, customerEmail, customerPhone)}
 
             <!-- Reservation Details -->
-            {AdminReservationDetails(t, p, t["DetailsTitle"], formattedDate, $"{formattedStartTime} - {formattedEndTime}", t.Format("GuestCount", numberOfGuests), tableNumber)}
+            {AdminReservationDetails(t, p, t["DetailsTitle"], formattedDate, $"{formattedStartTime} - {formattedEndTime}", t.Format(GuestCountKey, numberOfGuests), tableNumber)}
 
             <!-- What it used to be -->
             <div style='background: {p.FooterBackground}; border: 1px dashed {p.SurfaceBorder}; border-radius: 12px; padding: 20px; margin-bottom: 20px;'>
                 <h3 style='margin: 0 0 12px 0; color: {p.MutedText}; font-size: 14px; font-weight: 600;'>🕘 {t["PreviousTitle"]}</h3>
-                <p style='margin: 0; color: {p.MutedText}; font-size: 14px; text-decoration: line-through;'>{previousDate} · {previousTime} · {t.Format("GuestCount", previous.NumberOfGuests)}</p>
+                <p style='margin: 0; color: {p.MutedText}; font-size: 14px; text-decoration: line-through;'>{previousDate} · {previousTime} · {t.Format(GuestCountKey, previous.NumberOfGuests)}</p>
             </div>
 
             {requestsSection}
@@ -109,9 +116,10 @@ public static partial class EmailTemplates
 {t["SpecialRequestsLabel"]}
 {specialRequests}";
 
-            var formattedStartTime = startTime.ToString(@"hh\:mm");
-            var formattedEndTime = endTime.ToString(@"hh\:mm");
-            var previousTime = $"{previous.StartTime:hh':'mm} - {previous.EndTime:hh':'mm}";
+            var formattedStartTime = startTime.ToString(ClockFormat);
+            var formattedEndTime = endTime.ToString(ClockFormat);
+            var previousTime =
+                $"{previous.StartTime.ToString(ClockFormat)} - {previous.EndTime.ToString(ClockFormat)}";
 
             return $@"{brand.Name} - {t[HeadingKey]}
 
@@ -128,13 +136,13 @@ public static partial class EmailTemplates
 {Heading(t, t["DetailsTitle"])}
 {t["DateLabel"]} {LongDate(reservationDate, culture)}
 {t["TimeLabel"]} {formattedStartTime} - {formattedEndTime}
-{t["GuestsLabel"]} {t.Format("GuestCount", numberOfGuests)}
+{t["GuestsLabel"]} {t.Format(GuestCountKey, numberOfGuests)}
 {t["TableLabel"]} {tableNumber}{requestsSection}
 
 {Heading(t, t["PreviousTitle"])}
 {t["DateLabel"]} {LongDate(previous.Date, culture)}
 {t["TimeLabel"]} {previousTime}
-{t["GuestsLabel"]} {t.Format("GuestCount", previous.NumberOfGuests)}
+{t["GuestsLabel"]} {t.Format(GuestCountKey, previous.NumberOfGuests)}
 
 {t["ActionRequiredUpper"]}
 {t["ApproveOrRejectText"]}

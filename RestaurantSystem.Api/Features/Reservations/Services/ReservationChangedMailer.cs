@@ -39,13 +39,14 @@ public class ReservationChangedMailer : IReservationChangedMailer
     public async Task SendAsync(
         Reservation reservation, string tableNumber, ReservationEdit edit, CancellationToken cancellationToken)
     {
-        // Everything inside the try, including the argument checks: the update is committed before
-        // this is called, so nothing in here may turn into a failed request for a guest whose
-        // booking has already moved.
+        // The one thing OUTSIDE the try. Everything a mail provider can do at run time is caught
+        // below, because the update is already committed and no failure of it may reach the guest;
+        // a null reservation is not that — the parameter is non-nullable, so it is a programmer
+        // error at the single call site, and swallowing it would only hide the mails going missing.
+        ArgumentNullException.ThrowIfNull(reservation);
+
         try
         {
-            ArgumentNullException.ThrowIfNull(reservation);
-
             // Signed over the status the booking is in AFTER the edit (backend #402), which is the
             // whole point on this path: a re-shaped booking is Pending again, so the fresh buttons
             // work — while the ones in the mail the restaurant already has were signed over
@@ -81,13 +82,10 @@ public class ReservationChangedMailer : IReservationChangedMailer
         }
         catch (Exception ex)
         {
-            // reservation?.Id, not reservation.Id: a null argument is caught by the guard INSIDE the
-            // try, and dereferencing it here would throw out of the catch — turning the one thing
-            // this method promises (a mail cannot fail the edit) into the opposite.
             _logger.LogWarning(ex,
                 "Failed to send the changed-reservation emails for reservation {ReservationId}, but the "
                 + "reservation was updated",
-                reservation?.Id);
+                reservation.Id);
         }
     }
 
