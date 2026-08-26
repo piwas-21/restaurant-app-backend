@@ -21,6 +21,7 @@ using RestaurantSystem.Api.Features.Products.Queries.GetFeaturedSpecialQuery;
 using RestaurantSystem.Api.Features.Products.Commands.SetFeaturedSpecialCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UnsetFeaturedSpecialCommand;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Products;
 
@@ -39,6 +40,7 @@ public class ProductsController : ControllerBase
     /// Get all products with optional filters
     /// </summary>
     [HttpGet]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<PagedResult<ProductSummaryDto>>>> GetProducts(
         [FromQuery] GetProductsQuery query)
@@ -52,6 +54,7 @@ public class ProductsController : ControllerBase
     /// IMPORTANT: This must come before GET {id} to avoid route conflicts
     /// </summary>
     [HttpGet("specials")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<PagedResult<SpecialProductDto>>>> GetSpecialProducts(
         [FromQuery] int page = 1,
@@ -68,6 +71,7 @@ public class ProductsController : ControllerBase
     /// IMPORTANT: This must come before GET {id} to avoid route conflicts
     /// </summary>
     [HttpGet("featured-special")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<FeaturedSpecialDto?>>> GetFeaturedSpecial(
         [FromQuery] OrderType? requestedOrderType = null)
@@ -81,6 +85,7 @@ public class ProductsController : ControllerBase
     /// Get product by ID
     /// </summary>
     [HttpGet("{id}")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<ProductDto>>> GetProduct(
         Guid id,
@@ -95,6 +100,7 @@ public class ProductsController : ControllerBase
     /// Create a new product
     /// </summary>
     [HttpPost]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     public async Task<ActionResult<ApiResponse<ProductDto>>> CreateProduct([FromBody] CreateProductCommand command)
     {
         var result = await _mediator.SendCommand(command);
@@ -105,6 +111,7 @@ public class ProductsController : ControllerBase
     /// Update a product
     /// </summary>
     [HttpPut("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductDto>>> UpdateProduct(
         Guid id,
@@ -123,6 +130,7 @@ public class ProductsController : ControllerBase
     /// Update only a product's base price (admin quick-edit from the menu cards)
     /// </summary>
     [HttpPatch("{id}/price")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<decimal>>> UpdateProductPrice(
         Guid id,
@@ -137,6 +145,7 @@ public class ProductsController : ControllerBase
     ///// Delete a product
     ///// </summary>
     [HttpDelete("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> DeleteProduct(Guid id)
     {
@@ -151,6 +160,7 @@ public class ProductsController : ControllerBase
     /// Get all images for a product
     /// </summary>
     [HttpGet("{id}/images")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<List<ProductImageDto>>>> GetProductImages(Guid id)
     {
@@ -163,6 +173,7 @@ public class ProductsController : ControllerBase
     /// Upload an image for a product
     /// </summary>
     [HttpPost("{id}/images")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [Consumes("multipart/form-data")]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductImageDto>>> UploadProductImage(
@@ -186,6 +197,7 @@ public class ProductsController : ControllerBase
     /// Upload multiple images for a product
     /// </summary>
     [HttpPost("{id}/images/bulk")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [Consumes("multipart/form-data")]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<List<ProductImageDto>>>> UploadMultipleProductImages(
@@ -201,6 +213,7 @@ public class ProductsController : ControllerBase
     /// Update a product image
     /// </summary>
     [HttpPut("{productId}/images/{imageId}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductImageDto>>> UpdateProductImage(
         Guid productId,
@@ -223,6 +236,7 @@ public class ProductsController : ControllerBase
     /// Delete a product image
     /// </summary>
     [HttpDelete("{productId}/images/{imageId}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> DeleteProductImage(Guid productId, Guid imageId)
     {
@@ -238,6 +252,7 @@ public class ProductsController : ControllerBase
     /// Only one product can be featured at a time
     /// </summary>
     [HttpPost("{id}/set-featured")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> SetFeaturedSpecial(Guid id)
     {
@@ -250,6 +265,7 @@ public class ProductsController : ControllerBase
     /// Remove the currently featured special (admin only)
     /// </summary>
     [HttpDelete("featured-special")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> UnsetFeaturedSpecial()
     {
