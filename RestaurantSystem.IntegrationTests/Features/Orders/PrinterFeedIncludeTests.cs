@@ -104,8 +104,16 @@ public class PrinterFeedIncludeTests : IntegrationTestBase
         item.KitchenType.Should().Be(nameof(Domain.Common.Enums.KitchenType.BackKitchen));
         item.IngredientCustomizations.Should().NotBeNull();
         var ingredient = item.IngredientCustomizations!.Single(i => i.IngredientId == MenuIngredientId);
-        // Name resolved from GlobalIngredient.DefaultName proves the deepest include level ran.
-        ingredient.IngredientName.Should().Be("Emmental");
+        // The PER-PRODUCT name. This assertion used to read "Emmental" — the name of the
+        // GlobalIngredient behind this row — and was the proof that the deepest include level
+        // ran. S0n removed that proof by design: the order line renders ProductIngredient.Name
+        // so a rename cannot reword an already-printed ticket, and no DTO field reflects the
+        // GlobalIngredient level any more. The include chain this test is named for is still
+        // pinned by everything above — KitchenType and a non-null customization list can only
+        // come from Menu -> MenuItems -> Product -> DetailedIngredients, which is the level the
+        // printer actually needs. The GlobalIngredient level is asserted on the entity graph in
+        // OrderMappingServiceMenuIngredientTests instead.
+        ingredient.IngredientName.Should().Be("Cheese");
         ingredient.IsRemoved.Should().BeTrue("it was deselected (qty 0) from the base recipe");
     }
 

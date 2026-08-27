@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -135,14 +136,21 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
             ordersQuery = ordersQuery.Where(o => o.Type == orderType);
         }
 
-        if (query.StartDate.HasValue)
+        // Same defect class as backend #418: `?startDate=2026-08-27` binds Kind=Unspecified and
+        // Npgsql refuses to compare it with the timestamptz column, so the whole listing failed
+        // instead of narrowing. The bounds' documented meaning (verbatim UTC) is unchanged.
+        var startDateUtc = QueryInstant.AsUtc(query.StartDate);
+        var endDateUtc = QueryInstant.AsUtc(query.EndDate);
+        var modifiedSinceUtc = QueryInstant.AsUtc(query.ModifiedSince);
+
+        if (startDateUtc.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => o.OrderDate >= query.StartDate.Value);
+            ordersQuery = ordersQuery.Where(o => o.OrderDate >= startDateUtc.Value);
         }
 
-        if (query.EndDate.HasValue)
+        if (endDateUtc.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => o.OrderDate <= query.EndDate.Value);
+            ordersQuery = ordersQuery.Where(o => o.OrderDate <= endDateUtc.Value);
         }
 
         if (query.UserId.HasValue)
@@ -161,11 +169,11 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
 
         // ModifiedSince filter - returns orders created or updated after the timestamp
         // Used for efficient polling to only fetch new/changed orders
-        if (query.ModifiedSince.HasValue)
+        if (modifiedSinceUtc.HasValue)
         {
             ordersQuery = ordersQuery.Where(o =>
-                o.CreatedAt > query.ModifiedSince.Value ||
-                (o.UpdatedAt.HasValue && o.UpdatedAt.Value > query.ModifiedSince.Value));
+                o.CreatedAt > modifiedSinceUtc.Value ||
+                (o.UpdatedAt.HasValue && o.UpdatedAt.Value > modifiedSinceUtc.Value));
         }
 
         if (!string.IsNullOrEmpty(query.Search))

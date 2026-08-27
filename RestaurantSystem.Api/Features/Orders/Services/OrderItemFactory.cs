@@ -72,8 +72,14 @@ public class OrderItemFactory : IOrderItemFactory
     private async Task<string?> AddMenuItemAsync(
         Order order, CreateOrderItemDto itemDto, bool pricesAreTrusted, CancellationToken cancellationToken)
     {
+        // The recipe behind the menu's first item is what the order line's ingredient snapshot is
+        // projected against — the same resolution the read path uses for a menu-backed line
+        // (OrderIngredientCustomizations). Split, because MenuItems and the products' ingredient
+        // collections cartesian-multiply in EF's default single-query mode.
         var menu = await _context.Menus
             .Include(p => p.MenuItems)
+                .ThenInclude(mi => mi.Product.DetailedIngredients)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == itemDto.MenuId && !p.IsDeleted, cancellationToken);
 
         if (menu == null)
@@ -95,6 +101,10 @@ public class OrderItemFactory : IOrderItemFactory
             ItemTotal = (unitPrice * itemDto.Quantity) + customization,
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
+            IngredientSnapshots = OrderIngredientSnapshot.Build(
+                menu.MenuItems?.FirstOrDefault()?.Product?.DetailedIngredients,
+                itemDto.IngredientQuantities,
+                _currentUserService.GetAuditIdentifier()),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
         });
@@ -109,8 +119,12 @@ public class OrderItemFactory : IOrderItemFactory
         bool pricesAreTrusted,
         CancellationToken cancellationToken)
     {
+        // DetailedIngredients is loaded for the ingredient snapshot below, not for pricing — money
+        // is settled before this factory runs (see ResolvePricing). Sibling collections, hence split.
         var product = await _context.Products
             .Include(p => p.Variations)
+            .Include(p => p.DetailedIngredients)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == itemDto.ProductId && !p.IsDeleted, cancellationToken);
 
         if (product == null)
@@ -180,6 +194,14 @@ public class OrderItemFactory : IOrderItemFactory
             ItemTotal = itemTotal,
             SpecialInstructions = itemDto.SpecialInstructions,
             IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
+            // THE FREEZE POINT for the ingredient half of the line. Everything else on this row is
+            // already a snapshot (ProductName, VariationName, UnitPrice, ItemTotal); until S1 the
+            // ingredients were bare ids re-resolved against the live catalog on every read, so a
+            // rename or a delete rewrote a receipt already printed. D2, owner-confirmed 2026-08-24.
+            IngredientSnapshots = OrderIngredientSnapshot.Build(
+                product.DetailedIngredients,
+                itemDto.IngredientQuantities,
+                _currentUserService.GetAuditIdentifier()),
             ParentOrderItem = parentItem,
             // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
             // column cannot come to mean two things (#318).

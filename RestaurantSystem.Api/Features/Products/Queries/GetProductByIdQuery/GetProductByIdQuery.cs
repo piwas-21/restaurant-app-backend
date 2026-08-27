@@ -124,6 +124,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         IsActive = di.IsActive,
                         DisplayOrder = di.DisplayOrder,
                         MaxQuantity = di.MaxQuantity,
+                        GlobalIngredientId = di.GlobalIngredientId,
                         Content = content
                     };
                 })

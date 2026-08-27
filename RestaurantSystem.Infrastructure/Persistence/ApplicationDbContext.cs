@@ -66,6 +66,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Order-related DbSets
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<OrderItemIngredient> OrderItemIngredients { get; set; }
         public DbSet<OrderPayment> OrderPayments { get; set; }
         public DbSet<OrderCheckoutSession> OrderCheckoutSessions { get; set; }
         public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }

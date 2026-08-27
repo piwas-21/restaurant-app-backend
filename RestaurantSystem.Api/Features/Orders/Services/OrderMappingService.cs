@@ -1,5 +1,4 @@
-﻿using RestaurantSystem.Api.Common.Utilities;
-using RestaurantSystem.Api.Features.Orders.Dtos;
+﻿using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -125,7 +124,7 @@ public class OrderMappingService : IOrderMappingService
     // MapToOrderDto; null means "fall back to the navigation" (see MapToOrderItemDto).
     private OrderItemDto MapOrderItem(OrderItem item, ILookup<Guid, OrderItem>? childrenByParent)
     {
-        var ingredientCustomizations = MapIngredientCustomizations(item);
+        var ingredientCustomizations = OrderIngredientCustomizations.Map(item, _logger);
 
         // Get KitchenType from Product or Menu's first MenuItem's Product
         string? kitchenType = item.Product?.KitchenType.ToString()
@@ -172,71 +171,6 @@ public class OrderMappingService : IOrderMappingService
             IngredientCustomizations = ingredientCustomizations,
             SideItems = sideItems
         };
-    }
-
-    // Projects the line's ingredient-quantities snapshot against the recipe it belongs to.
-    // Returns null when the line has no snapshot, no resolvable recipe, or an unparseable one.
-    private List<OrderItemIngredientDto>? MapIngredientCustomizations(OrderItem item)
-    {
-        // Either the line's own Product, or — for a menu-backed line (e.g. Chief's Special) —
-        // the product behind the menu's first item.
-        var productIngredients = item.Product?.DetailedIngredients
-            ?? item.Menu?.MenuItems?.FirstOrDefault()?.Product?.DetailedIngredients;
-
-        if (string.IsNullOrEmpty(item.IngredientQuantitiesJson) || productIngredients == null)
-        {
-            return null;
-        }
-
-        Dictionary<Guid, int>? selectedIngredients;
-        try
-        {
-            selectedIngredients = System.Text.Json.JsonSerializer
-                .Deserialize<Dictionary<Guid, int>>(item.IngredientQuantitiesJson);
-        }
-        catch (System.Text.Json.JsonException ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse ingredient quantities for order item {ItemId}", item.Id);
-            return null;
-        }
-
-        if (selectedIngredients == null || selectedIngredients.Count == 0)
-        {
-            return null;
-        }
-
-        // Show all ingredients for kitchen (both selected and removed).
-        var customizations = new List<OrderItemIngredientDto>();
-        foreach (var ing in productIngredients)
-        {
-            if (selectedIngredients.TryGetValue(ing.Id, out var quantity))
-            {
-                // Ingredient is in the order - show it regardless of quantity. Whether a quantity
-                // of 0 counts as a REMOVAL (→ a "NO X" kitchen-ticket line) is IngredientRecipeRules'
-                // decision, shared since #363 with the cart, which must call a removal the same
-                // thing this does. The rationale that used to sit here lives on that class.
-                customizations.Add(new OrderItemIngredientDto
-                {
-                    IngredientId = ing.Id,
-                    IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
-                    Quantity = quantity,
-                    IsRemoved = IngredientRecipeRules.IsRemoved(ing, quantity)
-                });
-            }
-            else if (!ing.IsOptional)
-            {
-                // Required ingredient not in selection at all = removed
-                customizations.Add(new OrderItemIngredientDto
-                {
-                    IngredientId = ing.Id,
-                    IngredientName = ing.GlobalIngredient?.DefaultName ?? ing.Name,
-                    Quantity = 0,
-                    IsRemoved = true
-                });
-            }
-        }
-
-        return customizations;
     }
 
     public OrderPaymentDto MapToOrderPaymentDto(OrderPayment payment)
@@ -305,6 +239,16 @@ public class OrderMappingService : IOrderMappingService
         {
             foreach (var item in order.Items)
             {
+                // The FROZEN ingredient lines (S1) are what a placed order renders from; the catalog
+                // loads below are the fallback for rows written before the snapshot existed. Loading
+                // it here rather than relying on fix-up matters for the same reason the loads below
+                // do: this path serves an order that was fetched with a narrow include chain, and a
+                // missing navigation reads as "no snapshot" instead of throwing (#234's class).
+                if (!_context.Entry(item).Collection(i => i.IngredientSnapshots).IsLoaded)
+                {
+                    await _context.Entry(item).Collection(i => i.IngredientSnapshots).LoadAsync(cancellationToken);
+                }
+
                 // Load Product for regular product items
                 if (item.ProductId.HasValue)
                 {
@@ -390,33 +334,25 @@ public class OrderMappingService : IOrderMappingService
         return MapToOrderDto(order);
     }
 
-    // Ensures a product's DetailedIngredients — and each ingredient's GlobalIngredient
-    // reference, needed to resolve display names — are loaded. Each load is guarded by
-    // its own IsLoaded flag so the inner GlobalIngredient loads still run when
-    // DetailedIngredients was already tracked (e.g. via EF relationship fixup). That
-    // closes the fixup-loaded ingredient defect (#150/#152/#153) one level deeper and
-    // deduplicates the identical graph-walk the Product and Menu branches shared (#161).
+    // Ensures a product's DetailedIngredients are loaded, guarded by its own IsLoaded flag so the
+    // load still runs when the Product reference was already tracked via EF relationship fixup —
+    // the fixup-loaded ingredient defect (#150/#152/#153) — and deduplicating the identical
+    // graph-walk the Product and Menu branches shared (#161).
+    //
+    // This is the FALLBACK path only: a line carrying a frozen snapshot (S1) never reaches the
+    // catalog at all. It stays because S1 backfills nothing, so every pre-S1 line still resolves
+    // its id map against the live recipe.
+    //
+    // The per-ingredient GlobalIngredient load that used to follow is GONE (S1). S0n stopped the
+    // order line reading GlobalIngredient.DefaultName — a rename must not reword a placed order —
+    // and left the load in place because dropping a level of a load graph deserved its own,
+    // separately revertible change. This is that change: nothing on an order reads the navigation,
+    // so the loop was one query per ingredient per order for a value no DTO carries.
     private async Task EnsureProductIngredientsLoadedAsync(Product product, CancellationToken cancellationToken)
     {
         if (!_context.Entry(product).Collection(p => p.DetailedIngredients).IsLoaded)
         {
             await _context.Entry(product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
-        }
-
-        // DetailedIngredients is initialized to [] on the entity, but guard anyway to
-        // match the file's existing defensive style (see MapToOrderItemDto) and stay
-        // safe for manually-constructed / mocked Products.
-        if (product.DetailedIngredients == null)
-        {
-            return;
-        }
-
-        foreach (var ing in product.DetailedIngredients)
-        {
-            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
-            {
-                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
-            }
         }
     }
 }

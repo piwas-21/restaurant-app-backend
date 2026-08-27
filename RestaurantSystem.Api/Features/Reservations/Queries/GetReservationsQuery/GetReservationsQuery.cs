@@ -7,8 +7,15 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Reservations.Queries.GetReservationsQuery;
 
+/// <param name="Date">
+/// The CALENDAR DAY to filter on, as the operator names it — no time, no zone. Bound as
+/// <see cref="DateOnly"/> on purpose: a <c>DateTime</c> here bound <c>?date=2026-08-27</c> with
+/// <see cref="DateTimeKind.Unspecified"/>, which Npgsql refuses to write to the
+/// <c>timestamptz</c> column, so EVERY dated call failed and the dashboard's day view showed
+/// nothing (backend #418).
+/// </param>
 public record GetReservationsQuery(
-    DateTime? Date = null,
+    DateOnly? Date = null,
     Guid? TableId = null,
     ReservationStatus? Status = null,
     Guid? CustomerId = null,
@@ -38,7 +45,17 @@ public class GetReservationsQueryHandler : IQueryHandler<GetReservationsQuery, A
             // Apply filters
             if (query.Date.HasValue)
             {
-                reservationsQuery = reservationsQuery.Where(r => r.ReservationDate.Date == query.Date.Value.Date);
+                // ReservationDate is the booked CALENDAR DAY stored at midnight UTC (see the
+                // entity: "never run it through ITenantClock"), so the day is matched as the
+                // half-open UTC window it is written in — NOT as a tenant-local day window, which
+                // would offset every stored value by the zone and answer with the wrong day.
+                // A window rather than `r.ReservationDate.Date ==`: that wraps the column in
+                // date_trunc and cannot use the ReservationDate index.
+                var dayStartUtc = query.Date.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                var nextDayStartUtc = dayStartUtc.AddDays(1);
+
+                reservationsQuery = reservationsQuery.Where(
+                    r => r.ReservationDate >= dayStartUtc && r.ReservationDate < nextDayStartUtc);
             }
 
             if (query.TableId.HasValue)

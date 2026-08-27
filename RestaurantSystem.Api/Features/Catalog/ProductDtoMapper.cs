@@ -49,6 +49,7 @@ public static class ProductDtoMapper
                 IsActive = di.IsActive,
                 DisplayOrder = di.DisplayOrder,
                 MaxQuantity = di.MaxQuantity,
+                GlobalIngredientId = di.GlobalIngredientId,
                 Content = ToLocalizedContent(di.Descriptions, d => d.LanguageCode,
                     d => new ProductIngredientContentDto { Name = d.Name, Description = d.Description })
             }).ToList(),

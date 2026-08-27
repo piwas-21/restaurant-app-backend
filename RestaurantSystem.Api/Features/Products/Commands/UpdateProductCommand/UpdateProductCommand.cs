@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -311,50 +312,22 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             }
         }
 
-        // Update detailed ingredients
+        // Update detailed ingredients — BY ID, never remove-and-recreate.
+        //
+        // Orders and baskets key their customisation off the ingredient id
+        // (`IngredientQuantitiesJson` is a `{ ingredientId: quantity }` map), so re-creating these
+        // rows on every save silently blanked the ingredient detail of every past order. The diff
+        // lives in ProductIngredientSynchronizer with the full argument; §4 also forbids growing
+        // this file, which is already baselined over its 200-line limit.
         if (command.DetailedIngredients != null)
         {
-            // Remove existing ingredients and their descriptions
-            var existingIngredients = product.DetailedIngredients.ToList();
-            _context.ProductIngredients.RemoveRange(existingIngredients);
-
-            // Add new ingredients
-            foreach (var ingredientDto in command.DetailedIngredients)
-            {
-                var ingredient = new ProductIngredient
-                {
-                    ProductId = product.Id,
-                    Name = ingredientDto.Name,
-                    IsOptional = ingredientDto.IsOptional,
-                    Price = ingredientDto.Price,
-                    IsIncludedInBasePrice = ingredientDto.IsIncludedInBasePrice,
-                    IsActive = ingredientDto.IsActive,
-                    DisplayOrder = ingredientDto.DisplayOrder,
-                    MaxQuantity = ingredientDto.MaxQuantity,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-
-                await _context.ProductIngredients.AddAsync(ingredient, cancellationToken);
-
-                // Add ingredient descriptions
-                if (ingredientDto.Content != null)
-                {
-                    foreach (var (languageCode, content) in ingredientDto.Content)
-                    {
-                        var description = new ProductIngredientDescription
-                        {
-                            ProductIngredient = ingredient,
-                            LanguageCode = languageCode,
-                            Name = content.Name,
-                            Description = content.Description,
-                            CreatedAt = DateTime.UtcNow,
-                            CreatedBy = _currentUserService.GetAuditIdentifier()
-                        };
-                        await _context.ProductIngredientDescriptions.AddAsync(description, cancellationToken);
-                    }
-                }
-            }
+            await ProductIngredientSynchronizer.SyncAsync(
+                _context,
+                product,
+                command.DetailedIngredients,
+                _currentUserService.GetAuditIdentifier(),
+                _logger,
+                cancellationToken);
         }
 
         // Update Menu Definition.

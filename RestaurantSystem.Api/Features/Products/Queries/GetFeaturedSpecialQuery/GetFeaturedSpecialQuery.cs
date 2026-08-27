@@ -143,6 +143,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     IsActive = di.IsActive,
                     DisplayOrder = di.DisplayOrder,
                     MaxQuantity = di.MaxQuantity,
+                    GlobalIngredientId = di.GlobalIngredientId,
                     Content = di.Descriptions
                         .GroupBy(d => d.LanguageCode)
                         .ToDictionary(

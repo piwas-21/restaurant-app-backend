@@ -28,7 +28,7 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task MapToOrderDtoAsync_ProductDetailedIngredientsAlreadyTracked_ResolvesGlobalIngredientName()
+    public async Task MapToOrderDtoAsync_ProductDetailedIngredientsAlreadyTracked_MapsIngredientsWithoutTheGlobalLevel()
     {
         // Cheese carries a GlobalIngredient so its mapped name proves the deepest
         // load level (Product -> DetailedIngredients -> GlobalIngredient) actually
@@ -152,9 +152,20 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
 
         var dto = await mapper.MapToOrderDtoAsync(loadedOrder);
 
-        // Assert — the product's ingredient customizations survived the mapping and the
-        // cheese name resolved from GlobalIngredient.DefaultName. Pre-fix the deepest
-        // load was skipped, so cheese.IngredientName fell back to "Cheese".
+        // Assert — the product's ingredient customizations survived the mapping, and the mapper
+        // did NOT walk down to the GlobalIngredient level.
+        //
+        // The direction of this assertion is REVERSED from what #161 asserted, deliberately.
+        // #161 was about loading that level; S0n then stopped the order line reading its name (a
+        // global rename must not reword a placed order) and S1 froze the name on the order row, so
+        // by S1 nothing on an order reads the navigation at all. The load was therefore one query
+        // per ingredient per order for a value no DTO carries, and it is gone. Asserting it stays
+        // gone is what stops it being reinstated by reflex.
+        var trackedCheeseAfter = trackedItem.Product!.DetailedIngredients.Single(pi => pi.Id == cheeseId);
+        context.Entry(trackedCheeseAfter).Reference(i => i.GlobalIngredient).IsLoaded
+            .Should().BeFalse("no order surface reads GlobalIngredient since S0n/S1, so loading it "
+                + "per ingredient is pure query cost");
+
         var mappedItem = dto.Items.Single();
         mappedItem.ProductId.Should().Be(productId);
         mappedItem.IngredientCustomizations.Should().NotBeNull();
@@ -163,9 +174,10 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
         var cheese = mappedItem.IngredientCustomizations!.Single(c => c.IngredientId == cheeseId);
         cheese.Quantity.Should().Be(0);
         cheese.IsRemoved.Should().BeTrue();
-        // Name resolved from GlobalIngredient.DefaultName proves the deepest
-        // (GlobalIngredient) load ran, not just a fallback to ProductIngredient.Name.
-        cheese.IngredientName.Should().Be("Mozzarella");
+        // The PER-PRODUCT name, although this ingredient has a global one saying
+        // "Mozzarella" (asserted on the entity above). S0n: an order line never reads the
+        // global, so renaming it cannot reword a receipt that is already printed.
+        cheese.IngredientName.Should().Be("Cheese");
 
         var sauce = mappedItem.IngredientCustomizations!.Single(c => c.IngredientId == sauceId);
         sauce.Quantity.Should().Be(1);
@@ -173,22 +185,22 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
         sauce.IngredientName.Should().Be("Tomato Sauce");
     }
 
-    // §9.18 — the ingredient name on ALREADY-PLACED orders, and therefore on the kitchen
-    // ticket, falls back to ProductIngredient.Name once the GlobalIngredient behind it is
-    // deleted. Orders read through the global query filter (nothing in the order graph uses
-    // IgnoreQueryFilters), so a soft-deleted global resolves to null and the `?? ing.Name`
-    // fallback at OrderMappingService.cs:226/237 takes over.
+    // §9.18 — soft-deleting the GlobalIngredient behind an ingredient must not change what an
+    // ALREADY-PLACED order, and therefore the kitchen ticket, says. Orders read through the
+    // global query filter (nothing in the order graph uses IgnoreQueryFilters), so the
+    // navigation resolves to null for a soft-deleted global.
     //
-    // This is newly REACHABLE rather than newly broken: before the §9.18 fix the FK rejected
-    // the delete outright (a 500), so an admin could not reach this state for an ingredient
-    // any product used. Making the delete work is what exposes the fallback. Pinned rather
-    // than "fixed" because the fallback is the intended behaviour for an ingredient with no
-    // global — resolving through a deleted row would mean the order graph deliberately reads
-    // soft-deleted data, which nothing else in this codebase does. The name stays meaningful;
-    // it just stops being the global's. If that is ever judged wrong, this test is where the
-    // decision is recorded, and it is the printer-app-visible surface (#161's sibling).
+    // This test used to pin a FALLBACK — `GlobalIngredient?.DefaultName ?? ing.Name` — and said
+    // of it: "If that is ever judged wrong, this test is where the decision is recorded."
+    // The decision arrived. The owner ruled on 2026-08-24 that a past receipt never changes, so
+    // S0n dropped the global from the expression entirely; the local name is no longer a
+    // fallback, it is the only answer. What the test proves is therefore stronger and simpler
+    // than before: the deletion is invisible to a placed order. Kept because it is the
+    // printer-app-visible surface (#161's sibling) and because a null navigation on this path
+    // must stay harmless.
     [Fact]
-    public async Task MapToOrderDtoAsync_GlobalIngredientSoftDeleted_FallsBackToTheLocalName()
+
+    public async Task MapToOrderDtoAsync_GlobalIngredientSoftDeleted_StillRendersTheLocalName()
     {
         var cheeseId = Guid.NewGuid();
         Guid orderId;
@@ -277,8 +289,9 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
         var dto = await mapper.MapToOrderDtoAsync(loadedOrder);
 
         var cheese = dto.Items.Single().IngredientCustomizations!.Single(c => c.IngredientId == cheeseId);
-        // Not "Mozzarella" — the first test in this class pins that same field resolving to the
-        // global's name while it is live, so the pair brackets the behaviour on both sides.
+        // Not "Mozzarella", and — since S0n — not because the global went away: the first test
+        // in this class pins the SAME answer while the global is live and named differently, so
+        // the pair brackets the behaviour on both sides.
         cheese.IngredientName.Should().Be("Cheese");
     }
 
