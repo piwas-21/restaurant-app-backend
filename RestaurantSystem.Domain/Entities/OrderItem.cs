@@ -32,4 +32,11 @@ public class OrderItem : Entity
     public virtual Menu? Menu { get; set; }
     public virtual OrderItem? ParentOrderItem { get; set; }
     public virtual ICollection<OrderItem> ChildOrderItems { get; set; } = new List<OrderItem>();
+
+    /// <summary>
+    /// The line's FROZEN ingredient lines, written once at checkout and never updated (S1). Empty on
+    /// every row written before the snapshot existed — there is no backfill, so those keep resolving
+    /// <see cref="IngredientQuantitiesJson"/> against the live catalog.
+    /// </summary>
+    public virtual ICollection<OrderItemIngredient> IngredientSnapshots { get; set; } = new List<OrderItemIngredient>();
 }
