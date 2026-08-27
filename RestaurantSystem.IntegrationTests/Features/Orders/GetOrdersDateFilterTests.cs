@@ -149,6 +149,33 @@ public class GetOrdersDateFilterTests : IntegrationTestBase
         result.TotalCount.Should().Be(0);
     }
 
+    /// <summary>
+    /// A bound with no zone — `?startDate=2026-04-14` — is the shape that broke the reservations
+    /// list (backend #418): it binds Kind=Unspecified and Npgsql refuses it against a timestamptz
+    /// parameter. Here it must simply be READ AS UTC, as the parameter's documented contract says.
+    /// </summary>
+    [Fact]
+    public async Task BareCalendarDayBounds_AreReadAsUtc_AndDoNotFail()
+    {
+        AuthenticateAsAdmin();
+
+        var result = await GetOrders("/api/orders?startDate=2026-04-14&endDate=2026-04-16&pageSize=50");
+
+        // [2026-04-14T00:00Z, 2026-04-16T00:00Z] covers the anchor (15th, 12:00Z) and nothing else.
+        result!.Items.Select(o => o.OrderNumber).Should().BeEquivalentTo(new[] { "ORD-D0" });
+    }
+
+    /// <summary>The polling cursor is the same binding hazard, on the same columns.</summary>
+    [Fact]
+    public async Task BareCalendarDayModifiedSince_IsReadAsUtc_AndDoesNotFail()
+    {
+        AuthenticateAsAdmin();
+
+        var result = await GetOrders("/api/orders?modifiedSince=2026-04-16&pageSize=50");
+
+        result!.Items.Select(o => o.OrderNumber).Should().BeEquivalentTo(new[] { "ORD-D2F", "ORD-D7F" });
+    }
+
     [Fact]
     public async Task InvalidDateFormat_Returns400()
     {

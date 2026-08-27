@@ -32,11 +32,18 @@ public class ReservationsController : ControllerBase
     }
 
     /// <summary>Get all reservations (admin) or the caller's own reservations.</summary>
+    /// <remarks>
+    /// <paramref name="date"/> is a calendar day (<c>YYYY-MM-DD</c>), the same shape the z-report
+    /// takes. It used to bind as a <c>DateTime</c>, and a day with no zone binds
+    /// <c>Kind=Unspecified</c> — which Npgsql will not compare against the <c>timestamptz</c>
+    /// column, so every dated call failed outright (backend #418). No client format worked before
+    /// this: an offset-carrying value bound as <c>Local</c> and failed on the same rule.
+    /// </remarks>
     [HttpGet]
     [ApiScope(ApiTokenScopes.ReservationsRead)]
     [Authorize]
     public async Task<ActionResult<ApiResponse<PagedResult<ReservationDto>>>> GetReservations(
-        [FromQuery] DateTime? date = null,
+        [FromQuery] DateOnly? date = null,
         [FromQuery] Guid? tableId = null,
         [FromQuery] ReservationStatus? status = null,
         [FromQuery] int page = 1,
