@@ -125,6 +125,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // (EMAIL-SPEC-TENANT-APP GAP-11/GAP-12).
         public DbSet<OutboundEmail> OutboundEmails { get; set; }
 
+        // Machine credentials — scoped API tokens (docs/plans/API-TOKENS-PLAN.md)
+        public DbSet<ApiToken> ApiTokens { get; set; }
+
         // Data Protection Keys
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
 

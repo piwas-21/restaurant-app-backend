@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Tenant.Dtos;
+using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Tenant;
 
@@ -31,6 +33,7 @@ public class TenantModulesController : ControllerBase
     }
 
     [HttpGet("modules")]
+    [ApiScope(ApiTokenScopes.TenantRead)]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<TenantModulesDto>), StatusCodes.Status200OK)]
     public ActionResult<ApiResponse<TenantModulesDto>> Get()

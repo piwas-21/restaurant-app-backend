@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Settings.Dtos;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
+using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Settings;
 
@@ -21,6 +23,7 @@ public class WorkingHoursController : ControllerBase
     /// Get all working hours (public endpoint)
     /// </summary>
     [HttpGet]
+    [ApiScope(ApiTokenScopes.TenantRead)]
     [AllowAnonymous]
     public async Task<ApiResponse<List<WorkingHoursDto>>> GetAll(CancellationToken cancellationToken)
     {

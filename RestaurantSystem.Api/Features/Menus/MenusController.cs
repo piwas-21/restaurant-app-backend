@@ -11,6 +11,7 @@ using RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundlesQuery;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Menus;
 
@@ -29,6 +30,7 @@ public class MenusController : ControllerBase
     /// Create a new menu bundle
     /// </summary>
     [HttpPost]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductDto>>> CreateMenuBundle([FromBody] CreateMenuBundleCommand command)
     {
@@ -40,6 +42,7 @@ public class MenusController : ControllerBase
     /// Get all menu bundles with pagination
     /// </summary>
     [HttpGet]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<PagedResult<MenuBundleDto>>>> GetMenuBundles(
         [FromQuery] int page = 1,
@@ -62,6 +65,7 @@ public class MenusController : ControllerBase
     /// Get a specific menu bundle by ID
     /// </summary>
     [HttpGet("{id}")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     public async Task<ActionResult<ApiResponse<MenuBundleDto>>> GetMenuBundleById(
         Guid id,
         [FromQuery] OrderType? requestedOrderType = null)
@@ -81,6 +85,7 @@ public class MenusController : ControllerBase
     /// Update an existing menu bundle
     /// </summary>
     [HttpPut("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductDto>>> UpdateMenuBundle(Guid id, [FromBody] UpdateMenuBundleCommand command)
     {
@@ -97,6 +102,7 @@ public class MenusController : ControllerBase
     /// Delete a menu bundle
     /// </summary>
     [HttpDelete("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> DeleteMenuBundle(Guid id)
     {

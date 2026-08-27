@@ -14,6 +14,8 @@ using RestaurantSystem.Api.Features.Reservations.Queries.GetAvailableTimeSlotsQu
 using RestaurantSystem.Api.Features.Reservations.Queries.GetReservationsQuery;
 using RestaurantSystem.Domain.Common.Enums;
 using System.Security.Claims;
+using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Reservations;
 
@@ -31,6 +33,7 @@ public class ReservationsController : ControllerBase
 
     /// <summary>Get all reservations (admin) or the caller's own reservations.</summary>
     [HttpGet]
+    [ApiScope(ApiTokenScopes.ReservationsRead)]
     [Authorize]
     public async Task<ActionResult<ApiResponse<PagedResult<ReservationDto>>>> GetReservations(
         [FromQuery] DateTime? date = null,
@@ -84,6 +87,7 @@ public class ReservationsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [ApiScope(ApiTokenScopes.ReservationsWrite)]
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<ReservationDto>>> UpdateReservation(Guid id, [FromBody] UpdateReservationDto reservationData)
     {
@@ -109,6 +113,7 @@ public class ReservationsController : ControllerBase
     }
 
     [HttpPost("{id}/cancel")]
+    [ApiScope(ApiTokenScopes.ReservationsWrite)]
     [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> CancelReservation(Guid id)
     {
@@ -120,6 +125,7 @@ public class ReservationsController : ControllerBase
     }
 
     [HttpPost("{id}/confirm")]
+    [ApiScope(ApiTokenScopes.ReservationsWrite)]
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<bool>>> ConfirmReservation(Guid id)
     {

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication;
+using RestaurantSystem.Api.Common.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
@@ -37,13 +38,22 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     {
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // A machine API token is authenticated by the REAL handler, not faked here. This host
+        // replaces the default scheme wholesale, so without this forward the ApiToken scheme
+        // would never run and every token test would silently assert against a fake admin.
+        // It mirrors what Program.cs's BearerSelector policy scheme does in production.
+        if (ApiTokenDefaults.LooksLikeApiToken(ReadBearerValue()))
+        {
+            return await Context.AuthenticateAsync(ApiTokenDefaults.AuthenticationScheme);
+        }
+
         // Opt-in "no credentials at all", for endpoints whose whole point is that a guest
         // with no token can reach them.
         if (Context.Request.Headers.ContainsKey(AnonymousHeader))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return AuthenticateResult.NoResult();
         }
 
         var claims = new List<Claim>
@@ -81,6 +91,15 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, "Test");
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        return AuthenticateResult.Success(ticket);
+    }
+
+    private string? ReadBearerValue()
+    {
+        var header = Context.Request.Headers.Authorization.ToString();
+        const string prefix = "Bearer ";
+        return header.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? header[prefix.Length..].Trim()
+            : null;
     }
 }

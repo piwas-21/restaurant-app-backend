@@ -384,3 +384,6 @@ FodyWeavers.xsd
 
 # Local environment overrides — never commit (legacy GitLab CI registry vars).
 .env
+
+# macOS Finder metadata — never useful in the repo (shipped once in #414)
+.DS_Store

@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -12,6 +13,8 @@ using System.Threading.RateLimiting;
 using RestaurantSystem.Api.BackgroundServices;
 using RestaurantSystem.Api.Services;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Api.Common.Authentication;
+using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Conventers;
 using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Middleware;
@@ -98,6 +101,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddControllers(options =>
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+
+        // Deny-by-default scope enforcement for API-token callers (API-TOKENS-PLAN §5).
+        // Global on purpose: an endpoint added tomorrow is unreachable by every existing
+        // token until someone deliberately annotates it with [ApiScope]. Inert for humans.
+        options.Filters.Add<ApiTokenScopeFilter>();
     })
     .AddJsonOptions(options =>
     {
@@ -196,11 +204,33 @@ if (jwtOptions != null)
     jwtOptions.Validate();
 }
 
+// Two credential kinds share one Authorization header, so the DEFAULT scheme is a POLICY
+// scheme that picks between them by looking at the bearer value: `sk_`-prefixed values go to
+// the opaque API-token handler, everything else to JWT (API-TOKENS-PLAN §3a). Doing the choice
+// here means not one endpoint's [Authorize]/[RequireAdmin] metadata has to change.
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = ApiTokenDefaults.SelectorScheme;
+    options.DefaultChallengeScheme = ApiTokenDefaults.SelectorScheme;
+    options.DefaultForbidScheme = ApiTokenDefaults.SelectorScheme;
 })
+.AddPolicyScheme(ApiTokenDefaults.SelectorScheme, ApiTokenDefaults.SelectorScheme, options =>
+{
+    options.ForwardDefaultSelector = context =>
+    {
+        var header = context.Request.Headers.Authorization.ToString();
+        const string bearer = "Bearer ";
+        var value = header.StartsWith(bearer, StringComparison.OrdinalIgnoreCase)
+            ? header[bearer.Length..].Trim()
+            : null;
+
+        return ApiTokenDefaults.LooksLikeApiToken(value)
+            ? ApiTokenDefaults.AuthenticationScheme
+            : JwtBearerDefaults.AuthenticationScheme;
+    };
+})
+.AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(
+    ApiTokenDefaults.AuthenticationScheme, _ => { })
 .AddJwtBearer(options =>
 {
     options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
