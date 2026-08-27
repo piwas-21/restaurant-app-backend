@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
 using RestaurantSystem.Api.Features.GlobalIngredients.Queries.GetGlobalIngredientByIdQuery;
 using RestaurantSystem.Api.Features.GlobalIngredients.Queries.GetGlobalIngredientsQuery;
 using RestaurantSystem.Api.Features.GlobalIngredients.Queries.SearchGlobalIngredientsQuery;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.GlobalIngredients;
 
@@ -25,16 +26,19 @@ public class GlobalIngredientsController : ControllerBase
     }
 
     [HttpGet]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<List<GlobalIngredientDto>>>> GetGlobalIngredients() =>
         Ok(await _mediator.SendQuery(new GetGlobalIngredientsQuery()));
 
     [HttpGet("{id}")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<GlobalIngredientDto>>> GetGlobalIngredient(Guid id) =>
         Ok(await _mediator.SendQuery(new GetGlobalIngredientByIdQuery(id)));
 
     [HttpGet("search")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<List<GlobalIngredientDto>>>> SearchIngredients(
         [FromQuery] string query,
@@ -42,6 +46,7 @@ public class GlobalIngredientsController : ControllerBase
         Ok(await _mediator.SendQuery(new SearchGlobalIngredientsQuery(query, limit)));
 
     [HttpPost]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<GlobalIngredientDto>>> CreateGlobalIngredient(
         [FromBody] CreateGlobalIngredientDto body) =>
@@ -49,6 +54,7 @@ public class GlobalIngredientsController : ControllerBase
             body.DefaultName, body.ImageUrl, body.Translations)));
 
     [HttpPut("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<GlobalIngredientDto>>> UpdateGlobalIngredient(
         Guid id,
@@ -57,6 +63,7 @@ public class GlobalIngredientsController : ControllerBase
             id, body.DefaultName, body.ImageUrl, body.IsActive, body.Translations)));
 
     [HttpDelete("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> DeleteGlobalIngredient(Guid id) =>
         Ok(await _mediator.SendCommand(new DeleteGlobalIngredientCommand(id)));

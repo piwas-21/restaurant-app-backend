@@ -12,6 +12,7 @@ using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantLogo
 using RestaurantSystem.Api.Features.RestaurantInfo.Dtos;
 using RestaurantSystem.Api.Features.RestaurantInfo.Dtos.Requests;
 using RestaurantSystem.Api.Features.RestaurantInfo.Queries.GetRestaurantInfoQuery;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.RestaurantInfo;
 
@@ -32,6 +33,7 @@ public class RestaurantInfoController : ControllerBase
     }
 
     [HttpGet]
+    [ApiScope(ApiTokenScopes.TenantRead)]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> Get()

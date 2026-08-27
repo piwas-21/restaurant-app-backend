@@ -12,6 +12,7 @@ using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Categories.Dtos.Requests;
 using RestaurantSystem.Api.Features.Categories.Queries.GetCategoriesQuery;
 using RestaurantSystem.Api.Features.Categories.Queries.GetCategoryByIdQuery;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Categories;
 
@@ -35,6 +36,7 @@ public class CategoriesController : ControllerBase
     /// <param name="query">Query parameters for filtering and pagination</param>
     /// <returns>Paginated list of categories</returns>
     [HttpGet]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<CategoryDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<PagedResult<CategoryDto>>>> GetCategories(
@@ -50,6 +52,7 @@ public class CategoriesController : ControllerBase
     /// <param name="id">Category ID</param>
     /// <returns>Category details with featured products</returns>
     [HttpGet("{id}")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<CategoryDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -69,6 +72,7 @@ public class CategoriesController : ControllerBase
     /// <param name="command">Category creation details</param>
     /// <returns>Created category</returns>
     [HttpPost]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -88,6 +92,7 @@ public class CategoriesController : ControllerBase
     /// <param name="command">Category update details</param>
     /// <returns>Updated category</returns>
     [HttpPut("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -114,6 +119,7 @@ public class CategoriesController : ControllerBase
     /// <param name="request">Image upload request</param>
     /// <returns>Updated category with new image</returns>
     [HttpPut("{id}/image")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [Consumes("multipart/form-data")]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status200OK)]
@@ -136,6 +142,7 @@ public class CategoriesController : ControllerBase
     /// <param name="id">Category ID</param>
     /// <returns>Success message</returns>
     [HttpDelete("{id}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -155,6 +162,7 @@ public class CategoriesController : ControllerBase
     /// <param name="command">List of category IDs with new display orders</param>
     /// <returns>Success message</returns>
     [HttpPut("reorder")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

@@ -4,6 +4,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Settings.Dtos;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Settings;
 
@@ -22,6 +24,7 @@ public class OrderTypeConfigurationController : ControllerBase
     /// Get all order type configurations (admin only)
     /// </summary>
     [HttpGet]
+    [ApiScope(ApiTokenScopes.TenantRead)]
     [Authorize(Roles = "Admin")]
     public async Task<ApiResponse<List<OrderTypeConfigurationDto>>> GetAll(CancellationToken cancellationToken)
     {

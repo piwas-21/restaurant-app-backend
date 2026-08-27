@@ -19,6 +19,7 @@ using RestaurantSystem.Api.Features.Orders.Queries.GetFocusOrdersQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrderByIdQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetZReportQuery;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Orders;
 
@@ -32,7 +33,7 @@ public class OrdersController : ControllerBase
     public OrdersController(CustomMediator mediator, ITenantClock clock)
         => (_mediator, _clock) = (mediator, clock);
 
-    [HttpGet]
+    [HttpGet, ApiScope(ApiTokenScopes.OrdersRead)]
     [Authorize]
     public async Task<ActionResult<ApiResponse<PagedResult<OrderDto>>>> GetOrders([FromQuery] GetOrdersQuery query)
         => Ok(await _mediator.SendQuery(query));
@@ -48,7 +49,7 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<ApiResponse<ZReportDto>>> GetZReport([FromQuery] DateOnly? date)
         => Ok(await _mediator.SendQuery(new GetZReportQuery(date ?? DateOnly.FromDateTime(_clock.Now.Date))));
 
-    [HttpGet("{id}")]
+    [HttpGet("{id}"), ApiScope(ApiTokenScopes.OrdersRead)]
     [Authorize]
     public async Task<ActionResult<ApiResponse<OrderDto>>> GetOrder(Guid id)
         => Ok(await _mediator.SendQuery(new GetOrderByIdQuery(id)));
@@ -97,7 +98,7 @@ public class OrdersController : ControllerBase
         => Ok(await _mediator.SendQuery(query));
 
     // Drives the kitchen/cashier state machine and sends customer emails on some transitions.
-    [HttpPut("{orderId}/status")]
+    [HttpPut("{orderId}/status"), ApiScope(ApiTokenScopes.OrdersWrite)]
     [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> UpdateOrderStatus(Guid orderId, [FromBody] UpdateOrderStatusCommand command)
     {
@@ -109,7 +110,7 @@ public class OrdersController : ControllerBase
     // only, which matches the product as it exists: no customer surface calls this (verified across
     // the frontend — cashier and admin only). If "cancel my own order" is ever wanted, the shape is
     // an owner-or-staff test in the HANDLER, as GetOrderByIdQuery does — not a return to [Authorize].
-    [HttpPost("{orderId}/cancel")]
+    [HttpPost("{orderId}/cancel"), ApiScope(ApiTokenScopes.OrdersWrite)]
     [RequireStaff]
     public async Task<ActionResult<ApiResponse<OrderDto>>> CancelOrder(Guid orderId, [FromBody] CancelOrderCommand command)
     {

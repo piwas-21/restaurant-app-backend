@@ -133,4 +133,13 @@ public static class ErrorCodes
     /// ("your account already has one") is not something the user did wrong on the form.
     /// </summary>
     public const string PasswordAlreadySet = "PasswordAlreadySet"; // pragma: allowlist secret (an error code, not a credential)
+
+    /// <summary>
+    /// Returned with a 403 when a caller authenticated by an API TOKEN reaches an endpoint the
+    /// token's scope set does not cover — including every endpoint that carries no
+    /// <c>[ApiScope]</c> at all, which a token may never reach (API-TOKENS-PLAN §5). It is what
+    /// lets a machine client tell "my credential is wrong" (401) from "my credential is fine but
+    /// too narrow" (this) without parsing prose.
+    /// </summary>
+    public const string MissingScope = "MissingScope";
 }
