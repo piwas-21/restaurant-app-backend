@@ -78,8 +78,7 @@ public class OrderItemFactory : IOrderItemFactory
         // collections cartesian-multiply in EF's default single-query mode.
         var menu = await _context.Menus
             .Include(p => p.MenuItems)
-                .ThenInclude(mi => mi.Product)
-                    .ThenInclude(p => p.DetailedIngredients)
+                .ThenInclude(mi => mi.Product.DetailedIngredients)
             .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == itemDto.MenuId && !p.IsDeleted, cancellationToken);
 

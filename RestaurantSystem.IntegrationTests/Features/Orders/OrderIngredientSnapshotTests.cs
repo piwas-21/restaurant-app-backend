@@ -65,13 +65,7 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
     {
         var orderId = await CheckoutAsync("S1-FREEZE");
 
-        using var scope = Factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var frozen = await context.Set<OrderItemIngredient>()
-            .Where(row => row.OrderItem.OrderId == orderId)
-            .OrderBy(row => row.SortOrder)
-            .ToListAsync();
+        var frozen = await FrozenRowsAsync(orderId);
 
         frozen.Should().HaveCount(3, "the line renders all three recipe rows, chosen and removed alike");
 
@@ -184,12 +178,8 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
     {
         var orderId = await SeedHistoricOrderAsync("S1-HISTORIC", GuestChoice());
 
-        using (var scope = Factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            (await context.Set<OrderItemIngredient>().CountAsync(row => row.OrderItem.OrderId == orderId))
-                .Should().Be(0, "the fixture is a pre-S1 row: id map only, nothing frozen");
-        }
+        (await FrozenRowsAsync(orderId))
+            .Should().BeEmpty("the fixture is a pre-S1 row: id map only, nothing frozen");
 
         var rendered = await RenderIngredientLinesAsync(orderId);
 
@@ -302,6 +292,26 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
         CreatedAt = DateTime.UtcNow,
         CreatedBy = "test"
     };
+
+    /// <summary>
+    /// The frozen rows of an order, read by id rather than through the OrderItem navigation —
+    /// nothing in production loads that direction, so the test does not either.
+    /// </summary>
+    private async Task<List<OrderItemIngredient>> FrozenRowsAsync(Guid orderId)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var itemIds = await context.OrderItems
+            .Where(item => item.OrderId == orderId)
+            .Select(item => item.Id)
+            .ToListAsync();
+
+        return await context.Set<OrderItemIngredient>()
+            .Where(row => itemIds.Contains(row.OrderItemId))
+            .OrderBy(row => row.SortOrder)
+            .ToListAsync();
+    }
 
     private async Task MutateCatalogAsync(Func<ApplicationDbContext, Task> mutate)
     {

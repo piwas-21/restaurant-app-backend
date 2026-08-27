@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries;
@@ -24,8 +23,11 @@ public static class OrderQueryIncludes
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Callers should pair this with <c>AsSplitQuery()</c>: these are sibling collections that
-    /// cartesian-multiply in EF's default single-query mode.
+    /// It splits the query itself. These are sibling collections that cartesian-multiply in EF's
+    /// default single-query mode, and S1 added a THIRD (<c>IngredientSnapshots</c>) — so the old
+    /// arrangement, where the docblock asked each caller to remember <c>AsSplitQuery()</c>, was a
+    /// footgun that got sharper. All three callers already call it; the flag is idempotent, and
+    /// pairing it with the includes here means a fourth caller cannot forget.
     /// </para>
     /// <para>
     /// <b>What S1 removed, and what it deliberately did NOT.</b> The chain used to end
@@ -41,8 +43,7 @@ public static class OrderQueryIncludes
     /// blank the ingredient detail on all of history, which is the #234 failure mode again.
     /// </para>
     /// </remarks>
-    public static IIncludableQueryable<Order, ICollection<ProductIngredient>> IncludeOrderLineGraph(
-        this IQueryable<Order> query) =>
+    public static IQueryable<Order> IncludeOrderLineGraph(this IQueryable<Order> query) =>
         query
             .Include(o => o.Items)
                 .ThenInclude(i => i.IngredientSnapshots)
@@ -53,5 +54,6 @@ public static class OrderQueryIncludes
                 .ThenInclude(i => i.Menu)
                     .ThenInclude(m => m!.MenuItems)
                         .ThenInclude(mi => mi.Product)
-                            .ThenInclude(p => p.DetailedIngredients);
+                            .ThenInclude(p => p.DetailedIngredients)
+            .AsSplitQuery();
 }

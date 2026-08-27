@@ -31,8 +31,15 @@ public class OrderItemIngredient : Entity
     /// </summary>
     public Guid IngredientId { get; set; }
 
-    /// <summary>The per-product name as it read at checkout (<c>ProductIngredient.Name</c>).</summary>
-    public string IngredientName { get; set; } = null!;
+    /// <summary>
+    /// The per-product name as it read at checkout (<c>ProductIngredient.Name</c>).
+    /// <para>
+    /// <c>required</c> rather than the <c>= null!</c> the older entities use: this column is the
+    /// whole point of the table, so a construction site that forgets it should not compile. It
+    /// follows <c>BaseEntity.CreatedBy</c>, which is already <c>required</c> on every entity here.
+    /// </para>
+    /// </summary>
+    public required string IngredientName { get; set; }
 
     public int Quantity { get; set; }
 
@@ -46,6 +53,8 @@ public class OrderItemIngredient : Entity
     /// </summary>
     public int SortOrder { get; set; }
 
-    // Navigation properties
-    public virtual OrderItem OrderItem { get; set; } = null!;
+    // Navigation properties. Nullable, and honestly so: nothing loads it (the snapshot is read
+    // through OrderItem.IngredientSnapshots, never the other way round), so declaring it non-null
+    // would be a promise the runtime does not keep.
+    public virtual OrderItem? OrderItem { get; set; }
 }
