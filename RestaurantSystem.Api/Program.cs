@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -228,7 +229,7 @@ builder.Services.AddAuthentication(options =>
             : JwtBearerDefaults.AuthenticationScheme;
     };
 })
-.AddScheme<ApiTokenAuthenticationOptions, ApiTokenAuthenticationHandler>(
+.AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(
     ApiTokenDefaults.AuthenticationScheme, _ => { })
 .AddJwtBearer(options =>
 {

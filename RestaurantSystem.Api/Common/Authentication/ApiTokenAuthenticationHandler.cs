@@ -24,13 +24,13 @@ namespace RestaurantSystem.Api.Common.Authentication;
 /// </para>
 /// </remarks>
 public sealed class ApiTokenAuthenticationHandler
-    : AuthenticationHandler<ApiTokenAuthenticationOptions>
+    : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public ApiTokenAuthenticationHandler(
-        IOptionsMonitor<ApiTokenAuthenticationOptions> options,
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder)
         : base(options, logger, encoder)
@@ -44,13 +44,17 @@ public sealed class ApiTokenAuthenticationHandler
         // NoResult, not Fail: a value that is not one of our tokens is not this scheme's
         // business, and failing here would turn a plain missing-credential request into a
         // scheme-specific error.
-        if (!ApiTokenDefaults.LooksLikeApiToken(raw))
+        //
+        // The explicit `raw is null` half is what the null check below the prefix test would
+        // otherwise need a `!` for: LooksLikeApiToken already rejects null, but that is a fact
+        // about another method's body and the compiler cannot carry it here.
+        if (raw is null || !ApiTokenDefaults.LooksLikeApiToken(raw))
         {
             return AuthenticateResult.NoResult();
         }
 
         var db = Context.RequestServices.GetRequiredService<ApplicationDbContext>();
-        var hash = ApiTokenHasher.ComputeHash(raw!);
+        var hash = ApiTokenHasher.ComputeHash(raw);
 
         var token = await db.ApiTokens
             .FirstOrDefaultAsync(t => t.TokenHash == hash, Context.RequestAborted);
@@ -94,7 +98,7 @@ public sealed class ApiTokenAuthenticationHandler
         await db.SaveChangesAsync(Context.RequestAborted);
     }
 
-    private AuthenticationTicket BuildTicket(Domain.Entities.ApiToken token)
+    private static AuthenticationTicket BuildTicket(Domain.Entities.ApiToken token)
     {
         var claims = new List<Claim>
         {

@@ -109,6 +109,21 @@ public class ApiTokenManagementTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Create_RejectsABodyThatOmitsTheExpiry()
+    {
+        // [JsonRequired] on a non-nullable int: without it the omission would bind to 0 and the
+        // caller would be told "expiry must be between 1 and 365" about a value they never sent.
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/ApiTokens", new
+        {
+            name = "no-expiry",
+            scopes = new[] { ApiTokenScopes.MenuRead }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task NonAdmin_CannotListTokens()
     {
         AuthenticateAsUser();
