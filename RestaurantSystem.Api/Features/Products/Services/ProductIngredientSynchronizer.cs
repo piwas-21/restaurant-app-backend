@@ -48,6 +48,11 @@ internal static class ProductIngredientSynchronizer
             .OfType<Guid>()
             .ToHashSet();
 
+        // One lookup for the whole payload, before the loop, so an unknown library id becomes a
+        // dropped link and a warning instead of an FK violation from SaveChangesAsync.
+        var provenance = await GlobalIngredientProvenance.ResolveAsync(
+            context, incoming, logger, cancellationToken);
+
         // Remove ingredients not in the incoming list. Their descriptions go with them by cascade
         // (ProductIngredientConfiguration: Descriptions → DeleteBehavior.Cascade).
         var ingredientsToRemove = product.DetailedIngredients
@@ -80,6 +85,9 @@ internal static class ProductIngredientSynchronizer
                 ingredient.IsActive = ingredientDto.IsActive;
                 ingredient.DisplayOrder = ingredientDto.DisplayOrder;
                 ingredient.MaxQuantity = ingredientDto.MaxQuantity;
+                // Provenance is assigned from the payload, never preserved silently: the row the
+                // admin sees is the one that decides, and clearing the picker clears the link.
+                ingredient.GlobalIngredientId = provenance.LinkFor(ingredientDto, ingredient.GlobalIngredientId);
                 ingredient.UpdatedAt = DateTime.UtcNow;
                 ingredient.UpdatedBy = auditIdentifier;
 
@@ -102,6 +110,7 @@ internal static class ProductIngredientSynchronizer
                     IsActive = ingredientDto.IsActive,
                     DisplayOrder = ingredientDto.DisplayOrder,
                     MaxQuantity = ingredientDto.MaxQuantity,
+                    GlobalIngredientId = provenance.LinkFor(ingredientDto),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = auditIdentifier
                 };
