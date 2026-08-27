@@ -169,9 +169,16 @@ public class OrderMappingServiceMenuIngredientTests : IntegrationTestBase
         var cheese = mappedItem.IngredientCustomizations!.Single(c => c.IngredientId == cheeseId);
         cheese.Quantity.Should().Be(0);
         cheese.IsRemoved.Should().BeTrue();
-        // Name resolved from GlobalIngredient.DefaultName proves the deepest
-        // (GlobalIngredient) load ran, not just a fallback to ProductIngredient.Name.
-        cheese.IngredientName.Should().Be("Mozzarella");
+        // The PER-PRODUCT name, although this ingredient carries a global one named
+        // "Mozzarella" (S0n: an order line never reads the global, so renaming it cannot
+        // reword a placed order). The deepest (GlobalIngredient) load level is no longer
+        // observable through the DTO, so it is asserted on the entity graph instead — the
+        // Product-branch sibling of this test does the same.
+        cheese.IngredientName.Should().Be("Cheese");
+        var trackedCheese = trackedItem.Menu!.MenuItems.First().Product.DetailedIngredients
+            .Single(pi => pi.Id == cheeseId);
+        context.Entry(trackedCheese).Reference(i => i.GlobalIngredient).IsLoaded
+            .Should().BeTrue("the mapper loads the GlobalIngredient level on the menu branch too (#161)");
 
         var sauce = mappedItem.IngredientCustomizations!.Single(c => c.IngredientId == sauceId);
         sauce.Quantity.Should().Be(1);
