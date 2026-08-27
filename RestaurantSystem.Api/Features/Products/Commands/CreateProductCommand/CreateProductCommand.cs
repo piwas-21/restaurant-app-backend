@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -208,6 +209,9 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
             // Add detailed ingredients
             if (command.DetailedIngredients?.Any() == true)
             {
+                var provenance = await GlobalIngredientProvenance.ResolveAsync(
+                    _context, command.DetailedIngredients, _logger, cancellationToken);
+
                 foreach (var ingredientDto in command.DetailedIngredients)
                 {
                     var ingredient = new ProductIngredient
@@ -220,6 +224,8 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         IsActive = ingredientDto.IsActive,
                         DisplayOrder = ingredientDto.DisplayOrder,
                         MaxQuantity = ingredientDto.MaxQuantity,
+                        // Provenance of a picked library row; null when the name was typed by hand.
+                        GlobalIngredientId = provenance.LinkFor(ingredientDto),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
