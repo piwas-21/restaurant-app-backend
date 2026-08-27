@@ -239,6 +239,16 @@ public class OrderMappingService : IOrderMappingService
         {
             foreach (var item in order.Items)
             {
+                // The FROZEN ingredient lines (S1) are what a placed order renders from; the catalog
+                // loads below are the fallback for rows written before the snapshot existed. Loading
+                // it here rather than relying on fix-up matters for the same reason the loads below
+                // do: this path serves an order that was fetched with a narrow include chain, and a
+                // missing navigation reads as "no snapshot" instead of throwing (#234's class).
+                if (!_context.Entry(item).Collection(i => i.IngredientSnapshots).IsLoaded)
+                {
+                    await _context.Entry(item).Collection(i => i.IngredientSnapshots).LoadAsync(cancellationToken);
+                }
+
                 // Load Product for regular product items
                 if (item.ProductId.HasValue)
                 {
@@ -324,39 +334,25 @@ public class OrderMappingService : IOrderMappingService
         return MapToOrderDto(order);
     }
 
-    // Ensures a product's DetailedIngredients — and each ingredient's GlobalIngredient
-    // reference — are loaded. Each load is guarded by its own IsLoaded flag so the inner
-    // GlobalIngredient loads still run when DetailedIngredients was already tracked (e.g.
-    // via EF relationship fixup). That closes the fixup-loaded ingredient defect
-    // (#150/#152/#153) one level deeper and deduplicates the identical graph-walk the
-    // Product and Menu branches shared (#161).
+    // Ensures a product's DetailedIngredients are loaded, guarded by its own IsLoaded flag so the
+    // load still runs when the Product reference was already tracked via EF relationship fixup —
+    // the fixup-loaded ingredient defect (#150/#152/#153) — and deduplicating the identical
+    // graph-walk the Product and Menu branches shared (#161).
     //
-    // The GlobalIngredient level no longer feeds a display name — S0n made the order line
-    // render ProductIngredient.Name so a rename cannot reword a placed order. It is kept
-    // rather than deleted because dropping a level of an include/load graph is a separate,
-    // separately revertible change, and slice S1 (the OrderItemIngredient snapshot table)
-    // decides what this graph is for.
+    // This is the FALLBACK path only: a line carrying a frozen snapshot (S1) never reaches the
+    // catalog at all. It stays because S1 backfills nothing, so every pre-S1 line still resolves
+    // its id map against the live recipe.
+    //
+    // The per-ingredient GlobalIngredient load that used to follow is GONE (S1). S0n stopped the
+    // order line reading GlobalIngredient.DefaultName — a rename must not reword a placed order —
+    // and left the load in place because dropping a level of a load graph deserved its own,
+    // separately revertible change. This is that change: nothing on an order reads the navigation,
+    // so the loop was one query per ingredient per order for a value no DTO carries.
     private async Task EnsureProductIngredientsLoadedAsync(Product product, CancellationToken cancellationToken)
     {
         if (!_context.Entry(product).Collection(p => p.DetailedIngredients).IsLoaded)
         {
             await _context.Entry(product).Collection(p => p.DetailedIngredients).LoadAsync(cancellationToken);
-        }
-
-        // DetailedIngredients is initialized to [] on the entity, but guard anyway to
-        // match the file's existing defensive style (see MapToOrderItemDto) and stay
-        // safe for manually-constructed / mocked Products.
-        if (product.DetailedIngredients == null)
-        {
-            return;
-        }
-
-        foreach (var ing in product.DetailedIngredients)
-        {
-            if (!_context.Entry(ing).Reference(i => i.GlobalIngredient).IsLoaded)
-            {
-                await _context.Entry(ing).Reference(i => i.GlobalIngredient).LoadAsync(cancellationToken);
-            }
         }
     }
 }

@@ -28,7 +28,7 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task MapToOrderDtoAsync_ProductDetailedIngredientsAlreadyTracked_ResolvesGlobalIngredientName()
+    public async Task MapToOrderDtoAsync_ProductDetailedIngredientsAlreadyTracked_MapsIngredientsWithoutTheGlobalLevel()
     {
         // Cheese carries a GlobalIngredient so its mapped name proves the deepest
         // load level (Product -> DetailedIngredients -> GlobalIngredient) actually
@@ -152,21 +152,19 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
 
         var dto = await mapper.MapToOrderDtoAsync(loadedOrder);
 
-        // Assert — the product's ingredient customizations survived the mapping, and the
-        // deepest (GlobalIngredient) load level actually ran.
+        // Assert — the product's ingredient customizations survived the mapping, and the mapper
+        // did NOT walk down to the GlobalIngredient level.
         //
-        // That last claim used to be proved by the DTO name coming back "Mozzarella". S0n
-        // removed that evidence: the order line now renders ProductIngredient.Name
-        // unconditionally, so a rename of the global cannot reword a placed order, and no
-        // DTO field reflects the GlobalIngredient level any more. The load is still made
-        // (see EnsureProductIngredientsLoadedAsync) and is still what #161 was about, so the
-        // proof moves to the entity graph itself — which is a direct assertion on the
-        // behaviour rather than an inference from a rendered string.
+        // The direction of this assertion is REVERSED from what #161 asserted, deliberately.
+        // #161 was about loading that level; S0n then stopped the order line reading its name (a
+        // global rename must not reword a placed order) and S1 froze the name on the order row, so
+        // by S1 nothing on an order reads the navigation at all. The load was therefore one query
+        // per ingredient per order for a value no DTO carries, and it is gone. Asserting it stays
+        // gone is what stops it being reinstated by reflex.
         var trackedCheeseAfter = trackedItem.Product!.DetailedIngredients.Single(pi => pi.Id == cheeseId);
         context.Entry(trackedCheeseAfter).Reference(i => i.GlobalIngredient).IsLoaded
-            .Should().BeTrue("the mapper must load the GlobalIngredient level even when "
-                + "DetailedIngredients was already tracked (#161)");
-        trackedCheeseAfter.GlobalIngredient!.DefaultName.Should().Be("Mozzarella");
+            .Should().BeFalse("no order surface reads GlobalIngredient since S0n/S1, so loading it "
+                + "per ingredient is pure query cost");
 
         var mappedItem = dto.Items.Single();
         mappedItem.ProductId.Should().Be(productId);
