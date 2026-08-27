@@ -138,6 +138,24 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
         grandchild["productName"]!.GetValue<string>().Should().Be("Extra Patty");
     }
 
+    /// <summary>
+    /// The poll cursor with no zone (`?modifiedSince=2020-01-01`) binds Kind=Unspecified, which
+    /// Npgsql refuses against the timestamptz columns — the same defect that took the reservations
+    /// day view down (backend #418). Here it would stop the printer receiving tickets at all, and
+    /// this endpoint hides that behind HTTP 200, so the body's `success` is the only tell.
+    /// </summary>
+    [Fact]
+    public async Task PrinterFeed_AcceptsAZonelessModifiedSinceCursor()
+    {
+        var response = await Client.GetAsync("/api/orders/printer-feed?modifiedSince=2020-01-01");
+        response.EnsureSuccessStatusCode();
+
+        var feed = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+
+        feed["success"]!.GetValue<bool>().Should().BeTrue();
+        feed["data"]!["items"]!.AsArray().Should().NotBeEmpty("the seeded orders are all newer than 2020");
+    }
+
     private async Task<string> FetchRawFeedAsync()
     {
         // No X-Api-Key header: `ApiKeyAuthFilter` is open when `PrinterSettings:ApiKey` is unset,

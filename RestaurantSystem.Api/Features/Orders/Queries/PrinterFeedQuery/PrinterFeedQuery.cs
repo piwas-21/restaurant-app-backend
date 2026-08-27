@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -57,11 +58,16 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             .AsSplitQuery()
             .AsQueryable();
 
-        if (query.ModifiedSince.HasValue)
+        // Kind-normalised first: a cursor with no offset (`?modifiedSince=2026-08-27`) binds
+        // Unspecified, which Npgsql will not compare with the timestamptz column — the poll then
+        // throws and the printer stops receiving tickets altogether (backend #418).
+        var modifiedSinceUtc = QueryInstant.AsUtc(query.ModifiedSince);
+
+        if (modifiedSinceUtc.HasValue)
         {
             ordersQuery = ordersQuery.Where(o =>
-                o.CreatedAt > query.ModifiedSince.Value ||
-                (o.UpdatedAt.HasValue && o.UpdatedAt.Value > query.ModifiedSince.Value));
+                o.CreatedAt > modifiedSinceUtc.Value ||
+                (o.UpdatedAt.HasValue && o.UpdatedAt.Value > modifiedSinceUtc.Value));
         }
 
         var orders = await ordersQuery
