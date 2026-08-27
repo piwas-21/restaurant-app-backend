@@ -38,9 +38,14 @@ internal static class ProductIngredientSynchronizer
         ILogger logger,
         CancellationToken cancellationToken)
     {
+        // `OfType<Guid>()` rather than the `Where(HasValue).Select(x => x.Id!.Value)` the variation
+        // block uses: flow analysis does not carry `HasValue` across the lambda boundary, so that
+        // shape needs a null-forgiving operator to compile (CS8629) and Sonar then flags the `!`
+        // (S8970). OfType drops the id-less entries by the same rule with nothing to suppress, and
+        // without a `GetValueOrDefault()` that would quietly turn "no id" into Guid.Empty.
         var incomingIds = incoming
-            .Where(i => i.Id.HasValue)
-            .Select(i => i.Id!.Value)
+            .Select(i => i.Id)
+            .OfType<Guid>()
             .ToHashSet();
 
         // Remove ingredients not in the incoming list. Their descriptions go with them by cascade
