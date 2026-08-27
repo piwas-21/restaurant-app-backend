@@ -238,12 +238,13 @@ public class BasketRemovedIngredientNamesTests : IntegrationTestBase
     // line and like the customization sheet, MenuCard and the POS sheet — all of which read
     // ProductIngredientDto, which exposes no global name at all.
     //
-    // Pinned because the order snapshot does the opposite: OrderMappingService prefers
-    // GlobalIngredient.DefaultName. So for an ingredient whose global and per-product names have
-    // been allowed to diverge, the cart and the order still print different words. That is
-    // pre-existing and applies equally to the selected/added lists this PR does not touch;
-    // harmonizing it is a decision about which of the five surfaces is wrong, not part of #363.
-    // Asserting the current answer keeps the next change to it deliberate.
+    // Pinned because the order snapshot used to do the opposite: OrderMappingService preferred
+    // GlobalIngredient.DefaultName, so for an ingredient whose global and per-product names had
+    // been allowed to diverge, the cart and the order printed different words. #363 called that
+    // "a decision about which of the five surfaces is wrong". It was decided against the order:
+    // slice S0n made the order line read ProductIngredient.Name too, because the global name is
+    // read at RENDER time and renaming it silently reworded receipts already issued. The cart is
+    // now the pattern the order follows, not the odd one out.
     [Fact]
     public async Task RemovedIngredient_UsesTheProductLocalName()
     {
