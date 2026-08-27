@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Api.Features.Settings.FormFields;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
@@ -23,6 +24,7 @@ public class UpdateMyReservationCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly IFormFieldRequirementService _formFieldRequirements;
+    private readonly IReservationChangedMailer _mailer;
     private readonly ITenantClock _clock;
     private readonly ILogger<UpdateMyReservationCommandHandler> _logger;
 
@@ -30,12 +32,14 @@ public class UpdateMyReservationCommandHandler
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         IFormFieldRequirementService formFieldRequirements,
+        IReservationChangedMailer mailer,
         ITenantClock clock,
         ILogger<UpdateMyReservationCommandHandler> logger)
     {
         _context = context;
         _currentUser = currentUser;
         _formFieldRequirements = formFieldRequirements;
+        _mailer = mailer;
         _clock = clock;
         _logger = logger;
     }
@@ -69,7 +73,7 @@ public class UpdateMyReservationCommandHandler
         // is not an instant and is never run through the clock (#363).
         var tenantToday = _clock.Now.Date;
 
-        EnsureEditable(reservation, tenantToday);
+        GuestReservationEdit.EnsureEditable(reservation, tenantToday);
 
         if (bookedDay.Date < tenantToday)
         {
@@ -79,9 +83,13 @@ public class UpdateMyReservationCommandHandler
 
         await EnsureTableStillFitsAsync(reservation, data, bookedDay, cancellationToken);
 
-        ApplyGuestEditableFields(reservation, data, bookedDay);
+        var edit = GuestReservationEdit.Apply(reservation, data, bookedDay);
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // After the commit and never awaited into the response contract: the mails are a
+        // consequence of the change, and a mail failure must not tell a guest their change failed.
+        await _mailer.SendAsync(reservation, reservation.Table.TableNumber, edit, cancellationToken);
 
         _logger.LogInformation(
             "Customer {CustomerId} updated their reservation {ReservationId}",
@@ -116,24 +124,6 @@ public class UpdateMyReservationCommandHandler
         return reservation;
     }
 
-    /// <summary>Only a live, still-future booking is guest-editable: the cancel path's
-    /// terminal-status rule plus the create path's day comparison — not a second time model.</summary>
-    private static void EnsureEditable(Reservation reservation, DateTime tenantToday)
-    {
-        if (reservation.Status is not (ReservationStatus.Pending or ReservationStatus.Confirmed))
-        {
-            throw new BadRequestException(
-                $"A {reservation.Status.ToString().ToLowerInvariant()} reservation can no longer be changed",
-                ErrorCodes.ReservationNotEditable);
-        }
-
-        if (reservation.ReservationDate.Date < tenantToday)
-        {
-            throw new BadRequestException(
-                "A past reservation can no longer be changed", ErrorCodes.ReservationNotEditable);
-        }
-    }
-
     /// <summary>The create path's capacity and overlap checks, against the table the booking already
     /// sits on. No re-assignment: the guest DTO carries no <c>TableId</c>, and silently moving a party
     /// to another table changes what the restaurant agreed to.</summary>
@@ -166,33 +156,6 @@ public class UpdateMyReservationCommandHandler
             throw new BadRequestException(
                 $"Table {table.TableNumber} is not available for the selected time slot",
                 ErrorCodes.ReservationSlotUnavailable);
-        }
-    }
-
-    /// <summary>Writes the guest-editable fields only. A Confirmed booking whose SHAPE changed (day,
-    /// hours or party size) drops back to Pending — the restaurant approved those numbers, not the new
-    /// ones. A contact-detail-only edit keeps the confirmation.</summary>
-    private static void ApplyGuestEditableFields(
-        Reservation reservation, UpdateMyReservationDto data, DateTime bookedDay)
-    {
-        var shapeChanged =
-            reservation.ReservationDate.Date != bookedDay.Date ||
-            reservation.StartTime != data.StartTime ||
-            reservation.EndTime != data.EndTime ||
-            reservation.NumberOfGuests != data.NumberOfGuests;
-
-        reservation.CustomerName = data.CustomerName;
-        reservation.CustomerEmail = data.CustomerEmail;
-        reservation.CustomerPhone = data.CustomerPhone;
-        reservation.ReservationDate = bookedDay;
-        reservation.StartTime = data.StartTime;
-        reservation.EndTime = data.EndTime;
-        reservation.NumberOfGuests = data.NumberOfGuests;
-        reservation.SpecialRequests = data.SpecialRequests;
-
-        if (shapeChanged && reservation.Status == ReservationStatus.Confirmed)
-        {
-            reservation.Status = ReservationStatus.Pending;
         }
     }
 }

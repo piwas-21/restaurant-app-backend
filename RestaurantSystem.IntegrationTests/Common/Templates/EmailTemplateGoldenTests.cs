@@ -67,8 +67,16 @@ public class EmailTemplateGoldenTests
     private static readonly EmailLinks Links = new(ApiBaseUrl, FrontendBaseUrl, ContactEmail);
     private static readonly OrderMailDetails OrderDetails = new(
         OrderNumber, "Delivery", Total, Items, "CHF", "quick-action-token", Instructions, DeliveryAddress);
+    // The two link signatures are fixed strings, not real ones: a golden that minted a token would
+    // re-record itself on every run (the signature covers a wall-clock expiry). What the snapshot
+    // has to pin is that the buttons carry ONE, and where (backend #402).
     private static readonly ReservationMailDetails ReservationDetails = new(
-        Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests, ReservationId);
+        Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests, ReservationId,
+        "approve-token-fixture", "reject-token-fixture");
+
+    /// <summary>The shape the guest replaced — a confirmed booking, which is the case M17 exists for.</summary>
+    private static readonly ReservationPreviousBooking PreviousBooking = new(
+        Moment.AddDays(-1), new TimeSpan(18, 0, 0), new TimeSpan(20, 0, 0), 2, WasConfirmed: true);
     private const string RestaurantNote = "See you soon";
     private const string ApiBaseUrl = "https://api.demo.test";
     private const string FrontendBaseUrl = "https://demo.test";
@@ -121,6 +129,18 @@ public class EmailTemplateGoldenTests
             Culture, Brand, CustomerName, new ReservationMailDetails(Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests), ContactEmail, RestaurantNote));
         yield return ("ReservationApproved.text", EmailTemplates.ReservationApproved.GetTextBody(
             Culture, Brand, CustomerName, new ReservationMailDetails(Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests), ContactEmail, RestaurantNote));
+        yield return ("ReservationChanged.subject", EmailTemplates.ReservationChanged.GetSubject(Culture, Brand));
+        yield return ("ReservationChanged.html", EmailTemplates.ReservationChanged.GetHtmlBody(
+            Culture, Brand, CustomerName, new ReservationMailDetails(Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests),
+            ReservationChangeOutcome.NeedsApprovalAgain, ContactEmail));
+        yield return ("ReservationChanged.text", EmailTemplates.ReservationChanged.GetTextBody(
+            Culture, Brand, CustomerName, new ReservationMailDetails(Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests),
+            ReservationChangeOutcome.NeedsApprovalAgain, ContactEmail));
+        yield return ("ReservationChangedAdmin.subject", EmailTemplates.ReservationChangedAdmin.GetSubject(Culture, Brand));
+        yield return ("ReservationChangedAdmin.html", EmailTemplates.ReservationChangedAdmin.GetHtmlBody(
+            Culture, Brand, Guest, ReservationDetails, PreviousBooking, Links));
+        yield return ("ReservationChangedAdmin.text", EmailTemplates.ReservationChangedAdmin.GetTextBody(
+            Culture, Brand, Guest, ReservationDetails, PreviousBooking, ContactEmail));
         yield return ("ReservationConfirmation.subject", EmailTemplates.ReservationConfirmation.GetSubject(Culture, Brand));
         yield return ("ReservationConfirmation.html", EmailTemplates.ReservationConfirmation.GetHtmlBody(
             Culture, Brand, CustomerName, new ReservationMailDetails(Moment, StartTime, EndTime, 4, TableNumber, SpecialRequests), ContactEmail));

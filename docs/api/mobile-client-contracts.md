@@ -1,29 +1,32 @@
 # Mobile client API contracts
 
 > **Audience:** anyone writing a client against this API — in particular the mobile-app developer.
-> **Scope:** the four backend changes made for the mobile API audit of 2026-08-23, plus the two known
-> holes that were **not** fixed.
+> **Scope:** the backend changes made for the mobile API audit of 2026-08-23 — the four that shipped with
+> the audit, the signed reservation links that followed it, and the one known hole still **not** fixed.
 > **This file is the contract.** It is assembled from the code on the four feature branches, not from a
 > plan. Where a design note and the code disagreed, the code won.
 
 ## Release state — read this first
 
-**None of this is live yet.** Every change below sits on an **open pull request against `develop`**. The
-API reaches production only through a `develop` → `main` release, so until that release merges:
+The four audit changes below were **released to production on 2026-08-24** (release PR
+[#409](https://github.com/piwas-21/restaurant-app-backend/pull/409)). The API reaches production only
+through a `develop` → `main` release, so a change listed as *awaiting release* still answers with the
+old behaviour on production and staging.
 
-- production and staging still serve the **old** behaviour;
-- the endpoints marked "new" answer `404`;
-- the swagger document still carries the old schema ids.
-
-| Change | PR | Branch |
+| Change | PR | State |
 |---|---|---|
-| `GET /api/Auth/has-password` + `POST /api/Auth/set-password` | **#403** | `feat/auth-has-password-set-password` |
-| Readable swagger `schemaId`s | **#404** | `fix/swagger-readable-schema-ids` |
-| `PUT /api/Reservations/{id}/mine` + cancel ownership fix | **#405** | `feat/customer-update-own-reservation` |
-| Apple identity-token verification + name refresh | **#406** | `fix/apple-login-token-verification` |
+| `GET /api/Auth/has-password` + `POST /api/Auth/set-password` | **#403** | released (#409) |
+| Readable swagger `schemaId`s | **#404** | released (#409) |
+| `PUT /api/Reservations/{id}/mine` + cancel ownership fix | **#405** | released (#409) |
+| Apple identity-token verification + name refresh | **#406** | released (#409) |
+| Signed reservation quick-action email links (#402) | **#410** | merged to `develop`, awaiting release |
+| Reservation-changed mails, guest + restaurant (#407) | **#411** | merged to `develop`, awaiting release |
 
-Two related problems are **open issues, not fixed**: [#402](https://github.com/piwas-21/restaurant-app-backend/issues/402)
-and [#407](https://github.com/piwas-21/restaurant-app-backend/issues/407). See [§5](#5-known-gaps-that-are-not-fixed).
+Both problems the audit raised as "known holes" are now **fixed**:
+[#402](https://github.com/piwas-21/restaurant-app-backend/issues/402) — see
+[§4b](#4b-reservation-quick-action-email-links-are-signed--402) — and
+[#407](https://github.com/piwas-21/restaurant-app-backend/issues/407) — see
+[§1.2](#12-behaviour-a-client-must-handle) item 7.
 
 ---
 
@@ -221,7 +224,17 @@ the missing-reservation one.
 5. **Ownership is by `customerId`.** A booking created while signed out has no owner and stays
    uneditable through this route even when the email matches.
 6. **Concurrency: last write wins.** There is no ETag and no row version on a reservation.
-7. **No email is sent on this path — to anybody.** See [§5.2](#52-407--a-guest-edit-sends-no-mail).
+7. **Two emails leave on this path** (#407, PR #411 — awaiting release). They are sent **after** the
+   commit and are swallowed on failure: a mail that fails never turns into a failed edit, and the
+   response says nothing about them.
+   - The **guest** always gets "your reservation was updated", in the language frozen on the booking,
+     showing the booking as it now stands. It ends on one of three sentences: *still confirmed* (a
+     contact-only edit), *waiting for confirmation* (the booking was already `Pending`), or *the
+     restaurant has to approve this again* (a re-shaped `Confirmed` booking — case 1 above).
+   - The **restaurant** is alerted **only when the shape changed**. A contact-details-only edit sends it
+     nothing: no decision changed, and the alert is a request for a decision. The alert carries the same
+     **signed** approve / reject links as the new-booking alert (§4b), minted fresh for the booking's
+     current status, plus the previous day, time and party size.
 
 ### 1.3 `reservationDate` is a calendar day, and this route is strict
 
@@ -254,7 +267,7 @@ New behaviour — the response shape (`ApiResponse<bool>`) is unchanged:
 | customer | their own (`customerId` equals the caller) | cancels — unchanged |
 | customer | someone else's, or an ownerless walk-in | **refused**, see below |
 | anonymous | – | `401` — unchanged |
-| the restaurant's `quick-reject` email link | any | cancels — unchanged, `[AllowAnonymous]`, the one documented opt-out |
+| the restaurant's `quick-reject` email link | any | cancels — `[AllowAnonymous]`, the one documented ownership opt-out. Since #402 the link must also carry a valid `?token=` (§4b) |
 
 The refusal is **byte-identical to a genuinely missing id**:
 
@@ -674,47 +687,76 @@ two distinct CLR types claim one key).
 
 ---
 
-## 5. Known gaps that are NOT fixed
+## 4b. Reservation quick-action email links are signed — #402
 
-These are open. Do not build a client that assumes they are closed.
+### 4b.1 What changed
 
-### 5.1 #402 — a guest can approve their own booking
+`GET /api/reservations/{id}/quick-approve` and `GET /api/reservations/{id}/quick-reject` used to act on
+a bare reservation id with no authentication of any kind. The id is **not** a secret:
+`POST /api/Reservations` is `[AllowAnonymous]` and returns the whole `ReservationDto`, `id` included, to
+whoever made the booking. So the guest could **self-approve their own pending booking**, receive the
+"approved" mail, and hold the table the restaurant never agreed to.
 
-`GET /api/reservations/{id}/quick-approve` and `GET /api/reservations/{id}/quick-reject` are
-`[AllowAnonymous]` and act on a bare reservation id. Measured facts:
+Both routes now require a signed token:
 
-1. The links exist in exactly one place: the reservation alert mail sent to the **restaurant**. No
-   guest-facing template contains them.
-2. The id is **not secret**. `POST /api/Reservations` is `[AllowAnonymous]` and returns the full
-   `ReservationDto`, `id` included, to whoever created the booking.
-3. Ids are random v4 GUIDs, so they are not enumerable or guessable, and no listing endpoint hands a
-   guest anyone else's id.
+```
+GET /api/reservations/{id}/quick-approve?token={token}
+GET /api/reservations/{id}/quick-reject?token={token}
+```
 
-**Verdict: a real but narrow authorisation gap.** It is not "anyone can approve any reservation". The
-people who hold an id are the restaurant (from its alert mail) and the guest who made that booking (from
-the create response). What the guest can do is **self-approve their own pending booking**, bypassing the
-restaurant's decision — the confirmation mail then tells them the restaurant accepted, and the table is
-taken. Anyone who obtains a link (a forwarded alert mail, a shared browser history) can do the same for
-that one booking.
+The token is `{unixExpiry}.{base64url(HMAC-SHA256)}` over the reservation id, the action, and the
+booking's **current status**, keyed server-side. It is minted by the backend and written into the
+restaurant's alert mail; nothing else can produce one.
 
-Not fixed here because the fix is not one line: the link must carry a signed, expiring token, which needs
-a token service, a template change, a second route contract, and it **invalidates every alert mail
-already sitting in the restaurant's inbox** on deploy. That needs the restaurant's agreement.
+### 4b.2 What a client must know
 
-Tracked as [issue #402](https://github.com/piwas-21/restaurant-app-backend/issues/402).
-**Client impact: none — no client should call these endpoints.**
+**No client should call these routes.** They are mail links that render an HTML page, not an API. They
+are listed here because the mobile team's audit raised the gap (`BACKEND-NOTES.md` §5) and because the
+behaviour a person sees has changed:
 
-### 5.2 #407 — a guest edit sends no mail
+- A request with a missing, wrong, or expired token renders a plain HTML page — "This link can no
+  longer be used" — with a link to the reservations dashboard. **HTTP 200, never a stack trace.**
+- The same page, byte for byte, is returned for a reservation id that does not exist. The route is not
+  an existence oracle.
+- A link is **one-shot**. The status is part of what is signed, so approving a booking also retires the
+  reject button in the same mail. Changing a decision afterwards is a dashboard action, where there is
+  an authenticated caller to hold responsible.
+- Links expire (`ReservationQuickActions:LinkLifetimeDays`, default 7 days).
 
-`PUT /api/Reservations/{id}/mine` sends **no email, to nobody**. There is no "reservation changed"
-template for the guest and none for the restaurant, and inventing one was out of scope.
+### 4b.3 Migration — links already in the inbox
 
-The consequence matters for the UX: when a guest edits a **`Confirmed`** booking it drops back to
-`Pending` (§1.2.1) and **the restaurant is not told**. Staff see it only in the reservations list. A
-client must therefore say in words that the booking is waiting for approval again — the guest would
-otherwise believe the change was accepted.
+Alert mails sent before this release carry no token. A token-less link is still honoured while its own
+reservation is younger than `ReservationQuickActions:LegacyLinkGraceDays` (default 14 days, measured
+from that reservation's `CreatedAt`), and every such use is logged at warning level. Two config values
+close the window early; see the backend README §"Reservation quick-action links".
 
-Tracked as [issue #407](https://github.com/piwas-21/restaurant-app-backend/issues/407).
+### 4b.4 Test evidence
+
+`RestaurantSystem.IntegrationTests/Features/Reservations/ReservationQuickActionLinksTests.cs` (the
+signature itself: expiry, tamper, wrong action, wrong booking, replay, key separation, grace window),
+`…/ReservationQuickActionLinkAuthorizationTests.cs` (the two routes end to end, including the
+"unknown id answers exactly what a bad token answers" assertion),
+`…/ReservationQuickActionLegacyLinkTests.cs` (the migration window) and
+`RestaurantSystem.IntegrationTests/Common/Templates/ReservationAdminNotificationLinkTests.cs` (no
+template emits a token-less link).
+
+---
+
+## 5. Known gaps — both now closed
+
+Kept as a record of what the audit found and what answered it. Nothing in this section is open.
+
+### 5.1 #407 — a guest edit sends no mail — **CLOSED**
+
+Was: `PUT /api/Reservations/{id}/mine` sent **no email, to nobody**, so a `Confirmed` booking could drop
+back to `Pending` without the restaurant ever being told.
+
+**Fixed in PR #411** (awaiting release): the guest always gets a "your reservation was updated" mail, and
+the restaurant gets a "this needs a new decision" alert whenever the day, time or party size moved. The
+exact rules are in [§1.2](#12-behaviour-a-client-must-handle) item 7.
+
+A client should **still say in words** that a re-shaped booking is waiting for approval again — the mail
+is a written record, not the UI, and it may arrive after the guest has closed the app.
 
 ---
 

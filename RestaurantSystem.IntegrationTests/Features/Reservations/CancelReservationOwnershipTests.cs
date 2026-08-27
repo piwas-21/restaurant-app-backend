@@ -2,6 +2,7 @@ using System.Net;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -103,7 +104,14 @@ public class CancelReservationOwnershipTests : IntegrationTestBase
         var id = await SeedReservationAsync(OtherUserId);
         AuthenticateAsAnonymous();
 
-        var response = await Client.GetAsync($"/api/reservations/{id}/quick-reject");
+        // The link now carries the signature the alert mail puts on it (backend #402). What this
+        // test still pins is the OWNERSHIP opt-out: a signed link works with no caller at all.
+        // Everything about the signature itself is ReservationQuickActionLinkAuthorizationTests.
+        var token = Factory.Services
+            .GetRequiredService<IReservationQuickActionLinks>()
+            .Mint(id, ReservationQuickAction.Reject, ReservationStatus.Pending);
+
+        var response = await Client.GetAsync($"/api/reservations/{id}/quick-reject?token={Uri.EscapeDataString(token)}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         (await StatusOfAsync(id)).Should().Be(ReservationStatus.Cancelled);

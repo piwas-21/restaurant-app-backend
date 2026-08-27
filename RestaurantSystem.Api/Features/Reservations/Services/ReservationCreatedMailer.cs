@@ -13,6 +13,7 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
     private readonly IEmailService _emailService;
     private readonly IEmailBrandingProvider _brandingProvider;
     private readonly IEmailLanguageResolver _languages;
+    private readonly IReservationQuickActionLinks _quickActionLinks;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<ReservationCreatedMailer> _logger;
 
@@ -20,6 +21,7 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
         IEmailService emailService,
         IEmailBrandingProvider brandingProvider,
         IEmailLanguageResolver languages,
+        IReservationQuickActionLinks quickActionLinks,
         IOptions<EmailSettings> emailSettings,
         ILogger<ReservationCreatedMailer> logger)
     {
@@ -28,6 +30,7 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
         _emailService = emailService;
         _brandingProvider = brandingProvider;
         _languages = languages;
+        _quickActionLinks = quickActionLinks;
         _emailSettings = emailSettings.Value;
         _logger = logger;
     }
@@ -50,6 +53,10 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
 
             var guest = new EmailGuest(
                 reservation.CustomerName, reservation.CustomerEmail, reservation.CustomerPhone ?? string.Empty);
+            // One description of the booking, but only the OPERATOR's copy carries buttons, so the
+            // two signatures are minted here and simply ignored by the guest's template. Signed
+            // over the status the booking is in right now, which is what makes a link stop working
+            // the moment the booking is decided (backend #402).
             var details = new ReservationMailDetails(
                 reservation.ReservationDate,
                 reservation.StartTime,
@@ -57,7 +64,9 @@ public class ReservationCreatedMailer : IReservationCreatedMailer
                 reservation.NumberOfGuests,
                 tableNumber,
                 reservation.SpecialRequests,
-                reservation.Id);
+                reservation.Id,
+                _quickActionLinks.Mint(reservation.Id, ReservationQuickAction.Approve, reservation.Status),
+                _quickActionLinks.Mint(reservation.Id, ReservationQuickAction.Reject, reservation.Status));
 
             // One reservation, two mails, ONE description of it — and two different cultures, which
             // is the thing that must not be shared (§6.10).

@@ -85,6 +85,41 @@ All MRs require the pipeline to pass before merge.
 | `JwtSettings` | `app-secrets.json` | Secret must be ≥ 32 bytes |
 | `CorsSettings:AllowedOrigins` | `appsettings.<Env>.json` | App throws on startup in non-Dev if empty |
 | `SENTRY_DSN` (+ optional `SENTRY_ENVIRONMENT`) | env var (box `.env` → compose passthrough, deploy repo) | Empty/unset = Sentry never initializes (inert). Errors only — no PII, no request bodies, tracing off. Enable runbook: deploy repo `DEPLOYMENT.md` §Error tracking |
+| `ReservationQuickActions` | `appsettings.json` + env override | Signs the approve/reject links in the restaurant's alert mail. See below |
+
+### Reservation quick-action links
+
+`GET /api/reservations/{id}/quick-approve` and `.../quick-reject` are opened from the restaurant's
+alert mail, so they carry no session and stay `[AllowAnonymous]`. What authorises them is a `?token=`
+the mail puts on the link: an HMAC-SHA256 over the reservation id, the action, and the booking's
+**current status**, with an expiry (backend #402). Signing the status is what makes a link one-shot —
+once the booking is approved or rejected, both buttons in that mail stop working.
+
+Before this, the bare reservation id was the whole authorisation, and `POST /api/Reservations` is
+anonymous and returns that id to whoever made the booking. A guest could approve their own table.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `ReservationQuickActions:SigningKey` | `""` | HMAC key material. **Leave empty on an existing box:** the key is then derived (HKDF, purpose-labelled) from the already-required `JwtSettings:Secret`, so no new environment variable is needed to deploy. Set it to rotate link signatures independently of the JWT secret — every link already in an inbox stops working when you do |
+| `ReservationQuickActions:LinkLifetimeDays` | `7` | How long a freshly minted link is valid. After that the restaurant decides in the dashboard |
+| `ReservationQuickActions:LegacyLinkGraceDays` | `14` | Migration window for alert mails sent **before** signing shipped, which carry no token. Measured from each reservation's own `CreatedAt`, so it closes booking by booking. Every legacy use is logged at **warning** level |
+| `ReservationQuickActions:LegacyLinkCutoffUtc` | unset | Optional instant; a reservation created at or after it can never take the token-less path |
+
+**Closing the migration window.** The grace window is anchored per booking, so it needs no follow-up:
+once every reservation created before the release is older than `LegacyLinkGraceDays`, nothing can use
+a token-less link again. Two ways to close it sooner, both config-only — no code change, no redeploy of
+new code:
+
+1. **Recommended, at release:** set `ReservationQuickActions__LegacyLinkCutoffUtc` to the release
+   timestamp (e.g. `2026-08-24T00:00:00Z`). Mails already sent keep working; bookings made after the
+   release are signed-only from the first minute. Without it, the window also covers **new** bookings,
+   which leaves #402 open for its length.
+2. **Once the inbox is drained:** set `ReservationQuickActions__LegacyLinkGraceDays=0`. Every
+   token-less link then lands on the "this link can no longer be used" page, which links to the
+   reservations dashboard.
+
+Watch for `Accepted a LEGACY unsigned quick-…` warnings in the box logs to tell when the old mails have
+stopped being used.
 
 ## Pull requests
 
