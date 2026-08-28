@@ -338,8 +338,16 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
             selectedIngredientIds = Array.Empty<Guid>(),
         });
 
-        // The deduction is per LINE, not per unit — 2 × 18.00 − 1.50, never 2 × (18.00 − 1.50).
-        (await SingleOrderAsync()).Total.Should().Be((PizzaPrice * 2) - SaucePrice);
+        // PER UNIT: 2 × (18.00 − 1.50). Two pizzas each lose their own sauce.
+        //
+        // THIS LINE PREVIOUSLY ASSERTED `(PizzaPrice * 2) - SaucePrice`, with a comment explaining
+        // that the deduction was "per LINE, not per unit". That was WRONG, and the comment is why
+        // it survived review: the test documented the defect as intended behaviour, so it was green
+        // before the fix and would have gone red on it. A test can pin a bug exactly as firmly as it
+        // pins a rule, and mutation testing cannot tell the two apart — both are red when the code
+        // changes. What separates them is an ORACLE the test author did not compute, which is what
+        // WaiterAndGuestPricingParityTests now supplies: the guest basket path, priced independently.
+        (await SingleOrderAsync()).Total.Should().Be((PizzaPrice - SaucePrice) * 2);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────────────────
