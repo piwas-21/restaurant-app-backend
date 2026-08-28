@@ -25,8 +25,25 @@ public interface IBasketPricingService
     /// ingredient's <c>MaxQuantity</c>. Pure calculation (no I/O); shared by the menu-option
     /// and regular-product add-to-basket paths.
     /// </summary>
+    /// <param name="sauceIncludedFree">
+    /// The product's <c>SauceIncludedFree</c> allowance (SHARED-MODIFIERS-AND-SAUCES-PLAN D10): how
+    /// many CHARGED sauce units this line gets for nothing. <c>0</c> — the default, and the value
+    /// every product on production carries — changes nothing at all: the per-ingredient rule above
+    /// is untouched for every row, sauce rows included.
+    /// <para>
+    /// When it is positive, the allowance is spent on the most expensive charged sauce units first
+    /// (ties by <c>DisplayOrder</c>, then <c>Id</c>). It only ever removes charges this same call
+    /// made, so it can neither exceed what was billed nor turn a charge into a refund.
+    /// </para>
+    /// <para>
+    /// <b>This method enforces no minimum or maximum.</b> <c>SauceMin</c>/<c>SauceMax</c> are a UI
+    /// affordance in S6 by decision, not by omission: money is safe without them because every sauce
+    /// unit beyond the allowance is charged in full.
+    /// </para>
+    /// </param>
     decimal CalculateIngredientCustomizationPrice(
         IEnumerable<ProductIngredient>? detailedIngredients,
         IReadOnlyCollection<Guid>? selectedIngredientIds,
-        IReadOnlyDictionary<Guid, int>? ingredientQuantities);
+        IReadOnlyDictionary<Guid, int>? ingredientQuantities,
+        int sauceIncludedFree = 0);
 }

@@ -76,6 +76,13 @@ public static class MenuBundleMapper
                         IsDefault = i.IsDefault,
                         Ingredients = SectionItemIngredients(i.Product),
                         Allergens = i.Product?.Allergens,
+                        // The option product's OWN sauce rule (S6) — the same row BasketItemFactory
+                        // prices the child line with. A missing product means no rule to state, so
+                        // the defaults (0 / null / 0) say "no sauce group", which is what a product
+                        // that never mentions sauces carries anyway.
+                        SauceMin = i.Product?.SauceMin ?? 0,
+                        SauceMax = i.Product?.SauceMax,
+                        SauceIncludedFree = i.Product?.SauceIncludedFree ?? 0,
                         DetailedIngredients = i.Product?.DetailedIngredients
                             .Where(di => di.IsActive)
                             .OrderBy(di => di.DisplayOrder)

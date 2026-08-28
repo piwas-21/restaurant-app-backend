@@ -97,7 +97,8 @@ public class BasketPricingService : IBasketPricingService
     public decimal CalculateIngredientCustomizationPrice(
         IEnumerable<ProductIngredient>? detailedIngredients,
         IReadOnlyCollection<Guid>? selectedIngredientIds,
-        IReadOnlyDictionary<Guid, int>? ingredientQuantities)
+        IReadOnlyDictionary<Guid, int>? ingredientQuantities,
+        int sauceIncludedFree = 0)
     {
         if (detailedIngredients is null)
         {
@@ -107,6 +108,15 @@ public class BasketPricingService : IBasketPricingService
         // HashSet for O(1) membership checks inside the loop.
         var selected = selectedIngredientIds != null ? new HashSet<Guid>(selectedIngredientIds) : new HashSet<Guid>();
         decimal customizationPrice = 0;
+
+        // One entry per CHARGED unit of a sauce row (a row of Kind = Sauce that this method actually
+        // billed for). Built only when there is an allowance to spend, so the path every product on
+        // production takes today allocates nothing and behaves byte-identically.
+        // Deliberately a list of units, not of rows: "2 sauces free" means two units, and a guest
+        // who takes two of the same sauce has spent the allowance just as surely as one who took two
+        // different ones.
+        List<(decimal Price, int DisplayOrder, Guid Id)>? chargeableSauceUnits =
+            sauceIncludedFree > 0 ? new List<(decimal, int, Guid)>() : null;
 
         foreach (var ingredient in detailedIngredients.Where(i => i.IsOptional && i.IsActive))
         {
@@ -128,6 +138,22 @@ public class BasketPricingService : IBasketPricingService
             else if (quantity > ingredient.MaxQuantity)
             {
                 quantity = ingredient.MaxQuantity;
+            }
+
+            if (chargeableSauceUnits != null && ingredient.Kind == IngredientKind.Sauce && ingredient.Price > 0)
+            {
+                // How many units of THIS row the rule below is about to charge for. The two branches
+                // mirror the two branches of the per-ingredient rule exactly — nothing is collected
+                // that is not also billed, which is what makes the waiver incapable of inventing a
+                // refund: it can only remove a charge that this same loop added.
+                int chargeableUnits = ingredient.IsIncludedInBasePrice
+                    ? (isSelected ? Math.Max(0, quantity - 1) : 0)
+                    : (isSelected ? quantity : 0);
+
+                for (int unit = 0; unit < chargeableUnits; unit++)
+                {
+                    chargeableSauceUnits.Add((ingredient.Price, ingredient.DisplayOrder, ingredient.Id));
+                }
             }
 
             if (ingredient.IsIncludedInBasePrice)
@@ -153,6 +179,25 @@ public class BasketPricingService : IBasketPricingService
                     customizationPrice += ingredient.Price * quantity;
                 }
             }
+        }
+
+        if (chargeableSauceUnits is { Count: > 0 })
+        {
+            // The allowance is spent on the MOST EXPENSIVE charged units first. Three reasons, and
+            // the third is the security one:
+            //  - it is the customer-friendly reading of "N sauces included";
+            //  - it is deterministic, so the same basket always prices the same;
+            //  - it does NOT depend on the order of the client-supplied selection array, which would
+            //    otherwise make the order of a JSON array a price lever.
+            // Ties fall back to DisplayOrder (then Id, so the sort is total), which is the order the
+            // guest sheet renders in — so the sheet's "Included" badge lands on the first row shown,
+            // which is what the approved design draws.
+            customizationPrice -= chargeableSauceUnits
+                .OrderByDescending(u => u.Price)
+                .ThenBy(u => u.DisplayOrder)
+                .ThenBy(u => u.Id)
+                .Take(sauceIncludedFree)
+                .Sum(u => u.Price);
         }
 
         return customizationPrice;
