@@ -52,6 +52,8 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<ProductIngredientDescription> ProductIngredientDescriptions { get; set; }
         public DbSet<GlobalIngredient> GlobalIngredients { get; set; }
         public DbSet<GlobalIngredientTranslation> GlobalIngredientTranslations { get; set; }
+        public DbSet<GlobalVariation> GlobalVariations { get; set; }
+        public DbSet<GlobalVariationTranslation> GlobalVariationTranslations { get; set; }
         public DbSet<Menu> Menus { get; set; }
         public DbSet<MenuItem> MenuItems { get; set; }
         public DbSet<MenuDefinition> MenuDefinitions { get; set; }

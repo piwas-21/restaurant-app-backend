@@ -51,7 +51,10 @@ public record CreateProductVariationDto(
     decimal PriceModifier,
     bool IsActive,
     int DisplayOrder,
-    Dictionary<string, ProductVariationContentDto>? Content
+    Dictionary<string, ProductVariationContentDto>? Content,
+    // S4 provenance. Last and defaulted, so every existing caller and every existing test payload
+    // keeps compiling and keeps meaning "typed by hand".
+    Guid? GlobalVariationId = null
 );
 
 public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand, ApiResponse<ProductDto>>
@@ -161,6 +164,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
 
             if (command.Variations?.Any() == true)
             {
+                // One query for the whole payload, and none at all when nothing carries a link.
+                var variationProvenance = await GlobalVariationProvenance.ResolveAsync(
+                    _context,
+                    command.Variations.Select(v => v.GlobalVariationId),
+                    _logger,
+                    cancellationToken);
+
                 foreach (var variationDto in command.Variations)
                 {
                     var variation = new ProductVariation
@@ -170,6 +180,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         PriceModifier = variationDto.PriceModifier,
                         IsActive = variationDto.IsActive,
                         DisplayOrder = variationDto.DisplayOrder,
+                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };

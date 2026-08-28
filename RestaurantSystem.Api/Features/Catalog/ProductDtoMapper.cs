@@ -91,6 +91,7 @@ public static class ProductDtoMapper
                 FinalPrice = product.BasePrice + v.PriceModifier,
                 IsActive = v.IsActive,
                 DisplayOrder = v.DisplayOrder,
+                GlobalVariationId = v.GlobalVariationId,
                 Content = ToLocalizedContent(v.Descriptions, d => d.LanguageCode,
                     d => new ProductVariationContentDto { Name = d.Name, Description = d.Description })
             }).ToList(),

@@ -1,4 +1,5 @@
 using FluentValidation;
+using RestaurantSystem.Api.Common.Validation;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.CreateProductCommand;
 
@@ -14,26 +15,14 @@ namespace RestaurantSystem.Api.Features.Products.Commands.CreateProductCommand;
 /// <c>PrimaryCategoryId</c> rules do, encoding the #190 contract and ORDER-TYPE-AVAILABILITY-PLAN
 /// §3.4.
 ///
-/// Note for #316 (the nested variation/ingredient content maps, still unvalidated):
-/// <c>UpdateProductCommandValidator</c> has NO variation rules at all, so it is not a caller yet.
-/// Making it one is where the variation-content rule belongs, and having this here is what keeps that
-/// a small change rather than a copy — the pasted-into-four-places pattern is exactly what #192/#193
-/// had to unpick.
+/// The note that used to stand here said <c>UpdateProductCommandValidator</c> had NO variation rules
+/// at all, so this class was not yet its caller, and that making it one was where the fix belonged.
+/// S4 did exactly that. The rules are now expressed once, over the two record types' shared fields,
+/// and applied from BOTH validators — which is what stopped a 50-character bound from being a 400 on
+/// <c>POST</c> and a 500 on <c>PUT</c> (backend analysis §9 defect 1).
 /// </remarks>
 public static class CreateProductVariationRules
 {
-    public static void Apply(InlineValidator<CreateProductVariationDto> variation)
-    {
-        ArgumentNullException.ThrowIfNull(variation);
-
-        variation.RuleFor(v => v.Name)
-            .NotEmpty().WithMessage("Variation name is required")
-            .MaximumLength(50).WithMessage("Variation name cannot exceed 50 characters");
-
-        variation.RuleFor(v => v.Description)
-            .MaximumLength(200).WithMessage("Variation description cannot exceed 200 characters");
-
-        variation.RuleFor(v => v.DisplayOrder)
-            .GreaterThanOrEqualTo(0).WithMessage("Variation display order cannot be negative");
-    }
+    public static void Apply(InlineValidator<CreateProductVariationDto> variation) =>
+        variation.ApplyVariationFields(v => v.Name, v => v.Description, v => v.DisplayOrder);
 }
