@@ -39,17 +39,19 @@ internal static class GlobalIngredientUsage
             return new Dictionary<Guid, int>();
         }
 
-        var query = context.Products
-            .SelectMany(p => p.DetailedIngredients)
-            .Where(i => i.GlobalIngredientId != null);
+        var ingredients = context.Products.SelectMany(p => p.DetailedIngredients);
 
-        if (ids is not null)
-        {
-            query = query.Where(i => ids.Contains(i.GlobalIngredientId!.Value));
-        }
+        // The null test lives INSIDE each lambda, and the key stays nullable all the way to the
+        // pattern match below, so that nothing here needs a null-forgiving `!` (Sonar S8970). The
+        // shorter `i.GlobalIngredientId!.Value` is not a style choice that can simply be deleted —
+        // `.Value` on its own is CS8629, and this project builds warnings-as-errors. Flow analysis
+        // does carry within one lambda body, which is why this form compiles clean.
+        var query = ids is null
+            ? ingredients.Where(i => i.GlobalIngredientId != null)
+            : ingredients.Where(i => i.GlobalIngredientId != null && ids.Contains(i.GlobalIngredientId.Value));
 
         var counts = await query
-            .GroupBy(i => i.GlobalIngredientId!.Value)
+            .GroupBy(i => i.GlobalIngredientId)
             .Select(group => new
             {
                 GlobalIngredientId = group.Key,
@@ -57,7 +59,16 @@ internal static class GlobalIngredientUsage
             })
             .ToListAsync(cancellationToken);
 
-        return counts.ToDictionary(entry => entry.GlobalIngredientId, entry => entry.Products);
+        var byIngredient = new Dictionary<Guid, int>(counts.Count);
+        foreach (var entry in counts)
+        {
+            if (entry.GlobalIngredientId is { } globalIngredientId)
+            {
+                byIngredient[globalIngredientId] = entry.Products;
+            }
+        }
+
+        return byIngredient;
     }
 
     /// <summary>The count for one row, including the 0 that the aggregate omits.</summary>
