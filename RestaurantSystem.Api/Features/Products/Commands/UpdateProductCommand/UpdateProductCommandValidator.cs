@@ -15,15 +15,7 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         RuleFor(x => x.PreparationTimeMinutes).GreaterThanOrEqualTo(0).WithMessage("Preparation time must be non-negative");
         RuleFor(x => x.CategoryIds).NotEmpty().WithMessage("At least one category is required");
 
-        // A primary category is REQUIRED here, not merely validated when present. The handler
-        // rebuilds ProductCategories on every save (RemoveRange + recreate), so a null primary
-        // silently un-primaries the product — and products inherit order-type availability from
-        // their primary category (ORDER-TYPE-AVAILABILITY-PLAN §3.4).
-        RuleFor(x => x.PrimaryCategoryId)
-            .NotNull().WithMessage("A primary category is required")
-            .Must((command, primaryCategoryId) =>
-                !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
-            .WithMessage("Primary category must be one of the selected categories");
+        this.ValidatePrimaryCategory(x => x.PrimaryCategoryId, x => x.CategoryIds);
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
         this.ValidateSauceGroup(x => x.SauceMin, x => x.SauceMax, x => x.SauceIncludedFree); // S5 / D9
 
@@ -46,5 +38,11 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         RuleForEach(x => x.Variations)
             .ChildRules(variation =>
                 variation.ApplyVariationFields(v => v.Name, v => v.Description, v => v.DisplayOrder));
+
+        // #432 — the catalogue guard for the included-in-base deduction. One line here because both
+        // product validators sit at the 60-line gate; the reasoning, and why `>` and not `>=`, is in
+        // IncludedInBaseDeductionRule.
+        this.ValidateIncludedInBaseDeduction(x => x.BasePrice, x => x.HideBaseProduct,
+            x => x.DetailedIngredients, x => x.Variations?.Where(v => v.IsActive).Select(v => v.PriceModifier));
     }
 }

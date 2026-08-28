@@ -32,12 +32,7 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             .NotEmpty().WithMessage("At least one category must be selected")
             .Must(x => x.Distinct().Count() == x.Count).WithMessage("Duplicate categories are not allowed");
 
-        // Required, not just valid-when-present (ORDER-TYPE-AVAILABILITY-PLAN §3.4).
-        RuleFor(x => x.PrimaryCategoryId)
-            .NotNull().WithMessage("A primary category is required")
-            .Must((command, primaryCategoryId) =>
-                !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
-            .WithMessage("Primary category must be one of the selected categories");
+        this.ValidatePrimaryCategory(x => x.PrimaryCategoryId, x => x.CategoryIds);
 
         RuleForEach(x => x.Variations).ChildRules(CreateProductVariationRules.Apply);
 
@@ -55,5 +50,10 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             NestedContentRule.VariationNameMaxLength);
         this.ValidateNestedContent(x => x.DetailedIngredients, i => i.Content, c => c.Name,
             c => c.Description, NestedContentRule.IngredientNameMaxLength);
+
+        // #432 — the catalogue guard for the included-in-base deduction; why `>` and not `>=` is in
+        // IncludedInBaseDeductionRule.
+        this.ValidateIncludedInBaseDeduction(x => x.BasePrice, x => x.HideBaseProduct,
+            x => x.DetailedIngredients, x => x.Variations?.Where(v => v.IsActive).Select(v => v.PriceModifier));
     }
 }
