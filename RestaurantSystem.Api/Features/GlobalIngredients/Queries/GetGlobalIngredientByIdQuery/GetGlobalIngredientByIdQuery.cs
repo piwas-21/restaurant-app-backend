@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Api.Features.GlobalIngredients.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.GlobalIngredients.Queries.GetGlobalIngredientByIdQuery;
@@ -28,6 +29,9 @@ public class GetGlobalIngredientByIdQueryHandler : IQueryHandler<GetGlobalIngred
             return ApiResponse<GlobalIngredientDto>.Failure("Global ingredient not found");
         }
 
-        return ApiResponse<GlobalIngredientDto>.SuccessWithData(GlobalIngredientMapper.ToDto(ingredient));
+        var usedOnProductCount = await GlobalIngredientUsage.CountForAsync(_context, ingredient.Id, cancellationToken);
+
+        return ApiResponse<GlobalIngredientDto>.SuccessWithData(
+            GlobalIngredientMapper.ToDto(ingredient, usedOnProductCount));
     }
 }

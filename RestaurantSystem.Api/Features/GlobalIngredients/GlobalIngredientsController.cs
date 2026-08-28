@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.CreateGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.DeleteGlobalIngredientCommand;
+using RestaurantSystem.Api.Features.GlobalIngredients.Commands.RestoreGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.UpdateGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
 using RestaurantSystem.Api.Features.GlobalIngredients.Queries.GetGlobalIngredientByIdQuery;
@@ -30,6 +31,17 @@ public class GlobalIngredientsController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<List<GlobalIngredientDto>>>> GetGlobalIngredients() =>
         Ok(await _mediator.SendQuery(new GetGlobalIngredientsQuery()));
+
+    /// <summary>
+    /// The archive drawer — admin only, because it exists to undo an admin action and because
+    /// nothing on a guest surface has any use for a row that is off the shelf. The literal segment
+    /// wins over the <c>{id}</c> route below, which is why it is declared here.
+    /// </summary>
+    [HttpGet("archived")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<List<GlobalIngredientDto>>>> GetArchivedGlobalIngredients() =>
+        Ok(await _mediator.SendQuery(new GetGlobalIngredientsQuery(ArchivedOnly: true)));
 
     [HttpGet("{id}")]
     [ApiScope(ApiTokenScopes.MenuRead)]
@@ -62,6 +74,17 @@ public class GlobalIngredientsController : ControllerBase
         Ok(await _mediator.SendCommand(new UpdateGlobalIngredientCommand(
             id, body.DefaultName, body.ImageUrl, body.IsActive, body.Translations, body.Kind)));
 
+    [HttpPost("{id}/restore")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<GlobalIngredientDto>>> RestoreGlobalIngredient(Guid id) =>
+        Ok(await _mediator.SendCommand(new RestoreGlobalIngredientCommand(id)));
+
+    /// <summary>
+    /// Archives the row when a product uses it, deletes it when none does — see
+    /// <see cref="DeleteGlobalIngredientCommandHandler"/>. The picker knows which it will be,
+    /// because it renders the same count.
+    /// </summary>
     [HttpDelete("{id}")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
     [RequireAdmin]

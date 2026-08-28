@@ -33,6 +33,7 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
     private Guid _cheeseId;
     private Guid _globalMozzarellaId;
     private Guid _globalArchivedId;
+    private Guid _globalDeletedId;
 
     public ProductIngredientProvenanceTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -58,13 +59,27 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
         };
         _globalMozzarellaId = mozzarella.Id;
 
-        // A library row the admin archived AFTER attaching it. `GlobalIngredient` is a
-        // SoftDeleteEntity, so it disappears from every filtered query while the product keeps
-        // pointing at it — the behaviour DeleteGlobalIngredientCommandTests already pins.
+        // A library row the admin archived AFTER attaching it (S3). Archiving is the reversible
+        // state a DELETE now produces for a row a product uses: the row stays readable and keeps
+        // serving that product, but it is off the shelf, so no NEW link may point at it.
         var archived = new GlobalIngredient
         {
             Id = Guid.NewGuid(),
             DefaultName = "Discontinued Pesto",
+            IsActive = true,
+            ArchivedAt = DateTime.UtcNow,
+            ArchivedBy = "test",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        _globalArchivedId = archived.Id;
+
+        // The other way off the shelf, and the one that predates S3: a soft delete, hidden by the
+        // global query filter. Both must be refused as a NEW link, by two different mechanisms.
+        var deleted = new GlobalIngredient
+        {
+            Id = Guid.NewGuid(),
+            DefaultName = "Deleted Pesto",
             IsActive = false,
             IsDeleted = true,
             DeletedAt = DateTime.UtcNow,
@@ -72,7 +87,7 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "test"
         };
-        _globalArchivedId = archived.Id;
+        _globalDeletedId = deleted.Id;
 
         var product = new Product
         {
@@ -113,7 +128,7 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
             CreatedBy = "test"
         });
 
-        context.GlobalIngredients.AddRange(mozzarella, archived);
+        context.GlobalIngredients.AddRange(mozzarella, archived, deleted);
         context.Products.Add(product);
         await context.SaveChangesAsync();
     }
@@ -318,6 +333,20 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
 
         var response = await PutRawAsync(BuildPayload(
             Ingredient(_cheeseId, "Pesto", _globalArchivedId)));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadStoredLinkAsync(_cheeseId)).Should().BeNull();
+    }
+
+    // The same for the other off-the-shelf state, which the global query filter hides rather than a
+    // predicate: a soft-deleted row is not a library row any more either.
+    [Fact]
+    public async Task SoftDeletedGlobalIngredient_CannotBeNewlyAttached()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await PutRawAsync(BuildPayload(
+            Ingredient(_cheeseId, "Pesto", _globalDeletedId)));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await ReadStoredLinkAsync(_cheeseId)).Should().BeNull();

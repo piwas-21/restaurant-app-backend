@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Api.Features.GlobalIngredients.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.GlobalIngredients.Queries.SearchGlobalIngredientsQuery;
@@ -28,14 +29,27 @@ public class SearchGlobalIngredientsQueryHandler : IQueryHandler<SearchGlobalIng
 
         var ingredients = await _context.GlobalIngredients
             .Include(g => g.Translations)
-            .Where(g => g.IsActive && g.DefaultName.ToLower().Contains(normalizedQuery))
+            // Archived rows are off the shelf: the picker does not list them and the product write
+            // path refuses a new link to one, so offering them here would only produce a pick that
+            // silently saves without its provenance.
+            .Where(g => g.IsActive && g.ArchivedAt == null && g.DefaultName.ToLower().Contains(normalizedQuery))
             // Prioritize starts-with matches
             .OrderBy(g => g.DefaultName.ToLower().StartsWith(normalizedQuery) ? 0 : 1)
             .ThenBy(g => g.DefaultName)
             .Take(query.Limit)
             .ToListAsync(cancellationToken);
 
-        var dtos = ingredients.Select(GlobalIngredientMapper.ToDto).ToList();
+        var usage = await GlobalIngredientUsage.CountByIngredientAsync(
+            _context,
+            ingredients.Select(g => g.Id).ToList(),
+            cancellationToken);
+
+        var dtos = ingredients
+            .Select(ingredient => GlobalIngredientMapper.ToDto(
+                ingredient,
+                GlobalIngredientUsage.CountFor(usage, ingredient.Id)))
+            .ToList();
+
         return ApiResponse<List<GlobalIngredientDto>>.SuccessWithData(dtos);
     }
 }
