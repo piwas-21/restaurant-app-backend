@@ -142,13 +142,16 @@ public class BasketPricingService : IBasketPricingService
 
             if (chargeableSauceUnits != null && ingredient.Kind == IngredientKind.Sauce && ingredient.Price > 0)
             {
-                // How many units of THIS row the rule below is about to charge for. The two branches
+                // How many units of THIS row the rule below is about to charge for. The two cases
                 // mirror the two branches of the per-ingredient rule exactly — nothing is collected
                 // that is not also billed, which is what makes the waiver incapable of inventing a
-                // refund: it can only remove a charge that this same loop added.
-                int chargeableUnits = ingredient.IsIncludedInBasePrice
-                    ? (isSelected ? Math.Max(0, quantity - 1) : 0)
-                    : (isSelected ? quantity : 0);
+                // refund: it can only remove a charge that this same loop added. An unselected row
+                // is charged for nothing, whichever branch it would take.
+                int chargeableUnits = 0;
+                if (isSelected)
+                {
+                    chargeableUnits = ingredient.IsIncludedInBasePrice ? Math.Max(0, quantity - 1) : quantity;
+                }
 
                 for (int unit = 0; unit < chargeableUnits; unit++)
                 {
@@ -183,12 +186,11 @@ public class BasketPricingService : IBasketPricingService
 
         if (chargeableSauceUnits is { Count: > 0 })
         {
-            // The allowance is spent on the MOST EXPENSIVE charged units first. Three reasons, and
-            // the third is the security one:
-            //  - it is the customer-friendly reading of "N sauces included";
-            //  - it is deterministic, so the same basket always prices the same;
-            //  - it does NOT depend on the order of the client-supplied selection array, which would
-            //    otherwise make the order of a JSON array a price lever.
+            // The allowance is spent on the MOST EXPENSIVE charged units first, for three reasons,
+            // and the third is the security one. It is the customer-friendly reading of "N sauces
+            // included". It is deterministic, so the same basket always prices the same. And it does
+            // NOT depend on the order of the client-supplied selection array, which would otherwise
+            // make the order of a JSON array a price lever.
             // Ties fall back to DisplayOrder (then Id, so the sort is total), which is the order the
             // guest sheet renders in — so the sheet's "Included" badge lands on the first row shown,
             // which is what the approved design draws.
