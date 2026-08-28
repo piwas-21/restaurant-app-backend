@@ -179,6 +179,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     IsActive = v.IsActive,
 
                     DisplayOrder = v.DisplayOrder,
+                    GlobalVariationId = v.GlobalVariationId,
                     Content = v.Descriptions
                         .GroupBy(d => d.LanguageCode)
                         .Select(g => g.First())

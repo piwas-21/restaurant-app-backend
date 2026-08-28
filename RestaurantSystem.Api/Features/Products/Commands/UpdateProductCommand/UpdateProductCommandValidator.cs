@@ -36,25 +36,15 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         this.ValidateNestedContent(x => x.DetailedIngredients, i => i.Content, c => c.Name,
             c => c.Description, NestedContentRule.IngredientNameMaxLength);
 
-        // Mirrors MenuBundleCommandValidatorBase (#191). MenuDefinition itself stays optional here
-        // — absent means "no menu instruction" — but once one IS sent for a Menu, its sections are
-        // a full replace like every other field on it, so the key is required and `[]` alone
-        // clears them.
-        //
-        // This rule and the handler's section block now cover exactly the same payloads. They did
-        // not when the rule was written: the block additionally sat inside a detailed-ingredients
-        // null check, so the rule was deliberately WIDER than the code it protected, and #296 has
-        // since lifted the block to statement level. Do NOT narrow this to re-add a
-        // DetailedIngredients condition — the two conditions agreeing is the point, and the rule is
-        // what makes `command.MenuDefinition.Sections` non-null in the handler.
-        //
-        // Written as a Must on MenuDefinition itself, with the null case passing INSIDE the
-        // predicate, so no null-forgiving operator is needed and no accessor can dereference a
-        // null: MenuDefinition stays optional here (absent = "no menu instruction"), and only a
-        // definition that IS sent must carry its sections.
-        RuleFor(x => x.MenuDefinition)
-            .Must(menuDefinition => menuDefinition is null || menuDefinition.Sections != null)
-            .WithMessage(MenuDefinitionDto.SectionsRequiredMessage)
-            .When(x => x.Type == ProductType.Menu);
+        // Rationale in MenuDefinitionSectionsRule; extracted by S4 to make room for the variation
+        // rules below, unchanged in behaviour.
+        this.ValidateMenuDefinitionSections(x => x.MenuDefinition, x => x.Type);
+
+        // S4, backend analysis §9 defect 1. These three clauses existed on CREATE only, so a
+        // 500-character variation name was a 400 on POST and reached the database on PUT. Same rule
+        // object, same messages, both paths.
+        RuleForEach(x => x.Variations)
+            .ChildRules(variation =>
+                variation.ApplyVariationFields(v => v.Name, v => v.Description, v => v.DisplayOrder));
     }
 }

@@ -9,6 +9,14 @@ public record ProductVariationDto
     public decimal FinalPrice { get; init; }
     public bool IsActive { get; init; }
     public int DisplayOrder { get; init; }
+
+    /// <summary>
+    /// The library row this variation was copied from, or null (plan S4). PROVENANCE only — nothing
+    /// reads the library row afterwards, and a client that round-trips the DTO must send it back or
+    /// the link is cleared, exactly as the ingredient one behaves.
+    /// </summary>
+    public Guid? GlobalVariationId { get; init; }
+
     public Dictionary<string, ProductVariationContentDto>? Content { get; init; }
 }
 
