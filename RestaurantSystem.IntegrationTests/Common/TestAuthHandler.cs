@@ -16,8 +16,16 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 
     /// <summary>
     /// Non-admin back-of-house identity (Cashier / KitchenStaff / Server), selected with
-    /// <see cref="RoleHeader"/>. Not seeded in the users table — nothing that authenticates
-    /// through this handler requires the caller's own row to exist.
+    /// <see cref="RoleHeader"/>. Not seeded by <c>TestDataSeeder</c>.
+    /// <para>
+    /// AUTHENTICATION does not need the row, but PERSISTENCE can: an endpoint that writes the
+    /// caller's id into a column with an <c>AspNetUsers</c> foreign key answers 500 without it.
+    /// <c>POST /api/orders</c> is one (<c>fk_orders_asp_net_users_user_id</c>, measured 2026-08-28
+    /// by <c>WaiterLineIngredientSelectionTests</c>, which seeds the row itself). A test class that
+    /// uses <see cref="RoleHeader"/> AND creates a row owned by the caller must seed this user.
+    /// It is not in the shared seeder deliberately — that seeder feeds every test class, and a
+    /// third user row would silently move any assertion that counts or enumerates users.
+    /// </para>
     /// </summary>
     public const string StaffUserId = "33333333-3333-3333-3333-333333333333";
     public const string StaffUserName = "staff@example.com";
