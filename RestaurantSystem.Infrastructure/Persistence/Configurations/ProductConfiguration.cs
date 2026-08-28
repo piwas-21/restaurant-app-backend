@@ -41,6 +41,14 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.HideBaseProduct)
             .HasDefaultValue(false);
 
+        // S5 sauce group rule. The neutral values are the column defaults, so no product changes
+        // behaviour when the migration runs: nothing required, NO cap (null), nothing free.
+        builder.Property(p => p.SauceMin)
+            .HasDefaultValue(0);
+
+        builder.Property(p => p.SauceIncludedFree)
+            .HasDefaultValue(0);
+
         builder.Property(p => p.PreparationTimeMinutes)
             .IsRequired();
 

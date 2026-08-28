@@ -25,6 +25,7 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
                 !primaryCategoryId.HasValue || command.CategoryIds.Contains(primaryCategoryId.Value))
             .WithMessage("Primary category must be one of the selected categories");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
+        this.ValidateSauceGroup(x => x.SauceMin, x => x.SauceMax, x => x.SauceIncludedFree); // S5 / D9
 
         // #306; rationale in ProductContentRule. Covers the TOP-LEVEL map only.
         RuleFor(x => x.Content).ValidProductContent(required: false);

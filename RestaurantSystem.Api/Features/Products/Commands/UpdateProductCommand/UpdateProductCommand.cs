@@ -39,7 +39,13 @@ public record UpdateProductCommand(
     int? AvailableOrderTypes = null,
     // Hide the "no variation" base row so the guest must pick one. Optional and last so existing
     // callers keep today's behaviour (Track F / F2).
-    bool HideBaseProduct = false
+    bool HideBaseProduct = false,
+    // The sauce group rule (S5). Admin-editable per product with NO tenant default; the neutral
+    // seeds below are what every product has today — nothing required, no cap, nothing free.
+    // `SauceMax = null` is "no group cap", NOT 0. Semantics live on the Product entity.
+    int SauceMin = 0,
+    int? SauceMax = null,
+    int SauceIncludedFree = 0
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -106,6 +112,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         product.AvailableOrderTypes = command.AvailableOrderTypes;
         product.IsSpecial = command.IsSpecial;
         product.HideBaseProduct = command.HideBaseProduct;
+        product.SauceMin = command.SauceMin;
+        product.SauceMax = command.SauceMax;
+        product.SauceIncludedFree = command.SauceIncludedFree;
         product.PreparationTimeMinutes = command.PreparationTimeMinutes;
         product.Type = command.Type;
         product.KitchenType = command.KitchenType;

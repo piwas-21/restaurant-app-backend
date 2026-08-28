@@ -85,6 +85,7 @@ internal static class ProductIngredientSynchronizer
                 ingredient.IsActive = ingredientDto.IsActive;
                 ingredient.DisplayOrder = ingredientDto.DisplayOrder;
                 ingredient.MaxQuantity = ingredientDto.MaxQuantity;
+                ingredient.Kind = ingredientDto.Kind;
                 // Provenance is assigned from the payload, never preserved silently: the row the
                 // admin sees is the one that decides, and clearing the picker clears the link.
                 ingredient.GlobalIngredientId = provenance.LinkFor(ingredientDto, ingredient.GlobalIngredientId);
@@ -110,6 +111,7 @@ internal static class ProductIngredientSynchronizer
                     IsActive = ingredientDto.IsActive,
                     DisplayOrder = ingredientDto.DisplayOrder,
                     MaxQuantity = ingredientDto.MaxQuantity,
+                    Kind = ingredientDto.Kind,
                     GlobalIngredientId = provenance.LinkFor(ingredientDto),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = auditIdentifier

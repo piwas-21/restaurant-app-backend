@@ -39,6 +39,47 @@ public class Product : SoftDeleteEntity
     /// </summary>
     public int? AvailableOrderTypes { get; set; }
 
+    /// <summary>
+    /// How many <see cref="Common.Enums.IngredientKind.Sauce"/> rows a guest MUST choose. 0 = none
+    /// required, which is what every product gets and what every product had before S5.
+    /// </summary>
+    /// <remarks>
+    /// <b>These three are admin-editable per product, and carry NO tenant default (owner ruling,
+    /// plan §7 Q3, 2026-08-27).</b> A restaurant that gives one sauce away sets it in the item
+    /// editor; there is deliberately no "1 free sauce" rule in code or configuration, because that
+    /// is a RUMI fact and this is a multi-tenant product. The seeded values are the neutral ones an
+    /// ingredient already has today: nothing required, no group cap, nothing free.
+    /// <para>
+    /// They are also the WHOLE of the group rule. There is no general min/max-select engine here and
+    /// this is not a step towards one being smuggled in (plan §7 Q2).
+    /// </para>
+    /// </remarks>
+    public int SauceMin { get; set; }
+
+    /// <summary>
+    /// The most sauces a guest may choose, or <c>null</c> for NO group cap — which is the default,
+    /// and is exactly today's behaviour, where each row is bounded only by its own
+    /// <see cref="ProductIngredient.MaxQuantity"/> and nothing bounds the group.
+    /// </summary>
+    /// <remarks>
+    /// Nullable rather than "0 means unlimited": 0 is a perfectly meaningful cap (a product that
+    /// takes no sauces at all), so overloading it would make the two states indistinguishable and
+    /// would be exactly the magic number the workspace conventions forbid.
+    /// </remarks>
+    public int? SauceMax { get; set; }
+
+    /// <summary>
+    /// How many chosen sauces are free before the per-row price starts applying. 0 = none, so no
+    /// product changes price because of S5.
+    /// </summary>
+    /// <remarks>
+    /// <b>S5 stores this and prices nothing with it.</b> Ingredient money has exactly one writer —
+    /// <c>BasketPricingService.CalculateIngredientCustomizationPrice</c> — and the rule that reads
+    /// this value lands there in S6 (plan D10). Do not add a second place that computes money from
+    /// it.
+    /// </remarks>
+    public int SauceIncludedFree { get; set; }
+
     // Navigation properties
     public virtual ICollection<ProductImage> Images { get; set; } = [];
     public virtual ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();

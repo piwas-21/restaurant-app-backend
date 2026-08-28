@@ -89,6 +89,7 @@ public static class MenuBundleMapper
                                 IsActive = di.IsActive,
                                 DisplayOrder = di.DisplayOrder,
                                 MaxQuantity = di.MaxQuantity,
+                                Kind = di.Kind,
                                 Content = di.Descriptions?
                                     .GroupBy(desc => desc.LanguageCode)
                                     .Select(g => g.First()) // first wins on duplicate language codes
