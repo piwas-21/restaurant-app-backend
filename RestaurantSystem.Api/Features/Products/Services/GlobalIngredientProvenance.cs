@@ -26,13 +26,13 @@ namespace RestaurantSystem.Api.Features.Products.Services;
 ///
 /// <para>
 /// The check applies to a link the payload is CHANGING, never to one the row already carries. That
-/// distinction is what lets this run under the normal soft-delete query filter: a
-/// <see cref="GlobalIngredient"/> is soft-deletable, so an archived row is invisible to any
-/// filtered query, and validating an unchanged link would mean that archiving one library entry
-/// silently erased the provenance of every product that ever used it, on that product's next save.
-/// An id that is already persisted needs no proof — the FK held when it was written — so it is
-/// carried forward untouched, while a NEW link may only point at a live row, which is also all the
-/// picker ever offers.
+/// distinction is what lets a library row leave the shelf without taking the products with it: a
+/// <see cref="GlobalIngredient"/> can be archived (S3) or soft-deleted, and neither is offered
+/// here, so validating an unchanged link would mean that archiving one library entry silently
+/// erased the provenance of every product that ever used it, on that product's next save. An id
+/// that is already persisted needs no proof — the FK held when it was written — so it is carried
+/// forward untouched, while a NEW link may only point at a live, non-archived row, which is also
+/// all the picker ever offers.
 /// </para>
 /// </summary>
 internal sealed class GlobalIngredientProvenance
@@ -67,7 +67,11 @@ internal sealed class GlobalIngredientProvenance
         }
 
         var known = await context.GlobalIngredients
-            .Where(g => requested.Contains(g.Id))
+            // Archived as well as soft-deleted: S3 gave the catalog a second, reversible way to be
+            // off the shelf, and the query filter only hides the first one. A row an admin archived
+            // is one the picker no longer offers, so a NEW link to it is as unfounded as an
+            // invented id.
+            .Where(g => requested.Contains(g.Id) && g.ArchivedAt == null)
             .Select(g => g.Id)
             .ToListAsync(cancellationToken);
 

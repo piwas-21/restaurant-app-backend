@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260827235152_ArchiveGlobalIngredients")]
+    partial class ArchiveGlobalIngredients
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1540,12 +1543,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
-
-                    b.Property<int>("Kind")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("kind");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -3242,22 +3239,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("preparation_time_minutes");
 
-                    b.Property<int>("SauceIncludedFree")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("sauce_included_free");
-
-                    b.Property<int?>("SauceMax")
-                        .HasColumnType("integer")
-                        .HasColumnName("sauce_max");
-
-                    b.Property<int>("SauceMin")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("sauce_min");
-
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
@@ -3502,12 +3483,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsOptional")
                         .HasColumnType("boolean")
                         .HasColumnName("is_optional");
-
-                    b.Property<int>("Kind")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("kind");
 
                     b.Property<int>("MaxQuantity")
                         .HasColumnType("integer")

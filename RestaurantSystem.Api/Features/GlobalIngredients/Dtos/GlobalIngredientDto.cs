@@ -13,6 +13,19 @@ public record GlobalIngredientDto
     // it is on the read AND both write shapes. Omitting it keeps creating ingredients, which is
     // what all 654 seeded rows are.
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+
+    /// <summary>
+    /// Archived (plan D4): off the shelf, still linked. NOT the same as soft-deleted — an archived
+    /// row is readable, restorable, and keeps serving the products that already reference it.
+    /// </summary>
+    public bool IsArchived { get; set; }
+
+    /// <summary>
+    /// "used on N items": distinct live products whose ingredients link to this row. Counted for
+    /// the whole page in one aggregate query, never one query per row.
+    /// </summary>
+    public int UsedOnProductCount { get; set; }
+
     public List<GlobalIngredientTranslationDto> Translations { get; set; } = [];
 }
 

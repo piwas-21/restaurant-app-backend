@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Api.Features.GlobalIngredients.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -52,7 +53,10 @@ public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobal
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        return ApiResponse<GlobalIngredientDto>.SuccessWithData(GlobalIngredientMapper.ToDto(ingredient));
+        var usedOnProductCount = await GlobalIngredientUsage.CountForAsync(_context, ingredient.Id, cancellationToken);
+
+        return ApiResponse<GlobalIngredientDto>.SuccessWithData(
+            GlobalIngredientMapper.ToDto(ingredient, usedOnProductCount));
     }
 
     private void SyncTranslations(GlobalIngredient ingredient, List<GlobalIngredientTranslationDto> incoming, string auditId)

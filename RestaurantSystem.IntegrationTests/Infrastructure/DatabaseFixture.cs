@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using Respawn;
 using Respawn.Graph;
@@ -95,10 +96,18 @@ public class DatabaseFixture : IAsyncLifetime
         }
     }
 
-    public ApplicationDbContext CreateContext()
+    /// <param name="interceptors">
+    /// Attached to THIS context only. The caller that needs them is the S3 usage-count cost proof,
+    /// which counts the commands one handler issues: EF resolves no interceptor out of the test
+    /// host's service provider (the context there is registered by Aspire), and going over HTTP
+    /// would add the auth and middleware queries that have nothing to do with the claim. The shared
+    /// <c>_dataSource</c> is still used, so this does not open a second connection pool.
+    /// </param>
+    public ApplicationDbContext CreateContext(params IInterceptor[] interceptors)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_dataSource)
+            .AddInterceptors(interceptors)
             .Options;
 
         return new ApplicationDbContext(options);
