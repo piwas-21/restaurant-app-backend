@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.GlobalVariations.Commands.AttachGlobalVariationCommand;
 using RestaurantSystem.Api.Features.GlobalVariations.Commands.CreateGlobalVariationCommand;
 using RestaurantSystem.Api.Features.GlobalVariations.Commands.DeleteGlobalVariationCommand;
 using RestaurantSystem.Api.Features.GlobalVariations.Commands.RestoreGlobalVariationCommand;
 using RestaurantSystem.Api.Features.GlobalVariations.Commands.UpdateGlobalVariationCommand;
 using RestaurantSystem.Api.Features.GlobalVariations.Dtos;
 using RestaurantSystem.Api.Features.GlobalVariations.Queries.GetGlobalVariationByIdQuery;
+using RestaurantSystem.Api.Features.GlobalVariations.Queries.GetGlobalVariationProductsQuery;
 using RestaurantSystem.Api.Features.GlobalVariations.Queries.GetGlobalVariationsQuery;
 using RestaurantSystem.Domain.Common.Constants;
 
@@ -68,6 +70,32 @@ public class GlobalVariationsController : ControllerBase
         [FromBody] UpdateGlobalVariationDto body) =>
         Ok(await _mediator.SendCommand(new UpdateGlobalVariationCommand(
             id, body.DefaultName, body.IsActive, body.Translations)));
+
+    /// <summary>
+    /// WHICH products carry a copy of this row — the drill-down behind S4's "used on N items", and
+    /// what a blast-radius confirm subtracts to say how many the next action would actually change
+    /// (plan D6). Admin only: it is a catalogue-management view, and no guest surface has a use for
+    /// it.
+    /// </summary>
+    [HttpGet("{id}/products")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<List<CatalogUsageProductDto>>>> GetProductsUsing(Guid id) =>
+        Ok(await _mediator.SendQuery(new GetGlobalVariationProductsQuery(id)));
+
+    /// <summary>
+    /// Copies this library row onto many products at once (plan S8). The caller sends the product
+    /// ids it just showed the admin — there is no category target, so the confirm and the payload
+    /// are the same list. See <see cref="AttachGlobalVariationCommandHandler"/> for what is skipped
+    /// and what refuses the whole batch.
+    /// </summary>
+    [HttpPost("{id}/attach")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<AttachGlobalVariationResultDto>>> AttachGlobalVariation(
+        Guid id,
+        [FromBody] AttachGlobalVariationDto body) =>
+        Ok(await _mediator.SendCommand(new AttachGlobalVariationCommand(id, body)));
 
     [HttpPost("{id}/restore")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
