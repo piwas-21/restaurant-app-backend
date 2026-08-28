@@ -37,6 +37,7 @@ public class GetGlobalVariationsQueryHandler : IQueryHandler<GetGlobalVariations
     {
         var variations = await _context.GlobalVariations
             .Include(g => g.Translations)
+            .AsNoTracking()
             // The shelf is active AND not archived; the drawer is archived, whatever `IsActive` says
             // — an archived row that is also inactive must still be findable, or it could never be
             // restored.

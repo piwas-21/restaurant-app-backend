@@ -22,6 +22,7 @@ public class GetGlobalVariationByIdQueryHandler : IQueryHandler<GetGlobalVariati
     {
         var variation = await _context.GlobalVariations
             .Include(g => g.Translations)
+            .AsNoTracking()
             .FirstOrDefaultAsync(g => g.Id == query.Id, cancellationToken);
 
         if (variation == null)

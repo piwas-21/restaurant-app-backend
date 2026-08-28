@@ -3,7 +3,7 @@ namespace RestaurantSystem.Api.Features.GlobalVariations.Dtos;
 public record GlobalVariationDto
 {
     public Guid Id { get; set; }
-    public string DefaultName { get; set; } = null!;
+    public string DefaultName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
 
     /// <summary>Archived (plan D4): off the shelf, still linked, restorable. Not soft-deleted.</summary>
@@ -17,19 +17,19 @@ public record GlobalVariationDto
 
 public record GlobalVariationTranslationDto
 {
-    public string LanguageCode { get; set; } = null!;
-    public string Name { get; set; } = null!;
+    public string LanguageCode { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 }
 
 public record CreateGlobalVariationDto
 {
-    public string DefaultName { get; set; } = null!;
+    public string DefaultName { get; set; } = string.Empty;
     public List<GlobalVariationTranslationDto> Translations { get; set; } = [];
 }
 
 public record UpdateGlobalVariationDto
 {
-    public string DefaultName { get; set; } = null!;
+    public string DefaultName { get; set; } = string.Empty;
 
     /// <summary>
     /// Nullable on purpose, unlike the ingredient library's (backend #428): a PUT that simply omits
