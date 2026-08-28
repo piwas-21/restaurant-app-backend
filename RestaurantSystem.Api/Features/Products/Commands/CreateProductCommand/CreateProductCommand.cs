@@ -36,7 +36,13 @@ public record CreateProductCommand(
     int? AvailableOrderTypes = null,
     // Hide the "no variation" base row so the guest must pick one. Optional and last so existing
     // callers keep today's behaviour (Track F / F2).
-    bool HideBaseProduct = false
+    bool HideBaseProduct = false,
+    // The sauce group rule (S5). Admin-editable per product with NO tenant default; the neutral
+    // seeds below are what every product has today — nothing required, no cap, nothing free.
+    // `SauceMax = null` is "no group cap", NOT 0. Semantics live on the Product entity.
+    int SauceMin = 0,
+    int? SauceMax = null,
+    int SauceIncludedFree = 0
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -95,6 +101,9 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 IsActive = command.IsActive,
                 IsSpecial = command.IsSpecial,
                 HideBaseProduct = command.HideBaseProduct,
+                SauceMin = command.SauceMin,
+                SauceMax = command.SauceMax,
+                SauceIncludedFree = command.SauceIncludedFree,
                 IsAvailable = command.IsAvailable,
                 AvailableOrderTypes = command.AvailableOrderTypes,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,
@@ -224,6 +233,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         IsActive = ingredientDto.IsActive,
                         DisplayOrder = ingredientDto.DisplayOrder,
                         MaxQuantity = ingredientDto.MaxQuantity,
+                        Kind = ingredientDto.Kind,
                         // Provenance of a picked library row; null when the name was typed by hand.
                         GlobalIngredientId = provenance.LinkFor(ingredientDto),
                         CreatedAt = DateTime.UtcNow,

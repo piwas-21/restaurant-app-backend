@@ -73,6 +73,9 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             IsAvailable = product.IsAvailable,
             IsSpecial = product.IsSpecial,
             HideBaseProduct = product.HideBaseProduct,
+            SauceMin = product.SauceMin,
+            SauceMax = product.SauceMax,
+            SauceIncludedFree = product.SauceIncludedFree,
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = product.Type,
             KitchenType = product.KitchenType,
@@ -125,6 +128,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         DisplayOrder = di.DisplayOrder,
                         MaxQuantity = di.MaxQuantity,
                         GlobalIngredientId = di.GlobalIngredientId,
+                        Kind = di.Kind,
                         Content = content
                     };
                 })

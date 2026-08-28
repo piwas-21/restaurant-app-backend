@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -13,7 +14,9 @@ public record UpdateGlobalIngredientCommand(
     string DefaultName,
     string? ImageUrl,
     bool IsActive,
-    List<GlobalIngredientTranslationDto> Translations
+    List<GlobalIngredientTranslationDto> Translations,
+    // S5. Last and defaulted so every existing caller keeps saying "ingredient".
+    IngredientKind Kind = IngredientKind.Ingredient
 ) : ICommand<ApiResponse<GlobalIngredientDto>>;
 
 public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobalIngredientCommand, ApiResponse<GlobalIngredientDto>>
@@ -43,6 +46,7 @@ public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobal
         ingredient.DefaultName = command.DefaultName;
         ingredient.ImageUrl = command.ImageUrl;
         ingredient.IsActive = command.IsActive;
+        ingredient.Kind = command.Kind;
 
         SyncTranslations(ingredient, command.Translations, _currentUserService.GetAuditIdentifier());
 

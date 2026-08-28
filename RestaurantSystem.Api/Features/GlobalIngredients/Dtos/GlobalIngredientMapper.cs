@@ -10,6 +10,7 @@ internal static class GlobalIngredientMapper
         DefaultName = ingredient.DefaultName,
         ImageUrl = ingredient.ImageUrl,
         IsActive = ingredient.IsActive,
+        Kind = ingredient.Kind,
         Translations = ingredient.Translations
             .Select(t => new GlobalIngredientTranslationDto
             {

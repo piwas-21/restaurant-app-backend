@@ -1,3 +1,5 @@
+using RestaurantSystem.Domain.Common.Enums;
+
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 public record ProductIngredientDto
@@ -15,6 +17,12 @@ public record ProductIngredientDto
     // typed it by hand. Read-write — the field was absent until S2, so the id an admin picker sent
     // was dropped by the model binder and the link could never be persisted at all.
     public Guid? GlobalIngredientId { get; set; }
+
+    // Ingredient or sauce (S5). Additive and defaulted: a client that omits `kind` keeps sending
+    // ingredients, which is what every client did before this field existed. Rationale for the
+    // discriminator shape — and why a second entity was rejected — is on `IngredientKind` itself.
+    public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+
     public Dictionary<string, ProductIngredientContentDto>? Content { get; set; }
 }
 

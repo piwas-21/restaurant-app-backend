@@ -51,7 +51,7 @@ public class GlobalIngredientsController : ControllerBase
     public async Task<ActionResult<ApiResponse<GlobalIngredientDto>>> CreateGlobalIngredient(
         [FromBody] CreateGlobalIngredientDto body) =>
         Ok(await _mediator.SendCommand(new CreateGlobalIngredientCommand(
-            body.DefaultName, body.ImageUrl, body.Translations)));
+            body.DefaultName, body.ImageUrl, body.Translations, body.Kind)));
 
     [HttpPut("{id}")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
@@ -60,7 +60,7 @@ public class GlobalIngredientsController : ControllerBase
         Guid id,
         [FromBody] UpdateGlobalIngredientDto body) =>
         Ok(await _mediator.SendCommand(new UpdateGlobalIngredientCommand(
-            id, body.DefaultName, body.ImageUrl, body.IsActive, body.Translations)));
+            id, body.DefaultName, body.ImageUrl, body.IsActive, body.Translations, body.Kind)));
 
     [HttpDelete("{id}")]
     [ApiScope(ApiTokenScopes.MenuWrite)]

@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -17,6 +18,14 @@ public class ProductIngredient : Entity
     public int DisplayOrder { get; set; } // Order in which to display ingredients
 
     public Guid? GlobalIngredientId { get; set; } // Optional link to global ingredient definition
+
+    /// <summary>
+    /// Ingredient or sauce (S5, plan D8). Defaults to <see cref="IngredientKind.Ingredient"/>, which
+    /// is also the migration's column default, so every pre-S5 row keeps its meaning with no backfill.
+    /// It groups the row for the admin editor and (S6) the guest sheet; it changes NOTHING about the
+    /// row's identity, so <c>IngredientQuantitiesJson</c> keys are unaffected by design.
+    /// </summary>
+    public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
     // Navigation properties
     public virtual Product Product { get; set; } = null!;

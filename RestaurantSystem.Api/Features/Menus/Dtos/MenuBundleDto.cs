@@ -1,6 +1,8 @@
 using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
 
+using RestaurantSystem.Domain.Common.Enums;
+
 namespace RestaurantSystem.Api.Features.Menus.Dtos;
 
 // The menu-bundle READ/response contract (menu-bundles redesign #156, slice 4c). These types are
@@ -129,6 +131,12 @@ public class MenuBundleIngredientDto
     public bool IsActive { get; set; }
     public int DisplayOrder { get; set; }
     public int MaxQuantity { get; set; }
+
+    // S5. A bundle option row renders through the SAME guest section as a plain product
+    // (`OptionalIngredientsSection`, which `BundleOptionRow` mounts), so the group a row belongs to
+    // has to survive this projection too or bundles would be the one surface where sauces vanish.
+    public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+
     public Dictionary<string, MenuBundleIngredientContentDto>? Content { get; set; }
 }
 
