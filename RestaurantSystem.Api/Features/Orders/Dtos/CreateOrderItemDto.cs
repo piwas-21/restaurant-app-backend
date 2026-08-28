@@ -17,6 +17,23 @@ public record CreateOrderItemDto
     public string? SpecialInstructions { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; } // { ingredientId: quantity }
 
+    // The ingredient SELECTION — the ids that ARE on the dish — with the same meaning as
+    // BasketItemDto.SelectedIngredients. Its PRESENCE is what makes a line SERVER-PRICED: see
+    // OrderItemFactory.AddProductItemRecursiveAsync. An empty list is a real answer ("every optional
+    // ingredient off"), which is why the trigger is null-vs-not and not Count.
+    //
+    // IngredientQuantities alone cannot stand in for it. That map is a per-ingredient COUNT, and an
+    // ingredient the caller never mentioned is absent from it — indistinguishable from one the caller
+    // deliberately removed. BasketToOrderTranslator resolves that ambiguity by ZEROING the deselected
+    // (BasketToOrderTranslator.cs:176-197), which is a lossy encoding of an answer the basket held in
+    // two fields. This DTO now holds the same two fields, so the order path stops guessing.
+    //
+    // NOT set by BasketToOrderTranslator, deliberately: the basket has already settled its own money
+    // and re-pricing it here would make a second authority out of a field. Null therefore means
+    // "priced as before" for every caller that exists today, which is what keeps the anonymous path
+    // byte-identical.
+    public List<Guid>? SelectedIngredientIds { get; set; }
+
     // For Menu Bundles
     public List<CreateOrderItemDto>? ChildItems { get; set; }
 
