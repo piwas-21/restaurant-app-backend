@@ -24,11 +24,17 @@ public interface ILineCustomizationBuilder
     /// selection when present, else persist a provided map as-is). Since #303 the two agree on the
     /// one thing that is not precedence: neither backfills without a selection to backfill FROM.
     /// </param>
+    /// <param name="sauceIncludedFree">
+    /// The sauce allowance of the product THIS LINE IS (plan D10). The caller supplies it because
+    /// only the caller holds the product row; the default of 0 keeps every other call site — and
+    /// every product that never mentions sauces — priced exactly as before.
+    /// </param>
     LineCustomization Build(
         ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
-        bool preferProvidedQuantities);
+        bool preferProvidedQuantities,
+        int sauceIncludedFree = 0);
 }
 
 public class LineCustomizationBuilder : ILineCustomizationBuilder
@@ -44,7 +50,8 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
-        bool preferProvidedQuantities)
+        bool preferProvidedQuantities,
+        int sauceIncludedFree = 0)
     {
         // A payload carrying neither a selection nor a quantity map expressed no ingredient choice
         // at all, so there is nothing to record and nothing to price (#303). `useReorder` posts
@@ -61,7 +68,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
 
         var customizationPrice = expressedAnIngredientChoice
             ? _basketPricingService.CalculateIngredientCustomizationPrice(
-                detailedIngredients, selectedIngredients, ingredientQuantities)
+                detailedIngredients, selectedIngredients, ingredientQuantities, sauceIncludedFree)
             : 0m;
 
         var ingredientQuantitiesJson = BuildIngredientQuantitiesJson(
