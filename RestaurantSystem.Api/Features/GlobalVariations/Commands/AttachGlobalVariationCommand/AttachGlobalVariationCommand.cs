@@ -77,6 +77,12 @@ public class AttachGlobalVariationCommandHandler
         var products = await _context.Products
             .Include(p => p.DetailedIngredients)
             .Include(p => p.Variations)
+            // Two COLLECTION includes in one query multiply the rows by each other, and this query is
+            // the one that runs over a whole category: 40 products x 12 ingredients x 4 variations is
+            // 1,920 rows carrying the product columns 48 times each. Both collections are needed —
+            // the ingredients for the deduction, the variations for the price floor — so the fix is
+            // to split, not to drop one.
+            .AsSplitQuery()
             .Where(p => requested.Contains(p.Id))
             .ToListAsync(cancellationToken);
 

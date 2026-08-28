@@ -23,6 +23,14 @@ public class AttachGlobalVariationDto
 {
     public List<Guid> ProductIds { get; set; } = [];
 
-    /// <summary>Added to the product's base price. May be negative — "small" is often a discount.</summary>
-    public decimal PriceModifier { get; set; }
+    /// <summary>
+    /// Added to the product's base price. May be negative — "small" is often a discount, and a
+    /// negative one is what <c>GlobalVariationAttach.Fits</c> exists to bound.
+    /// </summary>
+    /// <remarks>
+    /// <b><c>required</c>, not defaulted to 0</b> (Sonar S6964): 0 is a legitimate value, so an
+    /// omitted field and a deliberate "no surcharge" would be the same payload, and the admin who
+    /// forgot the price of a Large on forty products would be told nothing.
+    /// </remarks>
+    public required decimal PriceModifier { get; set; }
 }

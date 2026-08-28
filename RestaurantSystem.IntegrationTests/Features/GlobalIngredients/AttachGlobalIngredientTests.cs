@@ -221,7 +221,7 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
 
         var response = await PostAsJsonAsync(
             $"/api/global-ingredients/{archivedId}/attach",
-            new AttachGlobalIngredientDto { ProductIds = [PizzaAId] });
+            new AttachGlobalIngredientDto { ProductIds = [PizzaAId], Price = 1m, IsIncludedInBasePrice = false });
 
         var body = await ReadResponseAsync<ApiResponse<AttachGlobalIngredientResultDto>>(response);
         body!.Success.Should().BeFalse();
@@ -241,7 +241,13 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
 
         var response = await PostAsJsonAsync(
             $"/api/global-ingredients/{libraryId}/attach",
-            new AttachGlobalIngredientDto { ProductIds = [PizzaBId], IsOptional = false });
+            new AttachGlobalIngredientDto
+            {
+                ProductIds = [PizzaBId],
+                IsOptional = false,
+                Price = 1m,
+                IsIncludedInBasePrice = false,
+            });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await RecipeAsync(PizzaBId)).Should().NotContain(r => r.GlobalIngredientId == libraryId);
@@ -389,6 +395,7 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
                 ProductIds = productIds,
                 Price = price,
                 MaxQuantity = 2,
+                IsIncludedInBasePrice = false,
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

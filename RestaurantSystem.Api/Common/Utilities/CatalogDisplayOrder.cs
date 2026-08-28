@@ -35,15 +35,11 @@ public static class CatalogDisplayOrder
     {
         ArgumentNullException.ThrowIfNull(displayOrdersInUse);
 
-        var highest = int.MinValue;
-        foreach (var displayOrder in displayOrdersInUse)
-        {
-            if (displayOrder > highest)
-            {
-                highest = displayOrder;
-            }
-        }
-
-        return highest == int.MinValue ? 0 : highest + 1;
+        // Materialised once so the empty test and the maximum share one enumeration, and written as
+        // an explicit Count check rather than `DefaultIfEmpty(-1).Max() + 1`: the sentinel form is a
+        // magic number that happens to work only because a negative DisplayOrder is refused
+        // elsewhere, which is a coupling this helper should not carry.
+        var orders = displayOrdersInUse.ToList();
+        return orders.Count == 0 ? 0 : orders.Max() + 1;
     }
 }

@@ -29,9 +29,19 @@ public class AttachGlobalIngredientDto
     /// </summary>
     public bool IsOptional { get; set; } = true;
 
-    public decimal Price { get; set; }
+    /// <summary>
+    /// <b><c>required</c>, and so is <see cref="IsIncludedInBasePrice"/> — every field that moves
+    /// money must be STATED.</b> Sonar S6964 flagged exactly the fields with no initializer, and
+    /// they were exactly the money ones: an omitted <c>price</c> binds to 0 and quietly makes an
+    /// extra free on forty products, while an omitted <c>isIncludedInBasePrice</c> decides whether
+    /// <c>BasketPricingService</c> DEDUCTS that price when the guest deselects it. The two fields
+    /// that keep a default keep it because their default is safe and meaningful: the attach may only
+    /// create OPTIONAL rows at all, and 1 is the minimum quantity.
+    /// </summary>
+    public required decimal Price { get; set; }
 
     public int MaxQuantity { get; set; } = 1;
 
-    public bool IsIncludedInBasePrice { get; set; }
+    /// <summary>See <see cref="Price"/> for why this is required rather than defaulted to false.</summary>
+    public required bool IsIncludedInBasePrice { get; set; }
 }
