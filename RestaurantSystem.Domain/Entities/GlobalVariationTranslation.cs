@@ -10,9 +10,10 @@ namespace RestaurantSystem.Domain.Entities;
 public class GlobalVariationTranslation : Entity
 {
     public Guid GlobalVariationId { get; set; }
-    public string LanguageCode { get; set; } = null!; // e.g. "en", "fr", "de"
-    public string Name { get; set; } = null!;
+    public string LanguageCode { get; set; } = string.Empty; // e.g. "en", "fr", "de"
+    public string Name { get; set; } = string.Empty;
 
-    // Navigation properties
-    public virtual GlobalVariation GlobalVariation { get; set; } = null!;
+    // Navigation properties — nullable because EF only fills it when the read asks for it; the
+    // relationship stays REQUIRED through the non-nullable FK above.
+    public virtual GlobalVariation? GlobalVariation { get; set; }
 }

@@ -21,7 +21,7 @@ namespace RestaurantSystem.Domain.Entities;
 /// </summary>
 public class GlobalVariation : SoftDeleteEntity
 {
-    public string DefaultName { get; set; } = null!; // Fallback name (usually English)
+    public string DefaultName { get; set; } = string.Empty; // Fallback name (usually English)
     public bool IsActive { get; set; } = true;
 
     /// <summary>
