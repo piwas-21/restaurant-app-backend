@@ -53,7 +53,27 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
             // statement below — behaviour is identical (it is query metadata, not a positional
             // operator) but Sonar's rule is syntactic and does not follow the variable.
             .AsSplitQuery()
-            .Where(p => p.IsSpecial)
+            // IsActive as well as IsSpecial, matching GetFeaturedSpecialQuery's
+            // `p.IsFeaturedSpecial && p.IsSpecial && p.IsActive`. The two queries answer ONE
+            // question — "which specials are there?" — and disagreed about a deactivated one, on an
+            // endpoint that is [AllowAnonymous]. Two consequences, and the second is a real defect
+            // rather than a tidiness argument:
+            //
+            //   - anonymously, `GET /api/Products/specials` served products the restaurant had
+            //     switched OFF. No shipped guest surface reads it today (its only caller is
+            //     /admin/specials-management, behind AdminAuthGuard), so this is closing a latent
+            //     hole, not a live leak — but the endpoint is anonymous, so "no caller" is a fact
+            //     about our clients, not a guarantee.
+            //   - the admin specials table offered `Set Featured` on a deactivated special, and
+            //     featuring one is a SILENT NO-OP: GetFeaturedSpecialQuery filters IsActive, so the
+            //     banner never renders it. The admin pressed a button that could not work. Dropping
+            //     inactive rows from this list removes the action along with the row.
+            //
+            // The admin loses nothing it can act on: this page's only control is `Set Featured`
+            // (itself gated on IsAvailable), its Status column reads IsAvailable and never IsActive,
+            // and un-marking an item as special is done in Menu Management — which is what this
+            // table's own empty state already tells the admin.
+            .Where(p => p.IsSpecial && p.IsActive)
             .AsQueryable();
 
         // Get total count
