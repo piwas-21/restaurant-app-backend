@@ -10,14 +10,20 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.GlobalIngredients.Commands.UpdateGlobalIngredientCommand;
 
+/// <param name="IsActive">
+/// Null means "the caller said nothing about availability", not "false" (#428). It is the whole
+/// point of the nullable: the flag has no reverse gear in the UI, because nothing lists an inactive
+/// row, so a partial payload must never be able to set it.
+/// </param>
+/// <param name="Kind">Null means "leave the classification alone" — same reasoning (#428).</param>
 public record UpdateGlobalIngredientCommand(
     Guid Id,
     string DefaultName,
     string? ImageUrl,
-    bool IsActive,
+    bool? IsActive,
     List<GlobalIngredientTranslationDto> Translations,
-    // S5. Last and defaulted so every existing caller keeps saying "ingredient".
-    IngredientKind Kind = IngredientKind.Ingredient
+    // S5. Last and defaulted so every existing caller keeps its meaning; null now means "unchanged".
+    IngredientKind? Kind = null
 ) : ICommand<ApiResponse<GlobalIngredientDto>>;
 
 public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobalIngredientCommand, ApiResponse<GlobalIngredientDto>>
@@ -46,8 +52,8 @@ public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobal
 
         ingredient.DefaultName = command.DefaultName;
         ingredient.ImageUrl = command.ImageUrl;
-        ingredient.IsActive = command.IsActive;
-        ingredient.Kind = command.Kind;
+        ingredient.IsActive = command.IsActive ?? ingredient.IsActive;
+        ingredient.Kind = command.Kind ?? ingredient.Kind;
 
         SyncTranslations(ingredient, command.Translations, _currentUserService.GetAuditIdentifier());
 

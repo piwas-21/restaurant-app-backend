@@ -47,7 +47,13 @@ public record UpdateGlobalIngredientDto
 {
     public string DefaultName { get; set; } = null!;
     public string? ImageUrl { get; set; }
-    public bool IsActive { get; set; }
-    public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+
+    // Both nullable on purpose (#428): on an UPDATE, absent must mean "unchanged". A non-nullable
+    // bool bound `false` and hid the row from every screen; a defaulted `Kind` demoted a sauce.
+    // The create DTO above keeps its default, because for a NEW row "ingredient" is the right
+    // answer. Reasoning in UpdateGlobalIngredientCommand's param docs.
+    public bool? IsActive { get; set; }
+    public IngredientKind? Kind { get; set; }
+
     public List<GlobalIngredientTranslationDto> Translations { get; set; } = [];
 }
