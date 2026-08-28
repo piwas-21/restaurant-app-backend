@@ -91,8 +91,22 @@ internal sealed record OrderLineIngredientChoice(Dictionary<Guid, int>? Quantiti
             && itemDto.ChildItems is not { Count: > 0 }
             && product.Type != ProductType.Menu;
 
+        // TIMES QUANTITY, and this is a UNIT CONVERSION, not a scaling choice.
+        // CalculateIngredientCustomizationPrice prices ONE dish's ingredients — it is PER UNIT. The
+        // slot it is going into is LINE-ABSOLUTE by contract: CreateOrderItemDto.CustomizationPrice
+        // says "for the WHOLE line, not per unit", and OrderItemFactory adds it ONCE, after
+        // UnitPrice * Quantity. Handing a per-unit figure to a line-absolute field charged the
+        // extras on a single dish however many the guest ordered.
+        //
+        // The authority for the factor is the guest path, which must agree to the cent:
+        // BasketLineTotal.ForRoot computes (UnitPrice + CustomizationPrice) * Quantity for a regular
+        // row, and BasketToOrderTranslator.LineAbsoluteCustomization converts that to the DTO's
+        // contract as ItemTotal - UnitPrice * Quantity — i.e. exactly per-unit * Quantity. This is
+        // the same defect #312 fixed for the basket producer, met from the other side.
+        //
+        // Quantity is validated GreaterThan(0) (CreateOrderCommandValidator.cs:32-34), so no clamp.
         return new OrderLineIngredientChoice(
             line.IngredientQuantities,
-            serverCanPrice ? line.CustomizationPrice : null);
+            serverCanPrice ? line.CustomizationPrice * itemDto.Quantity : null);
     }
 }
