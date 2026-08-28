@@ -30,6 +30,16 @@ namespace RestaurantSystem.IntegrationTests.Features.GlobalIngredients;
 /// case below.
 /// </para>
 /// <para>
+/// <b>S3 has since split this action in two, and this class now pins only half of it.</b> A
+/// <c>DELETE</c> on a row NOTHING uses still soft-deletes, which is everything below that acts on
+/// <c>_unusedId</c>. A <c>DELETE</c> on a row a product uses now ARCHIVES instead (plan D4), and that
+/// half lives in <c>GlobalIngredientArchiveTests</c>. The two tests here that still act on
+/// <c>_usedId</c> assert what is common to both — the call succeeds and the product's own ingredient
+/// row keeps its link — and the projection guard below reaches the soft-deleted state through the
+/// database rather than through the endpoint, because the endpoint no longer produces it for a used
+/// row. It is still reachable data: every row deleted before S3 is in exactly that state.
+/// </para>
+/// <para>
 /// <b>The referenced case is a live bug, not just a data-retention one.</b> Deleting an ingredient
 /// that any product actually used did not silently destroy data — it threw, and the admin got a 500
 /// on an ordinary action with no way to complete it. That is the half of §9.18 a user would have
@@ -103,7 +113,9 @@ public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
 
     /// <summary>
     /// The user-visible half of §9.18: this action used to fail outright, because the FK is NO ACTION
-    /// and a product still pointed at the row.
+    /// and a product still pointed at the row. It succeeds either way — since S3 by archiving rather
+    /// than deleting, which is asserted in <c>GlobalIngredientArchiveTests</c>; what is pinned here
+    /// is only that the admin can complete the action at all.
     /// </summary>
     [Fact]
     public async Task DeletingAnIngredientAProductStillUses_Succeeds()
@@ -173,11 +185,18 @@ public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
     /// §9.14 shape. Soft-deleting a global ingredient is what makes it reachable here for the first
     /// time, so the guard ships with this fix. The ingredient still renders under its local name; only
     /// the deleted global's translations are withheld.
+    /// <para>
+    /// The soft delete is applied to the database directly because since S3 the endpoint archives a
+    /// row a product uses instead of deleting it — and archiving deliberately KEEPS these
+    /// translations (<c>GlobalIngredientArchiveTests.ArchivingAUsedIngredient_LeavesTheProductRenderingItsTranslations</c>).
+    /// The state below is no longer producible through the API, and is exactly the state every row
+    /// deleted before S3 is already in, which is why the guard stays.
+    /// </para>
     /// </summary>
     [Fact]
     public async Task ProductDetail_DoesNotServeADeletedGlobalsTranslations()
     {
-        await DeleteAsync(_usedId);
+        await SoftDeleteInDatabaseAsync(_usedId);
 
         var detail = await GetFromJsonAsync<ApiResponse<ProductDto>>($"/api/Products/{_productId}");
 
@@ -206,6 +225,23 @@ public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
         var response = await Client.DeleteAsync($"/api/global-ingredients/{id}");
         response.EnsureSuccessStatusCode();
         return (await ReadResponseAsync<ApiResponse<string>>(response))!;
+    }
+
+    /// <summary>
+    /// The pre-S3 state of a USED row, written straight to the database: the endpoint that used to
+    /// produce it now archives instead, and this class's subject is what the flagged row does to the
+    /// reads around it, not how it came to be flagged.
+    /// </summary>
+    private async Task SoftDeleteInDatabaseAsync(Guid id)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var ingredient = await context.GlobalIngredients.SingleAsync(g => g.Id == id);
+        ingredient.IsDeleted = true;
+        ingredient.DeletedAt = DateTime.UtcNow;
+        ingredient.DeletedBy = "test";
+        await context.SaveChangesAsync();
     }
 
     private async Task<GlobalIngredient?> FindIncludingDeletedAsync(Guid id)

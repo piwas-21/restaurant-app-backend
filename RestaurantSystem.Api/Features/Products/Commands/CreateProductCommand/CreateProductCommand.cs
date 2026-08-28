@@ -36,7 +36,13 @@ public record CreateProductCommand(
     int? AvailableOrderTypes = null,
     // Hide the "no variation" base row so the guest must pick one. Optional and last so existing
     // callers keep today's behaviour (Track F / F2).
-    bool HideBaseProduct = false
+    bool HideBaseProduct = false,
+    // The sauce group rule (S5). Admin-editable per product with NO tenant default; the neutral
+    // seeds below are what every product has today — nothing required, no cap, nothing free.
+    // `SauceMax = null` is "no group cap", NOT 0. Semantics live on the Product entity.
+    int SauceMin = 0,
+    int? SauceMax = null,
+    int SauceIncludedFree = 0
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -45,7 +51,10 @@ public record CreateProductVariationDto(
     decimal PriceModifier,
     bool IsActive,
     int DisplayOrder,
-    Dictionary<string, ProductVariationContentDto>? Content
+    Dictionary<string, ProductVariationContentDto>? Content,
+    // S4 provenance. Last and defaulted, so every existing caller and every existing test payload
+    // keeps compiling and keeps meaning "typed by hand".
+    Guid? GlobalVariationId = null
 );
 
 public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand, ApiResponse<ProductDto>>
@@ -95,6 +104,9 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 IsActive = command.IsActive,
                 IsSpecial = command.IsSpecial,
                 HideBaseProduct = command.HideBaseProduct,
+                SauceMin = command.SauceMin,
+                SauceMax = command.SauceMax,
+                SauceIncludedFree = command.SauceIncludedFree,
                 IsAvailable = command.IsAvailable,
                 AvailableOrderTypes = command.AvailableOrderTypes,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,
@@ -152,6 +164,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
 
             if (command.Variations?.Any() == true)
             {
+                // One query for the whole payload, and none at all when nothing carries a link.
+                var variationProvenance = await GlobalVariationProvenance.ResolveAsync(
+                    _context,
+                    command.Variations.Select(v => v.GlobalVariationId),
+                    _logger,
+                    cancellationToken);
+
                 foreach (var variationDto in command.Variations)
                 {
                     var variation = new ProductVariation
@@ -161,6 +180,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         PriceModifier = variationDto.PriceModifier,
                         IsActive = variationDto.IsActive,
                         DisplayOrder = variationDto.DisplayOrder,
+                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
@@ -224,6 +244,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         IsActive = ingredientDto.IsActive,
                         DisplayOrder = ingredientDto.DisplayOrder,
                         MaxQuantity = ingredientDto.MaxQuantity,
+                        Kind = ingredientDto.Kind,
                         // Provenance of a picked library row; null when the name was typed by hand.
                         GlobalIngredientId = provenance.LinkFor(ingredientDto),
                         CreatedAt = DateTime.UtcNow,

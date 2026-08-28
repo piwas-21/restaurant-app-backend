@@ -1,6 +1,8 @@
 using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
 
+using RestaurantSystem.Domain.Common.Enums;
+
 namespace RestaurantSystem.Api.Features.Menus.Dtos;
 
 // The menu-bundle READ/response contract (menu-bundles redesign #156, slice 4c). These types are
@@ -117,6 +119,34 @@ public class MenuBundleSectionItemDto
     public List<string>? Allergens { get; set; }
     public List<MenuBundleIngredientDto>? DetailedIngredients { get; set; }
     public List<MenuBundleSuggestedSideItemDto>? SuggestedSideItems { get; set; }
+
+    /// <summary>
+    /// The OPTION PRODUCT's own sauce group rule (S6, plan D9/D9a/D10), copied from its product row:
+    /// how many sauces the guest must choose, the cap (<c>null</c> = no cap, never 0), and how many
+    /// charged sauce units are free.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// S5 shipped <c>kind</c> on <see cref="MenuBundleIngredientDto"/> but deliberately not these
+    /// three numbers, because whose rule a bundle option follows was an open S6 decision. It is
+    /// taken: <b>the option product's own</b>. The option IS that product, and the parent bundle
+    /// owns no sauce rows for an allowance to apply to. <c>BasketItemFactory</c> prices the child
+    /// line with exactly this product's <c>SauceIncludedFree</c>, so these fields are the same rule
+    /// the server charges with — without them the sheet's live "Add · CHF x" would lie inside a
+    /// bundle.
+    /// </para>
+    /// <para>
+    /// Display only. Nothing here is enforced server-side: <c>SauceMin</c>/<c>SauceMax</c> are a UI
+    /// affordance, and money is safe because every sauce beyond the allowance is charged.
+    /// </para>
+    /// </remarks>
+    public int SauceMin { get; set; }
+
+    /// <inheritdoc cref="SauceMin"/>
+    public int? SauceMax { get; set; }
+
+    /// <inheritdoc cref="SauceMin"/>
+    public int SauceIncludedFree { get; set; }
 }
 
 public class MenuBundleIngredientDto
@@ -129,6 +159,12 @@ public class MenuBundleIngredientDto
     public bool IsActive { get; set; }
     public int DisplayOrder { get; set; }
     public int MaxQuantity { get; set; }
+
+    // S5. A bundle option row renders through the SAME guest section as a plain product
+    // (`OptionalIngredientsSection`, which `BundleOptionRow` mounts), so the group a row belongs to
+    // has to survive this projection too or bundles would be the one surface where sauces vanish.
+    public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+
     public Dictionary<string, MenuBundleIngredientContentDto>? Content { get; set; }
 }
 

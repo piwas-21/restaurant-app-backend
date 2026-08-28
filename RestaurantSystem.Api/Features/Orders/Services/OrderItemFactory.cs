@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -14,11 +15,16 @@ public class OrderItemFactory : IOrderItemFactory
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
 
-    public OrderItemFactory(ApplicationDbContext context, ICurrentUserService currentUserService)
+    public OrderItemFactory(
+        ApplicationDbContext context,
+        ICurrentUserService currentUserService,
+        ILineCustomizationBuilder lineCustomizationBuilder)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _lineCustomizationBuilder = lineCustomizationBuilder;
     }
 
     public async Task<string?> AddItemAsync(
@@ -87,6 +93,12 @@ public class OrderItemFactory : IOrderItemFactory
             return $"Menu {itemDto.MenuId} not found";
         }
 
+        // SelectedIngredientIds is deliberately NOT read here. This branch already prices its unit
+        // from Menus.BasePrice rather than the DTO, and no producer reaches it: BasketService's
+        // MenuId branch is an empty block, so BasketItem.MenuId is never set (see
+        // BasketToOrderTranslator's remarks) and the take-order screen posts ProductId. Teaching a
+        // branch scheduled for removal (#160) to price a selection would be new untested surface on
+        // the anonymous endpoint for no caller.
         var unitPrice = menu.BasePrice;
         var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
         order.Items.Add(new OrderItem
@@ -135,8 +147,15 @@ public class OrderItemFactory : IOrderItemFactory
             throw new NotFoundException($"Product {itemDto.ProductId} not found");
         }
 
-        var (unitPrice, variationName) = ResolvePricing(itemDto, product, pricesAreTrusted);
-        var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
+        // What the line SAID about its ingredients, resolved against the recipe (#430). When it
+        // carried a structured selection the server prices the line itself, so the declared
+        // UnitPrice and CustomizationPrice are both dropped — `Price is not null` is that verdict.
+        // See OrderLineIngredientChoice for which lines it covers and why the rest are excluded.
+        var choice = OrderLineIngredientChoice.Resolve(
+            _lineCustomizationBuilder, itemDto, product, isRootLine: parentItem == null);
+
+        var (unitPrice, variationName) = ResolvePricing(itemDto, product, pricesAreTrusted && choice.Price is null);
+        var customization = choice.Price ?? ResolveCustomizationPrice(itemDto, pricesAreTrusted);
 
         // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-245):
         // child rows carry UnitPrice for display but ItemTotal = 0, because the
@@ -193,14 +212,14 @@ public class OrderItemFactory : IOrderItemFactory
             UnitPrice = unitPrice,
             ItemTotal = itemTotal,
             SpecialInstructions = itemDto.SpecialInstructions,
-            IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
+            IngredientQuantitiesJson = SerializeIngredients(choice.Quantities),
             // THE FREEZE POINT for the ingredient half of the line. Everything else on this row is
             // already a snapshot (ProductName, VariationName, UnitPrice, ItemTotal); until S1 the
             // ingredients were bare ids re-resolved against the live catalog on every read, so a
             // rename or a delete rewrote a receipt already printed. D2, owner-confirmed 2026-08-24.
             IngredientSnapshots = OrderIngredientSnapshot.Build(
                 product.DetailedIngredients,
-                itemDto.IngredientQuantities,
+                choice.Quantities,
                 _currentUserService.GetAuditIdentifier()),
             ParentOrderItem = parentItem,
             // A kind belongs to a CHILD row. Discarded on a root even if a caller sent one, so the
@@ -223,7 +242,8 @@ public class OrderItemFactory : IOrderItemFactory
 
     // An explicit UnitPrice is honoured ONLY when the price is trusted — the items came from the
     // persisted basket via IBasketToOrderTranslator (where a bundle's rolled-up unit price and a
-    // variation's modifier are already resolved), or the caller is staff.
+    // variation's modifier are already resolved), or the caller is staff AND the line is one the
+    // server could not price for itself (#430 — see OrderLineIngredientChoice).
     //
     // For a hand-built POST /api/orders body the price is taken from the catalogue instead. That
     // endpoint is ANONYMOUS, so honouring its UnitPrice let a caller name its own price: posting

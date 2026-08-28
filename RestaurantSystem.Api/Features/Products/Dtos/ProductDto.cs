@@ -48,4 +48,13 @@ public record ProductDto
     /// category). Admin editors need the stored value; customers read <see cref="Availability"/>.
     /// </summary>
     public int? AvailableOrderTypes { get; init; }
+
+    /// <summary>Sauce group rule (S5). Semantics, and why max is nullable, on <see cref="Domain.Entities.Product"/>.</summary>
+    public int SauceMin { get; init; }
+
+    /// <inheritdoc cref="SauceMin"/>
+    public int? SauceMax { get; init; }
+
+    /// <inheritdoc cref="SauceMin"/>
+    public int SauceIncludedFree { get; init; }
 }

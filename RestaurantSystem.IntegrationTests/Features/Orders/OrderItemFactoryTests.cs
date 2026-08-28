@@ -1,6 +1,11 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Basket.Services;
+using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -41,7 +46,17 @@ public class OrderItemFactoryTests : IAsyncLifetime
         _currentUserServiceMock.Setup(x => x.UserId).Returns(Guid.NewGuid());
         _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns("test-user");
 
-        _factory = new OrderItemFactory(_context, _currentUserServiceMock.Object);
+        // A REAL LineCustomizationBuilder, not a mock: the only thing this factory asks it for is
+        // CalculateIngredientCustomizationPrice, which is pure arithmetic over the recipe. A mock
+        // would answer 0 to every question and quietly pass a future test that asserted a price.
+        // Its own collaborators are stubbed because none of them is reached by that method.
+        _factory = new OrderItemFactory(
+            _context,
+            _currentUserServiceMock.Object,
+            new LineCustomizationBuilder(new BasketPricingService(
+                Mock.Of<ICustomerDiscountService>(),
+                Options.Create(new OrderSettings()),
+                NullLogger<BasketPricingService>.Instance)));
     }
 
     public async Task DisposeAsync()

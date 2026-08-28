@@ -104,7 +104,8 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     PriceModifier = v.PriceModifier,
                     FinalPrice = featuredProduct.BasePrice + v.PriceModifier,
                     IsActive = v.IsActive,
-                    DisplayOrder = v.DisplayOrder
+                    DisplayOrder = v.DisplayOrder,
+                    GlobalVariationId = v.GlobalVariationId
                 }).ToList(),
             SuggestedSideItems = featuredProduct.SuggestedSideItems
                 .Where(si => si.SideItemProduct.IsActive)
@@ -144,6 +145,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     DisplayOrder = di.DisplayOrder,
                     MaxQuantity = di.MaxQuantity,
                     GlobalIngredientId = di.GlobalIngredientId,
+                    Kind = di.Kind,
                     Content = di.Descriptions
                         .GroupBy(d => d.LanguageCode)
                         .ToDictionary(

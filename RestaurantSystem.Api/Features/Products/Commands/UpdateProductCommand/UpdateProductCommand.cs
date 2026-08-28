@@ -39,7 +39,13 @@ public record UpdateProductCommand(
     int? AvailableOrderTypes = null,
     // Hide the "no variation" base row so the guest must pick one. Optional and last so existing
     // callers keep today's behaviour (Track F / F2).
-    bool HideBaseProduct = false
+    bool HideBaseProduct = false,
+    // The sauce group rule (S5). Admin-editable per product with NO tenant default; the neutral
+    // seeds below are what every product has today — nothing required, no cap, nothing free.
+    // `SauceMax = null` is "no group cap", NOT 0. Semantics live on the Product entity.
+    int SauceMin = 0,
+    int? SauceMax = null,
+    int SauceIncludedFree = 0
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -106,6 +112,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         product.AvailableOrderTypes = command.AvailableOrderTypes;
         product.IsSpecial = command.IsSpecial;
         product.HideBaseProduct = command.HideBaseProduct;
+        product.SauceMin = command.SauceMin;
+        product.SauceMax = command.SauceMax;
+        product.SauceIncludedFree = command.SauceIncludedFree;
         product.PreparationTimeMinutes = command.PreparationTimeMinutes;
         product.Type = command.Type;
         product.KitchenType = command.KitchenType;
@@ -212,6 +221,14 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // Update variations
         if (command.Variations != null)
         {
+            // S4 provenance, resolved once for the payload — see GlobalVariationProvenance for why a
+            // link the row already carries is never re-checked.
+            var variationProvenance = await GlobalVariationProvenance.ResolveAsync(
+                _context,
+                command.Variations.Select(v => v.GlobalVariationId),
+                _logger,
+                cancellationToken);
+
             var incomingVariationIds = command.Variations
                 .Where(v => v.Id.HasValue)
                 .Select(v => v.Id!.Value)
@@ -245,6 +262,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     variation.PriceModifier = variationDto.PriceModifier;
                     variation.IsActive = variationDto.IsActive;
                     variation.DisplayOrder = variationDto.DisplayOrder;
+                    variation.GlobalVariationId = variationProvenance.LinkFor(
+                        variationDto.GlobalVariationId, variationDto.Name, variation.GlobalVariationId);
                     variation.UpdatedAt = DateTime.UtcNow;
                     variation.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -265,6 +284,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                         PriceModifier = variationDto.PriceModifier,
                         IsActive = variationDto.IsActive,
                         DisplayOrder = variationDto.DisplayOrder,
+                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
@@ -409,5 +429,7 @@ public record UpdateProductVariationDto(
     decimal PriceModifier,
     bool IsActive,
     int DisplayOrder,
-    Dictionary<string, ProductVariationContentDto>? Content
+    Dictionary<string, ProductVariationContentDto>? Content,
+    // S4 provenance. Last and defaulted, so every existing caller keeps compiling.
+    Guid? GlobalVariationId = null
 );

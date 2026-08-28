@@ -48,6 +48,13 @@ namespace RestaurantSystem.Infrastructure.Extensions
                 await GlobalIngredientsSeeder.SeedAsync(dbContext, logger);
                 logger.LogInformation("Global ingredients data seeded successfully");
 
+                // Seed global variations data (plan S4). Idempotent like its ingredient twin: it
+                // returns immediately when the table already holds a row, so an admin who curated
+                // the library keeps their edits on every subsequent boot.
+                logger.LogInformation("Seeding global variations data");
+                await GlobalVariationsSeeder.SeedAsync(dbContext, logger);
+                logger.LogInformation("Global variations data seeded successfully");
+
                 // Seed users and roles (admin credentials from SeedSettings — issue #116)
                 logger.LogInformation("Seeding users and roles");
                 var seedSettings = scope.ServiceProvider.GetService<IOptions<SeedSettings>>()?.Value ?? new SeedSettings();

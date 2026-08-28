@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -10,7 +11,9 @@ namespace RestaurantSystem.Api.Features.GlobalIngredients.Commands.CreateGlobalI
 public record CreateGlobalIngredientCommand(
     string DefaultName,
     string? ImageUrl,
-    List<GlobalIngredientTranslationDto> Translations
+    List<GlobalIngredientTranslationDto> Translations,
+    // S5. Last and defaulted so every existing caller keeps creating ingredients.
+    IngredientKind Kind = IngredientKind.Ingredient
 ) : ICommand<ApiResponse<GlobalIngredientDto>>;
 
 public class CreateGlobalIngredientCommandHandler : ICommandHandler<CreateGlobalIngredientCommand, ApiResponse<GlobalIngredientDto>>
@@ -35,6 +38,7 @@ public class CreateGlobalIngredientCommandHandler : ICommandHandler<CreateGlobal
             DefaultName = command.DefaultName,
             ImageUrl = command.ImageUrl,
             IsActive = true,
+            Kind = command.Kind,
             CreatedBy = auditId,
             Translations = command.Translations
                 .Select(t => new GlobalIngredientTranslation

@@ -44,10 +44,11 @@ public class BasketItemFactory : IBasketItemFactory
 
         // Ingredient customization (price + quantities JSON) via the single shared writer, so the
         // regular and bundle-child paths can never diverge on a new field. Regular items keep the
-        // "explicit client map persisted verbatim" precedence (preferProvidedQuantities: true).
+        // verbatim-client-map precedence; the sauce allowance (plan D10) is this product's own.
         var customization = _lineCustomizationBuilder.Build(
             product.DetailedIngredients, item.SelectedIngredients,
-            item.IngredientQuantities, preferProvidedQuantities: true);
+            item.IngredientQuantities, preferProvidedQuantities: true,
+            sauceIncludedFree: product.SauceIncludedFree);
         decimal customizationPrice = customization.CustomizationPrice;
 
         // Calculate side items price. Drop non-positive quantities first: side-item
@@ -258,9 +259,14 @@ public class BasketItemFactory : IBasketItemFactory
             // Bundle children keep the "backfill from the selection when present" precedence so a
             // deselected optional's "NO xxx" reaches the kitchen ticket (issue #150), while an
             // explicit client quantity still wins inside the backfill.
+            //
+            // S6 decision (plan D10): a bundle option follows the OPTION PRODUCT's own sauce rule,
+            // not the parent bundle's — the option IS that product, and the parent bundle owns no
+            // sauce rows at all for a per-product allowance to be applied to.
             var childCustomization = _lineCustomizationBuilder.Build(
                 childProduct.DetailedIngredients, option.SelectedIngredients,
-                option.IngredientQuantities, preferProvidedQuantities: false);
+                option.IngredientQuantities, preferProvidedQuantities: false,
+                sauceIncludedFree: childProduct.SauceIncludedFree);
 
             // Add child customization price to total
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;

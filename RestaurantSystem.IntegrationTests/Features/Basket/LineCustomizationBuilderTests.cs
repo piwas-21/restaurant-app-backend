@@ -152,4 +152,42 @@ public class LineCustomizationBuilderTests
 
         Deserialize(result.IngredientQuantitiesJson).Should().BeEquivalentTo(provided);
     }
+
+    // S6: the builder is only a conduit for the sauce allowance — it must hand the caller's number
+    // to the pricing service unchanged, on BOTH paths. The number itself is a product fact the
+    // builder has no access to, which is why it is a parameter and not something derived here.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheSauceAllowance_IsForwardedToThePricingService(bool preferProvidedQuantities)
+    {
+        var builder = Build(price: 0m, out var pricing);
+
+        builder.Build(Ingredients(), [Bacon], null, preferProvidedQuantities, sauceIncludedFree: 2);
+
+        pricing.Verify(
+            p => p.CalculateIngredientCustomizationPrice(
+                It.IsAny<IEnumerable<ProductIngredient>>(),
+                It.IsAny<IReadOnlyCollection<Guid>>(),
+                It.IsAny<IReadOnlyDictionary<Guid, int>>(),
+                2),
+            Times.Once);
+    }
+
+    // …and a caller that says nothing about sauces prices exactly as it did before S6.
+    [Fact]
+    public void WithoutASauceAllowance_ThePricingServiceIsAskedForZero()
+    {
+        var builder = Build(price: 0m, out var pricing);
+
+        builder.Build(Ingredients(), [Bacon], null, preferProvidedQuantities: true);
+
+        pricing.Verify(
+            p => p.CalculateIngredientCustomizationPrice(
+                It.IsAny<IEnumerable<ProductIngredient>>(),
+                It.IsAny<IReadOnlyCollection<Guid>>(),
+                It.IsAny<IReadOnlyDictionary<Guid, int>>(),
+                0),
+            Times.Once);
+    }
 }

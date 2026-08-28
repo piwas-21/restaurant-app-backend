@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -232,50 +233,29 @@ public class ProductsControllerTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetProducts_ByCategory_DedupesVariationContentByLanguage()
+    public void ProductSummaryMapper_DedupesVariationContentByLanguage()
     {
         // RE-HOMED 2026-07-29 from CategoriesControllerTests, whose endpoint
         // (GET /api/Categories/{id}/products) was deleted as unconsumed — plan §9.16. That test
         // was the ONLY fixture in the whole suite seeding two ProductVariationDescription rows
         // with the same LanguageCode, and #138 had two halves. The SQL-translation half died with
         // the endpoint; this half did NOT — ProductSummaryMapper:90 still runs
-        // GroupBy(LanguageCode).First().ToDictionary(), and it feeds THIS endpoint, the guest
-        // menu. Without a duplicate-language row anywhere, dropping that GroupBy as redundant
-        // looks safe and 500s /api/Products with "an item with the same key has already been
-        // added". So the coverage moves onto the shipping path rather than being deleted with the
-        // dead one.
-        var (categoryId, productName) = await SeedProductWithDuplicateLanguageVariationAsync();
-
-        var result = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>(
-            $"/api/products?CategoryId={categoryId}&PageSize=50");
-
-        result!.Success.Should().BeTrue();
-        var item = result.Data!.Items.Should().ContainSingle(p => p.Name == productName).Subject;
-        var variation = item.Variations.Should().ContainSingle().Subject;
-        // Two "en" rows collapse to one key. Assert the WINNER, not just the count: First() after
-        // GroupBy has to keep the first row, and a count-only assertion passes either way.
-        variation.Content.Should().HaveCount(1).And.ContainKey("en");
-        // WHICH of the two rows wins is deliberately NOT asserted, because the code does not
-        // guarantee it: `Descriptions` is loaded with no ORDER BY, so GroupBy(lang).First() takes
-        // whichever row EF materialized first. Measured, not assumed — asserting the first-inserted
-        // name passed this test in isolation and failed it in a full-class run, same commit. The
-        // dedup (one key, never a duplicate-key throw) is the real contract and is what this pins.
-        // Making the winner deterministic means an OrderBy in the mapper; that is a behaviour
-        // change to a guest-facing string and belongs in its own PR, not in a §9.16 deletion.
-        variation.Content["en"].Name.Should().BeOneOf("Large", "Large (duplicate language)");
-    }
-
-    private async Task<(Guid CategoryId, string ProductName)> SeedProductWithDuplicateLanguageVariationAsync()
-    {
-        using var scope = Factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var categoryId = (await context.Categories.FirstAsync()).Id;
-        const string productName = "Duplicate-language QA Product";
-
+        // GroupBy(LanguageCode).First().ToDictionary(), and it feeds the guest menu. Without a
+        // duplicate-language row anywhere, dropping that GroupBy as redundant looks safe and 500s
+        // /api/Products with "an item with the same key has already been added".
+        //
+        // REWRITTEN 2026-08-28 by S4, same subject, one layer lower. S4 gave
+        // product_variation_descriptions the unique (variation, language) index its ingredient twin
+        // always had (backend analysis §9 defect 2), so the state this used to seed is no longer
+        // storable — the seed itself now throws 23505, which is asserted deliberately in
+        // ProductVariationDefectTests.ASecondDescriptionInTheSameLanguage_IsRefusedByTheDatabase.
+        // The mapper's guard is therefore no longer defending against a reachable database state,
+        // and it still must not be deleted: it is what stops a duplicate-key throw if one ever
+        // arrives from anywhere else. So the coverage moves off the database and onto the mapper,
+        // which is where the guard lives.
         var product = new Product
         {
-            Name = productName,
+            Name = "Duplicate-language QA Product",
             BasePrice = 9.99m,
             IsActive = true,
             IsAvailable = true,
@@ -297,20 +277,15 @@ public class ProductsControllerTests : IntegrationTestBase
             },
         };
 
-        context.Products.Add(product);
-        await context.SaveChangesAsync();
+        var summary = ProductSummaryMapper.MapToSummaryDto(product, baseUrl: string.Empty, requestedOrderType: null);
 
-        context.ProductCategories.Add(new ProductCategory
-        {
-            ProductId = product.Id,
-            CategoryId = categoryId,
-            DisplayOrder = 1,
-            IsPrimary = true,
-            CreatedBy = "test",
-        });
-        await context.SaveChangesAsync();
-
-        return (categoryId, productName);
+        var variation = summary.Variations.Should().ContainSingle().Subject;
+        // Two "en" rows collapse to one key, and the mapper does not throw. WHICH of the two wins is
+        // deliberately NOT asserted: `Descriptions` has no ORDER BY anywhere, so GroupBy(lang)
+        // .First() takes whichever row came first — measured, not assumed, when the assertion passed
+        // in isolation and failed in a full-class run on the same commit.
+        variation.Content.Should().HaveCount(1).And.ContainKey("en");
+        variation.Content!["en"].Name.Should().BeOneOf("Large", "Large (duplicate language)");
     }
 
     private async Task<Guid> SeedPricedProductAsync(string name, decimal price, bool isDeleted = false)

@@ -1495,6 +1495,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("ArchivedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("archived_by");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1532,6 +1540,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
+
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("kind");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1595,6 +1609,126 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_global_ingredient_translations_global_ingredient_id");
 
                     b.ToTable("global_ingredient_translations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalVariation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("ArchivedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("archived_by");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DefaultName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("default_name");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_global_variations");
+
+                    b.HasIndex("DefaultName");
+
+                    b.ToTable("global_variations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalVariationTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("GlobalVariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_variation_id");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_global_variation_translations");
+
+                    b.HasIndex("GlobalVariationId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("global_variation_translations");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.GroupDiscount", b =>
@@ -3228,6 +3362,22 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("preparation_time_minutes");
 
+                    b.Property<int>("SauceIncludedFree")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("sauce_included_free");
+
+                    b.Property<int?>("SauceMax")
+                        .HasColumnType("integer")
+                        .HasColumnName("sauce_max");
+
+                    b.Property<int>("SauceMin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("sauce_min");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
@@ -3473,6 +3623,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_optional");
 
+                    b.Property<int>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("kind");
+
                     b.Property<int>("MaxQuantity")
                         .HasColumnType("integer")
                         .HasColumnName("max_quantity");
@@ -3653,12 +3809,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("deleted_by");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("description");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
+
+                    b.Property<Guid?>("GlobalVariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_variation_id");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -3672,11 +3833,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
                     b.Property<decimal>("PriceModifier")
-                        .HasColumnType("numeric")
+                        .HasColumnType("decimal(18,2)")
                         .HasColumnName("price_modifier");
 
                     b.Property<Guid>("ProductId")
@@ -3693,6 +3855,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_product_variations");
+
+                    b.HasIndex("GlobalVariationId")
+                        .HasDatabaseName("ix_product_variations_global_variation_id");
 
                     b.HasIndex("ProductId")
                         .HasDatabaseName("ix_product_variations_product_id");
@@ -3751,8 +3916,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_product_variation_descriptions");
 
-                    b.HasIndex("ProductVariationId")
-                        .HasDatabaseName("ix_product_variation_descriptions_product_variation_id");
+                    b.HasIndex("ProductVariationId", "LanguageCode")
+                        .IsUnique();
 
                     b.ToTable("product_variation_descriptions");
                 });
@@ -4746,6 +4911,18 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("GlobalIngredient");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalVariationTranslation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.GlobalVariation", "GlobalVariation")
+                        .WithMany("Translations")
+                        .HasForeignKey("GlobalVariationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_global_variation_translations_global_variations_global_vari~");
+
+                    b.Navigation("GlobalVariation");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.GroupDiscount", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.UserGroup", "Group")
@@ -5115,12 +5292,20 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductVariation", b =>
                 {
+                    b.HasOne("RestaurantSystem.Domain.Entities.GlobalVariation", "GlobalVariation")
+                        .WithMany()
+                        .HasForeignKey("GlobalVariationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("fk_product_variations_global_variations_global_variation_id");
+
                     b.HasOne("RestaurantSystem.Domain.Entities.Product", "Product")
                         .WithMany("Variations")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_product_variations_products_product_id");
+
+                    b.Navigation("GlobalVariation");
 
                     b.Navigation("Product");
                 });
@@ -5246,6 +5431,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalIngredient", b =>
+                {
+                    b.Navigation("Translations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.GlobalVariation", b =>
                 {
                     b.Navigation("Translations");
                 });
