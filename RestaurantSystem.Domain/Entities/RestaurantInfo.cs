@@ -45,5 +45,20 @@ public class RestaurantInfo : Entity
     /// </summary>
     public string? LogoDarkUrl { get; set; }
 
+    /// <summary>
+    /// One photo of the restaurant itself — the dining room, the counter, the shopfront —
+    /// uploaded through admin and rendered as a section on the landing page.
+    /// Null means the tenant has not uploaded one and the section is NOT rendered at all.
+    /// </summary>
+    /// <remarks>
+    /// The null case deliberately renders nothing rather than falling back to
+    /// <c>/branding/hero.png</c>: that asset is a neutral platform graphic that belongs to no
+    /// restaurant, so showing it under a heading like "our restaurant" would state something
+    /// untrue about the tenant. Owned only by its own upload/delete endpoints, exactly like
+    /// <see cref="LogoUrl"/> — the profile PUT never assigns it, so a client that PUTs the
+    /// address without knowing this field exists cannot clear the photo.
+    /// </remarks>
+    public string? InteriorImageUrl { get; set; }
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
 }

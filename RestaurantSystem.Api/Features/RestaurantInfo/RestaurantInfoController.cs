@@ -5,9 +5,11 @@ using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.AddPhoneNumberCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.DeletePhoneNumberCommand;
+using RestaurantSystem.Api.Features.RestaurantInfo.Commands.DeleteRestaurantInteriorImageCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.DeleteRestaurantLogoCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdatePhoneNumberCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantInfoCommand;
+using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantInteriorImageCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantLogoCommand;
 using RestaurantSystem.Api.Features.RestaurantInfo.Dtos;
 using RestaurantSystem.Api.Features.RestaurantInfo.Dtos.Requests;
@@ -82,6 +84,34 @@ public class RestaurantInfoController : ControllerBase
     public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> DeleteLogo(LogoVariant variant)
     {
         var result = await _mediator.SendCommand(new DeleteRestaurantLogoCommand(variant));
+        return Ok(result);
+    }
+
+    /// <summary>Replace the interior photo. Removing it is a DELETE, not an empty upload —
+    /// "no photo" is a real state and the landing page then omits the section.</summary>
+    [HttpPut("interior-image")]
+    [Consumes("multipart/form-data")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
+    [RequireAdmin]
+    [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> UpdateInteriorImage(
+        [FromForm] UpdateRestaurantInteriorImageRequest request)
+    {
+        var result = await _mediator.SendCommand(
+            new UpdateRestaurantInteriorImageCommand(request.Image));
+        return Ok(result);
+    }
+
+    [HttpDelete("interior-image")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
+    [RequireAdmin]
+    [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> DeleteInteriorImage()
+    {
+        var result = await _mediator.SendCommand(new DeleteRestaurantInteriorImageCommand());
         return Ok(result);
     }
 
