@@ -73,6 +73,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             IsAvailable = product.IsAvailable,
             IsSpecial = product.IsSpecial,
             HideBaseProduct = product.HideBaseProduct,
+            IsComponent = product.IsComponent,
             SauceMin = product.SauceMin,
             SauceMax = product.SauceMax,
             SauceIncludedFree = product.SauceIncludedFree,

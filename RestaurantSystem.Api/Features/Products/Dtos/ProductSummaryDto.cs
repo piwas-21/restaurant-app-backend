@@ -22,6 +22,14 @@ public record ProductSummaryDto
     /// </summary>
     public bool HideBaseProduct { get; init; }
 
+    /// <summary>
+    /// When <c>true</c> this product is a bundle COMPONENT, not a catalogue item: it is excluded
+    /// from product listings by default and refused as a top-level basket line. Semantics on
+    /// <see cref="Domain.Entities.Product.IsComponent"/>. Additive — clients that ignore it are
+    /// unaffected, because the server enforces both halves itself.
+    /// </summary>
+    public bool IsComponent { get; init; }
+
     public ProductType Type { get; init; }
     public List<string>? Ingredients { get; init; } = [];
     public List<ProductIngredientDto>? DetailedIngredients { get; init; } = [];

@@ -24,6 +24,12 @@ public record ProductDto
     /// </summary>
     public bool HideBaseProduct { get; init; }
 
+    /// <summary>
+    /// Bundle-only component: excluded from listings and refused as a top-level basket line.
+    /// Semantics on <see cref="Domain.Entities.Product.IsComponent"/>. Additive.
+    /// </summary>
+    public bool IsComponent { get; init; }
+
     public int PreparationTimeMinutes { get; init; }
     public ProductType Type { get; init; }
     public KitchenType KitchenType { get; init; } // Front or Back kitchen designation
