@@ -51,6 +51,7 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
             // Get working hours for this day of week
             var dayOfWeek = query.Date.DayOfWeek;
             var workingHours = await _context.WorkingHours
+                .AsNoTracking()
                 .Include(wh => wh.Shifts)
                 .FirstOrDefaultAsync(wh => wh.DayOfWeek == dayOfWeek && wh.IsActive, cancellationToken);
 

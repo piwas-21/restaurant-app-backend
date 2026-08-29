@@ -27,6 +27,7 @@ public class WorkingHoursService : IWorkingHoursService
     public async Task<List<WorkingHoursDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var workingHours = await _context.WorkingHours
+            .AsNoTracking()
             .Include(wh => wh.Shifts)
             .OrderBy(wh => wh.DayOfWeek)
             .ToListAsync(cancellationToken);
@@ -37,6 +38,7 @@ public class WorkingHoursService : IWorkingHoursService
     public async Task<WorkingHoursDto?> GetByDayAsync(DayOfWeek dayOfWeek, CancellationToken cancellationToken = default)
     {
         var workingHour = await _context.WorkingHours
+            .AsNoTracking()
             .Include(wh => wh.Shifts)
             .FirstOrDefaultAsync(wh => wh.DayOfWeek == dayOfWeek, cancellationToken);
 
@@ -108,6 +110,7 @@ public class WorkingHoursService : IWorkingHoursService
         var currentTime = localTime.TimeOfDay;
 
         var todayHours = await _context.WorkingHours
+            .AsNoTracking()
             .Include(wh => wh.Shifts)
             .FirstOrDefaultAsync(wh => wh.DayOfWeek == currentDay, cancellationToken);
 
