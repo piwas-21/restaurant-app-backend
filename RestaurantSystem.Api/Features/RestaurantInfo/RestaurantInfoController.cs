@@ -43,6 +43,7 @@ public class RestaurantInfoController : ControllerBase
     }
 
     [HttpPut]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<RestaurantInfoDto>>> Update(
@@ -58,6 +59,7 @@ public class RestaurantInfoController : ControllerBase
     /// </summary>
     [HttpPut("logo/{variant}")]
     [Consumes("multipart/form-data")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -72,6 +74,7 @@ public class RestaurantInfoController : ControllerBase
     }
 
     [HttpDelete("logo/{variant}")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<RestaurantInfoDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -83,6 +86,7 @@ public class RestaurantInfoController : ControllerBase
     }
 
     [HttpPost("phones")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<RestaurantPhoneNumberDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<RestaurantPhoneNumberDto>>> AddPhone(
@@ -93,6 +97,7 @@ public class RestaurantInfoController : ControllerBase
     }
 
     [HttpPut("phones/{id:guid}")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<RestaurantPhoneNumberDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<RestaurantPhoneNumberDto>>> UpdatePhone(
@@ -104,6 +109,7 @@ public class RestaurantInfoController : ControllerBase
     }
 
     [HttpDelete("phones/{id:guid}")]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [RequireAdmin]
     [ProducesResponseType(typeof(ApiResponse<Guid>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<Guid>>> DeletePhone(Guid id)

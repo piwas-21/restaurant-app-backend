@@ -37,6 +37,14 @@ public static class ApiTokenScopes
     public const string TenantRead = "tenant:read";
 
     /// <summary>
+    /// Edit the restaurant's own profile: address, phone numbers, logo and opening hours.
+    /// Deliberately NOT tax configuration, order-type configuration or form fields — those
+    /// change how the restaurant charges and serves people, and no machine client has asked
+    /// for them (workspace docs/plans/API-TOKENS-PLAN.md §2).
+    /// </summary>
+    public const string TenantWrite = "tenant:write";
+
+    /// <summary>
     /// Every scope that may be granted. The create-token validator rejects anything outside
     /// this set, so a typo is a 400 rather than a token that silently grants nothing.
     /// </summary>
@@ -45,7 +53,7 @@ public static class ApiTokenScopes
         MenuRead, MenuWrite,
         OrdersRead, OrdersWrite,
         ReservationsRead, ReservationsWrite,
-        TenantRead
+        TenantRead, TenantWrite
     };
 
     /// <summary>Whether <paramref name="scope"/> is part of the vocabulary. Case-sensitive on purpose.</summary>
