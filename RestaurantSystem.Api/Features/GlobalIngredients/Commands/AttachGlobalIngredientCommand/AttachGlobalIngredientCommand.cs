@@ -19,10 +19,11 @@ public record AttachGlobalIngredientCommand(Guid Id, AttachGlobalIngredientDto B
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>It is a COPY, exactly as the picker's is (plan D3).</b> Name, kind and the nine translations
-/// are taken from the library row at attach time and <c>GlobalIngredientId</c> is persisted as
-/// PROVENANCE. Nothing reads the library row afterwards and editing it still does not propagate —
-/// propagation is S9, licensed by S1's order snapshot rather than by this endpoint.
+/// <b>It is a COPY, exactly as the picker's is (plan D3).</b> Name and the nine translations are
+/// taken from the library row at attach time — the GROUP is stated by the caller and falls back to
+/// the row's own kind, see <c>GlobalIngredientAttach.CopyOnto</c> — and <c>GlobalIngredientId</c> is
+/// persisted as PROVENANCE. Nothing reads the library row afterwards and editing it still does not
+/// propagate — propagation is S9, licensed by S1's order snapshot rather than by this endpoint.
 /// </para>
 /// <para>
 /// <b>All-or-nothing on a rule violation, itemised skips otherwise.</b> A product that already
@@ -89,7 +90,10 @@ public class AttachGlobalIngredientCommandHandler
             .Where(p => requested.Contains(p.Id))
             .ToListAsync(cancellationToken);
 
-        var result = new AttachGlobalIngredientResultDto { Kind = library.Kind };
+        // The EFFECTIVE kind, not the library row's: `CopyOnto` writes `body.Kind ?? library.Kind`
+        // and the receipt has to report where the rows really went. One expression, read twice, is
+        // how the picker and this endpoint stopped disagreeing about the group in the first place.
+        var result = new AttachGlobalIngredientResultDto { Kind = command.Body.Kind ?? library.Kind };
         var targets = BulkCatalogAttach.Triage(
             requested,
             products,
