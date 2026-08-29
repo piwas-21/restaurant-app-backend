@@ -54,7 +54,9 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                 .ThenInclude(s => s.Images)
             .Include(p => p.DetailedIngredients)
                 .ThenInclude(di => di.Descriptions)
-            .Where(p => p.IsFeaturedSpecial && p.IsSpecial && p.IsActive)
+            // `!p.IsComponent` unconditionally — this is the public banner; see the same clause
+            // on GetSpecialProductsQuery. No opt-in exists because no caller could want one.
+            .Where(p => p.IsFeaturedSpecial && p.IsSpecial && p.IsActive && !p.IsComponent)
             // Five sibling collections LEFT-JOIN into each other's cartesian product, and this
             // endpoint is public + uncached + hit on every menu page load. `GetProductByIdQuery`
             // splits a near-identical graph for the same reason.

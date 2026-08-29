@@ -41,6 +41,12 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.HideBaseProduct)
             .HasDefaultValue(false);
 
+        // A component is bundle-only (see Product.IsComponent). `false` is the pre-feature
+        // meaning, so every existing row keeps behaving as an ordinary catalogue item when the
+        // migration runs — no backfill, no data change.
+        builder.Property(p => p.IsComponent)
+            .HasDefaultValue(false);
+
         // S5 sauce group rule. The neutral values are the column defaults, so no product changes
         // behaviour when the migration runs: nothing required, NO cap (null), nothing free.
         builder.Property(p => p.SauceMin)

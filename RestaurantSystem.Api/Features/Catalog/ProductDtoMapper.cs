@@ -33,6 +33,7 @@ public static class ProductDtoMapper
             IsActive = product.IsActive,
             IsAvailable = product.IsAvailable,
             HideBaseProduct = product.HideBaseProduct,
+            IsComponent = product.IsComponent,
             // S5. The guest sheet (S6) derives its sauce widget from these; the admin editor round-trips
             // them. `ProductSummaryDto` deliberately does NOT carry them — a menu card never renders a
             // group rule, and the sheet always loads the full product.

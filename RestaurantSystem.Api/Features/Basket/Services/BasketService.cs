@@ -108,6 +108,12 @@ public class BasketService : IBasketService
 
             BasketChannelGuard.EnsureOrderable(product, basket.OrderType);
 
+            // TOP-LEVEL only, and deliberately BEFORE the Menu branch below: a bundle's own chosen
+            // options are resolved inside BasketItemFactory and never reach this line, so marking
+            // a product as a component removes it from the menu without breaking any bundle that
+            // offers it.
+            BasketComponentGuard.EnsureNotOrderedAlone(product);
+
             // Handle Menu Type Product. The menu parent/child graph is built by the
             // factory and added in one go — EF cascades the children from the parent.
             if (product.Type == ProductType.Menu)
