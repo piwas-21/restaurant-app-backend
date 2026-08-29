@@ -202,33 +202,4 @@ public class ReservationClockTests : IntegrationTestBase
 
         return table.Id;
     }
-
-    /// <summary>
-    /// A clock stopped at an instant the test picks, in a zone the test picks. Hand-written for the
-    /// same reason <c>WorkingHoursClockTests</c> writes its own: the point of
-    /// <see cref="ITenantClock"/> being an interface is that a test can hold one.
-    /// </summary>
-    private sealed class MutableClock : ITenantClock
-    {
-        private DateTimeOffset _instant;
-
-        public MutableClock(DateTimeOffset instant, string zoneId)
-        {
-            _instant = instant;
-            TimeZone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
-        }
-
-        public TimeZoneInfo TimeZone { get; private set; }
-
-        public DateTimeOffset Now => ToTenantTime(_instant.UtcDateTime);
-
-        public void Set(DateTimeOffset instant, string zoneId)
-        {
-            _instant = instant;
-            TimeZone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
-        }
-
-        public DateTimeOffset ToTenantTime(DateTime value) =>
-            TimeZoneInfo.ConvertTime(new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)), TimeZone);
-    }
 }

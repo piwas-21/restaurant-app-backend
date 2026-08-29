@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Reservations.Queries.GetAvailableTimeSlotsQuery;
@@ -50,6 +51,7 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
             // Get working hours for this day of week
             var dayOfWeek = query.Date.DayOfWeek;
             var workingHours = await _context.WorkingHours
+                .Include(wh => wh.Shifts)
                 .FirstOrDefaultAsync(wh => wh.DayOfWeek == dayOfWeek && wh.IsActive, cancellationToken);
 
             // If restaurant is closed on this day or working hours not configured
@@ -63,12 +65,14 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
                 });
             }
 
-            // Use configured opening/closing times from database
-            var openingTime = workingHours.OpenTime;
-            var closingTime = workingHours.CloseTime;
+            // Every serving window of the day, not one interval. A restaurant that shuts between
+            // lunch and dinner used to be read as one 11:00-23:00 span here, which offered a table
+            // at 16:00 in an empty dining room (G11).
+            var servingWindows = WorkingHoursWindows.Of(workingHours);
 
-            _logger.LogInformation("Using working hours for {DayOfWeek}: {OpenTime} - {CloseTime}",
-                dayOfWeek, openingTime, closingTime);
+            _logger.LogInformation("Using working hours for {DayOfWeek}: {Windows}",
+                dayOfWeek,
+                string.Join(", ", servingWindows.Select(w => $"{w.Open}-{w.Close}")));
 
             // Get ALL active tables (not filtered by capacity)
             var allTables = await _context.Tables
@@ -93,62 +97,68 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
             var isToday = query.Date.Date == now.Date;
             var currentTimeSpan = isToday ? now.TimeOfDay : TimeSpan.Zero;
 
-            // Generate time slots
+            // Generate time slots WINDOW BY WINDOW. Generating over the day's whole span is what
+            // offered a table at 16:00 to a restaurant that serves 11:00-15:00 and 18:00-23:00: the
+            // closure now produces no slots at all, because it belongs to no window (G11).
             var timeSlots = new List<TimeSlotDto>();
-            var currentTime = openingTime;
 
-            while (currentTime.Add(TimeSpan.FromMinutes(SlotDurationMinutes)) <= closingTime)
+            foreach (var window in servingWindows)
             {
-                var slotEndTime = currentTime.Add(TimeSpan.FromMinutes(SlotDurationMinutes));
+                var currentTime = window.Open;
 
-                // Skip past time slots for today
-                if (isToday && currentTime <= currentTimeSpan)
+                while (currentTime.Add(TimeSpan.FromMinutes(SlotDurationMinutes)) <= window.Close)
                 {
-                    currentTime = currentTime.Add(TimeSpan.FromMinutes(30));
-                    continue;
-                }
+                    var slotEndTime = currentTime.Add(TimeSpan.FromMinutes(SlotDurationMinutes));
 
-                // Find available tables for this time slot
-                var availableTables = allTables.Where(table =>
-                {
-                    // Check if this table has any conflicting reservations
-                    var hasConflict = existingReservations.Any(r =>
-                        r.TableId == table.Id &&
-                        DoTimeSlotsOverlap(currentTime, slotEndTime, r.StartTime, r.EndTime));
-
-                    return !hasConflict;
-                })
-                .Select(t => new TableDto
-                {
-                    Id = t.Id,
-                    TableNumber = t.TableNumber,
-                    MaxGuests = t.MaxGuests,
-                    IsActive = t.IsActive,
-                    IsOutdoor = t.IsOutdoor,
-                    PositionX = t.PositionX,
-                    PositionY = t.PositionY,
-                    Width = t.Width,
-                    Height = t.Height,
-                    Shape = t.Shape,
-                    Notes = t.Notes,
-                    QRCodeData = t.QRCodeData,
-                    QRCodeGeneratedAt = t.QRCodeGeneratedAt
-                })
-                .ToList();
-
-                // Only add time slots that have at least one available table
-                if (availableTables.Any())
-                {
-                    timeSlots.Add(new TimeSlotDto
+                    // Skip past time slots for today
+                    if (isToday && currentTime <= currentTimeSpan)
                     {
-                        StartTime = currentTime,
-                        EndTime = slotEndTime,
-                        AvailableTables = availableTables
-                    });
-                }
+                        currentTime = currentTime.Add(TimeSpan.FromMinutes(30));
+                        continue;
+                    }
 
-                // Move to next slot (30-minute intervals)
-                currentTime = currentTime.Add(TimeSpan.FromMinutes(30));
+                    // Find available tables for this time slot
+                    var availableTables = allTables.Where(table =>
+                    {
+                        // Check if this table has any conflicting reservations
+                        var hasConflict = existingReservations.Any(r =>
+                            r.TableId == table.Id &&
+                            DoTimeSlotsOverlap(currentTime, slotEndTime, r.StartTime, r.EndTime));
+
+                        return !hasConflict;
+                    })
+                    .Select(t => new TableDto
+                    {
+                        Id = t.Id,
+                        TableNumber = t.TableNumber,
+                        MaxGuests = t.MaxGuests,
+                        IsActive = t.IsActive,
+                        IsOutdoor = t.IsOutdoor,
+                        PositionX = t.PositionX,
+                        PositionY = t.PositionY,
+                        Width = t.Width,
+                        Height = t.Height,
+                        Shape = t.Shape,
+                        Notes = t.Notes,
+                        QRCodeData = t.QRCodeData,
+                        QRCodeGeneratedAt = t.QRCodeGeneratedAt
+                    })
+                    .ToList();
+
+                    // Only add time slots that have at least one available table
+                    if (availableTables.Any())
+                    {
+                        timeSlots.Add(new TimeSlotDto
+                        {
+                            StartTime = currentTime,
+                            EndTime = slotEndTime,
+                            AvailableTables = availableTables
+                        });
+                    }
+
+                    // Move to next slot (30-minute intervals)
+                    currentTime = currentTime.Add(TimeSpan.FromMinutes(30));
+                }
             }
 
             var result = new AvailableTimeSlotsDto
