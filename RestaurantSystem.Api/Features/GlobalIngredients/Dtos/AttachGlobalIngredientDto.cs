@@ -1,3 +1,5 @@
+using RestaurantSystem.Domain.Common.Enums;
+
 namespace RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
 
 /// <summary>
@@ -12,15 +14,26 @@ namespace RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
 /// the admin never saw.
 /// </para>
 /// <para>
-/// The four fields below are exactly what plan D1 says the PRODUCT row owns — price, optionality,
-/// max quantity — so they are typed once and applied to every target. The name, the nine
-/// translations and the kind are COPIED from the library row instead (D3: provenance, not
-/// propagation).
+/// The fields below are what plan D1 says the PRODUCT row owns — price, optionality, max quantity,
+/// and now the group. The name and the nine translations are COPIED from the library row instead
+/// (D3: provenance, not propagation).
 /// </para>
 /// </remarks>
 public class AttachGlobalIngredientDto
 {
     public List<Guid> ProductIds { get; set; } = [];
+
+    /// <summary>WHICH GROUP the copied rows land in — Ingredients or Sauces — stated by the caller.</summary>
+    /// <remarks>
+    /// One rule, shared with the picker: <b>the ACTION states the kind, and the library row's kind is
+    /// only the DEFAULT when it does not</b> — <see cref="Services.GlobalIngredientAttach.CopyOnto"/>
+    /// holds the argument. <b>Nullable, and <c>null</c> is not <c>ingredient</c>:</b> "omitted" and
+    /// "put these in the Ingredients group" must not be the same payload, the rule
+    /// <c>UpdateGlobalIngredientDto.Kind</c> keeps for the same reason (backend #428). Omitted falls
+    /// back to the library row's own kind, so a client written before this field keeps the behaviour
+    /// it was written against.
+    /// </remarks>
+    public IngredientKind? Kind { get; set; }
 
     /// <summary>
     /// Must be <c>true</c>. A REQUIRED ingredient added to a product is retroactively rendered as a

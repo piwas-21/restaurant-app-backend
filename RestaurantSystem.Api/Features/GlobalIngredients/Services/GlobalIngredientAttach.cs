@@ -63,10 +63,29 @@ internal static class GlobalIngredientAttach
     }
 
     /// <summary>
-    /// Copies the library row onto the product: the name, the kind, the nine translations, and the
-    /// provenance link (plan D3). The four per-product facts come from the body, because plan D1
-    /// says the PRODUCT row owns price, optionality and max quantity.
+    /// Copies the library row onto the product: the name, the nine translations, and the provenance
+    /// link (plan D3). The per-product facts come from the body, because plan D1 says the PRODUCT
+    /// row owns price, optionality and max quantity — and, since this change, the GROUP.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b><c>body.Kind ?? library.Kind</c> — the ACTION states the group, and the catalogue row is
+    /// only the default.</b> This endpoint used to write <c>library.Kind</c> unconditionally while
+    /// the picker stamped the group it was opened from (plan D8), so the two shipped paths applied
+    /// OPPOSITE rules to the same decision. The measured consequence on a live tenant: every one of
+    /// its 654 catalogue rows is typed <c>ingredient</c>, because no admin write has ever sent a
+    /// kind, so "apply Sauce blanche to 21 products" put 21 rows in the INGREDIENTS group of 21
+    /// products — the exact operation the restaurant asked for, quietly landing in the wrong group.
+    /// </para>
+    /// <para>
+    /// The caller wins rather than the catalogue because <b>a library row is a WORD, not a
+    /// placement</b>: harissa is a sauce on a kebab and an ingredient in a merguez, and the same row
+    /// has to be attachable as either. That is plan D8's reasoning, now applied here so the two
+    /// paths cannot drift again. The library row's kind stays the fallback for a caller that has no
+    /// group to state — an API client, or the library screen that does not exist yet (G4) — and it
+    /// is what every client written before this field keeps getting.
+    /// </para>
+    /// </remarks>
     public static void CopyOnto(
         ApplicationDbContext context,
         Product product,
@@ -78,7 +97,7 @@ internal static class GlobalIngredientAttach
         {
             ProductId = product.Id,
             Name = library.DefaultName,
-            Kind = library.Kind,
+            Kind = body.Kind ?? library.Kind,
             GlobalIngredientId = library.Id,
             IsOptional = body.IsOptional,
             Price = body.Price,
