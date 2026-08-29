@@ -9,7 +9,6 @@ using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
-using System.Net.Http.Headers;
 
 namespace RestaurantSystem.IntegrationTests.Features.ApiTokens;
 
@@ -18,48 +17,10 @@ namespace RestaurantSystem.IntegrationTests.Features.ApiTokens;
 // `Bearer sk_...` to it rather than faking a principal, so these assertions are about the
 // shipped code path and not about the test harness.
 [Collection("Database Lane 2")]
-public class ApiTokenAuthenticationTests : IntegrationTestBase
+public class ApiTokenAuthenticationTests : ApiTokenScopeTestBase
 {
     public ApiTokenAuthenticationTests(DatabaseFixture databaseFixture) : base(databaseFixture)
     {
-    }
-
-    /// <summary>
-    /// Seeds a token row directly and returns its plaintext. Direct DB insertion is what lets a
-    /// test place a token in the past — the create endpoint refuses an expiry it would not issue.
-    /// </summary>
-    private async Task<string> SeedTokenAsync(
-        IEnumerable<string> scopes, DateTime? expiresAt = null, DateTime? revokedAt = null)
-    {
-        var plaintext = ApiTokenHasher.GenerateToken();
-
-        using var scope = Factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        db.Set<ApiToken>().Add(new ApiToken
-        {
-            Id = Guid.NewGuid(),
-            Name = $"test-{Guid.NewGuid():N}",
-            TokenHash = ApiTokenHasher.ComputeHash(plaintext),
-            Prefix = ApiTokenHasher.ExtractPrefix(plaintext),
-            Scopes = scopes.ToList(),
-            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(7),
-            RevokedAt = revokedAt,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = "test"
-        });
-
-        await db.SaveChangesAsync();
-        return plaintext;
-    }
-
-    private void AuthenticateWithToken(string plaintext)
-    {
-        Client.DefaultRequestHeaders.Remove("X-Test-Admin");
-        Client.DefaultRequestHeaders.Remove(TestAuthHandlerHeaders.Role);
-        Client.DefaultRequestHeaders.Remove(TestAuthHandlerHeaders.Anonymous);
-        Client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", plaintext);
     }
 
     [Fact]

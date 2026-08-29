@@ -15,6 +15,7 @@ public record RestaurantInfoDto(
     string? ThemePaletteKey,
     string? LogoUrl,
     string? LogoDarkUrl,
+    string? InteriorImageUrl,
     IReadOnlyList<RestaurantPhoneNumberDto> PhoneNumbers);
 
 /// <summary>Which of the two stored logos an upload or delete is addressing.</summary>

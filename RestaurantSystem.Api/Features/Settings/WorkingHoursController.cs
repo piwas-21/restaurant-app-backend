@@ -76,6 +76,7 @@ public class WorkingHoursController : ControllerBase
     /// Update working hours (admin only)
     /// </summary>
     [HttpPut]
+    [ApiScope(ApiTokenScopes.TenantWrite)]
     [Authorize(Roles = "Admin")]
     public async Task<ApiResponse<WorkingHoursDto>> Update(
         [FromBody] UpdateWorkingHoursDto dto,
