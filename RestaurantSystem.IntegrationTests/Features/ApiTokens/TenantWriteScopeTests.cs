@@ -161,6 +161,54 @@ public class TenantWriteScopeTests : ApiTokenScopeTestBase
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    // ── Interior photo ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TenantWriteToken_ReachesTheInteriorImageUpload()
+    {
+        // A multipart body with the WRONG part name, deliberately: the scope filter is an
+        // authorization filter and runs BEFORE model binding and validation, so the 400 the
+        // NotNull rule then produces is proof the request got past it — without needing the
+        // stubbed file storage a real upload requires (see RestaurantLogoTests for why).
+        AuthenticateWithToken(await SeedTokenAsync([ApiTokenScopes.TenantWrite]));
+
+        var response = await PutInteriorImageAsync("not-the-image-part");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task TenantReadToken_IsRefusedTheInteriorImageUpload()
+    {
+        AuthenticateWithToken(await SeedTokenAsync([ApiTokenScopes.TenantRead]));
+
+        var response = await PutInteriorImageAsync("image");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task TenantWriteToken_CanDeleteTheInteriorImage()
+    {
+        // Deleting a photo that was never set is a supported no-op (RestaurantInteriorImageTests
+        // pins it), so a 200 here is the scope check passing and nothing else.
+        AuthenticateWithToken(await SeedTokenAsync([ApiTokenScopes.TenantWrite]));
+
+        var response = await Client.DeleteAsync($"{InfoUrl}/interior-image");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task TenantReadToken_IsRefusedTheInteriorImageDelete()
+    {
+        AuthenticateWithToken(await SeedTokenAsync([ApiTokenScopes.TenantRead]));
+
+        var response = await Client.DeleteAsync($"{InfoUrl}/interior-image");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     // ── Opening hours ────────────────────────────────────────────────────
 
     [Fact]
@@ -239,6 +287,15 @@ public class TenantWriteScopeTests : ApiTokenScopeTestBase
         file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
         content.Add(file, "logo", "logo.png");
         return await Client.PutAsync($"{InfoUrl}/logo/{variant}", content);
+    }
+
+    private async Task<HttpResponseMessage> PutInteriorImageAsync(string partName)
+    {
+        using var content = new MultipartFormDataContent();
+        var file = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47]);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Add(file, partName, "interior.png");
+        return await Client.PutAsync($"{InfoUrl}/interior-image", content);
     }
 
     /// <summary>

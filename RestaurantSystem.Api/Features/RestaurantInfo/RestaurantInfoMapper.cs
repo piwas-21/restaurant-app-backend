@@ -5,8 +5,9 @@ namespace RestaurantSystem.Api.Features.RestaurantInfo;
 
 /// <summary>
 /// Maps the <see cref="Domain.Entities.RestaurantInfo"/> singleton onto
-/// <see cref="RestaurantInfoDto"/>. One place, because four handlers now return this shape
-/// (read, update-info, update-logo, delete-logo) and a field added to the entity but forgotten
+/// <see cref="RestaurantInfoDto"/>. One place, because six handlers now return this shape
+/// (read, update-info, update-logo, delete-logo, update-interior-image, delete-interior-image)
+/// and a field added to the entity but forgotten
 /// in one of them is invisible until a client notices the value is missing on one route only.
 /// </summary>
 public static class RestaurantInfoMapper
@@ -31,6 +32,7 @@ public static class RestaurantInfoMapper
             info.ThemePaletteKey,
             ToAbsoluteUrl(baseUrl, info.LogoUrl),
             ToAbsoluteUrl(baseUrl, info.LogoDarkUrl),
+            ToAbsoluteUrl(baseUrl, info.InteriorImageUrl),
             info.PhoneNumbers
                 .OrderBy(p => p.DisplayOrder)
                 .Select(p => new RestaurantPhoneNumberDto(

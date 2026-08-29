@@ -25,6 +25,7 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
         // which for S3 is a full URL and can be long.
         builder.Property(r => r.LogoUrl).HasMaxLength(2048);
         builder.Property(r => r.LogoDarkUrl).HasMaxLength(2048);
+        builder.Property(r => r.InteriorImageUrl).HasMaxLength(2048);
         // Percent coordinates (0–100) — 2 decimal places is ample granularity.
 
         builder.HasMany(r => r.PhoneNumbers)
