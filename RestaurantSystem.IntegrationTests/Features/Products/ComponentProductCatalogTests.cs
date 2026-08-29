@@ -104,6 +104,25 @@ public class ComponentProductCatalogTests : IntegrationTestBase
         without.Data.Items.Should().Contain(p => p.Name == PlainName, "positive control on the same call");
     }
 
+    /// <summary>
+    /// Both spellings, because the frontend really sends both: <c>menuService</c> emits
+    /// <c>IncludeComponents</c> to match its neighbouring <c>IncludeMenus</c>, and
+    /// <c>productService</c> emits <c>includeComponents</c> to match its neighbouring
+    /// <c>pageSize</c>. ASP.NET query binding is case-insensitive, so both work — this pins that,
+    /// so a future move to a case-sensitive binder breaks a test here instead of silently making
+    /// one of the two admin screens stop showing components.
+    /// </summary>
+    [Theory]
+    [InlineData("includeComponents")]
+    [InlineData("IncludeComponents")]
+    public async Task The_opt_in_binds_under_either_casing_the_clients_send(string parameterName)
+    {
+        var page = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>(
+            $"/api/Products?{parameterName}=true&pageSize=50");
+
+        page!.Data!.Items.Should().Contain(p => p.Name == MeatName);
+    }
+
     // ---- the guest surfaces, which have no opt-in ------------------------------------------------
 
     [Fact]
