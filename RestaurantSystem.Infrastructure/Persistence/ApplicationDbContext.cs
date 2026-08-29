@@ -107,6 +107,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Working Hours
         public DbSet<WorkingHours> WorkingHours { get; set; }
 
+        // One row per SERVING WINDOW inside a day: a lunch/dinner split is two of these.
+        public DbSet<WorkingHoursShift> WorkingHoursShifts { get; set; }
+
         // Restaurant identity + contact details (singleton row)
         public DbSet<RestaurantInfo> RestaurantInfo { get; set; }
         public DbSet<RestaurantPhoneNumber> RestaurantPhoneNumbers { get; set; }
