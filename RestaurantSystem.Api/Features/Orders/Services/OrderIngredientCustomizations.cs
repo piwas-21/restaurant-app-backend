@@ -150,7 +150,26 @@ internal static class OrderIngredientCustomizations
         IEnumerable<ProductIngredient> recipe,
         Dictionary<Guid, int> savedQuantities)
     {
-        var recipeRows = recipe.ToList();
+        // ORDERED, and this is the whole of the fix for the freeze order.
+        //
+        // The sequence this method returns is what OrderIngredientSnapshot.Build indexes to assign
+        // `OrderItemIngredient.SortOrder` (0,1,2…), and that snapshot is what a receipt and the
+        // kitchen ticket render. The input reaches here as `Product.DetailedIngredients`, an EF
+        // `.Include(...)` with no `OrderBy` on ANY call path, so the sequence was whatever Postgres
+        // happened to return: `SortOrder` was populated and stable per line — a given order always
+        // printed the same way — but WHICH ingredient became index 0 varied between two orders of
+        // the SAME dish, and matched the recipe order the admin arranged in the editor only by
+        // luck. #603 shipped drag-reordering to make `DisplayOrder` mean something; the freeze
+        // ignored it.
+        //
+        // `ThenBy(Id)` is not decoration: `useVariationReorder` documents that live `DisplayOrder`
+        // holds gaps AND DUPLICATES, so ordering by it alone still leaves ties, and a tie is where
+        // this defect lives.
+        //
+        // Already-frozen rows are NOT backfilled. Each one is faithful to what was rendered at
+        // checkout, and a receipt records what happened rather than what we would prefer it had
+        // looked like.
+        var recipeRows = recipe.OrderBy(row => row.DisplayOrder).ThenBy(row => row.Id).ToList();
 
         if (!recipeRows.Exists(ing => savedQuantities.ContainsKey(ing.Id)))
         {
