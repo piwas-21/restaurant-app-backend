@@ -70,7 +70,9 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
         var result = await AttachAsync(libraryId, [PizzaAId, PizzaBId]);
 
         result.AttachedProductIds.Should().BeEquivalentTo(new[] { PizzaAId, PizzaBId });
-        result.Kind.Should().Be(IngredientKind.Sauce, "the catalog row decides the group, not the caller");
+        result.Kind.Should().Be(
+            IngredientKind.Sauce,
+            "a body that states no kind falls back to the catalogue row's own — see TheGroupIsStatedByTheCaller_NotByTheCatalogueRow");
 
         foreach (var productId in new[] { PizzaAId, PizzaBId })
         {
@@ -90,6 +92,54 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
                 ["tr"] = "Acı biber yağı",
             }, "the nine translations are what the admin would otherwise retype per product");
         }
+    }
+
+    /// <summary>
+    /// WHICH GROUP the rows land in is stated by the CALLER, in both directions — the catalogue
+    /// row's own kind is only the fallback.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the defect the slice exists for, and it was measured on a live tenant, not inferred:
+    /// all 654 of its catalogue rows are typed <c>ingredient</c> because no admin write has ever
+    /// sent a kind, so "apply Sauce blanche to 21 products" landed 21 rows in the INGREDIENTS group
+    /// of 21 products. The picker had always stamped the GROUP it was opened from (plan D8); this
+    /// endpoint stamped <c>library.Kind</c>. Two shipped paths, opposite rules, one decision.
+    /// </para>
+    /// <para>
+    /// <b>BOTH directions, and that is what makes this a test rather than a demonstration.</b> A
+    /// single "sauce wins" case would also pass against an implementation that merely promoted
+    /// everything to <c>sauce</c>, or that read the catalogue row and happened to agree. The second
+    /// row of the theory takes a catalogue row that IS a sauce and asks for it as an ingredient —
+    /// harissa is a sauce on a kebab and an ingredient in a merguez — which no rule that reads the
+    /// catalogue can satisfy. Each case is seeded so the catalogue row's kind is the OPPOSITE of
+    /// what is asked for, and the last assertion pins that, so neither can pass vacuously.
+    /// </para>
+    /// <para>
+    /// Together with <see cref="AttachingToTwoProducts_CopiesTheNameKindTranslationsAndProvenance"/>
+    /// — same sauce row, no kind in the body, sauce rows out — this also pins that <c>null</c> and
+    /// <c>"ingredient"</c> are NOT the same payload, which is the whole reason the field is nullable.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData(HerbLibraryName, IngredientKind.Sauce)]
+    [InlineData(SauceLibraryName, IngredientKind.Ingredient)]
+    public async Task TheGroupIsStatedByTheCaller_NotByTheCatalogueRow(string libraryName, IngredientKind stated)
+    {
+        var libraryId = await LibraryIdAsync(libraryName);
+
+        var result = await AttachAsync(libraryId, [PizzaAId, PizzaBId], kind: stated);
+
+        result.Kind.Should().Be(stated, "the receipt reports where the rows really went");
+        foreach (var productId in new[] { PizzaAId, PizzaBId })
+        {
+            (await AttachedRowAsync(productId, libraryId)).Kind.Should().Be(stated);
+        }
+
+        (await LibraryKindAsync(libraryId)).Should().NotBe(
+            stated,
+            "the fixture must ASK FOR THE OPPOSITE of what the catalogue row says, or the assertion "
+            + "above passes against the very rule this test exists to replace");
     }
 
     /// <summary>
@@ -382,10 +432,17 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// <paramref name="kind"/> defaults to <c>null</c>, which is the payload every caller written
+    /// before backend #452 sends — "the field was omitted", NOT "put these in the Ingredients
+    /// group". Keeping the default null is what lets the existing tests in this file go on pinning
+    /// the fallback while the two new ones pin the stated case.
+    /// </summary>
     private async Task<AttachGlobalIngredientResultDto> AttachAsync(
         Guid libraryId,
         List<Guid> productIds,
-        decimal price = 1.50m)
+        decimal price = 1.50m,
+        IngredientKind? kind = null)
     {
         AuthenticateAsAdmin();
         var response = await PostAsJsonAsync(
@@ -393,6 +450,7 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
             new AttachGlobalIngredientDto
             {
                 ProductIds = productIds,
+                Kind = kind,
                 Price = price,
                 MaxQuantity = 2,
                 IsIncludedInBasePrice = false,
@@ -408,6 +466,21 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
     {
         var library = await GetFromJsonAsync<ApiResponse<List<GlobalIngredientDto>>>("/api/global-ingredients");
         return library!.Data!.Single(i => i.DefaultName == defaultName).Id;
+    }
+
+    /// <summary>
+    /// The catalogue row's OWN kind, read from the database — the control
+    /// <see cref="TheGroupIsStatedByTheCaller_NotByTheCatalogueRow"/> needs to prove its fixture
+    /// asks for the opposite of what the row says.
+    /// </summary>
+    private async Task<IngredientKind> LibraryKindAsync(Guid libraryId)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        return await context.GlobalIngredients
+            .Where(g => g.Id == libraryId)
+            .Select(g => g.Kind)
+            .SingleAsync();
     }
 
     private async Task<Guid> ArchivedLibraryIdAsync()

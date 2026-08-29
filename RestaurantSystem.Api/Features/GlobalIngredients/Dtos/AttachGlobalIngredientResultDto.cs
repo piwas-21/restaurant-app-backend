@@ -10,9 +10,15 @@ namespace RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
 public class AttachGlobalIngredientResultDto
 {
     /// <summary>
-    /// The library row's own kind, echoed so the client can say WHICH group the rows landed in
-    /// without a second request. It is the catalog row that decides, not the caller.
+    /// The EFFECTIVE kind — what the rows were actually written with, so the client can say WHICH
+    /// group they landed in without a second request.
     /// </summary>
+    /// <remarks>
+    /// It echoes <c>body.Kind</c> when the caller stated one and the library row's kind otherwise,
+    /// which is the same expression <see cref="Services.GlobalIngredientAttach.CopyOnto"/> writes.
+    /// It is deliberately not "what you asked for": a caller that omitted the field learns from the
+    /// receipt where its rows went, and a caller that stated one gets its own answer back unchanged.
+    /// </remarks>
     public IngredientKind Kind { get; set; }
 
     public List<Guid> AttachedProductIds { get; set; } = [];
