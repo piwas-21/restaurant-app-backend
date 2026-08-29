@@ -19,7 +19,10 @@ public class WorkingHoursShift : Entity
 {
     public Guid WorkingHoursId { get; set; }
 
-    public WorkingHours WorkingHours { get; set; } = null!;
+    // Navigation property — nullable because EF only fills it when the read asks for it; the
+    // relationship stays REQUIRED through the non-nullable FK above. Same shape as
+    // GlobalVariationTranslation, and it drops a `null!` that claims a guarantee EF does not give.
+    public virtual WorkingHours? WorkingHours { get; set; }
 
     public TimeSpan OpenTime { get; set; }
 
