@@ -69,8 +69,10 @@ public class ComponentProductCatalogTests : IntegrationTestBase
         // `TotalCount == Items.Count` — both of those move together and would pass unfixed.
         var page = await FetchProductsAsync(includeComponents: false);
 
-        page.TotalCount.Should().Be(
-            2, "the seed holds 4 products, and 2 of them are components; pre-fix this was 4");
+        // The universe is 6 rows: the 4 this class seeds plus the 2 in the shared base seed (one
+        // MainItem, one Beverage — neither a component and neither a Menu bundle, which the default
+        // list also excludes). 4 is the post-fix number and 6 is the pre-fix one, so this can fail.
+        page.TotalCount.Should().Be(4, "2 of the 6 seeded products are components; pre-fix this was 6");
     }
 
     [Fact]
@@ -80,7 +82,7 @@ public class ComponentProductCatalogTests : IntegrationTestBase
 
         page.Items.Should().Contain(p => p.Name == MeatName, "the admin list and the bundle picker need them");
         page.Items.Should().Contain(p => p.Name == PlainName);
-        page.TotalCount.Should().Be(4);
+        page.TotalCount.Should().Be(6, "every seeded product, the 2 components included");
     }
 
     /// <summary>
