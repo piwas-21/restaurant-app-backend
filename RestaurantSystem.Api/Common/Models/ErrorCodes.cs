@@ -107,6 +107,15 @@ public static class ErrorCodes
     public const string VariationRequired = "VariationRequired";
 
     /// <summary>
+    /// Returned with a 400 when an add-to-basket names a COMPONENT product
+    /// (<c>Product.IsComponent</c>) as a top-level line. A component exists only to be chosen
+    /// inside a bundle section, so the client's recovery is to order the bundle — not to retry.
+    /// Distinct from <see cref="VariationRequired"/>: that one says "choose an option on this
+    /// item", this one says "this item is itself an option".
+    /// </summary>
+    public const string ComponentNotOrderable = "ComponentNotOrderable";
+
+    /// <summary>
     /// Returned with a 400 by <c>POST /api/Auth/apple-login</c> when the Apple identity token
     /// fails verification — bad signature, wrong issuer or audience, expired, unsigned. One code
     /// for every cause on purpose: which check failed is a server-log detail, not something to

@@ -73,7 +73,10 @@ public class GetSpecialProductsQueryHandler : IQueryHandler<GetSpecialProductsQu
             // (itself gated on IsAvailable), its Status column reads IsAvailable and never IsActive,
             // and un-marking an item as special is done in Menu Management — which is what this
             // table's own empty state already tells the admin.
-            .Where(p => p.IsSpecial && p.IsActive)
+            // `!p.IsComponent` unconditionally, with NO opt-in: this endpoint is [AllowAnonymous]
+            // and its one admin caller (/admin/specials-management) has nothing to do with a
+            // bundle-only item. A component that someone also marked special must not surface here.
+            .Where(p => p.IsSpecial && p.IsActive && !p.IsComponent)
             .AsQueryable();
 
         // Get total count

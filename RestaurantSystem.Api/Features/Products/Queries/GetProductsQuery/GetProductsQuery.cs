@@ -26,6 +26,16 @@ public record GetProductsQuery(
     // filters: those are tri-state (null = don't filter on it), this is a binary
     // opt-in where false and "omitted" mean the same thing.
     bool IncludeMenus = false,
+    // Opt in to COMPONENT products (`Product.IsComponent`) — items that exist only to be chosen
+    // inside a bundle section and are not catalogue items. Without it they are excluded, which is
+    // what every guest surface wants; the admin menu list and the bundle option picker are the two
+    // callers that need them. Shaped exactly like IncludeMenus above, and binary for the same
+    // reason: false and "omitted" mean the same thing.
+    //
+    // Unlike IncludeMenus this exclusion has NO explicit-filter escape hatch, because no filter
+    // names components — so the opt-in is the only way to see one in a list. A single component is
+    // still readable by id (`GET /api/Products/{id}`) on purpose: the admin editor must open one.
+    bool IncludeComponents = false,
     // The channel the guest is ordering through. Does NOT filter the list — blocked items stay
     // visible so the customer sees "Dürüm is takeaway & delivery only" instead of a hole in the
     // menu. It only resolves each row's `Availability`. Null (no type chosen yet, the dominant
@@ -82,6 +92,13 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
         if (query.ExcludeType.HasValue)
         {
             productsQuery = productsQuery.Where(p => p.Type != query.ExcludeType.Value);
+        }
+
+        if (!query.IncludeComponents)
+        {
+            // Components are not catalogue items. Excluded by default so no guest surface has to
+            // remember to ask; the admin list and the bundle option picker opt in.
+            productsQuery = productsQuery.Where(p => !p.IsComponent);
         }
 
         if (query.IsActive.HasValue)

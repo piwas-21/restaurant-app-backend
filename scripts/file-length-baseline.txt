@@ -37,3 +37,4 @@ RestaurantSystem.Api/Features/Categories/CategoriesController.cs
 RestaurantSystem.Api/Features/Email/EmailTestController.cs
 RestaurantSystem.Api/Common/Services/EmailService.cs
 RestaurantSystem.Api/Common/Validation/StrongPasswordValidator.cs
+RestaurantSystem.Api/Features/Products/Dtos/ProductDto.cs

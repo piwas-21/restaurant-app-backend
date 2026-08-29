@@ -45,7 +45,11 @@ public record UpdateProductCommand(
     // `SauceMax = null` is "no group cap", NOT 0. Semantics live on the Product entity.
     int SauceMin = 0,
     int? SauceMax = null,
-    int SauceIncludedFree = 0
+    int SauceIncludedFree = 0,
+    // A bundle COMPONENT: not listed in the catalogue and not orderable on its own (see
+    // Product.IsComponent). Optional and last so every existing caller and test payload keeps
+    // compiling and keeps meaning "an ordinary catalogue item".
+    bool IsComponent = false
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -112,6 +116,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         product.AvailableOrderTypes = command.AvailableOrderTypes;
         product.IsSpecial = command.IsSpecial;
         product.HideBaseProduct = command.HideBaseProduct;
+        product.IsComponent = command.IsComponent;
         product.SauceMin = command.SauceMin;
         product.SauceMax = command.SauceMax;
         product.SauceIncludedFree = command.SauceIncludedFree;

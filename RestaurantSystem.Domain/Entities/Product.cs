@@ -22,6 +22,14 @@ public class Product : SoftDeleteEntity
     /// </summary>
     public bool HideBaseProduct { get; set; }
 
+    /// <summary>
+    /// A bundle COMPONENT, not a catalogue item: referenced by a <see cref="MenuSection"/>, never
+    /// listed, never orderable alone. A DIFFERENT AXIS from <see cref="HideBaseProduct"/>, which
+    /// degrades to <c>false</c> with no active variation. Enforced by the catalogue queries and by
+    /// <c>BasketComponentGuard</c>, on TOP-LEVEL lines only — bundle children stay choosable.
+    /// </summary>
+    public bool IsComponent { get; set; }
+
     public bool IsFeaturedSpecial { get; set; } // Is this the featured/highlighted special of the day
     public DateTime? FeaturedDate { get; set; } // Date when this was set as featured
     public int PreparationTimeMinutes { get; set; }
