@@ -319,6 +319,15 @@ builder.Services.AddAppleAuthentication(builder.Configuration);
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
 
+// Partner attribution shown in the tenant footer (SOFRA-PARTNER-PLAN §11 / S4a). Same rail and
+// same lifetime as the modules above: the deploy repo's tenant compose template maps
+// TENANT_PARTNER_NAME / TENANT_PARTNER_URL onto Partner__Name / Partner__Url, and an instance
+// with neither publishes nothing — which is every instance until that mapping ships.
+builder.Services.Configure<RestaurantSystem.Api.Settings.PartnerSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.PartnerSettings.SectionName));
+builder.Services.AddSingleton<RestaurantSystem.Api.Common.Partner.ITenantPartner,
+    RestaurantSystem.Api.Common.Partner.TenantPartner>();
+
 // Order-level pricing. DeliveryFee defaults to 0 so an absent section preserves what every live
 // tenant charges today — see OrderSettings for why that is not the old 5.00 constant. A tenant
 // opts in per box via OrderSettings__DeliveryFee.
@@ -674,6 +683,12 @@ var app = builder.Build();
 // hours after boot or never — and that line is the only operator-visible confirmation that a
 // re-provision + restart actually took effect. It belongs in the startup log where it is read.
 app.Services.GetRequiredService<ITenantModules>();
+
+// Same again for the partner attribution: its only operator-visible confirmation that a
+// re-provision took the new brand name — and its warning about a Partner__Url that was rejected
+// for not being https — is a line written when the singleton is constructed. Lazily, that is on
+// the first footer render, which is a strange place to learn a link was dropped.
+app.Services.GetRequiredService<RestaurantSystem.Api.Common.Partner.ITenantPartner>();
 
 // Same reasoning for the email language set: a lazy singleton would first be constructed by
 // whichever mail happens to be sent first, so the effective-languages line — and the warning about

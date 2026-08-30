@@ -148,6 +148,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     MaxQuantity = di.MaxQuantity,
                     GlobalIngredientId = di.GlobalIngredientId,
                     Kind = di.Kind,
+                    ExclusionGroup = di.ExclusionGroup,
                     Content = di.Descriptions
                         .GroupBy(d => d.LanguageCode)
                         .ToDictionary(

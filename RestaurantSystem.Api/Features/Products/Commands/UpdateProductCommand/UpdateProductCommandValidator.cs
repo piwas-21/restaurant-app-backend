@@ -18,6 +18,7 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         this.ValidatePrimaryCategory(x => x.PrimaryCategoryId, x => x.CategoryIds);
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
         this.ValidateSauceGroup(x => x.SauceMin, x => x.SauceMax, x => x.SauceIncludedFree); // S5 / D9
+        this.ValidateExclusionGroups(x => x.DetailedIngredients); // §9 / D13 — rules in the rule file
 
         // #306; rationale in ProductContentRule. Covers the TOP-LEVEL map only.
         RuleFor(x => x.Content).ValidProductContent(required: false);
