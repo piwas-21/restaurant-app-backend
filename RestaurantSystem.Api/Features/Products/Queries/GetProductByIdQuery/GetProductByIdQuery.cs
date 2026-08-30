@@ -40,7 +40,14 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             .Include(p => p.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
             .Include(p => p.ProductCategories)
                 .ThenInclude(pc => pc.Category)
-            .Include(p => p.Variations.OrderBy(v => v.DisplayOrder))
+            // `!v.IsDeleted` is LOAD-BEARING, for the same reason the images include above carries
+            // one: `IgnoreQueryFilters()` un-filters every INCLUDE, and `ProductVariation` is a
+            // `SoftDeleteEntity`, so deleting a variation (which `UpdateProductCommand` does by
+            // omitting it from the incoming list) left this endpoint serving it FOREVER. The list
+            // endpoint filtered it and this one did not, so the admin editor re-fetched the row it
+            // had just deleted and the guest sheet kept offering it — the §9.14 shape, on the one
+            // include nobody had reached yet.
+            .Include(p => p.Variations.Where(v => !v.IsDeleted).OrderBy(v => v.DisplayOrder))
                 .ThenInclude(v => v.Descriptions)
             .Include(p => p.DetailedIngredients.Where(di => di.IsActive).OrderBy(di => di.DisplayOrder))
                 .ThenInclude(di => di.Descriptions)
