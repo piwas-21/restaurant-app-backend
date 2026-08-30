@@ -41,6 +41,7 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             .WithMessage("Duplicate side items are not allowed");
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
         this.ValidateSauceGroup(x => x.SauceMin, x => x.SauceMax, x => x.SauceIncludedFree); // S5 / D9
+        this.ValidateExclusionGroups(x => x.DetailedIngredients); // §9 / D13
 
         // #306; required: true is CREATE-only — see ProductContentRule.
         RuleFor(x => x.Content).ValidProductContent(required: true);

@@ -58,6 +58,7 @@ public static class ProductDtoMapper
                 MaxQuantity = di.MaxQuantity,
                 GlobalIngredientId = di.GlobalIngredientId,
                 Kind = di.Kind,
+                ExclusionGroup = di.ExclusionGroup,
                 Content = ToLocalizedContent(di.Descriptions, d => d.LanguageCode,
                     d => new ProductIngredientContentDto { Name = d.Name, Description = d.Description })
             }).ToList(),

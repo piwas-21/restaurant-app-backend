@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -86,6 +87,10 @@ internal static class ProductIngredientSynchronizer
                 ingredient.DisplayOrder = ingredientDto.DisplayOrder;
                 ingredient.MaxQuantity = ingredientDto.MaxQuantity;
                 ingredient.Kind = ingredientDto.Kind;
+                // §9. Assigned from the payload like every other editable field, and NORMALISED
+                // here rather than trusted: a cleared text input sends "", which stored verbatim
+                // would put every cleared row into one anonymous group.
+                ingredient.ExclusionGroup = IngredientExclusionGroupRule.Normalize(ingredientDto.ExclusionGroup);
                 // Provenance is assigned from the payload, never preserved silently: the row the
                 // admin sees is the one that decides, and clearing the picker clears the link.
                 ingredient.GlobalIngredientId = provenance.LinkFor(ingredientDto, ingredient.GlobalIngredientId);
@@ -112,6 +117,7 @@ internal static class ProductIngredientSynchronizer
                     DisplayOrder = ingredientDto.DisplayOrder,
                     MaxQuantity = ingredientDto.MaxQuantity,
                     Kind = ingredientDto.Kind,
+                    ExclusionGroup = IngredientExclusionGroupRule.Normalize(ingredientDto.ExclusionGroup),
                     GlobalIngredientId = provenance.LinkFor(ingredientDto),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = auditIdentifier
