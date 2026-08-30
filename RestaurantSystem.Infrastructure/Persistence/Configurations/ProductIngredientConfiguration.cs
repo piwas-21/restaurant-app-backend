@@ -38,6 +38,12 @@ public class ProductIngredientConfiguration : IEntityTypeConfiguration<ProductIn
             .HasDefaultValue(IngredientKind.Ingredient)
             .IsRequired();
 
+        // Plan §9 / D13. Nullable and short: it is an admin-typed grouping key scoped to ONE product,
+        // never a foreign key, so there is nothing to reference and nothing to index — a product's
+        // whole ingredient collection is already loaded by every read that groups it.
+        builder.Property(pi => pi.ExclusionGroup)
+            .HasMaxLength(ProductIngredient.ExclusionGroupMaxLength);
+
         builder.Property(pi => pi.CreatedAt)
             .IsRequired();
 

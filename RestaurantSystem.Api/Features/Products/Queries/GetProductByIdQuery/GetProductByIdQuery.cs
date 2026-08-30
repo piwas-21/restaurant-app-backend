@@ -130,6 +130,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         MaxQuantity = di.MaxQuantity,
                         GlobalIngredientId = di.GlobalIngredientId,
                         Kind = di.Kind,
+                        ExclusionGroup = di.ExclusionGroup,
                         Content = content
                     };
                 })

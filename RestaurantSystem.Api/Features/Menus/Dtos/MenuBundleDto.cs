@@ -165,6 +165,11 @@ public class MenuBundleIngredientDto
     // has to survive this projection too or bundles would be the one surface where sauces vanish.
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
+    // §9, and here for the same reason `Kind` is: a bundle option row renders through the SAME guest
+    // section, so a mutual-exclusion group that did not survive this projection would be the one
+    // surface where two exclusive ingredients could both be ticked.
+    public string? ExclusionGroup { get; set; }
+
     public Dictionary<string, MenuBundleIngredientContentDto>? Content { get; set; }
 }
 

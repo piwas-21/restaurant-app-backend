@@ -23,6 +23,12 @@ public record ProductIngredientDto
     // discriminator shape — and why a second entity was rejected — is on `IngredientKind` itself.
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
+    // Mutual-exclusion key (plan §9). Additive and nullable: a client that omits it keeps sending
+    // ungrouped ingredients, which is what every client did before this field existed. It is
+    // ASSIGNED FROM THE PAYLOAD on every save, exactly as `globalIngredientId` is — a client that
+    // round-trips the DTO must send it back, or the row leaves its group.
+    public string? ExclusionGroup { get; set; }
+
     public Dictionary<string, ProductIngredientContentDto>? Content { get; set; }
 }
 

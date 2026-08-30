@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -250,6 +251,9 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         DisplayOrder = ingredientDto.DisplayOrder,
                         MaxQuantity = ingredientDto.MaxQuantity,
                         Kind = ingredientDto.Kind,
+                        // §9: normalised at the write path, so a cleared input ("") is stored as
+                        // "no group" and never as one anonymous group shared by every cleared row.
+                        ExclusionGroup = IngredientExclusionGroupRule.Normalize(ingredientDto.ExclusionGroup),
                         // Provenance of a picked library row; null when the name was typed by hand.
                         GlobalIngredientId = provenance.LinkFor(ingredientDto),
                         CreatedAt = DateTime.UtcNow,

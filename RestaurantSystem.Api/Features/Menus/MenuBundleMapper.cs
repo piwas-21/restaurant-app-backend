@@ -97,6 +97,7 @@ public static class MenuBundleMapper
                                 DisplayOrder = di.DisplayOrder,
                                 MaxQuantity = di.MaxQuantity,
                                 Kind = di.Kind,
+                                ExclusionGroup = di.ExclusionGroup,
                                 Content = di.Descriptions?
                                     .GroupBy(desc => desc.LanguageCode)
                                     .Select(g => g.First()) // first wins on duplicate language codes
