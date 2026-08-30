@@ -202,8 +202,14 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         )
                 })
                 .ToList(),
+            // `!IsDeleted` in code and not as a filtered include, for the same reason the global
+            // ingredient above needs it: `SideItemProduct` is a REFERENCE navigation and EF Core's
+            // include filters apply to collections only. This is the include whose comment used to
+            // read "Add soft delete filter here" — measured on a live stack, deleting a product left
+            // it offered as a side item on every product that suggested it, the same shape as the
+            // variation defect this ships with.
             SuggestedSideItems = product.SuggestedSideItems
-                .Where(si => si.SideItemProduct != null) // Add this
+                .Where(si => si.SideItemProduct != null && !si.SideItemProduct.IsDeleted)
                 .OrderBy(si => si.DisplayOrder)
                 .Select(si => new SideItemDto
                 {
@@ -248,7 +254,11 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     IsRequired = s.IsRequired,
                     MinSelection = s.MinSelection,
                     MaxSelection = s.MaxSelection,
-                    Items = s.Items.Select(i => new MenuSectionItemDto
+                    // Same rule as the side items above, on the other reference navigation this
+                    // query un-filters: a section that listed a DELETED product went on offering it
+                    // to guests, and the basket then refuses the line. `i.Product` stays nullable —
+                    // a row whose product row is gone entirely is dropped by the same test.
+                    Items = s.Items.Where(i => i.Product != null && !i.Product.IsDeleted).Select(i => new MenuSectionItemDto
                     {
                         Id = i.Id,
                         ProductId = i.ProductId,

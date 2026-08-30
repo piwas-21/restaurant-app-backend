@@ -35,6 +35,9 @@ public class ProductDetailDeletedVariationTests : IntegrationTestBase
     private Guid _categoryId;
     private Guid _keptVariationId;
     private Guid _deletedVariationId;
+    private Guid _sideItemProductId;
+    private Guid _sectionProductId;
+    private Guid _bundleId;
 
     public ProductDetailDeletedVariationTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -92,12 +95,82 @@ public class ProductDetailDeletedVariationTests : IntegrationTestBase
         deleted.IsDeleted.Should().BeTrue();
     }
 
+    /// <summary>
+    /// The audit that came with the fix: the SAME hole on the other two navigations this query
+    /// un-filters. `SuggestedSideItems` is the include whose comment read "Add soft delete filter
+    /// here" — measured before the fix, deleting the side product left it offered here forever.
+    /// </summary>
+    [Fact]
+    public async Task ADeletedSideItemProduct_IsGoneFromTheProductDetail()
+    {
+        AuthenticateAsAdmin();
+
+        (await Client.DeleteAsync($"/api/Products/{_sideItemProductId}")).StatusCode
+            .Should().Be(HttpStatusCode.OK);
+
+        var response = await Client.GetAsync($"/api/Products/{_productId}");
+        var payload = await response.Content.ReadFromJsonAsync<ProductDetailEnvelope>();
+
+        payload!.Data.SuggestedSideItems.Should().BeEmpty();
+    }
+
+    /// <summary>The control: a LIVE side item is still served, so the filter above is not a blanket drop.</summary>
+    [Fact]
+    public async Task ALiveSideItemProduct_IsStillServed()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await Client.GetAsync($"/api/Products/{_productId}");
+        var payload = await response.Content.ReadFromJsonAsync<ProductDetailEnvelope>();
+
+        payload!.Data.SuggestedSideItems.Should().ContainSingle().Which.Name.Should().Be("Garlic bread");
+    }
+
+    /// <summary>
+    /// The third navigation of the same class: a bundle SECTION that lists a deleted product. Before
+    /// the fix the section went on offering it and the basket refused the line; after it, the row is
+    /// simply not there.
+    /// </summary>
+    [Fact]
+    public async Task ADeletedSectionProduct_IsGoneFromABundlesSection()
+    {
+        AuthenticateAsAdmin();
+
+        (await Client.DeleteAsync($"/api/Products/{_sectionProductId}")).StatusCode
+            .Should().Be(HttpStatusCode.OK);
+
+        var payload = await ReadBundleAsync();
+
+        payload.MenuDefinition!.Sections.Single().Items.Should().BeEmpty();
+    }
+
+    /// <summary>The control: the LIVE section item is still served.</summary>
+    [Fact]
+    public async Task ALiveSectionProduct_IsStillServed()
+    {
+        AuthenticateAsAdmin();
+
+        var payload = await ReadBundleAsync();
+
+        payload.MenuDefinition!.Sections.Single().Items
+            .Should().ContainSingle().Which.ProductName.Should().Be("Chicken");
+    }
+
     // ---- helpers -------------------------------------------------------------------------------
 
     private Task<HttpResponseMessage> PutKeepingOnlyTheFirstVariationAsync() =>
         Client.PutAsync(
             $"/api/Products/{_productId}",
             new StringContent(PayloadKeepingOnly(_keptVariationId), Encoding.UTF8, "application/json"));
+
+    private async Task<ProductDetailPayload> ReadBundleAsync()
+    {
+        var response = await Client.GetAsync($"/api/Products/{_bundleId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var payload = await response.Content.ReadFromJsonAsync<ProductDetailEnvelope>();
+        return payload!.Data;
+    }
 
     private async Task<List<string>> ReadDetailVariationNamesAsync()
     {
@@ -136,9 +209,20 @@ public class ProductDetailDeletedVariationTests : IntegrationTestBase
 
     private sealed record ProductDetailEnvelope(ProductDetailPayload Data);
 
-    private sealed record ProductDetailPayload(List<VariationPayload> Variations);
+    private sealed record ProductDetailPayload(
+        List<VariationPayload> Variations,
+        List<SideItemPayload> SuggestedSideItems,
+        MenuDefinitionPayload? MenuDefinition);
+
+    private sealed record MenuDefinitionPayload(List<SectionPayload> Sections);
+
+    private sealed record SectionPayload(List<SectionItemPayload> Items);
+
+    private sealed record SectionItemPayload(string? ProductName);
 
     private sealed record VariationPayload(string Name);
+
+    private sealed record SideItemPayload(string Name);
 
     protected override async Task SeedTestData()
     {
@@ -184,9 +268,78 @@ public class ProductDetailDeletedVariationTests : IntegrationTestBase
         product.Variations.Add(kept);
         product.Variations.Add(removed);
 
+        var sideItemProduct = new Product
+        {
+            Name = "Garlic bread",
+            BasePrice = 4m,
+            IsActive = true,
+            IsAvailable = true,
+            Type = ProductType.MainItem,
+            CreatedBy = "test",
+        };
+        context.Add(sideItemProduct);
+        await context.SaveChangesAsync();
+
+        product.SuggestedSideItems.Add(new ProductSideItem
+        {
+            SideItemProductId = sideItemProduct.Id,
+            DisplayOrder = 0,
+            CreatedBy = "test",
+        });
+
         context.Add(product);
         await context.SaveChangesAsync();
 
+        var sectionProduct = new Product
+        {
+            Name = "Chicken",
+            BasePrice = 5m,
+            IsActive = true,
+            IsAvailable = true,
+            Type = ProductType.MainItem,
+            CreatedBy = "test",
+        };
+        var bundle = new Product
+        {
+            Name = "Lunch Deal",
+            BasePrice = 20m,
+            IsActive = true,
+            IsAvailable = true,
+            Type = ProductType.Menu,
+            CreatedBy = "test",
+        };
+        context.AddRange(sectionProduct, bundle);
+        await context.SaveChangesAsync();
+
+        bundle.MenuDefinition = new MenuDefinition
+        {
+            ProductId = bundle.Id,
+            IsAlwaysAvailable = true,
+            CreatedBy = "test",
+            Sections =
+            {
+                new MenuSection
+                {
+                    Name = "Main",
+                    DisplayOrder = 0,
+                    CreatedBy = "test",
+                    Items =
+                    {
+                        new MenuSectionItem
+                        {
+                            ProductId = sectionProduct.Id,
+                            DisplayOrder = 0,
+                            CreatedBy = "test",
+                        },
+                    },
+                },
+            },
+        };
+        await context.SaveChangesAsync();
+
+        _sideItemProductId = sideItemProduct.Id;
+        _sectionProductId = sectionProduct.Id;
+        _bundleId = bundle.Id;
         _productId = product.Id;
         _keptVariationId = kept.Id;
         _deletedVariationId = removed.Id;
