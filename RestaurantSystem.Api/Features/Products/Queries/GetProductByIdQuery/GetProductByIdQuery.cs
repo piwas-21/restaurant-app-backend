@@ -40,7 +40,14 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             .Include(p => p.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
             .Include(p => p.ProductCategories)
                 .ThenInclude(pc => pc.Category)
-            .Include(p => p.Variations.OrderBy(v => v.DisplayOrder))
+            // `!v.IsDeleted` is LOAD-BEARING, for the same reason the images include above carries
+            // one: `IgnoreQueryFilters()` un-filters every INCLUDE, and `ProductVariation` is a
+            // `SoftDeleteEntity`, so deleting a variation (which `UpdateProductCommand` does by
+            // omitting it from the incoming list) left this endpoint serving it FOREVER. The list
+            // endpoint filtered it and this one did not, so the admin editor re-fetched the row it
+            // had just deleted and the guest sheet kept offering it — the §9.14 shape, on the one
+            // include nobody had reached yet.
+            .Include(p => p.Variations.Where(v => !v.IsDeleted).OrderBy(v => v.DisplayOrder))
                 .ThenInclude(v => v.Descriptions)
             .Include(p => p.DetailedIngredients.Where(di => di.IsActive).OrderBy(di => di.DisplayOrder))
                 .ThenInclude(di => di.Descriptions)
@@ -195,8 +202,14 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         )
                 })
                 .ToList(),
+            // `!IsDeleted` in code and not as a filtered include, for the same reason the global
+            // ingredient above needs it: `SideItemProduct` is a REFERENCE navigation and EF Core's
+            // include filters apply to collections only. This is the include whose comment used to
+            // read "Add soft delete filter here" — measured on a live stack, deleting a product left
+            // it offered as a side item on every product that suggested it, the same shape as the
+            // variation defect this ships with.
             SuggestedSideItems = product.SuggestedSideItems
-                .Where(si => si.SideItemProduct != null) // Add this
+                .Where(si => si.SideItemProduct != null && !si.SideItemProduct.IsDeleted)
                 .OrderBy(si => si.DisplayOrder)
                 .Select(si => new SideItemDto
                 {
@@ -241,7 +254,11 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     IsRequired = s.IsRequired,
                     MinSelection = s.MinSelection,
                     MaxSelection = s.MaxSelection,
-                    Items = s.Items.Select(i => new MenuSectionItemDto
+                    // Same rule as the side items above, on the other reference navigation this
+                    // query un-filters: a section that listed a DELETED product went on offering it
+                    // to guests, and the basket then refuses the line. `i.Product` stays nullable —
+                    // a row whose product row is gone entirely is dropped by the same test.
+                    Items = s.Items.Where(i => i.Product != null && !i.Product.IsDeleted).Select(i => new MenuSectionItemDto
                     {
                         Id = i.Id,
                         ProductId = i.ProductId,
