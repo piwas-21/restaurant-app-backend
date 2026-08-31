@@ -31,6 +31,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly IAppleIdentityTokenVerifier _tokenVerifier;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -39,6 +40,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
     public AppleLoginCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         IAppleIdentityTokenVerifier tokenVerifier,
         LoginEventHandler loginEventHandler,
         IHttpContextAccessor httpContextAccessor,
@@ -46,6 +48,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _sessions = sessions;
         _tokenVerifier = tokenVerifier;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;
@@ -167,11 +170,7 @@ public class AppleLoginCommandHandler : ICommandHandler<AppleLoginCommand, ApiRe
     private async Task<ApiResponse<AuthResponse>> IssueTokensAsync(ApplicationUser user)
     {
         var token = _tokenService.GenerateAccessToken(user);
-        var rawRefreshToken = _tokenService.GenerateRefreshToken();
-
-        user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-        user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-        await _userManager.UpdateAsync(user);
+        var rawRefreshToken = await _sessions.IssueAsync(user, CancellationToken.None);
 
         // Merge anonymous basket if session ID exists
         var sessionId = _httpContextAccessor.HttpContext?.Request.Headers["X-Session-Id"].FirstOrDefault();

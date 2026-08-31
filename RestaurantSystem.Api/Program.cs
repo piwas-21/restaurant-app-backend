@@ -581,6 +581,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 // HttpContextAuditIdentityProvider, which depends on IHttpContextAccessor and nothing else.
 builder.Services.AddScoped<IAuditIdentityProvider, HttpContextAuditIdentityProvider>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IRefreshSessionService, RefreshSessionService>();
 builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transport (Smtp | Resend)
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();

@@ -71,6 +71,20 @@ namespace RestaurantSystem.Api.Common.Services
             return Convert.ToBase64String(bytes);
         }
 
+        public bool IsRefreshTokenHashMatch(string storedHash, string token)
+        {
+            try
+            {
+                var expectedHash = Convert.FromBase64String(storedHash);
+                var actualHash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+                return CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+        }
+
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string token)
         {
             var tokenHandler = new JwtSecurityTokenHandler();

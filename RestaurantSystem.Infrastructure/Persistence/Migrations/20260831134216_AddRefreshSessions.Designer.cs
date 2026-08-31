@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831134216_AddRefreshSessions")]
+    partial class AddRefreshSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4142,14 +4145,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(2048)")
                         .HasColumnName("interior_image_url");
 
-                    b.Property<string>("LandingBackgroundMode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("Default")
-                        .HasColumnName("landing_background_mode");
-
                     b.Property<decimal?>("Latitude")
                         .HasColumnType("decimal(9,6)")
                         .HasColumnName("latitude");
@@ -4202,77 +4197,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasName("pk_restaurant_info");
 
                     b.ToTable("RestaurantInfo", (string)null);
-                });
-
-            modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantLandingContent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("created_by");
-
-                    b.Property<string>("HeroEyebrow")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("hero_eyebrow");
-
-                    b.Property<string>("LanguageCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("language_code");
-
-                    b.Property<Guid>("RestaurantInfoId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("restaurant_info_id");
-
-                    b.Property<string>("StoryBody")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("story_body");
-
-                    b.Property<string>("StoryTitle")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("story_title");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text")
-                        .HasColumnName("updated_by");
-
-                    b.Property<string>("WelcomeBody")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("welcome_body");
-
-                    b.Property<string>("WelcomeTitle")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("welcome_title");
-
-                    b.HasKey("Id")
-                        .HasName("pk_restaurant_landing_contents");
-
-                    b.HasIndex("RestaurantInfoId", "LanguageCode")
-                        .IsUnique();
-
-                    b.ToTable("RestaurantLandingContents", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantPhoneNumber", b =>
@@ -5549,18 +5473,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Table");
                 });
 
-            modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantLandingContent", b =>
-                {
-                    b.HasOne("RestaurantSystem.Domain.Entities.RestaurantInfo", "RestaurantInfo")
-                        .WithMany("LandingContents")
-                        .HasForeignKey("RestaurantInfoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_restaurant_landing_contents_restaurant_info_restaurant_info~");
-
-                    b.Navigation("RestaurantInfo");
-                });
-
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantPhoneNumber", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.RestaurantInfo", "RestaurantInfo")
@@ -5739,8 +5651,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantInfo", b =>
                 {
-                    b.Navigation("LandingContents");
-
                     b.Navigation("PhoneNumbers");
                 });
 

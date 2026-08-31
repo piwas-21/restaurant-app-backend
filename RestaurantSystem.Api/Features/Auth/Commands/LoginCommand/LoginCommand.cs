@@ -16,6 +16,7 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
@@ -23,12 +24,14 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         LoginEventHandler loginEventHandler,
         IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _tokenService = tokenService;
+        _sessions = sessions;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;
     }
@@ -71,12 +74,9 @@ public class LoginCommandHandler : ICommandHandler<LoginCommand, ApiResponse<Aut
                 "Email verification required");
         }
 
-        // Generate tokens — store hash of refresh token, return raw value to client
+        // Each successful login creates an independent session; another browser stays signed in.
         var token = _tokenService.GenerateAccessToken(user);
-        var rawRefreshToken = _tokenService.GenerateRefreshToken();
-        user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-        user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-        await _userManager.UpdateAsync(user);
+        var rawRefreshToken = await _sessions.IssueAsync(user, cancellationToken);
 
         // Merge anonymous basket if session ID exists
         var sessionId = _httpContextAccessor.HttpContext?.Request.Headers["X-Session-Id"].FirstOrDefault();
