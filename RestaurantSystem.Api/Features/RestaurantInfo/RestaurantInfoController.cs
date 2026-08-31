@@ -87,8 +87,8 @@ public class RestaurantInfoController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Replace the interior photo. Removing it is a DELETE, not an empty upload —
-    /// "no photo" is a real state and the landing page then omits the section.</summary>
+    /// <summary>Replace the uploaded image available to custom landing-background mode.
+    /// Removing it is a DELETE; default and none background modes remain available.</summary>
     [HttpPut("interior-image")]
     [Consumes("multipart/form-data")]
     [ApiScope(ApiTokenScopes.TenantWrite)]

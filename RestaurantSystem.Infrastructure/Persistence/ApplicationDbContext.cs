@@ -114,6 +114,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Restaurant identity + contact details (singleton row)
         public DbSet<RestaurantInfo> RestaurantInfo { get; set; }
         public DbSet<RestaurantPhoneNumber> RestaurantPhoneNumbers { get; set; }
+        public DbSet<RestaurantLandingContent> RestaurantLandingContents { get; set; }
 
         // First-run setup checklist (singleton row, created lazily on first write)
         public DbSet<SetupChecklistState> SetupChecklistState { get; set; }
