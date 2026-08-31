@@ -36,6 +36,7 @@ public class SetPasswordCommandHandler : ICommandHandler<SetPasswordCommand, Api
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRefreshSessionService _sessions;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<SetPasswordCommandHandler> _logger;
@@ -43,12 +44,14 @@ public class SetPasswordCommandHandler : ICommandHandler<SetPasswordCommand, Api
     public SetPasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
         ICurrentUserService currentUserService,
+        IRefreshSessionService sessions,
         IEmailService emailService,
         IEmailLanguageResolver languages,
         ILogger<SetPasswordCommandHandler> logger)
     {
         _userManager = userManager;
         _currentUserService = currentUserService;
+        _sessions = sessions;
         _emailService = emailService;
         _languages = languages;
         _logger = logger;
@@ -83,11 +86,9 @@ public class SetPasswordCommandHandler : ICommandHandler<SetPasswordCommand, Api
             throw new BadRequestException(string.Join("; ", errors)) { Errors = errors };
         }
 
-        // Invalidate existing refresh tokens, exactly as change-password does: after a password
+        // Invalidate every refresh session, exactly as change-password does: after a password
         // change every other session must re-authenticate.
-        user.RefreshToken = string.Empty;
-        user.RefreshTokenExpiryTime = DateTime.UtcNow;
-        await _userManager.UpdateAsync(user);
+        await _sessions.RevokeAllAsync(user, cancellationToken);
 
         // The M4 "password changed" notification (EMAIL-SPEC-TENANT-APP §M4). Swallowed on failure
         // like ResetPasswordCommand does — a mail outage must not leave the caller believing the

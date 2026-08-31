@@ -16,15 +16,18 @@ public class ChangePasswordCommandHandler : ICommandHandler<ChangePasswordComman
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRefreshSessionService _sessions;
     private readonly ILogger<ChangePasswordCommandHandler> _logger;
 
     public ChangePasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
         ICurrentUserService currentUserService,
+        IRefreshSessionService sessions,
         ILogger<ChangePasswordCommandHandler> logger)
     {
         _userManager = userManager;
         _currentUserService = currentUserService;
+        _sessions = sessions;
         _logger = logger;
     }
 
@@ -65,10 +68,10 @@ public class ChangePasswordCommandHandler : ICommandHandler<ChangePasswordComman
             return ApiResponse<string>.Failure($"Failed to change password: {errors}");
         }
 
-        // Invalidate existing refresh tokens so active sessions must re-authenticate
-        user.RefreshToken = string.Empty;
-        user.RefreshTokenExpiryTime = DateTime.UtcNow;
-        await _userManager.UpdateAsync(user);
+        // Invalidate every refresh session (and the pre-migration legacy credential) so active
+        // sessions must re-authenticate. Revocation is not optional hygiene here: a stolen
+        // refresh token must not survive a password change.
+        await _sessions.RevokeAllAsync(user, cancellationToken);
 
         _logger.LogInformation("Password changed successfully for user: {Email}", user.Email);
         return ApiResponse<string>.SuccessWithData("Password changed successfully");
