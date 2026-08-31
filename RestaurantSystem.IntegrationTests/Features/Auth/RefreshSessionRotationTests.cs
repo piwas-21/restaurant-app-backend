@@ -103,6 +103,38 @@ public class RefreshSessionRotationTests : IntegrationTestBase
             .Success.Should().BeFalse("the OTHER browser's session must not survive either");
     }
 
+    [Fact]
+    public async Task ResetPassword_RevokesEveryLiveSession()
+    {
+        var user = await SeedUserAsync("reset@example.test");
+        var pair = await LoginAsync(user.Email!, Password);
+
+        // A real reset token, from the same provider the endpoint consumes.
+        string token;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            token = await userManager.GeneratePasswordResetTokenAsync(user);
+        }
+
+        // Identity tokens are base64-ish and can carry JSON-breaking characters — serialize,
+        // never interpolate.
+        var body = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                email = user.Email,
+                token,
+                newPassword = NewPassword,
+                confirmPassword = NewPassword,
+            }),
+            Encoding.UTF8,
+            "application/json");
+        (await Client.PostAsync("/api/Auth/reset-password", body)).IsSuccessStatusCode.Should().BeTrue();
+
+        (await RefreshAsync(pair.Data!.AccessToken, pair.Data.RefreshToken))
+            .Success.Should().BeFalse("a password RESET is the compromise response: every live session must end");
+    }
+
     // ---- helpers ----
 
     private async Task<ApplicationUser> SeedUserAsync(string email)
