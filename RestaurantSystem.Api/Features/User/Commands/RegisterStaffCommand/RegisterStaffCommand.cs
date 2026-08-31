@@ -21,6 +21,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
@@ -29,6 +30,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
     public RegisterStaffCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         ICurrentUserService currentUserService,
         IEmailService emailService,
         IEmailLanguageResolver languages,
@@ -36,6 +38,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _sessions = sessions;
         _currentUserService = currentUserService;
         _emailService = emailService;
         _languages = languages;
@@ -68,7 +71,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
             Role = command.Role,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = currentUser.Id.ToString(),
-            RefreshToken = _tokenService.GenerateRefreshToken()
+            RefreshToken = string.Empty
         };
 
         var result = await _userManager.CreateAsync(newUser, command.Password);
@@ -80,10 +83,9 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
             return ApiResponse<AuthResponse>.Failure(errors, "Failed to create user");
         }
 
-        // Generate tokens
+        // The raw token is returned once; the new refresh-session row stores only its hash.
         var token = _tokenService.GenerateAccessToken(newUser);
-        newUser.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-        await _userManager.UpdateAsync(newUser);
+        var refreshToken = await _sessions.IssueAsync(newUser, cancellationToken);
 
         // Send welcome email
         try
@@ -111,7 +113,7 @@ public class RegisterStaffCommandHandler : ICommandHandler<RegisterStaffCommand,
             Email = newUser.Email,
             Role = newUser.Role,
             AccessToken = token,
-            RefreshToken = newUser.RefreshToken,
+            RefreshToken = refreshToken,
             Expiration = _tokenService.GetAccessTokenExpiration()
         };
 

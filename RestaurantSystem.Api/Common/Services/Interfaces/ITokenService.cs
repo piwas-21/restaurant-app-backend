@@ -8,6 +8,7 @@ namespace RestaurantSystem.Api.Common.Services.Interfaces
         string GenerateAccessToken(ApplicationUser user);
         string GenerateRefreshToken();
         string HashRefreshToken(string token);
+        bool IsRefreshTokenHashMatch(string storedHash, string token);
         ClaimsPrincipal GetPrincipalFromExpiredToken(string token);
         DateTime GetAccessTokenExpiration();
         DateTime GetRefreshTokenExpiration();

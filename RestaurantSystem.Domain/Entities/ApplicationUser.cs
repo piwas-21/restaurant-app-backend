@@ -46,5 +46,6 @@ namespace RestaurantSystem.Domain.Entities
         public string? PreferredLanguage { get; set; }
 
         public virtual ICollection<UserAddress> Addresses { get; set; } = new List<UserAddress>();
+        public virtual ICollection<RefreshSession> RefreshSessions { get; set; } = new List<RefreshSession>();
     }
 }

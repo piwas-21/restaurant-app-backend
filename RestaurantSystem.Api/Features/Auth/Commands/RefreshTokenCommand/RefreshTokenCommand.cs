@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -9,27 +9,25 @@ using System.Security.Claims;
 
 namespace RestaurantSystem.Api.Features.Auth.Commands.RefreshTokenCommand;
 
-public record RefreshTokenCommand(
-    string AccessToken,      // The expired access token
-    string RefreshToken      // The long-lived refresh token
-) : ICommand<ApiResponse<AuthResponse>>;
+public record RefreshTokenCommand(string AccessToken, string RefreshToken) : ICommand<ApiResponse<AuthResponse>>;
 
-/// <summary>
-/// Handler for RefreshTokenCommand - Validates refresh token and generates new access token
-/// </summary>
+/// <summary>Validates and rotates exactly one refresh session.</summary>
 public class RefreshTokenCommandHandler : ICommandHandler<RefreshTokenCommand, ApiResponse<AuthResponse>>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly ILogger<RefreshTokenCommandHandler> _logger;
 
     public RefreshTokenCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         ILogger<RefreshTokenCommandHandler> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _sessions = sessions;
         _logger = logger;
     }
 
@@ -37,79 +35,42 @@ public class RefreshTokenCommandHandler : ICommandHandler<RefreshTokenCommand, A
     {
         try
         {
-            // Step 1: Extract user information from expired access token
             var principal = _tokenService.GetPrincipalFromExpiredToken(command.AccessToken);
             var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
             if (string.IsNullOrEmpty(userId))
             {
-                _logger.LogWarning("Invalid access token - no user ID found in claims");
                 return ApiResponse<AuthResponse>.Failure("Invalid token", "Token refresh failed");
             }
 
-            // Step 2: Find user in database
             var user = await _userManager.FindByIdAsync(userId);
-
-            if (user == null || user.IsDeleted)
+            if (user is null || user.IsDeleted)
             {
-                _logger.LogWarning("Token refresh attempted for non-existent or deleted user {UserId}", userId);
+                _logger.LogWarning("Token refresh attempted for unavailable user {UserId}", userId);
                 return ApiResponse<AuthResponse>.Failure("Invalid token", "Token refresh failed");
             }
 
-            // Step 3: Validate refresh token — compare stored hash against hash of provided token
-            if (user.RefreshToken != _tokenService.HashRefreshToken(command.RefreshToken))
+            var newRefreshToken = await _sessions.RotateAsync(user, command.RefreshToken, cancellationToken);
+            if (newRefreshToken is null)
             {
-                _logger.LogWarning("Invalid refresh token attempt for user {UserId} - token mismatch", user.Id);
+                _logger.LogWarning("Invalid or expired refresh token attempt for user {UserId}", user.Id);
                 return ApiResponse<AuthResponse>.Failure("Invalid token", "Token refresh failed");
             }
 
-            if (user.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                _logger.LogWarning("Expired refresh token attempt for user {UserId}", user.Id);
-                return ApiResponse<AuthResponse>.Failure("Invalid token", "Token refresh failed");
-            }
-
-            // Step 4: Generate new tokens (token rotation for security)
-            var newAccessToken = _tokenService.GenerateAccessToken(user);
-            var newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            // Step 5: Update user with hash of new refresh token
-            user.RefreshToken = _tokenService.HashRefreshToken(newRefreshToken);
-            user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-            user.UpdatedAt = DateTime.UtcNow;
-            user.UpdatedBy = user.Id.ToString();
-
-            var updateResult = await _userManager.UpdateAsync(user);
-
-            if (!updateResult.Succeeded)
-            {
-                var errors = updateResult.Errors.Select(e => e.Description).ToList();
-                _logger.LogError("Failed to update user {UserId} during token refresh: {Errors}",
-                    user.Id, string.Join(", ", errors));
-                return ApiResponse<AuthResponse>.Failure("Token refresh failed", "Internal error occurred");
-            }
-
-            _logger.LogInformation("Token refreshed successfully for user {UserId}", user.Id);
-
-            // Step 6: Return new authentication response
-            var authResponse = new AuthResponse
+            return ApiResponse<AuthResponse>.SuccessWithData(new AuthResponse
             {
                 UserId = user.Id,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 Email = user.Email!,
                 Role = user.Role,
-                AccessToken = newAccessToken,
+                AccessToken = _tokenService.GenerateAccessToken(user),
                 RefreshToken = newRefreshToken,
                 Expiration = _tokenService.GetAccessTokenExpiration()
-            };
-
-            return ApiResponse<AuthResponse>.SuccessWithData(authResponse, "Token refreshed successfully");
+            }, "Token refreshed successfully");
         }
         catch (SecurityTokenException ex)
         {
-            _logger.LogWarning(ex, "Security token exception during refresh for token: {Token}",
-                command.AccessToken?.Substring(0, Math.Min(20, command.AccessToken.Length)) + "...");
+            _logger.LogWarning(ex, "Security token exception during refresh");
             return ApiResponse<AuthResponse>.Failure("Invalid token", "Token refresh failed");
         }
         catch (Exception ex)

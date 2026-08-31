@@ -75,6 +75,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
         //User-related DbSets
         public DbSet<UserAddress> UserAddresses { get; set; }
+        public DbSet<RefreshSession> RefreshSessions { get; set; }
 
         public DbSet<OrderAddress> OrderAddresses { get; set; }
 
