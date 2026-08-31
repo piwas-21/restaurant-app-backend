@@ -1,6 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
@@ -59,6 +61,12 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         // Tracked loads: the header mutations below (UserId, IsDeleted) must persist.
         var anonymousBasket = await _basketRepository.FindTrackedBasketWithItemsAsync(sessionId, null);
         var userBasket = await _basketRepository.FindTrackedBasketWithItemsAsync(null, userId);
+
+        // A login merge is a write boundary too: old or crafted rows may predate the add-path
+        // enforcement. Check BOTH source baskets before matching, moving, or adding quantities.
+        await EnsureSauceMaximumsAsync(
+            anonymousBasket?.Items ?? [],
+            userBasket?.Items ?? []);
 
         if (anonymousBasket == null)
         {
@@ -206,6 +214,35 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
 
         return await MapByUserAsync(userId)
             ?? throw new BadRequestException("Failed to retrieve basket");
+    }
+
+    private async Task EnsureSauceMaximumsAsync(params IEnumerable<Domain.Entities.BasketItem>[] itemSets)
+    {
+        var lines = itemSets.SelectMany(items => items).ToList();
+        var productIds = lines
+            .Where(line => line.ProductId.HasValue)
+            .Select(line => line.ProductId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (productIds.Count == 0)
+        {
+            return;
+        }
+
+        var products = await _context.Products
+            .Include(product => product.DetailedIngredients)
+            .Where(product => productIds.Contains(product.Id))
+            .ToDictionaryAsync(product => product.Id);
+
+        foreach (var line in lines)
+        {
+            if (line.ProductId.HasValue && products.TryGetValue(line.ProductId.Value, out var product))
+            {
+                line.Product = product;
+                SauceSelectionRule.EnsureWithinMaximum(line);
+            }
+        }
     }
 
     private static Dictionary<Guid, IReadOnlyCollection<Domain.Entities.BasketItem>> ChildrenByParent(

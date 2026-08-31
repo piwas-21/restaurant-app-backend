@@ -44,6 +44,51 @@ public class ProductDtoMapperTests
         dto.MenuDefinition.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(ProductType.Beverage)]
+    [InlineData(ProductType.Dessert)]
+    [InlineData(ProductType.MainItem)]
+    public void SuggestedSideItem_MapsItsProductType(ProductType sideType)
+    {
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Meal",
+            BasePrice = 10m,
+            Type = ProductType.MainItem,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        var side = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Side",
+            BasePrice = 2m,
+            Type = sideType,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        product.SuggestedSideItems.Add(new ProductSideItem
+        {
+            Id = Guid.NewGuid(),
+            MainProductId = product.Id,
+            SideItemProductId = side.Id,
+            SideItemProduct = side,
+            IsRequired = false,
+            DisplayOrder = 0,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+
+        var dto = ProductDtoMapper.MapToProductDto(product);
+
+        dto.SuggestedSideItems.Should().ContainSingle().Which.Type.Should().Be(sideType);
+    }
+
     [Fact]
     public void Bundle_MapsMenuDefinition_AndCarriesProductCollectionsEmptyNotNull()
     {

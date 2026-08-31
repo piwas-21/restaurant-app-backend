@@ -118,6 +118,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     Name = si.SideItemProduct.Name,
                     Description = si.SideItemProduct.Description,
                     Price = si.SideItemProduct.BasePrice,
+                    Type = si.SideItemProduct.Type,
                     ImageUrl = si.SideItemProduct.Images
                         .Where(img => img.IsPrimary && !string.IsNullOrEmpty(img.Url))
                         .Select(img => UrlJoin.Join(_baseUrl, img.Url))
