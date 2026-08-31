@@ -16,17 +16,20 @@ public record ResetPasswordCommand(
 public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand, ApiResponse<string>>
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IRefreshSessionService _sessions;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<ResetPasswordCommandHandler> _logger;
 
     public ResetPasswordCommandHandler(
         UserManager<ApplicationUser> userManager,
+        IRefreshSessionService sessions,
         IEmailService emailService,
         IEmailLanguageResolver languages,
         ILogger<ResetPasswordCommandHandler> logger)
     {
         _userManager = userManager;
+        _sessions = sessions;
         _emailService = emailService;
         _languages = languages;
         _logger = logger;
@@ -56,6 +59,11 @@ public class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand,
         user.UpdatedAt = DateTime.UtcNow;
         user.UpdatedBy = "PasswordReset";
         await _userManager.UpdateAsync(user);
+
+        // Reset-password is the COMPROMISE response: whoever asked for it could not sign
+        // in, so every live refresh session (and the pre-migration legacy credential) must
+        // die with the password. Same contract as change-password (frontend #655 era).
+        await _sessions.RevokeAllAsync(user, cancellationToken);
 
         // Send password changed notification email
         try
