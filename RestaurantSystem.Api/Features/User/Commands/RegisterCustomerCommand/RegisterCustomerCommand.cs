@@ -20,6 +20,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
     private readonly ILogger<RegisterCustomerCommandHandler> _logger;
@@ -27,12 +28,14 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
     public RegisterCustomerCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         IEmailService emailService,
         IEmailLanguageResolver languages,
         ILogger<RegisterCustomerCommandHandler> logger)
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _sessions = sessions;
         _emailService = emailService;
         _languages = languages;
         _logger = logger;
@@ -65,7 +68,8 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
             PreferredLanguage = _languages.FromRequest(),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "System",
-            RefreshToken = _tokenService.GenerateRefreshToken()
+            // Legacy columns stay empty for compatibility with already-deployed rows.
+            RefreshToken = string.Empty
         };
 
         var result = await _userManager.CreateAsync(newUser, command.Password);
@@ -77,9 +81,9 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
             return ApiResponse<AuthResponse>.Failure(errors, "Failed to create user");
         }
 
-        // Generate tokens
+        // Generate tokens. The raw refresh token only leaves in this response; the database gets its hash.
         var token = _tokenService.GenerateAccessToken(newUser);
-        newUser.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
+        var refreshToken = await _sessions.IssueAsync(newUser, cancellationToken);
         // Registration sends the verification mail below, so it opens the per-address cooldown
         // too (GAP-3) — otherwise register-then-resend would deliver two mails back to back and
         // the cooldown would only start on the second. Piggy-backs the update already happening.
@@ -124,7 +128,7 @@ public class RegisterCustomerCommandHandler : ICommandHandler<RegisterCustomerCo
             Email = newUser.Email,
             Role = newUser.Role,
             AccessToken = token,
-            RefreshToken = newUser.RefreshToken,
+            RefreshToken = refreshToken,
             Expiration = _tokenService.GetAccessTokenExpiration()
         };
 

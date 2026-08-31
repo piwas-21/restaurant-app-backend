@@ -14,6 +14,7 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly IConfiguration _configuration;
     private readonly LoginEventHandler _loginEventHandler;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -21,12 +22,14 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
     public GoogleLoginCommandHandler(
         UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         IConfiguration configuration,
         LoginEventHandler loginEventHandler,
         IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _sessions = sessions;
         _configuration = configuration;
         _loginEventHandler = loginEventHandler;
         _httpContextAccessor = httpContextAccessor;
@@ -73,11 +76,7 @@ public class GoogleLoginCommandHandler : ICommandHandler<GoogleLoginCommand, Api
             }
 
             var token = _tokenService.GenerateAccessToken(user);
-            var rawRefreshToken = _tokenService.GenerateRefreshToken();
-
-            user.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-            user.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-            await _userManager.UpdateAsync(user);
+            var rawRefreshToken = await _sessions.IssueAsync(user, cancellationToken);
 
             // Merge anonymous basket if session ID exists
             var sessionId = _httpContextAccessor.HttpContext?.Request.Headers["X-Session-Id"].FirstOrDefault();

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831135625_AddRestaurantLandingContent")]
+    partial class AddRestaurantLandingContent
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3933,59 +3936,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("product_variation_descriptions");
                 });
 
-            modelBuilder.Entity("RestaurantSystem.Domain.Entities.RefreshSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("created_by");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("token_hash");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text")
-                        .HasColumnName("updated_by");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_refresh_sessions");
-
-                    b.HasIndex("UserId", "ExpiresAt");
-
-                    b.ToTable("RefreshSessions", (string)null);
-                });
-
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Reservation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5517,18 +5467,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductVariation");
                 });
 
-            modelBuilder.Entity("RestaurantSystem.Domain.Entities.RefreshSession", b =>
-                {
-                    b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", "User")
-                        .WithMany("RefreshSessions")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_refresh_sessions_asp_net_users_user_id");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Reservation", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", "Customer")
@@ -5630,8 +5568,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ApplicationUser", b =>
                 {
                     b.Navigation("Addresses");
-
-                    b.Navigation("RefreshSessions");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Basket", b =>

@@ -25,6 +25,7 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshSessionService _sessions;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UpdateStaffCommandHandler> _logger;
 
@@ -32,12 +33,14 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
         ITokenService tokenService,
+        IRefreshSessionService sessions,
         ICurrentUserService currentUserService,
         ILogger<UpdateStaffCommandHandler> logger)
     {
         _userManager = userManager;
         _context = context;
         _tokenService = tokenService;
+        _sessions = sessions;
         _currentUserService = currentUserService;
         _logger = logger;
     }
@@ -122,12 +125,10 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
             return IdentityFailure(updateResult, "Update failed");
         }
 
-        // Rotate tokens so the caller gets a fresh, usable pair
+        // Issue a fresh session so the caller gets a new, usable pair; a separate refresh session
+        // per issuance is what keeps the staff member's other logged-in browsers working.
         var accessToken = _tokenService.GenerateAccessToken(existingUser);
-        var rawRefreshToken = _tokenService.GenerateRefreshToken();
-        existingUser.RefreshToken = _tokenService.HashRefreshToken(rawRefreshToken);
-        existingUser.RefreshTokenExpiryTime = _tokenService.GetRefreshTokenExpiration();
-        await _userManager.UpdateAsync(existingUser);
+        var rawRefreshToken = await _sessions.IssueAsync(existingUser, cancellationToken);
 
         var authResponse = new AuthResponse
         {

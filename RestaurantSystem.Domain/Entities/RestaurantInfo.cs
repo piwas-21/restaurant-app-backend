@@ -46,19 +46,19 @@ public class RestaurantInfo : Entity
     public string? LogoDarkUrl { get; set; }
 
     /// <summary>
-    /// One photo of the restaurant itself — the dining room, the counter, the shopfront —
-    /// uploaded through admin and rendered as a section on the landing page.
-    /// Null means the tenant has not uploaded one and the section is NOT rendered at all.
+    /// Optional uploaded restaurant photo. Landing configuration uses it only when
+    /// <see cref="LandingBackgroundMode"/> is <see cref="LandingBackgroundMode.Custom"/>.
     /// </summary>
     /// <remarks>
-    /// The null case deliberately renders nothing rather than falling back to
-    /// <c>/branding/hero.png</c>: that asset is a neutral platform graphic that belongs to no
-    /// restaurant, so showing it under a heading like "our restaurant" would state something
-    /// untrue about the tenant. Owned only by its own upload/delete endpoints, exactly like
-    /// <see cref="LogoUrl"/> — the profile PUT never assigns it, so a client that PUTs the
-    /// address without knowing this field exists cannot clear the photo.
+    /// Owned only by its upload/delete endpoints, exactly like <see cref="LogoUrl"/>. The profile
+    /// PUT never assigns it, so an older client saving the address cannot remove the custom image.
+    /// When absent, custom background mode is invalid; default and none remain valid states.
     /// </remarks>
     public string? InteriorImageUrl { get; set; }
 
+    /// <summary>How the landing page resolves its background image.</summary>
+    public LandingBackgroundMode LandingBackgroundMode { get; set; } = LandingBackgroundMode.Default;
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
+    public virtual ICollection<RestaurantLandingContent> LandingContents { get; set; } = new List<RestaurantLandingContent>();
 }

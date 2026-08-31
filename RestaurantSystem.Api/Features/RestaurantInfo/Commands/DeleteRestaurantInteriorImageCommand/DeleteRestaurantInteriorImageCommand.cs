@@ -9,12 +9,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.RestaurantInfo.Commands.DeleteRestaurantInteriorImageCommand;
 
 /// <summary>
-/// Clears the restaurant's interior photo and deletes the stored file. Admin-only.
+/// Clears the uploaded custom landing-background image and deletes the stored file. Admin-only.
 /// </summary>
 /// <remarks>
-/// Removing it has to be reachable, because the state it returns to is a real one: the landing
-/// page then omits the section entirely, which is the designed default for a restaurant that
-/// has no photo rather than an error state.
+/// Removing it has to be reachable: it makes custom mode unavailable but leaves the explicit
+/// default and none landing-background states usable rather than inventing a separate image section.
 /// </remarks>
 public record DeleteRestaurantInteriorImageCommand : ICommand<ApiResponse<RestaurantInfoDto>>;
 

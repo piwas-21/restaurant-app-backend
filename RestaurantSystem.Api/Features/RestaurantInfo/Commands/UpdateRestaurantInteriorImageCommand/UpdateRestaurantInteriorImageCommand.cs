@@ -12,7 +12,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantInteriorImageCommand;
 
 /// <summary>
-/// Uploads the restaurant's own interior photo and points the
+/// Uploads the restaurant's custom landing-background image and points the
 /// <see cref="Domain.Entities.RestaurantInfo"/> singleton at it. Admin-only.
 /// </summary>
 /// <remarks>
