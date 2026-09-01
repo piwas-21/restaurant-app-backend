@@ -221,7 +221,8 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         var lines = itemSets.SelectMany(items => items).ToList();
         var productIds = lines
             .Where(line => line.ProductId.HasValue)
-            .Select(line => line.ProductId!.Value)
+            .Select(line => line.ProductId)
+            .OfType<Guid>()
             .Distinct()
             .ToList();
 
