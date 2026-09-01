@@ -1,13 +1,16 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos;
+using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Common;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using System.Net;
 
@@ -49,6 +52,8 @@ public class SauceAllowanceBasketPricingTests : IntegrationTestBase
     private Guid _garlicSauceId;   // 0.50, paid
     private Guid _truffleSauceId;  // 2.50, paid — the dearest, so the free slot must land here
     private Guid _extraMeatId;     // 3.00, NOT a sauce — must never be waived
+    private Guid _bbqSauceId;
+    private Guid _harissaSauceId;
 
     public SauceAllowanceBasketPricingTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -96,6 +101,10 @@ public class SauceAllowanceBasketPricingTests : IntegrationTestBase
         kebab.DetailedIngredients.Add(NewRow(_truffleSauceId, kebab.Id, "Truffle Sauce", 2.50m, 1, IngredientKind.Sauce));
         _extraMeatId = Guid.NewGuid();
         kebab.DetailedIngredients.Add(NewRow(_extraMeatId, kebab.Id, "Extra Meat", 3.00m, 2, IngredientKind.Ingredient));
+        _bbqSauceId = Guid.NewGuid();
+        kebab.DetailedIngredients.Add(NewRow(_bbqSauceId, kebab.Id, "BBQ Sauce", 0.75m, 3, IngredientKind.Sauce));
+        _harissaSauceId = Guid.NewGuid();
+        kebab.DetailedIngredients.Add(NewRow(_harissaSauceId, kebab.Id, "Harissa", 0.80m, 4, IngredientKind.Sauce));
 
         // The PARENT bundle claims three free sauces. Nothing may read it: a bundle has no sauce
         // rows for an allowance to apply to.
@@ -259,6 +268,105 @@ public class SauceAllowanceBasketPricingTests : IntegrationTestBase
         var line = basket!.Data!.Items.Single(i => i.ProductId == _kebabId);
 
         line.CustomizationPrice.Should().Be(3.50m, "the truffle sauce at 2.50 is the waived unit");
+    }
+
+    [Fact]
+    public async Task ThreeDistinctSauces_AreAcceptedOnRegularAndBundleLines()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+        var sauces = new List<Guid> { _garlicSauceId, _truffleSauceId, _bbqSauceId };
+
+        var regular = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _kebabId,
+            Quantity = 1,
+            SelectedIngredients = sauces
+        });
+        regular.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var bundle = await AddBundleAsync(sauces);
+        bundle.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task FourDistinctSauces_AreRejectedOnRegularAndBundleLines()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+        var sauces = new List<Guid> { _garlicSauceId, _truffleSauceId, _bbqSauceId, _harissaSauceId };
+
+        var regular = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _kebabId,
+            Quantity = 1,
+            SelectedIngredients = sauces
+        });
+        regular.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var regularBody = await ReadResponseAsync<ApiResponse<BasketDto>>(regular);
+        regularBody!.ErrorCode.Should().Be(ErrorCodes.SauceMaximumExceeded);
+        regularBody.Message.Should().Be("The selected sauces exceed this item's maximum");
+
+        var bundle = await AddBundleAsync(sauces);
+        bundle.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var bundleBody = await ReadResponseAsync<ApiResponse<BasketDto>>(bundle);
+        bundleBody!.ErrorCode.Should().Be(ErrorCodes.SauceMaximumExceeded);
+    }
+
+    [Fact]
+    public async Task UpdatingALegacyLineWithFourSauces_IsRejected()
+    {
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+        var valid = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = _kebabId,
+            Quantity = 1,
+            SelectedIngredients = new List<Guid> { _garlicSauceId, _truffleSauceId, _bbqSauceId }
+        });
+        var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(valid);
+        var lineId = basket!.Data!.Items.Single(item => item.ProductId == _kebabId).Id;
+
+        await SetStoredSaucesAsync(_sessionId, null,
+            new List<Guid> { _garlicSauceId, _truffleSauceId, _bbqSauceId, _harissaSauceId });
+
+        var update = await PutAsJsonAsync($"/api/basket/items/{lineId}", new { quantity = 2 });
+        update.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await ReadResponseAsync<ApiResponse<BasketDto>>(update);
+        body!.ErrorCode.Should().Be(ErrorCodes.SauceMaximumExceeded);
+    }
+
+    [Fact]
+    public async Task LoginMerge_RejectsALegacyAnonymousLineWithFourSauces()
+    {
+        var userId = Guid.Parse(TestAuthHandler.UserId);
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var baskets = scope.ServiceProvider.GetRequiredService<IBasketService>();
+            await baskets.AddItemToBasketAsync(_sessionId, null, new AddToBasketDto
+            {
+                ProductId = _kebabId,
+                Quantity = 1,
+                SelectedIngredients = new List<Guid> { _garlicSauceId, _truffleSauceId, _bbqSauceId }
+            });
+        }
+
+        await SetStoredSaucesAsync(_sessionId, null,
+            new List<Guid> { _garlicSauceId, _truffleSauceId, _bbqSauceId, _harissaSauceId });
+
+        using var mergeScope = Factory.Services.CreateScope();
+        var merger = mergeScope.ServiceProvider.GetRequiredService<IBasketService>();
+        var action = () => merger.MergeAnonymousBasketAsync(_sessionId, userId);
+
+        var exception = (await action.Should().ThrowAsync<BadRequestException>()).Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.SauceMaximumExceeded);
+    }
+
+    private async Task SetStoredSaucesAsync(string sessionId, Guid? userId, List<Guid> sauceIds)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var basket = await context.Baskets.Include(entry => entry.Items)
+            .SingleAsync(entry => entry.SessionId == sessionId && !entry.IsDeleted);
+        basket.Items.Single(item => item.ProductId == _kebabId).SelectedIngredients = sauceIds;
+        await context.SaveChangesAsync();
     }
 
     [Fact]

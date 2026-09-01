@@ -57,6 +57,8 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
     private static readonly Guid SauceProductId = Guid.NewGuid();   // BasePrice 10.00, SauceIncludedFree 1
     private static readonly Guid GarlicSauceId = Guid.NewGuid();
     private static readonly Guid ChilliSauceId = Guid.NewGuid();
+    private static readonly Guid BbqSauceId = Guid.NewGuid();
+    private static readonly Guid HarissaSauceId = Guid.NewGuid();
 
     // ── The defect ───────────────────────────────────────────────────────────────────────────
 
@@ -229,6 +231,25 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
         // Two paid sauces at 1.00 each, one of them free by the product's allowance of 1.
         (await SingleOrderAsync()).Total.Should().Be(10.00m + SaucePriceEach,
             "a default of 0 for sauceIncludedFree would charge 2.00 here and look perfectly plausible");
+    }
+
+    [Fact]
+    public async Task A_waiter_line_cannot_select_more_sauces_than_the_products_maximum()
+    {
+        AuthenticateAsRole(UserRole.Server);
+
+        var response = await PostAsync(new
+        {
+            productId = SauceProductId,
+            quantity = 1,
+            unitPrice = 99.00m,
+            selectedIngredientIds = new[] { GarlicSauceId, ChilliSauceId, BbqSauceId, HarissaSauceId },
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<RestaurantSystem.Api.Common.Models.ApiResponse<RestaurantSystem.Api.Features.Orders.Dtos.OrderDto>>();
+        body!.ErrorCode.Should().Be(RestaurantSystem.Api.Common.Models.ErrorCodes.SauceMaximumExceeded);
+        body.Message.Should().Be("The selected sauces exceed this item's maximum");
     }
 
     // ── What the carve-out still covers ──────────────────────────────────────────────────────
@@ -452,6 +473,7 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
             IsActive = true,
             IsAvailable = true,
             SauceIncludedFree = 1,
+            SauceMax = 3,
             Ingredients = new List<string>(),
             Allergens = new List<string>(),
             CreatedAt = DateTime.UtcNow,
@@ -459,6 +481,8 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
         };
         sauced.DetailedIngredients.Add(NewSauce(GarlicSauceId, "Garlic Sauce", order: 0));
         sauced.DetailedIngredients.Add(NewSauce(ChilliSauceId, "Chilli Sauce", order: 1));
+        sauced.DetailedIngredients.Add(NewSauce(BbqSauceId, "BBQ Sauce", order: 2));
+        sauced.DetailedIngredients.Add(NewSauce(HarissaSauceId, "Harissa Sauce", order: 3));
 
         context.Products.Add(pizza);
         context.Products.Add(sauced);

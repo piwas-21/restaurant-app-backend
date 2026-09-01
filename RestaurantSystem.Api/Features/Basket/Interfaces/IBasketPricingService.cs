@@ -36,9 +36,9 @@ public interface IBasketPricingService
     /// made, so it can neither exceed what was billed nor turn a charge into a refund.
     /// </para>
     /// <para>
-    /// <b>This method enforces no minimum or maximum.</b> <c>SauceMin</c>/<c>SauceMax</c> are a UI
-    /// affordance in S6 by decision, not by omission: money is safe without them because every sauce
-    /// unit beyond the allowance is charged in full.
+    /// <b>This pricing method enforces no minimum or maximum.</b> Selection writers enforce
+    /// <c>SauceMax</c> through <c>SauceSelectionRule</c>; <c>SauceMin</c> remains a UI prompt.
+    /// Keeping that check outside this pure money calculation avoids a second selection authority.
     /// </para>
     /// </param>
     decimal CalculateIngredientCustomizationPrice(

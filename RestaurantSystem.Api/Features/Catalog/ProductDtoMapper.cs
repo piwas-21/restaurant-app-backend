@@ -103,6 +103,7 @@ public static class ProductDtoMapper
                 Name = si.SideItemProduct.Name,
                 Description = si.SideItemProduct.Description,
                 Price = si.SideItemProduct.BasePrice,
+                Type = si.SideItemProduct.Type,
                 IsRequired = si.IsRequired,
                 DisplayOrder = si.DisplayOrder
             }).ToList(),

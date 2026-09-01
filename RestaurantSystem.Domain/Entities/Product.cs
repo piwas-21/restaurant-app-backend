@@ -65,9 +65,9 @@ public class Product : SoftDeleteEntity
     public int SauceMin { get; set; }
 
     /// <summary>
-    /// The most sauces a guest may choose, or <c>null</c> for NO group cap — which is the default,
-    /// and is exactly today's behaviour, where each row is bounded only by its own
-    /// <see cref="ProductIngredient.MaxQuantity"/> and nothing bounds the group.
+    /// The most distinct active sauce rows a guest may choose, or <c>null</c> for NO group cap.
+    /// <see cref="Api.Common.Validation.SauceSelectionRule"/> enforces it at basket and direct-order
+    /// selection writers; a row's own <see cref="ProductIngredient.MaxQuantity"/> remains separate.
     /// </summary>
     /// <remarks>
     /// Nullable rather than "0 means unlimited": 0 is a perfectly meaningful cap (a product that

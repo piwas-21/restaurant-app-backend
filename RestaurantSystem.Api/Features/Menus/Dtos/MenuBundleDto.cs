@@ -136,8 +136,8 @@ public class MenuBundleSectionItemDto
     /// bundle.
     /// </para>
     /// <para>
-    /// Display only. Nothing here is enforced server-side: <c>SauceMin</c>/<c>SauceMax</c> are a UI
-    /// affordance, and money is safe because every sauce beyond the allowance is charged.
+    /// The read contract lets a guest sheet draw the rule. Server-side selection writers enforce
+    /// <c>SauceMax</c>; <c>SauceMin</c> remains a UI prompt.
     /// </para>
     /// </remarks>
     public int SauceMin { get; set; }
@@ -185,6 +185,7 @@ public class MenuBundleSuggestedSideItemDto
     public Guid SideItemProductId { get; set; }
     public string? SideItemProductName { get; set; }
     public decimal SideItemBasePrice { get; set; }
+    public ProductType SideItemProductType { get; set; }
     public bool IsRequired { get; set; }
     public int DisplayOrder { get; set; }
 }
