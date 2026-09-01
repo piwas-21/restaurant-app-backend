@@ -48,7 +48,7 @@ public class BasketItemFactory : IBasketItemFactory
         var customization = _lineCustomizationBuilder.Build(
             product.DetailedIngredients, item.SelectedIngredients,
             item.IngredientQuantities, preferProvidedQuantities: true,
-            sauceIncludedFree: product.SauceIncludedFree);
+            sauceIncludedFree: product.SauceIncludedFree, sauceMax: product.SauceMax);
         decimal customizationPrice = customization.CustomizationPrice;
 
         // Calculate side items price. Drop non-positive quantities first: side-item
@@ -266,7 +266,7 @@ public class BasketItemFactory : IBasketItemFactory
             var childCustomization = _lineCustomizationBuilder.Build(
                 childProduct.DetailedIngredients, option.SelectedIngredients,
                 option.IngredientQuantities, preferProvidedQuantities: false,
-                sauceIncludedFree: childProduct.SauceIncludedFree);
+                sauceIncludedFree: childProduct.SauceIncludedFree, sauceMax: childProduct.SauceMax);
 
             // Add child customization price to total
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;

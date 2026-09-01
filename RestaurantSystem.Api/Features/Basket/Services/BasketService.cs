@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
@@ -205,14 +206,18 @@ public class BasketService : IBasketService
         if (basket == null)
             throw new NotFoundException(BasketNotFoundMessage, ErrorCodes.BasketNotFound);
 
+#pragma warning disable CS8602 // EF Core translates nullable navigation paths in Include; no dereference occurs here.
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
+            .Include(bi => bi.Product.DetailedIngredients)
             // Load-bearing for the rescale below (#305). Without it ChildBasketItems reads as an
             // EMPTY collection rather than throwing, so a bundle's children would silently keep
             // their add-time count and every test would still pass.
             // ...and load-bearing a second time, for the line total below (#308): the child count is
             // what says whether UnitPrice already contains the customization.
             .Include(bi => bi.ChildBasketItems)
+                .ThenInclude(child => child.Product.DetailedIngredients)
+            .AsSplitQuery()
             // ROOT ROWS ONLY, the same invariant the add-path dedup above now enforces. A bundle
             // child is not independently addressable: its quantity is DERIVED from the parent's,
             // and its ItemTotal is 0 so it cannot double-count. Updating one directly broke both —
@@ -229,9 +234,19 @@ public class BasketService : IBasketService
             // child id is not an addressable basket item, which is what that code already means.
             .FirstOrDefaultAsync(bi =>
                 bi.Id == basketItemId && bi.BasketId == basket.Id && bi.ParentBasketItemId == null);
+#pragma warning restore CS8602
 
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
+
+        // PUT changes only quantity/instructions, but it is also a write boundary for rows created
+        // before SauceMax was server-enforced. Validate the root and each bundle child rather than
+        // letting a legacy/crafted row become newly active through a later basket mutation.
+        SauceSelectionRule.EnsureWithinMaximum(basketItem);
+        foreach (var child in basketItem.ChildBasketItems)
+        {
+            SauceSelectionRule.EnsureWithinMaximum(child);
+        }
 
         // Captured BEFORE the overwrite: it is the divisor that recovers each child's per-unit
         // count. Read it after assigning update.Quantity and every child rescales by 1.

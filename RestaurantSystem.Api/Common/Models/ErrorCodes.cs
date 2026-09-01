@@ -99,6 +99,13 @@ public static class ErrorCodes
     public const string ReservationSlotUnavailable = "ReservationSlotUnavailable";
 
     /// <summary>
+    /// Returned with a 400 when a line selects more distinct active sauce rows than its product
+    /// permits. The cap is checked from every writer of an ingredient selection, not trusted to a
+    /// client-side checkbox limit.
+    /// </summary>
+    public const string SauceMaximumExceeded = "SauceMaximumExceeded";
+
+    /// <summary>
     /// Returned with a 400 when an add-to-basket names a product that hides its base row
     /// (<c>Product.HideBaseProduct</c>) but chooses no variation. The client hides that option, so
     /// reaching this means a stale tab, the waiter/POS de-select, or a crafted payload; the code is

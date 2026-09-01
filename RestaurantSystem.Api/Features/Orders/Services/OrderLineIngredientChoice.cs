@@ -84,7 +84,8 @@ internal sealed record OrderLineIngredientChoice(Dictionary<Guid, int>? Quantiti
             itemDto.SelectedIngredientIds,
             itemDto.IngredientQuantities,
             preferProvidedQuantities: false,
-            sauceIncludedFree: product.SauceIncludedFree);
+            sauceIncludedFree: product.SauceIncludedFree,
+            sauceMax: product.SauceMax);
 
         var serverCanPrice =
             isRootLine

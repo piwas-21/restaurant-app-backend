@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using System.Text.Json;
@@ -54,7 +55,8 @@ public interface ILineCustomizationBuilder
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities,
-        int sauceIncludedFree = 0);
+        int sauceIncludedFree = 0,
+        int? sauceMax = null);
 }
 
 public class LineCustomizationBuilder : ILineCustomizationBuilder
@@ -71,8 +73,11 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities,
-        int sauceIncludedFree = 0)
+        int sauceIncludedFree = 0,
+        int? sauceMax = null)
     {
+        SauceSelectionRule.EnsureWithinMaximum(detailedIngredients, selectedIngredients, sauceMax);
+
         // A payload carrying neither a selection nor a quantity map expressed no ingredient choice
         // at all, so there is nothing to record and nothing to price (#303). `useReorder` posts
         // exactly that: product + quantity.
