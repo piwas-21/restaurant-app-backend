@@ -350,12 +350,11 @@ Custom `StringEnumConverterFactory` in `/Common/Converters/`:
 
 ## Testing
 
-- See `docs/TEST-COVERAGE-PLAN.md` for full strategy
 - **Integration tests**: `RestaurantSystem.IntegrationTests/` - real PostgreSQL via Testcontainers + Respawn
 - **Unit tests** (planned): `RestaurantSystem.UnitTests/` - mocked dependencies
 - **Run**: `dotnet test --settings .runsettings`
 - **Coverage target**: 80%+ overall
-- **CI/CD**: Tests MUST run in GitLab pipeline before merge
+- **CI/CD**: tests must pass in the GitHub Actions pipeline before merge
 
 ### Test Authentication
 - `AuthenticateAsAdmin()` - sets admin claims via `X-Test-Admin: true` header
