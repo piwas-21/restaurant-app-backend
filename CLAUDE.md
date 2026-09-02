@@ -1,7 +1,8 @@
 # RUMI Backend — Agent Rules
 
 > Auto-loaded by Claude Code on every session in this repository. These rules apply to ALL code changes in `backend/`.
-> First read on a cold session: this file → [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) (refactoring track) + the sprint task you're picking up.
+> First read on a cold session: this file + the GitHub issue you're picking up. Cross-repo state lives in the
+> workspace [ROADMAP.md](../ROADMAP.md).
 
 ---
 
@@ -23,10 +24,9 @@
 | When | Read |
 |---|---|
 | Any task | This file |
-| Refactoring sprint task | [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) — find the task ID, read its acceptance criteria |
 | File-level audit context (god classes, DRY, design system) | [../docs/plans/RUMI-ANALYSIS-AND-PLAN.md](../docs/plans/RUMI-ANALYSIS-AND-PLAN.md) (workspace meta-repo) |
 | Quality/security gate work | [../docs/plans/DEV-PHASES-PLAN.md](../docs/plans/DEV-PHASES-PLAN.md) §2 (authoritative gate table) + [README.md](README.md) §CI gates for this repo's enforced/open gates |
-| Test work | [docs/TEST-COVERAGE-PLAN.md](docs/TEST-COVERAGE-PLAN.md) |
+| Test work | [docs/DEVELOPMENT-GUIDELINES.md](docs/DEVELOPMENT-GUIDELINES.md) §Testing |
 | Security review / threat model | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) |
 | Architectural decisions | [docs/adr/README.md](docs/adr/README.md) — index of ADRs |
 | Starting a session | Run `dotnet build RestaurantSystem.sln` to establish baseline |
@@ -262,9 +262,8 @@ Never commit:
 
 ### Starting
 1. Read this file (auto-loaded).
-2. Read [docs/SPRINT-PLAN.md](docs/SPRINT-PLAN.md) if picking up a sprint task.
-3. Run `dotnet build RestaurantSystem.sln` — confirm baseline green.
-4. Check `git status` — start from clean tree on `main`.
+2. Run `dotnet build RestaurantSystem.sln` — confirm baseline green.
+3. Check `git status` — start from a clean tree on `develop`.
 
 ### During implementation
 1. Output the §6 verification block before writing code.
