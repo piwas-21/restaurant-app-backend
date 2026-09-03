@@ -101,6 +101,7 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpPost]
     [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductDto>>> CreateProduct([FromBody] CreateProductCommand command)
     {
         var result = await _mediator.SendCommand(command);
