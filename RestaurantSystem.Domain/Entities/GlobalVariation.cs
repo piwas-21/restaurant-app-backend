@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -23,6 +24,14 @@ public class GlobalVariation : SoftDeleteEntity
 {
     public string DefaultName { get; set; } = string.Empty; // Fallback name (usually English)
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// Platform seed or this tenant's own (plan D14). Defaults to <see cref="LibraryOrigin.System"/>
+    /// so the rows that exist when the column lands keep meaning what they meant — every one of them
+    /// was seeded — and so a writer that forgets to stamp it produces an archivable-but-not-deletable
+    /// row rather than a deletable built-in.
+    /// </summary>
+    public LibraryOrigin Origin { get; set; } = LibraryOrigin.System;
 
     /// <summary>
     /// Archived (plan D4): off the shelf, so no picker offers it and no new product may link to it,

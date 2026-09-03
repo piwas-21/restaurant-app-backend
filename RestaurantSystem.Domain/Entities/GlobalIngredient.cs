@@ -21,6 +21,14 @@ public class GlobalIngredient : SoftDeleteEntity
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
     /// <summary>
+    /// Platform seed or this tenant's own (plan D14). Defaults to <see cref="LibraryOrigin.System"/>
+    /// so the rows that exist when the column lands keep meaning what they meant — every one of them
+    /// was seeded — and so a writer that forgets to stamp it produces an archivable-but-not-deletable
+    /// row rather than a deletable built-in.
+    /// </summary>
+    public LibraryOrigin Origin { get; set; } = LibraryOrigin.System;
+
+    /// <summary>
     /// When set, the row is ARCHIVED (plan D4): off the shelf, so no picker offers it and no new
     /// product may link to it, while every product that already links to it keeps both its
     /// provenance and the translations it renders.

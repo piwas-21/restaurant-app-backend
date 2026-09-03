@@ -284,11 +284,24 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
 
         created.Id.Should().NotBe(_cheeseId);
         created.GlobalIngredientId.Should().Be(_globalMozzarellaId);
-        (await ReadStoredLinkAsync(_cheeseId)).Should().BeNull();
+
+        // "Cheese" carries no picker link, so it must not point at the row Mozzarella came from.
+        // It is no longer NULL either: since D14 an unlinked name is promoted into the tenant's own
+        // library and links to THAT row. Asserted POSITIVELY as well — `NotBe` alone would also
+        // pass if promotion had silently stopped running on this branch.
+        var cheeseRow = await context.GlobalIngredients.SingleAsync(g => g.DefaultName == "Cheese");
+        cheeseRow.Id.Should().NotBe(_globalMozzarellaId);
+        (await ReadStoredLinkAsync(_cheeseId)).Should().Be(cheeseRow.Id);
     }
 
     // Provenance is assigned from the payload, not merged into it: an ingredient the admin retyped
     // by hand is no longer a copy of the library row, and must stop claiming to be one.
+    //
+    // Since D14 that is where the story continues rather than ends. The renamed row does not go
+    // back to NULL — "House Cheese" is promoted into the tenant's own library and links to its own
+    // row, so the link stays TRUE of the name it now carries. The defect this test exists for is
+    // the stale one, and it is still the assertion below: a row called "House Cheese" must not go
+    // on claiming to be a copy of "Mozzarella".
     [Fact]
     public async Task DroppingTheLinkFromThePayload_ClearsTheProvenance()
     {
@@ -300,7 +313,12 @@ public class ProductIngredientProvenanceTests : IntegrationTestBase
         (await PutRawAsync(BuildPayload(Ingredient(_cheeseId, "House Cheese", null))))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await ReadStoredLinkAsync(_cheeseId)).Should().BeNull();
+        (await ReadStoredLinkAsync(_cheeseId)).Should().NotBe(_globalMozzarellaId);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var promoted = await context.GlobalIngredients.SingleAsync(g => g.DefaultName == "House Cheese");
+        (await ReadStoredLinkAsync(_cheeseId)).Should().Be(promoted.Id, "the link follows the name");
     }
 
     // `global_ingredient_id` is a FK with NO ACTION, so an id the caller invented would reach the

@@ -93,6 +93,30 @@ public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
     }
 
     /// <summary>
+    /// D14. The catalog is a per-tenant TABLE seeded with 654 platform rows, so an unused built-in
+    /// was indistinguishable from a name the admin typed and the picker offered "Delete" on every
+    /// one of them. A built-in is ARCHIVED at any usage count — including zero, which is what the
+    /// test above covers for the tenant's own row.
+    /// </summary>
+    [Fact]
+    public async Task DeletingABuiltInIngredient_ArchivesItInsteadOfRemovingIt()
+    {
+        using (var seed = Factory.Services.CreateScope())
+        {
+            var context = seed.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var row = await context.GlobalIngredients.SingleAsync(g => g.Id == _unusedId);
+            row.Origin = LibraryOrigin.System;
+            await context.SaveChangesAsync();
+        }
+
+        await DeleteAsync(_unusedId);
+
+        var ingredient = await FindIncludingDeletedAsync(_unusedId);
+        ingredient!.IsDeleted.Should().BeFalse("a built-in is never removed");
+        ingredient.ArchivedAt.Should().NotBeNull();
+    }
+
+    /// <summary>
     /// The translations hung off the ingredient by a CASCADE foreign key, so the hard delete took
     /// them with it. They are not soft-deletable themselves, so nothing could have restored them.
     /// </summary>
@@ -265,6 +289,10 @@ public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
 
         var unused = new GlobalIngredient
         {
+            // Explicitly the TENANT's own: `Origin` defaults to System, and a built-in is archived
+            // at any usage count (plan D14), so a System row here would silently retarget every
+            // delete test in this class at the archive path.
+            Origin = LibraryOrigin.Custom,
             DefaultName = UnusedName,
             IsActive = true,
             CreatedBy = "test",
@@ -277,6 +305,10 @@ public class DeleteGlobalIngredientCommandTests : IntegrationTestBase
 
         var used = new GlobalIngredient
         {
+            // Explicitly the TENANT's own: `Origin` defaults to System, and a built-in is archived
+            // at any usage count (plan D14), so a System row here would silently retarget every
+            // delete test in this class at the archive path.
+            Origin = LibraryOrigin.Custom,
             DefaultName = UsedName,
             IsActive = true,
             CreatedBy = "test",

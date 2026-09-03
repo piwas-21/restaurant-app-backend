@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -23,6 +24,14 @@ public class GlobalVariationConfiguration : IEntityTypeConfiguration<GlobalVaria
             .HasMaxLength(100);
 
         builder.Property(g => g.IsActive)
+            .IsRequired();
+
+        // Stored as its `int` value like every other enum on this model. Not indexed: the picker
+        // reads the whole (≈50-row) catalog in one call and partitions it in the browser, so an
+        // index here would buy nothing and cost every write.
+        builder.Property(g => g.Origin)
+            .HasConversion<int>()
+            .HasDefaultValue(LibraryOrigin.System)
             .IsRequired();
 
         builder.Property(g => g.ArchivedBy)
