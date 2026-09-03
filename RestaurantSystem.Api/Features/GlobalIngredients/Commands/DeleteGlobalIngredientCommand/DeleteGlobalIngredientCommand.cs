@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.GlobalIngredients.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.GlobalIngredients.Commands.DeleteGlobalIngredientCommand;
@@ -29,8 +30,18 @@ public record DeleteGlobalIngredientCommand(Guid Id) : ICommand<ApiResponse<stri
 /// </para>
 ///
 /// <para>
+/// <b>A platform-seeded row is ARCHIVED whatever its usage count, never removed</b> (plan D14).
+/// These catalogs are per-tenant TABLES seeded with platform rows, so an unused built-in was
+/// indistinguishable from a name the admin typed, and the picker offered "Delete" on all 654 of
+/// them. Archiving stays available for both — "we do not sell that" is a thing a tenant has to be
+/// able to say about a shipped row — and the picker hides the destructive control for built-ins,
+/// but the rule is enforced HERE so a client that ignores <c>origin</c> cannot get round it.
+/// </para>
+///
+/// <para>
 /// The count is the same one the picker renders, so the UI can label the button honestly before the
-/// admin presses it — "Archive" above zero, "Delete" at zero.
+/// admin presses it — "Archive" above zero or on a built-in, "Delete" only on the tenant's own at
+/// zero.
 /// </para>
 /// </summary>
 public class DeleteGlobalIngredientCommandHandler : ICommandHandler<DeleteGlobalIngredientCommand, ApiResponse<string>>
@@ -66,15 +77,18 @@ public class DeleteGlobalIngredientCommandHandler : ICommandHandler<DeleteGlobal
 
         var usedOnProductCount = await GlobalIngredientUsage.CountForAsync(_context, ingredient.Id, cancellationToken);
 
-        if (usedOnProductCount > 0)
+        // A built-in is archived at any usage count — including zero, which is the case the picker
+        // used to label "Delete".
+        if (usedOnProductCount > 0 || ingredient.Origin == LibraryOrigin.System)
         {
             ingredient.ArchivedAt = DateTime.UtcNow;
             ingredient.ArchivedBy = _currentUserService.GetAuditIdentifier();
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            return ApiResponse<string>.SuccessWithData(
-                $"Global ingredient archived; {usedOnProductCount} product(s) still reference it");
+            return ApiResponse<string>.SuccessWithData(ingredient.Origin == LibraryOrigin.System
+                ? "Built-in ingredient archived; built-in library rows are never removed"
+                : $"Global ingredient archived; {usedOnProductCount} product(s) still reference it");
         }
 
         // Set by hand, as every other soft delete in the codebase does. This used to be a `Remove()`

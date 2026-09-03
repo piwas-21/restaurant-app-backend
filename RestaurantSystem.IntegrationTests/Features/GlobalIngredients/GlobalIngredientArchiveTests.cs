@@ -328,6 +328,10 @@ public class GlobalIngredientArchiveTests : IntegrationTestBase
 
         var used = new GlobalIngredient
         {
+            // Explicitly the TENANT's own: `Origin` defaults to System, and a built-in is archived
+            // at any usage count (plan D14), so a System row here would silently retarget every
+            // delete test in this class at the archive path.
+            Origin = LibraryOrigin.Custom,
             DefaultName = UsedName,
             IsActive = true,
             CreatedBy = "test",
@@ -339,6 +343,10 @@ public class GlobalIngredientArchiveTests : IntegrationTestBase
 
         var unused = new GlobalIngredient
         {
+            // Explicitly the TENANT's own: `Origin` defaults to System, and a built-in is archived
+            // at any usage count (plan D14), so a System row here would silently retarget every
+            // delete test in this class at the archive path.
+            Origin = LibraryOrigin.Custom,
             DefaultName = UnusedName,
             IsActive = true,
             CreatedBy = "test",

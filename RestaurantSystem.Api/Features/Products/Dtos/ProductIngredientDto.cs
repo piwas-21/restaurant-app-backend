@@ -25,8 +25,10 @@ public record ProductIngredientDto
 
     // Mutual-exclusion key (plan §9). Additive and nullable: a client that omits it keeps sending
     // ungrouped ingredients, which is what every client did before this field existed. It is
-    // ASSIGNED FROM THE PAYLOAD on every save, exactly as `globalIngredientId` is — a client that
-    // round-trips the DTO must send it back, or the row leaves its group.
+    // ASSIGNED FROM THE PAYLOAD on every save — a client that round-trips the DTO must send it
+    // back, or the row leaves its group. It used to cite `globalIngredientId` as the exemplar;
+    // since D14 that one is no longer purely payload-assigned (an unlinked name is matched against
+    // the library or promoted into it), so this rule now stands on its own.
     public string? ExclusionGroup { get; set; }
 
     public Dictionary<string, ProductIngredientContentDto>? Content { get; set; }

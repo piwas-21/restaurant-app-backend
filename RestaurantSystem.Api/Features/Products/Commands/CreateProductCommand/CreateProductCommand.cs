@@ -177,6 +177,14 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     _logger,
                     cancellationToken);
 
+                // …and one for the rows the payload does NOT link, so a size typed straight into
+                // the editor lands in the tenant's own library too (plan D14).
+                var variationPromotion = await CustomVariationPromotion.PrepareAsync(
+                    _context,
+                    command.Variations.Select(v => (v.GlobalVariationId, v.Name, v.Content)),
+                    _currentUserService.GetAuditIdentifier(),
+                    cancellationToken);
+
                 foreach (var variationDto in command.Variations)
                 {
                     var variation = new ProductVariation
@@ -186,7 +194,8 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         PriceModifier = variationDto.PriceModifier,
                         IsActive = variationDto.IsActive,
                         DisplayOrder = variationDto.DisplayOrder,
-                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name),
+                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name)
+                            ?? variationPromotion.IdFor(variationDto.Name),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };
@@ -238,6 +247,11 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 var provenance = await GlobalIngredientProvenance.ResolveAsync(
                     _context, command.DetailedIngredients, _logger, cancellationToken);
 
+                // Hand-typed names earn a place in the tenant's own library (plan D14) — see
+                // CustomIngredientPromotion. Same rule on the update path, in the synchroniser.
+                var ingredientPromotion = await CustomIngredientPromotion.PrepareAsync(
+                    _context, command.DetailedIngredients, _currentUserService.GetAuditIdentifier(), cancellationToken);
+
                 foreach (var ingredientDto in command.DetailedIngredients)
                 {
                     var ingredient = new ProductIngredient
@@ -254,8 +268,10 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                         // §9: normalised at the write path, so a cleared input ("") is stored as
                         // "no group" and never as one anonymous group shared by every cleared row.
                         ExclusionGroup = IngredientExclusionGroupRule.Normalize(ingredientDto.ExclusionGroup),
-                        // Provenance of a picked library row; null when the name was typed by hand.
-                        GlobalIngredientId = provenance.LinkFor(ingredientDto),
+                        // Provenance of a picked library row — or of the row a hand-typed name was
+                        // just promoted into.
+                        GlobalIngredientId = provenance.LinkFor(ingredientDto)
+                            ?? ingredientPromotion.IdFor(ingredientDto.Name, ingredientDto.Kind),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };

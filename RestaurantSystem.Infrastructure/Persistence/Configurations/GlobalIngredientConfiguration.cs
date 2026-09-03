@@ -20,5 +20,12 @@ public class GlobalIngredientConfiguration : IEntityTypeConfiguration<GlobalIngr
             .HasConversion<int>()
             .HasDefaultValue(IngredientKind.Ingredient)
             .IsRequired();
+
+        // Default 0 = LibraryOrigin.System, which is what all 654 seeded rows are — so the column
+        // lands with every existing row already correct and needs no backfill.
+        builder.Property(g => g.Origin)
+            .HasConversion<int>()
+            .HasDefaultValue(LibraryOrigin.System)
+            .IsRequired();
     }
 }

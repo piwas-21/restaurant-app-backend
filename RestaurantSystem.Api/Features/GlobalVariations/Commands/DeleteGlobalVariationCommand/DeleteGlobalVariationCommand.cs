@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.GlobalVariations.Services;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.GlobalVariations.Commands.DeleteGlobalVariationCommand;
@@ -18,6 +19,15 @@ public record DeleteGlobalVariationCommand(Guid Id) : ICommand<ApiResponse<strin
 /// <b>Some product uses it</b> — ARCHIVE. The row stays readable, keeps serving the products that
 /// copied it, disappears from the picker, and <c>restore</c> reverses it.
 /// <b>Nothing uses it</b> — soft delete, which the global query filter then hides from every read.
+/// </para>
+///
+/// <para>
+/// <b>A platform-seeded row is ARCHIVED whatever its usage count, never removed</b> (plan D14).
+/// These catalogs are per-tenant TABLES seeded with platform rows, so an unused built-in was
+/// indistinguishable from a name the admin typed, and the picker offered "Delete" on all 704 of
+/// them. Archiving stays available for both — "we do not sell that" is a thing a tenant has to be
+/// able to say about a shipped row — and the picker hides the destructive control for built-ins,
+/// but the rule is enforced HERE so a client that ignores <c>origin</c> cannot get round it.
 /// </para>
 /// </summary>
 public class DeleteGlobalVariationCommandHandler : ICommandHandler<DeleteGlobalVariationCommand, ApiResponse<string>>
@@ -53,15 +63,18 @@ public class DeleteGlobalVariationCommandHandler : ICommandHandler<DeleteGlobalV
 
         var usedOnProductCount = await GlobalVariationUsage.CountForAsync(_context, variation.Id, cancellationToken);
 
-        if (usedOnProductCount > 0)
+        // A built-in is archived at any usage count — including zero, which is the case the picker
+        // used to label "Delete".
+        if (usedOnProductCount > 0 || variation.Origin == LibraryOrigin.System)
         {
             variation.ArchivedAt = DateTime.UtcNow;
             variation.ArchivedBy = _currentUserService.GetAuditIdentifier();
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            return ApiResponse<string>.SuccessWithData(
-                $"Global variation archived; {usedOnProductCount} product(s) still reference it");
+            return ApiResponse<string>.SuccessWithData(variation.Origin == LibraryOrigin.System
+                ? "Built-in variation archived; built-in library rows are never removed"
+                : $"Global variation archived; {usedOnProductCount} product(s) still reference it");
         }
 
         // Set by hand, as every other soft delete in this codebase does: it states the intent at the

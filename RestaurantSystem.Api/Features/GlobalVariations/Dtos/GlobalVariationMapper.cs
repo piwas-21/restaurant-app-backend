@@ -14,6 +14,7 @@ internal static class GlobalVariationMapper
         DefaultName = variation.DefaultName,
         IsActive = variation.IsActive,
         IsArchived = variation.ArchivedAt.HasValue,
+        Origin = variation.Origin,
         UsedOnProductCount = usedOnProductCount,
         Translations = variation.Translations
             .Select(t => new GlobalVariationTranslationDto

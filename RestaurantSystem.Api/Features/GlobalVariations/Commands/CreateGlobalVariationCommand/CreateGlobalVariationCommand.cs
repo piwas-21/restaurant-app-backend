@@ -2,6 +2,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.GlobalVariations.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -43,6 +44,10 @@ public class CreateGlobalVariationCommandHandler : ICommandHandler<CreateGlobalV
         {
             DefaultName = command.DefaultName.Trim(),
             IsActive = true,
+            // The one place a Custom row is born. The column defaults to System so the seeded rows
+            // need no backfill, which makes stamping it HERE the whole of what separates the two
+            // shelves — see LibraryOrigin.
+            Origin = LibraryOrigin.Custom,
             CreatedBy = auditId,
             Translations = command.Translations
                 .Select(t => new GlobalVariationTranslation
