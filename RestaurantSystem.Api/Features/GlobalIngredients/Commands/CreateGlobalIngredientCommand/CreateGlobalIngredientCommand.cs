@@ -39,6 +39,9 @@ public class CreateGlobalIngredientCommandHandler : ICommandHandler<CreateGlobal
             ImageUrl = command.ImageUrl,
             IsActive = true,
             Kind = command.Kind,
+            // The one place a Custom ingredient is born — see LibraryOrigin for why the column
+            // defaults to System instead.
+            Origin = LibraryOrigin.Custom,
             CreatedBy = auditId,
             Translations = command.Translations
                 .Select(t => new GlobalIngredientTranslation

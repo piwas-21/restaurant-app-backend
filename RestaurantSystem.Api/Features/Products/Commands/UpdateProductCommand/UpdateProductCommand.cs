@@ -234,6 +234,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 _logger,
                 cancellationToken);
 
+            // …and one for the rows the payload does NOT link — see CustomVariationPromotion.
+            var variationPromotion = await CustomVariationPromotion.PrepareAsync(
+                _context,
+                command.Variations.Select(v => (v.GlobalVariationId, v.Name, v.Content)),
+                _currentUserService.GetAuditIdentifier(),
+                cancellationToken);
+
             var incomingVariationIds = command.Variations
                 .Where(v => v.Id.HasValue)
                 .Select(v => v.Id!.Value)
@@ -268,7 +275,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     variation.IsActive = variationDto.IsActive;
                     variation.DisplayOrder = variationDto.DisplayOrder;
                     variation.GlobalVariationId = variationProvenance.LinkFor(
-                        variationDto.GlobalVariationId, variationDto.Name, variation.GlobalVariationId);
+                        variationDto.GlobalVariationId, variationDto.Name, variation.GlobalVariationId)
+                        ?? variationPromotion.IdFor(variationDto.Name);
                     variation.UpdatedAt = DateTime.UtcNow;
                     variation.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -289,7 +297,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                         PriceModifier = variationDto.PriceModifier,
                         IsActive = variationDto.IsActive,
                         DisplayOrder = variationDto.DisplayOrder,
-                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name),
+                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name)
+                            ?? variationPromotion.IdFor(variationDto.Name),
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = _currentUserService.GetAuditIdentifier()
                     };

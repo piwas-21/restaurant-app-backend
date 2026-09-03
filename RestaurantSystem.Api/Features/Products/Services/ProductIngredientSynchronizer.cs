@@ -54,6 +54,13 @@ internal static class ProductIngredientSynchronizer
         var provenance = await GlobalIngredientProvenance.ResolveAsync(
             context, incoming, logger, cancellationToken);
 
+        // …and one more for the rows the payload does NOT link: a name typed straight into the
+        // editor now earns a place in the tenant's own library instead of living on this product
+        // alone (plan D14). Prepared from the same payload, in the same pass, so a save costs one
+        // extra SELECT and no extra round trip per row.
+        var promotion = await CustomIngredientPromotion.PrepareAsync(
+            context, incoming, auditIdentifier, cancellationToken);
+
         // Remove ingredients not in the incoming list. Their descriptions go with them by cascade
         // (ProductIngredientConfiguration: Descriptions → DeleteBehavior.Cascade).
         var ingredientsToRemove = product.DetailedIngredients
@@ -92,8 +99,15 @@ internal static class ProductIngredientSynchronizer
                 // would put every cleared row into one anonymous group.
                 ingredient.ExclusionGroup = IngredientExclusionGroupRule.Normalize(ingredientDto.ExclusionGroup);
                 // Provenance is assigned from the payload, never preserved silently: the row the
-                // admin sees is the one that decides, and clearing the picker clears the link.
-                ingredient.GlobalIngredientId = provenance.LinkFor(ingredientDto, ingredient.GlobalIngredientId);
+                // admin sees is the one that decides.
+                //
+                // Since D14 the link FOLLOWS THE NAME rather than dying with the picker. Clearing
+                // the picker no longer leaves the row unlinked whenever its name still matches a
+                // live library row — it re-points at THAT row, or promotes a new one. What it can
+                // never do is keep claiming to be a copy of a row whose name it no longer carries,
+                // which is the defect the old sentence was really about.
+                ingredient.GlobalIngredientId = provenance.LinkFor(ingredientDto, ingredient.GlobalIngredientId)
+                    ?? promotion.IdFor(ingredientDto.Name, ingredientDto.Kind);
                 ingredient.UpdatedAt = DateTime.UtcNow;
                 ingredient.UpdatedBy = auditIdentifier;
 
@@ -118,7 +132,7 @@ internal static class ProductIngredientSynchronizer
                     MaxQuantity = ingredientDto.MaxQuantity,
                     Kind = ingredientDto.Kind,
                     ExclusionGroup = IngredientExclusionGroupRule.Normalize(ingredientDto.ExclusionGroup),
-                    GlobalIngredientId = provenance.LinkFor(ingredientDto),
+                    GlobalIngredientId = provenance.LinkFor(ingredientDto) ?? promotion.IdFor(ingredientDto.Name, ingredientDto.Kind),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = auditIdentifier
                 };

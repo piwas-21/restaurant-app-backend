@@ -27,9 +27,11 @@ public class GlobalVariationLibraryTests : IntegrationTestBase
 {
     private const string UsedName = "S4 Used Variation";
     private const string UnusedName = "S4 Unused Variation";
+    private const string SeededName = "S4 Built-in Variation";
 
     private Guid _usedId;
     private Guid _unusedId;
+    private Guid _seededId;
     private Guid _productId;
 
     public GlobalVariationLibraryTests(DatabaseFixture databaseFixture)
@@ -104,13 +106,62 @@ public class GlobalVariationLibraryTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task DeletingAVariationNoProductUses_SoftDeletesIt()
+    public async Task DeletingATenantsOwnVariationNoProductUses_SoftDeletesIt()
     {
         await DeleteAsync(_unusedId);
 
         var row = await FindIncludingDeletedAsync(_unusedId);
         row!.IsDeleted.Should().BeTrue();
         row.ArchivedAt.Should().BeNull("nothing referenced it, so there was nothing to archive");
+    }
+
+    /// <summary>
+    /// D14. These catalogs are per-tenant TABLES seeded with platform rows, so an unused built-in
+    /// was indistinguishable from a name the admin typed and the picker offered "Delete" on all
+    /// fifty. A built-in is archived at ANY usage count — including zero, which is the case above.
+    /// </summary>
+    [Fact]
+    public async Task DeletingABuiltInVariation_ArchivesItInsteadOfRemovingIt()
+    {
+        var result = await DeleteAsync(_seededId);
+
+        result.Success.Should().BeTrue(result.Message);
+
+        var row = await FindIncludingDeletedAsync(_seededId);
+        row!.IsDeleted.Should().BeFalse("a built-in is never removed");
+        row.ArchivedAt.Should().NotBeNull();
+        row.ArchivedBy.Should().Be(TestAuthHandler.AdminUserId);
+    }
+
+    /// <summary>
+    /// The shelf has to SAY which rows are which, or the picker cannot hide the destructive control
+    /// for the built-ins — and the server rule above would be the only thing between an admin and a
+    /// button that no longer does what it says.
+    /// </summary>
+    [Fact]
+    public async Task TheLibrary_SaysWhichRowsAreBuiltInAndWhichAreTheTenantsOwn()
+    {
+        var response = await GetFromJsonAsync<ApiResponse<List<GlobalVariationDto>>>("/api/global-variations");
+
+        response!.Data!.Single(v => v.DefaultName == SeededName).Origin.Should().Be(LibraryOrigin.System);
+        response.Data!.Single(v => v.DefaultName == UnusedName).Origin.Should().Be(LibraryOrigin.Custom);
+    }
+
+    /// <summary>
+    /// A row the picker itself creates is the tenant's own, and therefore removable. The column
+    /// defaults to System so the seeded rows need no backfill, which makes the create handler's
+    /// stamp the whole of what separates the two shelves.
+    /// </summary>
+    [Fact]
+    public async Task ARowCreatedThroughThePicker_IsTheTenantsOwn()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync(
+            "/api/global-variations",
+            new CreateGlobalVariationDto { DefaultName = "S4 Typed In The Picker" });
+        var created = await ReadResponseAsync<ApiResponse<GlobalVariationDto>>(response);
+
+        created!.Data!.Origin.Should().Be(LibraryOrigin.Custom);
     }
 
     [Fact]
@@ -257,10 +308,23 @@ public class GlobalVariationLibraryTests : IntegrationTestBase
             },
         };
 
+        // The tenant's OWN unused row — what "Delete" is for. It is explicitly Custom because the
+        // column defaults to System, and a System row is archived at any usage count (D14).
         var unused = new GlobalVariation
         {
             DefaultName = UnusedName,
             IsActive = true,
+            Origin = LibraryOrigin.Custom,
+            CreatedBy = "test",
+        };
+
+        // …and a platform-seeded one that nothing uses, which is the case the picker used to label
+        // "Delete" on all fifty shipped rows.
+        var seeded = new GlobalVariation
+        {
+            DefaultName = SeededName,
+            IsActive = true,
+            Origin = LibraryOrigin.System,
             CreatedBy = "test",
         };
 
@@ -285,11 +349,12 @@ public class GlobalVariationLibraryTests : IntegrationTestBase
             CreatedBy = "test",
         });
 
-        context.AddRange(used, unused, product);
+        context.AddRange(used, unused, seeded, product);
         await context.SaveChangesAsync();
 
         _usedId = used.Id;
         _unusedId = unused.Id;
+        _seededId = seeded.Id;
         _productId = product.Id;
     }
 }

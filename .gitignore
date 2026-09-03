@@ -387,3 +387,8 @@ FodyWeavers.xsd
 
 # macOS Finder metadata — never useful in the repo (shipped once in #414)
 .DS_Store
+
+# Runtime upload target for the LOCAL file-storage provider (FileStorage:Provider=local). It is a
+# destination, never a source: the files in it are whatever the machine happened to upload, and
+# three of them were one `git add -A` away from the history while this was written.
+RestaurantSystem.Api/wwwroot/uploads/
