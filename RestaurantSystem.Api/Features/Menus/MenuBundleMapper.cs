@@ -44,6 +44,11 @@ public static class MenuBundleMapper
             DisplayOrder = product.DisplayOrder,
             Availability = OrderTypeAvailability.Resolve(product, requestedOrderType),
             AvailableOrderTypes = product.AvailableOrderTypes,
+            // The bundle's OWN labelling. The one other `Allergens` in this file is a section
+            // item's, and mapping only that meant a labelled combo reached the guest indis-
+            // tinguishable from an unlabelled one — which the menu filter reads as "free of
+            // everything" (#477).
+            Allergens = product.Allergens,
             MenuDefinition = product.MenuDefinition != null ? new MenuBundleDefinitionDto
             {
                 Id = product.MenuDefinition.Id,
