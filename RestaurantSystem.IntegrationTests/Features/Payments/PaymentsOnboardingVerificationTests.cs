@@ -121,8 +121,13 @@ public class PaymentsOnboardingAwaitingVerificationTests : PaymentsOnboardingVer
         raw.Should().NotContain("currentlyDue");
         raw.Should().NotContain("currently_due");
         raw.Should().NotContain("field.");
+        // `commissionBps` was added deliberately, and this list is where that deliberation had to
+        // happen — the assertion is an exact set precisely so a new field cannot arrive unnoticed.
+        // It is Sofra's own rate, not the restaurant's identity data, and the endpoint is admin-only,
+        // so it is disclosure the owner is entitled to rather than a leak.
         (await AskAsync()).EnumerateObject().Select(p => p.Name).Should()
-            .BeEquivalentTo(["state", "connectedAccountId", "dashboardUrl", "requirementsDue"]);
+            .BeEquivalentTo(
+                ["state", "connectedAccountId", "dashboardUrl", "requirementsDue", "commissionBps"]);
     }
 }
 

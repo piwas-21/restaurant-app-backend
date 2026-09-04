@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Dtos;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -55,6 +56,7 @@ public class CreateCheckoutSessionCommandHandler
     private readonly ICheckoutSessionReuse _reuse;
     private readonly ICurrentUserService _currentUser;
     private readonly LocalizationSettings _localization;
+    private readonly StripeCommissionSettings _commission;
     private readonly ILogger<CreateCheckoutSessionCommandHandler> _logger;
 
     public CreateCheckoutSessionCommandHandler(
@@ -64,9 +66,11 @@ public class CreateCheckoutSessionCommandHandler
         ICheckoutSessionReuse reuse,
         ICurrentUserService currentUser,
         IOptions<LocalizationSettings> localization,
+        IOptions<StripeCommissionSettings> commission,
         ILogger<CreateCheckoutSessionCommandHandler> logger)
     {
         ArgumentNullException.ThrowIfNull(localization);
+        ArgumentNullException.ThrowIfNull(commission);
 
         _context = context;
         _gateway = gateway;
@@ -74,6 +78,7 @@ public class CreateCheckoutSessionCommandHandler
         _reuse = reuse;
         _currentUser = currentUser;
         _localization = localization.Value;
+        _commission = commission.Value;
         _logger = logger;
     }
 
@@ -102,6 +107,10 @@ public class CreateCheckoutSessionCommandHandler
 
         var amount = CheckoutAmount.From(order.Total, _localization.Currency);
 
+        // Null on the fleet default (Stripe:Commission:Bps=0) — see CheckoutCommission for why null,
+        // not 0, is what keeps a non-commission tenant's Stripe request unchanged.
+        var applicationFeeMinor = CheckoutCommission.From(amount, _commission.Bps);
+
         var existing = await _context.OrderCheckoutSessions
             .Where(s => s.OrderId == order.Id)
             .OrderByDescending(s => s.CreatedAt)
@@ -129,6 +138,7 @@ public class CreateCheckoutSessionCommandHandler
                 AmountMinor = amount.Minor,
                 ExpiresAt = expiresAt,
                 IdempotencyKey = idempotencyKey,
+                ApplicationFeeMinor = applicationFeeMinor,
             },
             cancellationToken);
 

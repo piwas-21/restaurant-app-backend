@@ -33,5 +33,15 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 /// are the restaurant's own identity data, they are shown them by Stripe on the page where they can
 /// actually act on them, and a number is enough to say "there is still a form to finish".
 /// </param>
+/// <param name="CommissionBps">
+/// Sofra's commission rate for this restaurant, in basis points — <c>StripeCommissionSettings.Bps</c>
+/// verbatim. Default 0 = no commission, which is every tenant today. Disclosed here rather than left
+/// implicit because a restaurant owner is entitled to see the rate their own money moves through,
+/// and this admin-only endpoint is where that number can safely live.
+/// </param>
 public record PaymentsOnboardingDto(
-    string State, string? ConnectedAccountId, string DashboardUrl, int? RequirementsDue = null);
+    string State,
+    string? ConnectedAccountId,
+    string DashboardUrl,
+    int? RequirementsDue = null,
+    int CommissionBps = 0);

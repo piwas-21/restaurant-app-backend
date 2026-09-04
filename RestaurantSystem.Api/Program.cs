@@ -361,6 +361,12 @@ builder.Services.Configure<RestaurantSystem.Api.Settings.OrderSettings>(
 // lifetime, matching ITenantModules above: a change lands via re-provision + restart.
 builder.Services.Configure<RestaurantSystem.Api.Settings.StripeSettings>(
     builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeSettings.SectionName));
+// Sofra's own commission (Stripe:Commission:Bps). Same registration shape as StripeSettings above;
+// its own settings class rather than a StripeSettings property because that class is already at
+// the 50-line configuration-class limit. Bps defaults to 0 (no commission), so an absent section
+// ships inert to the whole fleet, matching StripeSettings.
+builder.Services.Configure<RestaurantSystem.Api.Settings.StripeCommissionSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeCommissionSettings.SectionName));
 builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway,
     RestaurantSystem.Api.Features.Payments.Services.StripeGateway>();
 // Scoped, unlike the gateway: this one reads EmailSettings/StripeSettings per request to build the

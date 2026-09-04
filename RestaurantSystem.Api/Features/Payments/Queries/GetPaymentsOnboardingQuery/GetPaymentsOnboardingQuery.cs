@@ -45,15 +45,21 @@ public class GetPaymentsOnboardingQueryHandler
     private readonly IStripeGateway _gateway;
     private readonly IStripeAccountClient _accounts;
     private readonly StripeSettings _settings;
+    private readonly StripeCommissionSettings _commission;
 
     public GetPaymentsOnboardingQueryHandler(
-        IStripeGateway gateway, IStripeAccountClient accounts, IOptions<StripeSettings> settings)
+        IStripeGateway gateway,
+        IStripeAccountClient accounts,
+        IOptions<StripeSettings> settings,
+        IOptions<StripeCommissionSettings> commission)
     {
         ArgumentNullException.ThrowIfNull(gateway);
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(commission);
         _gateway = gateway;
         _accounts = accounts;
         _settings = settings.Value;
+        _commission = commission.Value;
     }
 
     public async Task<ApiResponse<PaymentsOnboardingDto>> Handle(
@@ -66,7 +72,8 @@ public class GetPaymentsOnboardingQueryHandler
         if (!_gateway.IsConfigured)
         {
             return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
-                PaymentsOnboardingState.NotConfigured, null, _settings.DashboardUrl));
+                PaymentsOnboardingState.NotConfigured, null, _settings.DashboardUrl,
+                CommissionBps: _commission.Bps));
         }
 
         // Null means we could not find out — the key may not carry `Accounts → read` at all. Land
@@ -85,10 +92,12 @@ public class GetPaymentsOnboardingQueryHandler
                 PaymentsOnboardingState.AwaitingVerification,
                 _gateway.ConnectedAccountId,
                 _settings.DashboardUrl,
-                awaitingVerification.RequirementsDueCount));
+                awaitingVerification.RequirementsDueCount,
+                _commission.Bps));
         }
 
         return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
-            PaymentsOnboardingState.Configured, _gateway.ConnectedAccountId, _settings.DashboardUrl));
+            PaymentsOnboardingState.Configured, _gateway.ConnectedAccountId, _settings.DashboardUrl,
+            CommissionBps: _commission.Bps));
     }
 }

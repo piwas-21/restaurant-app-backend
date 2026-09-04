@@ -86,6 +86,18 @@ public class StripeCheckoutClient : IStripeCheckoutClient
             CancelUrl = BuildReturnUrl(_stripe.CancelPath, request.OrderId, "canceled=1"),
         };
 
+        // Deliberately conditional rather than always assigning PaymentIntentData with a possibly-
+        // null ApplicationFeeAmount: when the request carries no fee (every tenant on the inert
+        // Stripe:Commission:Bps=0 default), PaymentIntentData must stay UNSET so a non-commission
+        // tenant's request is unchanged from before this property existed.
+        if (request.ApplicationFeeMinor is not null)
+        {
+            options.PaymentIntentData = new SessionPaymentIntentDataOptions
+            {
+                ApplicationFeeAmount = request.ApplicationFeeMinor,
+            };
+        }
+
         var session = await new SessionService(_gateway.Client)
             .CreateAsync(options, _gateway.BuildRequestOptions(request.IdempotencyKey), cancellationToken);
 

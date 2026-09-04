@@ -72,9 +72,12 @@ public class StripeGatewayTests
     }
 
     /// <summary>
-    /// Every request must carry the connected account, and must NOT carry an application fee.
-    /// Direct charges are what keep the money off Sofra's balance and the chargeback liability off
-    /// Sofra's books (plan §2) — an application fee here would silently change the commercial model.
+    /// Every request must carry the connected account. This gateway is the CREDENTIAL seam only —
+    /// it never sets an application fee itself, on purpose: the fee is opt-in per tenant via
+    /// <c>Stripe:Commission:Bps</c> and is set per-session by <c>StripeCheckoutClient</c>
+    /// (<c>CheckoutCommission</c> computes it), which keeps "which key, which account" separate
+    /// from "how much Sofra takes" — a future change to one must not be able to silently touch the
+    /// other.
     /// </summary>
     [Fact]
     public void Requests_are_made_on_behalf_of_the_connected_account()
