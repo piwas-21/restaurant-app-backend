@@ -312,26 +312,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
             await transaction.CommitAsync(cancellationToken);
 
             var createdProduct = await _context.Products
-                .Include(p => p.ProductCategories)
-                    .ThenInclude(pc => pc.Category)
-                .Include(p => p.Variations)
-                    .ThenInclude(v => v.Descriptions)
-                .Include(p => p.SuggestedSideItems)
-                    .ThenInclude(si => si.SideItemProduct)
-                .Include(p => p.DetailedIngredients)
-                    .ThenInclude(di => di.Descriptions)
-                .Include(p => p.MenuDefinition)
-                    .ThenInclude(md => md!.Sections)
-                        .ThenInclude(s => s.Items)
-                            .ThenInclude(i => i.Product)
-                                // #468: the shared bundle mapper projects each option's recipe, and
-                                // an unloaded collection is EMPTY rather than absent — the echo
-                                // would state that every option has no ingredients.
-                                .ThenInclude(p => p.DetailedIngredients)
-                                    .ThenInclude(di => di.Descriptions)
-                // Split: 2+ collection Includes over ONE root still multiply rows, and #468 adds a
-                // fifth level to the chain (S8733). Behaviour is identical — it is query metadata.
-                .AsSplitQuery()
+                .WithProductDtoNavigations()
                 .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
             var productDto = ProductDtoMapper.MapToProductDto(createdProduct);

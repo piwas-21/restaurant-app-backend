@@ -58,17 +58,14 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             .Include(p => p.SuggestedSideItems) // Add soft delete filter here
                 .ThenInclude(si => si.SideItemProduct)
                     .ThenInclude(product => product.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
-            .Include(p => p.MenuDefinition)
-                .ThenInclude(md => md!.Sections)
-                    .ThenInclude(s => s.Items)
-                        .ThenInclude(i => i.Product)
-                            // #468: the option product's own recipe, which the shared bundle mapper
-                            // projects. Not optional — an unloaded collection is EMPTY, not absent,
-                            // so leaving it out serves a dish whose recipe reads as "no ingredients"
-                            // rather than failing. `AsSplitQuery()` above keeps this off the
-                            // Cartesian product of the sibling collection includes.
-                            .ThenInclude(p => p.DetailedIngredients)
-                                .ThenInclude(di => di.Descriptions)
+            // #468: down to the option product's own recipe, which the shared bundle mapper
+            // projects. Not optional — an unloaded collection is EMPTY, not absent, so leaving it
+            // out serves a dish whose recipe reads as "no ingredients" rather than failing.
+            // `AsSplitQuery()` above keeps it off the Cartesian product of the sibling includes.
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.DetailedIngredients)
+                        .ThenInclude(di => di.Descriptions)
             .FirstOrDefaultAsync(p => p.Id == query.Id && !p.IsDeleted, cancellationToken); // Also filter the main product
         if (product == null)
         {
