@@ -4,6 +4,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.Settings.FormFields;
+using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Api.Common.Templates;
@@ -18,17 +20,20 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
+    private readonly IFormFieldRequirementService _formFieldRequirements;
     private readonly ILogger<UpdateReservationCommandHandler> _logger;
 
     public UpdateReservationCommandHandler(
         ApplicationDbContext context,
         IEmailService emailService,
         IEmailLanguageResolver languages,
+        IFormFieldRequirementService formFieldRequirements,
         ILogger<UpdateReservationCommandHandler> logger)
     {
         _context = context;
         _emailService = emailService;
         _languages = languages;
+        _formFieldRequirements = formFieldRequirements;
         _logger = logger;
     }
 
@@ -47,6 +52,20 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
 
             var data = command.ReservationData;
             var previousStatus = reservation.Status;
+
+            // Admin-configured requiredness, exactly as the create and guest-edit paths apply it.
+            // This path used to assert it with a `[Required]` DataAnnotation instead, which ignored
+            // the tenant's own setting in both directions: it refused a blank phone for a restaurant
+            // that does not ask for one, and it is not what a restaurant that DOES ask for one is
+            // configured through.
+            await _formFieldRequirements.EnsureRequiredFieldsPresentAsync(
+                FormFieldRegistry.FormKeys.Reservation,
+                new Dictionary<string, string?>
+                {
+                    [FormFieldRegistry.ReservationFields.CustomerPhone] = data.CustomerPhone,
+                    [FormFieldRegistry.ReservationFields.SpecialRequests] = data.SpecialRequests,
+                },
+                cancellationToken);
 
             // Validate table exists and is active
             var table = await _context.Tables
@@ -127,7 +146,7 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
                 CustomerId = reservation.CustomerId,
                 CustomerName = reservation.CustomerName,
                 CustomerEmail = reservation.CustomerEmail,
-                CustomerPhone = reservation.CustomerPhone,
+                CustomerPhone = reservation.CustomerPhone ?? string.Empty,
                 TableId = reservation.TableId,
                 TableNumber = table.TableNumber,
                 ReservationDate = reservation.ReservationDate,
