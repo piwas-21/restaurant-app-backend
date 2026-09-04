@@ -34,56 +34,92 @@ public static class MenuScheduleWindow
     /// <param name="day">The day on the tenant's wall clock.</param>
     /// <param name="timeOfDay">The time on the tenant's wall clock.</param>
     /// <remarks>
-    /// A window with only one end set (start without end, or the reverse) matches nothing, which is
-    /// the behaviour this replaced — a half-written window is a data fault, and widening it here
-    /// would silently publish bundles no one asked to publish. The bundle editor writes both ends
-    /// or neither.
+    /// Three ways in, and the third is the one that did not exist: a window that crosses midnight
+    /// (22:00–02:00) belongs to the day it OPENED on, so 01:00 tonight is inside YESTERDAY's window
+    /// and yesterday's day flag decides it.
     /// </remarks>
     public static Expression<Func<Product, bool>> AvailableAt(DayOfWeek day, TimeSpan timeOfDay)
     {
-        // A wrapping window (22:00–02:00) belongs to the day it OPENED on, so 01:00 tonight is
-        // inside YESTERDAY's window and yesterday's day flag is the one that decides it.
         var previousDay = (DayOfWeek)(((int)day + 6) % 7);
 
-        return p =>
-            p.MenuDefinition!.IsAlwaysAvailable
-            || (
-                (
-                    (day == DayOfWeek.Monday && p.MenuDefinition.AvailableMonday)
-                    || (day == DayOfWeek.Tuesday && p.MenuDefinition.AvailableTuesday)
-                    || (day == DayOfWeek.Wednesday && p.MenuDefinition.AvailableWednesday)
-                    || (day == DayOfWeek.Thursday && p.MenuDefinition.AvailableThursday)
-                    || (day == DayOfWeek.Friday && p.MenuDefinition.AvailableFriday)
-                    || (day == DayOfWeek.Saturday && p.MenuDefinition.AvailableSaturday)
-                    || (day == DayOfWeek.Sunday && p.MenuDefinition.AvailableSunday)
-                )
-                && (
-                    // No window at all — the day flags alone decide.
-                    (p.MenuDefinition.StartTime == null && p.MenuDefinition.EndTime == null)
-                    // An ordinary window, both ends on the same day. Inclusive at both ends, as
-                    // before. Either end being null makes every comparison false, so a half-written
-                    // window falls through to "closed" without a null check of its own.
-                    || (p.MenuDefinition.StartTime <= p.MenuDefinition.EndTime
-                        && timeOfDay >= p.MenuDefinition.StartTime
-                        && timeOfDay <= p.MenuDefinition.EndTime)
-                    // The evening half of a wrapping window.
-                    || (p.MenuDefinition.StartTime > p.MenuDefinition.EndTime
-                        && timeOfDay >= p.MenuDefinition.StartTime)
-                )
-            )
-            // The small-hours half of a wrapping window, carried over from the previous day.
-            || (
-                (
-                    (previousDay == DayOfWeek.Monday && p.MenuDefinition.AvailableMonday)
-                    || (previousDay == DayOfWeek.Tuesday && p.MenuDefinition.AvailableTuesday)
-                    || (previousDay == DayOfWeek.Wednesday && p.MenuDefinition.AvailableWednesday)
-                    || (previousDay == DayOfWeek.Thursday && p.MenuDefinition.AvailableThursday)
-                    || (previousDay == DayOfWeek.Friday && p.MenuDefinition.AvailableFriday)
-                    || (previousDay == DayOfWeek.Saturday && p.MenuDefinition.AvailableSaturday)
-                    || (previousDay == DayOfWeek.Sunday && p.MenuDefinition.AvailableSunday)
-                )
-                && p.MenuDefinition.StartTime > p.MenuDefinition.EndTime
-                && timeOfDay <= p.MenuDefinition.EndTime
-            );
+        return Or(
+            AlwaysAvailable(),
+            Or(
+                And(ServedOn(day), WithinTodaysWindow(timeOfDay)),
+                And(ServedOn(previousDay), WithinLastNightsWindow(timeOfDay))));
+    }
+
+    private static Expression<Func<Product, bool>> AlwaysAvailable() =>
+        p => p.MenuDefinition!.IsAlwaysAvailable;
+
+    /// <summary>The day flag for one day of the week — seven columns, one of which is asked.</summary>
+    private static Expression<Func<Product, bool>> ServedOn(DayOfWeek day) =>
+        p => (day == DayOfWeek.Monday && p.MenuDefinition!.AvailableMonday)
+            || (day == DayOfWeek.Tuesday && p.MenuDefinition!.AvailableTuesday)
+            || (day == DayOfWeek.Wednesday && p.MenuDefinition!.AvailableWednesday)
+            || (day == DayOfWeek.Thursday && p.MenuDefinition!.AvailableThursday)
+            || (day == DayOfWeek.Friday && p.MenuDefinition!.AvailableFriday)
+            || (day == DayOfWeek.Saturday && p.MenuDefinition!.AvailableSaturday)
+            || (day == DayOfWeek.Sunday && p.MenuDefinition!.AvailableSunday);
+
+    /// <summary>
+    /// The time test for a window that starts TODAY: no window at all, an ordinary window, or the
+    /// evening half of one that crosses midnight.
+    /// </summary>
+    /// <remarks>
+    /// A window with only one end set (start without end, or the reverse) matches nothing, which is
+    /// the behaviour this replaced — a half-written window is a data fault, and widening it here
+    /// would silently publish bundles no one asked to publish. Every comparison below is false when
+    /// either end is null, in SQL and in a compiled delegate alike, so that case needs no branch of
+    /// its own.
+    /// </remarks>
+    private static Expression<Func<Product, bool>> WithinTodaysWindow(TimeSpan timeOfDay) =>
+        p => (p.MenuDefinition!.StartTime == null && p.MenuDefinition.EndTime == null)
+            || (timeOfDay >= p.MenuDefinition.StartTime && timeOfDay <= p.MenuDefinition.EndTime)
+            || (p.MenuDefinition.StartTime > p.MenuDefinition.EndTime
+                && timeOfDay >= p.MenuDefinition.StartTime);
+
+    /// <summary>
+    /// The small-hours half of a window that opened the day before. <c>Start &gt; End</c> IS the
+    /// wrap test, and it is false unless both ends are set.
+    /// </summary>
+    private static Expression<Func<Product, bool>> WithinLastNightsWindow(TimeSpan timeOfDay) =>
+        p => p.MenuDefinition!.StartTime > p.MenuDefinition.EndTime
+            && timeOfDay <= p.MenuDefinition.EndTime;
+
+    private static Expression<Func<Product, bool>> And(
+        Expression<Func<Product, bool>> left,
+        Expression<Func<Product, bool>> right) =>
+        Combine(left, right, Expression.AndAlso);
+
+    private static Expression<Func<Product, bool>> Or(
+        Expression<Func<Product, bool>> left,
+        Expression<Func<Product, bool>> right) =>
+        Combine(left, right, Expression.OrElse);
+
+    /// <summary>
+    /// Joins two predicates over ONE parameter. Written as a tree rather than as one long C# lambda
+    /// so each clause above stands alone and can be read — and so the day test is written once and
+    /// asked twice (today, and the day a wrapping window opened on) instead of twice verbatim.
+    /// <see cref="Expression.Invoke(Expression, Expression[])"/> is deliberately not used: EF Core
+    /// does not translate an invocation, so the parameter is rebound instead and what reaches the
+    /// provider is an ordinary boolean tree.
+    /// </summary>
+    private static Expression<Func<Product, bool>> Combine(
+        Expression<Func<Product, bool>> left,
+        Expression<Func<Product, bool>> right,
+        Func<Expression, Expression, BinaryExpression> join)
+    {
+        var parameter = left.Parameters[0];
+        var rebound = new ParameterRebinder(right.Parameters[0], parameter).Visit(right.Body);
+
+        return Expression.Lambda<Func<Product, bool>>(join(left.Body, rebound), parameter);
+    }
+
+    private sealed class ParameterRebinder(ParameterExpression from, ParameterExpression to)
+        : ExpressionVisitor
+    {
+        protected override Expression VisitParameter(ParameterExpression node) =>
+            node == from ? to : base.VisitParameter(node);
     }
 }
