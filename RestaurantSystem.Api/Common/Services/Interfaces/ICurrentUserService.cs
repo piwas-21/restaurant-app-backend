@@ -37,7 +37,22 @@ namespace RestaurantSystem.Api.Common.Services.Interfaces
         /// Deliberately shared rather than re-derived per handler: this predicate is the
         /// dividing line for order-ownership checks, and two copies of it drifting apart is
         /// exactly how <c>GetOrderByIdQuery</c> ended up without the check that
-        /// <c>GetOrdersQuery</c> had.
+        /// <c>GetOrdersQuery</c> had. Since #438 it is also the line the CATALOGUE reads turn on —
+        /// who may see a deactivated product, and who may open a bundle outside its schedule.
+        /// <para>
+        /// <b>A machine API token is back-of-house, on both counts.</b>
+        /// <c>ApiTokenAuthenticationHandler</c> stamps a token with the <c>Admin</c> role claim so
+        /// it satisfies the existing <c>[RequireAdmin]</c> endpoints (API-TOKENS-PLAN §5), and
+        /// <c>CurrentUserService.IsAdmin</c> is <c>Role == Admin</c> — so this property has always
+        /// been TRUE for a token, whatever a comment elsewhere may have claimed. That is the
+        /// intended answer: a token is issued by the owner, bounded by its scopes, and serves the
+        /// printer and till, which must see a withdrawn dish and an out-of-window bundle. It is
+        /// stated HERE, once, because the alternative is the same caller class getting two answers
+        /// in two features — and it is measured by
+        /// <c>AnonymousProductListActiveFilterTests.A_machine_token_keeps_the_back_of_house_default</c>
+        /// and <c>MenuBundleScheduleTests.A_machine_token_opens_an_out_of_window_bundle</c>, so
+        /// changing it is one visible decision rather than a silent drift.
+        /// </para>
         /// </remarks>
         bool IsStaff => IsAdmin
             || Role == UserRole.Cashier
