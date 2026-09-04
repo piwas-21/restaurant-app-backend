@@ -445,10 +445,13 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             // twice, so faking it here would delete the property most of these tests exist for.
             new CheckoutSessionReuse(ctx, checkout.Object),
             currentUser.Object,
-            Options.Create(new LocalizationSettings { Currency = "CHF" }),
-            // Defaults to 0 — the whole fleet's setting — so every test above this one asserts the
-            // NO-commission request shape without having to say so.
-            Options.Create(new RestaurantSystem.Api.Settings.StripeCommissionSettings { Bps = commissionBps }),
+            // The REAL resolver, not a stub — same reasoning as CheckoutSessionReuse below it. It is
+            // what turns order.Total into the amount AND the fee, so faking it would delete the
+            // property these two commission tests exist for. commissionBps defaults to 0, the whole
+            // fleet's setting, so every other test here asserts the NO-commission shape for free.
+            new CheckoutChargeResolver(
+                Options.Create(new LocalizationSettings { Currency = "CHF" }),
+                Options.Create(new RestaurantSystem.Api.Settings.StripeCommissionSettings { Bps = commissionBps })),
             NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
 
         return await handler.Handle(new CreateCheckoutSessionCommand { OrderId = orderId }, CancellationToken.None);
