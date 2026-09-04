@@ -42,8 +42,8 @@ public static class ProductContentRule
     public const string ContentRequiredMessage = "Translations are required";
 
     /// <summary>
-    /// Every entry must carry a non-blank language code, a non-null value, and non-null
-    /// <c>Name</c>/<c>Description</c>. A <c>null</c> map passes — "no translation changes" is a
+    /// Every entry must carry a non-blank language code, a non-null value, a NON-BLANK <c>Name</c>
+    /// and a non-null <c>Description</c>. A <c>null</c> map passes — "no translation changes" is a
     /// legitimate payload on the update paths, and the create paths gate on their own rule.
     /// </summary>
     /// <remarks>
@@ -64,12 +64,37 @@ public static class ProductContentRule
     /// Blank keys are the opposite failure: accepted silently, persisting a <c>Lang = ''</c> row that
     /// no locale will ever match.
     ///
-    /// EMPTY Name/Description are deliberately ALLOWED, only null is refused. The admin UI sends
-    /// <c>description: data.description || ''</c> (productFormUtils.ts), so a product with no
+    /// An EMPTY <c>Description</c> is deliberately ALLOWED, and only null is refused. The admin UI
+    /// sends <c>description: data.description || ''</c> (productFormUtils.ts), so a product with no
     /// description text posts an empty string on every save — rejecting it would turn a routine,
-    /// currently-working edit into a 400, which is a bigger defect than the one being fixed. The
-    /// language KEY is held to the stricter non-blank test because no client sends a blank one and
-    /// it is the junk-row case this rule exists to stop.
+    /// currently-working edit into a 400, which is a bigger defect than the one being fixed.
+    ///
+    /// <c>Name</c> IS held to the stricter non-blank test, since #325, and so is the language KEY.
+    /// An earlier version of this rule allowed an empty or whitespace-only name on the stated ground
+    /// that — unlike the nested maps — this one has no silent discard, because it stores what it is
+    /// given. THAT GROUND WAS WRONG, and an adversarial review measured the sequence rather than
+    /// reasoning about it:
+    ///
+    ///   1. <c>PUT /api/Products/{id}</c> with <c>"en": { "name": "   ", "description": "Une pizza" }</c>
+    ///      answered 200 and persisted the row.
+    ///   2. The admin editor's payload builder drops that row from the NEXT save —
+    ///      <c>productFormUtils.ts</c> filters on <c>e?.name?.trim()</c>, and <c>"   ".trim()</c> is falsy.
+    ///   3. <c>UpdateProductCommandHandler</c> does <c>if (contentMap.Any()) RemoveRange(...)</c> — a
+    ///      FULL REPLACE — and re-adds only what was sent.
+    ///
+    /// So the translation, DESCRIPTION TEXT INCLUDED, is silently deleted by a later save that never
+    /// mentioned it. Same class as the defect NestedContentRule refuses; the mechanism is the client
+    /// filter plus the full replace rather than a handler guard, which is why #323's fix did not
+    /// touch it. Of the three candidates #325 lists this is the one that closes the window, because
+    /// the window IS a client other than the editor: a client-side <c>.trim().min(1)</c> cannot
+    /// constrain a caller that is not the client.
+    ///
+    /// NO RELEASE ORDER, unlike NestedContentRule — and that is measured, not assumed. The editor
+    /// builds this map in two places: the EDIT path already filters blank names off the wire, and
+    /// the CREATE path seeds <c>content[currentLanguage].name</c> from the product's own name, whose
+    /// only blank spelling is already refused by <c>RuleFor(x => x.Name).NotEmpty()</c> — asserted by
+    /// <c>ProductContentRuleTests.AWhitespaceProductName_IsAlreadyRefused_…</c>, because "NotEmpty
+    /// rejects whitespace" is the load-bearing fact and its name does not say so.
     /// </remarks>
     /// <param name="required">
     /// <c>true</c> on the CREATE paths, whose handlers dereference the map unguarded — see
@@ -113,7 +138,9 @@ public static class ProductContentRule
                     continue;
                 }
 
-                if (entry.Name is null)
+                // BLANK, not merely null (#325): the same IsNullOrWhiteSpace test NestedContentRule
+                // applies to the nested maps. Description below stays a null-only check.
+                if (string.IsNullOrWhiteSpace(entry.Name))
                 {
                     context.AddFailure($"{NameRequiredMessage} ('{languageCode}')");
                 }
