@@ -43,17 +43,40 @@ public class CheckoutCommissionTests
     }
 
     /// <summary>
-    /// 333 minor at 150 bps is 333 × 150 / 10000 = 4.995, which must round AWAY FROM ZERO to 5, not
-    /// down to 4 (banker's rounding) or via a float truncation. Hand-verified before writing this
-    /// assertion, per the workspace CLAUDE.md rule on re-deriving a number that is the subject of a
-    /// claim rather than reading it off a slice.
+    /// 10 minor at 500 bps is 10 × 500 / 10000 = <b>exactly 0.5</b> — a true midpoint, which is the
+    /// only kind of value that can tell the rounding modes apart. <c>AwayFromZero</c> gives 1;
+    /// <c>ToEven</c> (C#'s DEFAULT for <c>decimal.Round</c>, and what a future edit would silently
+    /// fall back to if the explicit mode were dropped) gives 0, because 0 is the even neighbour —
+    /// and a 0 fee returns null here, so the two modes are distinguishable as 1 vs null.
+    ///
+    /// <para>
+    /// This test previously used 333 minor at 150 bps = 4.995 and claimed to pin the same property.
+    /// It did not: 4.995 is 0.005 from 5 and 0.995 from 4, so EVERY rounding mode returns 5. Proven
+    /// by mutation — swapping in <c>ToEven</c> left the whole suite green. A midpoint is not a
+    /// decorative detail in a rounding test; it is the entire test.
+    /// </para>
     /// </summary>
     [Fact]
     public void Rounding_is_away_from_zero()
     {
-        var amount = CheckoutAmount.From(3.33m, "CHF");
+        var amount = CheckoutAmount.From(0.10m, "CHF");
 
-        CheckoutCommission.From(amount, 150).Should().Be(5);
+        CheckoutCommission.From(amount, 500).Should().Be(1);
+    }
+
+    /// <summary>
+    /// Exactly at the ceiling is ALLOWED — the guard is <c>bps &gt; MaxBps</c>, not <c>&gt;=</c>.
+    /// Without this, `Bps_above_the_ceiling_throws` alone leaves the boundary unpinned: swapping the
+    /// operator to <c>&gt;=</c> left the whole suite green under mutation, so a tenant deliberately
+    /// configured at the documented 10% maximum would start throwing on EVERY checkout and no test
+    /// would have said so. 4000 minor at 1000 bps is 400.
+    /// </summary>
+    [Fact]
+    public void The_ceiling_itself_is_allowed()
+    {
+        var amount = CheckoutAmount.From(40.00m, "CHF");
+
+        CheckoutCommission.From(amount, 1000).Should().Be(400);
     }
 
     /// <summary>
