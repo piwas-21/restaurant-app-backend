@@ -361,6 +361,12 @@ builder.Services.Configure<RestaurantSystem.Api.Settings.OrderSettings>(
 // lifetime, matching ITenantModules above: a change lands via re-provision + restart.
 builder.Services.Configure<RestaurantSystem.Api.Settings.StripeSettings>(
     builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeSettings.SectionName));
+// Sofra's own commission, read from Stripe__Commission__Bps. It lives in its own settings class
+// rather than as one more property on StripeSettings because that class is already at the 50-line
+// configuration limit. The rate defaults to zero, meaning no commission, so a tenant whose config
+// says nothing about it ships inert exactly like the Stripe block above.
+builder.Services.Configure<RestaurantSystem.Api.Settings.StripeCommissionSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeCommissionSettings.SectionName));
 builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway,
     RestaurantSystem.Api.Features.Payments.Services.StripeGateway>();
 // Scoped, unlike the gateway: this one reads EmailSettings/StripeSettings per request to build the
@@ -377,6 +383,10 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
+// What an order costs at Stripe — the amount and Sofra's cut of it, together. Scoped rather than
+// singleton only to match its neighbours; it reads options and holds no per-request state.
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutChargeResolver,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutChargeResolver>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSettlementWriter,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSettlementWriter>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ISettlementNotifier,

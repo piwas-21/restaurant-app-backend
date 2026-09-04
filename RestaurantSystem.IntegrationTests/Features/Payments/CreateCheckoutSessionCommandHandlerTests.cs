@@ -74,6 +74,48 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// The fleet default. Every tenant runs at <c>Stripe:Commission:Bps=0</c>, and at 0 the request
+    /// must carry NO fee at all — <c>null</c>, not <c>0</c> — because that is what stops
+    /// <c>StripeCheckoutClient</c> setting <c>PaymentIntentData</c> and keeps the Stripe request
+    /// byte-identical to before this feature existed.
+    /// </summary>
+    [Fact]
+    public async Task No_commission_is_asked_of_stripe_by_default()
+    {
+        var orderId = await SeedOrderAsync(total: 42.50m);
+        var checkout = FakeCheckout(out var captured);
+
+        await HandleAsync(orderId, checkout);
+
+        captured.Should().ContainSingle();
+        captured[0].ApplicationFeeMinor.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The wiring this feature exists for: a configured rate reaches the Stripe request, computed
+    /// from the PERSISTED total and nothing else. 4250 minor at 150 bps is 63.75, which rounds away
+    /// from zero to 64 — hand-derived, not read back off the implementation.
+    ///
+    /// <para>
+    /// Asserting the amount too is the point: a test that only checked "not null" would still pass
+    /// if the fee were computed from a client-supplied number instead of <c>order.Total</c>, which
+    /// is the property S0b exists to protect.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task A_configured_commission_reaches_the_stripe_request()
+    {
+        var orderId = await SeedOrderAsync(total: 42.50m);
+        var checkout = FakeCheckout(out var captured);
+
+        await HandleAsync(orderId, checkout, commissionBps: 150);
+
+        captured.Should().ContainSingle();
+        captured[0].AmountMinor.Should().Be(4250);
+        captured[0].ApplicationFeeMinor.Should().Be(64);
+    }
+
+    /// <summary>
     /// Just over Stripe's documented 30-minute minimum, rather than the 24 h default: the
     /// reconciler (S7) cancels an order on expiry, and a full day of an abandoned order sitting
     /// un-cancelled is not a useful state for the kitchen. The extra minute absorbs the round trip
@@ -383,7 +425,8 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         RestaurantSystem.Api.Features.Payments.Dtos.CheckoutSessionDto>> HandleAsync(
         Guid orderId,
         Mock<IStripeCheckoutClient> checkout,
-        Mock<IStripeGateway>? gateway = null)
+        Mock<IStripeGateway>? gateway = null,
+        int commissionBps = 0)
     {
         await using var ctx = _fixture.CreateContext();
 
@@ -402,7 +445,13 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             // twice, so faking it here would delete the property most of these tests exist for.
             new CheckoutSessionReuse(ctx, checkout.Object),
             currentUser.Object,
-            Options.Create(new LocalizationSettings { Currency = "CHF" }),
+            // The REAL resolver, not a stub — same reasoning as CheckoutSessionReuse below it. It is
+            // what turns order.Total into the amount AND the fee, so faking it would delete the
+            // property these two commission tests exist for. commissionBps defaults to 0, the whole
+            // fleet's setting, so every other test here asserts the NO-commission shape for free.
+            new CheckoutChargeResolver(
+                Options.Create(new LocalizationSettings { Currency = "CHF" }),
+                Options.Create(new RestaurantSystem.Api.Settings.StripeCommissionSettings { Bps = commissionBps })),
             NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
 
         return await handler.Handle(new CreateCheckoutSessionCommand { OrderId = orderId }, CancellationToken.None);
