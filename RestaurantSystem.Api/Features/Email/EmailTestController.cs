@@ -42,6 +42,7 @@ public class EmailTestController : ControllerBase
     /// Test basic email sending functionality
     /// </summary>
     [HttpPost("send-test-email")]
+    [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> SendTestEmail([FromBody] TestEmailRequest request)
     {
         if (!_environment.IsDevelopment())
@@ -70,6 +71,7 @@ public class EmailTestController : ControllerBase
     /// Test password reset email template
     /// </summary>
     [HttpPost("test-password-reset-email")]
+    [RequireAdmin]
     public async Task<ActionResult<ApiResponse<string>>> TestPasswordResetEmail([FromBody] TestEmailRequest request)
     {
         if (!_environment.IsDevelopment())

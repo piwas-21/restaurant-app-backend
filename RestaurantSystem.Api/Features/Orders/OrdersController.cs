@@ -54,14 +54,14 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<ApiResponse<OrderDto>>> GetOrder(Guid id)
         => Ok(await _mediator.SendQuery(new GetOrderByIdQuery(id)));
 
-    [HttpPost]
+    [HttpPost, AllowAnonymous]
     public async Task<ActionResult<ApiResponse<OrderDto>>> CreateOrder([FromBody] CreateOrderCommand command)
         => Ok(await _mediator.SendCommand(command));
 
     // Order-from-basket: the server reads the user's persisted basket and owns the basket→order
     // item translation (menu-bundles redesign #157), instead of the client hand-building Items.
     // Session comes from the header (as with the basket endpoints), never the request body.
-    [HttpPost("from-basket")]
+    [HttpPost("from-basket"), AllowAnonymous]
     public async Task<ActionResult<ApiResponse<OrderDto>>> CreateOrderFromBasket(
         [FromHeader(Name = "X-Session-Id")] string sessionId,
         [FromBody] CreateOrderFromBasketCommand command)
