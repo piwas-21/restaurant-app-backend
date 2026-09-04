@@ -82,6 +82,12 @@ public class ProductContentRuleTests
     {
         { "missing-description", ProductContentRule.DescriptionRequiredMessage },
         { "missing-name", ProductContentRule.NameRequiredMessage },
+        // #325. A blank name is refused on all four paths, not just a null one — the same
+        // IsNullOrWhiteSpace test NestedContentRule already applies to the nested maps. Both the
+        // empty and the whitespace-only spelling are listed because they arrive by different
+        // routes and a `== string.Empty` guard would catch only one of them.
+        { "empty-name", ProductContentRule.NameRequiredMessage },
+        { "whitespace-name", ProductContentRule.NameRequiredMessage },
         { "null-entry", ProductContentRule.EntryRequiredMessage },
         { "blank-key", ProductContentRule.LanguageKeyRequiredMessage },
     };
@@ -94,6 +100,8 @@ public class ProductContentRuleTests
         {
             "missing-description" => Content("en", new ProductDescriptionDto { Name = "n", Description = null! }),
             "missing-name" => Content("en", new ProductDescriptionDto { Name = null!, Description = "d" }),
+            "empty-name" => Content("en", new ProductDescriptionDto { Name = string.Empty, Description = "d" }),
+            "whitespace-name" => Content("en", new ProductDescriptionDto { Name = "   ", Description = "d" }),
             "null-entry" => Content("en", null),
             "blank-key" => Content("   ", new ProductDescriptionDto { Name = "n", Description = "d" }),
             _ => throw new ArgumentOutOfRangeException(nameof(shape))
@@ -134,22 +142,58 @@ public class ProductContentRuleTests
         }
     }
 
-    // Also an over-strictness guard (see above — it survives a gutted rule). Empty strings are
+    // Also an over-strictness guard (see above — it survives a gutted rule). An empty DESCRIPTION is
     // legitimate: the admin form posts `description: data.description || ''` on every save, so this
-    // is what stops the rule being "tidied" into NotEmpty, which would 400 an ordinary edit of a
+    // is what stops Description being "tidied" into NotEmpty, which would 400 an ordinary edit of a
     // product that simply has no description text.
+    //
+    // The NAME half of this guard was deleted by #325 and now lives, inverted, in
+    // MalformedContent above. That is a deliberate narrowing, not a lost assertion: an empty name
+    // is not the same kind of value as an empty description. A description is a field the admin may
+    // legitimately leave blank; a name is the whole content of the row, and a row with only a
+    // description is the half-row this rule now refuses. The permissive claim about Description is
+    // unchanged, and this test is what keeps it from being widened back over Name by accident.
     [Fact]
-    public void NoValidator_RejectsEmptyButPresentStrings()
+    public void NoValidator_RejectsAnEmptyDescription()
     {
-        var content = Content("en", new ProductDescriptionDto { Name = string.Empty, Description = string.Empty });
+        var content = Content("en", new ProductDescriptionDto { Name = "n", Description = string.Empty });
 
         foreach (var (validator, errors) in ValidateAll(content))
         {
             errors.Should().NotContain(e =>
                 e.StartsWith(ProductContentRule.NameRequiredMessage, StringComparison.Ordinal) ||
                 e.StartsWith(ProductContentRule.DescriptionRequiredMessage, StringComparison.Ordinal),
-                $"{validator} must accept empty-but-present strings");
+                $"{validator} must accept an empty-but-present description");
         }
+    }
+
+    /// <summary>
+    /// The release-order evidence for #325, as a test rather than as a sentence in a comment.
+    /// </summary>
+    /// <remarks>
+    /// NestedContentRule had to wait for frontend #450 because the shipped editor really did post
+    /// blank-named NESTED entries, and landing the server rule first would have 400'd every
+    /// ordinary save. The top-level rule has no such wait, and this pins the reason.
+    ///
+    /// The editor builds the top-level map in exactly two places, both in `productFormUtils.ts`:
+    /// the EDIT path filters on `e?.language?.trim() &amp;&amp; e?.name?.trim()`, so a blank-named row is
+    /// already dropped before the wire; the CREATE path seeds `content[currentLanguage].name` from
+    /// the product's OWN name, untrimmed, and filters every other row on `item.name?.trim()`. So
+    /// the single way the shipped editor could send a blank top-level name is a product whose own
+    /// name is whitespace — and that request was ALREADY refused, by `RuleFor(x => x.Name).NotEmpty()`,
+    /// before this rule existed. FluentValidation's NotEmpty rejects whitespace, which is the load-
+    /// bearing fact and is therefore asserted here rather than assumed from its name.
+    /// </remarks>
+    [Fact]
+    public void AWhitespaceProductName_IsAlreadyRefused_SoTheCreatePathCannotSendABlankTranslationName()
+    {
+        var create = CreateProduct(Valid()) with { Name = "   " };
+        var update = UpdateProduct(Valid()) with { Name = "   " };
+
+        new CreateProductCommandValidator().Validate(create).Errors
+            .Should().Contain(e => e.ErrorMessage == "Product name is required");
+        new UpdateProductCommandValidator().Validate(update).Errors
+            .Should().Contain(e => e.ErrorMessage == "Name is required");
     }
 
     // The CREATE handlers dereference `command.Content` with no coalesce, so a null map threw

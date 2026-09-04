@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
@@ -11,7 +10,6 @@ using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using RestaurantSystem.Infrastructure.Settings;
 
 namespace RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
 
@@ -54,7 +52,7 @@ public class CreateCheckoutSessionCommandHandler
     private readonly IStripeCheckoutClient _checkout;
     private readonly ICheckoutSessionReuse _reuse;
     private readonly ICurrentUserService _currentUser;
-    private readonly LocalizationSettings _localization;
+    private readonly ICheckoutChargeResolver _charge;
     private readonly ILogger<CreateCheckoutSessionCommandHandler> _logger;
 
     public CreateCheckoutSessionCommandHandler(
@@ -63,17 +61,17 @@ public class CreateCheckoutSessionCommandHandler
         IStripeCheckoutClient checkout,
         ICheckoutSessionReuse reuse,
         ICurrentUserService currentUser,
-        IOptions<LocalizationSettings> localization,
+        ICheckoutChargeResolver charge,
         ILogger<CreateCheckoutSessionCommandHandler> logger)
     {
-        ArgumentNullException.ThrowIfNull(localization);
+        ArgumentNullException.ThrowIfNull(charge);
 
         _context = context;
         _gateway = gateway;
         _checkout = checkout;
         _reuse = reuse;
         _currentUser = currentUser;
-        _localization = localization.Value;
+        _charge = charge;
         _logger = logger;
     }
 
@@ -100,7 +98,9 @@ public class CreateCheckoutSessionCommandHandler
 
         OnlinePaymentEligibility.EnsurePayable(order);
 
-        var amount = CheckoutAmount.From(order.Total, _localization.Currency);
+        // One call for both numbers: the amount is still the PERSISTED order total and nothing
+        // else, and the fee is a share of that same amount. See ICheckoutChargeResolver.
+        var (amount, applicationFeeMinor) = _charge.Resolve(order.Total);
 
         var existing = await _context.OrderCheckoutSessions
             .Where(s => s.OrderId == order.Id)
@@ -129,6 +129,7 @@ public class CreateCheckoutSessionCommandHandler
                 AmountMinor = amount.Minor,
                 ExpiresAt = expiresAt,
                 IdempotencyKey = idempotencyKey,
+                ApplicationFeeMinor = applicationFeeMinor,
             },
             cancellationToken);
 

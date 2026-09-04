@@ -5,9 +5,8 @@ using RestaurantSystem.Api.Features.Products.Dtos;
 namespace RestaurantSystem.Api.Features.Menus.Commands;
 
 /// <summary>
-/// The validation rules shared by the create and update menu-bundle commands (menu-bundles
-/// redesign #156). Each command's validator derives from this and adds only its command-specific
-/// rules, so the common rules live in exactly one place.
+/// The rules shared by the create and update menu-bundle commands (#156). Each command's
+/// validator derives from this and adds only its own, so the common ones live in one place.
 /// </summary>
 public abstract class MenuBundleCommandValidatorBase<T> : AbstractValidator<T> where T : IMenuBundleCommandFields
 {
@@ -56,5 +55,6 @@ public abstract class MenuBundleCommandValidatorBase<T> : AbstractValidator<T> w
             .When(x => x.CategoryIds?.Count > 0);
 
         RuleFor(x => x.AvailableOrderTypes).ValidOrderChannelMask();
+        RuleFor(x => x.Allergens).ValidAllergenList();
     }
 }

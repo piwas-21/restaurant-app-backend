@@ -303,6 +303,27 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
+// Said ONCE, at boot, when the printer endpoints have no key to check (#475).
+//
+// A WARNING and not a throw, deliberately, and the difference is worth stating because the
+// CorsSettings check below — same shape, same argument — does throw. Module gating defaults to
+// UNENFORCED, which reads as "every module on", so a startup refusal here would take down any
+// deployment that simply never bought printing and never set a key. That is a brick risk on live
+// tenants traded for an alarm, and the security property does not need it: `ApiKeyAuthFilter`
+// now DENIES at request time, so the feed is closed either way. This exists so the operator
+// learns it from one boot line rather than from a printer that never prints.
+//
+// Once, not per request: the feed is polled every ~5s and Sentry ships anything at Error level,
+// so a per-request log would bury real errors under ~17k events a day per device.
+if (!builder.Environment.IsDevelopment()
+    && string.IsNullOrWhiteSpace(builder.Configuration["PrinterSettings:ApiKey"]))
+{
+    Console.WriteLine(
+        "WARNING: PrinterSettings:ApiKey is not configured. The printer feed and device endpoints "
+        + "will REFUSE every request (#475) — they have no other authentication. Set it in the "
+        + "tenant's app-secrets.json; provision-tenant.sh generates one.");
+}
+
 // Sign in with Apple (BACKEND-NOTES §4.1). Registered unconditionally, and REFUSING rather than
 // inert when Authentication:Apple:ClientIds is empty: the endpoint used to decode the identity
 // token without verifying it, so anyone could log in as any email address.
@@ -340,6 +361,12 @@ builder.Services.Configure<RestaurantSystem.Api.Settings.OrderSettings>(
 // lifetime, matching ITenantModules above: a change lands via re-provision + restart.
 builder.Services.Configure<RestaurantSystem.Api.Settings.StripeSettings>(
     builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeSettings.SectionName));
+// Sofra's own commission, read from Stripe__Commission__Bps. It lives in its own settings class
+// rather than as one more property on StripeSettings because that class is already at the 50-line
+// configuration limit. The rate defaults to zero, meaning no commission, so a tenant whose config
+// says nothing about it ships inert exactly like the Stripe block above.
+builder.Services.Configure<RestaurantSystem.Api.Settings.StripeCommissionSettings>(
+    builder.Configuration.GetSection(RestaurantSystem.Api.Settings.StripeCommissionSettings.SectionName));
 builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.IStripeGateway,
     RestaurantSystem.Api.Features.Payments.Services.StripeGateway>();
 // Scoped, unlike the gateway: this one reads EmailSettings/StripeSettings per request to build the
@@ -356,6 +383,10 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
+// What an order costs at Stripe — the amount and Sofra's cut of it, together. Scoped rather than
+// singleton only to match its neighbours; it reads options and holds no per-request state.
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutChargeResolver,
+    RestaurantSystem.Api.Features.Payments.Services.CheckoutChargeResolver>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSettlementWriter,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSettlementWriter>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ISettlementNotifier,

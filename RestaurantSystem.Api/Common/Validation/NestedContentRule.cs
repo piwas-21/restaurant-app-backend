@@ -102,23 +102,19 @@ public static class NestedContentRule
     /// tracks it; the other way round, every product save carrying a variation or a newly added
     /// ingredient answers 400.
     ///
-    /// THE TOP-LEVEL RULE DELIBERATELY DOES NOT FOLLOW, and the divergence is stated rather than silent
-    /// (#323 asked for one or the other). Two reasons that survive measurement, and one correction:
-    /// every read site resolves a name as <c>content[lang]?.name || content.en?.name || product.name</c>
-    /// — all eleven of them, checked, none using <c>??</c> — so a blank top-level name falls through the
-    /// chain and is inert rather than shadowing; and <see cref="ProductContentRule"/>'s permissiveness is
-    /// pinned by two tests whose stated reason (the form posts <c>description: data.description || ''</c>)
-    /// stays true of Description, which is unchanged either way.
+    /// THE TOP-LEVEL RULE NOW FOLLOWS, since #325 — <see cref="ProductContentRule"/> refuses a blank
+    /// <c>Name</c> by the same <c>IsNullOrWhiteSpace</c> test, on all four write paths. Description
+    /// still diverges and always will: it is nullable here and non-nullable there.
     ///
-    /// The correction: an earlier draft of this paragraph claimed the top-level path has NO silent
-    /// discard. That is wrong, and an adversarial review measured it. A whitespace-only top-level name
-    /// persists (200), the admin editor's payload builder then omits that row from the NEXT save, and
-    /// <c>UpdateProductCommandHandler</c>'s <c>if (contentMap.Any()) RemoveRange(...)</c> full-replace
-    /// deletes it — description text included. So the same silent-discard class does exist at top level;
-    /// it lives in the client filter plus the full replace rather than in a handler guard, which is why
-    /// it is not what #323 measured and not what this rule closes. Tracked separately; tightening the
-    /// top-level rule here would not fix it and would be an unmeasured behaviour change on four live
-    /// write paths.
+    /// This paragraph used to say the opposite, and the history is kept because the REASON it said so
+    /// is the reusable part. It first claimed the top-level path has NO silent discard, which an
+    /// adversarial review disproved by measurement; the correction then recorded the discard but still
+    /// declined to close it, on the ground that a blank top-level name is INERT — every read site
+    /// resolves a name as <c>content[lang]?.name || content.en?.name || product.name</c>, all eleven of
+    /// them, none using <c>??</c>, so a blank falls through the chain and shadows nothing. That
+    /// observation is still true and still not the point: the damage is not what the blank row
+    /// DISPLAYS, it is that the next ordinary save DELETES it, description text and all. Inert on read,
+    /// destructive on write.
     /// </remarks>
     /// <param name="name">Reads the entry's <c>Name</c> — the one required field the two DTOs share
     /// under different types.</param>

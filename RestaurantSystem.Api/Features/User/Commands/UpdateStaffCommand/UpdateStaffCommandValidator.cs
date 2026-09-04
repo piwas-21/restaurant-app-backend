@@ -36,7 +36,18 @@ public class UpdateStaffCommandValidator : AbstractValidator<UpdateStaffCommand>
                 .MeetsPasswordPolicy();
         });
 
+        // NotNull FIRST, and it is the whole point of making `Role` nullable. `UserRole.Customer`
+        // is 0, so before this an omitted `role` key bound to Customer, passed `IsInEnum()`, and
+        // DEMOTED the staff member the request was editing — an administrator could be stripped of
+        // every permission by a client that simply did not mention the field, and be told the
+        // update succeeded.
+        //
+        // Refusing beats defaulting. "Leave the role unchanged" is a reasonable thing to want, but
+        // it cannot be expressed here: this endpoint takes a full representation, and absent and
+        // "set it to Customer" are the same bytes on the wire. A 400 naming the field is the only
+        // answer that cannot be wrong. The admin UI already sends the field on every save.
         RuleFor(x => x.Role)
+            .NotNull().WithMessage("Role is required")
             .IsInEnum().WithMessage("Invalid role specified");
     }
 }

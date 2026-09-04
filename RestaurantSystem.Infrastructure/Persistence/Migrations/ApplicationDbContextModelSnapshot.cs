@@ -4034,7 +4034,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("customer_name");
 
                     b.Property<string>("CustomerPhone")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("customer_phone");

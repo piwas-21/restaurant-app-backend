@@ -80,6 +80,15 @@ public record CheckoutSessionRequest
     public required long AmountMinor { get; init; }
     public required DateTime ExpiresAt { get; init; }
     public required string IdempotencyKey { get; init; }
+
+    /// <summary>
+    /// Sofra's commission for this charge, in minor units — <c>CheckoutCommission.From</c>'s
+    /// result, verbatim. NOT <c>required</c>: <c>null</c> is the default and means "no commission",
+    /// which is every tenant today. <see cref="Services.StripeCheckoutClient"/> only sets Stripe's
+    /// <c>PaymentIntentData.ApplicationFeeAmount</c> when this is non-null, so a null value leaves
+    /// the built request identical to before this property existed.
+    /// </summary>
+    public long? ApplicationFeeMinor { get; init; }
 }
 
 /// <summary>

@@ -26,9 +26,11 @@ public interface IStripeGateway
 
     /// <summary>
     /// Per-request options carrying the <c>Stripe-Account</c> header — the supported way to act on
-    /// a connected account now that OAuth's account-scoped token is deprecated. Direct charges, so
-    /// <c>application_fee_amount</c> is deliberately never set: Sofra takes no commission and the
-    /// money never touches its balance.
+    /// a connected account now that OAuth's account-scoped token is deprecated. This is still a
+    /// direct charge — the money never touches Sofra's balance, Stripe transfers the fee to the
+    /// platform out of the connected account after the charge settles — and Sofra takes no share by
+    /// default; when a tenant is on a commission rate, <c>StripeCheckoutClient</c> is the one that
+    /// sets <c>application_fee_amount</c> per session, not this gateway.
     /// </summary>
     /// <param name="idempotencyKey">
     /// Replayed verbatim on retry so Stripe dedupes for us. Optional because reads do not need one.

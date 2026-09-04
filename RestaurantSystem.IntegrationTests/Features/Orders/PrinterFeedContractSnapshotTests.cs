@@ -147,6 +147,7 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
     [Fact]
     public async Task PrinterFeed_AcceptsAZonelessModifiedSinceCursor()
     {
+        AuthenticateAsDevice();
         var response = await Client.GetAsync("/api/orders/printer-feed?modifiedSince=2020-01-01");
         response.EnsureSuccessStatusCode();
 
@@ -158,8 +159,10 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
 
     private async Task<string> FetchRawFeedAsync()
     {
-        // No X-Api-Key header: `ApiKeyAuthFilter` is open when `PrinterSettings:ApiKey` is unset,
-        // which is the test configuration.
+        // The device key, since #475: `ApiKeyAuthFilter` now fails CLOSED when
+        // `PrinterSettings:ApiKey` is unset, and the test host configures a real one
+        // (appsettings.Test.json) so this suite goes through the same door production does.
+        AuthenticateAsDevice();
         var response = await Client.GetAsync("/api/orders/printer-feed");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();

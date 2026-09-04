@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -412,23 +413,64 @@ public class ProductUpdateContentTests : IntegrationTestBase
             ("fr", "Seeded FR Name", "Seeded FR Description"));
     }
 
-    // The counterpart the rule must NOT catch. An empty name or description is a legitimate
-    // translation — the admin form posts `description: data.description || ''` on every save, so a
-    // product with no description text sends "" rather than omitting the key. Only NULL is refused,
-    // and this is what says so; tightening the rule to NotEmpty would 400 an ordinary edit.
+    // The counterpart the rule must NOT catch. An empty DESCRIPTION is a legitimate translation —
+    // the admin form posts `description: data.description || ''` on every save, so a product with
+    // no description text sends "" rather than omitting the key. Only null is refused there, and
+    // this is what says so; tightening Description to NotEmpty would 400 an ordinary edit.
+    //
+    // This test used to send an empty NAME as well, and that half moved to
+    // BlankName_IsRefusedAsABadRequest_AndChangesNothing below when #325 made a blank name a 400.
+    // The two halves are split rather than merged so this one keeps stating the permissive rule
+    // about Description on its own — that rule is unchanged and must stay pinned by a test that
+    // cannot be reddened by a decision about Name.
     [Fact]
-    public async Task EmptyButPresentNameAndDescription_AreAccepted()
+    public async Task EmptyButPresentDescription_IsAccepted()
     {
         AuthenticateAsAdmin();
 
         var response = await PutRawAsync(BuildPayload("""
-        "content": { "en": { "name": "", "description": "" } }
+        "content": { "en": { "name": "New EN Name", "description": "" } }
         """));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await ReadProductNameAsync()).Should().Be(RenamedProduct);
         // A full REPLACE, so the seeded "fr" is gone — the same contract ContentMap_ReplacesEveryDescription
-        // pins. The point here is only that empty strings were ACCEPTED rather than refused.
-        (await ReadDescriptionsAsync()).Should().Equal(("en", "", ""));
+        // pins. The point here is only that an empty description was ACCEPTED rather than refused.
+        (await ReadDescriptionsAsync()).Should().Equal(("en", "New EN Name", ""));
+    }
+
+    // #325. The row this refusal exists to stop is the one the editor cannot re-save: a top-level
+    // translation whose Name is blank or whitespace-only stores fine (200, measured), the admin
+    // editor's payload builder then omits it from the NEXT save — `productFormUtils.ts` filters on
+    // `e?.name?.trim()` — and `if (contentMap.Any()) RemoveRange(...)` deletes it, DESCRIPTION TEXT
+    // INCLUDED. So the write is accepted and the data is destroyed later by an unrelated save.
+    //
+    // Whitespace and empty are two InlineData rows, not one: `"   "` is what `contentSchema.name`'s
+    // `min(1)` counts as three valid characters, and `""` is what a client that sends the key with
+    // no value produces. A guard written as `== string.Empty` passes the second and fails the first.
+    //
+    // Asserted on the ROWS, not only on the status: the two seeded translations must both survive,
+    // which is what proves the refusal happened BEFORE the RemoveRange rather than after it.
+    [Theory]
+    [InlineData("""
+        "content": { "en": { "name": "   ", "description": "Une pizza" } }
+        """)]
+    [InlineData("""
+        "content": { "en": { "name": "", "description": "Une pizza" } }
+        """)]
+    public async Task BlankName_IsRefusedAsABadRequest_AndChangesNothing(string contentFragment)
+    {
+        AuthenticateAsAdmin();
+
+        var response = await PutRawAsync(BuildPayload(contentFragment));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadErrorsAsync(response)).Should()
+            .ContainMatch($"*{ProductContentRule.NameRequiredMessage} ('en')*");
+
+        (await ReadProductNameAsync()).Should().Be("Translated Product");
+        (await ReadDescriptionsAsync()).Should().Equal(
+            ("en", "Seeded EN Name", "Seeded EN Description"),
+            ("fr", "Seeded FR Name", "Seeded FR Description"));
     }
 }

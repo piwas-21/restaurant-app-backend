@@ -18,7 +18,12 @@ public record UpdateStaffCommand(
     [property: JsonPropertyName("email")] string Email,
     [property: JsonPropertyName("phoneNumber")] string? PhoneNumber,
     [property: JsonPropertyName("password")] string? Password,
-    [property: JsonPropertyName("role")] UserRole Role) : ICommand<ApiResponse<AuthResponse>>;
+    // NULLABLE so that an omitted `role` is distinguishable from a chosen one. `UserRole.Customer`
+    // is 0, so a non-nullable enum bound an ABSENT key to Customer and `IsInEnum()` waved it
+    // through — a request that never mentioned the role stripped an administrator of every staff
+    // permission and reported success. The validator now refuses null; the handler dereferences it
+    // only after that. See UpdateStaffCommandValidator for why refusing beats defaulting.
+    [property: JsonPropertyName("role")] UserRole? Role) : ICommand<ApiResponse<AuthResponse>>;
 
 public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, ApiResponse<AuthResponse>>
 {
@@ -88,9 +93,15 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
         // Update basic info
         existingUser.FirstName = command.FirstName;
         existingUser.LastName = command.LastName;
-        existingUser.UserName = command.FirstName;
+        // Overwritten unconditionally, and that is deliberate rather than the same defect as the
+        // role. `string?` genuinely admits null as "clear the phone", so absence and "clear it" mean
+        // the same thing and BOTH are things an admin may legitimately intend; the cost is a data
+        // field. `UserRole.Customer` is a different valid ROLE, so absence there silently performed
+        // a privilege change nobody asked for. The sole caller sends this field on every save.
         existingUser.PhoneNumber = command.PhoneNumber;
-        existingUser.Role = command.Role;
+        // Non-null by the validator's `NotNull()`; `!` rather than a fallback on purpose — a
+        // fallback here is the defect this fixes, silently choosing a role nobody asked for.
+        existingUser.Role = command.Role!.Value;
 
         // Every `IdentityResult` below used to be discarded, so a refused change was reported as a
         // successful one. That is not theoretical for the password: `StrongPasswordValidator`
@@ -107,6 +118,20 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
                 return IdentityFailure(emailResult, "Email could not be updated");
             }
         }
+
+        // Identity's unique-username field, kept as the email — which is what `RegisterStaffCommand`
+        // creates the account with. It used to be set to the FIRST NAME, so the first admin edit
+        // silently rewrote it and two staff members called "Ali" could not both exist: the second
+        // `UpdateAsync` failed Identity's DuplicateUserName check, refusing a routine edit of one
+        // person because of an unrelated one.
+        //
+        // Placed here, immediately after the email block and BEFORE the password block, for a
+        // reason worth stating: `ChangeEmailAsync` is not a staging call — it saves. So by this
+        // point a changed email is already committed, and returning early from a failed password
+        // reset below would otherwise leave the row with the NEW email and the stale first-name
+        // username, which is the exact inconsistency this fix exists to remove. Read from
+        // `existingUser` rather than `command` so it tracks whichever address actually landed.
+        existingUser.UserName = existingUser.Email;
 
         // Update password only if provided
         if (!string.IsNullOrWhiteSpace(command.Password))
@@ -144,7 +169,7 @@ public class UpdateStaffCommandHandler : ICommandHandler<UpdateStaffCommand, Api
 
         // Said "registered" on an UPDATE — copied from RegisterStaffCommand. Any client that shows
         // the server's own success text told the admin they had just created the user they edited.
-        return ApiResponse<AuthResponse>.SuccessWithData(authResponse, $"User updated successfully with role {command.Role}");
+        return ApiResponse<AuthResponse>.SuccessWithData(authResponse, $"User updated successfully with role {existingUser.Role}");
     }
 
     /// <summary>

@@ -24,7 +24,12 @@ public record CreateMenuBundleCommand(
     Guid? PrimaryCategoryId,
     MenuDefinitionDto MenuDefinition,
     ProductDescriptionsDto Content,
-    int? AvailableOrderTypes = null
+    int? AvailableOrderTypes = null,
+    // Nullable-with-default for positional-record compatibility, NOT for the leave-alone
+    // semantics its sibling on the update command has: on create there is nothing stored to
+    // leave alone, so this is assigned as given and null simply yields an unlabelled bundle.
+    // See IMenuBundleCommandFields for the contract the two paths do and do not share.
+    List<string>? Allergens = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCommand, ApiResponse<ProductDto>>
@@ -57,6 +62,7 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 IsAvailable = command.IsAvailable,
                 PreparationTimeMinutes = command.PreparationTimeMinutes,
                 AvailableOrderTypes = command.AvailableOrderTypes,
+                Allergens = command.Allergens,
                 Type = ProductType.Menu, // Hardcoded
                 KitchenType = KitchenType.None, // Menus usually don't have kitchen type directly, or maybe FrontKitchen?
                 DisplayOrder = command.DisplayOrder,
@@ -146,13 +152,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             // Re-fetch with the navigations the shared ProductDtoMapper reads, then map.
 
             var createdProduct = await _context.Products
-               .Include(p => p.ProductCategories)
-                   .ThenInclude(pc => pc.Category)
-               .Include(p => p.MenuDefinition)
-                   .ThenInclude(md => md!.Sections)
-                       .ThenInclude(s => s.Items)
-                           .ThenInclude(i => i.Product)
-               .FirstAsync(p => p.Id == product.Id, cancellationToken);
+                .WithProductDtoNavigations()
+                .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
             var productDto = ProductDtoMapper.MapToProductDto(createdProduct);
 

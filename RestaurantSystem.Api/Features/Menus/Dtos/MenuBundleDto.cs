@@ -33,6 +33,21 @@ public class MenuBundleDto
     public List<ProductImageDto> Images { get; set; } = new();
 
     /// <summary>
+    /// The BUNDLE's own allergen labelling, from its product row — the same field
+    /// <c>ProductDto.Allergens</c> serves for a plain dish, which a bundle otherwise had no way to
+    /// express. Distinct from <see cref="MenuBundleSectionItemDto.Allergens"/>, which is one
+    /// selectable option's.
+    /// </summary>
+    /// <remarks>
+    /// Completeness here is a SAFETY property, not a display one. The guest-facing filter decides
+    /// exclusion by absence — an item with no tokens can never contain the one being excluded — so
+    /// an unlabelled bundle is listed under "No gluten" rather than withheld from it. Serving an
+    /// empty list and serving nothing are the same payload to that filter; what makes the
+    /// difference is whether the labelling exists on the row.
+    /// </remarks>
+    public List<string>? Allergens { get; set; }
+
+    /// <summary>
     /// Server-resolved per-order-type availability for the requested channel — the same field, from
     /// the same resolver, that <c>ProductSummaryDto</c> carries (ORDER-TYPE-AVAILABILITY-PLAN §9.2).
     /// </summary>

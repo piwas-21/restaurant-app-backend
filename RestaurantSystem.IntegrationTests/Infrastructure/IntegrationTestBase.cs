@@ -181,6 +181,34 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     }
 
     /// <summary>
+    /// The printer fleet's device key — what a paired printer-app sends. NOT a user identity:
+    /// these endpoints have no user, and <c>ApiKeyAuthFilter</c> is the only thing in front of
+    /// them.
+    /// <para>
+    /// It exists because #475 made that filter FAIL CLOSED. The suite used to reach the device
+    /// endpoints with no key at all, since an unconfigured key opened the door — so every test
+    /// that touched them was passing through an unauthenticated one and proving nothing about
+    /// the guard. The value matches <c>PrinterSettings:ApiKey</c> in appsettings.Test.json.
+    /// </para>
+    /// </summary>
+    protected void AuthenticateAsDevice()
+    {
+        Client.DefaultRequestHeaders.Remove(DeviceApiKeyHeader);
+        Client.DefaultRequestHeaders.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+    }
+
+    // The HEADER NAME, not a credential — detect-secrets flags it only because the identifier
+    // contains "ApiKey". Marked inline rather than baselined: a baseline entry is pinned to a
+    // LINE NUMBER, and this file is edited often.
+    protected const string DeviceApiKeyHeader = "X-Api-Key"; // pragma: allowlist secret
+
+    /// <summary>
+    /// Mirrors <c>PrinterSettings:ApiKey</c> in appsettings.Test.json. A fixed test value, not a
+    /// credential — it authenticates nothing outside this suite's own host.
+    /// </summary>
+    protected const string TestPrinterApiKey = "integration-test-printer-api-key"; // pragma: allowlist secret
+
+    /// <summary>
     /// Sends requests with no credentials at all. Note that merely clearing the
     /// Authorization header does NOT do this — <see cref="TestAuthHandler"/> authenticates
     /// every request by default, so a guest scenario needs this explicit opt-in.

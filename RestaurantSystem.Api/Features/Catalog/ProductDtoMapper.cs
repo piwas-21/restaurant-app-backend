@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -107,39 +108,13 @@ public static class ProductDtoMapper
                 IsRequired = si.IsRequired,
                 DisplayOrder = si.DisplayOrder
             }).ToList(),
-            MenuDefinition = product.MenuDefinition != null ? new MenuDefinitionDto
-            {
-                Id = product.MenuDefinition.Id,
-                IsAlwaysAvailable = product.MenuDefinition.IsAlwaysAvailable,
-                StartTime = product.MenuDefinition.StartTime,
-                EndTime = product.MenuDefinition.EndTime,
-                AvailableMonday = product.MenuDefinition.AvailableMonday,
-                AvailableTuesday = product.MenuDefinition.AvailableTuesday,
-                AvailableWednesday = product.MenuDefinition.AvailableWednesday,
-                AvailableThursday = product.MenuDefinition.AvailableThursday,
-                AvailableFriday = product.MenuDefinition.AvailableFriday,
-                AvailableSaturday = product.MenuDefinition.AvailableSaturday,
-                AvailableSunday = product.MenuDefinition.AvailableSunday,
-                Sections = product.MenuDefinition.Sections.Select(s => new MenuSectionDto
-                {
-                    Id = s.Id,
-                    Name = s.Name,
-                    Description = s.Description,
-                    DisplayOrder = s.DisplayOrder,
-                    IsRequired = s.IsRequired,
-                    MinSelection = s.MinSelection,
-                    MaxSelection = s.MaxSelection,
-                    Items = s.Items.Select(i => new MenuSectionItemDto
-                    {
-                        Id = i.Id,
-                        ProductId = i.ProductId,
-                        ProductName = i.Product?.Name,
-                        AdditionalPrice = i.AdditionalPrice,
-                        DisplayOrder = i.DisplayOrder,
-                        IsDefault = i.IsDefault
-                    }).OrderBy(i => i.DisplayOrder).ToList()
-                }).OrderBy(s => s.DisplayOrder).ToList()
-            } : null,
+            // #468: one projection for a bundle's sections, shared with the two Menus reads and
+            // with `GetProductByIdQuery`. This is a WRITE-path echo, so the caller must load
+            // sections → items → product → detailed-ingredients or the echo states a recipe the
+            // saved bundle does not have; all three callers do.
+            MenuDefinition = product.MenuDefinition != null
+                ? MenuBundleMapper.MapDefinition(product.MenuDefinition)
+                : null,
             Content = new()
         };
 
