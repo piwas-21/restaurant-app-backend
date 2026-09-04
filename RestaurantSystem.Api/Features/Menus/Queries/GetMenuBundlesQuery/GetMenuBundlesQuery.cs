@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -19,11 +20,15 @@ public record GetMenuBundlesQuery(
     bool IncludeUnavailable = false,
     OrderType? RequestedOrderType = null) : IQuery<ApiResponse<PagedResult<MenuBundleDto>>>;
 
-public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfiguration configuration)
+public class GetMenuBundlesQueryHandler(
+    ApplicationDbContext context,
+    IConfiguration configuration,
+    ITenantClock clock)
     : IQueryHandler<GetMenuBundlesQuery, ApiResponse<PagedResult<MenuBundleDto>>>
 {
     private readonly ApplicationDbContext _context = context;
     private readonly string _baseUrl = configuration["AWS:S3:BaseUrl"]!;
+    private readonly ITenantClock _clock = clock;
     // The original _logger field and its injection via the constructor are removed as per the primary constructor syntax in the provided change.
 
     public async Task<ApiResponse<PagedResult<MenuBundleDto>>> Handle(GetMenuBundlesQuery query, CancellationToken cancellationToken)
@@ -53,29 +58,12 @@ public class GetMenuBundlesQueryHandler(ApplicationDbContext context, IConfigura
         // Filter by schedule availability (only if not including unavailable)
         if (!query.IncludeUnavailable)
         {
-            var now = DateTime.UtcNow;
-            var currentDayOfWeek = now.DayOfWeek;
-            var currentTime = now.TimeOfDay;
+            // The TENANT's wall clock, not the container's UTC (#397). `_clock.Now` carries the
+            // tenant offset, so `.DayOfWeek`/`.TimeOfDay` are the day and time on the restaurant's
+            // own wall — the same two values `WorkingHoursService.IsOpenNowAsync` reads.
+            var now = _clock.Now;
 
-            queryable = queryable.Where(p =>
-                p.MenuDefinition!.IsAlwaysAvailable || // Include if always available
-                (
-                    // Check if available on current day
-                    (currentDayOfWeek == DayOfWeek.Monday && p.MenuDefinition.AvailableMonday) ||
-                    (currentDayOfWeek == DayOfWeek.Tuesday && p.MenuDefinition.AvailableTuesday) ||
-                    (currentDayOfWeek == DayOfWeek.Wednesday && p.MenuDefinition.AvailableWednesday) ||
-                    (currentDayOfWeek == DayOfWeek.Thursday && p.MenuDefinition.AvailableThursday) ||
-                    (currentDayOfWeek == DayOfWeek.Friday && p.MenuDefinition.AvailableFriday) ||
-                    (currentDayOfWeek == DayOfWeek.Saturday && p.MenuDefinition.AvailableSaturday) ||
-                    (currentDayOfWeek == DayOfWeek.Sunday && p.MenuDefinition.AvailableSunday)
-                ) &&
-                (
-                    // Check if within time range (if times are set)
-                    (p.MenuDefinition.StartTime == null && p.MenuDefinition.EndTime == null) ||
-                    (p.MenuDefinition.StartTime != null && p.MenuDefinition.EndTime != null &&
-                     currentTime >= p.MenuDefinition.StartTime && currentTime <= p.MenuDefinition.EndTime)
-                )
-            );
+            queryable = queryable.Where(MenuScheduleWindow.AvailableAt(now.DayOfWeek, now.TimeOfDay));
         }
 
 

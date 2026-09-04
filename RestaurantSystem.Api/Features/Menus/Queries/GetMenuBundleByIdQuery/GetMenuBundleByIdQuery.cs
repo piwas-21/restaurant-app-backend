@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -14,15 +15,21 @@ namespace RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundleByIdQuery;
 public record GetMenuBundleByIdQuery(Guid Id, OrderType? RequestedOrderType = null)
     : IQuery<ApiResponse<MenuBundleDto>>;
 
-public class GetMenuBundleByIdQueryHandler(ApplicationDbContext context, IConfiguration configuration)
+public class GetMenuBundleByIdQueryHandler(
+    ApplicationDbContext context,
+    IConfiguration configuration,
+    ITenantClock clock,
+    ICurrentUserService currentUser)
     : IQueryHandler<GetMenuBundleByIdQuery, ApiResponse<MenuBundleDto>>
 {
     private readonly ApplicationDbContext _context = context;
     private readonly string _baseUrl = configuration["AWS:S3:BaseUrl"]!;
+    private readonly ITenantClock _clock = clock;
+    private readonly ICurrentUserService _currentUser = currentUser;
 
     public async Task<ApiResponse<MenuBundleDto>> Handle(GetMenuBundleByIdQuery query, CancellationToken cancellationToken)
     {
-        var product = await _context.Products
+        var queryable = _context.Products
             // Load-bearing: inheritance resolves through the PRIMARY category and an unloaded
             // collection reads as UNRESTRICTED. See the same include on the list query.
             .Include(p => p.ProductCategories)
@@ -35,7 +42,25 @@ public class GetMenuBundleByIdQueryHandler(ApplicationDbContext context, IConfig
                                 .ThenInclude(di => di.Descriptions)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
-            .FirstOrDefaultAsync(p => p.Id == query.Id && !p.IsDeleted, cancellationToken);
+            .Where(p => p.Id == query.Id && !p.IsDeleted);
+
+        // #397: this read had NO schedule filter, so the guest list hid a bundle that this endpoint
+        // then served in full — the featured-special "Details" sheet opens from here. The same
+        // predicate the list uses, on the same clock, evaluated by the same engine.
+        //
+        // Staff are exempt, and deliberately: the bundle EDITOR loads through this endpoint
+        // (`useProductEditorFetch`) and the till opens a bundle a guest asks for by name. Filtering
+        // them would make an out-of-window lunch menu un-editable at 16:00 and un-sellable at the
+        // counter. `IsStaff` is the shared dividing line, not a fresh per-handler predicate.
+        // An API-token caller (`MenuRead`) is neither guest nor staff and is treated as a guest,
+        // which is the conservative half.
+        if (!_currentUser.IsStaff)
+        {
+            var now = _clock.Now;
+            queryable = queryable.Where(MenuScheduleWindow.AvailableAt(now.DayOfWeek, now.TimeOfDay));
+        }
+
+        var product = await queryable.FirstOrDefaultAsync(cancellationToken);
 
         if (product == null)
         {
