@@ -24,6 +24,10 @@ public class DeviceTelemetryTests : IntegrationTestBase
         {
             Content = JsonContent.Create(body),
         };
+        // The device key. #475 made `ApiKeyAuthFilter` fail CLOSED, so this is no longer
+        // optional — and it was never harmless to omit: without it this suite reached the
+        // endpoint through an unauthenticated door and proved nothing about the guard.
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
         if (deviceId is not null)
             request.Headers.Add("X-Device-Id", deviceId);
         return await Client.SendAsync(request);

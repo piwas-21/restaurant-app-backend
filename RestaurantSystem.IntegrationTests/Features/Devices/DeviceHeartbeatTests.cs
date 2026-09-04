@@ -33,6 +33,10 @@ public class DeviceHeartbeatTests : IntegrationTestBase
         {
             Content = JsonContent.Create(HeartbeatBody()),
         };
+        // The device key. #475 made `ApiKeyAuthFilter` fail CLOSED, so this is no longer
+        // optional — and it was never harmless to omit: without it this suite reached the
+        // endpoint through an unauthenticated door and proved nothing about the guard.
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
         if (deviceId is not null)
             request.Headers.Add("X-Device-Id", deviceId);
         return await Client.SendAsync(request);
@@ -96,6 +100,7 @@ public class DeviceHeartbeatTests : IntegrationTestBase
                 lastSuccessfulPollAt = "2026-07-19T10:00:00",
             }),
         };
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);  // #475: the filter fails closed now
         request.Headers.Add("X-Device-Id", deviceId);
 
         var response = await Client.SendAsync(request);

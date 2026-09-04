@@ -25,6 +25,7 @@ public class DeviceReadTests : IntegrationTestBase
     private async Task PostAsync(string path, object body, string deviceId)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);  // #475: the filter fails closed now
         request.Headers.Add("X-Device-Id", deviceId);
         (await Client.SendAsync(request)).EnsureSuccessStatusCode();
     }

@@ -303,6 +303,27 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 
+// Said ONCE, at boot, when the printer endpoints have no key to check (#475).
+//
+// A WARNING and not a throw, deliberately, and the difference is worth stating because the
+// CorsSettings check below — same shape, same argument — does throw. Module gating defaults to
+// UNENFORCED, which reads as "every module on", so a startup refusal here would take down any
+// deployment that simply never bought printing and never set a key. That is a brick risk on live
+// tenants traded for an alarm, and the security property does not need it: `ApiKeyAuthFilter`
+// now DENIES at request time, so the feed is closed either way. This exists so the operator
+// learns it from one boot line rather than from a printer that never prints.
+//
+// Once, not per request: the feed is polled every ~5s and Sentry ships anything at Error level,
+// so a per-request log would bury real errors under ~17k events a day per device.
+if (!builder.Environment.IsDevelopment()
+    && string.IsNullOrWhiteSpace(builder.Configuration["PrinterSettings:ApiKey"]))
+{
+    Console.WriteLine(
+        "WARNING: PrinterSettings:ApiKey is not configured. The printer feed and device endpoints "
+        + "will REFUSE every request (#475) — they have no other authentication. Set it in the "
+        + "tenant's app-secrets.json; provision-tenant.sh generates one.");
+}
+
 // Sign in with Apple (BACKEND-NOTES §4.1). Registered unconditionally, and REFUSING rather than
 // inert when Authentication:Apple:ClientIds is empty: the endpoint used to decode the identity
 // token without verifying it, so anyone could log in as any email address.
