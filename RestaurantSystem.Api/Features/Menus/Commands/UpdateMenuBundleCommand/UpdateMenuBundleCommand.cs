@@ -239,6 +239,14 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                     .ThenInclude(md => md!.Sections)
                         .ThenInclude(s => s.Items)
                             .ThenInclude(i => i.Product)
+                                // #468: the shared bundle mapper projects each option's recipe, and
+                                // an unloaded collection is EMPTY rather than absent — the echo
+                                // would state that every option has no ingredients.
+                                .ThenInclude(p => p.DetailedIngredients)
+                                    .ThenInclude(di => di.Descriptions)
+                // Split: 2+ collection Includes over ONE root still multiply rows, and #468 adds a
+                // fifth level to the chain (S8733). Behaviour is identical — it is query metadata.
+                .AsSplitQuery()
                 .Include(p => p.Descriptions)
                 .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
