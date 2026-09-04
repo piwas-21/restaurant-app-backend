@@ -7,7 +7,9 @@ using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.IntegrationTests.Common;
+using RestaurantSystem.IntegrationTests.Features.ApiTokens;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
 namespace RestaurantSystem.IntegrationTests.Features.Menus;
@@ -28,7 +30,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Menus;
 /// </para>
 /// </summary>
 [Collection("Database Lane 3")]
-public class MenuBundleScheduleTests : IntegrationTestBase
+public class MenuBundleScheduleTests : ApiTokenScopeTestBase
 {
     /// <summary>Friday 21:30 UTC — 23:30 on Friday night in Paris, which is a different HOUR and,
     /// for anything after 22:00Z, would be a different DAY too.</summary>
@@ -103,6 +105,24 @@ public class MenuBundleScheduleTests : IntegrationTestBase
     public async Task An_admin_can_still_open_an_out_of_window_bundle_to_edit_it()
     {
         AuthenticateAsAdmin();
+
+        var detail = await GetFromJsonAsync<ApiResponse<MenuBundleDto>>($"/api/Menus/{_lunchId}");
+
+        detail!.Success.Should().BeTrue(detail.Message);
+        detail.Data!.Name.Should().Be(LunchName);
+    }
+
+    /// <summary>
+    /// A machine API token is BACK-OF-HOUSE here, exactly as it is for a deactivated product on
+    /// <c>GET /api/Products</c> (#438) — one caller class, one answer. The rule is written on
+    /// <c>ICurrentUserService.IsStaff</c>; this measures it, because
+    /// <c>ApiTokenAuthenticationHandler</c> stamping the <c>Admin</c> role claim is not something a
+    /// reader of THIS file would think to check.
+    /// </summary>
+    [Fact]
+    public async Task A_machine_token_opens_an_out_of_window_bundle()
+    {
+        AuthenticateWithToken(await SeedTokenAsync([ApiTokenScopes.MenuRead]));
 
         var detail = await GetFromJsonAsync<ApiResponse<MenuBundleDto>>($"/api/Menus/{_lunchId}");
 

@@ -52,8 +52,11 @@ public class GetMenuBundleByIdQueryHandler(
         // (`useProductEditorFetch`) and the till opens a bundle a guest asks for by name. Filtering
         // them would make an out-of-window lunch menu un-editable at 16:00 and un-sellable at the
         // counter. `IsStaff` is the shared dividing line, not a fresh per-handler predicate.
-        // An API-token caller (`MenuRead`) is neither guest nor staff and is treated as a guest,
-        // which is the conservative half.
+        // A machine API token counts as BACK-OF-HOUSE here, not as a guest — the rule, and why, is
+        // written once on `ICurrentUserService.IsStaff`. (An earlier version of this comment said
+        // the opposite. It was wrong about the code it sat on: `ApiTokenAuthenticationHandler`
+        // stamps the token with the Admin role claim, so `IsStaff` has always been true for one.
+        // `MenuBundleScheduleTests` now measures it instead of asserting it in prose.)
         if (!_currentUser.IsStaff)
         {
             var now = _clock.Now;
