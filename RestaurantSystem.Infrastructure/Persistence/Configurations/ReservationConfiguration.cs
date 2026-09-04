@@ -19,8 +19,22 @@ public class ReservationConfiguration : IEntityTypeConfiguration<Reservation>
             .IsRequired()
             .HasMaxLength(255);
 
+        // NOT IsRequired, and the mapping is what was wrong rather than the entity or the column.
+        // `Reservation.CustomerPhone` is `string?`, and migration `MakeCustomerPhoneOptional`
+        // (20251102031347) is the only migration to touch this column after the table was created —
+        // it made it NULLABLE. The mapping was never brought into line, so the model believed a
+        // nullable column was non-nullable and materialised it with a non-null read: one NULL row
+        // threw `InvalidCastException`, `GetReservationsQueryHandler` caught it, and the whole page
+        // answered 200 / success:false. ONE phoneless booking hid EVERY reservation.
+        //
+        // The in-query `?? string.Empty` does not save it — measured, not assumed: the projection's
+        // SQL COALESCE is not where the failure happens.
+        //
+        // Requiredness of a phone is a per-tenant admin setting enforced at WRITE time
+        // (`EnsureRequiredFieldsPresentAsync`), which is the right place for a policy that differs
+        // by restaurant. It is not a schema invariant, and pretending it was here is what broke the
+        // read.
         builder.Property(r => r.CustomerPhone)
-            .IsRequired()
             .HasMaxLength(20);
 
         builder.Property(r => r.ReservationDate)
