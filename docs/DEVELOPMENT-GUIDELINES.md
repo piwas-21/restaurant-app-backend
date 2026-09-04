@@ -149,7 +149,10 @@ var url = "http://localhost:3000";
 - `JwtSettings` - JWT auth configuration
 - `AWSSettings` - S3 file storage
 - `CorsSettings:AllowedOrigins` - CORS allowed origins array (production)
-- `PrinterSettings:ApiKey` - API key for printer-feed endpoint
+- `PrinterSettings:ApiKey` - API key for the printer-feed and device endpoints. **Required outside
+  Development** since #475: it is the only authentication those endpoints have, so a blank value
+  now makes them REFUSE every request rather than serve everyone. In Development a blank value is
+  still allowed (working without secrets is a real need there) and is logged once at startup.
 
 ---
 
