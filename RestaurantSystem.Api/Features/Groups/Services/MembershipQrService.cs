@@ -184,8 +184,16 @@ public class MembershipQrService : IMembershipQrService
                 ? orderAmount * (discount.Value / 100)
                 : discount.Value;
 
-            // Apply maximum discount cap if set
-            if (discount.MaximumDiscountAmount.HasValue && discountAmount > discount.MaximumDiscountAmount.Value)
+            // Apply the maximum cap only when one is actually set. A stored 0 means
+            // "no cap", not "cap everything to nothing" — same rule, same reason and
+            // the same guard as CustomerDiscountService.CalculateGroupDiscountAmount,
+            // which reads THIS VERY COLUMN on the same rows for the basket path. The 0
+            // is reachable: the admin discount form coerces the API's null (and an
+            // emptied input) to 0 on every save, so an untouched uncapped discount is
+            // rewritten to a cap of zero. Without the > 0 the discount stops discounting.
+            if (discount.MaximumDiscountAmount.HasValue &&
+                discount.MaximumDiscountAmount.Value > 0 &&
+                discountAmount > discount.MaximumDiscountAmount.Value)
             {
                 discountAmount = discount.MaximumDiscountAmount.Value;
             }
