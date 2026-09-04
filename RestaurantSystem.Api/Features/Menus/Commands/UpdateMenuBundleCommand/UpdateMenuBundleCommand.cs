@@ -25,7 +25,14 @@ public record UpdateMenuBundleCommand(
     Guid? PrimaryCategoryId,
     MenuDefinitionDto MenuDefinition,
     ProductDescriptionsDto Content,
-    int? AvailableOrderTypes = null
+    int? AvailableOrderTypes = null,
+    // Nullable and defaulted so an older client that sends nothing LEAVES THE LABELS ALONE
+    // rather than clearing them. The frontend already put `allergens` in every bundle PUT
+    // before this field existed, so the shipping order matters and is the reverse of the
+    // usual: the client that seeds the stored value lands FIRST
+    // (piwas-21/restaurant-app-frontend#704). A client that seeds nothing sends `[]`, and `[]`
+    // is a real instruction — an admin who unticks every chip means it.
+    List<string>? Allergens = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
@@ -90,13 +97,24 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             // null. §9.1 accepted the same trade for products and closed the resulting landmine by
             // making the one writer always echo the field.
             //
-            // That mitigation is NOT yet in place for bundles: `baseMenuBundleSchema` has no
-            // `availableOrderTypes` key, so the bundle editor cannot echo what it does not carry.
-            // Until the frontend half of §9.2 lands, a mask set out of band (direct SQL, curl, or
-            // `PUT /api/Products` on a Menu-type product) is silently nulled by any unrelated bundle
-            // save — a NEW exposure, since this PUT previously left the column alone. Both halves
-            // must ship in the same release.
+            // That mitigation IS in place for bundles now: `baseMenuBundleSchema` carries
+            // `availableOrderTypes` and `toBundleDefaults` seeds it, so the editor echoes what it
+            // loaded. This paragraph used to say the opposite and was left behind when the
+            // frontend half of §9.2 shipped.
+            //
+            // It is still an ECHO, not a merge — a caller that is not the admin editor and does
+            // not send the field nulls the mask. Allergens below take the other approach, for a
+            // reason worth contrasting.
             product.AvailableOrderTypes = command.AvailableOrderTypes;
+            // `null` LEAVES THEM ALONE; `[]` clears. Those are different instructions and the
+            // distinction is the whole safety property here: an older client sends nothing, and
+            // must not strip a labelled combo, while an admin who unticks every chip means it.
+            // The order-type mask above deliberately does NOT make that distinction — null there
+            // means "inherit from the primary category", a real value.
+            if (command.Allergens is not null)
+            {
+                product.Allergens = command.Allergens;
+            }
             product.UpdatedAt = DateTime.UtcNow;
             product.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
