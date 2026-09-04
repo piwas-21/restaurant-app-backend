@@ -233,13 +233,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
 
             // Re-fetch to map to DTO
             var updatedProduct = await _context.Products
-                .Include(p => p.ProductCategories)
-                    .ThenInclude(pc => pc.Category)
-                .Include(p => p.MenuDefinition)
-                    .ThenInclude(md => md!.Sections)
-                        .ThenInclude(s => s.Items)
-                            .ThenInclude(i => i.Product)
-                .Include(p => p.Descriptions)
+                .WithProductDtoNavigations()
                 .FirstAsync(p => p.Id == product.Id, cancellationToken);
 
             var productDto = ProductDtoMapper.MapToProductDto(updatedProduct);

@@ -1,5 +1,6 @@
 ﻿using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
@@ -44,7 +45,21 @@ public record ProductDto
     public CategoryDto? PrimaryCategory { get; init; }
     public List<ProductVariationDto> Variations { get; init; } = [];
     public List<SideItemDto> SuggestedSideItems { get; init; } = [];
-    public MenuDefinitionDto? MenuDefinition { get; init; }
+    /// <summary>
+    /// A bundle's schedule and sections, in the same shape <c>GET /api/Menus/{id}</c> serves
+    /// (#468). It used to be the WRITE contract's <c>MenuDefinitionDto</c>, whose section items
+    /// carry an option's identity and price and nothing else — so a reader that opened a bundle by
+    /// PRODUCT id got a combo with no recipe, no sauce rule and no allergens, and had nothing to
+    /// customize. The two families are documented in <c>MenuBundleDto.cs</c>: <c>MenuBundle*</c> is
+    /// the READ contract, and this is a read.
+    /// </summary>
+    /// <remarks>
+    /// Additive on the wire: every key the old shape carried is still here, with the same name and
+    /// the same JSON (<c>TimeSpan</c> and the mapper's <c>hh:mm:ss</c> string serialize
+    /// identically), plus the seven the option rows were missing. The REQUEST direction is
+    /// unchanged — the product and bundle commands still take <c>MenuDefinitionDto</c>.
+    /// </remarks>
+    public MenuBundleDefinitionDto? MenuDefinition { get; init; }
 
     /// <summary>Resolved per-order-type availability. Additive.</summary>
     public ItemAvailabilityDto Availability { get; init; } = new();

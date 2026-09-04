@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -57,10 +58,14 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             .Include(p => p.SuggestedSideItems) // Add soft delete filter here
                 .ThenInclude(si => si.SideItemProduct)
                     .ThenInclude(product => product.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
-            .Include(p => p.MenuDefinition)
-                .ThenInclude(md => md!.Sections)
-                    .ThenInclude(s => s.Items)
-                        .ThenInclude(i => i.Product)
+            // #468: down to the option product's own recipe, which the shared bundle mapper
+            // projects. Not optional — an unloaded collection is EMPTY, not absent, so leaving it
+            // out serves a dish whose recipe reads as "no ingredients" rather than failing.
+            // `AsSplitQuery()` above keeps it off the Cartesian product of the sibling includes.
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.DetailedIngredients)
+                        .ThenInclude(di => di.Descriptions)
             .FirstOrDefaultAsync(p => p.Id == query.Id && !p.IsDeleted, cancellationToken); // Also filter the main product
         if (product == null)
         {
@@ -233,43 +238,15 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         .ToList()
                 })
                 .ToList(),
-            MenuDefinition = product.MenuDefinition != null ? new MenuDefinitionDto
-            {
-                Id = product.MenuDefinition.Id,
-                IsAlwaysAvailable = product.MenuDefinition.IsAlwaysAvailable,
-                StartTime = product.MenuDefinition.StartTime,
-                EndTime = product.MenuDefinition.EndTime,
-                AvailableMonday = product.MenuDefinition.AvailableMonday,
-                AvailableTuesday = product.MenuDefinition.AvailableTuesday,
-                AvailableWednesday = product.MenuDefinition.AvailableWednesday,
-                AvailableThursday = product.MenuDefinition.AvailableThursday,
-                AvailableFriday = product.MenuDefinition.AvailableFriday,
-                AvailableSaturday = product.MenuDefinition.AvailableSaturday,
-                AvailableSunday = product.MenuDefinition.AvailableSunday,
-                Sections = product.MenuDefinition.Sections.Select(s => new MenuSectionDto
-                {
-                    Id = s.Id,
-                    Name = s.Name,
-                    Description = s.Description,
-                    DisplayOrder = s.DisplayOrder,
-                    IsRequired = s.IsRequired,
-                    MinSelection = s.MinSelection,
-                    MaxSelection = s.MaxSelection,
-                    // Same rule as the side items above, on the other reference navigation this
-                    // query un-filters: a section that listed a DELETED product went on offering it
-                    // to guests, and the basket then refuses the line. `i.Product` stays nullable —
-                    // a row whose product row is gone entirely is dropped by the same test.
-                    Items = s.Items.Where(i => i.Product != null && !i.Product.IsDeleted).Select(i => new MenuSectionItemDto
-                    {
-                        Id = i.Id,
-                        ProductId = i.ProductId,
-                        ProductName = i.Product?.Name,
-                        AdditionalPrice = i.AdditionalPrice,
-                        DisplayOrder = i.DisplayOrder,
-                        IsDefault = i.IsDefault
-                    }).OrderBy(i => i.DisplayOrder).ToList()
-                }).OrderBy(s => s.DisplayOrder).ToList()
-            } : null,
+            // #468: the SAME projection `GET /api/Menus/{id}` uses. This read had one of its own
+            // that carried an option row's id, name, price and display order and stopped there — no
+            // recipe, no sauce rule, no allergens — so the guest sheet's by-id entry
+            // (`useItemCustomizationSheet.openForProduct`) opened a bundle with nothing to
+            // customize, and the mobile client reading this contract got the same. The two reads now
+            // cannot drift, because there is only one of them.
+            MenuDefinition = product.MenuDefinition != null
+                ? MenuBundleMapper.MapDefinition(product.MenuDefinition)
+                : null,
             Content = new()
         };
 
