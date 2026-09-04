@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
@@ -12,6 +13,8 @@ public record GetProductsQuery(
     Guid? CategoryId,
     ProductType? Type,
     ProductType? ExcludeType,
+    // Honoured for BACK-OF-HOUSE callers only. A guest never sees a deactivated product, whatever
+    // this says — see the handler, and #438 for the five-caller table that decided it.
     bool? IsActive,
     bool? IsAvailable,
     bool? isSpeacial,
@@ -47,12 +50,18 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetProductsQueryHandler> _logger;
+    private readonly ICurrentUserService _currentUser;
     private readonly string _baseUrl;
 
-    public GetProductsQueryHandler(ApplicationDbContext context, ILogger<GetProductsQueryHandler> logger, IConfiguration configuration)
+    public GetProductsQueryHandler(
+        ApplicationDbContext context,
+        ILogger<GetProductsQueryHandler> logger,
+        ICurrentUserService currentUser,
+        IConfiguration configuration)
     {
         _context = context;
         _logger = logger;
+        _currentUser = currentUser;
         _baseUrl = configuration["AWS:S3:BaseUrl"]!;
     }
 
@@ -101,7 +110,24 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
             productsQuery = productsQuery.Where(p => !p.IsComponent);
         }
 
-        if (query.IsActive.HasValue)
+        // #438. Hiding a deactivated product used to be OPT-IN, per caller: the filter ran only when
+        // the caller asked for it. Three of five callers remembered; the web guest menu was
+        // ACCIDENTALLY safe (a client-side `isVisible` filter drops them after they are sent) and
+        // the mobile category browse showed them. An owner switching a dish off did not remove it
+        // from that menu.
+        //
+        // So the default is now the CALLER's, not the query's: a guest never sees a deactivated
+        // product, and back-of-house keeps today's unfiltered default because seeing an inactive
+        // item IS the point of the admin list's Active toggle. `IsStaff` is the shared dividing
+        // line — the same one order ownership turns on — not a fresh predicate.
+        //
+        // For a guest the filter is FORCED, not merely defaulted: `?isActive=false` from an
+        // unauthenticated caller must not become a way to enumerate what the owner switched off.
+        if (!_currentUser.IsStaff)
+        {
+            productsQuery = productsQuery.Where(p => p.IsActive);
+        }
+        else if (query.IsActive.HasValue)
         {
             productsQuery = productsQuery.Where(p => p.IsActive == query.IsActive.Value);
         }
