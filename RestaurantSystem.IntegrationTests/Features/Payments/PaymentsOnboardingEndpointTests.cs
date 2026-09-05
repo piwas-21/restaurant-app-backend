@@ -105,10 +105,16 @@ public class PaymentsOnboardingConfiguredTests : PaymentsOnboardingEndpointTests
         data.GetProperty("state").GetString().Should().Be(PaymentsOnboardingState.Configured);
         data.GetProperty("connectedAccountId").GetString().Should().Be("acct_onboarding");
         // The DEFAULT from `StripeSettings`, not an override — this class sets no
-        // `Stripe:DashboardUrl`, so the assertion pins the shipped value a restaurant owner is
-        // actually sent to.
-        data.GetProperty("dashboardUrl").GetString().Should().Be("https://dashboard.stripe.com");
+        // `Stripe:PaymentsLinkUrl`, so the assertion pins what a restaurant owner is actually
+        // sent to today: NOWHERE. Under Connect Express there is no full Stripe dashboard to open
+        // and the links Stripe does issue live 300 seconds, so a blank setting is reported as
+        // null and the admin tab says so instead of opening a login the owner does not have.
+        data.GetProperty("paymentsLinkUrl").ValueKind.Should().Be(JsonValueKind.Null);
+        // The retired field is GONE, not merely empty: a stale bundle reading `dashboardUrl` must
+        // find nothing and render an inert control rather than inherit some other URL.
+        data.TryGetProperty("dashboardUrl", out _).Should().BeFalse();
     }
+
 
     [Theory]
     [InlineData("Cashier")]
@@ -228,5 +234,46 @@ public class PaymentsOnboardingModuleOffTests : PaymentsOnboardingEndpointTestsB
         // The discriminator, not the status. A bare 404 is also what a wrong route answers, so
         // asserting only the status would pass against an endpoint that was never added.
         (await ReadErrorCode(response)).Should().Be(ErrorCodes.ModuleNotEnabled);
+    }
+}
+
+/// <summary>
+/// The same configured tenant, once a page exists that can mint a Stripe link on click.
+/// </summary>
+/// <remarks>
+/// The negative control for <c>PaymentsOnboardingConfiguredTests</c>'s null assertion. Blank is
+/// reported as null on purpose — under Connect Express there is no static URL that is correct, so
+/// the handler must never invent one — and without this class that null would also pass on a
+/// handler that answers null unconditionally, which would silently break the tab the day the page
+/// ships.
+/// </remarks>
+[Collection("Database Lane 3")]
+public class PaymentsOnboardingLinkConfiguredTests : PaymentsOnboardingEndpointTestsBase
+{
+    private const string MintingPage = "https://sofrapiwas.com/onboarding/payments";
+
+    public PaymentsOnboardingLinkConfiguredTests(DatabaseFixture databaseFixture)
+        : base(databaseFixture) { }
+
+    protected override IReadOnlyDictionary<string, string> Settings
+    {
+        get
+        {
+            var settings = StripeConfigured();
+            settings["Modules:Enforce"] = "true";
+            settings["Modules:Enabled"] = "core,online-payments";
+            settings["Stripe:PaymentsLinkUrl"] = MintingPage;
+            return settings;
+        }
+    }
+
+    [Fact]
+    public async Task Hands_over_the_configured_page_verbatim()
+    {
+        var response = await AskAsAdmin();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var data = await ReadData(response);
+        data.GetProperty("paymentsLinkUrl").GetString().Should().Be(MintingPage);
     }
 }

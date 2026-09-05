@@ -23,9 +23,15 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 /// identifier that appears in Stripe's own dashboard URLs — and it is the string the owner (or
 /// whoever they ask for help) pastes into a support conversation.
 /// </param>
-/// <param name="DashboardUrl">
-/// Where the restaurant manages its own account. Their dashboard, not ours: Connect Standard
-/// means the money is theirs and so is the login.
+/// <param name="PaymentsLinkUrl">
+/// Where to send the restaurant to reach its own Stripe account, or <c>null</c> when there is
+/// nowhere honest to send it. <b>Never a Stripe URL</b>: an Express account has no full dashboard,
+/// an onboarding link dies 300 seconds after it is minted, and a login link is refused until
+/// onboarding finishes — so it is a page of ours that mints one per click, empty until that page
+/// exists. It <b>replaced</b> <c>dashboardUrl</c> rather than being redefined in place, and the
+/// rename is the safety property: through either deploy order the bundle that is out of step finds
+/// nothing and renders an inert control, where the old name would have opened
+/// <c>https://dashboard.stripe.com</c> — a login the restaurant does not have.
 /// </param>
 /// <param name="RequirementsDue">
 /// How many KYC fields Stripe is still waiting for, or null when we do not know — which covers both
@@ -42,6 +48,6 @@ namespace RestaurantSystem.Api.Features.Payments.Dtos;
 public record PaymentsOnboardingDto(
     string State,
     string? ConnectedAccountId,
-    string DashboardUrl,
+    string? PaymentsLinkUrl,
     int? RequirementsDue = null,
     int CommissionBps = 0);

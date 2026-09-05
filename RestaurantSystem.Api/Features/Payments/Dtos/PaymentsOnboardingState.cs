@@ -14,6 +14,17 @@ public static class PaymentsOnboardingState
     /// false, so no card will clear yet however correct the box is. Reported only when the account
     /// was actually READ; an unreadable account is never guessed into this state, because telling a
     /// trading restaurant that Stripe is still checking them would be a fabrication.
+    ///
+    /// <para>
+    /// Under Connect <b>Express</b> this is usually the restaurant's own turn, not Stripe's queue.
+    /// The platform creates the account and prefills it, which takes Stripe's
+    /// <c>requirements.currently_due</c> list from 16 fields to 6 — date of birth, phone, and
+    /// accepting Stripe's terms — and the platform cannot supply that remainder: Stripe refuses
+    /// terms acceptance on behalf of an account with
+    /// <c>controller[requirement_collection]=stripe</c>, "which includes Standard and Express
+    /// accounts". The state is derived from <c>charges_enabled</c> either way, so nothing here
+    /// moves; the copy the tab hangs on it does.
+    /// </para>
     /// </summary>
     public const string AwaitingVerification = "awaitingVerification";
 
