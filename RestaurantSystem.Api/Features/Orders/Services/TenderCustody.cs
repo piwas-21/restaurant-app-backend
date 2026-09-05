@@ -58,9 +58,12 @@ public static class TenderCustody
     /// The refusal shown to staff, naming the gateway that must issue the refund.
     /// </summary>
     /// <remarks>
-    /// It says where to go, not merely no. The restaurant owns the Stripe account outright
-    /// (Connect Standard — ADR-011 as amended), so a refund there is two clicks in a dashboard they
-    /// already have; a message that only refused would read as a broken button.
+    /// It says where to go, not merely no. The charge sits at Stripe on the restaurant's own
+    /// connected account and only Stripe can return it — our key carries no refunds write — so
+    /// naming the gateway is the actionable half of the refusal; a message that only refused would
+    /// read as a broken button. (It used to say the restaurant "owns the account outright, Connect
+    /// Standard": under Connect Express the platform is the account's controller, so that reason
+    /// no longer holds even though the refusal does.)
     /// </remarks>
     public static string RefusalMessage(OrderPayment payment)
     {

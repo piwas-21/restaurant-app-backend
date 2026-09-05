@@ -72,7 +72,7 @@ public class GetPaymentsOnboardingQueryHandler
         if (!_gateway.IsConfigured)
         {
             return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
-                PaymentsOnboardingState.NotConfigured, null, _settings.DashboardUrl,
+                PaymentsOnboardingState.NotConfigured, null, PaymentsLink(),
                 CommissionBps: _commission.Bps));
         }
 
@@ -91,13 +91,26 @@ public class GetPaymentsOnboardingQueryHandler
             return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
                 PaymentsOnboardingState.AwaitingVerification,
                 _gateway.ConnectedAccountId,
-                _settings.DashboardUrl,
+                PaymentsLink(),
                 awaitingVerification.RequirementsDueCount,
                 _commission.Bps));
         }
 
         return ApiResponse<PaymentsOnboardingDto>.SuccessWithData(new PaymentsOnboardingDto(
-            PaymentsOnboardingState.Configured, _gateway.ConnectedAccountId, _settings.DashboardUrl,
+            PaymentsOnboardingState.Configured, _gateway.ConnectedAccountId, PaymentsLink(),
             CommissionBps: _commission.Bps));
     }
+
+    /// <summary>
+    /// The link the restaurant is sent to, or null when there is none to give.
+    /// </summary>
+    /// <remarks>
+    /// An unset setting is NOT a URL to fall back to. Under Connect Express the restaurant has no
+    /// full Stripe dashboard, the links Stripe does issue live 300 seconds, and this box cannot
+    /// mint one — so blank means "we have nowhere to send you", and the tab is built to say that
+    /// rather than to open a login the owner does not have. Whitespace is treated as blank because
+    /// an env file renders it exactly that way.
+    /// </remarks>
+    private string? PaymentsLink() =>
+        string.IsNullOrWhiteSpace(_settings.PaymentsLinkUrl) ? null : _settings.PaymentsLinkUrl;
 }

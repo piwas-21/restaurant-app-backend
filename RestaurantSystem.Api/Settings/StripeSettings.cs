@@ -24,7 +24,8 @@ public class StripeSettings
 
     /// <summary>
     /// The restaurant's own <c>acct_...</c>. Direct charges settle to their balance; funds never
-    /// pass through Sofra.
+    /// pass through Sofra. Unchanged by Connect Express, which moves only who is liable when that
+    /// balance goes NEGATIVE (<c>controller.losses.payments = application</c>: us).
     /// </summary>
     public string ConnectedAccountId { get; set; } = string.Empty;
 
@@ -40,10 +41,10 @@ public class StripeSettings
     public string CancelPath { get; set; } = "/checkout/review";
 
     /// <summary>
-    /// Where the RESTAURANT manages its own account — their dashboard, not ours (Connect Standard:
-    /// the money is theirs and so is the login). Reported by the admin onboarding endpoint (§9 P7a).
-    /// Unlike <see cref="SuccessPath"/> no deployment should differ; overriding it points a
-    /// restaurant owner at a login page we do not control. Settable only so no URL is compiled in.
+    /// Where the RESTAURANT is sent to reach its own Stripe account (§9 P7a) — and <b>never a
+    /// Stripe URL</b>: a Connect Express account has no full dashboard, and the links Stripe does
+    /// issue cannot be stored. The only correct value is a page of OURS that mints one per click,
+    /// so this is EMPTY until that page exists (GetPaymentsOnboardingQueryHandler says why).
     /// </summary>
-    public string DashboardUrl { get; set; } = "https://dashboard.stripe.com";
+    public string PaymentsLinkUrl { get; set; } = string.Empty;
 }
