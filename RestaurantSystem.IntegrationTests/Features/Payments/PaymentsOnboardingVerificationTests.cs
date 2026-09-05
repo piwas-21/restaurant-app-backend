@@ -125,9 +125,14 @@ public class PaymentsOnboardingAwaitingVerificationTests : PaymentsOnboardingVer
         // happen — the assertion is an exact set precisely so a new field cannot arrive unnoticed.
         // It is Sofra's own rate, not the restaurant's identity data, and the endpoint is admin-only,
         // so it is disclosure the owner is entitled to rather than a leak.
+        //
+        // `dashboardUrl` left the same way it arrived: under Connect Express it named a Stripe
+        // login the restaurant does not have. Its replacement, `paymentsLinkUrl`, is a page of
+        // ours that mints a short-lived Stripe link per click, and it is null until that page
+        // exists. This exact-set assertion is what caught the rename — keep it exact.
         (await AskAsync()).EnumerateObject().Select(p => p.Name).Should()
             .BeEquivalentTo(
-                ["state", "connectedAccountId", "dashboardUrl", "requirementsDue", "commissionBps"]);
+                ["state", "connectedAccountId", "paymentsLinkUrl", "requirementsDue", "commissionBps"]);
     }
 }
 
