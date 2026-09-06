@@ -69,6 +69,7 @@ public class GetCategoriesQueryHandler : IQueryHandler<GetCategoriesQuery, ApiRe
                 ImageUrl = c.ImageUrl,
                 IsActive = c.IsActive,
                 DisplayOrder = c.DisplayOrder,
+                IsHiddenFromAllTab = c.IsHiddenFromAllTab,
                 AvailableOrderTypes = c.AvailableOrderTypes,
                 ProductCount = c.ProductCategories.Count(pc => !pc.Product.IsDeleted && pc.Product.IsActive),
                 CreatedAt = c.CreatedAt,

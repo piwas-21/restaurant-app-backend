@@ -15,7 +15,11 @@ public record CreateCategoryCommand(
     int DisplayOrder,
     // OrderChannels bitmask; null = available on every order type (the default, so existing
     // clients that omit it are unrestricted). Written by the admin channel matrix.
-    int? AvailableOrderTypes = null
+    int? AvailableOrderTypes = null,
+    // Partner request 2026-09-06: keep the category orderable on its own tab but out of the
+    // guest "All" list. Default false — every category that existed before this flag stays
+    // exactly where it was.
+    bool IsHiddenFromAllTab = false
 ) : ICommand<ApiResponse<CategoryDto>>;
 
 public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryCommand, ApiResponse<CategoryDto>>
@@ -57,6 +61,7 @@ public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryComman
             AvailableOrderTypes = command.AvailableOrderTypes,
             Description = command.Description,
             IsActive = command.IsActive,
+            IsHiddenFromAllTab = command.IsHiddenFromAllTab,
             DisplayOrder = max + 1,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier()
@@ -72,6 +77,7 @@ public class CreateCategoryCommandHandler : ICommandHandler<CreateCategoryComman
             Description = category.Description,
             IsActive = category.IsActive,
             DisplayOrder = category.DisplayOrder,
+            IsHiddenFromAllTab = category.IsHiddenFromAllTab,
             AvailableOrderTypes = category.AvailableOrderTypes,
             ProductCount = 0,
             CreatedAt = category.CreatedAt,

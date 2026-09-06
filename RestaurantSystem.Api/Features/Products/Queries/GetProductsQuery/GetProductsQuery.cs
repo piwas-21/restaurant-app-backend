@@ -86,6 +86,12 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
         {
             productsQuery = productsQuery.Where(p => p.ProductCategories.Any(pc => pc.CategoryId == query.CategoryId.Value));
         }
+        else if (!_currentUser.IsStaff)
+        {
+            // The guest ALL view honours the category "hide from the All tab" flag (2026-09-06).
+            // Rationale + the soft-delete conflation it avoids: GuestAllViewVisibility.
+            productsQuery = await GuestAllViewVisibility.ExcludeHiddenAsync(_context, productsQuery, cancellationToken);
+        }
 
         if (query.Type.HasValue)
         {

@@ -179,6 +179,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     ImageUrl = pc.Category.ImageUrl,
                     IsActive = pc.Category.IsActive,
                     DisplayOrder = pc.Category.DisplayOrder,
+                    IsHiddenFromAllTab = pc.Category.IsHiddenFromAllTab,
                     AvailableOrderTypes = pc.Category.AvailableOrderTypes
                 })
                 .FirstOrDefault(),
