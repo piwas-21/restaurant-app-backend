@@ -102,15 +102,18 @@ public class UploadMultipleProductImagesCommandTests : IntegrationTestBase
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var fileStorageSettings = scope.ServiceProvider.GetRequiredService<IOptions<FileStorageSettings>>();
 
-        var handler = new UploadMultipleProductImagesCommandHandler(
+        var walker = new BulkImageUploadWalker(
             context,
             new StubStorage(),
             new ImageSharpImageProcessor(fileStorageSettings, NullLogger<ImageSharpImageProcessor>.Instance),
             currentUser,
-            NullLogger<UploadMultipleProductImagesCommandHandler>.Instance,
-            NullLogger<BulkImageUploadWalker>.Instance,
             configuration,
-            fileStorageSettings);
+            fileStorageSettings,
+            NullLogger<BulkImageUploadWalker>.Instance);
+        var handler = new UploadMultipleProductImagesCommandHandler(
+            context,
+            NullLogger<UploadMultipleProductImagesCommandHandler>.Instance,
+            walker);
 
         return await handler.Handle(
             new UploadMultipleProductImagesCommand(productId, files.ToList()), CancellationToken.None);
