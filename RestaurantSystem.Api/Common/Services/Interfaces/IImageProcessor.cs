@@ -22,4 +22,15 @@ public interface IImageProcessor
     /// that picks the encoder. A non-seekable stream is buffered first.
     /// </summary>
     Task<Stream?> ProcessAsync(Stream source, string fileName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A CARD-SIZED WebP derivative of a stored original (menu cards render at 120-400 CSS px;
+    /// served originals run 800-1600 px, which is 8.3-16.4 MB per All view across tenants —
+    /// partner-reported slowness, 2026-09-06). Fits within <paramref name="maxEdge"/>, never
+    /// enlarges, always encodes WebP regardless of the source format: a PNG photo at this size
+    /// is the single largest win. Returns a rewound stream, or <c>null</c> when the source is
+    /// not a decodable raster image — the caller then serves the original, exactly as
+    /// <see cref="ProcessAsync"/>'s fail-open contract does.
+    /// </summary>
+    Task<Stream?> GenerateCardVariantAsync(Stream source, string fileName, int maxEdge, CancellationToken cancellationToken = default);
 }

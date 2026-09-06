@@ -18,7 +18,10 @@ public record UpdateCategoryCommand(
     // omitted value is distinguishable from a posted 0 rather than silently becoming one (S6964).
     int? DisplayOrder = null,
     // OrderChannels bitmask; null = every order type. Written by the admin channel matrix.
-    int? AvailableOrderTypes = null
+    int? AvailableOrderTypes = null,
+    // Partner request 2026-09-06: keep the category orderable on its own tab but out of the
+    // guest "All" list. The admin edit form always posts it (the PUT is a full replace).
+    bool IsHiddenFromAllTab = false
 ) : ICommand<ApiResponse<CategoryDto>>;
 
 public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryCommand, ApiResponse<CategoryDto>>
@@ -68,6 +71,7 @@ public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryComman
         category.Name = command.Name;
         category.Description = command.Description;
         category.IsActive = command.IsActive;
+        category.IsHiddenFromAllTab = command.IsHiddenFromAllTab;
         category.AvailableOrderTypes = command.AvailableOrderTypes;
         category.UpdatedAt = DateTime.UtcNow;
         category.UpdatedBy = _currentUserService.GetAuditIdentifier();
@@ -82,6 +86,7 @@ public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryComman
             ImageUrl = category.ImageUrl,
             IsActive = category.IsActive,
             DisplayOrder = category.DisplayOrder,
+            IsHiddenFromAllTab = category.IsHiddenFromAllTab,
             AvailableOrderTypes = category.AvailableOrderTypes,
             ProductCount = category.ProductCategories.Count(pc => !pc.Product.IsDeleted && pc.Product.IsActive),
             CreatedAt = category.CreatedAt,

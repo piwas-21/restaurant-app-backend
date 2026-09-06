@@ -111,16 +111,93 @@ public class ImageSharpImageProcessor : IImageProcessor
             image.Metadata.XmpProfile = null;
             image.Metadata.IptcProfile = null;
 
-            var output = new MemoryStream();
-            await image.SaveAsync(output, EncoderFor(extension), cancellationToken);
-            output.Position = 0;
-            return output;
+            return await EncodeAsync(image, EncoderFor(extension), cancellationToken);
         }
         catch (Exception ex)
         {
             // Fail open: an undecodable upload is stored as-is rather than rejected at this seam
             // (the command validator already screens type + size).
             _logger.LogWarning(ex, "Image processing failed for {FileName}; storing the original", fileName);
+            return null;
+        }
+        finally
+        {
+            if (buffered is not null)
+            {
+                await buffered.DisposeAsync();
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Stream?> GenerateCardVariantAsync(Stream source, string fileName, int maxEdge, CancellationToken cancellationToken = default)
+    {
+        var extension = Path.GetExtension(fileName);
+        if (!ProcessableExtensions.Contains(extension))
+        {
+            return null;
+        }
+
+        // An already-cancelled caller must not reach decode work: ImageSharp may complete a tiny
+        // identify without observing the token and the fail-open catch would swallow the request.
+        cancellationToken.ThrowIfCancellationRequested();
+
+        MemoryStream? buffered = null;
+        try
+        {
+            Stream input = source;
+            if (!source.CanSeek)
+            {
+                buffered = await BufferAsync(source, cancellationToken);
+                input = buffered;
+            }
+
+            var start = input.Position;
+            var info = await Image.IdentifyAsync(input, cancellationToken);
+            // Same decompression-bomb guard ProcessAsync applies: the variant runs on the RAW
+            // upload (the stored original was already bounded, but this stream never was), and
+            // PNG/WebP cannot scale-on-decode, so the plain pixel limit is the honest one here.
+            if ((long)info.Width * info.Height > _settings.MaxDecodePixels)
+            {
+                _logger.LogWarning(
+                    "Skipping card variant for {FileName}: {Width}x{Height} exceeds the decode guard",
+                    fileName, info.Width, info.Height);
+                return null;
+            }
+
+            input.Position = start;
+            using var image = await Image.LoadAsync(input, cancellationToken);
+
+            image.Mutate(ctx =>
+            {
+                ctx.AutoOrient();
+                // Never enlarge: a source already at or under the card box is stored as WebP
+                // unchanged in geometry, which still wins on bytes for JPEG/PNG sources.
+                if (Math.Max(image.Width, image.Height) > maxEdge)
+                {
+                    ctx.Resize(new ResizeOptions
+                    {
+                        Mode = ResizeMode.Max,
+                        Size = new Size(maxEdge, maxEdge),
+                    });
+                }
+            });
+
+            image.Metadata.ExifProfile = null;
+            image.Metadata.XmpProfile = null;
+            image.Metadata.IptcProfile = null;
+
+            return await EncodeAsync(image, new WebpEncoder { Quality = Math.Clamp(_settings.ImageQuality, 1, 100) }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Same fail-open contract as ProcessAsync: no variant is strictly better than a
+            // broken one, and the caller serves the original.
+            _logger.LogWarning(ex, "Card variant generation failed for {FileName}; serving the original", fileName);
             return null;
         }
         finally
@@ -166,9 +243,33 @@ public class ImageSharpImageProcessor : IImageProcessor
     private static async Task<MemoryStream> BufferAsync(Stream source, CancellationToken cancellationToken)
     {
         var buffered = new MemoryStream();
-        await source.CopyToAsync(buffered, cancellationToken);
-        buffered.Position = 0;
-        return buffered;
+        try
+        {
+            await source.CopyToAsync(buffered, cancellationToken);
+            buffered.Position = 0;
+            return buffered;
+        }
+        catch
+        {
+            await buffered.DisposeAsync();
+            throw;
+        }
+    }
+
+    private static async Task<Stream> EncodeAsync(Image image, IImageEncoder encoder, CancellationToken cancellationToken)
+    {
+        var output = new MemoryStream();
+        try
+        {
+            await image.SaveAsync(output, encoder, cancellationToken);
+            output.Position = 0;
+            return output;
+        }
+        catch
+        {
+            await output.DisposeAsync();
+            throw;
+        }
     }
 
     private IImageEncoder EncoderFor(string extension)

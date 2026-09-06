@@ -57,6 +57,9 @@ public class ImageProcessingFileStorageServiceTests
 
         public Task<Stream?> ProcessAsync(Stream source, string fileName, CancellationToken cancellationToken = default) =>
             Task.FromResult(result);
+
+        public Task<Stream?> GenerateCardVariantAsync(Stream source, string fileName, int maxEdge, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Stream?>(null);
     }
 
     private sealed class RecordingStorage : IFileStorageService

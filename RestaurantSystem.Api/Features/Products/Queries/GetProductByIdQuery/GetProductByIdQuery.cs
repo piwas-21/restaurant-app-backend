@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
@@ -96,61 +97,13 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             Allergens = product.Allergens,
             DisplayOrder = product.DisplayOrder,
             DetailedIngredients = product.DetailedIngredients
-                .Select(di =>
-                {
-                    // Start with global translations if available
-                    var content = new Dictionary<string, ProductIngredientContentDto>();
-
-                    // `!IsDeleted` in code, not as a filtered include: EF Core's include filters
-                    // apply to COLLECTIONS only, and this is a reference navigation. Without it the
-                    // `IgnoreQueryFilters()` above serves a soft-deleted global ingredient's
-                    // translations here — the §9.14 shape, newly reachable now that deleting a global
-                    // ingredient soft-deletes instead of failing on its FK. The ingredient row itself
-                    // still renders; only the global's translated names are withheld, and
-                    // `ProductIngredient.Name` below is the fallback that already covers that.
-                    if (di.GlobalIngredient != null && !di.GlobalIngredient.IsDeleted)
-                    {
-                        foreach (var trans in di.GlobalIngredient.Translations)
-                        {
-                            content[trans.LanguageCode] = new ProductIngredientContentDto
-                            {
-                                Name = trans.Name,
-                                Description = null // Global ingredients don't have descriptions in this context yet
-                            };
-                        }
-                    }
-
-                    // Override with specific descriptions
-                    foreach (var desc in di.Descriptions)
-                    {
-                        content[desc.LanguageCode] = new ProductIngredientContentDto
-                        {
-                            Name = desc.Name,
-                            Description = desc.Description
-                        };
-                    }
-
-                    return new ProductIngredientDto
-                    {
-                        Id = di.Id,
-                        Name = di.Name,
-                        IsOptional = di.IsOptional,
-                        Price = di.Price,
-                        IsIncludedInBasePrice = di.IsIncludedInBasePrice,
-                        IsActive = di.IsActive,
-                        DisplayOrder = di.DisplayOrder,
-                        MaxQuantity = di.MaxQuantity,
-                        GlobalIngredientId = di.GlobalIngredientId,
-                        Kind = di.Kind,
-                        ExclusionGroup = di.ExclusionGroup,
-                        Content = content
-                    };
-                })
+                .Select(MapDetailedIngredient)
                 .ToList(),
             Images = product.Images.Select(i => new ProductImageDto
             {
                 Id = i.Id,
                 Url = UrlJoin.Join(_baseUrl, i.Url),
+                CardUrl = i.CardUrl is null ? null : UrlJoin.Join(_baseUrl, i.CardUrl),
                 AltText = i.AltText,
                 IsPrimary = i.IsPrimary,
                 SortOrder = i.SortOrder,
@@ -179,6 +132,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     ImageUrl = pc.Category.ImageUrl,
                     IsActive = pc.Category.IsActive,
                     DisplayOrder = pc.Category.DisplayOrder,
+                    IsHiddenFromAllTab = pc.Category.IsHiddenFromAllTab,
                     AvailableOrderTypes = pc.Category.AvailableOrderTypes
                 })
                 .FirstOrDefault(),
@@ -230,6 +184,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         {
                             Id = i.Id,
                             Url = UrlJoin.Join(_baseUrl, i.Url),
+                            CardUrl = i.CardUrl is null ? null : UrlJoin.Join(_baseUrl, i.CardUrl),
                             AltText = i.AltText,
                             IsPrimary = i.IsPrimary,
                             SortOrder = i.SortOrder,
@@ -261,5 +216,60 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
 
         _logger.LogInformation("Retrieved product {ProductId} successfully", query.Id);
         return ApiResponse<ProductDto>.SuccessWithData(productDto);
+    }
+
+    /// <summary>
+    /// Projects one detailed ingredient. Extracted from Handle so the query handler stays inside
+    /// the cognitive-complexity budget; the rules it applies are unchanged.
+    /// </summary>
+    private static ProductIngredientDto MapDetailedIngredient(ProductIngredient di)
+    {
+        // Start with global translations if available
+        var content = new Dictionary<string, ProductIngredientContentDto>();
+
+        // `!IsDeleted` in code, not as a filtered include: EF Core's include filters
+        // apply to COLLECTIONS only, and this is a reference navigation. Without it the
+        // `IgnoreQueryFilters()` above serves a soft-deleted global ingredient's
+        // translations here — the §9.14 shape, newly reachable now that deleting a global
+        // ingredient soft-deletes instead of failing on its FK. The ingredient row itself
+        // still renders; only the global's translated names are withheld, and
+        // `ProductIngredient.Name` below is the fallback that already covers that.
+        if (di.GlobalIngredient != null && !di.GlobalIngredient.IsDeleted)
+        {
+            foreach (var trans in di.GlobalIngredient.Translations)
+            {
+                content[trans.LanguageCode] = new ProductIngredientContentDto
+                {
+                    Name = trans.Name,
+                    Description = null // Global ingredients don't have descriptions in this context yet
+                };
+            }
+        }
+
+        // Override with specific descriptions
+        foreach (var desc in di.Descriptions)
+        {
+            content[desc.LanguageCode] = new ProductIngredientContentDto
+            {
+                Name = desc.Name,
+                Description = desc.Description
+            };
+        }
+
+        return new ProductIngredientDto
+        {
+            Id = di.Id,
+            Name = di.Name,
+            IsOptional = di.IsOptional,
+            Price = di.Price,
+            IsIncludedInBasePrice = di.IsIncludedInBasePrice,
+            IsActive = di.IsActive,
+            DisplayOrder = di.DisplayOrder,
+            MaxQuantity = di.MaxQuantity,
+            GlobalIngredientId = di.GlobalIngredientId,
+            Kind = di.Kind,
+            ExclusionGroup = di.ExclusionGroup,
+            Content = content
+        };
     }
 }

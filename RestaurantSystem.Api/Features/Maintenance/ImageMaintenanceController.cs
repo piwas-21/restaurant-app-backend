@@ -8,12 +8,13 @@ namespace RestaurantSystem.Api.Features.Maintenance;
 
 /// <summary>
 /// Admin-only one-off maintenance over stored images. Resize-on-upload only ever applied to new
-/// uploads; this brings everything older into line with the same settings.
+/// uploads; this brings everything older into line with the same settings. Card-variant repair
+/// lives in <see cref="CardVariantMaintenanceController"/>.
 /// </summary>
 [ApiController]
 [Route("api/maintenance/images")]
 [Authorize(Roles = "Admin")]
-public class ImageMaintenanceController : ControllerBase
+public class ImageMaintenanceController(IImageBackfillService backfill) : ControllerBase
 {
     /// <summary>
     /// Ceiling on <c>maxFiles</c>. The work is synchronous, so one call must stay inside a sane
@@ -24,13 +25,6 @@ public class ImageMaintenanceController : ControllerBase
     /// rewritten one does and counts against this cap just the same.
     /// </summary>
     private const int MaxFilesPerRun = 500;
-
-    private readonly IImageBackfillService _backfill;
-
-    public ImageMaintenanceController(IImageBackfillService backfill)
-    {
-        _backfill = backfill;
-    }
 
     /// <summary>
     /// Report what the resize pipeline would do to the images already in storage.
@@ -48,7 +42,7 @@ public class ImageMaintenanceController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var capped = Math.Clamp(maxFiles, 1, MaxFilesPerRun);
-        var report = await _backfill.RunAsync(apply, capped, continueFrom, cancellationToken);
+        var report = await backfill.RunAsync(apply, capped, continueFrom, cancellationToken);
 
         var message = apply
             ? $"Rewrote {report.FilesChanged} image(s), saving {report.TotalBytesSaved / 1024} KB."
@@ -69,7 +63,7 @@ public class ImageMaintenanceController : ControllerBase
     [HttpDelete("backfill/previews")]
     public ApiResponse<int> ClearPreviews()
     {
-        var removed = _backfill.ClearPreviews();
+        var removed = backfill.ClearPreviews();
         return ApiResponse<int>.SuccessWithData(removed, $"Removed {removed} preview file(s).");
     }
 }

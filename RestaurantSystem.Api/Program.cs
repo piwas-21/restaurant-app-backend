@@ -674,6 +674,8 @@ builder.Services.AddSingleton<IFormFieldSeedState, FormFieldSeedState>();
 builder.Services.AddScoped<IQRCodeService, QRCodeService>();
 // One-off admin maintenance: re-runs the resize-on-upload pipeline over images stored before it
 // existed. Dry-run by default (see ImageMaintenanceController).
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Maintenance.Interfaces.IProductCardVariantBackfillService,
+    RestaurantSystem.Api.Features.Maintenance.Services.ProductCardVariantBackfillService>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Maintenance.Interfaces.IImageBackfillService,
     RestaurantSystem.Api.Features.Maintenance.Services.ImageBackfillService>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.FloorPlan.Services.IFloorPlanService, RestaurantSystem.Api.Features.FloorPlan.Services.FloorPlanService>();

@@ -46,6 +46,9 @@ public static class ProductSummaryMapper
             {
                 Id = image.Id,
                 Url = UrlJoin.Join(baseUrl, image.Url),
+                // Null-safe: rows predating the card variant (or a failed derivation) serve the
+                // original — the frontend falls back to Url when this is absent.
+                CardUrl = image.CardUrl is null ? null : UrlJoin.Join(baseUrl, image.CardUrl),
                 IsPrimary = image.IsPrimary,
                 SortOrder = image.SortOrder,
                 AltText = image.AltText
