@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -25,6 +26,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
 {
     private readonly ApplicationDbContext _context;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IImageProcessor _imageProcessor;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UploadProductImageCommandHandler> _logger;
     private readonly string _baseUrl;
@@ -33,6 +35,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
     public UploadProductImageCommandHandler(
         ApplicationDbContext context,
         IFileStorageService fileStorageService,
+        IImageProcessor imageProcessor,
         ICurrentUserService currentUserService,
         ILogger<UploadProductImageCommandHandler> logger,
         IConfiguration configuration,
@@ -44,6 +47,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
         _logger = logger;
         _baseUrl = configuration["AWS:S3:BaseUrl"]!;
         _fileStorageSettings = fileStorageSettings.Value;
+        _imageProcessor = imageProcessor;
     }
 
     public async Task<ApiResponse<ProductImageDto>> Handle(UploadProductImageCommand command, CancellationToken cancellationToken)
@@ -71,6 +75,13 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
                 $"products/{command.ProductId}",
                 cancellationToken: cancellationToken);
 
+            // The card variant is best-effort (fail-open to serving the original): a failed
+            // derivation must never fail the upload itself.
+            var cardUrl = await ProductImageCardVariants.GenerateAndStoreAsync(
+                _fileStorageService, _imageProcessor,
+                $"products/{command.ProductId}", Path.GetFileName(imageUrl),
+                command.Image.OpenReadStream(), _logger, cancellationToken);
+
             // If this is the first image or marked as primary, unset other primary images
             if (command.IsPrimary || !product.Images.Any(i => !i.IsDeleted))
             {
@@ -88,6 +99,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
             {
                 ProductId = command.ProductId,
                 Url = imageUrl,
+                CardUrl = cardUrl,
                 AltText = command.AltText ?? product.Name,
                 IsPrimary = command.IsPrimary || !product.Images.Any(i => !i.IsDeleted),
                 SortOrder = command.SortOrder ?? product.Images.Count(i => !i.IsDeleted),
@@ -101,6 +113,7 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
             var responseDto = new ProductImageDto
             {
                 Url = UrlJoin.Join(_baseUrl, productImage.Url),
+                CardUrl = productImage.CardUrl is null ? null : UrlJoin.Join(_baseUrl, productImage.CardUrl),
                 AltText = productImage.AltText,
                 IsPrimary = productImage.IsPrimary,
                 SortOrder = productImage.SortOrder,

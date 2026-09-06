@@ -25,11 +25,35 @@ public class ImageMaintenanceController : ControllerBase
     /// </summary>
     private const int MaxFilesPerRun = 500;
 
-    private readonly IImageBackfillService _backfill;
+    /// <summary>
+    /// Ceiling on <c>maxRows</c>: one card variant costs a full decode + re-encode of the
+    /// original, the same per-file cost class the resize backfill's cap exists for.
+    /// </summary>
+    private const int MaxRowsPerRun = 300;
 
-    public ImageMaintenanceController(IImageBackfillService backfill)
+    private readonly IImageBackfillService _backfill;
+    private readonly IProductCardVariantBackfillService _cardVariants;
+
+    public ImageMaintenanceController(IImageBackfillService backfill, IProductCardVariantBackfillService cardVariants)
     {
         _backfill = backfill;
+        _cardVariants = cardVariants;
+    }
+
+    /// <summary>
+    /// Generates the card WebP for every product image that predates the feature. Dry-run
+    /// (<c>apply=false</c>) reports counts only; <c>apply=true</c> writes
+    /// <c>&lt;name&gt;-800.webp</c> beside each original and fills <c>ProductImage.CardUrl</c>.
+    /// Re-running continues — filled rows drop out of the query.
+    /// </summary>
+    [HttpPost("card-variants")]
+    public async Task<ApiResponse<ProductCardVariantReportDto>> BackfillCardVariants(
+        [FromQuery] bool apply = false,
+        [FromQuery] int maxRows = MaxRowsPerRun,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await _cardVariants.RunAsync(apply, maxRows, cancellationToken);
+        return ApiResponse<ProductCardVariantReportDto>.SuccessWithData(report);
     }
 
     /// <summary>

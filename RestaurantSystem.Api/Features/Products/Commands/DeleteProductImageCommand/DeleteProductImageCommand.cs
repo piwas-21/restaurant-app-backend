@@ -62,6 +62,14 @@ public class DeleteProductImageCommandHandler : ICommandHandler<DeleteProductIma
         try
         {
             await _fileStorageService.DeleteFileAsync(image.Url, cancellationToken);
+
+            // The card variant is a sibling file derived from this original — leaving it behind
+            // would orphan bytes on the volume (and a later re-upload of the same filename is
+            // impossible: names are timestamp-hash unique).
+            if (image.CardUrl != null)
+            {
+                await _fileStorageService.DeleteFileAsync(image.CardUrl, cancellationToken);
+            }
         }
         catch (Exception ex)
         {

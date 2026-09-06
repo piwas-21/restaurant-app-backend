@@ -151,6 +151,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             {
                 Id = i.Id,
                 Url = UrlJoin.Join(_baseUrl, i.Url),
+                CardUrl = i.CardUrl is null ? null : UrlJoin.Join(_baseUrl, i.CardUrl),
                 AltText = i.AltText,
                 IsPrimary = i.IsPrimary,
                 SortOrder = i.SortOrder,
@@ -231,6 +232,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                         {
                             Id = i.Id,
                             Url = UrlJoin.Join(_baseUrl, i.Url),
+                            CardUrl = i.CardUrl is null ? null : UrlJoin.Join(_baseUrl, i.CardUrl),
                             AltText = i.AltText,
                             IsPrimary = i.IsPrimary,
                             SortOrder = i.SortOrder,
