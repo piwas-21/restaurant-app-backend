@@ -74,36 +74,46 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                 return ApiResponse<ReservationDto>.Failure("Cannot make reservations for past dates");
             }
 
-            // Validate table exists and is active
-            var table = await _context.Tables
-                .FirstOrDefaultAsync(t => t.Id == data.TableId && t.IsActive, cancellationToken);
+            // Validate tables: the primary AND every combined table must exist and be active.
+            // A combined booking is ONE reservation over N tables (#561).
+            var combinedTableIds = data.CombinedTableIds ?? new List<Guid>();
+            var requestedTableIds = combinedTableIds.Append(data.TableId).Distinct().ToList();
 
-            if (table == null)
+            var tables = await _context.Tables
+                .Where(t => requestedTableIds.Contains(t.Id) && t.IsActive)
+                .ToListAsync(cancellationToken);
+
+            if (tables.Count != requestedTableIds.Count)
             {
                 return ApiResponse<ReservationDto>.Failure("Table not found or inactive");
             }
 
-            // Validate table capacity
-            if (table.MaxGuests < data.NumberOfGuests)
+            var table = tables.Single(t => t.Id == data.TableId);
+
+            // Capacity: the party fits when the SUM of the set's capacities fits — the point of
+            // combining is that INDIVIDUAL tables may each be smaller than the party.
+            var seatedCapacity = tables.Sum(t => t.MaxGuests);
+            if (seatedCapacity < data.NumberOfGuests)
             {
-                return ApiResponse<ReservationDto>.Failure($"Table {table.TableNumber} can only accommodate {table.MaxGuests} guests");
+                return ApiResponse<ReservationDto>.Failure(
+                    $"The selected tables can only accommodate {seatedCapacity} guests in total");
             }
 
-            // Check for time slot conflicts
-            var hasConflict = await _context.Reservations
-                .AnyAsync(r =>
-                    r.TableId == data.TableId &&
-                    r.ReservationDate.Date == data.ReservationDate.Date &&
-                    (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed) &&
-                    ((r.StartTime < data.EndTime && r.EndTime > data.StartTime)), // Check overlap
-                    cancellationToken);
+            // Check for time slot conflicts across EVERY table the booking would occupy — a
+            // combined reservation elsewhere blocks each of its tables here too.
+            var hasConflict = await _context.Reservations.AnyAsync(
+                ReservationSlotOccupancy.ConflictsWithAnyOf(
+                    requestedTableIds, data.ReservationDate, data.StartTime, data.EndTime),
+                cancellationToken);
 
             if (hasConflict)
             {
-                return ApiResponse<ReservationDto>.Failure($"Table {table.TableNumber} is not available for the selected time slot");
+                return ApiResponse<ReservationDto>.Failure("One or more of the selected tables is not available for the selected time slot");
             }
 
-            // Create reservation
+            // Create reservation — with one child row per combined table, so every occupancy
+            // read of these tables sees this booking (#561).
+            var createdBy = command.CustomerId?.ToString() ?? "Guest";
             var reservation = new Reservation
             {
                 CustomerId = command.CustomerId,
@@ -118,7 +128,11 @@ public class CreateReservationCommandHandler : ICommandHandler<CreateReservation
                 Status = ReservationStatus.Pending,
                 SpecialRequests = data.SpecialRequests,
                 PreferredLanguage = language,
-                CreatedBy = command.CustomerId?.ToString() ?? "Guest"
+                CreatedBy = createdBy,
+                CombinedTables = combinedTableIds
+                    .Where(id => id != data.TableId)
+                    .Select(id => new ReservationTable { TableId = id, CreatedBy = createdBy })
+                    .ToList()
             };
 
             _context.Reservations.Add(reservation);

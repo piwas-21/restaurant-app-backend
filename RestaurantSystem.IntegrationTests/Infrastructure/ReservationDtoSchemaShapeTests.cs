@@ -73,4 +73,19 @@ public class ReservationDtoSchemaShapeTests
     {
         Document().Components!.Schemas!.Should().NotContainKey("ReservationWriteDto");
     }
+
+    /// <summary>
+    /// #561: the booking request carries the combined-tables extension. Additive and create-only —
+    /// the update DTO deliberately has no way to change a combined set, and this pins BOTH halves
+    /// so the next field cannot silently land on the wrong one.
+    /// </summary>
+    [Fact]
+    public void Only_the_create_dto_carries_the_combined_tables_extension()
+    {
+        var schemas = Document().Components!.Schemas!;
+
+        schemas["CreateReservationDto"].Properties!.Keys.Should().Contain("combinedTableIds");
+        schemas["UpdateReservationDto"].Properties!.Keys.Should().NotContain("combinedTableIds");
+        schemas["ReservationDto"].Properties!.Keys.Should().Contain("combinedTableIds");
+    }
 }
