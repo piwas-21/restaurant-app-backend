@@ -154,13 +154,20 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
         var totalCount = await productsQuery.CountAsync(cancellationToken);
 
 
-        var products = await productsQuery
-        // ThenBy(Id) is REQUIRED by the split above, not cosmetic: a split query with
-        // Skip/Take correlates its separate round-trips by the ordering, so a non-unique one
-        // (DisplayOrder+Name is not unique) can attach a product's images to another product.
-        .OrderBy(p => p.DisplayOrder)
-        .ThenBy(p => p.Name)
-        .ThenBy(p => p.Id)
+        // The guest's ALL view (no CategoryId) reads as one menu, so it follows the menu's own
+        // structure — primary category display_order, then the product's own (partner feedback
+        // 2026-09-06). Staff keeps the flat order the admin list edits against; the IsActive
+        // branch above already splits guest/staff on purpose. Policy + rationale:
+        // ProductListOrdering. The shared ThenBy tail is REQUIRED by the split query: Skip/Take
+        // correlates its round-trips by the ordering, so a non-unique one can attach one
+        // product's images to another.
+        var ordered = (query.CategoryId is null && !_currentUser.IsStaff
+                ? ProductListOrdering.ForGuestAllView(productsQuery)
+                : ProductListOrdering.Flat(productsQuery))
+            .ThenBy(p => p.Name)
+            .ThenBy(p => p.Id);
+
+        var products = await ordered
         .Skip((query.Page - 1) * query.PageSize)
         .Take(query.PageSize)
         .ToListAsync(cancellationToken);
