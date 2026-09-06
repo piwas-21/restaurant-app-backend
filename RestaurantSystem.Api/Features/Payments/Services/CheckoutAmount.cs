@@ -1,4 +1,3 @@
-using System.Globalization;
 using RestaurantSystem.Api.Common.Exceptions;
 
 namespace RestaurantSystem.Api.Features.Payments.Services;
@@ -7,22 +6,24 @@ namespace RestaurantSystem.Api.Features.Payments.Services;
 /// A chargeable amount, resolved once from the PERSISTED order total and the tenant's currency.
 ///
 /// <para>
-/// Its reason for existing is that three separate things can make a total unchargeable — an
-/// unusable currency label, a non-positive total, and Stripe's TWINT ceiling — and all three must
-/// be answered BEFORE the Stripe call. Answered after, each one is a raw gateway error in front of
-/// a diner instead of a sentence they can act on.
+/// Its reason for existing is that a total can be unchargeable for reasons this can answer
+/// cheaply — an unusable currency label, a non-positive total — and both must be answered BEFORE
+/// the Stripe call. Answered after, each one is a raw gateway error in front of a diner instead
+/// of a sentence they can act on.
 /// </para>
+///
+/// <remarks>
+/// The TWINT ceiling pre-check was removed (#343): with payment methods chosen dynamically —
+/// how S4 ships them, <c>payment_method_types</c> unset — Stripe silently drops TWINT above its
+/// CHF 5,000 session ceiling and keeps card, so there was no gateway error to pre-empt and a
+/// diner with a CHF 5,001 order was wrongly refused. Measured, plan §7.5. If a future slice ever
+/// pins <c>payment_method_types</c> explicitly, the refusal becomes real again and the pre-check
+/// should return with it.
+/// </remarks>
 /// </summary>
 public readonly record struct CheckoutAmount
 {
     private const int MinorUnitsPerMajor = 100;
-
-    /// <summary>
-    /// Stripe enforces the TWINT ceiling at SESSION CREATION, not at payment — measured, plan §3:
-    /// <c>code = amount_too_large</c>, max CHF 5,000.00. So the whole redirect fails, not just the
-    /// TWINT tile, which is why this is a pre-check rather than something the diner discovers.
-    /// </summary>
-    private const long TwintMaxMinorChf = 5_000_00;
 
     private const string ChfCurrency = "CHF";
 
@@ -83,15 +84,6 @@ public readonly record struct CheckoutAmount
         }
 
         var minor = decimal.ToInt64(decimal.Round(total, 2, MidpointRounding.AwayFromZero) * MinorUnitsPerMajor);
-
-        if (currency.Equals(ChfCurrency, StringComparison.OrdinalIgnoreCase) && minor > TwintMaxMinorChf)
-        {
-            throw new BadRequestException(string.Format(
-                CultureInfo.InvariantCulture,
-                "Online payment is not available for orders above {0:N2} {1}. Please pay at the restaurant.",
-                TwintMaxMinorChf / (decimal)MinorUnitsPerMajor,
-                ChfCurrency));
-        }
 
         return new CheckoutAmount(currency.ToLowerInvariant(), minor);
     }
