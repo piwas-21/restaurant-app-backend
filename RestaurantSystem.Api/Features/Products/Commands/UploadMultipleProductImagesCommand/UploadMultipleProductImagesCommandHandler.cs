@@ -74,9 +74,9 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
 
         try
         {
-            (uploadedImages, errors) = await BulkImageUploadWalker.UploadEachAsync(
-                command, product, hasPrimaryImage, currentMaxSortOrder,
-                _fileStorageSettings, _logger, StoreAsync, Describe, cancellationToken);
+            var walker = new BulkImageUploadWalker(_fileStorageSettings, _logger, StoreAsync, Describe);
+            (uploadedImages, errors) = await walker.UploadEachAsync(
+                command, product, hasPrimaryImage, currentMaxSortOrder, cancellationToken);
 
             if (uploadedImages.Count > 0)
             {

@@ -15,17 +15,17 @@ namespace RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductI
 /// the handler so the transaction flow and the per-file rules stay separately readable (and the
 /// handler inside its CLAUDE.md §4 file-length budget).
 /// </summary>
-internal static class BulkImageUploadWalker
+internal sealed class BulkImageUploadWalker(
+    FileStorageSettings fileStorageSettings,
+    ILogger<UploadMultipleProductImagesCommandHandler> logger,
+    Func<Guid, string, IFormFile, bool, int, CancellationToken, Task<ProductImageDto>> storeAsync,
+    Func<IFormFile, string, string> describe)
 {
-    public static async Task<(List<ProductImageDto> Uploaded, List<string> Errors)> UploadEachAsync(
+    public async Task<(List<ProductImageDto> Uploaded, List<string> Errors)> UploadEachAsync(
         UploadMultipleProductImagesCommand command,
         Product product,
         bool hasPrimaryImage,
         int currentMaxSortOrder,
-        FileStorageSettings fileStorageSettings,
-        ILogger<UploadMultipleProductImagesCommandHandler> logger,
-        Func<Guid, string, IFormFile, bool, int, CancellationToken, Task<ProductImageDto>> storeAsync,
-        Func<IFormFile, string, string> describe,
         CancellationToken cancellationToken)
     {
         var uploadedImages = new List<ProductImageDto>();
