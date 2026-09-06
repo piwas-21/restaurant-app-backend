@@ -19,6 +19,7 @@ namespace RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductI
 public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadMultipleProductImagesCommand, ApiResponse<List<ProductImageDto>>>
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<BulkImageUploadWalker> _bulkUploadLogger;
     private readonly IFileStorageService _fileStorageService;
     private readonly IImageProcessor _imageProcessor;
     private readonly ICurrentUserService _currentUserService;
@@ -32,10 +33,12 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
         IImageProcessor imageProcessor,
         ICurrentUserService currentUserService,
         ILogger<UploadMultipleProductImagesCommandHandler> logger,
+        ILogger<BulkImageUploadWalker> bulkUploadLogger,
         IConfiguration configuration,
         IOptions<FileStorageSettings> fileStorageSettings)
     {
         _context = context;
+        _bulkUploadLogger = bulkUploadLogger;
         _fileStorageService = fileStorageService;
         _currentUserService = currentUserService;
         _logger = logger;
@@ -74,7 +77,7 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
 
         try
         {
-            var walker = new BulkImageUploadWalker(_fileStorageSettings, _logger, StoreAsync, Describe);
+            var walker = new BulkImageUploadWalker(_fileStorageSettings, _bulkUploadLogger, StoreAsync, Describe);
             (uploadedImages, errors) = await walker.UploadEachAsync(
                 command, product, hasPrimaryImage, currentMaxSortOrder, cancellationToken);
 

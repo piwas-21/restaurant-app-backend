@@ -15,9 +15,9 @@ namespace RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductI
 /// the handler so the transaction flow and the per-file rules stay separately readable (and the
 /// handler inside its CLAUDE.md §4 file-length budget).
 /// </summary>
-internal sealed class BulkImageUploadWalker(
+public sealed class BulkImageUploadWalker(
     FileStorageSettings fileStorageSettings,
-    ILogger<UploadMultipleProductImagesCommandHandler> logger,
+    ILogger<BulkImageUploadWalker> logger,
     Func<Guid, string, IFormFile, bool, int, CancellationToken, Task<ProductImageDto>> storeAsync,
     Func<IFormFile, string, string> describe)
 {

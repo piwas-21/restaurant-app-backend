@@ -108,6 +108,7 @@ public class UploadMultipleProductImagesCommandTests : IntegrationTestBase
             new ImageSharpImageProcessor(fileStorageSettings, NullLogger<ImageSharpImageProcessor>.Instance),
             currentUser,
             NullLogger<UploadMultipleProductImagesCommandHandler>.Instance,
+            NullLogger<BulkImageUploadWalker>.Instance,
             configuration,
             fileStorageSettings);
 

@@ -98,7 +98,7 @@ public class ProductImageUploadLifecycleTests(DatabaseFixture databaseFixture)
         {
             var handler = new UploadMultipleProductImagesCommandHandler(
                 context, storage, processor, currentUser.Object, NullLogger<UploadMultipleProductImagesCommandHandler>.Instance,
-                configuration, settings);
+                NullLogger<BulkImageUploadWalker>.Instance, configuration, settings);
             return (await handler.Handle(new UploadMultipleProductImagesCommand(productId, [file]), token)).Success;
         }
         var single = new UploadProductImageCommandHandler(
