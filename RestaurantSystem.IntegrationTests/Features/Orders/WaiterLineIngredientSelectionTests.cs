@@ -200,8 +200,12 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
         });
 
         (await SingleOrderAsync()).Total.Should().Be(PizzaPrice, "nothing was added and nothing was removed");
+
+        // Set, not sequence (#441): the freeze assigns SortOrder over an EF projection with no
+        // OrderBy on the path, so which recipe row receives 0 is whatever order Postgres happened
+        // to return. Equal asserted an order the test never claimed to check and failed on it.
         (await FrozenRowsAsync()).Select(row => row.IngredientId)
-            .Should().Equal(new[] { CheeseId, SauceId, BaconId }, "only real recipe rows are frozen");
+            .Should().BeEquivalentTo(new[] { CheeseId, SauceId, BaconId }, "only real recipe rows are frozen");
     }
 
     /// <summary>
