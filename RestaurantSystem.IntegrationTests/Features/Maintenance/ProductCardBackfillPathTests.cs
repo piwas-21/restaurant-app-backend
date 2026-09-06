@@ -7,10 +7,10 @@ namespace RestaurantSystem.IntegrationTests.Features.Maintenance;
 public class ProductCardBackfillPathTests(DatabaseFixture fixture) : CardBackfillTestBase(fixture)
 {
     [Theory]
-    [InlineData("https://images.example.test/media/tenant-a", "D")]
-    [InlineData("https://images.example.test/uploads/archive/uploads", "N")]
-    [InlineData("http://images.example.test:8080/custom-prefix/", "D")]
-    public async Task Configured_prefix_is_removed_once_and_guid_formats_are_accepted(string baseUrl, string format)
+    [InlineData("tenant-media", "https://images.example.test/media/tenant-a", "D")]
+    [InlineData("archived-n", "https://images.example.test/uploads/archive/uploads", "N")]
+    [InlineData("custom-port", "http://images.example.test:8080/custom-prefix/", "D")]
+    public async Task Configured_prefix_is_removed_once_and_guid_formats_are_accepted(string label, string baseUrl, string format)
     {
         await AddRowAsync(1, Url("photo.png", baseUrl, format));
         await WriteOriginalAsync(productFormat: format);
@@ -20,27 +20,27 @@ public class ProductCardBackfillPathTests(DatabaseFixture fixture) : CardBackfil
         report.RowsScanned.Should().Be(1);
         report.VariantsCreated.Should().Be(1);
         report.RowsFailed.Should().Be(0);
-        report.Truncated.Should().BeFalse();
+        report.Truncated.Should().BeFalse($"case [{label}] must produce a complete page");
         (await CardUrlAsync(ImageId(1))).Should().Be(Url("photo-800.webp", baseUrl, format));
         await AssertValidCardAsync(FinalPath(productFormat: format));
     }
 
     [Theory]
-    [InlineData("not a URL")]
-    [InlineData("products/{product}/photo.png")]
-    [InlineData("https://foreign.example.test/uploads/products/{product}/photo.png")]
-    [InlineData("https://images.example.test.evil.test/uploads/products/{product}/photo.png")]
-    [InlineData("https://images.example.test:444/uploads/products/{product}/photo.png")]
-    [InlineData("ftp://images.example.test/uploads/products/{product}/photo.png")]
-    [InlineData("https://images.example.test/uploads-extra/products/{product}/photo.png")]
-    [InlineData("https://images.example.test/uploads/products/99999999-9999-9999-9999-999999999999/photo.png")]
-    [InlineData("https://images.example.test/uploads/products/not-a-guid/photo.png")]
-    [InlineData("https://images.example.test/uploads/products/{product}/../{product}/photo.png")]
-    [InlineData("https://images.example.test/uploads/products/{product}/%2e%2e/{product}/photo.png")]
-    [InlineData("https://images.example.test/uploads/products/{product}/sub/photo.png")]
-    [InlineData("https://images.example.test/uploads/products/{product}/%2fphoto.png")]
-    [InlineData("https://images.example.test/uploads/products/{product}/%5cphoto.png")]
-    public async Task Unsafe_url_is_failed_without_reading_a_plausible_local_file(string hostileUrl)
+    [InlineData("plain-relative", "not a URL")]
+    [InlineData("bare-relative", "products/{product}/photo.png")]
+    [InlineData("foreign-host", "https://foreign.example.test/uploads/products/{product}/photo.png")]
+    [InlineData("lookalike-host", "https://images.example.test.evil.test/uploads/products/{product}/photo.png")]
+    [InlineData("other-port", "https://images.example.test:444/uploads/products/{product}/photo.png")]
+    [InlineData("ftp-scheme", "ftp://images.example.test/uploads/products/{product}/photo.png")]
+    [InlineData("prefix-adjacent", "https://images.example.test/uploads-extra/products/{product}/photo.png")]
+    [InlineData("other-guid", "https://images.example.test/uploads/products/99999999-9999-9999-9999-999999999999/photo.png")]
+    [InlineData("not-a-guid", "https://images.example.test/uploads/products/not-a-guid/photo.png")]
+    [InlineData("literal-dotdot", "https://images.example.test/uploads/products/{product}/../{product}/photo.png")]
+    [InlineData("encoded-dotdot", "https://images.example.test/uploads/products/{product}/%2e%2e/{product}/photo.png")]
+    [InlineData("extra-segment", "https://images.example.test/uploads/products/{product}/sub/photo.png")]
+    [InlineData("encoded-slash", "https://images.example.test/uploads/products/{product}/%2fphoto.png")]
+    [InlineData("encoded-backslash", "https://images.example.test/uploads/products/{product}/%5cphoto.png")]
+    public async Task Unsafe_url_is_failed_without_reading_a_plausible_local_file(string label, string hostileUrl)
     {
         await AddRowAsync(1, hostileUrl.Replace("{product}", ProductId.ToString(), StringComparison.Ordinal));
         await WriteOriginalAsync();
@@ -51,7 +51,7 @@ public class ProductCardBackfillPathTests(DatabaseFixture fixture) : CardBackfil
 
         var report = await Service(processor).RunAsync(apply: true, maxRows: 1);
 
-        report.RowsScanned.Should().Be(1);
+        report.RowsScanned.Should().Be(1, $"case [{label}] must be rejected");
         report.RowsFailed.Should().Be(1);
         report.FailedImageIds.Should().Equal(ImageId(1));
         report.AlreadyPresent.Should().Be(0);
@@ -61,7 +61,6 @@ public class ProductCardBackfillPathTests(DatabaseFixture fixture) : CardBackfil
         (await CardUrlAsync(ImageId(1))).Should().BeNull();
         (await File.ReadAllBytesAsync(FinalPath())).Should().Equal(sentinel);
     }
-
     [Theory]
     [InlineData("uploads")]
     [InlineData("products")]
