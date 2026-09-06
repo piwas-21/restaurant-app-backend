@@ -79,6 +79,9 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
             // statement below — behaviour is identical (it is query metadata, not a positional
             // operator) but Sonar's rule is syntactic and does not follow the variable.
             .AsSplitQuery()
+            // Pure read → DTO projection; change tracking would only cost allocations on the
+            // hottest guest endpoint. Nothing downstream of this query writes.
+            .AsNoTracking()
             .AsQueryable();
 
         // Apply filters
