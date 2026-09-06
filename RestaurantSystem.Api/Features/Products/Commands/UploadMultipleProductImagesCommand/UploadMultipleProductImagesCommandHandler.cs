@@ -154,10 +154,11 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
 
         // Best-effort card variant, same contract as the single upload: a failed derivation
         // leaves CardUrl null and the guest serves the original.
+        await using var originalSource = image.OpenReadStream();
         var cardUrl = await ProductImageCardVariants.GenerateAndStoreAsync(
             _fileStorageService, _imageProcessor,
             $"products/{productId}", Path.GetFileName(imageUrl),
-            image.OpenReadStream(), _logger, cancellationToken);
+            originalSource, _logger, cancellationToken);
 
         var productImage = new ProductImage
         {

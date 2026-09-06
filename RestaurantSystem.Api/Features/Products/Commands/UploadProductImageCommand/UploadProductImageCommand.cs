@@ -77,10 +77,11 @@ public class UploadProductImageCommandHandler : ICommandHandler<UploadProductIma
 
             // The card variant is best-effort (fail-open to serving the original): a failed
             // derivation must never fail the upload itself.
+            await using var originalSource = command.Image.OpenReadStream();
             var cardUrl = await ProductImageCardVariants.GenerateAndStoreAsync(
                 _fileStorageService, _imageProcessor,
                 $"products/{command.ProductId}", Path.GetFileName(imageUrl),
-                command.Image.OpenReadStream(), _logger, cancellationToken);
+                originalSource, _logger, cancellationToken);
 
             // If this is the first image or marked as primary, unset other primary images
             if (command.IsPrimary || !product.Images.Any(i => !i.IsDeleted))

@@ -28,7 +28,7 @@ public static class ProductImageCardVariants
 
     /// <summary>
     /// Generates the card variant for an upload and stores it beside the original. Fail-open:
-    /// any failure returns <c>null</c> and the caller leaves <c>CardUrl</c> null — the guest
+    /// failures other than caller cancellation return <c>null</c> and leave <c>CardUrl</c> null — the guest
     /// then gets the original, which is the pre-feature behaviour and never a broken image.
     /// The stream overload of <see cref="IFileStorageService.UploadFileAsync"/> bypasses the
     /// processing decorator by design: the original is already the processed artefact.
@@ -56,6 +56,10 @@ public static class ProductImageCardVariants
                 return await storage.UploadFileAsync(
                     variant, folder, VariantFileName(storedFileName), ContentType, cancellationToken);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

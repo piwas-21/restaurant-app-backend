@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Maintenance.Dtos;
@@ -10,15 +11,9 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.Maintenance.Services;
 
 /// <summary>
-/// Generates card variants for product images stored BEFORE the feature existed. Walks the
-/// <c>ProductImage</c> TABLE (not the directory, unlike <see cref="ImageBackfillService"/>): a row
-/// without <c>CardUrl</c> is exactly the backlog, and a re-run is naturally idempotent because
-/// filled rows drop out of the query.
+/// Bounded local-only repair of missing product cards. Continue with the returned cursor, not a
+/// bare rerun: missing and failed rows consume the page too. Start a fresh walk to retry them.
 /// </summary>
-/// <remarks>
-/// Local provider only, for the same reason the resize backfill is: it reads and writes the
-/// uploads directory directly, which only <c>LocalStorage</c> means anything for.
-/// </remarks>
 public class ProductCardVariantBackfillService : IProductCardVariantBackfillService
 {
     private readonly ApplicationDbContext _context;
@@ -45,89 +40,109 @@ public class ProductCardVariantBackfillService : IProductCardVariantBackfillServ
     }
 
     public async Task<ProductCardVariantReportDto> RunAsync(
-        bool apply, int maxRows, CancellationToken cancellationToken = default)
+        bool apply, int maxRows, string? continueFrom = null, CancellationToken cancellationToken = default)
     {
+        if (maxRows is < 1 or > IProductCardVariantBackfillService.MaxRowsPerRun)
+        {
+            throw new BadRequestException($"maxRows must be between 1 and {IProductCardVariantBackfillService.MaxRowsPerRun}.");
+        }
         if (!string.Equals(_settings.Provider, "Local", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException(
-                $"The card-variant backfill reads the local uploads directory; the configured provider is '{_settings.Provider}'.");
+            throw new BadRequestException("Card-variant backfill requires the Local storage provider.");
         }
-
-        var report = new ProductCardVariantReportDto { Applied = apply };
-
-        var rows = await _context.ProductImages
-            .AsNoTracking()
-            .Where(i => !i.IsDeleted && i.CardUrl == null)
-            .OrderBy(i => i.CreatedAt)
-            .Take(maxRows)
-            .Select(i => new { i.Id, i.Url })
-            .ToListAsync(cancellationToken);
-
-        foreach (var row in rows)
+        if (!Uri.TryCreate(_baseUrl, UriKind.Absolute, out var baseUri)
+            || (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Scheme != Uri.UriSchemeHttp)
+            || baseUri.UserInfo.Length != 0 || baseUri.Query.Length != 0 || baseUri.Fragment.Length != 0)
         {
-            report.RowsScanned++;
-
-            // Url carries the LocalStorage base + "products/<id>/<file>"; the filename and the
-            // folder come from the SAME derivation the upload path used, so a variant written
-            // here is byte-for-byte where a fresh upload would have put it.
-            var fileName = Path.GetFileName(new Uri(row.Url).AbsolutePath);
-            var folder = Path.GetDirectoryName(new Uri(row.Url).AbsolutePath.TrimStart('/').Replace("uploads/", ""))!
-                .Replace('\\', '/');
-            var variantName = ProductImageCardVariants.VariantFileName(fileName);
-            var variantRelative = $"{folder}/{variantName}";
-            var variantPath = Path.Combine(_uploadsRoot, variantRelative);
-
-            if (File.Exists(variantPath))
-            {
-                report.AlreadyPresent++;
-                if (apply)
-                {
-                    await AttachCardUrlAsync(row.Id, variantRelative, cancellationToken);
-                }
-                continue;
-            }
-
-            var originalPath = Path.Combine(_uploadsRoot, folder, fileName);
-            if (!File.Exists(originalPath))
-            {
-                report.SkippedMissingFile++;
-                continue;
-            }
-
-            if (!apply)
-            {
-                // Dry run stops here: nothing written, nothing decoded.
-                continue;
-            }
-
-            await using var source = File.OpenRead(originalPath);
-            var variant = await _processor.GenerateCardVariantAsync(
-                source, fileName, ProductImageCardVariants.EdgePixels, cancellationToken);
-            if (variant is null)
-            {
-                report.SkippedUndecodable++;
-                continue;
-            }
-
-            await using (variant)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(variantPath)!);
-                await using var target = File.Create(variantPath);
-                await variant.CopyToAsync(target, cancellationToken);
-            }
-
-            await AttachCardUrlAsync(row.Id, variantRelative, cancellationToken);
-            report.VariantsCreated++;
+            throw new BadRequestException("Card-variant backfill requires a valid LocalStorage:BaseUrl.");
         }
 
-        report.Truncated = report.RowsScanned >= maxRows;
+        var cursor = ProductCardVariantCursor.Parse(continueFrom);
+        var paths = new ProductCardVariantPaths(_uploadsRoot, baseUri);
+        var query = _context.ProductImages.AsNoTracking().Where(i => !i.IsDeleted && i.CardUrl == null);
+        if (cursor is not null)
+        {
+            query = query.Where(i => i.CreatedAt > cursor.CreatedAt
+                || (i.CreatedAt == cursor.CreatedAt && i.Id.CompareTo(cursor.Id) > 0));
+        }
+
+        var rows = await query.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id)
+            .Take(maxRows + 1)
+            .Select(i => new { i.Id, i.ProductId, i.Url, i.CreatedAt })
+            .ToListAsync(cancellationToken);
+        var report = new ProductCardVariantReportDto { Applied = apply, Truncated = rows.Count > maxRows };
+
+        foreach (var row in rows.Take(maxRows))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            report.RowsScanned++;
+            string? cardUrl = null;
+            try
+            {
+                var location = paths.Resolve(row.Url, row.ProductId);
+                cardUrl = await ProcessOneAsync(location, paths, apply, report, cancellationToken);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // Database failures and caller cancellation are not per-file skips. Keep them
+                // outside this boundary; malformed keys and filesystem races must not stop a page.
+                report.RowsFailed++;
+                report.FailedImageIds.Add(row.Id);
+                _logger.LogWarning(ex, "Card-variant backfill failed for image {ImageId}", row.Id);
+            }
+
+            if (cardUrl is not null)
+            {
+                // A concurrent delete or successful attachment wins. Do not resurrect or replace it.
+                await _context.ProductImages
+                    .Where(i => i.Id == row.Id && i.Url == row.Url && i.CardUrl == null)
+                    .ExecuteUpdateAsync(u => u.SetProperty(i => i.CardUrl, cardUrl), cancellationToken);
+            }
+
+            report.NextCursor = new ProductCardVariantCursor(row.CreatedAt, row.Id).ToString();
+        }
+
+        if (!report.Truncated)
+        {
+            report.NextCursor = null;
+        }
         return report;
     }
 
-    private async Task AttachCardUrlAsync(Guid imageId, string variantRelative, CancellationToken cancellationToken)
+    private async Task<string?> ProcessOneAsync(
+        CardVariantLocation location, ProductCardVariantPaths paths, bool apply,
+        ProductCardVariantReportDto report, CancellationToken cancellationToken)
     {
-        await _context.ProductImages
-            .Where(i => i.Id == imageId)
-            .ExecuteUpdateAsync(u => u.SetProperty(i => i.CardUrl, $"{_baseUrl}/{variantRelative}"), cancellationToken);
+        if (File.Exists(location.VariantPath)
+            && await ProductCardVariantFile.IsValidAsync(location.VariantPath, cancellationToken))
+        {
+            report.AlreadyPresent++;
+            return apply ? location.CardUrl : null;
+        }
+        if (!File.Exists(location.OriginalPath))
+        {
+            report.SkippedMissingFile++;
+            return null;
+        }
+        if (!apply)
+        {
+            // Dry-run validates an existing derivative but never decodes the original or writes.
+            return null;
+        }
+
+        paths.EnsureSafe(location.OriginalPath);
+        await using var source = File.OpenRead(location.OriginalPath);
+        await using var variant = await _processor.GenerateCardVariantAsync(
+            source, location.FileName, ProductImageCardVariants.EdgePixels, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (variant is null)
+        {
+            report.SkippedUndecodable++;
+            return null;
+        }
+
+        await ProductCardVariantFile.PublishAsync(variant, location.VariantPath, paths, cancellationToken);
+        report.VariantsCreated++;
+        return location.CardUrl;
     }
 }

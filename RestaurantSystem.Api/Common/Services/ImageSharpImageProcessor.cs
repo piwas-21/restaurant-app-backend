@@ -111,10 +111,7 @@ public class ImageSharpImageProcessor : IImageProcessor
             image.Metadata.XmpProfile = null;
             image.Metadata.IptcProfile = null;
 
-            var output = new MemoryStream();
-            await image.SaveAsync(output, EncoderFor(extension), cancellationToken);
-            output.Position = 0;
-            return output;
+            return await EncodeAsync(image, EncoderFor(extension), cancellationToken);
         }
         catch (Exception ex)
         {
@@ -140,6 +137,10 @@ public class ImageSharpImageProcessor : IImageProcessor
         {
             return null;
         }
+
+        // An already-cancelled caller must not reach decode work: ImageSharp may complete a tiny
+        // identify without observing the token and the fail-open catch would swallow the request.
+        cancellationToken.ThrowIfCancellationRequested();
 
         MemoryStream? buffered = null;
         try
@@ -186,10 +187,11 @@ public class ImageSharpImageProcessor : IImageProcessor
             image.Metadata.XmpProfile = null;
             image.Metadata.IptcProfile = null;
 
-            var output = new MemoryStream();
-            await image.SaveAsync(output, new WebpEncoder { Quality = Math.Clamp(_settings.ImageQuality, 1, 100) }, cancellationToken);
-            output.Position = 0;
-            return output;
+            return await EncodeAsync(image, new WebpEncoder { Quality = Math.Clamp(_settings.ImageQuality, 1, 100) }, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -241,9 +243,33 @@ public class ImageSharpImageProcessor : IImageProcessor
     private static async Task<MemoryStream> BufferAsync(Stream source, CancellationToken cancellationToken)
     {
         var buffered = new MemoryStream();
-        await source.CopyToAsync(buffered, cancellationToken);
-        buffered.Position = 0;
-        return buffered;
+        try
+        {
+            await source.CopyToAsync(buffered, cancellationToken);
+            buffered.Position = 0;
+            return buffered;
+        }
+        catch
+        {
+            await buffered.DisposeAsync();
+            throw;
+        }
+    }
+
+    private static async Task<Stream> EncodeAsync(Image image, IImageEncoder encoder, CancellationToken cancellationToken)
+    {
+        var output = new MemoryStream();
+        try
+        {
+            await image.SaveAsync(output, encoder, cancellationToken);
+            output.Position = 0;
+            return output;
+        }
+        catch
+        {
+            await output.DisposeAsync();
+            throw;
+        }
     }
 
     private IImageEncoder EncoderFor(string extension)

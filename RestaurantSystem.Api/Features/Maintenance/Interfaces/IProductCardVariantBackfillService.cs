@@ -4,11 +4,13 @@ namespace RestaurantSystem.Api.Features.Maintenance.Interfaces;
 
 public interface IProductCardVariantBackfillService
 {
+    public const int MaxRowsPerRun = 300;
+
     /// <summary>
-    /// Generates card variants for <c>ProductImage</c> rows that predate the feature
-    /// (<c>CardUrl == null</c>). <paramref name="apply"/> = false reports what WOULD happen
-    /// without writing. Rows are walked in upload order; the run ends at <paramref name="maxRows"/>
-    /// with <c>Truncated</c>, so re-running continues — filled rows drop out of the query.
+    /// Walks rows without CardUrl in stable upload order. maxRows must be 1..300. Pass the
+    /// report's NextCursor as continueFrom to advance past ALL inspected rows, including skips
+    /// and failures. Dry-run never writes. A fresh walk retries rows skipped by an earlier walk.
     /// </summary>
-    Task<ProductCardVariantReportDto> RunAsync(bool apply, int maxRows, CancellationToken cancellationToken = default);
+    Task<ProductCardVariantReportDto> RunAsync(
+        bool apply, int maxRows, string? continueFrom = null, CancellationToken cancellationToken = default);
 }
