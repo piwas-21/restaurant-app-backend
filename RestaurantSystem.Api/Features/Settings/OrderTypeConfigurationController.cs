@@ -52,7 +52,11 @@ public class OrderTypeConfigurationController : ControllerBase
         [FromBody] UpdateOrderTypeConfigurationDto dto,
         CancellationToken cancellationToken)
     {
-        var updated = await _service.UpdateAsync(dto.OrderType, dto.IsEnabled, cancellationToken);
+        var updated = await _service.UpdateAsync(
+            dto.OrderType,
+            dto.IsEnabled,
+            dto.EnforceOpeningHours,
+            cancellationToken);
         return ApiResponse<OrderTypeConfigurationDto>.SuccessWithData(
             updated,
             "Order type configuration updated successfully"
