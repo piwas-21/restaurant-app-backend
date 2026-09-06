@@ -8,12 +8,13 @@ namespace RestaurantSystem.Api.Features.Maintenance;
 
 /// <summary>
 /// Admin-only one-off maintenance over stored images. Resize-on-upload only ever applied to new
-/// uploads; this brings everything older into line with the same settings.
+/// uploads; this brings everything older into line with the same settings. Card-variant repair
+/// lives in <see cref="CardVariantMaintenanceController"/>.
 /// </summary>
 [ApiController]
 [Route("api/maintenance/images")]
 [Authorize(Roles = "Admin")]
-public class ImageMaintenanceController : ControllerBase
+public class ImageMaintenanceController(IImageBackfillService backfill) : ControllerBase
 {
     /// <summary>
     /// Ceiling on <c>maxFiles</c>. The work is synchronous, so one call must stay inside a sane
@@ -24,39 +25,6 @@ public class ImageMaintenanceController : ControllerBase
     /// rewritten one does and counts against this cap just the same.
     /// </summary>
     private const int MaxFilesPerRun = 500;
-
-    /// <summary>
-    /// Ceiling on <c>maxRows</c>: one card variant costs a full decode + re-encode of the
-    /// original, the same per-file cost class the resize backfill's cap exists for.
-    /// </summary>
-    private const int MaxRowsPerRun = IProductCardVariantBackfillService.MaxRowsPerRun;
-
-    private readonly IImageBackfillService _backfill;
-    private readonly IProductCardVariantBackfillService _cardVariants;
-
-    public ImageMaintenanceController(IImageBackfillService backfill, IProductCardVariantBackfillService cardVariants)
-    {
-        _backfill = backfill;
-        _cardVariants = cardVariants;
-    }
-
-    /// <summary>
-    /// Generates the card WebP for every product image that predates the feature. Dry-run
-    /// (<c>apply=false</c>) reports counts only; <c>apply=true</c> writes
-    /// <c>&lt;name&gt;-800.webp</c> beside each original and fills <c>ProductImage.CardUrl</c>.
-    /// Continue with the returned NextCursor, including after a dry run or skipped rows.
-    /// maxRows must be between 1 and 300; start without a cursor to retry skipped rows.
-    /// </summary>
-    [HttpPost("card-variants")]
-    public async Task<ApiResponse<ProductCardVariantReportDto>> BackfillCardVariants(
-        [FromQuery] bool apply = false,
-        [FromQuery] int maxRows = MaxRowsPerRun,
-        [FromQuery] string? continueFrom = null,
-        CancellationToken cancellationToken = default)
-    {
-        var report = await _cardVariants.RunAsync(apply, maxRows, continueFrom, cancellationToken);
-        return ApiResponse<ProductCardVariantReportDto>.SuccessWithData(report);
-    }
 
     /// <summary>
     /// Report what the resize pipeline would do to the images already in storage.
@@ -74,7 +42,7 @@ public class ImageMaintenanceController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var capped = Math.Clamp(maxFiles, 1, MaxFilesPerRun);
-        var report = await _backfill.RunAsync(apply, capped, continueFrom, cancellationToken);
+        var report = await backfill.RunAsync(apply, capped, continueFrom, cancellationToken);
 
         var message = apply
             ? $"Rewrote {report.FilesChanged} image(s), saving {report.TotalBytesSaved / 1024} KB."
@@ -95,7 +63,7 @@ public class ImageMaintenanceController : ControllerBase
     [HttpDelete("backfill/previews")]
     public ApiResponse<int> ClearPreviews()
     {
-        var removed = _backfill.ClearPreviews();
+        var removed = backfill.ClearPreviews();
         return ApiResponse<int>.SuccessWithData(removed, $"Removed {removed} preview file(s).");
     }
 }

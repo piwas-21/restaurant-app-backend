@@ -74,28 +74,9 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
 
         try
         {
-            foreach (var image in command.Images)
-            {
-                if (!ImageUploadRules.IsAcceptable(image, _fileStorageSettings, out var rejection))
-                {
-                    errors.Add(Describe(image, rejection));
-                    continue;
-                }
-
-                try
-                {
-                    var isPrimary = !hasPrimaryImage;
-                    uploadedImages.Add(await StoreAsync(
-                        command.ProductId, product.Name, image, isPrimary, ++currentMaxSortOrder, cancellationToken));
-                    hasPrimaryImage |= isPrimary;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to upload image '{FileName}' for product {ProductId}",
-                        image.FileName, command.ProductId);
-                    errors.Add(Describe(image, "the file could not be stored"));
-                }
-            }
+            (uploadedImages, errors) = await BulkImageUploadWalker.UploadEachAsync(
+                command, product, hasPrimaryImage, currentMaxSortOrder,
+                _fileStorageSettings, _logger, StoreAsync, Describe, cancellationToken);
 
             if (uploadedImages.Count > 0)
             {
@@ -137,6 +118,7 @@ public class UploadMultipleProductImagesCommandHandler : ICommandHandler<UploadM
         partial.Errors = errors;
         return partial;
     }
+
 
     /// <summary>
     /// Uploads one file and stages its <see cref="ProductImage"/> row; the caller commits.

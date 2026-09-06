@@ -10,14 +10,16 @@ namespace RestaurantSystem.Api.Features.Maintenance.Services;
 internal sealed class ProductCardVariantPaths(string uploadsRoot, Uri baseUri)
 {
     private readonly string _root = Path.GetFullPath(uploadsRoot);
-    private readonly string _prefix = baseUri.AbsolutePath.TrimEnd('/') + "/";
+    // URL segment delimiter, not a filesystem delimiter — this class joins URL paths only.
+    private const char SegmentDelimiter = '/';
+    private readonly string _prefix = string.Concat(baseUri.AbsolutePath.TrimEnd(SegmentDelimiter), SegmentDelimiter);
 
     public CardVariantLocation Resolve(string url, Guid productId)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
             || uri.Scheme != baseUri.Scheme || uri.Authority != baseUri.Authority
             || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0
-            || !uri.AbsolutePath.StartsWith(_prefix, StringComparison.Ordinal))
+            || !IsUnderPrefix(uri.AbsolutePath))
         {
             throw new IOException("Image URL is outside the configured local storage namespace.");
         }
@@ -35,7 +37,11 @@ internal sealed class ProductCardVariantPaths(string uploadsRoot, Uri baseUri)
             throw new IOException("Image URL contains dot or encoded separator segments.");
         }
 
-        var segments = uri.AbsolutePath[_prefix.Length..].Split('/').Select(Uri.UnescapeDataString).ToArray();
+        var remainder = uri.AbsolutePath[_prefix.Length..].TrimStart(SegmentDelimiter);
+        var segments = remainder
+            .Split(SegmentDelimiter)
+            .Select(Uri.UnescapeDataString)
+            .ToArray();
         if (segments.Length != 3 || segments[0] != "products"
             || !Guid.TryParse(segments[1], out var folderId) || folderId != productId
             || segments.Any(IsUnsafeSegment))
@@ -48,10 +54,13 @@ internal sealed class ProductCardVariantPaths(string uploadsRoot, Uri baseUri)
         var variant = Path.Combine(_root, segments[0], segments[1], variantName);
         EnsureSafe(original);
         EnsureSafe(variant);
-        var relative = string.Join('/', segments.Take(2).Append(variantName).Select(Uri.EscapeDataString));
-        var cardUrl = new Uri(baseUri.AbsoluteUri.TrimEnd('/') + "/" + relative).AbsoluteUri;
+        var relative = string.Join(SegmentDelimiter, segments.Take(2).Append(variantName).Select(Uri.EscapeDataString));
+        var cardUrl = baseUri.AbsoluteUri.TrimEnd(SegmentDelimiter) + SegmentDelimiter + relative;
         return new CardVariantLocation(original, variant, segments[2], cardUrl);
     }
+
+    private bool IsUnderPrefix(string absolutePath) =>
+        absolutePath.StartsWith(_prefix, StringComparison.Ordinal); // _prefix ends with the delimiter
 
     public void EnsureSafe(string path)
     {

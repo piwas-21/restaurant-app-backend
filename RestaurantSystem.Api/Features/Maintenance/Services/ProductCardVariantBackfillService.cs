@@ -42,21 +42,7 @@ public class ProductCardVariantBackfillService : IProductCardVariantBackfillServ
     public async Task<ProductCardVariantReportDto> RunAsync(
         bool apply, int maxRows, string? continueFrom = null, CancellationToken cancellationToken = default)
     {
-        if (maxRows is < 1 or > IProductCardVariantBackfillService.MaxRowsPerRun)
-        {
-            throw new BadRequestException($"maxRows must be between 1 and {IProductCardVariantBackfillService.MaxRowsPerRun}.");
-        }
-        if (!string.Equals(_settings.Provider, "Local", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new BadRequestException("Card-variant backfill requires the Local storage provider.");
-        }
-        if (!Uri.TryCreate(_baseUrl, UriKind.Absolute, out var baseUri)
-            || (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Scheme != Uri.UriSchemeHttp)
-            || baseUri.UserInfo.Length != 0 || baseUri.Query.Length != 0 || baseUri.Fragment.Length != 0)
-        {
-            throw new BadRequestException("Card-variant backfill requires a valid LocalStorage:BaseUrl.");
-        }
-
+        var baseUri = ValidateRunPrerequisites(maxRows);
         var cursor = ProductCardVariantCursor.Parse(continueFrom);
         var paths = new ProductCardVariantPaths(_uploadsRoot, baseUri);
         var query = _context.ProductImages.AsNoTracking().Where(i => !i.IsDeleted && i.CardUrl == null);
@@ -107,6 +93,30 @@ public class ProductCardVariantBackfillService : IProductCardVariantBackfillServ
             report.NextCursor = null;
         }
         return report;
+    }
+
+
+    /// <summary>Caller-facing input contract: bounded pages, local provider, sane base URL.</summary>
+    private Uri ValidateRunPrerequisites(int maxRows)
+    {
+        if (maxRows is < 1 or > IProductCardVariantBackfillService.MaxRowsPerRun)
+        {
+            throw new BadRequestException($"maxRows must be between 1 and {IProductCardVariantBackfillService.MaxRowsPerRun}.");
+        }
+
+        if (!string.Equals(_settings.Provider, "Local", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BadRequestException("Card-variant backfill requires the Local storage provider.");
+        }
+
+        if (!Uri.TryCreate(_baseUrl, UriKind.Absolute, out var baseUri)
+            || (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Scheme != Uri.UriSchemeHttp)
+            || baseUri.UserInfo.Length != 0 || baseUri.Query.Length != 0 || baseUri.Fragment.Length != 0)
+        {
+            throw new BadRequestException("Card-variant backfill requires a valid LocalStorage:BaseUrl.");
+        }
+
+        return baseUri;
     }
 
     private async Task<string?> ProcessOneAsync(
