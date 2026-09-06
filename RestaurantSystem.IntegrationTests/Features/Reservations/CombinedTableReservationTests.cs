@@ -105,14 +105,15 @@ public class CombinedTableReservationTests : IntegrationTestBase
         body.Success.Should().BeTrue(string.Join("; ", body.Errors ?? new List<string>()));
 
         body.Data!.TableId.Should().Be(_t1);
-        body.Data.CombinedTableIds.Should().Equal(new[] { _t2, _t3 });
+        body.Data.CombinedTableIds.Should().BeEquivalentTo(new[] { _t2, _t3 });
 
         // The claim is about PERSISTENCE, not the mapped response: the child rows must exist.
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var stored = await context.Reservations.Include(r => r.CombinedTables)
             .SingleAsync(r => r.Id == body.Data.Id);
-        stored.CombinedTables.Select(c => c.TableId).Should().Equal(new[] { _t2, _t3 });
+        // Set, not sequence (#441's lesson again): child-row order is whatever Postgres returns.
+        stored.CombinedTables.Select(c => c.TableId).Should().BeEquivalentTo(new[] { _t2, _t3 });
     }
 
     [Fact]
