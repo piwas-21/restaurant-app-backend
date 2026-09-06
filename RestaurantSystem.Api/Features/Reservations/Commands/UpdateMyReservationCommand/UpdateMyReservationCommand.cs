@@ -107,6 +107,7 @@ public class UpdateMyReservationCommandHandler
     {
         var reservation = await _context.Reservations
             .Include(r => r.Table)
+            .Include(r => r.CombinedTables).ThenInclude(c => c.Table)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
         var userId = _currentUser.UserId;
@@ -135,21 +136,27 @@ public class UpdateMyReservationCommandHandler
     {
         var table = reservation.Table;
 
-        if (table.MaxGuests < data.NumberOfGuests)
+        // Capacity (#561): a combined booking holds when the SUM of its tables' capacities holds —
+        // a guest may raise the party within what their whole arrangement seats.
+        var seatedCapacity = table.MaxGuests + reservation.CombinedTables.Sum(c => c.Table.MaxGuests);
+        if (seatedCapacity < data.NumberOfGuests)
         {
             throw new BadRequestException(
-                $"Table {table.TableNumber} can only accommodate {table.MaxGuests} guests",
+                $"The selected tables can only accommodate {seatedCapacity} guests in total",
                 ErrorCodes.ReservationTableCapacityExceeded);
         }
 
-        var hasConflict = await _context.Reservations
-            .AnyAsync(r =>
-                r.Id != reservation.Id &&
-                r.TableId == reservation.TableId &&
-                r.ReservationDate.Date == bookedDay.Date &&
-                (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed) &&
-                r.StartTime < data.EndTime && r.EndTime > data.StartTime,
-                cancellationToken);
+        // Slot conflict across EVERY table the booking occupies; the booking itself is excluded
+        // from its own check, every other reservation — combined or not — counts whole.
+        var occupiedTableIds = reservation.CombinedTables
+            .Select(c => c.TableId)
+            .Append(table.Id)
+            .Distinct()
+            .ToList();
+        var hasConflict = await _context.Reservations.AnyAsync(
+            ReservationSlotOccupancy.ConflictsWithAnyOf(
+                occupiedTableIds, bookedDay, data.StartTime, data.EndTime, reservation.Id),
+            cancellationToken);
 
         if (hasConflict)
         {

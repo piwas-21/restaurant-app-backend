@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
+using RestaurantSystem.Api.Features.Reservations.Services;
 using RestaurantSystem.Api.Features.Settings.FormFields;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
@@ -43,6 +44,7 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
         {
             var reservation = await _context.Reservations
                 .Include(r => r.Table)
+                .Include(r => r.CombinedTables).ThenInclude(c => c.Table)
                 .FirstOrDefaultAsync(r => r.Id == command.ReservationId, cancellationToken);
 
             if (reservation == null)
@@ -76,21 +78,28 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
                 return ApiResponse<ReservationDto>.Failure("Table not found or inactive");
             }
 
-            // Validate table capacity
-            if (table.MaxGuests < data.NumberOfGuests)
+            // Capacity (#561): a combined booking fits when the SUM of the tables it occupies
+            // fits. The PUT can re-seat the primary table, so the sum reads the POST-update set:
+            // the new primary plus the untouched combined tables.
+            var combinedTables = reservation.CombinedTables.Select(c => c.Table).ToList();
+            var seatedCapacity = table.MaxGuests
+                + combinedTables.Where(t => t.Id != table.Id).Sum(t => t.MaxGuests);
+            if (seatedCapacity < data.NumberOfGuests)
             {
-                return ApiResponse<ReservationDto>.Failure($"Table {table.TableNumber} can only accommodate {table.MaxGuests} guests");
+                return ApiResponse<ReservationDto>.Failure(
+                    $"The selected tables can only accommodate {seatedCapacity} guests in total");
             }
 
-            // Check for time slot conflicts (excluding current reservation)
-            var hasConflict = await _context.Reservations
-                .AnyAsync(r =>
-                    r.Id != command.ReservationId &&
-                    r.TableId == data.TableId &&
-                    r.ReservationDate.Date == data.ReservationDate.Date &&
-                    (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed) &&
-                    ((r.StartTime < data.EndTime && r.EndTime > data.StartTime)),
-                    cancellationToken);
+            // Check for time slot conflicts (excluding current reservation) across EVERY table the
+            // booking will occupy — its combined tables stay occupied by it too.
+            var requestedTableIds = combinedTables.Select(t => t.Id)
+                .Append(data.TableId)
+                .Distinct()
+                .ToList();
+            var hasConflict = await _context.Reservations.AnyAsync(
+                ReservationSlotOccupancy.ConflictsWithAnyOf(
+                    requestedTableIds, data.ReservationDate, data.StartTime, data.EndTime, command.ReservationId),
+                cancellationToken);
 
             if (hasConflict)
             {
@@ -149,6 +158,7 @@ public class UpdateReservationCommandHandler : ICommandHandler<UpdateReservation
                 CustomerPhone = reservation.CustomerPhone ?? string.Empty,
                 TableId = reservation.TableId,
                 TableNumber = table.TableNumber,
+                CombinedTableIds = reservation.CombinedTables.Select(c => c.TableId).ToList(),
                 ReservationDate = reservation.ReservationDate,
                 StartTime = reservation.StartTime,
                 EndTime = reservation.EndTime,
