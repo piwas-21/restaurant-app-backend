@@ -29,6 +29,15 @@ public class GlobalIngredient : SoftDeleteEntity
     public LibraryOrigin Origin { get; set; } = LibraryOrigin.System;
 
     /// <summary>
+    /// This global ingredient is the "no X" answer for its kind (e.g. "Sans Sauces" for sauces,
+    /// MC FOOD partner feedback 2026-09-07): a guest choosing it wants NO other option of that
+    /// kind, so the guest sheet treats it as exclusive within its step and the kitchen ticket
+    /// reads the refusal instead of a sauce list. Defaults to false — every existing row keeps
+    /// its meaning. Surfaced on the product detail's ingredient DTO so the sheet can see it.
+    /// </summary>
+    public bool IsNoneOption { get; set; }
+
+    /// <summary>
     /// When set, the row is ARCHIVED (plan D4): off the shelf, so no picker offers it and no new
     /// product may link to it, while every product that already links to it keeps both its
     /// provenance and the translations it renders.

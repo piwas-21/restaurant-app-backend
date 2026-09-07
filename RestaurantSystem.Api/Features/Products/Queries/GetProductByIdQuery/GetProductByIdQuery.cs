@@ -267,6 +267,10 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             DisplayOrder = di.DisplayOrder,
             MaxQuantity = di.MaxQuantity,
             GlobalIngredientId = di.GlobalIngredientId,
+            // The "no X" answer marker (Sans Sauces, MC FOOD 2026-09-07): the guest sheet makes
+            // such a row exclusive within its sauce step. Soft-deleted globals keep withholding
+            // their translations (§9.14) and are not none-options either.
+            IsNoneOption = di.GlobalIngredient is { IsDeleted: false, IsNoneOption: true },
             Kind = di.Kind,
             ExclusionGroup = di.ExclusionGroup,
             Content = content

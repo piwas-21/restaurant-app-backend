@@ -23,6 +23,11 @@ public record ProductIngredientDto
     // discriminator shape — and why a second entity was rejected — is on `IngredientKind` itself.
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
+    // True when this row links the library's "no X" answer for its kind (e.g. "Sans Sauces",
+    // MC FOOD partner feedback 2026-09-07). The guest sheet treats it as exclusive within its
+    // step; absent/false on every row that is not linked to such a library row.
+    public bool IsNoneOption { get; set; }
+
     // Mutual-exclusion key (plan §9). Additive and nullable: a client that omits it keeps sending
     // ungrouped ingredients, which is what every client did before this field existed. It is
     // ASSIGNED FROM THE PAYLOAD on every save — a client that round-trips the DTO must send it

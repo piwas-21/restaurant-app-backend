@@ -17,6 +17,10 @@ public record CreateGlobalIngredientDto
     public string DefaultName { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+    // Nullable + defaulted rather than [JsonRequired]: for a NEW row "not a none-option" is the
+    // right answer, and the admin create form does not send the field yet (S6964 wants the
+    // under-posting to be explicit, which null is).
+    public bool? IsNoneOption { get; set; }
     public List<GlobalIngredientTranslationDto> Translations { get; set; } = [];
 }
 
@@ -31,6 +35,7 @@ public record UpdateGlobalIngredientDto
     // answer. Reasoning in UpdateGlobalIngredientCommand's param docs.
     public bool? IsActive { get; set; }
     public IngredientKind? Kind { get; set; }
+    public bool? IsNoneOption { get; set; }
 
     public List<GlobalIngredientTranslationDto> Translations { get; set; } = [];
 }

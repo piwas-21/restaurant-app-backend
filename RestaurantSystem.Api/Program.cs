@@ -13,6 +13,7 @@ using System.Threading.RateLimiting;
 using RestaurantSystem.Api.BackgroundServices;
 using RestaurantSystem.Api.Services;
 using RestaurantSystem.Api.Common;
+using Microsoft.AspNetCore.Authorization;
 using RestaurantSystem.Api.Common.Authentication;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Conventers;
@@ -436,6 +437,10 @@ builder.Services.AddScoped<RestaurantSystem.Api.Common.Services.Interfaces.IPref
 
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IAuthorizationHandler, MaintenanceAdminHandler>();
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy(MaintenanceAdminRequirement.PolicyName,
+        policy => policy.Requirements.Add(new MaintenanceAdminRequirement())));
 
 // Trust the Caddy reverse-proxy's X-Forwarded-For header so the rate limiter partitions by real client IP
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

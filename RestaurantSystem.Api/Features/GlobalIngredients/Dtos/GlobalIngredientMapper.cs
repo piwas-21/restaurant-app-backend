@@ -16,6 +16,7 @@ internal static class GlobalIngredientMapper
         IsActive = ingredient.IsActive,
         Kind = ingredient.Kind,
         IsArchived = ingredient.ArchivedAt.HasValue,
+        IsNoneOption = ingredient.IsNoneOption,
         Origin = ingredient.Origin,
         UsedOnProductCount = usedOnProductCount,
         Translations = ingredient.Translations
