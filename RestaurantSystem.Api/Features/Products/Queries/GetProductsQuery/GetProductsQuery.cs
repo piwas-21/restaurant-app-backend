@@ -43,7 +43,16 @@ public record GetProductsQuery(
     // visible so the customer sees "Dürüm is takeaway & delivery only" instead of a hole in the
     // menu. It only resolves each row's `Availability`. Null (no type chosen yet, the dominant
     // browse state) reports everything as orderable and still fills AllowedOrderTypes for the chip.
-    OrderType? RequestedOrderType = null
+    OrderType? RequestedOrderType = null,
+    // Opt in to the guest ALL-view hidden-category exclusion EVEN FOR A STAFF CALLER. The public
+    // menu page sends it: its visitors include the owner previewing what a guest sees, and the
+    // browser rides their staff token on every fetch, which otherwise silently exempted the page
+    // from `GuestAllViewVisibility` — the owner hides a category, opens /menu, and watches the
+    // dishes sit right there in the All list. A guest needs no flag (the exclusion is their
+    // default); a back-of-house caller that omits it keeps seeing everything, which is what the
+    // admin list needs to manage the flag itself. Deliberately narrow: it widens exactly this one
+    // exclusion, not the forced guest `IsActive` filter or the guest ordering.
+    bool GuestAllView = false
 ) : IQuery<ApiResponse<PagedResult<ProductSummaryDto>>>;
 
 public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiResponse<PagedResult<ProductSummaryDto>>>

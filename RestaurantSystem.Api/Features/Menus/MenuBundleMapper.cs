@@ -49,6 +49,10 @@ public static class MenuBundleMapper
             DisplayOrder = product.DisplayOrder,
             Availability = OrderTypeAvailability.Resolve(product, requestedOrderType),
             AvailableOrderTypes = product.AvailableOrderTypes,
+            // The links the caller must have loaded for the channel verdict anyway (see the class
+            // doc) — so grouping comes free, no extra round-trip.
+            CategoryIds = product.ProductCategories.Select(pc => pc.CategoryId).ToList(),
+            PrimaryCategoryId = product.ProductCategories.FirstOrDefault(pc => pc.IsPrimary)?.CategoryId,
             // The bundle's OWN labelling. The one other `Allergens` in this file is a section
             // item's, and mapping only that meant a labelled combo reached the guest indis-
             // tinguishable from an unlabelled one — which the menu filter reads as "free of
