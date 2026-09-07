@@ -15,7 +15,8 @@ public class GlobalIngredientConfiguration : IEntityTypeConfiguration<GlobalIngr
 {
     public void Configure(EntityTypeBuilder<GlobalIngredient> builder)
     {
-        // Default 0 = IngredientKind.Ingredient, which is what all 654 seeded rows are.
+        // Default 0 = IngredientKind.Ingredient; the seeder stamps its curated 39-row sauce family
+        // as Sauce (ReclassifySeededSauces backfills databases seeded before that stamp existed).
         builder.Property(g => g.Kind)
             .HasConversion<int>()
             .HasDefaultValue(IngredientKind.Ingredient)
