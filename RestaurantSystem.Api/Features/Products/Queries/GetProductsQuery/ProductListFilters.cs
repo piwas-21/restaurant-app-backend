@@ -26,10 +26,12 @@ public static class ProductListFilters
         {
             productsQuery = productsQuery.Where(p => p.ProductCategories.Any(pc => pc.CategoryId == query.CategoryId.Value));
         }
-        else if (!currentUser.IsStaff)
+        else if (!currentUser.IsStaff || query.GuestAllView)
         {
             // The guest ALL view honours the category "hide from the All tab" flag (2026-09-06).
             // Rationale + the soft-delete conflation it avoids: GuestAllViewVisibility.
+            // `GuestAllView` extends the exclusion to a STAFF caller who asked to see the guest's
+            // list — the public menu page, whose preview rides a staff token (GetProductsQuery).
             productsQuery = await GuestAllViewVisibility.ExcludeHiddenAsync(context, productsQuery, cancellationToken);
         }
 
