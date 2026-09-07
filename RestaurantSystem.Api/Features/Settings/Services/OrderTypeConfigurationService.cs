@@ -37,7 +37,8 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
         {
             OrderType = c.OrderType,
             IsEnabled = c.IsEnabled,
-            DisplayOrder = c.DisplayOrder
+            DisplayOrder = c.DisplayOrder,
+            EnforceOpeningHours = c.EnforceOpeningHours
         }).ToList();
     }
 
@@ -62,6 +63,9 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
                 OrderType = type,
                 IsEnabled = true,
                 DisplayOrder = (int)type,
+                // A row that vanished (or a type added later) must come back with the gating that
+                // type has ALWAYS had, not with a blanket on/off (#448).
+                EnforceOpeningHours = OrderTypeConfiguration.EnforcedByDefault(type),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             });
@@ -72,21 +76,30 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
 
     public async Task<List<OrderType>> GetEnabledOrderTypesAsync(CancellationToken cancellationToken = default)
     {
-        var enabledTypes = await _context.OrderTypeConfigurations
+        var configurations = await _context.OrderTypeConfigurations
             .Where(c => c.IsEnabled)
             .OrderBy(c => c.DisplayOrder)
-            .Select(c => c.OrderType)
             .ToListAsync(cancellationToken);
 
-        // Check if restaurant is currently open for dine-in using dynamic working hours
-        if (enabledTypes.Contains(OrderType.DineIn))
+        var enabledTypes = configurations.Select(c => c.OrderType).ToList();
+
+        // The opening-hours gate is PER ORDER TYPE (#448). DineIn has always been refused while
+        // the restaurant is closed; takeaway and delivery keep the behaviour tenants rely on —
+        // accepted at any hour — until the tenant turns the gate on for that type. Refusal looks
+        // exactly as it always has for DineIn: the type is removed from the offered set.
+        // One clock read decides every gated type at once: the answer cannot differ between them.
+        if (configurations.Any(c => c.EnforceOpeningHours))
         {
             var isOpen = await _workingHoursService.IsOpenNowAsync(cancellationToken);
 
-            // Remove dine-in if restaurant is closed
             if (!isOpen)
             {
-                enabledTypes.Remove(OrderType.DineIn);
+                var gatedTypes = configurations
+                    .Where(c => c.EnforceOpeningHours)
+                    .Select(c => c.OrderType)
+                    .ToHashSet();
+
+                enabledTypes.RemoveAll(gatedTypes.Contains);
             }
         }
 
@@ -96,6 +109,7 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
     public async Task<OrderTypeConfigurationDto> UpdateAsync(
         OrderType orderType,
         bool isEnabled,
+        bool? enforceOpeningHours = null,
         CancellationToken cancellationToken = default)
     {
         var configuration = await _context.OrderTypeConfigurations
@@ -107,6 +121,15 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
         }
 
         configuration.IsEnabled = isEnabled;
+
+        // null means "the caller has not heard of this field" — the shipped frontend sends only
+        // { orderType, isEnabled }. Applying false there would switch the hours gate off on every
+        // such save, so an omitted value must leave the stored one untouched.
+        if (enforceOpeningHours.HasValue)
+        {
+            configuration.EnforceOpeningHours = enforceOpeningHours.Value;
+        }
+
         configuration.UpdatedAt = DateTime.UtcNow;
         configuration.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -116,7 +139,8 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
         {
             OrderType = configuration.OrderType,
             IsEnabled = configuration.IsEnabled,
-            DisplayOrder = configuration.DisplayOrder
+            DisplayOrder = configuration.DisplayOrder,
+            EnforceOpeningHours = configuration.EnforceOpeningHours
         };
     }
 }

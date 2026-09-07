@@ -6,7 +6,8 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 
 /// <summary>
 /// S4 (SOFRA-PAYMENTS-PLAN §5). The conversion from an order total to something Stripe will accept,
-/// and the three ways it can legitimately refuse.
+/// and the two ways it can legitimately refuse (an unusable currency, a non-positive total — the
+/// third, the TWINT ceiling, was removed by #343).
 ///
 /// <para>
 /// Pure unit tests: this is arithmetic and a policy, and neither needs a database. The reason it is
@@ -101,32 +102,25 @@ public class CheckoutAmountTests
     }
 
     /// <summary>
-    /// Stripe enforces the TWINT ceiling when the SESSION is created, not when it is paid
-    /// (measured, plan §3: <c>amount_too_large</c>), so the whole redirect fails rather than the
-    /// TWINT tile quietly disappearing. Pre-checked so the diner gets a sentence instead of a
-    /// gateway error.
+    /// #343 regression guard. The TWINT-ceiling pre-check (max CHF 5,000) was removed: with
+    /// payment methods chosen dynamically — how S4 ships them, <c>payment_method_types</c> unset —
+    /// Stripe silently drops TWINT from the offered set above its ceiling and keeps card, so the
+    /// pre-check refused payments Stripe would have completed (measured, plan §7.5). Just above
+    /// and well above the former cap must now be chargeable in CHF.
     /// </summary>
     [Fact]
-    public void A_chf_order_above_the_twint_ceiling_is_refused()
+    public void A_chf_order_above_the_former_twint_cap_is_accepted()
     {
-        var act = () => CheckoutAmount.From(5000.01m, "CHF");
-
-        act.Should().Throw<BadRequestException>().WithMessage("*5,000.00 CHF*");
-    }
-
-    /// <summary>The boundary itself is allowed — the measured cap is max CHF 5,000.00, inclusive.</summary>
-    [Fact]
-    public void The_twint_ceiling_itself_is_allowed()
-    {
-        CheckoutAmount.From(5000.00m, "CHF").Minor.Should().Be(500000);
+        CheckoutAmount.From(5000.01m, "CHF").Minor.Should().Be(500001);
+        CheckoutAmount.From(6000m, "CHF").Minor.Should().Be(600000);
     }
 
     /// <summary>
-    /// The control for the test above, and the reason the cap is not a global amount limit: TWINT
-    /// is a Swiss method, so a €6,000 order in a euro market must still be payable by card.
+    /// The former cap was CHF-only, so large EUR orders always worked — that is unchanged, and
+    /// still worth pinning as the currency-independence control of the test above.
     /// </summary>
     [Fact]
-    public void The_twint_ceiling_does_not_apply_to_other_currencies()
+    public void A_large_order_in_another_currency_is_accepted()
     {
         CheckoutAmount.From(6000m, "EUR").Minor.Should().Be(600000);
     }

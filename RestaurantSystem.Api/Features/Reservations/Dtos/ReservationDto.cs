@@ -11,6 +11,10 @@ public record ReservationDto
     public string CustomerPhone { get; set; } = string.Empty;
     public Guid TableId { get; set; }
     public string TableNumber { get; set; } = string.Empty;
+
+    /// <summary>The additional tables this booking occupies (#561). Empty for a single-table
+    /// reservation, which is every booking made before the feature existed.</summary>
+    public List<Guid> CombinedTableIds { get; set; } = new List<Guid>();
     public DateTime ReservationDate { get; set; }
     public TimeSpan StartTime { get; set; }
     public TimeSpan EndTime { get; set; }

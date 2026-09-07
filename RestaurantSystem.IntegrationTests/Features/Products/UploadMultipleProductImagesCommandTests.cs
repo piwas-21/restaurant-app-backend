@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductImagesCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -101,13 +102,18 @@ public class UploadMultipleProductImagesCommandTests : IntegrationTestBase
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var fileStorageSettings = scope.ServiceProvider.GetRequiredService<IOptions<FileStorageSettings>>();
 
-        var handler = new UploadMultipleProductImagesCommandHandler(
+        var walker = new BulkImageUploadWalker(
             context,
             new StubStorage(),
+            new ImageSharpImageProcessor(fileStorageSettings, NullLogger<ImageSharpImageProcessor>.Instance),
             currentUser,
-            NullLogger<UploadMultipleProductImagesCommandHandler>.Instance,
             configuration,
-            fileStorageSettings);
+            fileStorageSettings,
+            NullLogger<BulkImageUploadWalker>.Instance);
+        var handler = new UploadMultipleProductImagesCommandHandler(
+            context,
+            NullLogger<UploadMultipleProductImagesCommandHandler>.Instance,
+            walker);
 
         return await handler.Handle(
             new UploadMultipleProductImagesCommand(productId, files.ToList()), CancellationToken.None);

@@ -732,6 +732,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsHiddenFromAllTab")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_hidden_from_all_tab");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
@@ -3033,6 +3037,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("display_order");
 
+                    b.Property<bool>("EnforceOpeningHours")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enforce_opening_hours");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean")
                         .HasColumnName("is_enabled");
@@ -3542,6 +3550,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<string>("AltText")
                         .HasColumnType("text")
                         .HasColumnName("alt_text");
+
+                    b.Property<string>("CardUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("card_url");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -4098,6 +4110,53 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("TableId", "ReservationDate");
 
                     b.ToTable("Reservations", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ReservationTable", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("ReservationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reservation_id");
+
+                    b.Property<Guid>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reservation_table");
+
+                    b.HasIndex("TableId")
+                        .HasDatabaseName("ix_reservation_table_table_id");
+
+                    b.HasIndex("ReservationId", "TableId")
+                        .IsUnique();
+
+                    b.ToTable("ReservationTables", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantInfo", b =>
@@ -5560,6 +5619,27 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Table");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ReservationTable", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Reservation", "Reservation")
+                        .WithMany("CombinedTables")
+                        .HasForeignKey("ReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reservation_table_reservations_reservation_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Table", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_reservation_table_tables_table_id");
+
+                    b.Navigation("Reservation");
+
+                    b.Navigation("Table");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantLandingContent", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.RestaurantInfo", "RestaurantInfo")
@@ -5746,6 +5826,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductVariation", b =>
                 {
                     b.Navigation("Descriptions");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.Reservation", b =>
+                {
+                    b.Navigation("CombinedTables");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.RestaurantInfo", b =>

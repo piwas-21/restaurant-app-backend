@@ -91,6 +91,7 @@ public class GetReservationsQueryHandler : IQueryHandler<GetReservationsQuery, A
                     CustomerPhone = r.CustomerPhone ?? string.Empty,
                     TableId = r.TableId,
                     TableNumber = r.Table.TableNumber,
+                    CombinedTableIds = r.CombinedTables.Select(c => c.TableId).ToList(),
                     ReservationDate = r.ReservationDate,
                     StartTime = r.StartTime,
                     EndTime = r.EndTime,

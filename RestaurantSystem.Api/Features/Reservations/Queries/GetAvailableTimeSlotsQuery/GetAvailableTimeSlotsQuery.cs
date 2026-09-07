@@ -88,6 +88,7 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
             // Get all confirmed/pending reservations for the requested date
             var queryDateUtc = DateTime.SpecifyKind(query.Date.Date, DateTimeKind.Utc);
             var existingReservations = await _context.Reservations
+                .Include(r => r.CombinedTables)
                 .Where(r => r.ReservationDate.Date == queryDateUtc &&
                            (r.Status == ReservationStatus.Pending || r.Status == ReservationStatus.Confirmed))
                 .ToListAsync(cancellationToken);
@@ -121,9 +122,10 @@ public class GetAvailableTimeSlotsQueryHandler : IQueryHandler<GetAvailableTimeS
                     // Find available tables for this time slot
                     var availableTables = allTables.Where(table =>
                     {
-                        // Check if this table has any conflicting reservations
+                        // Check if this table has any conflicting reservations — a COMBINED
+                        // booking occupies every one of its tables, not just the primary (#561).
                         var hasConflict = existingReservations.Any(r =>
-                            r.TableId == table.Id &&
+                            (r.TableId == table.Id || r.CombinedTables.Any(c => c.TableId == table.Id)) &&
                             DoTimeSlotsOverlap(currentTime, slotEndTime, r.StartTime, r.EndTime));
 
                         return !hasConflict;

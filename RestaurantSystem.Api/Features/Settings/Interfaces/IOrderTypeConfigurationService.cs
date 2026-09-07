@@ -7,5 +7,9 @@ public interface IOrderTypeConfigurationService
 {
     Task<List<OrderTypeConfigurationDto>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<List<OrderType>> GetEnabledOrderTypesAsync(CancellationToken cancellationToken = default);
-    Task<OrderTypeConfigurationDto> UpdateAsync(OrderType orderType, bool isEnabled, CancellationToken cancellationToken = default);
+    Task<OrderTypeConfigurationDto> UpdateAsync(
+        OrderType orderType,
+        bool isEnabled,
+        bool? enforceOpeningHours = null,
+        CancellationToken cancellationToken = default);
 }

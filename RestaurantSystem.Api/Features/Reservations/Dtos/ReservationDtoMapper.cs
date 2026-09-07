@@ -13,6 +13,9 @@ internal static class ReservationDtoMapper
         CustomerPhone = reservation.CustomerPhone ?? string.Empty,
         TableId = reservation.TableId,
         TableNumber = tableNumber,
+        // Only populated when the query loaded the navigation; reads that never asked (the
+        // availability query, quick actions) do not go through this mapper's callers.
+        CombinedTableIds = reservation.CombinedTables.Select(c => c.TableId).ToList(),
         ReservationDate = reservation.ReservationDate,
         StartTime = reservation.StartTime,
         EndTime = reservation.EndTime,

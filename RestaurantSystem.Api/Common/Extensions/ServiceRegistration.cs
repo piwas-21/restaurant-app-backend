@@ -60,6 +60,7 @@ namespace RestaurantSystem.Api.Common.Extensions
 
             // Register all command handlers
             RegisterCommandHandlers(services, assemblies);
+            RegisterCatalogSupportServices(services);
 
             // Register all query handlers
             RegisterQueryHandlers(services, assemblies);
@@ -70,6 +71,14 @@ namespace RestaurantSystem.Api.Common.Extensions
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
             return services;
+        }
+
+        private static void RegisterCatalogSupportServices(IServiceCollection services)
+        {
+            // Per-file staging for the bulk image upload; owns the storage + decode work the
+            // bulk command handler orchestrates (2026-09-06 card-variant batch).
+            services.AddScoped<Features.Products.Commands.UploadMultipleProductImagesCommand.IBulkImageUploadWalker,
+                Features.Products.Commands.UploadMultipleProductImagesCommand.BulkImageUploadWalker>();
         }
 
         private static void RegisterCommandHandlers(IServiceCollection services, Assembly[] assemblies)
