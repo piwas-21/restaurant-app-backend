@@ -65,7 +65,7 @@ public class GlobalIngredientsController : ControllerBase
     public async Task<ActionResult<ApiResponse<GlobalIngredientDto>>> CreateGlobalIngredient(
         [FromBody] CreateGlobalIngredientDto body) =>
         Ok(await _mediator.SendCommand(new CreateGlobalIngredientCommand(
-            body.DefaultName, body.ImageUrl, body.Translations, body.Kind)));
+            body.DefaultName, body.ImageUrl, body.Translations, body.Kind, body.IsNoneOption)));
 
     [HttpPut("{id}")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
@@ -74,7 +74,7 @@ public class GlobalIngredientsController : ControllerBase
         Guid id,
         [FromBody] UpdateGlobalIngredientDto body) =>
         Ok(await _mediator.SendCommand(new UpdateGlobalIngredientCommand(
-            id, body.DefaultName, body.ImageUrl, body.IsActive, body.Translations, body.Kind)));
+            id, body.DefaultName, body.ImageUrl, body.IsActive, body.Translations, body.Kind, body.IsNoneOption)));
 
     /// <summary>
     /// WHICH products carry a copy of this row — the drill-down behind S3's "used on N items", and

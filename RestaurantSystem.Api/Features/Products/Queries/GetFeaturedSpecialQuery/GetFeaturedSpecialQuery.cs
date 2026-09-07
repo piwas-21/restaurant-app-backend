@@ -54,6 +54,9 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                 .ThenInclude(s => s.Images)
             .Include(p => p.DetailedIngredients)
                 .ThenInclude(di => di.Descriptions)
+            // The "no X" answer marker rides on the library row (Sans Sauces, 2026-09-07).
+            .Include(p => p.DetailedIngredients)
+                .ThenInclude(di => di.GlobalIngredient)
             // `!p.IsComponent` unconditionally — this is the public banner; see the same clause
             // on GetSpecialProductsQuery. No opt-in exists because no caller could want one.
             .Where(p => p.IsFeaturedSpecial && p.IsSpecial && p.IsActive && !p.IsComponent)
@@ -148,6 +151,7 @@ public class GetFeaturedSpecialQueryHandler : IQueryHandler<GetFeaturedSpecialQu
                     DisplayOrder = di.DisplayOrder,
                     MaxQuantity = di.MaxQuantity,
                     GlobalIngredientId = di.GlobalIngredientId,
+                    IsNoneOption = di.GlobalIngredient is { IsDeleted: false, IsNoneOption: true },
                     Kind = di.Kind,
                     ExclusionGroup = di.ExclusionGroup,
                     Content = di.Descriptions

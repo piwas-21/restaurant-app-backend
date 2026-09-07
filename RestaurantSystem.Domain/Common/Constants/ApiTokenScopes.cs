@@ -45,6 +45,13 @@ public static class ApiTokenScopes
     public const string TenantWrite = "tenant:write";
 
     /// <summary>
+    /// Run the admin image-maintenance jobs (resize backfill, card-variant backfill, preview
+    /// cleanup). Write-shaped: it rewrites stored files and fills CardUrl. Added 2026-09-07 so a
+    /// machine client can run the per-tenant image backfills without an admin password.
+    /// </summary>
+    public const string MaintenanceWrite = "maintenance:write";
+
+    /// <summary>
     /// Every scope that may be granted. The create-token validator rejects anything outside
     /// this set, so a typo is a 400 rather than a token that silently grants nothing.
     /// </summary>
@@ -53,7 +60,8 @@ public static class ApiTokenScopes
         MenuRead, MenuWrite,
         OrdersRead, OrdersWrite,
         ReservationsRead, ReservationsWrite,
-        TenantRead, TenantWrite
+        TenantRead, TenantWrite,
+        MaintenanceWrite
     };
 
     /// <summary>Whether <paramref name="scope"/> is part of the vocabulary. Case-sensitive on purpose.</summary>

@@ -17,6 +17,7 @@ public record CreateGlobalIngredientDto
     public string DefaultName { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
+    public bool IsNoneOption { get; set; }
     public List<GlobalIngredientTranslationDto> Translations { get; set; } = [];
 }
 
@@ -31,6 +32,7 @@ public record UpdateGlobalIngredientDto
     // answer. Reasoning in UpdateGlobalIngredientCommand's param docs.
     public bool? IsActive { get; set; }
     public IngredientKind? Kind { get; set; }
+    public bool? IsNoneOption { get; set; }
 
     public List<GlobalIngredientTranslationDto> Translations { get; set; } = [];
 }

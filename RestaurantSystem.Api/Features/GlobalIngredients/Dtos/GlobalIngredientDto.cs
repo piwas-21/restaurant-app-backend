@@ -20,6 +20,9 @@ public record GlobalIngredientDto
     /// </summary>
     public bool IsArchived { get; set; }
 
+    /// <summary>The "no X" answer for its kind (e.g. "Sans Sauces") — exclusive in the guest sheet.</summary>
+    public bool IsNoneOption { get; set; }
+
     /// <summary>Platform seed or this tenant's own — see <see cref="LibraryOrigin"/>.</summary>
     public LibraryOrigin Origin { get; set; }
 
