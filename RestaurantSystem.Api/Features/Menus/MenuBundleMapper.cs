@@ -62,6 +62,7 @@ public static class MenuBundleMapper
             {
                 Id = i.Id,
                 Url = UrlJoin.Join(baseUrl, i.Url),
+                CardUrl = i.CardUrl is null ? null : UrlJoin.Join(baseUrl, i.CardUrl),
                 AltText = i.AltText,
                 IsPrimary = i.IsPrimary,
                 SortOrder = i.SortOrder

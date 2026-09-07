@@ -11,6 +11,13 @@ public record CategoryDto
     public string? ImageUrl { get; init; }
     public bool IsActive { get; init; }
     public int DisplayOrder { get; init; }
+
+    /// <summary>
+    /// The category stays orderable on its own tab; when true its products are left out of the
+    /// guest "All" list (see <c>Category.IsHiddenFromAllTab</c>). Admin-facing and informational
+    /// on public clients — the filtering happens server-side.
+    /// </summary>
+    public bool IsHiddenFromAllTab { get; init; }
     public int ProductCount { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
