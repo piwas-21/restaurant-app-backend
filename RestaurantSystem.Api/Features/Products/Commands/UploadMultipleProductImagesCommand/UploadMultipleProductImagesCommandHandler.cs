@@ -18,7 +18,7 @@ namespace RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductI
 public class UploadMultipleProductImagesCommandHandler(
     ApplicationDbContext context,
     ILogger<UploadMultipleProductImagesCommandHandler> logger,
-    BulkImageUploadWalker bulkImageUploadWalker)
+    IBulkImageUploadWalker bulkImageUploadWalker)
     : ICommandHandler<UploadMultipleProductImagesCommand, ApiResponse<List<ProductImageDto>>>
 {
     public async Task<ApiResponse<List<ProductImageDto>>> Handle(UploadMultipleProductImagesCommand command, CancellationToken cancellationToken)

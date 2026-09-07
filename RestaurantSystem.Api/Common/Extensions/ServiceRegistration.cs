@@ -77,7 +77,8 @@ namespace RestaurantSystem.Api.Common.Extensions
         {
             // Per-file staging for the bulk image upload; owns the storage + decode work the
             // bulk command handler orchestrates (2026-09-06 card-variant batch).
-            services.AddScoped<Features.Products.Commands.UploadMultipleProductImagesCommand.BulkImageUploadWalker>();
+            services.AddScoped<Features.Products.Commands.UploadMultipleProductImagesCommand.IBulkImageUploadWalker,
+                Features.Products.Commands.UploadMultipleProductImagesCommand.BulkImageUploadWalker>();
         }
 
         private static void RegisterCommandHandlers(IServiceCollection services, Assembly[] assemblies)

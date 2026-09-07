@@ -25,6 +25,7 @@ public sealed class BulkImageUploadWalker(
     IConfiguration configuration,
     IOptions<FileStorageSettings> fileStorageSettings,
     ILogger<BulkImageUploadWalker> logger)
+    : IBulkImageUploadWalker
 {
     private readonly ApplicationDbContext _context = context;
     private readonly IFileStorageService _fileStorageService = fileStorageService;
