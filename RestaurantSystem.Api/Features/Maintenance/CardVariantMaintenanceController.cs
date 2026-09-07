@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Maintenance.Dtos;
 using RestaurantSystem.Api.Features.Maintenance.Interfaces;
@@ -13,7 +15,8 @@ namespace RestaurantSystem.Api.Features.Maintenance;
 /// </summary>
 [ApiController]
 [Route("api/maintenance/images")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = MaintenanceAdminRequirement.PolicyName)]
+[ApiScope(ApiTokenScopes.MaintenanceWrite)]
 public class CardVariantMaintenanceController(
     IProductCardVariantBackfillService cardVariants)
 {

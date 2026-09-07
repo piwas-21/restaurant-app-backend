@@ -23,7 +23,9 @@ public record UpdateGlobalIngredientCommand(
     bool? IsActive,
     List<GlobalIngredientTranslationDto> Translations,
     // S5. Last and defaulted so every existing caller keeps its meaning; null now means "unchanged".
-    IngredientKind? Kind = null
+    IngredientKind? Kind = null,
+    // The "no X" answer marker (Sans Sauces, 2026-09-07); null means "unchanged", same reasoning.
+    bool? IsNoneOption = null
 ) : ICommand<ApiResponse<GlobalIngredientDto>>;
 
 public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobalIngredientCommand, ApiResponse<GlobalIngredientDto>>
@@ -54,6 +56,7 @@ public class UpdateGlobalIngredientCommandHandler : ICommandHandler<UpdateGlobal
         ingredient.ImageUrl = command.ImageUrl;
         ingredient.IsActive = command.IsActive ?? ingredient.IsActive;
         ingredient.Kind = command.Kind ?? ingredient.Kind;
+        ingredient.IsNoneOption = command.IsNoneOption ?? ingredient.IsNoneOption;
 
         SyncTranslations(ingredient, command.Translations, _currentUserService.GetAuditIdentifier());
 
