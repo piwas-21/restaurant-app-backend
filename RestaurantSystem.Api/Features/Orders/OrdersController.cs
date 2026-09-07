@@ -146,4 +146,5 @@ public class OrdersController : ControllerBase
     //   /api/orders/{n}/quick-confirm|quick-cancel
     //   /api/orders/{id}/approve-delay|reject-delay
     //                                             -> OrderQuickActionsController  (task 2.5)
+    //   /api/orders/table/{n}/bill{,/payments}    -> TableBillController (one-bill-per-table)
 }
