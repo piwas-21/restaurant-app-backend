@@ -16,7 +16,7 @@ public record CreateGlobalIngredientCommand(
     IngredientKind Kind = IngredientKind.Ingredient,
     // The "no X" answer marker (Sans Sauces, 2026-09-07). Last + defaulted: existing callers
     // keep creating plain ingredients.
-    bool IsNoneOption = false
+    bool? IsNoneOption = null
 ) : ICommand<ApiResponse<GlobalIngredientDto>>;
 
 public class CreateGlobalIngredientCommandHandler : ICommandHandler<CreateGlobalIngredientCommand, ApiResponse<GlobalIngredientDto>>
@@ -42,7 +42,7 @@ public class CreateGlobalIngredientCommandHandler : ICommandHandler<CreateGlobal
             ImageUrl = command.ImageUrl,
             IsActive = true,
             Kind = command.Kind,
-            IsNoneOption = command.IsNoneOption,
+            IsNoneOption = command.IsNoneOption ?? false,
             // The one place a Custom ingredient is born — see LibraryOrigin for why the column
             // defaults to System instead.
             Origin = LibraryOrigin.Custom,
