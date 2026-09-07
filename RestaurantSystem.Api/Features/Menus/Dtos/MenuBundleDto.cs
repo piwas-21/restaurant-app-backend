@@ -74,6 +74,20 @@ public class MenuBundleDto
     /// <c>UpdateMenuBundleCommandHandler</c>.
     /// </remarks>
     public int? AvailableOrderTypes { get; set; }
+
+    /// <summary>
+    /// The categories the bundle is LISTED in — the same <c>ProductCategories</c> links a plain
+    /// dish carries (the admin assigns the main dish's categories to the bundle at creation).
+    /// The customer menu groups bundles into their categories' tabs with these ids; the bundles
+    /// area itself keeps listing every active bundle regardless.
+    /// </summary>
+    public List<Guid> CategoryIds { get; set; } = new();
+
+    /// <summary>
+    /// The bundle's primary category, when one of the links is marked primary — the ordering and
+    /// channel-inheritance anchor. Null for an orphan bundle (no links, or none primary).
+    /// </summary>
+    public Guid? PrimaryCategoryId { get; set; }
 }
 
 /// <summary>

@@ -148,6 +148,52 @@ public class MenuBundleMapperTests
         dto.Availability.AllowedOrderTypes.Should().HaveCount(3);
     }
 
+    /// <summary>
+    /// The customer menu groups a bundle into the tabs of its main dish's categories, so the read
+    /// contract has to carry the links (the same ProductCategories the channel verdict already
+    /// reads). Both a primary and a secondary link must survive, and the primary must be the one
+    /// flagged IsPrimary — ordering on the tab hangs off it.
+    /// </summary>
+    [Fact]
+    public void ProjectsTheCategoriesTheBundleIsListedIn()
+    {
+        var primaryId = Guid.NewGuid();
+        var secondaryId = Guid.NewGuid();
+        var bundle = BundleWith(availableOrderTypes: null);
+        bundle.ProductCategories.Add(new ProductCategory
+        {
+            ProductId = bundle.Id,
+            CategoryId = secondaryId,
+            IsPrimary = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+        bundle.ProductCategories.Add(new ProductCategory
+        {
+            ProductId = bundle.Id,
+            CategoryId = primaryId,
+            IsPrimary = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", requestedOrderType: null);
+
+        dto.CategoryIds.Should().BeEquivalentTo(new[] { primaryId, secondaryId });
+        dto.PrimaryCategoryId.Should().Be(primaryId,
+            "the primary link is the anchor, not whichever link happened to sort first");
+    }
+
+    [Fact]
+    public void AnOrphanBundleProjectsNoCategories()
+    {
+        var dto = MenuBundleMapper.MapToMenuBundleDto(
+            BundleWith(availableOrderTypes: null), "https://cdn.example", requestedOrderType: null);
+
+        dto.CategoryIds.Should().BeEmpty();
+        dto.PrimaryCategoryId.Should().BeNull();
+    }
+
     private static Product BundleWith(int? availableOrderTypes) => new()
     {
         Id = Guid.NewGuid(),
