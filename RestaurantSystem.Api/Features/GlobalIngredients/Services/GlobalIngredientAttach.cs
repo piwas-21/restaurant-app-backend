@@ -72,8 +72,9 @@ internal static class GlobalIngredientAttach
     /// <b><c>body.Kind ?? library.Kind</c> — the ACTION states the group, and the catalogue row is
     /// only the default.</b> This endpoint used to write <c>library.Kind</c> unconditionally while
     /// the picker stamped the group it was opened from (plan D8), so the two shipped paths applied
-    /// OPPOSITE rules to the same decision. The measured consequence on a live tenant: every one of
-    /// its 654 catalogue rows is typed <c>ingredient</c>, because no admin write has ever sent a
+    /// OPPOSITE rules to the same decision. The measured consequence on a live tenant (measured
+    /// 2026-09, before the seeder's sauce stamp and the ReclassifySeededSauces backfill): every one
+    /// of its 654 catalogue rows was typed <c>ingredient</c>, because no admin write had ever sent a
     /// kind, so "apply Sauce blanche to 21 products" put 21 rows in the INGREDIENTS group of 21
     /// products — the exact operation the restaurant asked for, quietly landing in the wrong group.
     /// </para>

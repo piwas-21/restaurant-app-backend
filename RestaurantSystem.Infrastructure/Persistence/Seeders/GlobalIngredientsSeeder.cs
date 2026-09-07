@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Seeders;
@@ -896,6 +897,13 @@ public static class GlobalIngredientsSeeder
             { "Kebab mix", T("Kebab mix", "Kebap harcı", "Kebab-Mischung", "Mezcla para kebab", "Impasto per kebab", "Mélange à kebab", "烤肉串混合物", "Смесь для кебаба", "خليط الكباب") },
             { "Lahmacun topping mix", T("Lahmacun topping mix", "Lahmacun üstü karışımı", "Lahmacun-Belagmischung", "Mezcla de cobertura para lahmacun", "Topping per lahmacun", "Garniture à lahmacun", "土耳其披萨馅料", "Начинка для лахмаджуна", "خليط حشوة اللحم بعجين") },
         });
+
+        // Stamp the curated sauce family (SeededSauceFamily): same rows, same money — typed
+        // apart so the Sauces picker offers them on a fresh install.
+        foreach (var sauce in ingredients.Where(i => SeededSauceFamily.DefaultNames.Contains(i.DefaultName)))
+        {
+            sauce.Kind = IngredientKind.Sauce;
+        }
 
         // --- Final Commit ---
         await context.GlobalIngredients.AddRangeAsync(ingredients);

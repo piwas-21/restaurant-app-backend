@@ -100,8 +100,9 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This is the defect the slice exists for, and it was measured on a live tenant, not inferred:
-    /// all 654 of its catalogue rows are typed <c>ingredient</c> because no admin write has ever
+    /// This is the defect the slice exists for, and it was measured on a live tenant, not inferred
+    /// (measured 2026-09, before the seeder's sauce stamp and the ReclassifySeededSauces backfill):
+    /// all 654 of its catalogue rows were typed <c>ingredient</c> because no admin write had ever
     /// sent a kind, so "apply Sauce blanche to 21 products" landed 21 rows in the INGREDIENTS group
     /// of 21 products. The picker had always stamped the GROUP it was opened from (plan D8); this
     /// endpoint stamped <c>library.Kind</c>. Two shipped paths, opposite rules, one decision.

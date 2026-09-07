@@ -15,8 +15,9 @@ public class GlobalIngredient : SoftDeleteEntity
     /// <summary>
     /// Ingredient or sauce (S5, plan D8). The catalog carries the same discriminator as the
     /// per-product row so the library picker can offer sauces to the Sauces group and ingredients to
-    /// the Ingredients group. Defaults to <see cref="IngredientKind.Ingredient"/>: the 654 seeded
-    /// rows keep the meaning they were seeded with, and nothing is re-classified by this slice.
+    /// the Ingredients group. Defaults to <see cref="IngredientKind.Ingredient"/>: the seeder stamps
+    /// only its curated 39-row sauce family as <see cref="IngredientKind.Sauce"/>, and
+    /// <c>ReclassifySeededSauces</c> backfills databases seeded before that stamp existed.
     /// </summary>
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
