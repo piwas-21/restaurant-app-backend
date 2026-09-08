@@ -56,8 +56,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
+    /// 131 at <c>POST /api/global-ingredients/{'{'}id{'}'}/apply-translations</c>.
     /// </summary>
-    private const int KnownMutatingActionCount = 130;
+    private const int KnownMutatingActionCount = 131;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
