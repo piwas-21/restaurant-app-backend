@@ -91,7 +91,7 @@ public class CategoryHiddenFromAllTabTests : IntegrationTestBase
         };
     }
 
-    private async Task<List<string>> FetchGuestAllViewNamesAsync()
+    private async Task<List<string>> FetchGuestAllViewNamesAsync(bool guestAllView = false)
     {
         using var scope = Factory.Services.CreateScope();
         var mediator = scope.ServiceProvider.GetRequiredService<CustomMediator>();
@@ -99,7 +99,7 @@ public class CategoryHiddenFromAllTabTests : IntegrationTestBase
             new ProductsQuery(
                 CategoryId: null, Type: null, ExcludeType: null, IsActive: null, IsAvailable: null,
                 isSpeacial: null, Search: null, Page: 1, PageSize: 200,
-                IncludeComponents: false));
+                IncludeComponents: false, GuestAllView: guestAllView));
         return response.Data!.Items.Select(p => p.Name).ToList();
     }
 
@@ -145,5 +145,32 @@ public class CategoryHiddenFromAllTabTests : IntegrationTestBase
         page!.Data!.Items.Should().Contain(p => p.Name == HiddenOnly,
             "the admin must still see every category's products to manage the flag itself");
         page.Data.Items.Should().Contain(p => p.Name == Visible, "positive control");
+    }
+
+    /// <summary>
+    /// The public menu page is a GUEST surface even when the browser carries a staff token — its
+    /// visitors include the owner previewing what a guest sees, and <c>apiClient</c> rides that
+    /// token on every fetch. Without an explicit opt-in the staff check exempted the page from the
+    /// exclusion entirely: the owner hid a category, opened /menu, and the dishes sat right there
+    /// in the All list (the reported "the flag is broken"). The page therefore sends
+    /// <c>GuestAllView=true</c>, and the exclusion must then fire for staff exactly as it does for
+    /// an anonymous guest. Through HTTP, because the staff identity lives in the request.
+    /// </summary>
+    [Fact]
+    public async Task A_staff_caller_asking_for_the_guest_all_view_loses_the_hidden_category_products()
+    {
+        AuthenticateAsAdmin();
+
+        var withoutOptIn = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>(
+            "/api/Products?Page=1&PageSize=200");
+        withoutOptIn!.Data!.Items.Should().Contain(p => p.Name == HiddenOnly,
+            "positive control: without the opt-in the staff exemption still holds");
+
+        var preview = await GetFromJsonAsync<ApiResponse<PagedResult<ProductSummaryDto>>>(
+            "/api/Products?Page=1&PageSize=200&GuestAllView=true");
+        preview!.Data!.Items.Should().NotContain(p => p.Name == HiddenOnly,
+            "the public menu preview must show the guest's All list, hidden categories gone");
+        preview.Data.Items.Should().Contain(p => p.Name == Visible,
+            "the exclusion never touches visible categories");
     }
 }

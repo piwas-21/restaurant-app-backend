@@ -10,8 +10,9 @@ public record GlobalIngredientDto
     public bool IsActive { get; set; }
 
     // Ingredient or sauce (S5). The picker needs it to offer a library row to the right group, so
-    // it is on the read AND both write shapes. Omitting it keeps creating ingredients, which is
-    // what all 654 seeded rows are.
+    // it is on the read AND both write shapes. Omitting it keeps creating ingredients — the seeder
+    // stamps only its curated 39-row sauce family as Sauce (ReclassifySeededSauces backfills
+    // databases seeded before that stamp existed).
     public IngredientKind Kind { get; set; } = IngredientKind.Ingredient;
 
     /// <summary>
