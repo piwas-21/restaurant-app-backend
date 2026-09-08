@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -27,7 +28,11 @@ public record UpdateRestaurantInfoCommand(
     decimal? Longitude,
     string Email,
     string? Website,
-    string? ThemePaletteKey = null
+    string? ThemePaletteKey = null,
+    // Defaults keep every constructor that predates the menu-display settings compiling and
+    // preserve today's behaviour (tabs, no bundles on the All tab).
+    string MenuLayout = "tabs",
+    bool ShowMenuBundlesOnAllTab = false
 ) : ICommand<ApiResponse<RestaurantInfoDto>>;
 
 public class UpdateRestaurantInfoCommandHandler
@@ -73,6 +78,9 @@ public class UpdateRestaurantInfoCommandHandler
         info.Email = command.Email;
         info.Website = command.Website;
         info.ThemePaletteKey = command.ThemePaletteKey;
+        // The validator has already pinned MenuLayout to a known name; the parse cannot fail here.
+        info.MenuLayout = Enum.Parse<MenuLayout>(command.MenuLayout, ignoreCase: true);
+        info.ShowMenuBundlesOnAllTab = command.ShowMenuBundlesOnAllTab;
         info.UpdatedAt = DateTime.UtcNow;
         info.UpdatedBy = _currentUserService.GetAuditIdentifier();
 

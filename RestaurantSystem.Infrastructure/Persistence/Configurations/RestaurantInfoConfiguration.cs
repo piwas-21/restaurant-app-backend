@@ -30,6 +30,14 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
             .HasConversion<string>()
             .HasMaxLength(16)
             .HasDefaultValue(LandingBackgroundMode.Default);
+        // Same storage shape as LandingBackgroundMode: enum as a short string with a default, so
+        // existing rows read back as Tabs and no tenant's menu changes layout under them.
+        builder.Property(r => r.MenuLayout)
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .HasDefaultValue(MenuLayout.Tabs);
+        // Default false: the guest All tab stays products-only for every existing tenant.
+        builder.Property(r => r.ShowMenuBundlesOnAllTab).HasDefaultValue(false);
         // Percent coordinates (0–100) — 2 decimal places is ample granularity.
 
         builder.HasMany(r => r.PhoneNumbers)

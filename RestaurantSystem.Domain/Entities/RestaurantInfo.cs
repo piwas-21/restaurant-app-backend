@@ -59,6 +59,30 @@ public class RestaurantInfo : Entity
     /// <summary>How the landing page resolves its background image.</summary>
     public LandingBackgroundMode LandingBackgroundMode { get; set; } = LandingBackgroundMode.Default;
 
+    /// <summary>
+    /// How the public menu page presents the catalogue: one tab per category
+    /// (the default) or every category on one scrolling page. Stored as a
+    /// string; the admin UI owns the labels, the guest site owns the rendering.
+    /// </summary>
+    public MenuLayout MenuLayout { get; set; } = MenuLayout.Tabs;
+
+    /// <summary>
+    /// Whether the guest "All items" tab also lists the tenant's menu bundles
+    /// (partner request, mcdoner). Default false keeps every existing tenant's
+    /// All tab products-only, which is the behaviour the platform shipped with.
+    /// </summary>
+    public bool ShowMenuBundlesOnAllTab { get; set; }
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
     public virtual ICollection<RestaurantLandingContent> LandingContents { get; set; } = new List<RestaurantLandingContent>();
+}
+
+/// <summary>How the public menu page presents the catalogue.</summary>
+public enum MenuLayout
+{
+    /// <summary>The current behaviour: All items, Menu Bundles, then one tab per category.</summary>
+    Tabs,
+
+    /// <summary>Every category on one page; the category bar scrolls to each section.</summary>
+    OnePage,
 }
