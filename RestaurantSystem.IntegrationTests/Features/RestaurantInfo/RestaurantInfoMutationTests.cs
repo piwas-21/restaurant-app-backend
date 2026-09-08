@@ -115,6 +115,132 @@ public class RestaurantInfoMutationTests : IntegrationTestBase
         info.ThemePaletteKey.Should().Be("olive-grove");
     }
 
+    [Fact]
+    public async Task Update_AsAdmin_RoundTripsMenuDisplaySettings()
+    {
+        AuthenticateAsAdmin();
+
+        // The mcdoner partner settings: one-page layout + bundles on the All tab.
+        // The PUT is a full upsert, so the identity fields ride along.
+        var response = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: "Rumi Restaurant Geneva",
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: "contact@rumirestaurant.ch",
+                Website: null,
+                ThemePaletteKey: null,
+                MenuLayout: "onepage",
+                ShowMenuBundlesOnAllTab: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await ReadDataAsync<RestaurantInfoDto>(response);
+        dto.MenuLayout.Should().Be("onepage");
+        dto.ShowMenuBundlesOnAllTab.Should().BeTrue();
+
+        // The public GET is where the guest /menu reads the settings.
+        var getResp = await Client.GetAsync("/api/restaurant-info");
+        var info = await ReadDataAsync<RestaurantInfoDto>(getResp);
+        info.MenuLayout.Should().Be("onepage");
+        info.ShowMenuBundlesOnAllTab.Should().BeTrue();
+
+        // Restore the platform defaults so other tests in this lane read the shipped behaviour
+        // (tabs, products-only All tab) no matter which order they run in.
+        await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: "Rumi Restaurant Geneva",
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: "contact@rumirestaurant.ch",
+                Website: null));
+    }
+
+    [Fact]
+    public async Task Update_OmittingMenuDisplaySettings_FallsBackToShippedDefaults()
+    {
+        AuthenticateAsAdmin();
+
+        // A client compiled before the menu-display settings omits both fields.
+        // The command's parameter defaults must land on the shipped behaviour —
+        // tabs + products-only All tab — never an accidental layout switch.
+        var response = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: "Rumi Restaurant Geneva",
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: "contact@rumirestaurant.ch",
+                Website: null,
+                ThemePaletteKey: null,
+                MenuLayout: "onepage",
+                ShowMenuBundlesOnAllTab: true));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var omitted = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: "Rumi Restaurant Geneva",
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: "contact@rumirestaurant.ch",
+                Website: null));
+
+        omitted.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await ReadDataAsync<RestaurantInfoDto>(omitted);
+        dto.MenuLayout.Should().Be("tabs");
+        dto.ShowMenuBundlesOnAllTab.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("page")]
+    [InlineData("ONE-PAGE-HYPHENATED")]
+    [InlineData("")]
+    public async Task Update_WithUnknownMenuLayout_Returns400(string badLayout)
+    {
+        AuthenticateAsAdmin();
+
+        // A typo'd layout would silently read as the default on the guest site,
+        // so the validator pins the value the way the landing page's mode does.
+        var response = await Client.PutAsJsonAsync(
+            "/api/restaurant-info",
+            new UpdateRestaurantInfoCommand(
+                Name: "Rumi Restaurant Geneva",
+                AddressLine1: "Rue du Grand-Pré 99",
+                AddressLine2: null,
+                City: "Genève",
+                PostalCode: "1202",
+                Country: "Switzerland",
+                Latitude: null,
+                Longitude: null,
+                Email: "contact@rumirestaurant.ch",
+                Website: null,
+                MenuLayout: badLayout));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ── Required-field validation ────────────────────────────────────────
     // The handler carries no inline null/empty guards; required-field and
     // email-format validation is enforced by UpdateRestaurantInfoCommandValidator

@@ -16,7 +16,10 @@ public record RestaurantInfoDto(
     string? LogoUrl,
     string? LogoDarkUrl,
     string? InteriorImageUrl,
-    IReadOnlyList<RestaurantPhoneNumberDto> PhoneNumbers);
+    IReadOnlyList<RestaurantPhoneNumberDto> PhoneNumbers,
+    /// <summary>Serialised lowercase (<c>tabs</c> | <c>onepage</c>) — the frontend's union.</summary>
+    string MenuLayout,
+    bool ShowMenuBundlesOnAllTab);
 
 /// <summary>Which of the two stored logos an upload or delete is addressing.</summary>
 /// <remarks>
