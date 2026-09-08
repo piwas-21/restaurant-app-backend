@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.AttachGlobalIngredientCommand;
+using RestaurantSystem.Api.Features.GlobalIngredients.Commands.ApplyGlobalIngredientTranslationsCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.CreateGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.DeleteGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.RestoreGlobalIngredientCommand;
@@ -101,6 +102,21 @@ public class GlobalIngredientsController : ControllerBase
         Guid id,
         [FromBody] AttachGlobalIngredientDto body) =>
         Ok(await _mediator.SendCommand(new AttachGlobalIngredientCommand(id, body)));
+
+    /// <summary>
+    /// Writes one set of per-locale names onto the library row AND onto every product ingredient
+    /// copy that references it — the propagation the attach endpoint deliberately does not do (its
+    /// copies are frozen at attach time, plan D3). See
+    /// <see cref="Commands.ApplyGlobalIngredientTranslationsCommand.ApplyGlobalIngredientTranslationsCommandHandler"/>
+    /// for which copies are reached and why a copy's own description never moves.
+    /// </summary>
+    [HttpPost("{id}/apply-translations")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<ApplyGlobalIngredientTranslationsResultDto>>> ApplyTranslations(
+        Guid id,
+        [FromBody] List<GlobalIngredientTranslationDto> body) =>
+        Ok(await _mediator.SendCommand(new ApplyGlobalIngredientTranslationsCommand(id, body)));
 
     [HttpPost("{id}/restore")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
