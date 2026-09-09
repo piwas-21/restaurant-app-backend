@@ -58,6 +58,7 @@ internal static class OrderIngredientSnapshot
                 IngredientName = row.IngredientName,
                 Quantity = row.Quantity,
                 IsRemoved = row.IsRemoved,
+                IsAddOn = row.IsAddOn,
                 SortOrder = index,
                 CreatedAt = createdAt,
                 CreatedBy = createdBy,

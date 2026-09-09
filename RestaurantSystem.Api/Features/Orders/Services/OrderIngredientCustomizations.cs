@@ -113,7 +113,10 @@ internal static class OrderIngredientCustomizations
 
     /// <summary>
     /// The frozen rows, in the order they were rendered in at checkout, or null when this line
-    /// carries no snapshot (every order placed before S1, which is not backfilled).
+    /// carries no snapshot (every order placed before S1, which is not backfilled). Everything a
+    /// display surface reads off these rows was settled at checkout — name, quantity, removal, and
+    /// whether the row was a paid extra — so a later catalog edit cannot reword or reclass a line
+    /// that was already rendered once.
     /// </summary>
     private static List<OrderItemIngredientDto>? FromSnapshot(OrderItem item)
     {
@@ -130,7 +133,8 @@ internal static class OrderIngredientCustomizations
                 IngredientId = row.IngredientId,
                 IngredientName = row.IngredientName,
                 Quantity = row.Quantity,
-                IsRemoved = row.IsRemoved
+                IsRemoved = row.IsRemoved,
+                IsAddOn = row.IsAddOn
             })
             .ToList();
     }
@@ -180,6 +184,12 @@ internal static class OrderIngredientCustomizations
         var customizations = new List<OrderItemIngredientDto>();
         foreach (var ing in recipeRows)
         {
+            // The paid-extra marker travels on every row of an add-on, INCLUDING the explicit
+            // quantity-0 zero the backfill writes for an add-on nobody picked — the flag says what
+            // the row IS, the quantity says whether the guest chose it. Readers combine the two
+            // (see OrderItemIngredientDto.IsAddOn).
+            var isAddOn = !IngredientRecipeRules.IsInBaseRecipe(ing);
+
             if (savedQuantities.TryGetValue(ing.Id, out var quantity))
             {
                 // Ingredient is in the order - show it regardless of quantity. Whether a quantity
@@ -191,20 +201,22 @@ internal static class OrderIngredientCustomizations
                     IngredientId = ing.Id,
                     IngredientName = ing.Name,
                     Quantity = quantity,
-                    IsRemoved = IngredientRecipeRules.IsRemoved(ing, quantity)
+                    IsRemoved = IngredientRecipeRules.IsRemoved(ing, quantity),
+                    IsAddOn = isAddOn
                 });
             }
             else if (!ing.IsOptional)
             {
                 // Required ingredient not in selection at all = removed. Reachable only when at
                 // least one OTHER saved id resolved — the guard above rules out the case where this
-                // branch would fire for the whole recipe.
+                // branch would fire for the whole recipe. Required ⇒ base recipe ⇒ never an add-on.
                 customizations.Add(new OrderItemIngredientDto
                 {
                     IngredientId = ing.Id,
                     IngredientName = ing.Name,
                     Quantity = 0,
-                    IsRemoved = true
+                    IsRemoved = true,
+                    IsAddOn = false
                 });
             }
         }

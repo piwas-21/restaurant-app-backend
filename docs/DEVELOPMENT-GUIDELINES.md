@@ -355,7 +355,7 @@ Custom `StringEnumConverterFactory` in `/Common/Converters/`:
 
 - **Integration tests**: `RestaurantSystem.IntegrationTests/` - real PostgreSQL via Testcontainers + Respawn
 - **Unit tests** (planned): `RestaurantSystem.UnitTests/` - mocked dependencies
-- **Run**: `dotnet test --settings .runsettings`
+- **Run**: `dotnet test` (no runsettings file exists in this repo — CI runs it without one too)
 - **Coverage target**: 80%+ overall
 - **CI/CD**: tests must pass in the GitHub Actions pipeline before merge
 

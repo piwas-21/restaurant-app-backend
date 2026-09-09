@@ -53,6 +53,22 @@ public class OrderItemIngredient : Entity
     /// </summary>
     public int SortOrder { get; set; }
 
+    /// <summary>
+    /// Frozen answer of "was this row a PAID EXTRA the guest opted into?" — an optional ingredient
+    /// NOT included in the base price. Every fresh add-on carries <c>Quantity == 1</c>, which is
+    /// wire-identical to a base-recipe default, so a read surface that showed only removals and
+    /// <c>Quantity &gt; 1</c> hid the guest's ordinary "extra sauce" on every order surface (admin
+    /// order details, cashier, the printed kitchen ticket).
+    /// </summary>
+    /// <remarks>
+    /// Frozen at checkout like the name, not derived at read time: the whole point of this table
+    /// (S1) is that a past receipt never changes, and an admin flipping a row's
+    /// <c>IsOptional</c>/<c>IsIncludedInBasePrice</c> — or deleting the recipe outright — must not
+    /// reclass a line already printed. The migration's column default is <c>false</c>, so every
+    /// pre-flag row renders exactly as it did before the flag existed.
+    /// </remarks>
+    public bool IsAddOn { get; set; }
+
     // Navigation properties. Nullable, and honestly so: nothing loads it (the snapshot is read
     // through OrderItem.IngredientSnapshots, never the other way round), so declaring it non-null
     // would be a promise the runtime does not keep.

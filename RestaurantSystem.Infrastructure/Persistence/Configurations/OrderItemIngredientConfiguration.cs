@@ -27,6 +27,11 @@ public class OrderItemIngredientConfiguration : IEntityTypeConfiguration<OrderIt
         builder.Property(oii => oii.SortOrder)
             .IsRequired();
 
+        // Frozen at checkout (see the property's remarks): additive, defaulted false, so every
+        // pre-flag row keeps its meaning with no backfill.
+        builder.Property(oii => oii.IsAddOn)
+            .IsRequired();
+
         builder.HasOne(oii => oii.OrderItem)
             .WithMany(i => i.IngredientSnapshots)
             .HasForeignKey(oii => oii.OrderItemId)
