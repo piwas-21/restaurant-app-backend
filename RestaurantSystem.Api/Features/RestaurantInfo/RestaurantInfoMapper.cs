@@ -37,7 +37,11 @@ public static class RestaurantInfoMapper
                 .OrderBy(p => p.DisplayOrder)
                 .Select(p => new RestaurantPhoneNumberDto(
                     p.Id, p.Label, p.Number, p.WhatsAppEnabled, p.DisplayOrder, p.IsActive))
-                .ToList());
+                .ToList(),
+            // Lowercase wire values — the frontend's `MenuLayout` union is written against them,
+            // exactly like the landing page's background mode.
+            info.MenuLayout.ToString().ToLowerInvariant(),
+            info.ShowMenuBundlesOnAllTab);
 
     /// <summary>
     /// Joins a stored logo path onto the storage base URL, collapsing "no logo" to null.

@@ -1,4 +1,5 @@
 using FluentValidation;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.RestaurantInfo.Commands.UpdateRestaurantInfoCommand;
 
@@ -44,5 +45,11 @@ public class UpdateRestaurantInfoCommandValidator : AbstractValidator<UpdateRest
         RuleFor(x => x.ThemePaletteKey)
             .MaximumLength(64).WithMessage("Theme palette key cannot exceed 64 characters")
             .When(x => x.ThemePaletteKey != null);
+
+        // Unlike the palette key this one has exactly two legal values, and a typo would silently
+        // read as the default on the guest site — so the value IS validated, landing-page-style.
+        RuleFor(x => x.MenuLayout)
+            .Must(value => Enum.TryParse<MenuLayout>(value, ignoreCase: true, out _))
+            .WithMessage("Menu layout must be tabs or onepage.");
     }
 }
