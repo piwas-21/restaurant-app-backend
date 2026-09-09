@@ -12,8 +12,9 @@ public record OrderItemIngredientDto
     // True when this row is a PAID EXTRA the guest opted into (an optional ingredient not included
     // in the base price), false on every base-recipe row. It exists because a fresh add-on carries
     // quantity 1 — wire-identical to a base-recipe default — so a read surface that showed only
-    // removals and quantity > 1 hid every ordinary "extra sauce" the guest chose. The display rule
-    // a row must pass to count as CHOSEN is: !IsRemoved && Quantity > 0 && (IsAddOn || Quantity > 1).
+    // removals and above-base quantities hid every ordinary "extra sauce" the guest chose. A row
+    // counts as CHOSEN when it is not removed, its quantity is positive, and it is either an
+    // add-on or above the base quantity.
     // A quantity-0 row with IsAddOn true is an add-on the guest did NOT pick (the backfilled
     // explicit zero), so consumers must keep the Quantity > 0 half.
     //
