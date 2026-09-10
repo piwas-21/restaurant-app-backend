@@ -123,8 +123,11 @@ public class OrderMappingServiceMenuIngredientTests : IntegrationTestBase
                 Quantity = 1,
                 UnitPrice = 15.00m,
                 ItemTotal = 15.00m,
+                // Sauce at 2, not 1: since the display rule of 2026-09-10 a base ingredient at its
+                // default quantity prints nothing, and this line needs both rows to survive so the
+                // mapping assertions have something to read. 2 is a decision ("extra sauce").
                 IngredientQuantitiesJson = System.Text.Json.JsonSerializer.Serialize(
-                    new Dictionary<Guid, int> { [cheeseId] = 0, [sauceId] = 1 }),
+                    new Dictionary<Guid, int> { [cheeseId] = 0, [sauceId] = 2 }),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = "test"
             });
@@ -182,7 +185,7 @@ public class OrderMappingServiceMenuIngredientTests : IntegrationTestBase
             .Should().BeFalse("no order surface reads GlobalIngredient since S0n/S1");
 
         var sauce = mappedItem.IngredientCustomizations!.Single(c => c.IngredientId == sauceId);
-        sauce.Quantity.Should().Be(1);
+        sauce.Quantity.Should().Be(2);
         sauce.IsRemoved.Should().BeFalse();
     }
 }

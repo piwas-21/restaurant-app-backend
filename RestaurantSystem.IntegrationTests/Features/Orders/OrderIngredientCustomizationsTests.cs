@@ -90,19 +90,23 @@ public class OrderIngredientCustomizationsTests : IntegrationTestBase
         });
 
         dto.IngredientCustomizations.Should().NotBeNull();
-        dto.IngredientCustomizations!.Should().HaveCount(2);
 
-        var cheese = dto.IngredientCustomizations!.Single(c => c.IngredientId == CheeseId);
-        cheese.Quantity.Should().Be(1);
-        cheese.IsRemoved.Should().BeFalse();
-
+        // The display rule (2026-09-10) hides the cheese row: it is in the map at quantity 1, and
+        // an untouched default is the dish, not a decision. What "keeps today's behaviour" is the
+        // removal — the surviving id keeps the absent-required branch live, and it still reports
+        // exactly the ingredient that is really gone.
         var sauce = dto.IngredientCustomizations!.Single(c => c.IngredientId == SauceId);
         sauce.Quantity.Should().Be(0);
         sauce.IsRemoved.Should().BeTrue("a required ingredient absent from a snapshot that still "
             + "resolves is a genuine removal");
+
+        dto.IngredientCustomizations!.Should().NotContain(c => c.IngredientId == CheeseId,
+            "cheese sits at its default quantity — the kitchen knows the recipe, the ticket wants decisions");
     }
 
-    // The clean line: every saved id is live. Untouched by both changes except for the name.
+    // The clean line: every saved id is live. The cheese-at-default-quantity half of the old
+    // assertion is gone with the display rule (2026-09-10): a base-recipe row at quantity 1 is the
+    // dish, not a decision, and prints nothing — the removal is the one line this recipe has.
     [Fact]
     public void NoOrphans_MapsEverySavedIngredientUnchanged()
     {
@@ -113,22 +117,24 @@ public class OrderIngredientCustomizationsTests : IntegrationTestBase
         });
 
         dto.IngredientCustomizations.Should().NotBeNull();
-        dto.IngredientCustomizations!.Should().HaveCount(2);
+        dto.IngredientCustomizations!.Should().ContainSingle();
 
-        dto.IngredientCustomizations!.Single(c => c.IngredientId == CheeseId).IsRemoved.Should().BeFalse();
-        dto.IngredientCustomizations!.Single(c => c.IngredientId == SauceId).IsRemoved.Should().BeTrue(
+        dto.IngredientCustomizations!.Single().IngredientId.Should().Be(SauceId);
+        dto.IngredientCustomizations!.Single().IsRemoved.Should().BeTrue(
             "an explicit 0 on a base-recipe ingredient is a removal (IngredientRecipeRules)");
     }
 
     // S0n itself. Cheese carries a GlobalIngredient named differently from the per-product row; the
     // order line must render the PER-PRODUCT name. Renaming the global is exactly the operation the
-    // owner ruled must not reach an order that has already been placed.
+    // owner ruled must not reach an order that has already been placed. The guest pushed cheese to
+    // quantity 2 — a decision, so the row survives the display rule and carries the name.
     [Fact]
     public void IngredientName_IsThePerProductName_NotTheGlobalOne()
     {
-        var dto = Map(new Dictionary<Guid, int> { [CheeseId] = 1, [SauceId] = 1 });
+        var dto = Map(new Dictionary<Guid, int> { [CheeseId] = 2, [SauceId] = 1 });
 
         var cheese = dto.IngredientCustomizations!.Single(c => c.IngredientId == CheeseId);
+        cheese.Quantity.Should().Be(2);
         cheese.IngredientName.Should().Be(CheeseLocalName);
         cheese.IngredientName.Should().NotBe(CheeseGlobalName);
     }

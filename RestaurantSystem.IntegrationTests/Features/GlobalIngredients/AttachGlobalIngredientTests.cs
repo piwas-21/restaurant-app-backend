@@ -653,8 +653,11 @@ public class AttachGlobalIngredientTests : IntegrationTestBase
                     Quantity = 1,
                     UnitPrice = 18m,
                     ItemTotal = 18m,
+                    // Dough at DOUBLE, not at its default: the display rule of 2026-09-10 renders
+                    // only decisions, and the attach tests need a surviving row on this historic
+                    // line for their before/after oracle to mean anything.
                     IngredientQuantitiesJson = JsonSerializer.Serialize(
-                        new Dictionary<Guid, int> { [PizzaADoughId] = 1 }),
+                        new Dictionary<Guid, int> { [PizzaADoughId] = 2 }),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = "test",
                 },

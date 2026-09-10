@@ -327,13 +327,15 @@ public class ProductSauceKindTests : IntegrationTestBase
 
         var frozen = await FrozenRowsAsync(orderId);
 
-        frozen.Should().HaveCount(2);
-        frozen[0].IngredientName.Should().Be("Cheese");
-        frozen[0].IngredientId.Should().Be(_cheeseId);
-        frozen[1].IngredientName.Should().Be("Garlic Sauce");
-        frozen[1].IngredientId.Should().Be(_garlicSauceId);
-        frozen[1].Quantity.Should().Be(1);
-        frozen[1].IsRemoved.Should().BeFalse();
+        // The display rule (2026-09-10): the sauce the guest chose is a decision and freezes; the
+        // cheese at its base-recipe default is not, and prints nothing.
+        frozen.Should().ContainSingle();
+        frozen[0].IngredientName.Should().Be("Garlic Sauce");
+        frozen[0].IngredientId.Should().Be(_garlicSauceId);
+        frozen[0].Quantity.Should().Be(1);
+        frozen[0].IsRemoved.Should().BeFalse();
+        frozen[0].IsAddOn.Should().BeTrue(
+            "the sauce is a paid extra here — which is exactly why it survives the display rule at quantity 1");
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────
