@@ -47,7 +47,7 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound);
         }
 
-        if (order.Status == OrderStatus.Cancelled || order.Status == OrderStatus.Completed)
+        if (!OrderSettlementEligibility.CanCollect(order))
         {
             return PaymentApplicationResult.NotPayable(order.Status.ToString());
         }
