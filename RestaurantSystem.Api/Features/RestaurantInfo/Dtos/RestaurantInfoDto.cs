@@ -19,7 +19,12 @@ public record RestaurantInfoDto(
     IReadOnlyList<RestaurantPhoneNumberDto> PhoneNumbers,
     /// <summary>Serialised lowercase (<c>tabs</c> | <c>onepage</c>) — the frontend's union.</summary>
     string MenuLayout,
-    bool ShowMenuBundlesOnAllTab);
+    bool ShowMenuBundlesOnAllTab,
+    /// <summary>
+    /// The tenant's declared display currency (ISO-4217 alpha-3), or null while undeclared
+    /// (POS plan C18). Display metadata only; the admin edits it through the PUT below.
+    /// </summary>
+    string? Currency);
 
 /// <summary>Which of the two stored logos an upload or delete is addressing.</summary>
 /// <remarks>

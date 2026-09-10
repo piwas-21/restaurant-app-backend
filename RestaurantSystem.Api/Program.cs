@@ -633,6 +633,9 @@ builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
+// One scoped instance per request caches the RestaurantInfo singleton's currency on first use,
+// so the per-row mapper loop in the staff list stays at one tenant lookup, not N.
+builder.Services.AddScoped<IOrderDisplayCurrencyResolver, OrderDisplayCurrencyResolver>();
 builder.Services.AddScoped<IOrderDisplayTranslator, OrderDisplayTranslator>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();

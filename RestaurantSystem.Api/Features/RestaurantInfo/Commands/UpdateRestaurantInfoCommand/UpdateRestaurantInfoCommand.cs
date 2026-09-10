@@ -32,7 +32,10 @@ public record UpdateRestaurantInfoCommand(
     // Defaults keep every constructor that predates the menu-display settings compiling and
     // preserve today's behaviour (tabs, no bundles on the All tab).
     string MenuLayout = "tabs",
-    bool ShowMenuBundlesOnAllTab = false
+    bool ShowMenuBundlesOnAllTab = false,
+    // The tenant's declared display currency (ISO-4217 alpha-3, POS plan C18). Null clears —
+    // same full-replace semantics as ThemePaletteKey: the PUT sends the whole settings form.
+    string? Currency = null
 ) : ICommand<ApiResponse<RestaurantInfoDto>>;
 
 public class UpdateRestaurantInfoCommandHandler
@@ -81,6 +84,9 @@ public class UpdateRestaurantInfoCommandHandler
         // The validator has already pinned MenuLayout to a known name; the parse cannot fail here.
         info.MenuLayout = Enum.Parse<MenuLayout>(command.MenuLayout, ignoreCase: true);
         info.ShowMenuBundlesOnAllTab = command.ShowMenuBundlesOnAllTab;
+        // Trimmed so " EUR " cannot enter the column; null clears, matching the full-replace
+        // contract every other field on this command follows.
+        info.Currency = command.Currency?.Trim();
         info.UpdatedAt = DateTime.UtcNow;
         info.UpdatedBy = _currentUserService.GetAuditIdentifier();
 

@@ -43,6 +43,7 @@
         "promoCode": null,
         "hasUserLimitDiscount": false,
         "userLimitAmount": 0.00,
+        "currency": null,
         "items": [
           {
             "id": "__volatile__",
@@ -171,6 +172,7 @@
         "promoCode": null,
         "hasUserLimitDiscount": false,
         "userLimitAmount": 0.00,
+        "currency": null,
         "items": [
           {
             "id": "__volatile__",
