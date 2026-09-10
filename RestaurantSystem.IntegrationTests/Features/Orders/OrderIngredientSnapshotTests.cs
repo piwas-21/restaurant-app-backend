@@ -67,22 +67,24 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
 
         var frozen = await FrozenRowsAsync(orderId);
 
-        frozen.Should().HaveCount(3, "the line renders all three recipe rows, chosen and removed alike");
+        // The display rule (2026-09-10): only decisions freeze. The cheese sits at its base-recipe
+        // default — the dish, not a decision — so the two surviving rows are the removal and the
+        // double bacon, which are the two things a kitchen has to act on.
+        frozen.Should().HaveCount(2, "the removal and the extra render; the untouched default does not");
 
-        frozen[0].IngredientName.Should().Be(CheeseName);
-        frozen[0].Quantity.Should().Be(1);
-        frozen[0].IsRemoved.Should().BeFalse();
+        frozen[0].IngredientName.Should().Be(SauceName);
+        frozen[0].Quantity.Should().Be(0);
+        frozen[0].IsRemoved.Should().BeTrue("an explicit 0 on a base-recipe ingredient is a removal");
 
-        frozen[1].IngredientName.Should().Be(SauceName);
-        frozen[1].Quantity.Should().Be(0);
-        frozen[1].IsRemoved.Should().BeTrue("an explicit 0 on a base-recipe ingredient is a removal");
+        frozen[1].IngredientName.Should().Be(BaconName);
+        frozen[1].Quantity.Should().Be(2);
+        frozen[1].IsRemoved.Should().BeFalse("a paid add-on at qty 2 was added, not removed");
 
-        frozen[2].IngredientName.Should().Be(BaconName);
-        frozen[2].Quantity.Should().Be(2);
-        frozen[2].IsRemoved.Should().BeFalse("a paid add-on at qty 2 was added, not removed");
+        frozen.Should().NotContain(row => row.IngredientName == CheeseName,
+            "cheese at its default quantity is the recipe, not a choice");
 
         // Provenance is recorded even though no reader ever resolves it.
-        frozen.Select(row => row.IngredientId).Should().Equal(CheeseId, SauceId, BaconId);
+        frozen.Select(row => row.IngredientId).Should().Equal(SauceId, BaconId);
     }
 
     /// <summary>
@@ -112,15 +114,15 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
 
         await MutateCatalogAsync(async context =>
         {
-            var cheese = await context.ProductIngredients.SingleAsync(pi => pi.Id == CheeseId);
-            cheese.Name = "Mozzarella di Bufala";
+            var bacon = await context.ProductIngredients.SingleAsync(pi => pi.Id == BaconId);
+            bacon.Name = "Smoked Pancetta";
         });
 
         var after = await RenderIngredientLinesAsync(orderId);
 
         after.Should().Be(before, "a past receipt never changes (D2)");
-        after.Should().Contain(CheeseName, "the frozen word is what was printed, not the new one");
-        after.Should().NotContain("Mozzarella");
+        after.Should().Contain(BaconName, "the frozen word is what was printed, not the new one");
+        after.Should().NotContain("Pancetta");
     }
 
     [Fact]
@@ -154,14 +156,14 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
 
         await MutateCatalogAsync(async context =>
         {
-            var cheese = await context.ProductIngredients.SingleAsync(pi => pi.Id == CheeseId);
-            cheese.Name = "Renamed After The Ticket Printed";
+            var bacon = await context.ProductIngredients.SingleAsync(pi => pi.Id == BaconId);
+            bacon.Name = "Renamed After The Ticket Printed";
         });
 
         var after = await FetchPrinterLinesAsync("S1-PRINTER");
 
         after.Should().Be(before, "a kitchen ticket already printed cannot be reworded by a catalog edit");
-        after.Should().Contain(CheeseName);
+        after.Should().Contain(BaconName);
         orderId.Should().NotBeEmpty();
     }
 
@@ -183,9 +185,11 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
 
         var rendered = await RenderIngredientLinesAsync(orderId);
 
-        rendered.Should().Contain(CheeseName);
+        // The fallback follows the SAME display rule: the removal and the double bacon render; the
+        // cheese at its default quantity is the recipe, not a choice, and prints nothing.
         rendered.Should().Contain(SauceName);
         rendered.Should().Contain(BaconName);
+        rendered.Should().NotContain(CheeseName);
     }
 
     [Fact]
@@ -196,14 +200,14 @@ public class OrderIngredientSnapshotTests : IntegrationTestBase
 
         await MutateCatalogAsync(async context =>
         {
-            var cheese = await context.ProductIngredients.SingleAsync(pi => pi.Id == CheeseId);
-            cheese.Name = "Renamed Cheese";
+            var bacon = await context.ProductIngredients.SingleAsync(pi => pi.Id == BaconId);
+            bacon.Name = "Renamed Bacon";
         });
 
         var after = await RenderIngredientLinesAsync(orderId);
 
         after.Should().NotBe(before);
-        after.Should().Contain("Renamed Cheese",
+        after.Should().Contain("Renamed Bacon",
             "unchanged behaviour, stated rather than assumed: a historic line has nothing frozen to "
             + "read, so it still follows the catalog. Only a backfill could change that, and S1 "
             + "deliberately performs none");
