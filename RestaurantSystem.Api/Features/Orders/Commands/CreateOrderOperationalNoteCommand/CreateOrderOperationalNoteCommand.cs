@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
@@ -12,9 +13,19 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderOperationalNo
 
 public record CreateOrderOperationalNoteCommand : ICommand<ApiResponse<OrderOperationalNoteDto>>
 {
+    // Route-owned identity: [JsonIgnore] keeps a body value from binding, so the request can
+    // never even carry a different order id for the handler to overwrite (S6964 under-posting).
+    [JsonIgnore]
     public Guid OrderId { get; set; }
+
     public string Text { get; set; } = string.Empty;
+
+    // Required so an omitted value cannot silently default (S6964).
+    [JsonRequired]
     public OrderNoteAudience Audience { get; set; }
+
+    // Required: the idempotency key — a note without one is not retry-safe (S6964).
+    [JsonRequired]
     public Guid ClientOperationId { get; set; }
 }
 
