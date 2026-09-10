@@ -8,7 +8,16 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 
-public record PrinterFeedQuery(DateTime? ModifiedSince) : IQuery<List<OrderDto>>
+/// <summary>
+/// <paramref name="Language"/> asks for the order DETAILS (product, variation and ingredient
+/// names) in a specific language — the print-language switch the printer-app sends on every poll
+/// (2026-09-10 partner request; the ticket's labels were always translated, the names never were).
+/// Values: a print-safe code (en/de/fr/it/es/nl/tr) resolves every name in that language with the
+/// frozen checkout name as fallback; "auto" resolves per order from the order's own
+/// PreferredLanguage within the same set; anything else (or absent) is today's behaviour — the
+/// frozen single-language names. See <see cref="OrderDisplayTranslator"/>.
+/// </summary>
+public record PrinterFeedQuery(DateTime? ModifiedSince, string? Language = null) : IQuery<List<OrderDto>>
 {
     public const int MaxOrdersPerPoll = 50;
 }
@@ -17,15 +26,18 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 {
     private readonly ApplicationDbContext _context;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderDisplayTranslator _displayTranslator;
     private readonly ILogger<PrinterFeedQueryHandler> _logger;
 
     public PrinterFeedQueryHandler(
         ApplicationDbContext context,
         IOrderMappingService mappingService,
+        IOrderDisplayTranslator displayTranslator,
         ILogger<PrinterFeedQueryHandler> logger)
     {
         _context = context;
         _mappingService = mappingService;
+        _displayTranslator = displayTranslator;
         _logger = logger;
     }
 
@@ -70,6 +82,18 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
                 (o.UpdatedAt.HasValue && o.UpdatedAt.Value > modifiedSinceUtc.Value));
         }
 
+        // Name translations need the per-language description rows. They ride ONLY on this feed's
+        // query (a polled endpoint, not the admin list), and only when a language was asked for —
+        // without a language the poll costs exactly what it always did.
+        if (!string.IsNullOrWhiteSpace(query.Language))
+        {
+            ordersQuery = ordersQuery
+                .Include(o => o.Items).ThenInclude(i => i.Product!.Descriptions)
+                .Include(o => o.Items).ThenInclude(i => i.Product!.DetailedIngredients)
+                    .ThenInclude(pi => pi.Descriptions)
+                .Include(o => o.Items).ThenInclude(i => i.ProductVariation!.Descriptions);
+        }
+
         var orders = await ordersQuery
             .OrderByDescending(o => o.OrderDate)
             // OrderDate is not unique, and a split query runs one SQL statement per
@@ -77,6 +101,11 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             .ThenBy(o => o.Id)
             .Take(PrinterFeedQuery.MaxOrdersPerPoll)
             .ToListAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(query.Language))
+        {
+            _displayTranslator.Apply(orders, query.Language);
+        }
 
         var orderDtos = orders.Select(_mappingService.MapToOrderDto).ToList();
 
