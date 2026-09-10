@@ -633,6 +633,7 @@ builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
+builder.Services.AddScoped<IOrderDisplayTranslator, OrderDisplayTranslator>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Reservations.Services.IReservationCreatedMailer,

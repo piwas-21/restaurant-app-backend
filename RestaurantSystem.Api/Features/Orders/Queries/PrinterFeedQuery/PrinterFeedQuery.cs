@@ -26,15 +26,18 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 {
     private readonly ApplicationDbContext _context;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderDisplayTranslator _displayTranslator;
     private readonly ILogger<PrinterFeedQueryHandler> _logger;
 
     public PrinterFeedQueryHandler(
         ApplicationDbContext context,
         IOrderMappingService mappingService,
+        IOrderDisplayTranslator displayTranslator,
         ILogger<PrinterFeedQueryHandler> logger)
     {
         _context = context;
         _mappingService = mappingService;
+        _displayTranslator = displayTranslator;
         _logger = logger;
     }
 
@@ -101,7 +104,7 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 
         if (!string.IsNullOrWhiteSpace(query.Language))
         {
-            OrderDisplayTranslator.Apply(orders, query.Language, _logger);
+            _displayTranslator.Apply(orders, query.Language);
         }
 
         var orderDtos = orders.Select(_mappingService.MapToOrderDto).ToList();

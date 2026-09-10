@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
@@ -22,7 +21,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// and dies with the response. Nothing is persisted.
 /// </para>
 /// </summary>
-public static class OrderDisplayTranslator
+public class OrderDisplayTranslator : IOrderDisplayTranslator
 {
     /// <summary>
     /// Languages a PC857 receipt can actually render (ADR-002) — the printer-app's own
@@ -32,7 +31,7 @@ public static class OrderDisplayTranslator
     /// </summary>
     public static readonly IReadOnlyList<string> PrintSafeLanguages = ["en", "de", "fr", "it", "es", "nl", "tr"];
 
-    public static void Apply(IEnumerable<Order> orders, string? language, ILogger logger)
+    public void Apply(IEnumerable<Order> orders, string? language)
     {
         foreach (var order in orders)
         {
