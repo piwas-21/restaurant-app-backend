@@ -45,12 +45,13 @@ public class PrinterFeedController : ControllerBase
     [ApiKeyAuthFilter]
     public async Task<ActionResult<object>> Get(
         [FromQuery] DateTime? modifiedSince,
+        [FromQuery] string? language,
         CancellationToken cancellationToken)
     {
         try
         {
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince),
+                new PrinterFeedQuery(modifiedSince, language),
                 cancellationToken);
 
             return Ok(new
