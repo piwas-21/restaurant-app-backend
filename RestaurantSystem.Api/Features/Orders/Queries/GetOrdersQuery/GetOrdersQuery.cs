@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -33,6 +34,17 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 /// <param name="UserId">Limit to orders owned by this user. Non-staff callers are auto-restricted to their own user-id regardless of this parameter.</param>
 /// <param name="Search">Case-insensitive substring match on order number, customer name, email, or phone.</param>
 /// <param name="IsFocusOrder">Filter on the cashier "focus" flag.</param>
+/// <param name="TenantDay">
+/// The CALENDAR DAY to list, as the cashier names it on the RESTAURANT'S wall clock — no time, no
+/// zone. When present it REPLACES <see cref="StartDate"/> and <see cref="EndDate"/> (those bounds
+/// are then ignored, not intersected): the handler derives the venue-day window
+/// [TenantDay 00:00, TenantDay+1 00:00) on the tenant clock — the DST-safe rule of
+/// <c>GetZReportQuery</c>, backend #372 — and filters <c>Order.OrderDate</c> to those UTC
+/// instants, so an order created at 23:30 venue time belongs to the day the venue says it does,
+/// not to whichever UTC day the instant happens to fall in. Bound as <see cref="DateOnly"/> so a
+/// bare ISO <c>?tenantDay=2026-05-02</c> cannot arrive <see cref="DateTimeKind.Unspecified"/> and
+/// be refused by the timestamptz column (backend #418).
+/// </param>
 /// <param name="ModifiedSince">Returns orders created or updated after this UTC timestamp. Used for efficient polling.</param>
 /// <param name="OrderBy">Sort key: OrderDate (default), OrderNumber, Total, Status, PaymentStatus, CustomerName.</param>
 /// <param name="Descending">Sort descending (default true).</param>
@@ -47,6 +59,7 @@ public record GetOrdersQuery(
     Guid? UserId,
     string? Search,
     bool? IsFocusOrder,
+    DateOnly? TenantDay = null,
     DateTime? ModifiedSince = null,  // For efficient polling - returns orders modified after this timestamp
     string? OrderBy = "OrderDate",
     bool Descending = true,
@@ -57,17 +70,20 @@ public record GetOrdersQuery(
 public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<PagedResult<OrderDto>>>
 {
     private readonly ApplicationDbContext _context;
+    private readonly ITenantClock _clock;
     private readonly ILogger<GetOrdersQueryHandler> _logger;
     private readonly IOrderMappingService _mappingService;
     private readonly ICurrentUserService _currentUserService;
 
     public GetOrdersQueryHandler(
         ApplicationDbContext context,
+        ITenantClock clock,
         IOrderMappingService mappingService,
         ILogger<GetOrdersQueryHandler> logger,
         ICurrentUserService currentUserService)
     {
         _context = context;
+        _clock = clock;
         _logger = logger;
         _mappingService = mappingService;
         _currentUserService = currentUserService;
@@ -143,14 +159,39 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
         var endDateUtc = QueryInstant.AsUtc(query.EndDate);
         var modifiedSinceUtc = QueryInstant.AsUtc(query.ModifiedSince);
 
-        if (startDateUtc.HasValue)
+        // A named venue day REPLACES the raw UTC bounds: the half-open window [TenantDay 00:00,
+        // TenantDay+1 00:00) on the tenant's own wall clock — the till-day rule of
+        // GetZReportQuery (backend #372). TenantDayWindowUtc derives the two midnights
+        // independently, so a local day of 23 or 25 hours on a DST changeover is covered;
+        // never startOfDay.AddDays(1).
+        if (query.TenantDay.HasValue)
         {
-            ordersQuery = ordersQuery.Where(o => o.OrderDate >= startDateUtc.Value);
-        }
+            var (tenantDayStartUtc, tenantDayEndUtc) = _clock.TenantDayWindowUtc(query.TenantDay.Value);
 
-        if (endDateUtc.HasValue)
+            ordersQuery = ordersQuery.Where(o =>
+                o.OrderDate >= tenantDayStartUtc && o.OrderDate < tenantDayEndUtc);
+
+            // The window is logged beside the day because they are no longer the same statement,
+            // and comparing the two is how an operator's "the history is missing orders" gets
+            // answered — the same call the Z-report makes.
+            _logger.LogInformation(
+                "Filtered orders by tenant day {TenantDay} ({ZoneId}, [{StartUtc:o}, {EndUtc:o}))",
+                query.TenantDay.Value,
+                _clock.TimeZone.Id,
+                tenantDayStartUtc,
+                tenantDayEndUtc);
+        }
+        else
         {
-            ordersQuery = ordersQuery.Where(o => o.OrderDate <= endDateUtc.Value);
+            if (startDateUtc.HasValue)
+            {
+                ordersQuery = ordersQuery.Where(o => o.OrderDate >= startDateUtc.Value);
+            }
+
+            if (endDateUtc.HasValue)
+            {
+                ordersQuery = ordersQuery.Where(o => o.OrderDate <= endDateUtc.Value);
+            }
         }
 
         if (query.UserId.HasValue)
