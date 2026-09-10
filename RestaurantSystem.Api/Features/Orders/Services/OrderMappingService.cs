@@ -8,11 +8,16 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 public class OrderMappingService : IOrderMappingService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly ILogger<OrderMappingService> _logger;
 
-    public OrderMappingService(ApplicationDbContext context, ILogger<OrderMappingService> logger)
+    public OrderMappingService(
+        ApplicationDbContext context,
+        IOrderDisplayCurrencyResolver currencyResolver,
+        ILogger<OrderMappingService> logger)
     {
         _context = context;
+        _currencyResolver = currencyResolver;
         _logger = logger;
     }
 
@@ -59,6 +64,7 @@ public class OrderMappingService : IOrderMappingService
             PromoCode = order.PromoCode,
             HasUserLimitDiscount = order.HasUserLimitDiscount,
             UserLimitAmount = order.UserLimitAmount,
+            Currency = _currencyResolver.Resolve(order),
             Status = order.Status.ToString(),
             PaymentStatus = order.PaymentStatus.ToString(),
             IsFocusOrder = order.Focus is not null,

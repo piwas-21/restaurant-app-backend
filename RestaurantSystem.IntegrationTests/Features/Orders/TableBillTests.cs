@@ -185,7 +185,10 @@ public class TableBillTests : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         return new TableBillAssembler(
             ctx,
-            new RestaurantSystem.Api.Features.Orders.Services.OrderMappingService(ctx, NullLogger<RestaurantSystem.Api.Features.Orders.Services.OrderMappingService>.Instance),
+            new RestaurantSystem.Api.Features.Orders.Services.OrderMappingService(
+                ctx,
+                new RestaurantSystem.Api.Features.Orders.Services.OrderDisplayCurrencyResolver(ctx),
+                NullLogger<RestaurantSystem.Api.Features.Orders.Services.OrderMappingService>.Instance),
             NullLogger<TableBillAssembler>.Instance);
     }
 

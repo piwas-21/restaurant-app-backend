@@ -75,6 +75,17 @@ public record OrderDto
     public bool HasUserLimitDiscount { get; set; }
     public decimal UserLimitAmount { get; set; } // Threshold for discount
 
+    /// <summary>
+    /// The currency this order's money amounts are DISPLAYED in (POS plan C18) — never an input
+    /// to pricing or rounding. Resolution lives in <see cref="Services.OrderDisplayCurrencyResolver"/>:
+    /// the first payment tender carrying a currency (any status) wins, else the tenant's declared
+    /// <see cref="RestaurantInfo.Currency"/>, else null — a consumer must not invent a label
+    /// (receipts used to hardcode CHF on a EUR tenant's paper). Additive and read-only: older
+    /// printer-app / frontend builds ignore it. A tender value is lower-case as Stripe stores it;
+    /// consumers render case-insensitively.
+    /// </summary>
+    public string? Currency { get; set; }
+
     // Related Data
     public List<OrderItemDto> Items { get; set; } = new();
     public List<OrderPaymentDto> Payments { get; set; } = new();

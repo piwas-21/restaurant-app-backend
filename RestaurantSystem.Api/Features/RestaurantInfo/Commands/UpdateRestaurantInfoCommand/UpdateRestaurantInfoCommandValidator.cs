@@ -51,5 +51,10 @@ public class UpdateRestaurantInfoCommandValidator : AbstractValidator<UpdateRest
         RuleFor(x => x.MenuLayout)
             .Must(value => Enum.TryParse<MenuLayout>(value, ignoreCase: true, out _))
             .WithMessage("Menu layout must be tabs or onepage.");
+
+        // Currency (POS C18): exactly 3 ASCII letters when present; null = undeclared, not an error.
+        RuleFor(x => x.Currency)
+            .Matches("^[a-zA-Z]{3}$").WithMessage("Currency must be a 3-letter ISO-4217 code.")
+            .When(x => x.Currency != null);
     }
 }

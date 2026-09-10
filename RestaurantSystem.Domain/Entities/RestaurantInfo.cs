@@ -73,6 +73,15 @@ public class RestaurantInfo : Entity
     /// </summary>
     public bool ShowMenuBundlesOnAllTab { get; set; }
 
+    /// <summary>
+    /// The tenant's declared display currency (ISO-4217 alpha-3, e.g. "CHF", "EUR"),
+    /// edited by the admin through restaurant-info settings. Null = the tenant has not
+    /// declared one — order surfaces then fall back to the tender's own currency and
+    /// must not invent a label (POS plan C18: receipts used to hardcode CHF while a
+    /// tenant traded in EUR). Display metadata only; pricing and rounding are untouched.
+    /// </summary>
+    public string? Currency { get; set; }
+
     public virtual ICollection<RestaurantPhoneNumber> PhoneNumbers { get; set; } = new List<RestaurantPhoneNumber>();
     public virtual ICollection<RestaurantLandingContent> LandingContents { get; set; } = new List<RestaurantLandingContent>();
 }
