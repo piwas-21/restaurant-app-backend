@@ -412,9 +412,9 @@ public class BasketRemovedIngredientNamesTests : IntegrationTestBase
         // eager-loaded, since an un-included collection would yield an empty list, not a wrong name.
         pizzaChild.RemovedIngredientNames.Should().Contain(BasilProductName);
 
-        // Still deliberately unset on a child — the added side is not #363's subject, and the cart
-        // pairs it positionally. Asserted so removing this restraint is a visible decision.
-        pizzaChild.SelectedIngredientNames.Should().BeNull();
+        // The cart renders this child recursively and pairs names with the selected IDs
+        // positionally for its Added row, just as it does for a root basket line.
+        pizzaChild.SelectedIngredientNames.Should().Equal("Tomato Sauce", "Mushrooms");
     }
 
     // The uncustomized component of the same bundle stays quiet — a child with no quantities has

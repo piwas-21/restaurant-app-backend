@@ -199,24 +199,18 @@ public class BasketMappingService : IBasketMappingService
     }
 
     /// <summary>
-    /// Maps one bundle component. Extracted from the inline initializer it used to be so the child
-    /// can carry <see cref="BasketItemDto.RemovedIngredientNames"/> through the same helper the
-    /// root uses — a component's removals were previously unreportable, because the child mapping
-    /// set no name lists at all.
-    ///
-    /// <para><b>It still sets no SelectedIngredientNames, deliberately.</b> That would be the
-    /// ADDED side, not #363's subject, and it is not a free addition: the cart pairs
-    /// <c>selectedIngredientNames[i]</c> with <c>selectedIngredients[i]</c> positionally
-    /// (<c>lineSummary.ts</c> — the only such site since frontend #189 deleted
-    /// <c>CartItemCustomizations.tsx</c>, which this used to name as the second), and the list also labels every
-    /// selection "Added" — including base-recipe ingredients the guest never added. Populating it
-    /// would change checkout copy from a backend-only change with no paired frontend work. Removals
-    /// carry no such contract: the list stands alone and pairs with nothing.</para>
+    /// Maps one bundle component. A child carries the same IDs, quantities, display names and
+    /// removals as a root basket line: <c>OrderLineSummary</c> renders the tree recursively on the
+    /// basket flyout, cart and checkout. Omitting its selected names silently hid a bundle option's
+    /// added ingredients and sauces even though checkout persisted them (#150).
     /// </summary>
     private BasketItemDto MapChildItem(BasketItem child)
     {
         var childIngredients = child.Product?.DetailedIngredients ?? new List<ProductIngredient>();
         var childQuantities = DeserializeIngredientQuantities(child.IngredientQuantitiesJson, child.Id);
+        var childSelectedNames = child.SelectedIngredients?
+            .Select(id => childIngredients.FirstOrDefault(pi => pi.Id == id)?.Name ?? id.ToString())
+            .ToList();
 
         return new BasketItemDto
         {
@@ -233,6 +227,7 @@ public class BasketMappingService : IBasketMappingService
             SpecialInstructions = child.SpecialInstructions,
             SelectedIngredients = child.SelectedIngredients,
             IngredientQuantities = childQuantities,
+            SelectedIngredientNames = childSelectedNames,
             RemovedIngredientNames = BuildRemovedIngredientNames(
                 childIngredients, childQuantities, child.SelectedIngredients),
         };

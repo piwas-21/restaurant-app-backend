@@ -279,6 +279,10 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         var pizzaChild = GetChildItem(basket!.Data!, _menuProduct.Id, _testPizza.Id);
 
         pizzaChild.SpecialInstructions.Should().Be("Extra crispy");
+        // The basket/cart/checkout renderer reads this name list recursively from ChildItems.
+        // Without it the child reached checkout correctly but all three guest-facing cart surfaces
+        // showed only "Pizza", never its chosen ingredients or sauces.
+        pizzaChild.SelectedIngredientNames.Should().Equal("Tomato Sauce", "Cheese", "Mushrooms");
         pizzaChild.IngredientQuantities.Should().NotBeNull();
         pizzaChild.IngredientQuantities![_mushrooms.Id].Should().Be(2); // explicit extra wins
         pizzaChild.IngredientQuantities[_cheese.Id].Should().Be(1);     // selected default
