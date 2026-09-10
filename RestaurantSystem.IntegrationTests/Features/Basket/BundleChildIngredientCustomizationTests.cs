@@ -369,9 +369,11 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         mushrooms.IsRemoved.Should().BeFalse();
         mushrooms.Quantity.Should().Be(2);   // the extra survives to the ticket
 
-        var sauce = pizzaOrderItem.IngredientCustomizations!
-            .Single(c => c.IngredientId == _tomatoSauce.Id);
-        sauce.IsRemoved.Should().BeFalse();
+        // The tomato sauce sits at its base-recipe default — the dish, not a decision — so the
+        // display rule of 2026-09-10 prints nothing for it. The removal and the extra above are
+        // the two lines the kitchen acts on.
+        pizzaOrderItem.IngredientCustomizations!
+            .Should().NotContain(c => c.IngredientId == _tomatoSauce.Id);
 
         // Child OrderItem row persists the quantities JSON.
         using var scope = Factory.Services.CreateScope();

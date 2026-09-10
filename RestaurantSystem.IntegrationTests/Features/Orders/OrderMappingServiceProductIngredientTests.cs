@@ -108,8 +108,11 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
                 Quantity = 1,
                 UnitPrice = 15.00m,
                 ItemTotal = 15.00m,
+                // Sauce at 2, not 1: since the display rule of 2026-09-10 a base ingredient at its
+                // default quantity prints nothing, and this line needs both rows to survive so the
+                // mapping assertions have something to read. 2 is a decision ("extra sauce").
                 IngredientQuantitiesJson = System.Text.Json.JsonSerializer.Serialize(
-                    new Dictionary<Guid, int> { [cheeseId] = 0, [sauceId] = 1 }),
+                    new Dictionary<Guid, int> { [cheeseId] = 0, [sauceId] = 2 }),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = "test"
             });
@@ -180,7 +183,7 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
         cheese.IngredientName.Should().Be("Cheese");
 
         var sauce = mappedItem.IngredientCustomizations!.Single(c => c.IngredientId == sauceId);
-        sauce.Quantity.Should().Be(1);
+        sauce.Quantity.Should().Be(2);
         sauce.IsRemoved.Should().BeFalse();
         sauce.IngredientName.Should().Be("Tomato Sauce");
     }
@@ -260,8 +263,10 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
                 Quantity = 1,
                 UnitPrice = 15.00m,
                 ItemTotal = 15.00m,
+                // Quantity 2, not the default 1: the display rule of 2026-09-10 renders only
+                // decisions, and this test needs a surviving row to carry the name assertion.
                 IngredientQuantitiesJson = System.Text.Json.JsonSerializer.Serialize(
-                    new Dictionary<Guid, int> { [cheeseId] = 1 }),
+                    new Dictionary<Guid, int> { [cheeseId] = 2 }),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = "test"
             });
@@ -402,11 +407,15 @@ public class OrderMappingServiceProductIngredientTests : IntegrationTestBase
         var dto = await mapper.MapToOrderDtoAsync(loadedOrder);
 
         var customizations = dto.Items.Single().IngredientCustomizations!;
-        // Dough kept (part of the base) — present, not removed.
-        customizations.Single(c => c.IngredientId == doughId).IsRemoved.Should().BeFalse();
         // Mozzarella is included-in-base and deselected → a genuine removal ("NO Mozzarella").
         customizations.Single(c => c.IngredientId == mozzarellaId).IsRemoved.Should().BeTrue();
-        // Olives is a non-included add-on at qty 0 → NOT removed (no "NO Olives" on the ticket).
-        customizations.Single(c => c.IngredientId == olivesId).IsRemoved.Should().BeFalse();
+
+        // The display rule (2026-09-10): dough kept at its default quantity is the dish, not a
+        // decision — it renders no row at all, so it cannot be misread as a "kept" line either.
+        customizations.Should().NotContain(c => c.IngredientId == doughId);
+
+        // Olives is a non-included add-on at qty 0 → never on the dish and never picked, so no
+        // "NO Olives" on the ticket AND no row at all — the ticket prints decisions only.
+        customizations.Should().NotContain(c => c.IngredientId == olivesId);
     }
 }

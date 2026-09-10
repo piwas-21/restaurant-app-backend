@@ -14,9 +14,29 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <see cref="OrderChildRendering"/> was: that service is already over its §4 limit, and the
 /// reasoning here is longer than the code.
 /// </para>
+/// <para>
+/// <b>Every row this class lets through is a DECISION the guest made</b> (partner feedback
+/// 2026-09-10, MC FOOD): a removal, a chosen paid extra, or an above-default quantity. The
+/// untouched base recipe is the dish, not a decision — a kitchen knows it, and a ticket that
+/// prints "Bread, Patty, Tomato…" under every order drowns the two lines that matter. The
+/// predicate is <see cref="IsDisplayWorthy"/>, applied to BOTH paths — projected rows and frozen
+/// snapshot rows alike (snapshots written before the rule carry the whole recipe, and would
+/// otherwise print it whole forever). It mirrors the web's <c>isChosenIngredient</c>
+/// (frontend lineSummary.ts) plus that function's removal half, so a ticket and an order screen
+/// can never disagree about one line.
+/// </para>
 /// </summary>
 internal static class OrderIngredientCustomizations
 {
+    /// <summary>
+    /// True when a row is worth a line on a kitchen ticket or an order screen: the guest removed
+    /// it ("NO X"), chose a paid extra (any quantity — the ordinary extra sauce carries 1), or
+    /// pushed a base-recipe ingredient above its default quantity ("extra cheese ×2"). Everything
+    /// else is the standard recipe or an unpicked extra, and prints nothing.
+    /// </summary>
+    internal static bool IsDisplayWorthy(OrderItemIngredientDto row) =>
+        row.IsRemoved || (row.Quantity > 0 && (row.Quantity > 1 || row.IsAddOn));
+
     /// <summary>
     /// Returns null when the line has nothing to say: no snapshot and no id map, no resolvable
     /// recipe, an unparseable map, or a map that no longer resolves to ANY live ingredient row.
@@ -126,6 +146,13 @@ internal static class OrderIngredientCustomizations
             return null;
         }
 
+        // The filter is a DISPLAY rule, applied at read time: the frozen rows are untouched data
+        // (S1's "a past receipt never changes" is about catalog drift, not about which lines a
+        // kitchen wants), and snapshots written before the display rule carried the whole recipe —
+        // without this, every order placed before the change would print that recipe whole forever.
+        // A line whose snapshot filters to nothing returns an EMPTY list, deliberately NOT null:
+        // null would send the line down the live-catalog fallback, resurrecting the very rows the
+        // snapshot exists to outrank.
         return snapshot
             .OrderBy(row => row.SortOrder)
             .Select(row => new OrderItemIngredientDto
@@ -136,6 +163,7 @@ internal static class OrderIngredientCustomizations
                 IsRemoved = row.IsRemoved,
                 IsAddOn = row.IsAddOn
             })
+            .Where(IsDisplayWorthy)
             .ToList();
     }
 
@@ -180,7 +208,6 @@ internal static class OrderIngredientCustomizations
             return null;
         }
 
-        // Show all ingredients for kitchen (both selected and removed).
         var customizations = new List<OrderItemIngredientDto>();
         foreach (var ing in recipeRows)
         {
@@ -192,18 +219,27 @@ internal static class OrderIngredientCustomizations
 
             if (savedQuantities.TryGetValue(ing.Id, out var quantity))
             {
-                // Ingredient is in the order - show it regardless of quantity. Whether a quantity
-                // of 0 counts as a REMOVAL (→ a "NO X" kitchen-ticket line) is IngredientRecipeRules'
-                // decision, shared since #363 with the cart, which must call a removal the same
-                // thing this does. The rationale that used to sit here lives on that class.
-                customizations.Add(new OrderItemIngredientDto
+                // Whether a quantity of 0 counts as a REMOVAL (→ a "NO X" kitchen-ticket line) is
+                // IngredientRecipeRules' decision, shared since #363 with the cart, which must call
+                // a removal the same thing this does. The rationale that used to sit here lives on
+                // that class.
+                var row = new OrderItemIngredientDto
                 {
                     IngredientId = ing.Id,
                     IngredientName = ing.Name,
                     Quantity = quantity,
                     IsRemoved = IngredientRecipeRules.IsRemoved(ing, quantity),
                     IsAddOn = isAddOn
-                });
+                };
+
+                // A base-recipe row the guest left at its default quantity is the dish itself, and
+                // an add-on at 0 was never picked — neither is a decision, so neither prints
+                // (IsDisplayWorthy). This is the line that used to print the whole recipe under
+                // every order and bury the two lines the kitchen had to act on.
+                if (IsDisplayWorthy(row))
+                {
+                    customizations.Add(row);
+                }
             }
             else if (!ing.IsOptional)
             {
@@ -221,6 +257,8 @@ internal static class OrderIngredientCustomizations
             }
         }
 
-        return customizations;
+        // A projection that filters to nothing says nothing (null), the same answer the all-orphan
+        // guard gives — an empty list on the wire would claim the line carries customizations.
+        return customizations.Count > 0 ? customizations : null;
     }
 }

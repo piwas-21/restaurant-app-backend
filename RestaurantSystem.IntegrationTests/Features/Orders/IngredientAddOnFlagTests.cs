@@ -179,15 +179,15 @@ public class IngredientAddOnFlagTests : IntegrationTestBase
         mushrooms.Quantity.Should().Be(1);
         mushrooms.IsRemoved.Should().BeFalse();
 
-        item.IngredientCustomizations!.Single(c => c.IngredientId == CheeseId).IsAddOn
-            .Should().BeFalse("cheese is included in the base price — a base-recipe row");
-        item.IngredientCustomizations!.Single(c => c.IngredientId == TomatoSauceId).IsAddOn
-            .Should().BeFalse("a required ingredient is always part of the base recipe");
-
-        var olives = item.IngredientCustomizations!.Single(c => c.IngredientId == OlivesId);
-        olives.IsAddOn.Should().BeTrue("the flag says what the row IS");
-        olives.Quantity.Should().Be(0);
-        olives.IsRemoved.Should().BeFalse("a paid extra nobody picked was never there to remove");
+        // The display rule (2026-09-10): only decisions render. Cheese and tomato sauce sit at
+        // their base-recipe defaults — the dish, not a decision — and the unchosen olives were
+        // never there, so none of the three prints a line.
+        item.IngredientCustomizations!.Should().NotContain(c => c.IngredientId == CheeseId,
+            "cheese is included in the base price at its default quantity — the kitchen knows the recipe");
+        item.IngredientCustomizations!.Should().NotContain(c => c.IngredientId == TomatoSauceId,
+            "a required ingredient at its default quantity is part of the base recipe, not a choice");
+        item.IngredientCustomizations!.Should().NotContain(c => c.IngredientId == OlivesId,
+            "a paid extra nobody picked prints nothing");
 
         // The same order read back through GET /api/orders/{id} — the FROZEN snapshot path, where
         // name AND flag come off the OrderItemIngredient column. This is what the admin
@@ -201,7 +201,8 @@ public class IngredientAddOnFlagTests : IntegrationTestBase
         var rereadMushrooms = rereadItem.IngredientCustomizations!.Single(c => c.IngredientId == MushroomsId);
         rereadMushrooms.IsAddOn.Should().BeTrue();
         rereadMushrooms.IngredientName.Should().Be("Mushrooms");
-        rereadItem.IngredientCustomizations!.Single(c => c.IngredientId == CheeseId).IsAddOn.Should().BeFalse();
+        rereadItem.IngredientCustomizations!.Should().ContainSingle(
+            "the chosen extra is the only decision on the line — the defaults do not print");
     }
 
     [Fact]
@@ -231,14 +232,18 @@ public class IngredientAddOnFlagTests : IntegrationTestBase
         mushrooms.IsRemoved.Should().BeFalse();
         mushrooms.IsAddOn.Should().BeTrue("the live recipe marks mushrooms a paid extra");
 
-        var olives = item.IngredientCustomizations!.Single(c => c.IngredientId == OlivesId);
-        olives.Quantity.Should().Be(0);
-        olives.IsRemoved.Should().BeFalse();
-        olives.IsAddOn.Should().BeTrue();
-
-        // Cheese is optional-but-in-base and absent from the saved map, so it renders no row at
-        // all — the pre-existing fallback behavior, unchanged by the flag.
+        // Olives were explicitly zeroed and never picked, and cheese is optional-but-in-base and
+        // absent from the saved map — neither is a decision, so neither renders a row (the display
+        // rule of 2026-09-10; cheese's absence predates it, olives' is the rule at work).
+        item.IngredientCustomizations!.Should().NotContain(c => c.IngredientId == OlivesId);
         item.IngredientCustomizations!.Should().NotContain(c => c.IngredientId == CheeseId);
+
+        // What is left is exactly two decisions: the chosen extra, and the required tomato sauce
+        // the map is silent about — the pre-existing "absent required = removed" branch.
+        item.IngredientCustomizations!.Should().HaveCount(2);
+        item.IngredientCustomizations!.Should().Contain(c =>
+            c.IngredientId == TomatoSauceId && c.IsRemoved,
+            "a required ingredient absent from a map that still resolves is a genuine removal");
     }
 
 }

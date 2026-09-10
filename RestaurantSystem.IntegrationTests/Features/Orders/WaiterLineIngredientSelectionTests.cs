@@ -87,21 +87,19 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var frozen = await FrozenRowsAsync();
-        frozen.Should().HaveCount(3,
-            "the line renders every recipe row — kept, removed and added alike; before #430 this was EMPTY");
+        // The display rule (2026-09-10): the cheese the waiter kept at its default quantity is the
+        // dish, not a decision — the freeze carries the two lines the kitchen acts on. Before #430
+        // this was EMPTY; before 2026-09-10 it was the whole recipe.
+        frozen.Should().HaveCount(2, "the removal and the extra freeze; the untouched default does not");
 
-        frozen[0].IngredientName.Should().Be("Cheese");
-        frozen[0].Quantity.Should().Be(1);
-        frozen[0].IsRemoved.Should().BeFalse();
-
-        frozen[1].IngredientName.Should().Be("Tomato Sauce");
-        frozen[1].Quantity.Should().Be(0);
-        frozen[1].IsRemoved.Should().BeTrue(
+        frozen[0].IngredientName.Should().Be("Tomato Sauce");
+        frozen[0].Quantity.Should().Be(0);
+        frozen[0].IsRemoved.Should().BeTrue(
             "an ingredient absent from the selection is one the guest asked to have taken off");
 
-        frozen[2].IngredientName.Should().Be("Extra Bacon");
-        frozen[2].Quantity.Should().Be(2);
-        frozen[2].IsRemoved.Should().BeFalse();
+        frozen[1].IngredientName.Should().Be("Extra Bacon");
+        frozen[1].Quantity.Should().Be(2);
+        frozen[1].IsRemoved.Should().BeFalse();
 
         // 18.00 base − 1.50 for the sauce that is in the base price and was removed
         //             + 2 × 2.50 for the bacon = 21.50. Neither 5.00 nor 99.00 appears.
@@ -132,7 +130,9 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
 
         rendered.Should().NotBeNull("before #430 a waiter line carried nothing for the ticket to render");
         rendered!.Single(row => row.IngredientName == "Tomato Sauce").IsRemoved.Should().BeTrue();
-        rendered.Single(row => row.IngredientName == "Cheese").IsRemoved.Should().BeFalse();
+        // The cheese the waiter kept at its default quantity is the dish, not a decision — the
+        // display rule of 2026-09-10 keeps the ticket to what the kitchen must act on.
+        rendered.Should().NotContain(row => row.IngredientName == "Cheese");
     }
 
     // ── The pricing rule and its edges ───────────────────────────────────────────────────────
@@ -195,17 +195,25 @@ public class WaiterLineIngredientSelectionTests : IntegrationTestBase
             productId = ProductId,
             quantity = 1,
             unitPrice = PizzaPrice,
-            selectedIngredientIds = new[] { CheeseId, SauceId, Guid.NewGuid() },
-            ingredientQuantities = new Dictionary<Guid, int> { [Guid.NewGuid()] = 50 },
+            selectedIngredientIds = new[] { CheeseId, SauceId, BaconId, Guid.NewGuid() },
+            ingredientQuantities = new Dictionary<Guid, int> { [Guid.NewGuid()] = 50, [BaconId] = 2 },
         });
 
-        (await SingleOrderAsync()).Total.Should().Be(PizzaPrice, "nothing was added and nothing was removed");
+        // The foreign id buys nothing: the pricing walks THIS product's ingredients, and bacon at
+        // two (a real decision) is the only money that moves.
+        (await SingleOrderAsync()).Total.Should().Be(PizzaPrice + (BaconPrice * 2),
+            "a foreign id is never asked about, so it is inert rather than merely harmless-looking");
 
         // Set, not sequence (#441): the freeze assigns SortOrder over an EF projection with no
         // OrderBy on the path, so which recipe row receives 0 is whatever order Postgres happened
         // to return. Equal asserted an order the test never claimed to check and failed on it.
+        //
+        // The display rule (2026-09-10) slims the freeze to decisions, which sharpens this assert:
+        // the cheese and the sauce sit at their defaults and print nothing, the doubled bacon is
+        // the one decision — and the foreign id, which IS in the saved map, injected no row. An
+        // outside id is inert; it is also invisible.
         (await FrozenRowsAsync()).Select(row => row.IngredientId)
-            .Should().BeEquivalentTo(new[] { CheeseId, SauceId, BaconId }, "only real recipe rows are frozen");
+            .Should().BeEquivalentTo(new[] { BaconId }, "only real recipe decisions are frozen");
     }
 
     /// <summary>

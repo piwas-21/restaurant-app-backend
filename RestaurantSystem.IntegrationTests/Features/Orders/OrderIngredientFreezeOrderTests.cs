@@ -99,9 +99,22 @@ public class OrderIngredientFreezeOrderTests : IntegrationTestBase
                     productId = ProductId,
                     quantity = 1,
                     unitPrice = 12.00m,
-                    // Every row named, so the projection freezes the whole recipe and the assertion
-                    // is about ORDER rather than about which rows survive.
+                    // Decisions only, since the display rule of 2026-09-10: the bun doubled and the
+                    // cheese taken off are lines a kitchen acts on; the patty and the onion at their
+                    // defaults are the dish itself and print nothing. The survivors still tie on
+                    // DisplayOrder 2? No — cheese (2) survives, onion (2) survives: the tie is
+                    // exactly what the assertion must still pin, and both survive as removals.
                     selectedIngredientIds = new[] { BunId, PattyId, CheeseId, OnionId },
+                    ingredientQuantities = new Dictionary<Guid, int>
+                    {
+                        // Every row NAMED — leaving a required ingredient out of the map would be a
+                        // "NO Patty" removal (the absent-required branch), a decision this test is
+                        // not trying to make. 1 is the untouched default; 2 and 0 are decisions.
+                        [BunId] = 2,
+                        [PattyId] = 1,
+                        [CheeseId] = 0,
+                        [OnionId] = 0,
+                    },
                 },
             },
         });
@@ -141,13 +154,14 @@ public class OrderIngredientFreezeOrderTests : IntegrationTestBase
     /// it is what this test exists to stop.
     /// </summary>
     private static List<string> ExpectedOrder() =>
-        new List<(Guid Id, string Name, int Order)>
+        new List<(Guid Id, string Name, int Order, int Quantity)>
         {
-            (BunId, "Bun", 0),
-            (PattyId, "Patty", 1),
-            (CheeseId, "Cheese", 2),
-            (OnionId, "Onion", 2),
+            (BunId, "Bun", 0, 2),
+            (PattyId, "Patty", 1, 1),
+            (CheeseId, "Cheese", 2, 0),
+            (OnionId, "Onion", 2, 0),
         }
+        .Where(row => row.Quantity != 1)
         .OrderBy(row => row.Order)
         .ThenBy(row => row.Id)
         .Select(row => row.Name)
@@ -249,25 +263,36 @@ public class ProjectRecipeOrderTests
             NewIngredient(BunId, "Bun", 0),
         };
 
-        var quantities = recipe.ToDictionary(row => row.Id, _ => 1);
+        // Only DECISIONS render since the display rule of 2026-09-10: the bun pushed to double
+        // (an above-default quantity), the cheese and onion taken off (a base-recipe 0 is a
+        // removal). The patty at its default quantity is the dish itself and prints nothing —
+        // which is exactly why the survivors must still pin the ordering.
+        var quantities = new Dictionary<Guid, int>
+        {
+            [BunId] = 2,
+            [PattyId] = 1,
+            [CheeseId] = 0,
+            [OnionId] = 0,
+        };
 
         var projected = OrderIngredientCustomizations.ProjectRecipe(recipe, quantities);
 
         projected.Should().NotBeNull();
         projected!.Select(row => row.IngredientName).Should().Equal(
             ExpectedOrder(),
-            "the receipt renders the recipe in the order the admin arranged, not in the order a row happened to arrive");
+            "the receipt renders the surviving decisions in the order the admin arranged, not in the order a row happened to arrive");
     }
 
     /// <summary>Derived from the rule, not restated by hand: the tie's resolution is not guessable.</summary>
     private static List<string> ExpectedOrder() =>
-        new List<(Guid Id, string Name, int Order)>
+        new List<(Guid Id, string Name, int Order, int Quantity)>
         {
-            (BunId, "Bun", 0),
-            (PattyId, "Patty", 1),
-            (CheeseId, "Cheese", 2),
-            (OnionId, "Onion", 2),
+            (BunId, "Bun", 0, 2),
+            (PattyId, "Patty", 1, 1),
+            (CheeseId, "Cheese", 2, 0),
+            (OnionId, "Onion", 2, 0),
         }
+        .Where(row => row.Quantity != 1)
         .OrderBy(row => row.Order)
         .ThenBy(row => row.Id)
         .Select(row => row.Name)
