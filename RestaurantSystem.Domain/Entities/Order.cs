@@ -94,5 +94,6 @@ public class Order : SoftDeleteEntity
     public virtual ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
     public virtual ICollection<OrderStatusHistory> StatusHistory { get; set; } = new List<OrderStatusHistory>();
     public virtual ICollection<OrderPayment> Payments { get; set; } = new List<OrderPayment>();
+    public virtual ICollection<OrderOperationalNote> OperationalNotes { get; set; } = new List<OrderOperationalNote>();
     public virtual ICollection<FidelityPointsTransaction> FidelityPointsTransactions { get; set; } = new List<FidelityPointsTransaction>();
 }
