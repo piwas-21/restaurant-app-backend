@@ -85,10 +85,10 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
         if (!string.IsNullOrWhiteSpace(query.Language))
         {
             ordersQuery = ordersQuery
-                .Include(o => o.Items).ThenInclude(i => i.Product).ThenInclude(p => p!.Descriptions)
-                .Include(o => o.Items).ThenInclude(i => i.Product)
-                    .ThenInclude(p => p!.DetailedIngredients).ThenInclude(pi => pi.Descriptions)
-                .Include(o => o.Items).ThenInclude(i => i.ProductVariation).ThenInclude(v => v!.Descriptions);
+                .Include(o => o.Items).ThenInclude(i => i.Product!.Descriptions)
+                .Include(o => o.Items).ThenInclude(i => i.Product!.DetailedIngredients)
+                    .ThenInclude(pi => pi!.Descriptions)
+                .Include(o => o.Items).ThenInclude(i => i.ProductVariation!.Descriptions);
         }
 
         var orders = await ordersQuery
