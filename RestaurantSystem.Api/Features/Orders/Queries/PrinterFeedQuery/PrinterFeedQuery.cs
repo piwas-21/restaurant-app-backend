@@ -87,7 +87,7 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             ordersQuery = ordersQuery
                 .Include(o => o.Items).ThenInclude(i => i.Product!.Descriptions)
                 .Include(o => o.Items).ThenInclude(i => i.Product!.DetailedIngredients)
-                    .ThenInclude(pi => pi!.Descriptions)
+                    .ThenInclude(pi => pi.Descriptions)
                 .Include(o => o.Items).ThenInclude(i => i.ProductVariation!.Descriptions);
         }
 
