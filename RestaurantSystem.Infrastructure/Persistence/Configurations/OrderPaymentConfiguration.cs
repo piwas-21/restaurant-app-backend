@@ -54,6 +54,13 @@ public class OrderPaymentConfiguration : IEntityTypeConfiguration<OrderPayment>
         builder.HasIndex(p => p.TransactionId);
         builder.HasIndex(p => p.PaymentDate);
 
+        // One client operation id banks exactly one tender. The filter keeps every tender
+        // recorded before OperationId existed (and every table-bill tender — its key is a
+        // follow-up) legal at null, so this is a pure additive constraint.
+        builder.HasIndex(p => p.OperationId)
+            .IsUnique()
+            .HasFilter("\"operation_id\" IS NOT NULL");
+
         // Relationships
         builder.HasOne(p => p.Order)
             .WithMany(o => o.Payments)
