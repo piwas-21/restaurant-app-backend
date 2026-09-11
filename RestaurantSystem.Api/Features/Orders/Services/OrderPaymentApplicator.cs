@@ -141,8 +141,8 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
         }
         catch (Exception ex) when (IsUniqueOperationKeyViolation(ex))
         {
-            // Two concurrent first-submits of one operation id both passed the replay check;
-            // the filtered unique index is the durable guard and the loser dies here. Roll the
+            // Two concurrent first-submits of one operation id both passed the replay check,
+            // and the filtered unique index is the durable guard: the loser dies here. Roll the
             // loser's transaction back BEFORE reading the ledger — a Postgres transaction is
             // aborted once a statement has failed, so the read below must not run inside it.
             if (transaction is not null)
@@ -156,7 +156,7 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
             var winner = await _replayResolver.ResolveOutcomeAsync(orderId, tender, cancellationToken);
             if (winner is not null)
             {
-                _logger.LogInformation(
+                _logger.LogInformation(ex,
                     "Concurrent tender for operation {OperationId} on order {OrderId} resolved as {Outcome}",
                     tender.OperationId, orderId, winner.Outcome);
                 return winner;

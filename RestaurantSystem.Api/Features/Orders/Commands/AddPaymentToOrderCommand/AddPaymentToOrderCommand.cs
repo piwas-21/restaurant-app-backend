@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -15,6 +16,9 @@ public record AddPaymentToOrderCommand : ICommand<ApiResponse<OrderDto>>
     // answered with the original result instead of a second tender. Required: without it the
     // endpoint cannot tell a retry from a new payment. A repeat with a different method or
     // amount is refused with ErrorCodes.PaymentOperationPayloadMismatch.
+    // Required on the wire too (S6964): an omitted operation id cannot silently become a
+    // brand-new payment instead of the retry the till intended.
+    [JsonRequired]
     public Guid OperationId { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public decimal Amount { get; set; }
