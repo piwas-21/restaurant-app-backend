@@ -23,9 +23,20 @@ public interface IOrderPaymentReplayResolver
     Task<PaymentApplicationResult?> ResolveOutcomeAsync(
         Guid orderId, OrderPaymentTender tender, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Looks up an operation without a tender payload. A lookup asks only whether the operation
+    /// committed on this order; it must never invent method or amount values to feed
+    /// <see cref="ResolveOutcomeAsync"/> because that would turn a read into a mismatch refusal.
+    /// </summary>
+    Task<PaymentOperationResolution> ResolveOperationAsync(
+        Guid orderId, Guid operationId, CancellationToken cancellationToken);
+
     /// <summary>The full-includes order read every response and replay is assembled from.</summary>
     Task<Order?> LoadOrderForResponseAsync(Guid orderId, CancellationToken cancellationToken);
 }
+
+/// <summary>The order and, when present on that order, the payment carrying an operation key.</summary>
+public sealed record PaymentOperationResolution(Order? Order, OrderPayment? Payment);
 
 /// <inheritdoc />
 public class OrderPaymentReplayResolver : IOrderPaymentReplayResolver
@@ -70,6 +81,18 @@ public class OrderPaymentReplayResolver : IOrderPaymentReplayResolver
         return order == null
             ? PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound)
             : PaymentApplicationResult.Replayed(order);
+    }
+
+    /// <inheritdoc />
+    public async Task<PaymentOperationResolution> ResolveOperationAsync(
+        Guid orderId, Guid operationId, CancellationToken cancellationToken)
+    {
+        // Read the same full order graph used by normal responses, then inspect only its
+        // operation key. The route order id scopes the result to this tenant/order: an operation
+        // committed for another order is Unknown here, rather than an operation-id oracle.
+        var order = await LoadOrderForResponseAsync(orderId, cancellationToken);
+        var payment = order?.Payments.SingleOrDefault(p => p.OperationId == operationId);
+        return new PaymentOperationResolution(order, payment);
     }
 
     /// <inheritdoc />

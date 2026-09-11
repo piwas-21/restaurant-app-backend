@@ -185,6 +185,7 @@ public class OrderMappingService : IOrderMappingService
         {
             Id = payment.Id,
             OrderId = payment.OrderId,
+            OperationId = payment.OperationId,
             PaymentMethod = payment.PaymentMethod.ToString(),
             Amount = payment.Amount,
             Status = payment.Status.ToString(),
