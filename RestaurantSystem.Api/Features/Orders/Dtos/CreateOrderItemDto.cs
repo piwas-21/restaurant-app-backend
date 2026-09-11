@@ -34,6 +34,11 @@ public record CreateOrderItemDto
     // byte-identical.
     public List<Guid>? SelectedIngredientIds { get; set; }
 
+    // The menu section that owns this option. Staff bundle children must carry it so the server
+    // prices the exact section membership rather than choosing the first matching product across
+    // sections. Additive metadata: roots and non-bundle children leave it null.
+    public Guid? SectionId { get; set; }
+
     // For Menu Bundles
     public List<CreateOrderItemDto>? ChildItems { get; set; }
 

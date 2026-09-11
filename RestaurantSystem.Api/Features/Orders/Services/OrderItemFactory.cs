@@ -28,14 +28,19 @@ public class OrderItemFactory : IOrderItemFactory
     }
 
     public async Task<string?> AddItemAsync(
-        Order order, CreateOrderItemDto itemDto, bool itemsAreServerPriced, CancellationToken cancellationToken)
+        Order order, CreateOrderItemDto itemDto, bool itemsAreServerPriced,
+        CancellationToken cancellationToken, bool allowStaffPrices = true)
     {
         // Prices in the DTO are honoured from two sources and no others: the persisted basket
         // (itemsAreServerPriced), and a staff member standing behind the till. Everyone else gets
         // catalogue pricing. The staff carve-out is the same one OrderPaymentBuilder already draws
         // for tenders — the POS legitimately hand-builds composed lines, and taking that away in
         // the name of guarding an anonymous endpoint would break the till instead.
-        var pricesAreTrusted = itemsAreServerPriced || _currentUserService.IsStaff;
+        // Legacy callers retain the staff carve-out for composed lines. The authenticated counter
+        // contract opts out explicitly: its payload is still a hand-built request, so only catalogue
+        // values (or values prepared by a server-owned quote) may affect money.
+        var pricesAreTrusted = itemsAreServerPriced
+            || (allowStaffPrices && _currentUserService.IsStaff);
 
         if (itemDto.MenuId.HasValue)
         {
@@ -66,8 +71,7 @@ public class OrderItemFactory : IOrderItemFactory
             await AddProductItemRecursiveAsync(order, itemDto, parentItem: null, pricesAreTrusted, cancellationToken);
         }
 
-        // Neither MenuId nor ProductId — silently skip, matching the
-        // original outer loop's fall-through behaviour.
+        // Neither MenuId nor ProductId: preserve the original fall-through.
         return null;
     }
 
@@ -82,11 +86,14 @@ public class OrderItemFactory : IOrderItemFactory
         // projected against — the same resolution the read path uses for a menu-backed line
         // (OrderIngredientCustomizations). Split, because MenuItems and the products' ingredient
         // collections cartesian-multiply in EF's default single-query mode.
-        var menu = await _context.Menus
-            .Include(p => p.MenuItems)
-                .ThenInclude(mi => mi.Product.DetailedIngredients)
+        var menu = _context.Menus.Local.FirstOrDefault(
+            candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted);
+        menu ??= await _context.Menus
+            .Include(candidate => candidate.MenuItems)
+                .ThenInclude(item => item.Product.DetailedIngredients)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.Id == itemDto.MenuId && !p.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted,
+                cancellationToken);
 
         if (menu == null)
         {
@@ -133,11 +140,14 @@ public class OrderItemFactory : IOrderItemFactory
     {
         // DetailedIngredients is loaded for the ingredient snapshot below, not for pricing — money
         // is settled before this factory runs (see ResolvePricing). Sibling collections, hence split.
-        var product = await _context.Products
-            .Include(p => p.Variations)
-            .Include(p => p.DetailedIngredients)
+        var product = _context.Products.Local.FirstOrDefault(
+            candidate => candidate.Id == itemDto.ProductId && !candidate.IsDeleted);
+        product ??= await _context.Products
+            .Include(candidate => candidate.Variations)
+            .Include(candidate => candidate.DetailedIngredients)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.Id == itemDto.ProductId && !p.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(candidate => candidate.Id == itemDto.ProductId && !candidate.IsDeleted,
+                cancellationToken);
 
         if (product == null)
         {
@@ -156,6 +166,10 @@ public class OrderItemFactory : IOrderItemFactory
 
         var (unitPrice, variationName) = ResolvePricing(itemDto, product, pricesAreTrusted && choice.Price is null);
         var customization = choice.Price ?? ResolveCustomizationPrice(itemDto, pricesAreTrusted);
+        if (choice.Price is not null && parentItem != null && itemDto.Kind == OrderItemKind.SideItem)
+        {
+            customization *= parentItem.Quantity;
+        }
 
         // Convention mirrors BasketService.AddItemToBasketAsync (Features/Basket/Services/BasketService.cs:230-245):
         // child rows carry UnitPrice for display but ItemTotal = 0, because the
@@ -176,30 +190,8 @@ public class OrderItemFactory : IOrderItemFactory
         // top-level branch below and the menu path on line 61. BasketToOrderTranslator
         // sends 0 here for both child kinds, so no basket-sourced DTO reaches this
         // line at all; it exists for a caller that hand-builds POST /api/orders.)
-        decimal itemTotal;
-        if (parentItem != null)
-        {
-            itemTotal = 0m;
-            if (customization != 0m)
-            {
-                // Walk up to the top-level root: every intermediate parent's
-                // ItemTotal must stay 0 (BasketService convention — see
-                // OrderItemFactoryTests.cs grandchild test). At grandchild
-                // depth, rolling into the immediate parent would silently
-                // drop the customization because the next level zeros it.
-                // PR #67 review.
-                var root = parentItem;
-                while (root.ParentOrderItem != null)
-                {
-                    root = root.ParentOrderItem;
-                }
-                root.ItemTotal += customization;
-            }
-        }
-        else
-        {
-            itemTotal = (unitPrice * itemDto.Quantity) + customization;
-        }
+        var itemTotal = ResolveItemTotal(
+            parentItem, unitPrice, itemDto.Quantity, customization);
 
         var orderItem = new OrderItem
         {
@@ -238,6 +230,25 @@ public class OrderItemFactory : IOrderItemFactory
                 await AddProductItemRecursiveAsync(order, childDto, orderItem, pricesAreTrusted, cancellationToken);
             }
         }
+    }
+
+    private static decimal ResolveItemTotal(
+        OrderItem? parentItem, decimal unitPrice, int quantity, decimal customization)
+    {
+        if (parentItem is null)
+        {
+            return (unitPrice * quantity) + customization;
+        }
+
+        // Every child row remains zero. Roll a child's customization into the root because an
+        // intermediate parent's zero total is deliberately ignored by aggregate pricing.
+        var root = parentItem;
+        while (root.ParentOrderItem is not null)
+        {
+            root = root.ParentOrderItem;
+        }
+        root.ItemTotal += customization;
+        return 0m;
     }
 
     // An explicit UnitPrice is honoured ONLY when the price is trusted — the items came from the

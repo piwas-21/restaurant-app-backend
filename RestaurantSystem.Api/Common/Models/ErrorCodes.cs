@@ -181,6 +181,10 @@ public static class ErrorCodes
     public const string TableServiceSessionNotClosable = "TableServiceSessionNotClosable";
     public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+
+    public const string StaffOrderOperationPayloadMismatch = "StaffOrderOperationPayloadMismatch";
+    public const string StaffOrderOperationIdReused = "StaffOrderOperationIdReused";
+    public const string StaffOrderVersionConflict = "StaffOrderVersionConflict";
 }
 
 
