@@ -36,7 +36,7 @@ public class OrderSettlementEligibilityTests : IntegrationTestBase
 
         var response = await Client.PostAsJsonAsync(
             $"/api/Orders/{_completedUnpaidOrderId}/payments",
-            new { paymentMethod = "Cash", amount = 10m });
+            new { operationId = Guid.NewGuid(), paymentMethod = "Cash", amount = 10m });
 
         response.IsSuccessStatusCode.Should().BeTrue();
         var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);
@@ -125,7 +125,7 @@ public class OrderSettlementEligibilityTests : IntegrationTestBase
 
         var response = await Client.PostAsJsonAsync(
             $"/api/Orders/{orderId}/payments",
-            new { paymentMethod = "Cash", amount = 1m });
+            new { operationId = Guid.NewGuid(), paymentMethod = "Cash", amount = 1m });
 
         response.IsSuccessStatusCode.Should().BeTrue("the endpoint represents business refusals in its response body");
         var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);

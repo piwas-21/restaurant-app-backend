@@ -212,7 +212,8 @@ public class TableBillTests : IAsyncLifetime
         var fidelity = new Mock<IFidelityPointsService>();
 
         var applicator = new OrderPaymentApplicator(
-            ctx, currentUser.Object, fidelity.Object, NullLogger<OrderPaymentApplicator>.Instance);
+            ctx, currentUser.Object, fidelity.Object, new OrderPaymentReplayResolver(ctx),
+            NullLogger<OrderPaymentApplicator>.Instance);
         var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
             ctx, applicator, assembler, NullLogger<AddTableBillPaymentCommandHandler>.Instance);

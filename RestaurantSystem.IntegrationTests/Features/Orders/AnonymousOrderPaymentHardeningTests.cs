@@ -283,6 +283,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         AuthenticateAsAdmin();
         var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
         {
+            operationId = Guid.NewGuid(),
             paymentMethod = nameof(PaymentMethod.Cash),
             amount = 12.99m
         });
@@ -407,6 +408,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         AuthenticateAsAdmin();
         var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
         {
+            operationId = Guid.NewGuid(),
             paymentMethod = nameof(PaymentMethod.CreditCard),
             amount = 12.99m,
             transactionId = "till-terminal-0099"

@@ -10,6 +10,10 @@ public class AddPaymentToOrderCommandValidator : AbstractValidator<AddPaymentToO
             .NotEmpty()
             .WithMessage("Order ID is required");
 
+        RuleFor(x => x.OperationId)
+            .NotEmpty()
+            .WithMessage("Operation ID is required");
+
         RuleFor(x => x.PaymentMethod)
             .IsInEnum()
             .WithMessage("Invalid payment method");

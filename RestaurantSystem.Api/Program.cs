@@ -663,6 +663,7 @@ builder.Services.AddSingleton<IOutboundEmailLedger, OutboundEmailLedger>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
 builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationService>();
 builder.Services.AddScoped<IOrderPaymentApplicator, OrderPaymentApplicator>();
+builder.Services.AddScoped<IOrderPaymentReplayResolver, OrderPaymentReplayResolver>();
 builder.Services.AddScoped<ITableBillAssembler, TableBillAssembler>();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();

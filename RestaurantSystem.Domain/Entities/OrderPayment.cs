@@ -29,6 +29,13 @@ public class OrderPayment : Entity
     public string? PaymentGateway { get; set; } // Stripe, PayPal, etc.
     public string? PaymentNotes { get; set; }
 
+    // Client operation key for idempotent tender recording (C04 / #523): the POS mints one
+    // Guid per cashier action and replays it on retry, so a network timeout after commit
+    // cannot bank a second tender. Tenant DBs are per-tenant, so the filtered unique index
+    // on this column is tenant-scoped by construction. Null on every tender recorded before
+    // it existed and by the table-bill flow, whose idempotency is a deliberate follow-up.
+    public Guid? OperationId { get; set; }
+
     // For refunds
     public bool IsRefunded { get; set; }
     public decimal? RefundedAmount { get; set; }

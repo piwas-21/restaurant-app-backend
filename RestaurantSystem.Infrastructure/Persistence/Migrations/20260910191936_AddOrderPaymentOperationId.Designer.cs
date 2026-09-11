@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260910191936_AddOrderPaymentOperationId")]
+    partial class AddOrderPaymentOperationId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2837,64 +2840,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("OrderItemIngredients", (string)null);
                 });
 
-            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderOperationalNote", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<string>("Audience")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("audience");
-
-                    b.Property<Guid>("ClientOperationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("client_operation_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("created_by");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("order_id");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text")
-                        .HasColumnName("updated_by");
-
-                    b.HasKey("Id")
-                        .HasName("pk_order_operational_notes");
-
-                    b.HasIndex("OrderId", "ClientOperationId")
-                        .IsUnique();
-
-                    b.HasIndex("OrderId", "CreatedAt");
-
-                    b.ToTable("OrderOperationalNotes", (string)null);
-                });
-
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderPayment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4275,11 +4220,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("created_by");
 
-                    b.Property<string>("Currency")
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("currency");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(254)
@@ -5529,18 +5469,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("OrderItem");
                 });
 
-            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderOperationalNote", b =>
-                {
-                    b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
-                        .WithMany("OperationalNotes")
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_order_operational_notes_orders_order_id");
-
-                    b.Navigation("Order");
-                });
-
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderPayment", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
@@ -5891,8 +5819,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("FidelityPointsTransactions");
 
                     b.Navigation("Items");
-
-                    b.Navigation("OperationalNotes");
 
                     b.Navigation("Payments");
 

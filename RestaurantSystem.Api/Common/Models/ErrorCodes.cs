@@ -158,4 +158,20 @@ public static class ErrorCodes
     /// too narrow" (this) without parsing prose.
     /// </summary>
     public const string MissingScope = "MissingScope";
+
+    /// <summary>
+    /// Returned by the till endpoint (<c>POST /api/Orders/&#123;id&#125;/payments</c>) when a tender's
+    /// client operation id already banked a payment on THIS order with a DIFFERENT method or
+    /// amount (#523). The original payment stands; the code lets the frontend show the cashier
+    /// "already paid with different details" instead of a generic failure, and tells a retry
+    /// bug (payload drifting between retries) apart from a double tap.
+    /// </summary>
+    public const string PaymentOperationPayloadMismatch = "PaymentOperationPayloadMismatch";
+
+    /// <summary>
+    /// Returned by the till endpoint when a tender's client operation id already banked a
+    /// payment on a DIFFERENT order — one Guid per cashier action is the client contract, so
+    /// this is a client generation bug, not a user mistake (#523).
+    /// </summary>
+    public const string PaymentOperationIdReused = "PaymentOperationIdReused";
 }
