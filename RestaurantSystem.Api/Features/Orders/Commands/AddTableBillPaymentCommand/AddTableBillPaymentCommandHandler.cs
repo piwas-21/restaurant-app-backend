@@ -42,8 +42,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             return replay;
         }
 
-        // One bill tender may create N payments. SERIALIZABLE makes the allocation atomic and
-        // aborts a concurrent stale allocation before it can overstate the ledger.
+        // SERIALIZABLE makes the multi-order allocation atomic.
         await using var transaction = await _context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
 
@@ -53,7 +52,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 && o.TableNumber == command.TableNumber
                 && !TableBillAssembler.ExcludedStatuses.Contains(o.Status))
             .OrderBy(o => o.OrderDate).ThenBy(o => o.OrderNumber)
-            .Select(o => new { o.Id, o.RemainingAmount })
+            .Select(o => new BillRound(o.Id, o.RemainingAmount))
             .ToListAsync(cancellationToken);
 
         if (openOrders.Count == 0)
@@ -101,47 +100,21 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             PaymentNotes = command.PaymentNotes,
         };
 
-        var appliedTo = new List<string>();
-        var leftToApply = command.Amount;
+        var allocation = new AllocationResult(command.Amount, new List<string>());
         try
         {
-            foreach (var order in openOrders)
+            allocation = await ApplyAcrossOrdersAsync(openOrders, tender, command.TableNumber, allocation, cancellationToken);
+            if (!allocation.Success)
             {
-                if (leftToApply <= 0)
-                {
-                    break;
-                }
-
-                var outstanding = Math.Max(0, order.RemainingAmount);
-                if (outstanding <= 0)
-                {
-                    continue; // already-settled round (or overpaid one): allocation never reaches back
-                }
-
-                var share = Math.Min(outstanding, leftToApply);
-                var result = await _paymentApplicator.ApplyToOrderAsync(
-                    order.Id, tender with { Amount = share }, cancellationToken);
-
-                if (result.Outcome != OrderPaymentApplicationOutcome.Applied || result.Order == null)
-                {
-                    // An unapplyable round invalidates the whole allocation.
-                    _logger.LogWarning(
-                        "Bill payment for table {TableNumber} rolled back on order {OrderId}: {Outcome}",
-                        command.TableNumber, order.Id, result.Outcome);
-                    return ApiResponse<TableBillDto>.Failure(
-                        "The bill changed while the payment was being applied. Please review the bill and try again");
-                }
-
-                appliedTo.Add(result.Order.OrderNumber);
-                leftToApply -= share;
+                return ApiResponse<TableBillDto>.Failure(
+                    "The bill changed while the payment was being applied. Please review the bill and try again");
             }
-
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             await transaction.RollbackAsync(cancellationToken);
-            await transaction.DisposeAsync();
+            await _context.Database.UseTransactionAsync(null, cancellationToken);
             _context.ChangeTracker.Clear();
             var winner = await _replayResolver.ResolveAsync(command, cancellationToken);
             if (winner is not null)
@@ -162,11 +135,11 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         }
 
         // A sub-tolerance slack may remain; slack is NEVER charged — the message reports what the till actually took.
-        var appliedTotal = command.Amount - Math.Max(0, leftToApply);
+        var appliedTotal = command.Amount - Math.Max(0, allocation.Left);
 
         _logger.LogInformation(
             "Bill payment {Amount} applied across {OrderCount} orders on table {TableNumber}: {Orders}",
-            appliedTotal, appliedTo.Count, command.TableNumber, string.Join(", ", appliedTo));
+            appliedTotal, allocation.Orders.Count, command.TableNumber, string.Join(", ", allocation.Orders));
 
         // Re-assemble AFTER the commit so the response reflects the post-payment bill. Money is
         // already committed here: whatever happens, the response must not deny the tenders —
@@ -194,7 +167,34 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         }
 
         return ApiResponse<TableBillDto>.SuccessWithData(
-            bill, $"Payment of {appliedTotal:0.00} applied across {appliedTo.Count} order(s)");
+            bill, $"Payment of {appliedTotal:0.00} applied across {allocation.Orders.Count} order(s)");
     }
+
+    private async Task<AllocationResult> ApplyAcrossOrdersAsync(
+        IReadOnlyList<BillRound> orders, OrderPaymentTender tender, int tableNumber,
+        AllocationResult allocation, CancellationToken cancellationToken)
+    {
+        foreach (var order in orders)
+        {
+            if (allocation.Left <= 0) break;
+            var outstanding = Math.Max(0, order.RemainingAmount);
+            if (outstanding <= 0) continue;
+            var share = Math.Min(outstanding, allocation.Left);
+            var result = await _paymentApplicator.ApplyToOrderAsync(
+                order.Id, tender with { Amount = share }, cancellationToken);
+            if (result.Outcome != OrderPaymentApplicationOutcome.Applied || result.Order is null)
+            {
+                _logger.LogWarning(
+                    "Bill payment for table {TableNumber} rolled back on order {OrderId}: {Outcome}",
+                    tableNumber, order.Id, result.Outcome);
+                return allocation with { Success = false };
+            }
+            allocation.Orders.Add(result.Order.OrderNumber);
+            allocation = allocation with { Left = allocation.Left - share };
+        }
+        return allocation;
+    }
+    private sealed record BillRound(Guid Id, decimal RemainingAmount);
+    private sealed record AllocationResult(decimal Left, List<string> Orders, bool Success = true);
 
 }
