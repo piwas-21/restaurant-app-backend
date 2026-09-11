@@ -29,6 +29,7 @@ public record OrderPaymentTender
     public string? CardLastFourDigits { get; init; }
     public string? CardType { get; init; }
     public string? PaymentNotes { get; init; }
+    public string? Currency { get; init; }
 
     /// <summary>Client operation key for idempotent replay (#523). The till flow mints one
     /// Guid per cashier action; null on the table-bill flow, whose idempotency is a

@@ -1,21 +1,30 @@
 namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
 /// <summary>
-/// ONE bill for a dine-in table: the union of that table's still-open orders
-/// (guests order in several rounds; the till must settle them together).
-/// An order is open while its <c>Status</c> is neither Completed nor Cancelled —
-/// the same set <see cref="Commands.CompleteAllTableOrdersCommand"/> closes when the
-/// table is cleared. Per-order grouping is preserved so the waiter can see which
-/// round each line belongs to; the sums are what the guest actually owes.
+/// One bill for a dine-in table. Legacy table-number reads contain non-terminal rounds; an
+/// explicit service-session read uses immutable membership and also retains settled rounds for a
+/// durable receipt. Per-order grouping is preserved so the waiter can see each round.
 /// </summary>
 public record TableBillDto
 {
     public int TableNumber { get; set; }
 
+    /// <summary>Explicit visit identity. Null on the legacy table-number bill.</summary>
+    public Guid? ServiceSessionId { get; set; }
+
+    /// <summary>Optimistic-concurrency version for an explicit visit.</summary>
+    public int? ServiceSessionVersion { get; set; }
+
+    /// <summary>Currency captured for the visit; null means no currency is declared.</summary>
+    public string? Currency { get; set; }
+
+    /// <summary>True only when the legacy table-number lookup found incompatible visits.</summary>
+    public bool IsAmbiguous { get; set; }
+
     /// <summary>Server clock instant the bill was assembled (UTC).</summary>
     public DateTime GeneratedAt { get; set; }
 
-    /// <summary>Open orders for the table, oldest round first.</summary>
+    /// <summary>Bill rounds, oldest first.</summary>
     public List<OrderDto> Orders { get; set; } = new();
 
     public int OrderCount { get; set; }

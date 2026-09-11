@@ -93,8 +93,14 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(o => o.OrderDate);
         builder.HasIndex(o => o.Status);
         builder.HasIndex(o => new { o.UserId, o.OrderDate });
+        builder.HasIndex(o => o.ServiceSessionId);
 
         // Relationships
+        builder.HasOne(o => o.ServiceSession)
+            .WithMany(session => session.Orders)
+            .HasForeignKey(o => o.ServiceSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(o => o.User)
             .WithMany()
             .HasForeignKey(o => o.UserId)

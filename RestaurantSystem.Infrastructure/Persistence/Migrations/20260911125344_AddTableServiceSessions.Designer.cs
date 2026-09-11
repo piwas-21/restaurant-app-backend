@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911125344_AddTableServiceSessions")]
+    partial class AddTableServiceSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1018,15 +1021,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("failure_reason");
 
-                    b.Property<Guid?>("JobId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("job_id");
-
-                    b.Property<string>("JobType")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("job_type");
-
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
@@ -1038,10 +1032,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("ReceivedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("received_at");
-
-                    b.Property<int?>("Revision")
-                        .HasColumnType("integer")
-                        .HasColumnName("revision");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1073,12 +1063,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrderId");
 
                     b.HasIndex("OrderId", "DeviceId", "Target")
-                        .IsUnique()
-                        .HasFilter("\"job_id\" IS NULL");
-
-                    b.HasIndex("DeviceId", "JobId", "Revision", "Target")
-                        .IsUnique()
-                        .HasFilter("\"job_id\" IS NOT NULL");
+                        .IsUnique();
 
                     b.ToTable("DeviceOrderReceipts", (string)null);
                 });

@@ -10,6 +10,11 @@ public class TableBillPaymentOperation : Entity
 {
     public Guid OperationId { get; set; }
     public int TableNumber { get; set; }
+
+    /// <summary>Non-null for the durable service-session bill flow; null for legacy table-number tenders.</summary>
+    public Guid? ServiceSessionId { get; set; }
+    public int? ExpectedVersion { get; set; }
+    public string? Currency { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public decimal Amount { get; set; }
     public string? TransactionId { get; set; }
@@ -17,5 +22,6 @@ public class TableBillPaymentOperation : Entity
     public string? CardLastFourDigits { get; set; }
     public string? CardType { get; set; }
     public string? PaymentNotes { get; set; }
+    public virtual TableServiceSession? ServiceSession { get; set; }
     public virtual ICollection<OrderPayment> Payments { get; set; } = new List<OrderPayment>();
 }

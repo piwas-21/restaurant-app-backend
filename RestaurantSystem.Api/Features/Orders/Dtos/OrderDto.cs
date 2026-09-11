@@ -13,6 +13,9 @@ public record OrderDto
     public string Type { get; set; } = null!;
     public int? TableNumber { get; set; }
 
+    /// <summary>Explicit table-visit membership. Null means a legacy/anonymous order.</summary>
+    public Guid? ServiceSessionId { get; set; }
+
     // Pricing
     public decimal SubTotal { get; set; }
     public decimal Tax { get; set; }

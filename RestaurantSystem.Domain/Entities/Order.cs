@@ -6,11 +6,9 @@ namespace RestaurantSystem.Domain.Entities;
 public class Order : SoftDeleteEntity
 {
     public string OrderNumber { get; set; } = null!;
-
     /// <summary>Credential for the anonymous quick-action email links (plan §9.20). Null on rows
     /// predating it and must never authenticate; never expose in a DTO, log or SSE.</summary>
     public string? QuickActionToken { get; set; }
-
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }
@@ -19,6 +17,8 @@ public class Order : SoftDeleteEntity
     // Order Type
     public OrderType Type { get; set; } // Dine-In, Takeaway, Delivery
     public int? TableNumber { get; set; } // For dine-in orders
+
+    public Guid? ServiceSessionId { get; set; } // Immutable visit membership; null is legacy/anonymous.
 
     // Pricing
     public decimal SubTotal { get; set; }
@@ -89,6 +89,7 @@ public class Order : SoftDeleteEntity
 
     // Navigation properties
     public virtual ApplicationUser? User { get; set; }
+    public virtual TableServiceSession? ServiceSession { get; set; }
     public virtual OrderAddress? DeliveryAddress { get; set; } // One-to-one relationship
     public virtual CustomerDiscountRule? CustomerDiscountRule { get; set; }
     public virtual ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
