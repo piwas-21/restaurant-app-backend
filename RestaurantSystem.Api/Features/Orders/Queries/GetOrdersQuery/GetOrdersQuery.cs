@@ -13,6 +13,19 @@ using System.Linq.Expressions;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 
+/// <summary>Limits the order list to a named read surface.</summary>
+public enum OrderListScope
+{
+    /// <summary>Return all orders that match the remaining filters.</summary>
+    All = 0,
+
+    /// <summary>
+    /// Return unfinished orders of any age and completed orders that can still be collected.
+    /// Date-window filters are not applied to this scope.
+    /// </summary>
+    Operational = 1
+}
+
 /// <summary>
 /// Query orders with optional filters + pagination.
 /// </summary>
@@ -32,7 +45,8 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 /// </param>
 /// <param name="EndDate">Upper bound on <c>Order.OrderDate</c>, **inclusive** (<c>OrderDate &lt;= EndDate</c>). Same UTC semantics as <see cref="StartDate"/>.</param>
 /// <param name="UserId">Limit to orders owned by this user. Non-staff callers are auto-restricted to their own user-id regardless of this parameter.</param>
-/// <param name="Search">Case-insensitive substring match on order number, customer name, email, or phone.</param>
+/// <param name="Search">Case-insensitive substring match on order number, customer name, email, phone, or table number.</param>
+/// <param name="TableNumber">Exact table-number filter.</param>
 /// <param name="IsFocusOrder">Filter on the cashier "focus" flag.</param>
 /// <param name="TenantDay">
 /// The CALENDAR DAY to list, as the cashier names it on the RESTAURANT'S wall clock — no time, no
@@ -50,6 +64,7 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 /// <param name="Descending">Sort descending (default true).</param>
 /// <param name="Page">1-based page index.</param>
 /// <param name="PageSize">Rows per page.</param>
+/// <param name="Scope">Operational returns unfinished orders of any age and collectible completed orders. It ignores calendar date bounds.</param>
 public record GetOrdersQuery(
     string? Status,
     string? PaymentStatus,
@@ -64,7 +79,9 @@ public record GetOrdersQuery(
     string? OrderBy = "OrderDate",
     bool Descending = true,
     int Page = 1,
-    int PageSize = 10
+    int PageSize = 10,
+    OrderListScope Scope = OrderListScope.All,
+    int? TableNumber = null
 ) : IQuery<ApiResponse<PagedResult<OrderDto>>>;
 
 public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<PagedResult<OrderDto>>>
@@ -122,6 +139,15 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
                 : ordersQuery.Where(_ => false);
         }
 
+        // Operational is a server-owned queue scope: it deliberately does not inherit a browser
+        // calendar window. This keeps unfinished work visible across midnight and includes a
+        // completed sale only when the same settlement rule used by the payment command says it
+        // can still be collected.
+        if (query.Scope == OrderListScope.Operational)
+        {
+            ordersQuery = ordersQuery.Where(OrderSettlementEligibility.OperationalQueuePredicate());
+        }
+
         // Apply filters - handle comma-separated status values
         if (!string.IsNullOrEmpty(query.Status))
         {
@@ -163,8 +189,13 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
         // TenantDay+1 00:00) on the tenant's own wall clock — the till-day rule of
         // GetZReportQuery (backend #372). TenantDayWindowUtc derives the two midnights
         // independently, so a local day of 23 or 25 hours on a DST changeover is covered;
-        // never startOfDay.AddDays(1).
-        if (query.TenantDay.HasValue)
+        // never startOfDay.AddDays(1). Operational scope is intentionally date-independent, so
+        // an open order from yesterday cannot disappear from the till at midnight.
+        if (query.Scope == OrderListScope.Operational)
+        {
+            _logger.LogInformation("Filtered orders by operational queue scope; date bounds ignored");
+        }
+        else if (query.TenantDay.HasValue)
         {
             var (tenantDayStartUtc, tenantDayEndUtc) = _clock.TenantDayWindowUtc(query.TenantDay.Value);
 
@@ -199,6 +230,11 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
             ordersQuery = ordersQuery.Where(o => o.UserId == query.UserId.Value);
         }
 
+        if (query.TableNumber.HasValue)
+        {
+            ordersQuery = ordersQuery.Where(o => o.TableNumber == query.TableNumber.Value);
+        }
+
         if (query.IsFocusOrder.HasValue)
         {
             // Branching rather than comparing `(o.Focus != null) == value`, which EF has no
@@ -224,7 +260,8 @@ public class GetOrdersQueryHandler : IQueryHandler<GetOrdersQuery, ApiResponse<P
                 o.OrderNumber.ToLower().Contains(searchLower) ||
                 (o.CustomerName != null && o.CustomerName.ToLower().Contains(searchLower)) ||
                 (o.CustomerEmail != null && o.CustomerEmail.ToLower().Contains(searchLower)) ||
-                (o.CustomerPhone != null && o.CustomerPhone.ToLower().Contains(searchLower)));
+                (o.CustomerPhone != null && o.CustomerPhone.ToLower().Contains(searchLower)) ||
+                (o.TableNumber.HasValue && o.TableNumber.Value.ToString().Contains(searchLower)));
         }
 
         // Get total count before pagination
