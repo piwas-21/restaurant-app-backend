@@ -62,6 +62,11 @@ public class OrderPaymentConfiguration : IEntityTypeConfiguration<OrderPayment>
             .HasFilter("\"operation_id\" IS NOT NULL");
 
         // Relationships
+        builder.HasOne(p => p.TableBillPaymentOperation)
+            .WithMany(operation => operation.Payments)
+            .HasForeignKey(p => p.TableBillPaymentOperationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(p => p.Order)
             .WithMany(o => o.Payments)
             .HasForeignKey(p => p.OrderId)

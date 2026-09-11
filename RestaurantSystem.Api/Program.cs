@@ -665,6 +665,7 @@ builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationS
 builder.Services.AddScoped<IOrderPaymentApplicator, OrderPaymentApplicator>();
 builder.Services.AddScoped<IOrderPaymentReplayResolver, OrderPaymentReplayResolver>();
 builder.Services.AddScoped<ITableBillAssembler, TableBillAssembler>();
+builder.Services.AddScoped<ITableBillPaymentOperationReplayResolver, TableBillPaymentOperationReplayResolver>();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();

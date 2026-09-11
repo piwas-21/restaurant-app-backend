@@ -36,6 +36,10 @@ public class OrderPayment : Entity
     // it existed and by the table-bill flow, whose idempotency is a deliberate follow-up.
     public Guid? OperationId { get; set; }
 
+    /// <summary>Bill-level retry operation that allocated this tender; null for ordinary till payments.</summary>
+    public Guid? TableBillPaymentOperationId { get; set; }
+    public virtual TableBillPaymentOperation? TableBillPaymentOperation { get; set; }
+
     // For refunds
     public bool IsRefunded { get; set; }
     public decimal? RefundedAmount { get; set; }

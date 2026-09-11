@@ -137,6 +137,44 @@ public class TableBillTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task BillPayment_RetryReturnsCommittedBillWithoutDuplicateTenders()
+    {
+        await SeedDineInOrderAsync(tableNumber: 14, total: 30m, orderedAt: Utc(12, 0));
+        await SeedDineInOrderAsync(tableNumber: 14, total: 20m, orderedAt: Utc(12, 45));
+        var operationId = Guid.NewGuid();
+
+        var first = await PayBillAsync(14, amount: 40m, operationId);
+        var retry = await PayBillAsync(14, amount: 40m, operationId);
+
+        first.Success.Should().BeTrue();
+        retry.Success.Should().BeTrue();
+        retry.Message.Should().Be("Payment already recorded");
+        retry.Data!.Remaining.Should().Be(10m);
+        await using var verify = _fixture.CreateContext();
+        (await verify.OrderPayments.CountAsync()).Should().Be(2);
+        (await verify.TableBillPaymentOperations.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task BillPayment_OperationReuseWithChangedPayloadOrTableIsRefused()
+    {
+        await SeedDineInOrderAsync(tableNumber: 15, total: 30m, orderedAt: Utc(12, 0));
+        await SeedDineInOrderAsync(tableNumber: 16, total: 30m, orderedAt: Utc(12, 0));
+        var operationId = Guid.NewGuid();
+        (await PayBillAsync(15, amount: 20m, operationId)).Success.Should().BeTrue();
+
+        var changedAmount = await PayBillAsync(15, amount: 10m, operationId);
+        var changedTable = await PayBillAsync(16, amount: 20m, operationId);
+
+        changedAmount.Success.Should().BeFalse();
+        changedTable.Success.Should().BeFalse();
+        changedAmount.Errors.Should().ContainSingle().Which.Should().Contain("different table or payment payload");
+        await using var verify = _fixture.CreateContext();
+        (await verify.OrderPayments.CountAsync()).Should().Be(1);
+        (await verify.TableBillPaymentOperations.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
     public async Task BillPayment_RejectsOverpaymentAndWritesNothing()
     {
         await SeedDineInOrderAsync(tableNumber: 3, total: 30m, orderedAt: Utc(12, 0));
@@ -201,7 +239,7 @@ public class TableBillTests : IAsyncLifetime
     }
 
     private async Task<RestaurantSystem.Api.Common.Models.ApiResponse<RestaurantSystem.Api.Features.Orders.Dtos.TableBillDto>>
-        PayBillAsync(int tableNumber, decimal amount)
+        PayBillAsync(int tableNumber, decimal amount, Guid? operationId = null)
     {
         var ctx = _fixture.CreateContext();
         var currentUser = new Mock<ICurrentUserService>();
@@ -216,12 +254,14 @@ public class TableBillTests : IAsyncLifetime
             NullLogger<OrderPaymentApplicator>.Instance);
         var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
-            ctx, applicator, assembler, NullLogger<AddTableBillPaymentCommandHandler>.Instance);
+            ctx, applicator, assembler, new TableBillPaymentOperationReplayResolver(ctx, assembler),
+            NullLogger<AddTableBillPaymentCommandHandler>.Instance);
 
         return await handler.Handle(
             new AddTableBillPaymentCommand
             {
                 TableNumber = tableNumber,
+                OperationId = operationId ?? Guid.NewGuid(),
                 Amount = amount,
                 PaymentMethod = PaymentMethod.Cash,
             },
@@ -392,10 +432,18 @@ public class TableBillTests : IAsyncLifetime
             })
             .ReturnsAsync(PaymentApplicationResult.NotPayable(OrderStatus.Cancelled.ToString()));
 
+        var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
-            ctx, applicator.Object, Assembler(), NullLogger<AddTableBillPaymentCommandHandler>.Instance);
+            ctx, applicator.Object, assembler, new TableBillPaymentOperationReplayResolver(ctx, assembler),
+            NullLogger<AddTableBillPaymentCommandHandler>.Instance);
         var response = await handler.Handle(
-            new AddTableBillPaymentCommand { TableNumber = 11, Amount = 40m, PaymentMethod = PaymentMethod.Cash },
+            new AddTableBillPaymentCommand
+            {
+                TableNumber = 11,
+                OperationId = Guid.NewGuid(),
+                Amount = 40m,
+                PaymentMethod = PaymentMethod.Cash
+            },
             CancellationToken.None);
 
         response.Success.Should().BeFalse("a half-settled bill must answer as a refusal");
@@ -426,10 +474,18 @@ public class TableBillTests : IAsyncLifetime
                 "Concurrent update",
                 new PostgresException("could not serialize access", "40P01", "XX40001", "40001")));
 
+        var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
-            ctx, applicator.Object, Assembler(), NullLogger<AddTableBillPaymentCommandHandler>.Instance);
+            ctx, applicator.Object, assembler, new TableBillPaymentOperationReplayResolver(ctx, assembler),
+            NullLogger<AddTableBillPaymentCommandHandler>.Instance);
         var response = await handler.Handle(
-            new AddTableBillPaymentCommand { TableNumber = 12, Amount = 10m, PaymentMethod = PaymentMethod.Cash },
+            new AddTableBillPaymentCommand
+            {
+                TableNumber = 12,
+                OperationId = Guid.NewGuid(),
+                Amount = 10m,
+                PaymentMethod = PaymentMethod.Cash
+            },
             CancellationToken.None);
 
         response.Success.Should().BeFalse();

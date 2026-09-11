@@ -34,6 +34,7 @@ public record OrderPaymentTender
     /// Guid per cashier action; null on the table-bill flow, whose idempotency is a
     /// deliberate follow-up. Null never replays and never collides.</summary>
     public Guid? OperationId { get; init; }
+    public Guid? TableBillPaymentOperationId { get; init; }
 }
 
 public record PaymentApplicationResult(

@@ -96,6 +96,7 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
                 Amount = tender.Amount, // Allow overpayment - it will be flagged in payment status
                 Status = PaymentStatus.Pending,
                 OperationId = tender.OperationId,
+                TableBillPaymentOperationId = tender.TableBillPaymentOperationId,
                 TransactionId = tender.TransactionId,
                 ReferenceNumber = tender.ReferenceNumber,
                 CardLastFourDigits = tender.CardLastFourDigits,
