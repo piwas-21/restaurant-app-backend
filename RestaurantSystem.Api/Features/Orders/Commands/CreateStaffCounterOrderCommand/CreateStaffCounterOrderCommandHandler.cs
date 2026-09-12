@@ -20,7 +20,7 @@ public sealed class CreateStaffCounterOrderCommandHandler
     private readonly ICurrentUserService _currentUser;
     private readonly IStaffCounterOrderBuilder _builder;
     private readonly IStaffOrderOperationStore _operations;
-    private readonly IOrderMappingService _mapping;
+    private readonly IOrderResponseProjector _responses;
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderNotificationService _notifications;
     private readonly IOrderTableReservationService _tableReservation;
@@ -30,14 +30,14 @@ public sealed class CreateStaffCounterOrderCommandHandler
     public CreateStaffCounterOrderCommandHandler(
         ApplicationDbContext context, ICurrentUserService currentUser,
         IStaffCounterOrderBuilder builder, IStaffOrderOperationStore operations,
-        IOrderMappingService mapping, IOrderFidelityCoordinator fidelity,
+        IOrderResponseProjector responses, IOrderFidelityCoordinator fidelity,
         IOrderNotificationService notifications, IOrderTableReservationService tableReservation)
     {
         _context = context;
         _currentUser = currentUser;
         _builder = builder;
         _operations = operations;
-        _mapping = mapping;
+        _responses = responses;
         _fidelity = fidelity;
         _notifications = notifications;
         _tableReservation = tableReservation;
@@ -123,14 +123,14 @@ public sealed class CreateStaffCounterOrderCommandHandler
             return ApiResponse<OrderDto>.Failure("The original counter order could not be found.");
         }
 
-        var dto = await _mapping.MapToOrderDtoAsync(replay.Order, cancellationToken);
+        var dto = await _responses.ProjectAsync(replay.Order, cancellationToken);
         return ApiResponse<OrderDto>.SuccessWithData(dto, "Counter order already created");
     }
 
     private async Task<ApiResponse<OrderDto>> PublishAsync(
         Order order, string message, CancellationToken cancellationToken)
     {
-        var dto = await _mapping.MapToOrderDtoAsync(order, cancellationToken);
+        var dto = await _responses.ProjectAsync(order, cancellationToken);
         if (order.IsKitchenReleased)
         {
             await _notifications.NotifyOrderCreatedAsync(dto);

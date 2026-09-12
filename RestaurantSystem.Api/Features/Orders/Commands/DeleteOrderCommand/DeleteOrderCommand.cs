@@ -6,7 +6,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.DeleteOrderCommand;
 
-public record DeleteOrderCommand(Guid OrderId) : ICommand<ApiResponse<bool>>;
+public record DeleteOrderCommand(Guid OrderId) : ICommand<ApiResponse<bool>>
+{
+    /// <summary>Optional detail version; older administrative clients may omit it.</summary>
+    public int? ExpectedVersion { get; init; }
+}
 
 public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, ApiResponse<bool>>
 {
@@ -26,24 +30,57 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
 
     public async Task<ApiResponse<bool>> Handle(DeleteOrderCommand command, CancellationToken cancellationToken)
     {
-        // 1. Delete associated TableReservations first to avoid FK constraint violation
-        // strict FK "fk_table_reservations_orders_order_id" prevents deleting order otherwise
-        // Use IgnoreQueryFilters to ensure we catch ALL linked reservations, even soft-deleted ones
-        await _context.TableReservations
-            .IgnoreQueryFilters()
-            .Where(tr => tr.OrderId == command.OrderId)
-            .ExecuteDeleteAsync(cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-        // 2. Hard delete the order using ExecuteDeleteAsync for efficiency
-        // This will cascade delete related entities (Items, Payments, etc.) due to DB configuration
-        var rowsDeleted = await _context.Orders
-            .Where(o => o.Id == command.OrderId)
-            .ExecuteDeleteAsync(cancellationToken);
+        var order = await _context.Orders
+            .Where(order => order.Id == command.OrderId)
+            .Select(order => new { order.Version })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (rowsDeleted == 0)
+        if (order is null)
         {
+            await transaction.RollbackAsync(cancellationToken);
             return ApiResponse<bool>.Failure("Order not found");
         }
+
+        if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ApiResponse<bool>.FailureWithCode(
+                "The order changed. Refresh it before deleting.",
+                ErrorCodes.OrderVersionConflict);
+        }
+
+        // Delete associated TableReservations first to avoid the restrict FK. Keep this in the
+        // same transaction as the conditional order delete so a stale version cannot remove a
+        // reservation before discovering that the order changed.
+        await _context.TableReservations
+            // soft-delete-bypass: permanent order purge must also remove linked reservations,
+            // including already soft-deleted rows hidden by the global filter, before the restrict FK.
+            .IgnoreQueryFilters()
+            .Where(reservation => reservation.OrderId == command.OrderId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        var orderQuery = _context.Orders.Where(current => current.Id == command.OrderId);
+        if (command.ExpectedVersion.HasValue)
+        {
+            orderQuery = orderQuery.Where(current => current.Version == command.ExpectedVersion.Value);
+        }
+
+        var rowsDeleted = await orderQuery.ExecuteDeleteAsync(cancellationToken);
+        if (rowsDeleted == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            var stillExists = await _context.Orders
+                .AnyAsync(current => current.Id == command.OrderId, cancellationToken);
+            return stillExists && command.ExpectedVersion.HasValue
+                ? ApiResponse<bool>.FailureWithCode(
+                    "The order changed. Refresh it before deleting.",
+                    ErrorCodes.OrderVersionConflict)
+                : ApiResponse<bool>.Failure("Order not found");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
 
         _logger.LogInformation(
             "Order with ID {OrderId} permanently deleted by user {UserId}",

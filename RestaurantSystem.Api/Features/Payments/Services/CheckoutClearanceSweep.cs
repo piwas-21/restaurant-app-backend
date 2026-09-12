@@ -243,17 +243,47 @@ public class CheckoutClearanceSweep : ICheckoutClearanceSweep
     {
         var now = DateTime.UtcNow;
         var auditId = _currentUser.GetAuditIdentifier();
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var orderId = await _context.OrderCheckoutSessions
+            .AsNoTracking()
+            .Where(session => session.Id == sessionId && session.ReconciledAt == null)
+            .Select(session => (Guid?)session.OrderId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (!orderId.HasValue)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return;
+        }
 
-        await _context.OrderCheckoutSessions
-            .Where(s => s.Id == sessionId)
+        var claimed = await _context.OrderCheckoutSessions
+            .Where(session => session.Id == sessionId && session.ReconciledAt == null)
             .ExecuteUpdateAsync(
-                s => s
-                    .SetProperty(x => x.ReconciledAt, now)
-                    .SetProperty(x => x.LastError, x => error ?? x.LastError)
-                    // ExecuteUpdate bypasses the change tracker, so the IAuditable stamper never
-                    // runs — the same hand-stamping every other write to this table does.
-                    .SetProperty(x => x.UpdatedAt, now)
-                    .SetProperty(x => x.UpdatedBy, auditId),
+                setters => setters
+                    .SetProperty(session => session.ReconciledAt, now)
+                    .SetProperty(session => session.LastError, session => error ?? session.LastError)
+                    .SetProperty(session => session.UpdatedAt, now)
+                    .SetProperty(session => session.UpdatedBy, auditId),
                 cancellationToken);
+        if (claimed == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return;
+        }
+
+        var bumped = await _context.Orders
+            .Where(order => order.Id == orderId.Value)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(order => order.Version, order => order.Version + 1)
+                    .SetProperty(order => order.UpdatedAt, now)
+                    .SetProperty(order => order.UpdatedBy, auditId),
+                cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        // A previous reversal may have left a tracked owner stale after this set-based bump.
+        if (bumped > 0)
+        {
+            _context.ChangeTracker.Clear();
+        }
     }
 }

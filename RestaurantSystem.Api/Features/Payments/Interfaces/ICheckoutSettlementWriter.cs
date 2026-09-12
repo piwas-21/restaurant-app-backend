@@ -37,4 +37,7 @@ public interface ICheckoutSettlementWriter
         string? paymentIntentId,
         long? amountReceivedMinor,
         CancellationToken cancellationToken);
+
+    /// <summary>Describes the current order state without changing the settlement.</summary>
+    Task<CheckoutSettlementDto> DescribeAsync(Guid orderId, CancellationToken cancellationToken);
 }

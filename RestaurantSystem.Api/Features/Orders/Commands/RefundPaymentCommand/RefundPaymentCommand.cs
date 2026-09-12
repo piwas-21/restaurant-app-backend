@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.RefundPaymentCommand;
@@ -13,6 +14,10 @@ public record RefundPaymentCommand : ICommand<ApiResponse<OrderPaymentDto>>
 {
     public Guid OrderId { get; set; }
     public Guid PaymentId { get; set; }
+
+    /// <summary>Optional detail version; old clients may omit it.</summary>
+    public int? ExpectedVersion { get; set; }
+
     public decimal RefundAmount { get; set; }
     public string RefundReason { get; set; } = null!;
 }
@@ -44,6 +49,13 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure("Order not found");
         }
 
+        if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
+        {
+            return ApiResponse<OrderPaymentDto>.FailureWithCode(
+                "The order changed. Refresh it before refunding the payment.",
+                ErrorCodes.OrderVersionConflict);
+        }
+
         var payment = order.Payments.FirstOrDefault(p => p.Id == command.PaymentId);
         if (payment == null)
         {
@@ -55,19 +67,43 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure("Can only refund completed payments");
         }
 
-        // Before anything is written. Every check below this line assumes the refund is ours to
-        // make; this one asks whether the money is even here. See TenderCustody — the platform's
-        // Stripe key has no refunds write by design, so "book it and move on" would put a returned
-        // amount in the ledger, the Z-report and the order, against a charge still sitting at
-        // Stripe. Refusing is the honest answer, and it is deliberately NOT overridable: an admin
-        // who could force it through would be re-creating the same false record by hand.
+        var validationFailure = ValidatePaymentRefund(payment, command);
+        if (validationFailure is not null)
+        {
+            return validationFailure;
+        }
+
+        ApplyRefund(payment, command);
+        UpdateOrderPaymentSummary(order);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ApiResponse<OrderPaymentDto>.FailureWithCode(
+                "The order changed. Refresh it before refunding the payment.",
+                ErrorCodes.OrderVersionConflict);
+        }
+
+        var paymentDto = CreatePaymentDto(payment);
+
+        _logger.LogInformation("Payment {PaymentId} refunded for amount {RefundAmount} by user {UserId}",
+            payment.Id, command.RefundAmount, _currentUserService.UserId);
+
+        return ApiResponse<OrderPaymentDto>.SuccessWithData(paymentDto, "Payment refunded successfully");
+    }
+
+    private ApiResponse<OrderPaymentDto>? ValidatePaymentRefund(
+        OrderPayment payment, RefundPaymentCommand command)
+    {
         if (TenderCustody.IsHeldByGateway(payment))
         {
             _logger.LogWarning(
                 "Refund refused on order {OrderId} payment {PaymentId}: captured by {Gateway} "
                 + "(transaction {TransactionId}), which only that gateway can reverse",
                 command.OrderId, command.PaymentId, payment.PaymentGateway, payment.TransactionId);
-
             return ApiResponse<OrderPaymentDto>.Failure(TenderCustody.RefusalMessage(payment));
         }
 
@@ -76,35 +112,32 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure("Payment has already been refunded");
         }
 
-        if (command.RefundAmount > payment.Amount)
-        {
-            return ApiResponse<OrderPaymentDto>.Failure($"Refund amount cannot exceed payment amount of {payment.Amount}");
-        }
+        return command.RefundAmount > payment.Amount
+            ? ApiResponse<OrderPaymentDto>.Failure(
+                $"Refund amount cannot exceed payment amount of {payment.Amount}")
+            : null;
+    }
 
-        // Everything past the custody check is a TILL refund: the money is in the restaurant's own
-        // drawer or on its own terminal, a human hands it back, and this records that it happened.
-        // (A deferred-work comment promising a gateway call used to sit here. It was not a missing
-        // feature but a wrong premise — the guard above is the answer, and calling a gateway from a
-        // tenant box is exactly what §4's credential design refuses to allow. Worded without the
-        // marker word on purpose: S1135 matches it inside prose, so describing a removed marker
-        // re-raises the very issue the removal closed.)
+    private void ApplyRefund(OrderPayment payment, RefundPaymentCommand command)
+    {
         payment.IsRefunded = command.RefundAmount == payment.Amount;
         payment.RefundedAmount = command.RefundAmount;
         payment.RefundDate = DateTime.UtcNow;
         payment.RefundReason = command.RefundReason;
-        payment.Status = command.RefundAmount == payment.Amount ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded;
+        payment.Status = command.RefundAmount == payment.Amount
+            ? PaymentStatus.Refunded
+            : PaymentStatus.PartiallyRefunded;
         payment.UpdatedAt = DateTime.UtcNow;
         payment.UpdatedBy = _currentUserService.GetAuditIdentifier();
+    }
 
-        // Update order payment summary. The gross sum spans every CAPTURED
-        // tender, not just Completed ones — a payment we just refunded is no
-        // longer Completed, and summing only Completed would subtract its
-        // refund without ever having added the payment.
+    private void UpdateOrderPaymentSummary(Order order)
+    {
         order.TotalPaid = order.Payments.Where(p => p.Status.IsCaptured()).Sum(p => p.Amount)
-                          - order.Payments.Where(p => p.RefundedAmount.HasValue).Sum(p => p.RefundedAmount ?? 0);
+                          - order.Payments.Where(p => p.RefundedAmount.HasValue)
+                              .Sum(p => p.RefundedAmount ?? 0);
         order.RemainingAmount = order.Total - order.TotalPaid;
 
-        // Update order payment status with tolerance for floating point precision
         const decimal tolerance = 0.01m;
         if (order.Payments.All(p => p.Status == PaymentStatus.Refunded))
         {
@@ -120,38 +153,30 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         }
         else
         {
-            // Within tolerance of zero - fully paid
             order.PaymentStatus = PaymentStatus.Completed;
         }
 
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        var paymentDto = new OrderPaymentDto
-        {
-            Id = payment.Id,
-            OrderId = payment.OrderId,
-            PaymentMethod = payment.PaymentMethod.ToString(),
-            Amount = payment.Amount,
-            Status = payment.Status.ToString(),
-            TransactionId = payment.TransactionId,
-            ReferenceNumber = payment.ReferenceNumber,
-            PaymentDate = payment.PaymentDate,
-            CardLastFourDigits = payment.CardLastFourDigits,
-            CardType = payment.CardType,
-            PaymentGateway = payment.PaymentGateway,
-            PaymentNotes = payment.PaymentNotes,
-            IsRefunded = payment.IsRefunded,
-            RefundedAmount = payment.RefundedAmount,
-            RefundDate = payment.RefundDate,
-            RefundReason = payment.RefundReason
-        };
-
-        _logger.LogInformation("Payment {PaymentId} refunded for amount {RefundAmount} by user {UserId}",
-            payment.Id, command.RefundAmount, _currentUserService.UserId);
-
-        return ApiResponse<OrderPaymentDto>.SuccessWithData(paymentDto, "Payment refunded successfully");
     }
+
+    private static OrderPaymentDto CreatePaymentDto(OrderPayment payment) => new()
+    {
+        Id = payment.Id,
+        OrderId = payment.OrderId,
+        PaymentMethod = payment.PaymentMethod.ToString(),
+        Amount = payment.Amount,
+        Status = payment.Status.ToString(),
+        TransactionId = payment.TransactionId,
+        ReferenceNumber = payment.ReferenceNumber,
+        PaymentDate = payment.PaymentDate,
+        CardLastFourDigits = payment.CardLastFourDigits,
+        CardType = payment.CardType,
+        PaymentGateway = payment.PaymentGateway,
+        PaymentNotes = payment.PaymentNotes,
+        IsRefunded = payment.IsRefunded,
+        RefundedAmount = payment.RefundedAmount,
+        RefundDate = payment.RefundDate,
+        RefundReason = payment.RefundReason
+    };
 }

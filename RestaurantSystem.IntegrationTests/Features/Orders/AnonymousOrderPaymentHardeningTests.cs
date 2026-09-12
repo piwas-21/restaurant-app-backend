@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
@@ -253,20 +254,11 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// The diner abandons Stripe and pays cash instead — the single likeliest way an online payment
-    /// ends in a restaurant.
+    /// Cash must not be recorded while a Stripe tender can still settle. Staff reconcile or retire
+    /// that attempt first; otherwise the later Stripe completion would double-charge the order.
     /// </summary>
-    /// <remarks>
-    /// The order must still be confirmable. <c>UpdateOrderStatusCommand</c> refuses <c>Confirmed</c>
-    /// while a tender is <c>Processing</c>, and <c>AddPaymentToOrder</c> sweeps only <c>Pending</c>
-    /// tenders — so the abandoned online tender outlives the cash payment that replaced it. Without
-    /// something retiring it, a fully-paid order is stuck: <c>Pending</c> leads only to
-    /// <c>Confirmed</c>, <c>Cancelled</c> or <c>PendingApproval</c>, and <c>PendingApproval</c> only
-    /// back to the first two — so Confirm is blocked forever and Cancel is the only move left on an
-    /// order the restaurant has already been paid for.
-    /// </remarks>
     [Fact]
-    public async Task An_abandoned_online_order_paid_in_cash_can_still_be_confirmed()
+    public async Task Processing_online_tender_blocks_cash_and_confirmation_until_reconciled()
     {
         AuthenticateAsAnonymous();
         var created = await PostAsJsonAsync("/api/orders", NewOrder(
@@ -277,7 +269,14 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         using (var scope = Factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
+            var pendingOrder = await context.Orders
+                .Include(value => value.Payments)
+                .AsNoTracking()
+                .SingleAsync();
+            orderId = pendingOrder.Id;
+            pendingOrder.Payments.Should().ContainSingle(payment =>
+                payment.PaymentMethod == PaymentMethod.OnlinePayment
+                && payment.Status == PaymentStatus.Processing);
         }
 
         AuthenticateAsAdmin();
@@ -288,32 +287,27 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
             amount = 12.99m
         });
         paid.StatusCode.Should().Be(HttpStatusCode.OK);
+        var paymentBody = await ReadResponseAsync<ApiResponse<OrderDto>>(paid);
+        paymentBody!.Success.Should().BeFalse();
+        paymentBody.Errors.Should().ContainSingle(error => error.Contains("Cannot add payment"));
 
         var confirmed = await PutAsJsonAsync($"/api/Orders/{orderId}/status", new
         {
             orderId,
             newStatus = nameof(OrderStatus.Confirmed)
         });
-
         confirmed.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await confirmed.Content.ReadAsStringAsync())
-            .Should().NotContain("awaiting an online payment",
-                "the money is in — the guard exists to stop confirming an UNPAID order");
+        var confirmationBody = await ReadResponseAsync<ApiResponse<OrderDto>>(confirmed);
+        confirmationBody!.Success.Should().BeFalse();
+        confirmationBody.Errors.Should().ContainSingle(error => error.Contains("awaiting an online payment"));
 
         using var after = Factory.Services.CreateScope();
         var afterContext = after.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var order = await afterContext.Orders.AsNoTracking().SingleAsync();
-
-        order.PaymentStatus.Should().Be(PaymentStatus.Completed);
-        order.Status.Should().Be(OrderStatus.Confirmed, "a paid order must be able to reach the kitchen");
+        order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+        order.Status.Should().Be(OrderStatus.Pending);
     }
 
-    /// <summary>
-    /// The five gateway fields are gone from <c>CreateOrderPaymentDto</c> rather than merely ignored,
-    /// so a body carrying them binds without them. Asserted against the persisted row, because
-    /// "the DTO no longer has the property" is a fact about the source, not about what got written —
-    /// a permissive binder or a re-added property would break this and nothing else.
-    /// </summary>
     [Fact]
     public async Task Gateway_metadata_in_the_request_body_never_reaches_the_ledger()
     {

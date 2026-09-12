@@ -104,6 +104,12 @@ public class StripeCheckoutClient : IStripeCheckoutClient
         return Map(session);
     }
 
+    public async Task ExpireAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        await new SessionService(_gateway.Client)
+            .ExpireAsync(sessionId, options: null, _gateway.BuildRequestOptions(), cancellationToken);
+    }
+
     public async Task<StripeCheckoutSession?> GetAsync(string sessionId, CancellationToken cancellationToken)
     {
         try

@@ -31,6 +31,11 @@ public static class OrderSettlementEligibility
     private static readonly Expression<Func<Order, bool>> OutstandingBalancePredicate = order =>
         order.TotalPaid < order.Total - PaymentTolerance;
 
+    private static readonly Expression<Func<Order, bool>> NoProcessingOnlineTenderPredicate = order =>
+        !order.Payments.Any(payment =>
+            payment.PaymentMethod == PaymentMethod.OnlinePayment
+            && payment.Status == PaymentStatus.Processing);
+
     private static readonly Expression<Func<Order, bool>> CanCollectPredicate =
         BuildCanCollectPredicate();
 
@@ -38,6 +43,8 @@ public static class OrderSettlementEligibility
         BuildOperationalQueuePredicate();
 
     private static readonly Func<Order, bool> CanCollectEvaluator = CanCollectPredicate.Compile();
+    private static readonly Func<Order, bool> TerminalReversalEvaluator = TerminalReversalPredicate.Compile();
+
 
     /// <summary>
     /// True only when the order has an outstanding balance and no terminal reversal state.
@@ -46,6 +53,13 @@ public static class OrderSettlementEligibility
     {
         ArgumentNullException.ThrowIfNull(order);
         return CanCollectEvaluator(order);
+    }
+
+    /// <summary>True when fulfilment or payment has entered a terminal reversal state.</summary>
+    public static bool IsTerminalReversal(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return TerminalReversalEvaluator(order);
     }
 
     /// <summary>
@@ -64,9 +78,12 @@ public static class OrderSettlementEligibility
         var parameter = Expression.Parameter(typeof(Order), "order");
         var terminalReversal = ReplaceParameter(TerminalReversalPredicate, parameter);
         var outstandingBalance = ReplaceParameter(OutstandingBalancePredicate, parameter);
+        var noProcessingOnlineTender = ReplaceParameter(NoProcessingOnlineTenderPredicate, parameter);
 
         return Expression.Lambda<Func<Order, bool>>(
-            Expression.AndAlso(Expression.Not(terminalReversal), outstandingBalance),
+            Expression.AndAlso(
+                Expression.AndAlso(Expression.Not(terminalReversal), outstandingBalance),
+                noProcessingOnlineTender),
             parameter);
     }
 

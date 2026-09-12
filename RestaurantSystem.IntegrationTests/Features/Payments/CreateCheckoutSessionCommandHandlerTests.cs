@@ -443,7 +443,13 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             checkout.Object,
             // The REAL reuse service, not a stub. It is what stands between a diner and paying
             // twice, so faking it here would delete the property most of these tests exist for.
-            new CheckoutSessionReuse(ctx, checkout.Object),
+            new CheckoutSessionReuse(
+                ctx,
+                checkout.Object,
+                new CheckoutSessionRetirement(
+                    ctx,
+                    currentUser.Object,
+                    NullLogger<CheckoutSessionRetirement>.Instance)),
             currentUser.Object,
             // The REAL resolver, not a stub — same reasoning as CheckoutSessionReuse below it. It is
             // what turns order.Total into the amount AND the fee, so faking it would delete the

@@ -185,6 +185,10 @@ public static class ErrorCodes
     public const string StaffOrderOperationPayloadMismatch = "StaffOrderOperationPayloadMismatch";
     public const string StaffOrderOperationIdReused = "StaffOrderOperationIdReused";
     public const string StaffOrderVersionConflict = "StaffOrderVersionConflict";
+
+    /// <summary>Returned when an order changed after a caller read its version token.</summary>
+    public const string OrderVersionConflict = "OrderVersionConflict";
+    public const string KitchenReleaseRequired = "KitchenReleaseRequired";
 }
 
 

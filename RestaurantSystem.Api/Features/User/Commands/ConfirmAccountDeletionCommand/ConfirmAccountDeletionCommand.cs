@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace RestaurantSystem.Api.Features.User.Commands.ConfirmAccountDeletionCommand;
 
@@ -13,15 +14,18 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _context;
+    private readonly IRetainedCustomerDataScrubber _retainedDataScrubber;
     private readonly ILogger<ConfirmAccountDeletionCommandHandler> _logger;
 
     public ConfirmAccountDeletionCommandHandler(
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext context,
+        IRetainedCustomerDataScrubber retainedDataScrubber,
         ILogger<ConfirmAccountDeletionCommandHandler> logger)
     {
         _userManager = userManager;
         _context = context;
+        _retainedDataScrubber = retainedDataScrubber;
         _logger = logger;
     }
 
@@ -40,6 +44,7 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
         }
 
         // --- Cleanup dependent entities before deleting user ---
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
             // 1. Delete Baskets (Soft Delete or Hard Delete depending on strategy - using Hard as baskets are transient)
@@ -71,20 +76,12 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
                 .Where(g => g.UserId == user.Id)
                 .ExecuteDeleteAsync(cancellationToken);
 
-            // 6. Anonymize Orders (Set UserId to null)
-            // CRITICAL: INCLUDE Soft-deleted orders to avoid FK violations
-            await _context.Orders
-                .IgnoreQueryFilters()
-                .Where(o => o.UserId == user.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(o => o.UserId, (Guid?)null), cancellationToken);
+            await _retainedDataScrubber.ScrubAsync(user.Id, cancellationToken);
 
-            // 7. Anonymize Reservations (Set CustomerId to null)
-            await _context.Reservations
-                .Where(r => r.CustomerId == user.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.CustomerId, (Guid?)null), cancellationToken);
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(cancellationToken);
             _logger.LogError(ex, "Error cleaning up dependent entities for user {UserId}", user.Id);
             return ApiResponse<string>.Failure("An error occurred while cleaning up user data.");
         }
@@ -109,10 +106,12 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
 
         if (deleted == 0)
         {
+            await transaction.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to delete user {UserId}: no row was removed", user.Id);
             return ApiResponse<string>.Failure("Failed to delete account.");
         }
 
+        await transaction.CommitAsync(cancellationToken);
         _logger.LogInformation("User {UserId} permanently deleted via confirmation token", user.Id);
 
         return ApiResponse<string>.SuccessWithData("Account permanently deleted");

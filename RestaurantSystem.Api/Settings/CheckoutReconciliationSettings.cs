@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace RestaurantSystem.Api.Settings;
 
 /// <summary>
@@ -29,4 +31,8 @@ public class CheckoutReconciliationSettings
     /// drains over the following sweeps instead.
     /// </summary>
     public int BatchSize { get; set; } = 100;
+
+    /// <summary>Bounded retries when a paid checkout races another order mutation.</summary>
+    [Range(1, 5)]
+    public int SettlementMaxAttempts { get; set; } = 2;
 }

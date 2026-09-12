@@ -15,6 +15,9 @@ public enum OrderPaymentApplicationOutcome
     /// method or amount — a retried operation may not change its own payload (#523).</summary>
     OperationPayloadMismatch,
 
+    /// <summary>The order changed while this tender was being recorded.</summary>
+    VersionConflict,
+
     /// <summary>The operation id already banked a tender on a DIFFERENT order — a client
     /// bug (one Guid per cashier action), refused before the unique index has to.</summary>
     OperationIdReused,
@@ -36,6 +39,9 @@ public record OrderPaymentTender
     /// deliberate follow-up. Null never replays and never collides.</summary>
     public Guid? OperationId { get; init; }
     public Guid? TableBillPaymentOperationId { get; init; }
+
+    /// <summary>Optional order version for conditional till writes.</summary>
+    public int? ExpectedVersion { get; init; }
 }
 
 public record PaymentApplicationResult(
@@ -52,6 +58,9 @@ public record PaymentApplicationResult(
         new(OrderPaymentApplicationOutcome.Applied, order, IsIdempotentReplay: true);
 
     public static PaymentApplicationResult Failed(OrderPaymentApplicationOutcome outcome) => new(outcome, null);
+
+    public static PaymentApplicationResult VersionConflict() =>
+        Failed(OrderPaymentApplicationOutcome.VersionConflict);
 
     /// <summary>The order exists but is Cancelled/Completed — carries that status for the user-facing message.</summary>
     public static PaymentApplicationResult NotPayable(string status) =>

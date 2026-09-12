@@ -306,8 +306,24 @@ namespace RestaurantSystem.Infrastructure.Persistence
         /// </remarks>
         private void ApplyAuditInformation()
         {
+            ChangeTracker.DetectChanges();
+
             var now = DateTime.UtcNow;
             var userId = _auditIdentity?.GetAuditIdentifier() ?? "System";
+            var orderEntries = ChangeTracker.Entries<Order>()
+                .Where(entry => entry.Entity.Id != Guid.Empty)
+                .ToDictionary(entry => entry.Entity.Id);
+            var orderItemEntries = ChangeTracker.Entries<OrderItem>()
+                .Where(entry => entry.Entity.Id != Guid.Empty)
+                .ToDictionary(entry => entry.Entity.Id, entry => entry.Entity.OrderId);
+            AddPersistedOrderItemOwners(orderItemEntries);
+            AddPersistedOrderOwners(orderEntries, orderItemEntries);
+
+            // An order detail is an aggregate read: a tender, status-history row, note, line, or
+            // delivery snapshot changes what that read means even when the Order row itself was
+            // not otherwise assigned. Touch the tracked owner before stamping so the one UPDATE
+            // carries both the audit columns and the optimistic-concurrency version.
+            TouchOrderOwners(orderEntries, orderItemEntries);
 
             foreach (var entry in ChangeTracker.Entries<IAuditable>())
             {
@@ -330,6 +346,156 @@ namespace RestaurantSystem.Infrastructure.Persistence
                     ConvertDeleteToSoftDelete(entry, now, userId);
                 }
             }
+        }
+
+        /// <summary>
+        /// Promotes a tracked order to Modified when a directly-owned detail row changed. Set-based
+        /// updates cannot reach this hook and must bump the order explicitly at their call site.
+        /// </summary>
+        private void AddPersistedOrderItemOwners(Dictionary<Guid, Guid> orderItemEntries)
+        {
+            var missingItemIds = ChangeTracker.Entries<OrderItemIngredient>()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .Select(entry => entry.Entity.OrderItemId)
+                .Where(itemId => !orderItemEntries.ContainsKey(itemId))
+                .Distinct()
+                .ToArray();
+
+            if (missingItemIds.Length == 0)
+            {
+                return;
+            }
+
+            foreach (var owner in OrderItems
+                .Where(item => missingItemIds.Contains(item.Id))
+                .Select(item => new { item.Id, item.OrderId })
+                .ToList())
+            {
+                orderItemEntries[owner.Id] = owner.OrderId;
+            }
+        }
+
+        private void AddPersistedOrderOwners(
+            Dictionary<Guid, EntityEntry<Order>> orderEntries,
+            Dictionary<Guid, Guid> orderItemEntries)
+        {
+            var changedOrderIds = ChangeTracker.Entries()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .Select(entry => entry.Entity switch
+                {
+                    OrderPayment payment => payment.OrderId,
+                    OrderOperationalNote note => note.OrderId,
+                    OrderStatusHistory history => history.OrderId,
+                    OrderCheckoutSession session => session.OrderId,
+                    FidelityPointsTransaction points => points.OrderId ?? Guid.Empty,
+                    OrderAddress address => address.OrderId,
+                    OrderItem item => item.OrderId,
+                    OrderItemIngredient ingredient when orderItemEntries.TryGetValue(
+                        ingredient.OrderItemId, out var ownerId) => ownerId,
+                    _ => OwnedOrderId(entry),
+                })
+                .Where(orderId => orderId != Guid.Empty && !orderEntries.ContainsKey(orderId))
+                .Distinct()
+                .ToArray();
+
+            foreach (var order in Orders
+                .Where(value => changedOrderIds.Contains(value.Id)).ToList())
+            {
+                orderEntries[order.Id] = Entry(order);
+            }
+        }
+
+        private static Guid OwnedOrderId(EntityEntry entry)
+        {
+            var ownership = entry.Metadata.FindOwnership();
+            if (ownership?.PrincipalEntityType.ClrType != typeof(Order))
+            {
+                return Guid.Empty;
+            }
+
+            var key = ownership.Properties.SingleOrDefault();
+            return key is not null && entry.Property(key.Name).CurrentValue is Guid orderId
+                ? orderId
+                : Guid.Empty;
+        }
+
+        private void TouchOrderOwners(
+            IReadOnlyDictionary<Guid, EntityEntry<Order>> orderEntries,
+            Dictionary<Guid, Guid> orderItemEntries)
+        {
+            TouchDirectOrderOwners<OrderPayment>(payment => payment.OrderId, orderEntries);
+            TouchDirectOrderOwners<OrderOperationalNote>(note => note.OrderId, orderEntries);
+            TouchDirectOrderOwners<OrderStatusHistory>(history => history.OrderId, orderEntries);
+            TouchDirectOrderOwners<OrderCheckoutSession>(session => session.OrderId, orderEntries);
+            TouchDirectOrderOwners<FidelityPointsTransaction>(points => points.OrderId, orderEntries);
+            TouchDirectOrderOwners<OrderAddress>(address => address.OrderId, orderEntries);
+            TouchDirectOrderOwners<OrderItem>(item => item.OrderId, orderEntries);
+            TouchOrderItemIngredientOwners(orderEntries, orderItemEntries);
+            TouchOwnedOrderOwners(orderEntries);
+        }
+
+        private void TouchDirectOrderOwners<TEntity>(
+            Func<TEntity, Guid?> orderIdSelector,
+            IReadOnlyDictionary<Guid, EntityEntry<Order>> orderEntries)
+            where TEntity : class
+        {
+            foreach (var entry in ChangeTracker.Entries<TEntity>().ToArray())
+            {
+                if (orderIdSelector(entry.Entity) is Guid orderId)
+                {
+                    TouchOrderOwner(orderId, orderEntries, entry.State);
+                }
+            }
+        }
+
+        // Ingredient snapshots point at their line rather than directly at the order. The line
+        // map is built from the same tracked graph, so editing a snapshot cannot silently leave
+        // the detail version unchanged.
+        private void TouchOrderItemIngredientOwners(
+            IReadOnlyDictionary<Guid, EntityEntry<Order>> orderEntries,
+            Dictionary<Guid, Guid> orderItemEntries)
+        {
+            foreach (var entry in ChangeTracker.Entries<OrderItemIngredient>().ToArray())
+            {
+                if (orderItemEntries.TryGetValue(entry.Entity.OrderItemId, out var orderId))
+                {
+                    TouchOrderOwner(orderId, orderEntries, entry.State);
+                }
+            }
+        }
+
+        // OrderFocus is an optional owned row stored in the orders table and therefore has no
+        // OrderId CLR property. Its ownership key is the owner's key, which lets this cover a
+        // direct focus edit as well as the command that replaces the owned value.
+        private void TouchOwnedOrderOwners(
+            IReadOnlyDictionary<Guid, EntityEntry<Order>> orderEntries)
+        {
+            foreach (var entry in ChangeTracker.Entries()
+                .Where(entry => entry.Metadata.FindOwnership()?.PrincipalEntityType.ClrType == typeof(Order))
+                .ToArray())
+            {
+                var ownership = entry.Metadata.FindOwnership();
+                var key = ownership?.Properties.SingleOrDefault();
+                var value = key is null ? null : entry.Property(key.Name).CurrentValue;
+                if (value is Guid orderId)
+                {
+                    TouchOrderOwner(orderId, orderEntries, entry.State);
+                }
+            }
+        }
+
+        private static void TouchOrderOwner(
+            Guid orderId,
+            IReadOnlyDictionary<Guid, EntityEntry<Order>> orderEntries,
+            EntityState childState)
+        {
+            if (orderId == Guid.Empty || childState is not (EntityState.Added or EntityState.Modified or EntityState.Deleted) ||
+                !orderEntries.TryGetValue(orderId, out var owner) || owner.State != EntityState.Unchanged)
+            {
+                return;
+            }
+
+            owner.State = EntityState.Modified;
         }
 
         /// <remarks>
@@ -356,10 +522,25 @@ namespace RestaurantSystem.Infrastructure.Persistence
             {
                 entry.Entity.CreatedBy = userId;
             }
+
+            // Historical rows receive 1 from the migration, while new objects should be safe even
+            // when a caller bypasses the CLR initializer.
+            if (entry.Entity is Order order && order.Version <= 0)
+            {
+                order.Version = 1;
+            }
         }
 
         private static void StampUpdate(EntityEntry<IAuditable> entry, DateTime now, string userId)
         {
+            if (entry.Entity is Order order)
+            {
+                // Version is application-managed so every tracked order mutation, not only the POS
+                // handlers, invalidates a detail snapshot. EF includes the original value in the
+                // UPDATE predicate because OrderConfiguration marks it as a concurrency token.
+                order.Version++;
+            }
+
             if (!IsSetInThisSave(entry, nameof(IAuditable.UpdatedAt)))
             {
                 entry.Entity.UpdatedAt = now;
@@ -390,6 +571,11 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
             entry.State = EntityState.Modified;
             entry.Entity.IsDeleted = true;
+
+            if (entry.Entity is Order order)
+            {
+                order.Version++;
+            }
 
             if (!deletedAtWasSet)
             {
