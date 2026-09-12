@@ -22,15 +22,18 @@ public static class PostgresConcurrencyAborts
     /// <c>SqlState</c> is handed back for the log.</summary>
     public static bool IsMatch(Exception ex, out string sqlState)
     {
-        var pg = ex switch
+        for (var current = ex; current is not null; current = current.InnerException)
         {
-            PostgresException direct => direct,
-            DbUpdateException { InnerException: PostgresException wrapped } => wrapped,
-            _ => null,
-        };
+            if (current is not PostgresException postgres)
+            {
+                continue;
+            }
 
-        sqlState = pg?.SqlState ?? "";
-        return pg is not null
-            && (sqlState is SerializationFailure or Deadlock or AbortedTransaction);
+            sqlState = postgres.SqlState;
+            return sqlState is SerializationFailure or Deadlock or AbortedTransaction;
+        }
+
+        sqlState = string.Empty;
+        return false;
     }
 }

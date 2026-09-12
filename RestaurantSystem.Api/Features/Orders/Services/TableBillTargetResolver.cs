@@ -11,6 +11,10 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// </summary>
 public sealed class TableBillTargetResolver : ITableBillTargetResolver
 {
+    /// <summary>Stable wording for an ambiguous table visit, including legacy unassigned orders.</summary>
+    public const string AmbiguousMessage =
+        "The table has more than one possible service visit; use the explicit service session id.";
+
     private readonly ApplicationDbContext _context;
 
     public TableBillTargetResolver(ApplicationDbContext context) => _context = context;
@@ -68,7 +72,6 @@ public sealed class TableBillTargetResolver : ITableBillTargetResolver
         return new TableBillTarget(null, false);
     }
 
-    private static TableBillTarget Ambiguous(string reason =
-        "The table has more than one possible service visit; use the explicit service session id.") =>
+    private static TableBillTarget Ambiguous(string reason = AmbiguousMessage) =>
         new(null, true, reason);
 }

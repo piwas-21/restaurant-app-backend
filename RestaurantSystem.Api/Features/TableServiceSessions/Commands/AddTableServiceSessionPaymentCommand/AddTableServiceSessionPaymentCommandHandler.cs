@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -88,23 +89,63 @@ public sealed class AddTableServiceSessionPaymentCommandHandler
                     response,
                     $"Payment of {write.Applied:0.00} applied across {write.OrderCount} order(s)");
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            return await ResolveConcurrencyAsync(command, transaction, cancellationToken);
+        }
         catch (DbUpdateException ex) when (IsOperationConflict(ex))
         {
-            await transaction.RollbackAsync(cancellationToken);
-            _context.ChangeTracker.Clear();
+            await ResetTransactionAsync(transaction, cancellationToken);
             var winner = await _replays.ResolveAsync(command, cancellationToken);
             if (winner is not null)
             {
                 return winner;
             }
+
             throw;
         }
         catch (Exception ex) when (PostgresConcurrencyAborts.IsMatch(ex, out var sqlState))
         {
             _logger.LogWarning(ex, "Table service session payment lost a concurrency race: {SqlState}", sqlState);
-            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                "The session changed while the payment was being applied. Refresh the bill and try again.",
-                ErrorCodes.TableServiceSessionStale);
+            return await ResolveConcurrencyAsync(command, transaction, cancellationToken);
+        }
+    }
+
+    private async Task<ApiResponse<TableServiceSessionDto>> ResolveConcurrencyAsync(
+        AddTableServiceSessionPaymentCommand command,
+        IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await ResetTransactionAsync(transaction, cancellationToken);
+
+        // The operation row is the durable replay anchor. If the commit outcome was uncertain,
+        // replaying the exact payload is safe; otherwise the fresh session version is the stable
+        // optimistic-concurrency answer for the caller.
+        var replay = await _replays.ResolveAsync(command, cancellationToken);
+        if (replay is not null)
+        {
+            return replay;
+        }
+
+        var current = await _context.TableServiceSessions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == command.ServiceSessionId, cancellationToken);
+        return current is null ? NotFound() : Stale(current.Version);
+    }
+
+    private async Task ResetTransactionAsync(
+        IDbContextTransaction transaction, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await transaction.RollbackAsync(cancellationToken);
+        }
+        finally
+        {
+            // A failed serializable statement aborts the PostgreSQL transaction. Detach it before
+            // replay/reload queries; otherwise EF may issue those reads on the doomed transaction.
+            await _context.Database.UseTransactionAsync(null, cancellationToken);
+            _context.ChangeTracker.Clear();
         }
     }
 

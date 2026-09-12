@@ -1,5 +1,7 @@
+using System.Data.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using RestaurantSystem.Api.Common.Models;
@@ -85,6 +87,75 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
 
         response.Success.Should().BeFalse();
         response.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionAmbiguous);
+    }
+
+    [Fact]
+    public async Task Close_RefusesActiveLegacyOrdersWithoutChangingMembership()
+    {
+        var sessionId = await SeedSessionAsync(14);
+        var legacyOrderId = await SeedOrderAsync(null, 14, 20m, Utc(12, 0));
+
+        var result = await CloseAsync(sessionId, expectedVersion: 1);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionAmbiguous);
+        result.Errors.Should().ContainSingle(TableBillTargetResolver.AmbiguousMessage);
+        await using var verify = _fixture.CreateContext();
+        (await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId))
+            .Status.Should().Be(TableServiceSessionStatus.Open);
+        (await verify.Orders.SingleAsync(value => value.Id == legacyOrderId))
+            .ServiceSessionId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Close_RejectsStaleExpectedVersionWithoutWriting()
+    {
+        var sessionId = await SeedSessionAsync(15);
+
+        var result = await CloseAsync(sessionId, expectedVersion: 0);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionStale);
+        result.Errors.Should().ContainSingle().Which.Should().Contain("current version is 1");
+        await using var verify = _fixture.CreateContext();
+        (await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId))
+            .Status.Should().Be(TableServiceSessionStatus.Open);
+    }
+
+    [Fact]
+    public async Task ConcurrentClose_OneCommitIsReplayedByTheLoser()
+    {
+        var sessionId = await SeedSessionAsync(16);
+        var gate = new SessionReadGate();
+
+        var results = await Task.WhenAll(
+            CloseAsync(sessionId, expectedVersion: 1, gate),
+            CloseAsync(sessionId, expectedVersion: 1, gate));
+
+        results.Should().OnlyContain(result => result.Success);
+        results.Select(result => result.Data!.Status).Should().OnlyContain(
+            status => status == nameof(TableServiceSessionStatus.Closed));
+        await using var verify = _fixture.CreateContext();
+        var session = await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId);
+        session.Status.Should().Be(TableServiceSessionStatus.Closed);
+        session.Version.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task PaymentAndClose_RaceWithOneAuthoritativeVersion()
+    {
+        var sessionId = await SeedSessionAsync(17);
+        var gate = new SessionReadGate();
+
+        var close = CloseAsync(sessionId, expectedVersion: 1, gate);
+        var payment = PayWithWriterAsync(sessionId, expectedVersion: 1, gate);
+        var results = await Task.WhenAll(close, payment);
+
+        results.Count(result => result.Success).Should().Be(1);
+        results.Should().Contain(result => result.ErrorCode == ErrorCodes.TableServiceSessionStale);
+        await using var verify = _fixture.CreateContext();
+        (await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId))
+            .Version.Should().Be(2);
     }
 
     [Fact]
@@ -179,9 +250,12 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     private async Task<ApiResponse<TableServiceSessionDto>> PayAsync(
-        Guid sessionId, int expectedVersion, decimal amount, string? currency = null)
+        Guid sessionId, int expectedVersion, decimal amount, string? currency = null,
+        DbCommandInterceptor? interceptor = null)
     {
-        await using var context = _fixture.CreateContext();
+        await using var context = interceptor is null
+            ? _fixture.CreateContext()
+            : _fixture.CreateContext(interceptor);
         var current = new Mock<ICurrentUserService>();
         current.Setup(value => value.GetAuditIdentifier()).Returns(nameof(TableServiceSessionTests));
         current.Setup(value => value.UserId).Returns(Guid.NewGuid());
@@ -211,9 +285,43 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         }, CancellationToken.None);
     }
 
-    private async Task<ApiResponse<TableServiceSessionDto>> CloseAsync(Guid sessionId, int expectedVersion)
+    private async Task<ApiResponse<TableServiceSessionDto>> PayWithWriterAsync(
+        Guid sessionId, int expectedVersion, DbCommandInterceptor interceptor)
     {
-        await using var context = _fixture.CreateContext();
+        await using var context = _fixture.CreateContext(interceptor);
+        var assembler = new TableBillAssembler(
+            context,
+            new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
+                NullLogger<OrderMappingService>.Instance),
+            NullLogger<TableBillAssembler>.Instance);
+        var reader = new TableServiceSessionReader(context, assembler);
+        var writer = new Mock<ITableServiceSessionPaymentWriter>();
+        writer.Setup(value => value.ApplyAsync(
+                It.IsAny<TableServiceSession>(), It.IsAny<AddTableServiceSessionPaymentCommand>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SessionPaymentWriteResult(true, 1m, 0));
+        var handler = new AddTableServiceSessionPaymentCommandHandler(
+            context,
+            writer.Object,
+            new TableServiceSessionPaymentReplayResolver(context, reader),
+            reader,
+            NullLogger<AddTableServiceSessionPaymentCommandHandler>.Instance);
+        return await handler.Handle(new AddTableServiceSessionPaymentCommand
+        {
+            ServiceSessionId = sessionId,
+            ExpectedVersion = expectedVersion,
+            OperationId = Guid.NewGuid(),
+            PaymentMethod = PaymentMethod.Cash,
+            Amount = 1m,
+        }, CancellationToken.None);
+    }
+
+    private async Task<ApiResponse<TableServiceSessionDto>> CloseAsync(
+        Guid sessionId, int expectedVersion, DbCommandInterceptor? interceptor = null)
+    {
+        await using var context = interceptor is null
+            ? _fixture.CreateContext()
+            : _fixture.CreateContext(interceptor);
         var assembler = new TableBillAssembler(
             context,
             new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
@@ -280,4 +388,31 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     private static DateTime Utc(int hour, int minute) => new(2026, 9, 11, hour, minute, 0, DateTimeKind.Utc);
+
+    private sealed class SessionReadGate : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource<bool> _bothArrived =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _arrivals;
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("table_service_sessions", StringComparison.OrdinalIgnoreCase)
+                && Interlocked.Increment(ref _arrivals) <= 2)
+            {
+                if (Volatile.Read(ref _arrivals) == 2)
+                {
+                    _bothArrived.TrySetResult(true);
+                }
+
+                await _bothArrived.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            }
+
+            return await base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
 }
