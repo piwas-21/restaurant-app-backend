@@ -2,11 +2,13 @@ using System.Data;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -24,18 +26,21 @@ public record CloseTableServiceSessionCommand : ICommand<ApiResponse<TableServic
 public sealed class CloseTableServiceSessionCommandHandler
     : ICommandHandler<CloseTableServiceSessionCommand, ApiResponse<TableServiceSessionDto>>
 {
-    private const decimal Tolerance = 0.01m;
+    private readonly decimal _paymentTolerance;
     private readonly ApplicationDbContext _context;
     private readonly ITableServiceSessionReader _reader;
     private readonly TimeProvider _timeProvider;
 
     public CloseTableServiceSessionCommandHandler(
-        ApplicationDbContext context, ITableServiceSessionReader reader,
-        TimeProvider? timeProvider = null)
+        ApplicationDbContext context,
+        ITableServiceSessionReader reader,
+        TimeProvider? timeProvider = null,
+        IOptions<TableServiceSessionSettings>? settings = null)
     {
         _context = context;
         _reader = reader;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
     }
 
     public async Task<ApiResponse<TableServiceSessionDto>> Handle(
@@ -84,10 +89,10 @@ public sealed class CloseTableServiceSessionCommandHandler
                 .Where(order => order.Status is not OrderStatus.Completed and not OrderStatus.Cancelled)
                 .Select(order => order.OrderNumber)
                 .ToList();
-            if (outstanding > Tolerance || unresolved.Count > 0)
+            if (outstanding > _paymentTolerance || unresolved.Count > 0)
             {
                 var errors = new List<string>();
-                if (outstanding > Tolerance)
+                if (outstanding > _paymentTolerance)
                 {
                     errors.Add($"The session still has an outstanding balance of {outstanding:0.00}.");
                 }
@@ -124,7 +129,7 @@ public sealed class CloseTableServiceSessionCommandHandler
             && order.TableNumber == tableNumber
             && order.ServiceSessionId == null
             && ((order.Status != OrderStatus.Completed && order.Status != OrderStatus.Cancelled)
-                || (order.Status == OrderStatus.Completed && order.RemainingAmount > Tolerance)),
+                || (order.Status == OrderStatus.Completed && order.RemainingAmount > _paymentTolerance)),
             cancellationToken);
 
     private async Task<ApiResponse<TableServiceSessionDto>> ResolveConcurrencyAsync(

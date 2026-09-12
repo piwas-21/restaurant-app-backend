@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -11,14 +13,18 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
 /// <summary>Writes one session tender and allocates it oldest-round-first.</summary>
 public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPaymentWriter
 {
-    private const decimal Tolerance = 0.01m;
+    private readonly decimal _paymentTolerance;
     private readonly ApplicationDbContext _context;
     private readonly IOrderPaymentApplicator _payments;
 
-    public TableServiceSessionPaymentWriter(ApplicationDbContext context, IOrderPaymentApplicator payments)
+    public TableServiceSessionPaymentWriter(
+        ApplicationDbContext context,
+        IOrderPaymentApplicator payments,
+        IOptions<TableServiceSessionSettings>? settings = null)
     {
         _context = context;
         _payments = payments;
+        _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
     }
 
     public async Task<SessionPaymentWriteResult> ApplyAsync(
@@ -47,7 +53,7 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
             return new SessionPaymentWriteResult(false, 0, 0, "The service session has no outstanding balance.");
         }
 
-        if (command.Amount > remaining + Tolerance)
+        if (command.Amount > remaining + _paymentTolerance)
         {
             return new SessionPaymentWriteResult(
                 false, 0, 0, $"Payment amount exceeds the session's remaining balance of {remaining:0.00}");
