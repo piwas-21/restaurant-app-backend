@@ -75,6 +75,48 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ActiveList_AssembliesMultipleSessionsAndKeepsEmptyAndSettledBills()
+    {
+        var firstSessionId = await SeedSessionAsync(31, currency: "chf");
+        var firstOrder = await SeedOrderAsync(firstSessionId, 31, 10m, Utc(12, 0));
+        var settledOrder = await SeedOrderAsync(firstSessionId, 31, 20m, Utc(12, 30));
+        await MarkCompletedAsync(settledOrder);
+        var secondSessionId = await SeedSessionAsync(32, currency: "eur");
+        var secondOrder = await SeedOrderAsync(secondSessionId, 32, 7m, Utc(13, 0));
+        var emptySessionId = await SeedSessionAsync(33);
+        var queryCounter = new SessionMetadataQueryCounter();
+
+        await using var context = _fixture.CreateContext(queryCounter);
+        var assembler = new TableBillAssembler(
+            context,
+            new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
+                NullLogger<OrderMappingService>.Instance),
+            NullLogger<TableBillAssembler>.Instance);
+        var sessions = await new TableServiceSessionReader(context, assembler)
+            .ReadActiveAsync(CancellationToken.None);
+
+        queryCounter.SessionMetadataQueries.Should().Be(1);
+        sessions.Select(session => session.TableNumber).Should().ContainInOrder(31, 32, 33);
+        var first = sessions.Single(session => session.ServiceSessionId == firstSessionId);
+        first.Currency.Should().Be("CHF");
+        first.RoundCount.Should().Be(2);
+        first.Outstanding.Should().Be(30m);
+        first.Bill.Orders.Select(order => order.Id).Should().ContainInOrder(firstOrder, settledOrder);
+        first.Bill.Total.Should().Be(30m);
+
+        var second = sessions.Single(session => session.ServiceSessionId == secondSessionId);
+        second.Currency.Should().Be("EUR");
+        second.RoundCount.Should().Be(1);
+        second.Bill.Orders.Select(order => order.Id).Should().ContainSingle().Which.Should().Be(secondOrder);
+
+        var empty = sessions.Single(session => session.ServiceSessionId == emptySessionId);
+        empty.RoundCount.Should().Be(0);
+        empty.Outstanding.Should().Be(0m);
+        empty.Bill.Orders.Should().BeEmpty();
+        empty.Bill.GeneratedAt.Should().NotBe(default);
+    }
+
+    [Fact]
     public async Task LegacyTableBill_RefusesOldUnassignedRoundMixedWithExplicitVisit()
     {
         var sessionId = await SeedSessionAsync(8);
@@ -388,6 +430,27 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     private static DateTime Utc(int hour, int minute) => new(2026, 9, 11, hour, minute, 0, DateTimeKind.Utc);
+
+    private sealed class SessionMetadataQueryCounter : DbCommandInterceptor
+    {
+        private int _sessionMetadataQueries;
+
+        public int SessionMetadataQueries => Volatile.Read(ref _sessionMetadataQueries);
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("table_service_sessions", StringComparison.OrdinalIgnoreCase))
+            {
+                Interlocked.Increment(ref _sessionMetadataQueries);
+            }
+
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+    }
 
     private sealed class SessionReadGate : DbCommandInterceptor
     {

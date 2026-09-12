@@ -69,21 +69,52 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
     public async Task<IReadOnlyList<TableServiceSessionDto>> ReadActiveAsync(
         CancellationToken cancellationToken)
     {
-        var ids = await _context.TableServiceSessions
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var sessionRows = await _context.TableServiceSessions
             .AsNoTracking()
             .Where(value => value.Status == Domain.Common.Enums.TableServiceSessionStatus.Open)
             .OrderBy(value => value.TableNumber)
-            .Select(value => value.Id)
             .ToListAsync(cancellationToken);
-        var sessions = new List<TableServiceSessionDto>(ids.Count);
-        foreach (var id in ids)
+        var bills = await _bills.AssembleManyAsync(sessionRows, cancellationToken);
+        var sessions = new List<TableServiceSessionDto>(sessionRows.Count);
+
+        for (var index = 0; index < sessionRows.Count; index++)
         {
-            var session = await ReadAsync(id, cancellationToken);
-            if (session is not null)
+            var session = sessionRows[index];
+            var currency = CurrencyCode.Normalize(session.Currency);
+            var bill = bills[index] ?? new TableBillDto
             {
-                sessions.Add(session);
-            }
+                TableNumber = session.TableNumber,
+                ServiceSessionId = session.Id,
+                ServiceSessionVersion = session.Version,
+                Currency = currency,
+                GeneratedAt = now,
+            };
+
+            // Session metadata is authoritative for identity, version, currency, and the active
+            // list clock. The batch assembler returns member orders only, so keep those fields
+            // aligned even when a session has no orders.
+            bill.ServiceSessionId = session.Id;
+            bill.ServiceSessionVersion = session.Version;
+            bill.Currency = currency;
+            bill.GeneratedAt = now;
+
+            sessions.Add(new TableServiceSessionDto
+            {
+                ServiceSessionId = session.Id,
+                TableNumber = session.TableNumber,
+                Currency = currency,
+                Status = session.Status.ToString(),
+                Version = session.Version,
+                OpenedAt = session.OpenedAt,
+                ClosedAt = session.ClosedAt,
+                RoundCount = bill.OrderCount,
+                AgeMinutes = Math.Max(0, (int)(now - session.OpenedAt).TotalMinutes),
+                Outstanding = bill.Remaining,
+                Bill = bill,
+            });
         }
+
         return sessions;
     }
 

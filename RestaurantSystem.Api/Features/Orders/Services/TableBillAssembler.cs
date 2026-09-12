@@ -66,8 +66,34 @@ public class TableBillAssembler : ITableBillAssembler
 
         var orders = await QueryOrders(o => o.ServiceSessionId == serviceSessionId
             && o.Status != OrderStatus.Cancelled, cancellationToken);
-        return await BuildBillAsync(orders, session.TableNumber, session.Id, session.Version, session.Currency,
-            cancellationToken);
+        return BuildBill(orders, session.TableNumber, session.Id, session.Version, session.Currency);
+    }
+
+    /// <summary>
+    /// Assembles all supplied visits from one batched member-order graph load. The caller owns the
+    /// session metadata read, so an active-session list never re-reads one session per bill.
+    /// </summary>
+    public async Task<IReadOnlyList<TableBillDto?>> AssembleManyAsync(
+        IReadOnlyList<TableServiceSession> sessions, CancellationToken cancellationToken)
+    {
+        if (sessions.Count == 0)
+        {
+            return Array.Empty<TableBillDto?>();
+        }
+
+        var sessionIds = sessions.Select(session => session.Id).ToArray();
+        var orders = await QueryOrders(order => order.ServiceSessionId.HasValue
+            && sessionIds.Contains(order.ServiceSessionId.Value)
+            && order.Status != OrderStatus.Cancelled, cancellationToken);
+        var ordersBySession = orders
+            .Where(order => order.ServiceSessionId.HasValue)
+            .GroupBy(order => order.ServiceSessionId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        return sessions.Select(session => ordersBySession.TryGetValue(session.Id, out var members)
+                ? BuildBill(members, session.TableNumber, session.Id, session.Version, session.Currency)
+                : null)
+            .ToList();
     }
 
     private async Task<TableBillDto?> AssembleLegacyUnassignedAsync(
@@ -76,7 +102,7 @@ public class TableBillAssembler : ITableBillAssembler
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
             && o.ServiceSessionId == null
             && !ExcludedStatuses.Contains(o.Status), cancellationToken);
-        return await BuildBillAsync(orders, tableNumber, null, null, null, cancellationToken);
+        return BuildBill(orders, tableNumber, null, null, null);
     }
 
     private async Task<List<Order>> QueryOrders(
@@ -94,13 +120,12 @@ public class TableBillAssembler : ITableBillAssembler
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<TableBillDto?> BuildBillAsync(
+    private TableBillDto? BuildBill(
         List<Order> orders,
         int tableNumber,
         Guid? serviceSessionId,
         int? serviceSessionVersion,
-        string? currency,
-        CancellationToken cancellationToken)
+        string? currency)
     {
         if (orders.Count == 0)
         {
@@ -119,7 +144,9 @@ public class TableBillAssembler : ITableBillAssembler
 
         foreach (var order in orders)
         {
-            bill.Orders.Add(await _mappingService.MapToOrderDtoAsync(order, cancellationToken));
+            // QueryOrders eagerly loads every navigation MapToOrderDto reads. Keeping this path
+            // synchronous makes a bill's cost independent of its number of member orders.
+            bill.Orders.Add(_mappingService.MapToOrderDto(order));
         }
 
         Summarize(bill);

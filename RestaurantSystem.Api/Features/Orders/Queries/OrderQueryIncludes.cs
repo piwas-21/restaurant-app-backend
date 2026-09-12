@@ -45,6 +45,7 @@ public static class OrderQueryIncludes
     /// </remarks>
     public static IQueryable<Order> IncludeOrderLineGraph(this IQueryable<Order> query) =>
         query
+            .Include(o => o.DeliveryAddress)
             .Include(o => o.Items)
                 .ThenInclude(i => i.IngredientSnapshots)
             .Include(o => o.Items)
