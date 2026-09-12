@@ -75,7 +75,7 @@ public class TableBillAssembler : ITableBillAssembler
     {
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
             && o.ServiceSessionId == null
-            && ExcludedStatuses.Contains(o.Status), cancellationToken);
+            && !ExcludedStatuses.Contains(o.Status), cancellationToken);
         return await BuildBillAsync(orders, tableNumber, null, null, null, cancellationToken);
     }
 

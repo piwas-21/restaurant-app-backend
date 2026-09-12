@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -21,15 +22,18 @@ public class CompleteAllTableOrdersCommandHandler : ICommandHandler<CompleteAllT
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ITableBillTargetResolver _targetResolver;
     private readonly ILogger<CompleteAllTableOrdersCommandHandler> _logger;
 
     public CompleteAllTableOrdersCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        ILogger<CompleteAllTableOrdersCommandHandler> logger)
+        ILogger<CompleteAllTableOrdersCommandHandler> logger,
+        ITableBillTargetResolver? targetResolver = null)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _targetResolver = targetResolver ?? new TableBillTargetResolver(context);
         _logger = logger;
     }
 
@@ -43,6 +47,22 @@ public class CompleteAllTableOrdersCommandHandler : ICommandHandler<CompleteAllT
             if (!int.TryParse(request.TableNumber, out var tableNumberInt))
             {
                 return ApiResponse<CompleteAllTableOrdersResult>.Failure("Invalid table number");
+            }
+
+            // The legacy route has only a table number, so it cannot know which visit owns an
+            // order. Refuse both an active explicit visit and any ambiguous explicit membership
+            // before loading rows; otherwise clearing one visit could cancel another visit's work.
+            var target = await _targetResolver.ResolveAsync(tableNumberInt, cancellationToken);
+            if (target.IsAmbiguous || target.ServiceSessionId.HasValue)
+            {
+                var reason = target.Reason
+                    ?? $"Table {request.TableNumber} has an active service session. "
+                    + "Complete it through the explicit service-session endpoint.";
+                _logger.LogInformation(
+                    "Refusing legacy table clear for table {TableNumber}: {Reason}",
+                    request.TableNumber, reason);
+                return ApiResponse<CompleteAllTableOrdersResult>.FailureWithCode(
+                    reason, ErrorCodes.TableServiceSessionAmbiguous);
             }
 
             // Fetch all active dine-in orders for this table

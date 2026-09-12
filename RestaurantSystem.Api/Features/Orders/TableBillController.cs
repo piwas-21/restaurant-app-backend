@@ -15,9 +15,9 @@ namespace RestaurantSystem.Api.Features.Orders;
 // controller under its length budget — the same decomposition Sprint 2 applied
 // to the printer feed, order emails and quick actions.
 //
-// Staff-only on both endpoints ([RequireStaff], like the per-order payment
-// endpoints): the bill exposes the table's WHOLE spend, and the payment is a
-// till action. The guest surfaces keep seeing only their own orders.
+// Table-service staff only on both endpoints ([RequireTableServiceStaff]): the bill exposes the
+// table's WHOLE spend, and the payment is a till action. Kitchen staff do not need a table-wide
+// receipt or tender path. The guest surfaces keep seeing only their own orders.
 [ApiController]
 [Route("api/orders/table")]
 public class TableBillController : ControllerBase
@@ -32,7 +32,7 @@ public class TableBillController : ControllerBase
     /// </summary>
     [HttpGet("{tableNumber}/bill")]
     [Authorize]
-    [RequireStaff]
+    [RequireTableServiceStaff]
     public async Task<ActionResult<ApiResponse<TableBillDto>>> GetTableBill(int tableNumber)
         => Ok(await _mediator.SendQuery(new GetTableBillQuery(tableNumber)));
 
@@ -43,7 +43,7 @@ public class TableBillController : ControllerBase
     /// </summary>
     [HttpPost("{tableNumber}/bill/payments")]
     [Authorize]
-    [RequireStaff]
+    [RequireTableServiceStaff]
     public async Task<ActionResult<ApiResponse<TableBillDto>>> AddTableBillPayment(
         int tableNumber, [FromBody] AddTableBillPaymentCommand command)
     {

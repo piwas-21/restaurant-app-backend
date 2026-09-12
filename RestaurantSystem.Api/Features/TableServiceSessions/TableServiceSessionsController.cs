@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
@@ -18,6 +19,7 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions;
 [ApiController]
 [Route("api/table-service-sessions")]
 [RequireTableServiceStaff]
+[RequireModule(ModuleIds.Cashier)]
 public sealed class TableServiceSessionsController : ControllerBase
 {
     private readonly CustomMediator _mediator;
