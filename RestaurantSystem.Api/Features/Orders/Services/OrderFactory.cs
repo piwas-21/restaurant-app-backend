@@ -42,6 +42,7 @@ public class OrderFactory : IOrderFactory
 
         var order = new Order
         {
+            Id = Guid.NewGuid(),
             OrderNumber = orderNumber,
             // Minted for every order, not just the ones that trigger an admin email: which
             // orders get mailed is a runtime decision made later and elsewhere, and an order

@@ -31,6 +31,12 @@ public record OrderDto
     public decimal RemainingAmount { get; set; }
     public bool IsFullyPaid { get; set; }
 
+    // Staff counter release state. Additive so older clients can ignore it.
+    public bool IsKitchenReleased { get; set; }
+    public DateTime? KitchenReleasedAt { get; set; }
+    public string? KitchenReleasedBy { get; set; }
+    public int Version { get; set; }
+
     // Status
     public string Status { get; set; } = string.Empty;
     public string PaymentStatus { get; set; } = string.Empty;

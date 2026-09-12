@@ -326,6 +326,40 @@ public class OrderLineCustomizationPriceTests : IntegrationTestBase
         (await ReadOrderRowsAsync(order.Id)).Sum(r => r.ItemTotal).Should().Be(basket.SubTotal);
     }
 
+    [Fact]
+    public async Task StaffRegularLine_SideCustomization_scales_with_both_quantities()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Takeaway",
+            items = new[]
+            {
+                new
+                {
+                    productId = _testPizza.Id,
+                    quantity = 2,
+                    childItems = new[]
+                    {
+                        new
+                        {
+                            productId = _testCola.Id,
+                            quantity = 3,
+                            selectedIngredientIds = new[] { _colaExtraShotId }
+                        }
+                    }
+                }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);
+        result!.Data!.Total.Should().Be((
+            _testPizza.BasePrice + (_testCola.BasePrice * 3)) * 2 + (ExtraShotPrice * 3 * 2));
+    }
+
     // ---- The customised bundle: the overcharge, in the opposite direction -----------------------
 
     [Fact]

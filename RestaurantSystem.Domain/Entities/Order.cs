@@ -3,7 +3,7 @@ using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
-public class Order : SoftDeleteEntity
+public partial class Order : SoftDeleteEntity
 {
     public string OrderNumber { get; set; } = null!;
     /// <summary>Credential for the anonymous quick-action email links (plan §9.20). Null on rows

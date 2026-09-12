@@ -22,18 +22,15 @@ public class BasketItemFactory : IBasketItemFactory
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
-    private readonly ILogger<BasketItemFactory> _logger;
 
     public BasketItemFactory(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        ILineCustomizationBuilder lineCustomizationBuilder,
-        ILogger<BasketItemFactory> logger)
+        ILineCustomizationBuilder lineCustomizationBuilder)
     {
         _context = context;
         _currentUserService = currentUserService;
         _lineCustomizationBuilder = lineCustomizationBuilder;
-        _logger = logger;
     }
 
     public async Task<BasketItem> BuildRegularItemAsync(
@@ -118,72 +115,6 @@ public class BasketItemFactory : IBasketItemFactory
         };
     }
 
-    /// <summary>
-    /// Validates each section's required / min / max selection rules and returns the section-option
-    /// surcharge to add to the menu's base price.
-    /// </summary>
-    /// <remarks>
-    /// Extracted from <see cref="BuildMenuItemAsync"/>: adding the §9.3 channel guard pushed that
-    /// method past the cognitive-complexity limit, and this validation is a self-contained concern
-    /// with one output — the surcharge — so it splits cleanly rather than by cutting the method in
-    /// an arbitrary place to satisfy a number.
-    /// </remarks>
-    private decimal ValidateSectionsAndSumOptionPrices(
-        IEnumerable<MenuSection> sections, List<SelectedMenuOptionDto> selectedOptions)
-    {
-        decimal optionsPrice = 0m;
-
-        foreach (var section in sections)
-        {
-            var sectionSelections = selectedOptions.Where(o => o.SectionId == section.Id).ToList();
-
-            // Count distinct items, not sum of quantities
-            var distinctItemCount = sectionSelections.Count;
-
-            // Log for debugging
-            _logger.LogInformation(
-                "Section '{SectionName}' validation: {ItemCount} items selected (min: {Min}, max: {Max})",
-                section.Name, distinctItemCount, section.MinSelection, section.MaxSelection
-            );
-
-            if (section.IsRequired && distinctItemCount < section.MinSelection)
-            {
-                throw new BadRequestException($"Section '{section.Name}' requires at least {section.MinSelection} selection(s)");
-            }
-
-            if (distinctItemCount > section.MaxSelection)
-            {
-                throw new BadRequestException($"Section '{section.Name}' allows at most {section.MaxSelection} selection(s)");
-            }
-
-            optionsPrice += SumSelectionPrices(section, sectionSelections);
-        }
-
-        return optionsPrice;
-    }
-
-    /// <summary>One section's selections: per-selection validation plus its additional-price total.</summary>
-    private static decimal SumSelectionPrices(MenuSection section, List<SelectedMenuOptionDto> sectionSelections)
-    {
-        decimal price = 0m;
-
-        foreach (var selection in sectionSelections)
-        {
-            // Validate individual selection
-            if (selection.Quantity < 1)
-            {
-                throw new BadRequestException($"Invalid quantity for item in section '{section.Name}'");
-            }
-
-            var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == selection.ItemId)
-                ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
-
-            price += sectionItem.AdditionalPrice * selection.Quantity;
-        }
-
-        return price;
-    }
-
     public async Task<BasketItem> BuildMenuItemAsync(
         Product product, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
@@ -194,8 +125,10 @@ public class BasketItemFactory : IBasketItemFactory
         decimal menuTotalPrice = product.BasePrice;
         var selectedOptions = item.SelectedMenuOptions ?? new List<SelectedMenuOptionDto>();
 
-        // Validate required sections and calculate price
-        menuTotalPrice += ValidateSectionsAndSumOptionPrices(product.MenuDefinition.Sections, selectedOptions);
+        // Basket and staff counter orders share one exact section rule. It validates required/min/max
+        // counts, quantities, and that every option belongs to the section named by the request.
+        menuTotalPrice += MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            product.MenuDefinition.Sections, selectedOptions);
 
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
 
@@ -245,12 +178,10 @@ public class BasketItemFactory : IBasketItemFactory
 
         foreach (var option in selectedOptions)
         {
-            // Safe lookups: a malformed SectionId/ItemId from the client yields a 400/404,
-            // not an unhandled InvalidOperationException (500).
-            var section = product.MenuDefinition.Sections.FirstOrDefault(s => s.Id == option.SectionId)
-                ?? throw new BadRequestException($"Invalid section '{option.SectionId}' for this menu");
-            var sectionItem = section.Items.FirstOrDefault(i => i.ProductId == option.ItemId)
-                ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
+            // The shared rule already validated this exact section/item pair. Resolve through the
+            // same helper here so the child row cannot silently drift to another section's price.
+            var sectionItem = MenuBundleSelectionRules.ResolveSectionItem(
+                product.MenuDefinition.Sections, option.SectionId, option.ItemId);
 
             if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");

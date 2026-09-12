@@ -48,6 +48,7 @@ public class GetMissedOrdersQueryHandler
         var missed = await _context.Orders
             .AsNoTracking()
             .Where(o => !o.IsDeleted
+                && o.IsKitchenReleased
                 && o.Status == OrderStatus.Confirmed
                 && o.CreatedAt < graceCutoff
                 && o.CreatedAt >= lookbackFloor

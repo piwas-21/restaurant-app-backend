@@ -62,6 +62,9 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             .Include(o => o.DeliveryAddress)
             .Where(o => !o.IsDeleted)
             .Where(o => o.Status == OrderStatus.Confirmed)
+            // A held counter sale is a real unpaid order, but it is not a kitchen ticket yet.
+            // Legacy rows are migrated with this flag true.
+            .Where(o => o.IsKitchenReleased)
             .AsNoTracking()
             // Sibling collection includes (Items, Payments, StatusHistory) LEFT JOIN into one
             // cartesian result set in EF's default single-query mode, and the Menu branch

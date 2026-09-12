@@ -122,6 +122,15 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.RemainingAmount)
             .HasColumnType("decimal(10,2)");
 
+        builder.Property(o => o.IsKitchenReleased)
+            .HasDefaultValue(true);
+
+        builder.Property(o => o.KitchenReleasedBy)
+            .HasMaxLength(100);
+
+        builder.Property(o => o.Version)
+            .HasDefaultValue(1);
+
         // Focus shares the Orders row rather than getting a table of its own: it is read on every
         // order fetch, so a join would cost more than the five columns it saves. Column names are
         // pinned to the pre-extraction ones, which keeps this a code move — the only schema change

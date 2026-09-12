@@ -35,7 +35,7 @@ public class DeviceReadTests : IntegrationTestBase
 
     // Insert a confirmed order at a controlled CreatedAt. The audit hook forces CreatedAt=now on
     // insert, so we override it in a second (Modified) save, which preserves the value.
-    private async Task<Guid> SeedConfirmedOrder(DateTime createdAt)
+    private async Task<Guid> SeedConfirmedOrder(DateTime createdAt, bool isKitchenReleased = true)
     {
         var id = Guid.NewGuid();
         using var scope = Factory.Services.CreateScope();
@@ -48,6 +48,7 @@ public class DeviceReadTests : IntegrationTestBase
             TableNumber = 7,
             Status = OrderStatus.Confirmed,
             PaymentStatus = PaymentStatus.Pending,
+            IsKitchenReleased = isKitchenReleased,
             OrderDate = createdAt,
             CreatedBy = "test",
         };
@@ -134,6 +135,21 @@ public class DeviceReadTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<MissedOrderDto>>>(JsonOptions);
         body!.Data.Should().Contain(o => o.OrderId == orderId && o.TableNumber == 7);
+    }
+
+    [Fact]
+    public async Task GetMissedOrders_HeldStaffOrder_IsExcluded()
+    {
+        var held = await SeedConfirmedOrder(DateTime.UtcNow.AddHours(-1), isKitchenReleased: false);
+        var released = await SeedConfirmedOrder(DateTime.UtcNow.AddHours(-1));
+
+        AuthenticateAsAdmin();
+        var response = await Client.GetAsync("/api/devices/missed-orders?graceMinutes=15");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<MissedOrderDto>>>(JsonOptions);
+        body!.Data.Should().NotContain(order => order.OrderId == held);
+        body.Data.Should().Contain(order => order.OrderId == released);
     }
 
     [Fact]
