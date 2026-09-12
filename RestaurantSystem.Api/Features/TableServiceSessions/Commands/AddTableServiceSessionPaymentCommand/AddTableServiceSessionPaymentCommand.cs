@@ -16,7 +16,10 @@ public record AddTableServiceSessionPaymentCommand : ICommand<ApiResponse<TableS
 
     [JsonRequired]
     public int ExpectedVersion { get; set; }
+    [JsonRequired]
     public PaymentMethod PaymentMethod { get; set; }
+
+    [JsonRequired]
     public decimal Amount { get; set; }
     public string? Currency { get; set; }
     public string? TransactionId { get; set; }

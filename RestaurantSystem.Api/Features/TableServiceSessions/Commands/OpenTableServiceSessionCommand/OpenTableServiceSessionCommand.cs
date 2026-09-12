@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
@@ -13,6 +14,7 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableS
 
 public record OpenTableServiceSessionCommand : ICommand<ApiResponse<TableServiceSessionDto>>
 {
+    [JsonRequired]
     public int TableNumber { get; init; }
     public string? Currency { get; init; }
 }
