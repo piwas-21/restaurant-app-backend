@@ -42,7 +42,8 @@ public class GetMissedOrdersQueryHandler
 
         // Served = Confirmed (the printer-feed's eligibility filter) + not soft-deleted. Explicit
         // !IsDeleted mirrors PrinterFeedQuery so the read intent is unambiguous. "Accounted for" =
-        // has at least one Printed receipt on any device — a correlated !Any() so EF emits a
+        // has at least one legacy (non-update) Printed receipt on any device — update tickets do
+        // not prove the original order printed. This is a correlated !Any() so EF emits a
         // NOT EXISTS (more efficient in Postgres than NOT IN over an uncorrelated subquery).
         var missed = await _context.Orders
             .AsNoTracking()
@@ -51,7 +52,9 @@ public class GetMissedOrdersQueryHandler
                 && o.CreatedAt < graceCutoff
                 && o.CreatedAt >= lookbackFloor
                 && !_context.DeviceOrderReceipts.Any(r =>
-                    r.OrderId == o.Id && r.Status == DevicePrintStatus.Printed))
+                    r.OrderId == o.Id
+                    && r.JobId == null
+                    && r.Status == DevicePrintStatus.Printed))
             .OrderBy(o => o.OrderDate)
             .Take(GetMissedOrdersQuery.MaxResults)
             .Select(o => new MissedOrderDto(

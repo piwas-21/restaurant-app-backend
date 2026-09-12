@@ -303,6 +303,11 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services
+    .AddOptions<PrinterFeedSettings>()
+    .Bind(builder.Configuration.GetSection(PrinterFeedSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // Said ONCE, at boot, when the printer endpoints have no key to check (#475).
 //
