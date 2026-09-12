@@ -308,6 +308,11 @@ builder.Services
     .Bind(builder.Configuration.GetSection(PrinterFeedSettings.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services
+    .AddOptions<TableServiceSessionSettings>()
+    .Bind(builder.Configuration.GetSection(TableServiceSessionSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // Said ONCE, at boot, when the printer endpoints have no key to check (#475).
 //

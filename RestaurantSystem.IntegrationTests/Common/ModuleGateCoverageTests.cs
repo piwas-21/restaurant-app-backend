@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Modules;
 
 namespace RestaurantSystem.IntegrationTests.Common;
@@ -36,6 +37,9 @@ public class ModuleGateCoverageTests
         // Class-level, unlike the order controllers: every route on PaymentsController exists only
         // because the tenant bought online payments, so there is no core surface to take away.
         { "PaymentsController", ModuleIds.OnlinePayments },
+        // Explicit table visits are the cashier/table-service surface; the class-level gate covers
+        // list, open, read, pay and close together.
+        { "TableServiceSessionsController", ModuleIds.Cashier },
     };
 
     public static TheoryData<string, string, string> GatedActions() => new()
@@ -65,6 +69,21 @@ public class ModuleGateCoverageTests
 
         gate.Should().NotBeNull($"{controller}.{action} is the {moduleId} module's own surface");
         gate!.ModuleIdsRequired.Should().Equal(moduleId);
+    }
+
+    [Fact]
+    public void Legacy_table_bill_routes_exclude_kitchen_staff()
+    {
+        var actions = new[] { "GetTableBill", "AddTableBillPayment" }
+            .Select(name => Controller("TableBillController").GetMethod(name)!)
+            .ToArray();
+
+        foreach (var action in actions)
+        {
+            var gate = action.GetCustomAttribute<RequireTableServiceStaffAttribute>();
+            gate.Should().NotBeNull();
+            gate!.Roles.Should().Be("Admin,Cashier,Server");
+        }
     }
 
     [Fact]

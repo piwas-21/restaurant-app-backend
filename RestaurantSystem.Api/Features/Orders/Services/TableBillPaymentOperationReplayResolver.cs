@@ -43,6 +43,8 @@ public class TableBillPaymentOperationReplayResolver : ITableBillPaymentOperatio
 
     private static bool Matches(TableBillPaymentOperation operation, AddTableBillPaymentCommand command) =>
         operation.TableNumber == command.TableNumber
+        && operation.ServiceSessionId == command.ServiceSessionId
+        && string.Equals(operation.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
         && operation.PaymentMethod == command.PaymentMethod
         && operation.Amount == command.Amount
         && operation.TransactionId == command.TransactionId

@@ -122,3 +122,12 @@ public class RequireAdminOrCashierAttribute : RequireRoleAttribute
     {
     }
 }
+
+/// <summary>Authorization for the table-service POS: Admin, Cashier or Server.</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
+public sealed class RequireTableServiceStaffAttribute : RequireRoleAttribute
+{
+    public RequireTableServiceStaffAttribute() : base(UserRole.Admin, UserRole.Cashier, UserRole.Server)
+    {
+    }
+}

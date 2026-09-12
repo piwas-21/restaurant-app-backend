@@ -102,6 +102,7 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
                 CardLastFourDigits = tender.CardLastFourDigits,
                 CardType = tender.CardType,
                 PaymentNotes = tender.PaymentNotes,
+                Currency = tender.Currency,
                 PaymentDate = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = _currentUserService.GetAuditIdentifier()

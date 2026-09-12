@@ -50,6 +50,7 @@ public class OrderMappingService : IOrderMappingService
             CustomerPhone = order.CustomerPhone,
             Type = order.Type.ToString(),
             TableNumber = order.TableNumber,
+            ServiceSessionId = order.ServiceSessionId,
             SubTotal = order.SubTotal,
             Tax = order.Tax,
             DeliveryFee = order.DeliveryFee,

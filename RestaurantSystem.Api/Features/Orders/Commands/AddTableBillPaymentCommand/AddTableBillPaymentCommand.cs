@@ -24,8 +24,13 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.AddTableBillPaymentComma
 public record AddTableBillPaymentCommand : ICommand<ApiResponse<TableBillDto>>
 {
     public required int TableNumber { get; set; }
+
+    /// <summary>Set internally when the legacy route resolves one explicit visit.</summary>
+    [JsonIgnore]
+    public Guid? ServiceSessionId { get; set; }
     public required PaymentMethod PaymentMethod { get; set; }
     public required decimal Amount { get; set; }
+    public string? Currency { get; set; }
     [JsonRequired]
     public Guid OperationId { get; set; }
     public string? TransactionId { get; set; }

@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -18,6 +19,8 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
     private readonly IOrderPaymentApplicator _paymentApplicator;
     private readonly ITableBillAssembler _billAssembler;
     private readonly ITableBillPaymentOperationReplayResolver _replayResolver;
+    private readonly ITableBillTargetResolver _targetResolver;
+    private readonly ITableServiceSessionCurrencyPolicy _currencyPolicy;
     private readonly ILogger<AddTableBillPaymentCommandHandler> _logger;
 
     public AddTableBillPaymentCommandHandler(
@@ -25,24 +28,44 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         IOrderPaymentApplicator paymentApplicator,
         ITableBillAssembler billAssembler,
         ITableBillPaymentOperationReplayResolver replayResolver,
-        ILogger<AddTableBillPaymentCommandHandler> logger)
+        ILogger<AddTableBillPaymentCommandHandler> logger,
+        ITableBillTargetResolver? targetResolver = null,
+        ITableServiceSessionCurrencyPolicy? currencyPolicy = null)
     {
         _context = context;
         _paymentApplicator = paymentApplicator;
         _billAssembler = billAssembler;
         _replayResolver = replayResolver;
+        _targetResolver = targetResolver ?? new TableBillTargetResolver(context);
+        _currencyPolicy = currencyPolicy ?? new TableServiceSessionCurrencyPolicy(context);
         _logger = logger;
     }
 
     public async Task<ApiResponse<TableBillDto>> Handle(AddTableBillPaymentCommand command, CancellationToken cancellationToken)
     {
+        var target = await _targetResolver.ResolveAsync(command.TableNumber, cancellationToken);
+        if (target.IsAmbiguous)
+        {
+            return ApiResponse<TableBillDto>.FailureWithCode(
+                target.Reason ?? "Use the explicit service session id for this table.",
+                ErrorCodes.TableServiceSessionAmbiguous);
+        }
+
+        command.ServiceSessionId = target.ServiceSessionId;
+        var currency = await _currencyPolicy.ResolveAsync(
+            command.ServiceSessionId, command.Currency, cancellationToken);
+        if (!currency.Success)
+        {
+            return ApiResponse<TableBillDto>.FailureWithCode(
+                currency.Error!, ErrorCodes.TableServiceSessionCurrencyMismatch);
+        }
+        command.Currency = currency.Currency;
         var replay = await _replayResolver.ResolveAsync(command, cancellationToken);
         if (replay is not null)
         {
             return replay;
         }
 
-        // SERIALIZABLE makes the multi-order allocation atomic.
         await using var transaction = await _context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
 
@@ -50,6 +73,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             .Where(o => !o.IsDeleted
                 && o.Type == OrderType.DineIn
                 && o.TableNumber == command.TableNumber
+                && o.ServiceSessionId == command.ServiceSessionId
                 && !TableBillAssembler.ExcludedStatuses.Contains(o.Status))
             .OrderBy(o => o.OrderDate).ThenBy(o => o.OrderNumber)
             .Select(o => new BillRound(o.Id, o.RemainingAmount))
@@ -79,6 +103,8 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             CreatedBy = string.Empty,
             OperationId = command.OperationId,
             TableNumber = command.TableNumber,
+            ServiceSessionId = command.ServiceSessionId,
+            Currency = command.Currency,
             PaymentMethod = command.PaymentMethod,
             Amount = command.Amount,
             TransactionId = command.TransactionId,
@@ -98,16 +124,25 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             CardLastFourDigits = command.CardLastFourDigits,
             CardType = command.CardType,
             PaymentNotes = command.PaymentNotes,
+            Currency = command.Currency,
         };
 
         var allocation = new AllocationResult(command.Amount, new List<string>());
         try
         {
-            allocation = await ApplyAcrossOrdersAsync(openOrders, tender, command.TableNumber, allocation, cancellationToken);
+            allocation = await TableBillPaymentAllocation.ApplyAsync(
+                openOrders, tender, command.TableNumber, allocation, _paymentApplicator, _logger, cancellationToken);
             if (!allocation.Success)
             {
                 return ApiResponse<TableBillDto>.Failure(
                     "The bill changed while the payment was being applied. Please review the bill and try again");
+            }
+            if (command.ServiceSessionId.HasValue)
+            {
+                var session = await _context.TableServiceSessions
+                    .SingleAsync(value => value.Id == command.ServiceSessionId.Value, cancellationToken);
+                session.Version++;
+                await _context.SaveChangesAsync(cancellationToken);
             }
             await transaction.CommitAsync(cancellationToken);
         }
@@ -134,17 +169,12 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 "The bill changed while the payment was being applied. Please review the bill and try again");
         }
 
-        // A sub-tolerance slack may remain; slack is NEVER charged — the message reports what the till actually took.
         var appliedTotal = command.Amount - Math.Max(0, allocation.Left);
 
         _logger.LogInformation(
             "Bill payment {Amount} applied across {OrderCount} orders on table {TableNumber}: {Orders}",
             appliedTotal, allocation.Orders.Count, command.TableNumber, string.Join(", ", allocation.Orders));
 
-        // Re-assemble AFTER the commit so the response reflects the post-payment bill. Money is
-        // already committed here: whatever happens, the response must not deny the tenders —
-        // the refusals below say "recorded", and the retry guard ("no outstanding balance")
-        // keeps the cashier from paying twice.
         TableBillDto? bill;
         try
         {
@@ -160,41 +190,10 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
 
         if (bill == null)
         {
-            // Every order got settled and completed right after our commit — possible only
-            // through a concurrent table-clear; the tenders themselves are committed.
             return ApiResponse<TableBillDto>.Failure(
                 "The payment was recorded, but the bill could not be refreshed. Please reopen the bill");
         }
-
         return ApiResponse<TableBillDto>.SuccessWithData(
             bill, $"Payment of {appliedTotal:0.00} applied across {allocation.Orders.Count} order(s)");
     }
-
-    private async Task<AllocationResult> ApplyAcrossOrdersAsync(
-        IReadOnlyList<BillRound> orders, OrderPaymentTender tender, int tableNumber,
-        AllocationResult allocation, CancellationToken cancellationToken)
-    {
-        foreach (var order in orders)
-        {
-            if (allocation.Left <= 0) break;
-            var outstanding = Math.Max(0, order.RemainingAmount);
-            if (outstanding <= 0) continue;
-            var share = Math.Min(outstanding, allocation.Left);
-            var result = await _paymentApplicator.ApplyToOrderAsync(
-                order.Id, tender with { Amount = share }, cancellationToken);
-            if (result.Outcome != OrderPaymentApplicationOutcome.Applied || result.Order is null)
-            {
-                _logger.LogWarning(
-                    "Bill payment for table {TableNumber} rolled back on order {OrderId}: {Outcome}",
-                    tableNumber, order.Id, result.Outcome);
-                return allocation with { Success = false };
-            }
-            allocation.Orders.Add(result.Order.OrderNumber);
-            allocation = allocation with { Left = allocation.Left - share };
-        }
-        return allocation;
-    }
-    private sealed record BillRound(Guid Id, decimal RemainingAmount);
-    private sealed record AllocationResult(decimal Left, List<string> Orders, bool Success = true);
-
 }

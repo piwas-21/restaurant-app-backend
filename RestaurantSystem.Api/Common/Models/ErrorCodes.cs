@@ -174,4 +174,15 @@ public static class ErrorCodes
     /// this is a client generation bug, not a user mistake (#523).
     /// </summary>
     public const string PaymentOperationIdReused = "PaymentOperationIdReused";
+    public const string TableServiceSessionNotFound = "TableServiceSessionNotFound";
+    public const string TableServiceSessionAmbiguous = "TableServiceSessionAmbiguous";
+    public const string TableServiceSessionStale = "TableServiceSessionStale";
+    public const string TableServiceSessionCurrencyMismatch = "TableServiceSessionCurrencyMismatch";
+    public const string TableServiceSessionNotClosable = "TableServiceSessionNotClosable";
+    public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
+    public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
 }
+
+
+// Table-service-session codes are additive to the POS contract. They are kept as strings so old
+// clients can continue to display Errors[0] while the redesigned cashier branches safely.

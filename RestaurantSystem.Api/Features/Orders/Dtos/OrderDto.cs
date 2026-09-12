@@ -3,15 +3,18 @@
 public record OrderDto
 {
     public Guid Id { get; set; }
-    public string OrderNumber { get; set; } = null!;
+    public string OrderNumber { get; set; } = string.Empty;
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
 
     // Order Type
-    public string Type { get; set; } = null!;
+    public string Type { get; set; } = string.Empty;
     public int? TableNumber { get; set; }
+
+    /// <summary>Explicit table-visit membership. Null means a legacy/anonymous order.</summary>
+    public Guid? ServiceSessionId { get; set; }
 
     // Pricing
     public decimal SubTotal { get; set; }
@@ -29,8 +32,8 @@ public record OrderDto
     public bool IsFullyPaid { get; set; }
 
     // Status
-    public string Status { get; set; } = null!;
-    public string PaymentStatus { get; set; } = null!;
+    public string Status { get; set; } = string.Empty;
+    public string PaymentStatus { get; set; } = string.Empty;
 
     // Focus Order
     public bool IsFocusOrder { get; set; }
