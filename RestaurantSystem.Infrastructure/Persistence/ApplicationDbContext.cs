@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -32,6 +33,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         /// overload and degrades every stamp to "System" with no error. <c>Program.cs</c> registers
         /// both together for that reason.
         /// </remarks>
+        [ActivatorUtilitiesConstructor]
         public ApplicationDbContext(
             DbContextOptions<ApplicationDbContext> options,
             IAuditIdentityProvider auditIdentity) : base(options)
@@ -68,6 +70,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Order-related DbSets
         public DbSet<Order> Orders { get; set; }
         public DbSet<TableServiceSession> TableServiceSessions { get; set; }
+        public DbSet<OrderChange> OrderChanges { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<OrderItemIngredient> OrderItemIngredients { get; set; }
         public DbSet<OrderPayment> OrderPayments { get; set; }
