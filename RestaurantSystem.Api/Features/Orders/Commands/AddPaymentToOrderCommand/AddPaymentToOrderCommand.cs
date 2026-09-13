@@ -20,6 +20,10 @@ public record AddPaymentToOrderCommand : ICommand<ApiResponse<OrderDto>>
     // brand-new payment instead of the retry the till intended.
     [JsonRequired]
     public Guid OperationId { get; set; }
+
+    /// <summary>Optional detail version; old clients may omit it.</summary>
+    public int? ExpectedVersion { get; set; }
+
     public PaymentMethod PaymentMethod { get; set; }
     public decimal Amount { get; set; }
     public string? TransactionId { get; set; }
@@ -35,13 +39,16 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
 {
     private readonly IOrderPaymentApplicator _paymentApplicator;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderPermittedActionsService? _permittedActionsService;
 
     public AddPaymentToOrderCommandHandler(
         IOrderPaymentApplicator paymentApplicator,
-        IOrderMappingService mappingService)
+        IOrderMappingService mappingService,
+        IOrderPermittedActionsService? permittedActionsService = null)
     {
         _paymentApplicator = paymentApplicator;
         _mappingService = mappingService;
+        _permittedActionsService = permittedActionsService;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(AddPaymentToOrderCommand command, CancellationToken cancellationToken)
@@ -58,6 +65,7 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
                 CardLastFourDigits = command.CardLastFourDigits,
                 CardType = command.CardType,
                 PaymentNotes = command.PaymentNotes,
+                ExpectedVersion = command.ExpectedVersion,
             },
             cancellationToken);
 
@@ -85,6 +93,13 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
                 ErrorCodes.PaymentOperationIdReused);
         }
 
+        if (result.Outcome == OrderPaymentApplicationOutcome.VersionConflict)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before recording the payment.",
+                ErrorCodes.OrderVersionConflict);
+        }
+
         if (result.Outcome == OrderPaymentApplicationOutcome.OrderNotInPayableStatus || result.Order == null)
         {
             return ApiResponse<OrderDto>.Failure($"Cannot add payment to {result.NotPayableStatus ?? "Completed"} order");
@@ -94,6 +109,11 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
         // so the UI can tell the cashier "already recorded" from a fresh success without
         // guessing from row counts.
         var orderDto = await _mappingService.MapToOrderDtoAsync(result.Order, cancellationToken);
+        if (_permittedActionsService is not null)
+        {
+            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(result.Order);
+        }
+
         return result.IsIdempotentReplay
             ? ApiResponse<OrderDto>.SuccessWithData(orderDto, "Payment already recorded")
             : ApiResponse<OrderDto>.SuccessWithData(orderDto, "Payment added successfully");

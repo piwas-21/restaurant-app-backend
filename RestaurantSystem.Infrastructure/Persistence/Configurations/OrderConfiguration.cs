@@ -88,6 +88,13 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        // The detail contract echoes this value and write handlers optionally require it. It is
+        // an application-managed concurrency token: the DbContext increments it for every tracked
+        // order update, while the migration supplies 1 to historical rows.
+        builder.Property(o => o.Version)
+            .HasDefaultValue(1)
+            .IsConcurrencyToken();
+
         // Indexes
         builder.HasIndex(o => o.UserId);
         builder.HasIndex(o => o.OrderDate);
@@ -128,8 +135,6 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.KitchenReleasedBy)
             .HasMaxLength(100);
 
-        builder.Property(o => o.Version)
-            .HasDefaultValue(1);
 
         // Focus shares the Orders row rather than getting a table of its own: it is read on every
         // order fetch, so a join would cost more than the five columns it saves. Column names are

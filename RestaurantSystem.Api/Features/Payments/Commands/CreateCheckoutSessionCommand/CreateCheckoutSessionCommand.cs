@@ -88,11 +88,8 @@ public class CreateCheckoutSessionCommandHandler
             throw new BadRequestException("Online payment is not available for this restaurant.");
         }
 
-        // AsNoTracking: the order is read for its price and its status and is never written here.
-        // Online payment does not touch the order — the tender, the deferred confirm and the
-        // fidelity award are all S5's, on the settle path.
+        // Track the order so adding a session bumps its aggregate version.
         var order = await _context.Orders
-            .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == command.OrderId && !o.IsDeleted, cancellationToken)
             ?? throw new NotFoundException("Order not found");
 
@@ -110,14 +107,15 @@ public class CreateCheckoutSessionCommandHandler
         var reused = await _reuse.TryReuseAsync(existing, amount, cancellationToken);
         if (reused is not null) return ApiResponse<CheckoutSessionDto>.SuccessWithData(reused);
 
+        // Retirement uses set-based writes and may have bumped this tracked aggregate's version.
+        // Reload before adding the replacement session so its aggregate touch cannot write stale state.
+        await _context.Entry(order).ReloadAsync(cancellationToken);
+        OnlinePaymentEligibility.EnsurePayable(order);
+
         var now = DateTime.UtcNow;
         var expiresAt = now.Add(SessionLifetime);
 
-        // `attempt` counts every session ever minted for this order, expired ones included, and is
-        // DERIVED rather than random on purpose. That makes two concurrent callers compute the same
-        // key, so Stripe replays one session to both and the unique index on SessionId rejects the
-        // second insert — one order cannot end up with two payable sessions. (The loser sees a 500
-        // and retries into the reuse path above, which is correct if ugly.)
+        // A derived attempt key makes Stripe replay concurrent creates for the same order.
         var idempotencyKey = $"checkout:{order.Id}:{existing.Count + 1}";
 
         var session = await _checkout.CreateAsync(
@@ -133,13 +131,19 @@ public class CreateCheckoutSessionCommandHandler
             },
             cancellationToken);
 
-        // A session with no URL cannot be paid. It is still RECORDED — as Failed, not Created — for
-        // two reasons: the session exists on the connected account whether or not we like it, and
-        // the row is what advances the attempt counter. Throwing without recording would replay the
-        // same idempotency key forever, and Stripe would hand back the same unusable session on
-        // every retry: the order could never be paid. Failed is terminal, so the reconciler (S7)
-        // will not cancel an order over it either.
+        // Record a URL-less session as Failed so its idempotency attempt is never replayed.
         var usable = !string.IsNullOrWhiteSpace(session.Url);
+
+        try
+        {
+            await _context.Entry(order).ReloadAsync(cancellationToken);
+            OnlinePaymentEligibility.EnsurePayable(order);
+        }
+        catch
+        {
+            await ExpireOrLogAsync(session.Id, order.Id, cancellationToken);
+            throw;
+        }
 
         _context.OrderCheckoutSessions.Add(new OrderCheckoutSession
         {
@@ -158,7 +162,15 @@ public class CreateCheckoutSessionCommandHandler
             CreatedBy = _currentUser.GetAuditIdentifier(),
         });
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await ExpireOrLogAsync(session.Id, order.Id, cancellationToken);
+            throw;
+        }
 
         if (string.IsNullOrWhiteSpace(session.Url))
         {
@@ -166,10 +178,23 @@ public class CreateCheckoutSessionCommandHandler
         }
 
         _logger.LogInformation(
-            "Checkout session {SessionId} created for order {OrderNumber} ({AmountMinor} {Currency})",
-            session.Id, order.OrderNumber, amount.Minor, amount.Currency);
+            "Checkout created for order {OrderId}/{OrderNumber} ({AmountMinor} {Currency})",
+            order.Id, order.OrderNumber, amount.Minor, amount.Currency);
 
         return ApiResponse<CheckoutSessionDto>.SuccessWithData(
             CheckoutSessionDto.From(session.Id, session.Url, expiresAt, amount.Currency, amount.Minor));
     }
+    private async Task ExpireOrLogAsync(
+        string sessionId, Guid orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _checkout.ExpireAsync(sessionId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to expire orphaned Stripe checkout for order {OrderId}", orderId);
+        }
+    }
+
 }

@@ -46,6 +46,21 @@ public class OrderSettlementEligibilityUnitTests
     }
 
     [Fact]
+    public void Processing_online_tender_blocks_manual_collection_until_reconciled()
+    {
+        var order = NewOrder(OrderStatus.Pending, PaymentStatus.Pending, 0m);
+        order.Payments.Add(new OrderPayment
+        {
+            PaymentMethod = PaymentMethod.OnlinePayment,
+            Status = PaymentStatus.Processing,
+            CreatedBy = nameof(OrderSettlementEligibilityUnitTests),
+        });
+
+        OrderSettlementEligibility.CanCollect(order).Should().BeFalse();
+        OrderSettlementEligibility.CanCollectQuery().Compile()(order).Should().BeFalse();
+    }
+
+    [Fact]
     public void Operational_predicate_keeps_unfinished_orders_but_excludes_reversals()
     {
         var predicate = OrderSettlementEligibility.OperationalQueuePredicate().Compile();

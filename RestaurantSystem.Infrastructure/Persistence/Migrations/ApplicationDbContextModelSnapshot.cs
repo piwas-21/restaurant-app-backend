@@ -2471,6 +2471,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("user_limit_amount");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(1)

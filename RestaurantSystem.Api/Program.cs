@@ -673,6 +673,7 @@ builder.Services.AddSingleton<IOutboundEmailLedger, OutboundEmailLedger>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
 builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationService>();
 builder.Services.AddOrderPaymentServices();
+builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
@@ -709,8 +710,10 @@ builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
 builder.Services.Configure<ReservationRetentionSettings>(builder.Configuration.GetSection("ReservationRetention"));
-builder.Services.Configure<CheckoutReconciliationSettings>(
-    builder.Configuration.GetSection(CheckoutReconciliationSettings.SectionName));
+builder.Services.AddOptions<CheckoutReconciliationSettings>()
+    .Bind(builder.Configuration.GetSection(CheckoutReconciliationSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configuration.GetSection("DeviceTelemetryRetention"));
 builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();

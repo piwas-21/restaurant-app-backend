@@ -19,18 +19,18 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly IStaffOrderOperationStore _operations;
-    private readonly IOrderMappingService _mapping;
+    private readonly IOrderResponseProjector _responses;
     private readonly IOrderNotificationService _notifications;
 
     public ReleaseStaffCounterOrderCommandHandler(
         ApplicationDbContext context, ICurrentUserService currentUser,
-        IStaffOrderOperationStore operations, IOrderMappingService mapping,
+        IStaffOrderOperationStore operations, IOrderResponseProjector responses,
         IOrderNotificationService notifications)
     {
         _context = context;
         _currentUser = currentUser;
         _operations = operations;
-        _mapping = mapping;
+        _responses = responses;
         _notifications = notifications;
     }
 
@@ -80,7 +80,6 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
                 {
                     order.Status = OrderStatus.Confirmed;
                 }
-                order.Version++;
                 order.UpdatedAt = now;
                 order.UpdatedBy = _currentUser.GetAuditIdentifier();
                 order.StatusHistory.Add(new OrderStatusHistory
@@ -111,7 +110,7 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            var dto = await _mapping.MapToOrderDtoAsync(order, CancellationToken.None);
+            var dto = await _responses.ProjectAsync(order, CancellationToken.None);
             if (!wasReleased)
             {
                 await _notifications.NotifyOrderCreatedAsync(dto);
@@ -159,7 +158,7 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
         }
         if (authoritative.IsKitchenReleased)
         {
-            var dto = await _mapping.MapToOrderDtoAsync(authoritative, cancellationToken);
+            var dto = await _responses.ProjectAsync(authoritative, cancellationToken);
             return ApiResponse<OrderDto>.SuccessWithData(dto, "Order was already released");
         }
 
@@ -190,7 +189,7 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
         {
             return ApiResponse<OrderDto>.Failure("The released order could not be found.");
         }
-        var dto = await _mapping.MapToOrderDtoAsync(replay.Order, cancellationToken);
+        var dto = await _responses.ProjectAsync(replay.Order, cancellationToken);
         return ApiResponse<OrderDto>.SuccessWithData(dto, "Order release already recorded");
     }
 

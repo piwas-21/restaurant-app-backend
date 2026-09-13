@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Models;
@@ -18,12 +19,7 @@ public class CheckoutExpirySweep : ICheckoutExpirySweep
 {
     private const string CancellationReason = "Online payment not completed";
 
-    /// <summary>
-    /// The tender states that mean the restaurant took the money, spelled out because
-    /// <c>IsCaptured()</c> is a C# extension method and cannot be translated into the conditional
-    /// UPDATE below — and that UPDATE is what makes the guard atomic rather than advisory.
-    /// <c>CapturedStatusesMatchIsCaptured</c> in the tests fails if the two ever drift.
-    /// </summary>
+    // Keep this SQL-translatable list in sync with PaymentStatusExtensions.IsCaptured (see drift test).
     private static readonly PaymentStatus[] CapturedStatuses =
     [
         PaymentStatus.Completed,
@@ -106,7 +102,7 @@ public class CheckoutExpirySweep : ICheckoutExpirySweep
                     // on it would mass-destroy live orders the first minute after a key mix-up.
                     case CheckoutSessionStatus.Expired:
                         expired++;
-                        if (await CancelAbandonedOrderAsync(session.OrderId, cancellationToken))
+                        if (await CancelAbandonedOrderAsync(session.Id, session.OrderId, cancellationToken))
                         {
                             cancelled++;
                         }
@@ -204,33 +200,36 @@ public class CheckoutExpirySweep : ICheckoutExpirySweep
     /// </para>
     /// <para>
     /// <b>Only with no other live session</b>, since a second session means a payment may be in
-    /// progress right now. That one stays a plain read: it concerns a different table, and losing
-    /// the race merely costs one more sweep.
+    /// progress right now. This predicate is part of the serializable conditional UPDATE below,
+    /// not a preflight read: a session created during the claim aborts the transaction instead of
+    /// being missed by a time-of-check/time-of-use race.
     /// </para>
     /// </remarks>
-    private async Task<bool> CancelAbandonedOrderAsync(Guid orderId, CancellationToken cancellationToken)
+    private async Task<bool> CancelAbandonedOrderAsync(
+        Guid expiredSessionId, Guid orderId, CancellationToken cancellationToken)
     {
-        var anotherSessionIsLive = await _context.OrderCheckoutSessions.AnyAsync(
-            s => s.OrderId == orderId && s.Status == CheckoutSessionStatus.Created, cancellationToken);
-
-        if (anotherSessionIsLive)
-        {
-            return false;
-        }
-
         var now = DateTime.UtcNow;
         var auditId = _currentUser.GetAuditIdentifier();
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        // Serializable turns the no-live-session predicate into part of the claim. If a checkout
+        // session is inserted concurrently, PostgreSQL aborts one transaction rather than letting
+        // this cancellation win on a stale snapshot.
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
 
         var claimed = await _context.Orders
             .Where(o => o.Id == orderId
                 && o.Status == OrderStatus.Pending
-                && !o.Payments.Any(p => CapturedStatuses.Contains(p.Status)))
+                && !o.Payments.Any(p => CapturedStatuses.Contains(p.Status))
+                && !_context.OrderCheckoutSessions.Any(session =>
+                    session.OrderId == orderId
+                    && session.Id != expiredSessionId
+                    && session.Status == CheckoutSessionStatus.Created))
             .ExecuteUpdateAsync(
                 o => o
                     .SetProperty(x => x.Status, OrderStatus.Cancelled)
                     .SetProperty(x => x.CancellationReason, CancellationReason)
+                    .SetProperty(x => x.Version, x => x.Version + 1)
                     // ExecuteUpdate bypasses the IAuditable stamper, as everywhere else here.
                     .SetProperty(x => x.UpdatedAt, now)
                     .SetProperty(x => x.UpdatedBy, auditId),

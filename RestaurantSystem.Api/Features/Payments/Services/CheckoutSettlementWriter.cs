@@ -165,7 +165,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     /// </remarks>
     private bool ConfirmIfDeferred(Order order)
     {
-        if (order.Type != OrderType.DineIn ||
+        if (!order.IsKitchenReleased || order.Type != OrderType.DineIn ||
             !OrderStatusTransitions.IsValid(order.Status, OrderStatus.Confirmed))
         {
             return false;
@@ -230,7 +230,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         await _fidelity.AwardEarnedPointsAsync(order, order.UserId, cancellationToken);
     }
 
-    private async Task<CheckoutSettlementDto> DescribeAsync(Guid orderId, CancellationToken cancellationToken)
+    public async Task<CheckoutSettlementDto> DescribeAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var order = await _context.Orders.AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken)

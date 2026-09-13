@@ -1,4 +1,6 @@
-﻿namespace RestaurantSystem.Api.Features.Orders.Dtos;
+using System.Text.Json.Serialization;
+
+namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
 public record OrderDto
 {
@@ -35,11 +37,16 @@ public record OrderDto
     public bool IsKitchenReleased { get; set; }
     public DateTime? KitchenReleasedAt { get; set; }
     public string? KitchenReleasedBy { get; set; }
+
+    /// <summary>Server-issued aggregate version for conditional order mutations.</summary>
     public int Version { get; set; }
 
     // Status
     public string Status { get; set; } = string.Empty;
     public string PaymentStatus { get; set; } = string.Empty;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<OrderPermittedActionDto>? PermittedActions { get; set; }
 
     // Focus Order
     public bool IsFocusOrder { get; set; }

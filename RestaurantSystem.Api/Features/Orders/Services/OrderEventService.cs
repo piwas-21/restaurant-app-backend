@@ -61,7 +61,7 @@ public class OrderEventService : IOrderEventService
         var eventData = new OrderEvent
         {
             EventType = "order-created",
-            Order = order,
+            Order = ForBroadcast(order),
             Timestamp = DateTime.UtcNow
         };
 
@@ -107,7 +107,7 @@ public class OrderEventService : IOrderEventService
         var eventData = new OrderEvent
         {
             EventType = "order-status-changed",
-            Order = order,
+            Order = ForBroadcast(order),
             PreviousStatus = previousStatus,
             Timestamp = DateTime.UtcNow
         };
@@ -139,7 +139,7 @@ public class OrderEventService : IOrderEventService
         var eventData = new OrderEvent
         {
             EventType = "order-ready",
-            Order = order,
+            Order = ForBroadcast(order),
             Timestamp = DateTime.UtcNow
         };
 
@@ -154,7 +154,7 @@ public class OrderEventService : IOrderEventService
         var eventData = new OrderEvent
         {
             EventType = "order-completed",
-            Order = order,
+            Order = ForBroadcast(order),
             Timestamp = DateTime.UtcNow
         };
 
@@ -169,7 +169,7 @@ public class OrderEventService : IOrderEventService
         var eventData = new OrderEvent
         {
             EventType = "focus-order-update",
-            Order = order,
+            Order = ForBroadcast(order),
             Timestamp = DateTime.UtcNow
         };
 
@@ -178,6 +178,9 @@ public class OrderEventService : IOrderEventService
 
         _logger.LogInformation("Notified staff about focus order update for {OrderNumber}", order.OrderNumber);
     }
+
+    private static OrderDto ForBroadcast(OrderDto order) =>
+        order with { PermittedActions = null };
 
     private List<ClientType> GetClientTypesForStatus(string status)
     {

@@ -199,6 +199,32 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Generic_status_update_cannot_release_a_held_order()
+    {
+        AuthenticateAsAdmin();
+        var create = await PostAsJsonAsync("/api/staff/orders", CreateBody(Guid.NewGuid(), false));
+        var created = (await ReadResponseAsync<ApiResponse<OrderDto>>(create))!.Data!;
+
+        var response = await Client.PutAsJsonAsync($"/api/orders/{created.Id}/status", new
+        {
+            newStatus = "Confirmed",
+            expectedVersion = created.Version
+        });
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        body.Success.Should().BeFalse();
+        body.ErrorCode.Should().Be(ErrorCodes.KitchenReleaseRequired);
+        await using var context = DatabaseFixture.CreateContext();
+        var order = await context.Orders
+            .Include(value => value.StatusHistory)
+            .SingleAsync(value => value.Id == created.Id);
+        order.IsKitchenReleased.Should().BeFalse();
+        order.Status.Should().Be(OrderStatus.Pending);
+        order.Version.Should().Be(created.Version);
+        order.StatusHistory.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task Release_requires_current_version_and_is_idempotent()
     {
         AuthenticateAsAdmin();

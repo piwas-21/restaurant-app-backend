@@ -12,11 +12,16 @@ public class CheckoutSessionReuse : ICheckoutSessionReuse
 {
     private readonly ApplicationDbContext _context;
     private readonly IStripeCheckoutClient _checkout;
+    private readonly ICheckoutSessionRetirement _retirement;
 
-    public CheckoutSessionReuse(ApplicationDbContext context, IStripeCheckoutClient checkout)
+    public CheckoutSessionReuse(
+        ApplicationDbContext context,
+        IStripeCheckoutClient checkout,
+        ICheckoutSessionRetirement retirement)
     {
         _context = context;
         _checkout = checkout;
+        _retirement = retirement;
     }
 
     /// <inheritdoc />
@@ -69,9 +74,9 @@ public class CheckoutSessionReuse : ICheckoutSessionReuse
         // Neither open nor complete: expired, or an id Stripe does not recognise (a key or account
         // swapped underneath us). Retire the row and let the caller mint a fresh session, rather
         // than handing the diner a dead page or wedging the order forever.
-        live.Status = CheckoutSessionStatus.Expired;
-        live.LastError = $"Stripe reported status '{remote?.Status ?? "unknown"}' when reusing.";
-        await _context.SaveChangesAsync(cancellationToken);
+        var reason = $"Stripe reported status '{remote?.Status ?? "unknown"}' when reusing.";
+        await _retirement.RetireAsync(
+            live, CheckoutSessionStatus.Expired, reason, cancellationToken);
 
         return null;
     }
