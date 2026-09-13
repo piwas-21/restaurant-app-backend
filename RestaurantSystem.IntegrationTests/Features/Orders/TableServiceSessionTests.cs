@@ -12,6 +12,7 @@ using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServic
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -281,6 +282,85 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         result.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionCurrencyMismatch);
     }
 
+    [Fact]
+    public async Task SessionBill_ReportsRoundSettlementStatesAndCollectsOnlyEligibleDebt()
+    {
+        var sessionId = await SeedSessionAsync(18);
+        var refunded = await SeedOrderAsync(sessionId, 18, 10m, Utc(12, 0));
+        var eligible = await SeedOrderAsync(sessionId, 18, 20m, Utc(12, 30));
+        await MarkRefundedAsync(refunded);
+
+        var bill = await Assembler().AssembleAsync(sessionId, CancellationToken.None);
+
+        bill.Should().NotBeNull();
+        bill!.EligibleOutstanding.Should().Be(20m);
+        bill.Credit.Should().Be(0m);
+        bill.Rounds.Select(round => round.SettlementState).Should()
+            .ContainInOrder("Refunded", "EligibleDebt");
+        bill.Rounds[0].CanCollect.Should().BeFalse();
+        bill.Rounds[1].CanCollect.Should().BeTrue();
+
+        var payment = await PayAsync(sessionId, expectedVersion: 1, amount: 10m);
+        payment.Success.Should().BeTrue();
+        await using var verify = _fixture.CreateContext();
+        var refundedRow = await verify.Orders.Include(order => order.Payments)
+            .SingleAsync(order => order.Id == refunded);
+        var eligibleRow = await verify.Orders.Include(order => order.Payments)
+            .SingleAsync(order => order.Id == eligible);
+        refundedRow.Payments.Should().ContainSingle(payment => payment.Status == PaymentStatus.Refunded);
+        eligibleRow.Payments.Should().ContainSingle(payment =>
+            payment.Status == PaymentStatus.Completed && payment.Amount == 10m);
+    }
+
+    [Fact]
+    public async Task SessionRead_ReportsLegacyOccupancyAndCloseParity()
+    {
+        var sessionId = await SeedSessionAsync(19);
+        await SeedOrderAsync(null, 19, 10m, Utc(12, 0));
+
+        await using var context = _fixture.CreateContext();
+        var dto = await new TableServiceSessionReader(context, Assembler()).ReadAsync(
+            sessionId, CancellationToken.None);
+
+        dto.Should().NotBeNull();
+        dto!.HasUnassignedActiveOrders.Should().BeTrue();
+        dto.LegacyActiveOrderCount.Should().Be(1);
+        dto.CanClose.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PaymentOperationLookup_IsCommittedOnlyInsideItsOwningSession()
+    {
+        var sessionId = await SeedSessionAsync(20);
+        await SeedOrderAsync(sessionId, 20, 10m, Utc(12, 0));
+        var operationId = Guid.NewGuid();
+        (await PayAsync(sessionId, expectedVersion: 1, amount: 3m, operationId: operationId))
+            .Success.Should().BeTrue();
+        var otherSessionId = await SeedSessionAsync(21);
+
+        await using var context = _fixture.CreateContext();
+        var mapping = new OrderMappingService(
+            context, new OrderDisplayCurrencyResolver(context),
+            NullLogger<OrderMappingService>.Instance);
+        var assembler = new TableBillAssembler(context, mapping, NullLogger<TableBillAssembler>.Instance);
+        var reader = new TableServiceSessionReader(context, assembler);
+        var handler = new GetTableServiceSessionPaymentOperationQueryHandler(context, reader, mapping);
+
+        var committed = await handler.Handle(
+            new GetTableServiceSessionPaymentOperationQuery(sessionId, operationId),
+            CancellationToken.None);
+        committed.Data!.Status.Should().Be("Committed");
+        committed.Data.Session.Should().NotBeNull();
+        committed.Data.Payments.Should().ContainSingle(payment => payment.Amount == 3m);
+
+        var crossSession = await handler.Handle(
+            new GetTableServiceSessionPaymentOperationQuery(otherSessionId, operationId),
+            CancellationToken.None);
+        crossSession.Data!.Status.Should().Be("Unknown");
+        crossSession.Data.Session.Should().BeNull();
+        crossSession.Data.Payments.Should().BeEmpty();
+    }
+
     private TableBillAssembler Assembler()
     {
         var context = _fixture.CreateContext();
@@ -293,7 +373,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
 
     private async Task<ApiResponse<TableServiceSessionDto>> PayAsync(
         Guid sessionId, int expectedVersion, decimal amount, string? currency = null,
-        DbCommandInterceptor? interceptor = null)
+        DbCommandInterceptor? interceptor = null, Guid? operationId = null)
     {
         await using var context = interceptor is null
             ? _fixture.CreateContext()
@@ -320,7 +400,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         {
             ServiceSessionId = sessionId,
             ExpectedVersion = expectedVersion,
-            OperationId = Guid.NewGuid(),
+            OperationId = operationId ?? Guid.NewGuid(),
             PaymentMethod = PaymentMethod.Cash,
             Amount = amount,
             Currency = currency,
@@ -419,6 +499,31 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         });
         await context.SaveChangesAsync();
         return id;
+    }
+
+    private async Task MarkRefundedAsync(Guid orderId)
+    {
+        await using var context = _fixture.CreateContext();
+        var order = await context.Orders.SingleAsync(value => value.Id == orderId);
+        var now = Utc(13, 0);
+        order.Status = OrderStatus.Completed;
+        order.PaymentStatus = PaymentStatus.Refunded;
+        order.TotalPaid = 0m;
+        order.RemainingAmount = order.Total;
+        context.OrderPayments.Add(new OrderPayment
+        {
+            OrderId = order.Id,
+            PaymentMethod = PaymentMethod.Cash,
+            Amount = order.Total,
+            Status = PaymentStatus.Refunded,
+            IsRefunded = true,
+            RefundedAmount = order.Total,
+            PaymentDate = now,
+            RefundDate = now,
+            CreatedAt = now,
+            CreatedBy = nameof(TableServiceSessionTests),
+        });
+        await context.SaveChangesAsync();
     }
 
     private async Task MarkCompletedAsync(Guid orderId)

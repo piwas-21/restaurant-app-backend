@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Reservations.Commands.CreateTableCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.DeleteTableCommand;
 using RestaurantSystem.Api.Features.Reservations.Commands.GenerateTableQRCodeCommand;
@@ -34,9 +36,23 @@ public class TablesController : ControllerBase
         [FromQuery] bool? isActive = null,
         [FromQuery] bool? isOutdoor = null)
     {
-        var query = new GetTablesQuery(isActive, isOutdoor);
+        var query = new GetTablesQuery(isActive, isOutdoor, IncludeOccupancy: false);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Get all tables with live occupancy for the staff table workspace.
+    /// </summary>
+    [HttpGet("occupancy")]
+    [RequireTableServiceStaff]
+    [RequireModule(ModuleIds.Cashier)]
+    public async Task<ActionResult<ApiResponse<List<TableDto>>>> GetStaffTables(
+        [FromQuery] bool? isActive = null,
+        [FromQuery] bool? isOutdoor = null)
+    {
+        var query = new GetTablesQuery(isActive, isOutdoor, IncludeOccupancy: true);
+        return Ok(await _mediator.SendQuery(query));
     }
 
     /// <summary>

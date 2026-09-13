@@ -73,8 +73,8 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
             .Where(o => !o.IsDeleted
                 && o.Type == OrderType.DineIn
                 && o.TableNumber == command.TableNumber
-                && o.ServiceSessionId == command.ServiceSessionId
-                && !TableBillAssembler.ExcludedStatuses.Contains(o.Status))
+                && o.ServiceSessionId == command.ServiceSessionId)
+            .Where(OrderSettlementEligibility.CanCollectQuery())
             .OrderBy(o => o.OrderDate).ThenBy(o => o.OrderNumber)
             .Select(o => new BillRound(o.Id, o.RemainingAmount))
             .ToListAsync(cancellationToken);

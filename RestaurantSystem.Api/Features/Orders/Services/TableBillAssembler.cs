@@ -18,17 +18,20 @@ public class TableBillAssembler : ITableBillAssembler
     private readonly IOrderMappingService _mappingService;
     private readonly ILogger<TableBillAssembler> _logger;
     private readonly ITableBillTargetResolver _targetResolver;
+    private readonly IOrderPermittedActionsService? _permittedActions;
 
     public TableBillAssembler(
         ApplicationDbContext context,
         IOrderMappingService mappingService,
         ILogger<TableBillAssembler> logger,
-        ITableBillTargetResolver? targetResolver = null)
+        ITableBillTargetResolver? targetResolver = null,
+        IOrderPermittedActionsService? permittedActions = null)
     {
         _context = context;
         _mappingService = mappingService;
         _logger = logger;
         _targetResolver = targetResolver ?? new TableBillTargetResolver(context);
+        _permittedActions = permittedActions;
     }
 
     /// <summary>
@@ -99,22 +102,32 @@ public class TableBillAssembler : ITableBillAssembler
     private async Task<TableBillDto?> AssembleLegacyUnassignedAsync(
         int tableNumber, CancellationToken cancellationToken)
     {
+        // Legacy table-number reads must follow the same authoritative settlement predicate as
+        // writes: a completed-but-unpaid round is still billable, while cancelled/refunded rows
+        // are not. This keeps GET and POST from disagreeing about the same legacy visit.
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
-            && o.ServiceSessionId == null
-            && !ExcludedStatuses.Contains(o.Status), cancellationToken);
+            && o.ServiceSessionId == null, cancellationToken,
+            OrderSettlementEligibility.OperationalQueuePredicate());
         return BuildBill(orders, tableNumber, null, null, null);
     }
 
     private async Task<List<Order>> QueryOrders(
         System.Linq.Expressions.Expression<Func<Order, bool>> predicate,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        System.Linq.Expressions.Expression<Func<Order, bool>>? settlementPredicate = null)
     {
-        return await _context.Orders
+        var query = _context.Orders
             .IncludeOrderLineGraph()
             .Include(o => o.Payments)
             .Include(o => o.StatusHistory)
             .Where(o => !o.IsDeleted && o.Type == OrderType.DineIn)
-            .Where(predicate)
+            .Where(predicate);
+        if (settlementPredicate is not null)
+        {
+            query = query.Where(settlementPredicate);
+        }
+
+        return await query
             .OrderBy(o => o.OrderDate).ThenBy(o => o.OrderNumber)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
@@ -146,7 +159,23 @@ public class TableBillAssembler : ITableBillAssembler
         {
             // QueryOrders eagerly loads every navigation MapToOrderDto reads. Keeping this path
             // synchronous makes a bill's cost independent of its number of member orders.
-            bill.Orders.Add(_mappingService.MapToOrderDto(order));
+            var dto = _mappingService.MapToOrderDto(order);
+            var canCollect = OrderSettlementEligibility.CanCollect(order);
+            var round = new TableBillRoundDto
+            {
+                Order = dto,
+                SettlementState = SettlementStateFor(order, canCollect),
+                Outstanding = OrderSettlementEligibility.Outstanding(order),
+                RefundedAmount = OrderSettlementEligibility.RefundedAmount(order),
+                Credit = OrderSettlementEligibility.Credit(order),
+                CanCollect = canCollect,
+                PermittedActions = _permittedActions?.GetPermittedActions(order)
+                    ?? Array.Empty<OrderPermittedActionDto>()
+            };
+            bill.Orders.Add(dto);
+            bill.Rounds.Add(round);
+            bill.EligibleOutstanding += canCollect ? round.Outstanding : 0m;
+            bill.Credit += round.Credit;
         }
 
         Summarize(bill);
@@ -154,6 +183,32 @@ public class TableBillAssembler : ITableBillAssembler
             "Assembled bill for table {TableNumber}, session {ServiceSessionId}: {OrderCount} orders, remaining {Remaining}",
             tableNumber, serviceSessionId, bill.OrderCount, bill.Remaining);
         return bill;
+    }
+
+    private static string SettlementStateFor(Order order, bool canCollect)
+    {
+        var refunded = OrderSettlementEligibility.RefundedAmount(order);
+        var captured = order.Payments.Where(payment => payment.Status.IsCaptured())
+            .Sum(payment => payment.Amount);
+        if (order.Status == OrderStatus.Refunded
+            || order.PaymentStatus == PaymentStatus.Refunded
+            || (captured > 0m && refunded >= captured))
+        {
+            return "Refunded";
+        }
+
+        if (refunded > 0m || order.PaymentStatus == PaymentStatus.PartiallyRefunded)
+        {
+            return "PartiallyRefunded";
+        }
+
+        if (OrderSettlementEligibility.Credit(order) > 0m
+            || order.PaymentStatus == PaymentStatus.Overpaid)
+        {
+            return "Credit";
+        }
+
+        return canCollect ? "EligibleDebt" : "Settled";
     }
 
     private static void Summarize(TableBillDto bill)
