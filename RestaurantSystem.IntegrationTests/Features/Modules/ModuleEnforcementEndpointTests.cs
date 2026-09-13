@@ -82,6 +82,8 @@ public class ModuleEnforcementEndpointTests : IAsyncLifetime
     // ── A module the tenant did not buy ──────────────────────────────────────
     [Theory]
     [InlineData("/api/Reservations")]              // reservations — controller-level gate
+    [InlineData("/api/Reservations/available-slots?date=2030-01-01&numberOfGuests=2")] // public booking route
+    [InlineData("/api/reservations/00000000-0000-0000-0000-000000000000/quick-approve")] // email route
     [InlineData("/api/FidelityPoints/balance")]    // loyalty
     [InlineData("/api/UserGroup")]                 // loyalty
     public async Task An_unbought_module_answers_404_with_ModuleNotEnabled(string url)
