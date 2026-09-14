@@ -17,7 +17,7 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// <see cref="ApplicationDbContext"/>; the ingredient customisation state (price + quantities JSON)
 /// is delegated to the single shared <see cref="ILineCustomizationBuilder"/>.
 /// </summary>
-public class BasketItemFactory : IBasketItemFactory
+public partial class BasketItemFactory : IBasketItemFactory
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
@@ -37,13 +37,8 @@ public class BasketItemFactory : IBasketItemFactory
         Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
         var explicitSelection = ExplicitCustomizationSelection.Resolve(product, item.CustomizationSelections);
-        var hasExplicitGroups = product.CustomizationGroups.Any(group => group.IsActive);
-        var selectedIngredients = hasExplicitGroups
-            ? explicitSelection.SelectedIngredientIds
-            : item.SelectedIngredients;
-        var ingredientQuantities = hasExplicitGroups
-            ? explicitSelection.IngredientQuantities
-            : item.IngredientQuantities;
+        var (selectedIngredients, ingredientQuantities) = ResolveIngredientSelection(
+            product, explicitSelection, item.SelectedIngredients, item.IngredientQuantities);
 
         foreach (var option in explicitSelection.ProductOptions)
             BasketChannelGuard.EnsureOrderable(option.Product, basketOrderType);
@@ -186,6 +181,7 @@ public class BasketItemFactory : IBasketItemFactory
         // instead of one round-trip per option (avoids N+1).
         var childProductIds = selectedOptions.Select(o => o.ItemId).Distinct().ToList();
         var childProducts = await _context.Products
+            .AsSplitQuery()
             .Include(p => p.DetailedIngredients)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.IngredientOptions)

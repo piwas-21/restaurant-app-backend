@@ -92,6 +92,7 @@ public class BasketService : IBasketService
         {
             // Validate product exists and is available
             var product = await _context.Products
+                .AsSplitQuery()
                 .Include(p => p.Variations)
                 .Include(p => p.DetailedIngredients)
                 .Include(p => p.CustomizationGroups)

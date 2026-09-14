@@ -232,6 +232,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         }
 
         var products = await _context.Products
+            .AsSplitQuery()
             .Include(product => product.DetailedIngredients)
             .Include(product => product.CustomizationGroups)
                 .ThenInclude(group => group.IngredientOptions)
