@@ -40,6 +40,13 @@ public static class ProductDtoIncludes
                 .ThenInclude(si => si.SideItemProduct)
             .Include(p => p.DetailedIngredients)
                 .ThenInclude(di => di.Descriptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.Descriptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    .ThenInclude(option => option.OptionProduct)
             // Down to the option products' own recipes: the shared bundle mapper projects them, and
             // an unloaded collection is EMPTY rather than absent, so the echo would state that every
             // option of every bundle has no ingredients.

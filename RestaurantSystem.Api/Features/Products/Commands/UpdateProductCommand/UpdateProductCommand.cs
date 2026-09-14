@@ -49,7 +49,8 @@ public record UpdateProductCommand(
     // A bundle COMPONENT: not listed in the catalogue and not orderable on its own (see
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
-    bool IsComponent = false
+    bool IsComponent = false,
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -89,6 +90,12 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             .Include(p => p.SuggestedSideItems)
             .Include(p => p.DetailedIngredients)
                 .ThenInclude(di => di.Descriptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.Descriptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
             .Include(p => p.MenuDefinition)
             .FirstOrDefaultAsync(p => p.Id == command.Id && !p.IsDeleted, cancellationToken);
 
@@ -362,6 +369,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 _currentUserService.GetAuditIdentifier(),
                 _logger,
                 cancellationToken);
+        }
+
+        if (command.CustomizationGroups != null)
+        {
+            await ProductCustomizationGroupSynchronizer.SyncAsync(
+                _context, product, command.CustomizationGroups,
+                _currentUserService.GetAuditIdentifier(), cancellationToken);
         }
 
         // Update Menu Definition.

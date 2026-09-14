@@ -46,6 +46,10 @@ public record ProductDto
     public List<ProductVariationDto> Variations { get; init; } = [];
     public List<SideItemDto> SuggestedSideItems { get; init; } = [];
     /// <summary>
+    /// Explicit, ordered choice groups. Empty means the legacy ingredient/sauce flow remains active.
+    /// </summary>
+    public List<ProductCustomizationGroupDto> CustomizationGroups { get; init; } = [];
+    /// <summary>
     /// A bundle's schedule and sections, in the same shape <c>GET /api/Menus/{id}</c> serves
     /// (#468). It used to be the WRITE contract's <c>MenuDefinitionDto</c>, whose section items
     /// carry an option's identity and price and nothing else — so a reader that opened a bundle by

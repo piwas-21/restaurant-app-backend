@@ -47,7 +47,8 @@ public record CreateProductCommand(
     // A bundle COMPONENT: not listed in the catalogue and not orderable on its own (see
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
-    bool IsComponent = false
+    bool IsComponent = false,
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -256,6 +257,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 {
                     var ingredient = new ProductIngredient
                     {
+                        Id = ingredientDto.Id ?? Guid.NewGuid(),
                         ProductId = product.Id,
                         Name = ingredientDto.Name,
                         IsOptional = ingredientDto.IsOptional,
@@ -305,6 +307,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     }
                 }
 
+            }
+
+            if (command.CustomizationGroups != null)
+            {
+                await ProductCustomizationGroupSynchronizer.SyncAsync(
+                    _context, product, command.CustomizationGroups,
+                    _currentUserService.GetAuditIdentifier(), cancellationToken);
             }
 
             await _context.SaveChangesAsync(cancellationToken);
