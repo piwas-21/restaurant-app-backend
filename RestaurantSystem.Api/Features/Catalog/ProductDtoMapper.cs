@@ -134,7 +134,7 @@ public static class ProductDtoMapper
         return dto;
     }
 
-    private static ProductCustomizationGroupDto MapCustomizationGroup(ProductCustomizationGroup group)
+    public static ProductCustomizationGroupDto MapCustomizationGroup(ProductCustomizationGroup group)
         => new()
         {
             Id = group.Id,

@@ -54,6 +54,19 @@ public static class ProductDtoIncludes
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.DetailedIngredients)
                         .ThenInclude(di => di.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.CustomizationGroups)
+                        .ThenInclude(group => group.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.CustomizationGroups)
+                        .ThenInclude(group => group.IngredientOptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.CustomizationGroups)
+                        .ThenInclude(group => group.ProductOptions)
+                            .ThenInclude(option => option.OptionProduct)
             .AsSplitQuery();
     }
 }
