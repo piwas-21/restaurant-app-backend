@@ -18,7 +18,8 @@ public record AddToBasketCommand(
     List<Guid>? AddedIngredients,
     Dictionary<Guid, int>? IngredientQuantities,
     List<SelectedSideItemDto>? SelectedSideItems,
-    List<SelectedMenuOptionDto>? SelectedMenuOptions
+    List<SelectedMenuOptionDto>? SelectedMenuOptions,
+    List<CustomizationGroupSelectionDto>? CustomizationSelections = null
 ) : ICommand<ApiResponse<BasketDto>>;
 
 
@@ -53,7 +54,8 @@ public class AddToBasketCommandHandler : ICommandHandler<AddToBasketCommand, Api
                 AddedIngredients = command.AddedIngredients,
                 IngredientQuantities = command.IngredientQuantities,
                 SelectedSideItems = command.SelectedSideItems,
-                SelectedMenuOptions = command.SelectedMenuOptions
+                SelectedMenuOptions = command.SelectedMenuOptions,
+                CustomizationSelections = command.CustomizationSelections
             };
 
             var basket = await _basketService.AddItemToBasketAsync(

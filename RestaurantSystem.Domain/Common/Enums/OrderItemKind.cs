@@ -37,5 +37,6 @@ namespace RestaurantSystem.Domain.Common.Enums;
 public enum OrderItemKind
 {
     BundleChild = 0,
-    SideItem = 1
+    SideItem = 1,
+    CustomizationOption = 2
 }

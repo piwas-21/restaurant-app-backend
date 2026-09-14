@@ -29,6 +29,8 @@ public class BasketItem : Entity
     public virtual Menu? Menu { get; set; }
 
     public Guid? ParentBasketItemId { get; set; }
+    /// <summary>The explicit product-option membership represented by this child row.</summary>
+    public Guid? ProductCustomizationOptionId { get; set; }
     public virtual BasketItem? ParentBasketItem { get; set; }
     public virtual ICollection<BasketItem> ChildBasketItems { get; set; } = new List<BasketItem>();
 }

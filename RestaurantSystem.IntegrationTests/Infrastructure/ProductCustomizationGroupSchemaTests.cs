@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -91,6 +93,46 @@ public class ProductCustomizationGroupSchemaTests : IntegrationTestBase
 
         await act.Should().ThrowAsync<DbUpdateException>(
             "group membership must be unambiguous when the server validates a selected ingredient id");
+    }
+
+    [Fact]
+    public async Task Unchanged_sync_preserves_group_and_membership_ids()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var owner = NewProduct("Stable IDs");
+        var ingredient = NewIngredient(owner, "Cheddar");
+        var group = NewGroup(owner, "Cheese", min: 0, max: 1);
+        var membership = NewIngredientOption(ingredient);
+        group.IngredientOptions.Add(membership);
+        context.Add(group);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var product = await context.Products
+            .Include(item => item.DetailedIngredients)
+            .Include(item => item.CustomizationGroups).ThenInclude(item => item.Descriptions)
+            .Include(item => item.CustomizationGroups).ThenInclude(item => item.IngredientOptions)
+            .Include(item => item.CustomizationGroups).ThenInclude(item => item.ProductOptions)
+            .SingleAsync(item => item.Id == owner.Id);
+        await ProductCustomizationGroupSynchronizer.SyncAsync(context, product,
+        [
+            new ProductCustomizationGroupDto
+            {
+                Id = group.Id, Name = group.Name, MinSelection = 0, MaxSelection = 1, IsActive = true,
+                IngredientOptions =
+                [
+                    new ProductCustomizationIngredientOptionDto
+                    {
+                        Id = membership.Id, ProductIngredientId = ingredient.Id
+                    }
+                ]
+            }
+        ], "test", CancellationToken.None);
+        await context.SaveChangesAsync();
+
+        (await context.ProductCustomizationGroups.SingleAsync()).Id.Should().Be(group.Id);
+        (await context.ProductCustomizationIngredientOptions.SingleAsync()).Id.Should().Be(membership.Id);
     }
 
     [Fact]

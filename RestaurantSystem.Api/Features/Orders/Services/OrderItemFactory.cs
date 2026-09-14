@@ -46,7 +46,6 @@ public class OrderItemFactory : IOrderItemFactory
         {
             return await AddMenuItemAsync(order, itemDto, pricesAreTrusted, cancellationToken);
         }
-
         if (itemDto.ProductId.HasValue)
         {
             // A composed line is REFUSED on the untrusted path rather than priced from the
@@ -70,7 +69,6 @@ public class OrderItemFactory : IOrderItemFactory
 
             await AddProductItemRecursiveAsync(order, itemDto, parentItem: null, pricesAreTrusted, cancellationToken);
         }
-
         // Neither MenuId nor ProductId: preserve the original fall-through.
         return null;
     }
@@ -145,6 +143,8 @@ public class OrderItemFactory : IOrderItemFactory
         product ??= await _context.Products
             .Include(candidate => candidate.Variations)
             .Include(candidate => candidate.DetailedIngredients)
+            .Include(candidate => candidate.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
             .AsSplitQuery()
             .FirstOrDefaultAsync(candidate => candidate.Id == itemDto.ProductId && !candidate.IsDeleted,
                 cancellationToken);

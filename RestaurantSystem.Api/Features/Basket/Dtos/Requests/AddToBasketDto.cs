@@ -12,6 +12,7 @@ public record AddToBasketDto
     public List<Guid>? SelectedIngredients { get; set; }
     public List<Guid>? AddedIngredients { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; } // { ingredientId: quantity }
+    public List<CustomizationGroupSelectionDto>? CustomizationSelections { get; set; }
 
     // Selected side items with quantities
     public List<SelectedSideItemDto>? SelectedSideItems { get; set; }

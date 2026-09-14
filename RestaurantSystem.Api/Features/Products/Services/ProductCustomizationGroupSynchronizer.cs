@@ -77,9 +77,6 @@ internal static class ProductCustomizationGroupSynchronizer
         string auditIdentifier)
     {
         context.ProductCustomizationGroupDescriptions.RemoveRange(group.Descriptions);
-        context.ProductCustomizationIngredientOptions.RemoveRange(group.IngredientOptions);
-        context.ProductCustomizationProductOptions.RemoveRange(group.ProductOptions);
-
         group.Descriptions = dto.Content.Select(entry => new ProductCustomizationGroupDescription
         {
             Id = Guid.NewGuid(),
@@ -90,27 +87,74 @@ internal static class ProductCustomizationGroupSynchronizer
             CreatedAt = DateTime.UtcNow,
             CreatedBy = auditIdentifier
         }).ToList();
-        group.IngredientOptions = dto.IngredientOptions.Select(option => new ProductCustomizationIngredientOption
+
+        SyncIngredientOptions(context, group, dto.IngredientOptions, auditIdentifier);
+        SyncProductOptions(context, group, dto.ProductOptions, auditIdentifier);
+    }
+
+    private static void SyncIngredientOptions(
+        ApplicationDbContext context,
+        ProductCustomizationGroup group,
+        IReadOnlyCollection<ProductCustomizationIngredientOptionDto> incoming,
+        string auditIdentifier)
+    {
+        var incomingIds = incoming.Select(option => option.Id).OfType<Guid>().ToHashSet();
+        context.ProductCustomizationIngredientOptions.RemoveRange(
+            group.IngredientOptions.Where(option => !incomingIds.Contains(option.Id)).ToList());
+
+        foreach (var dto in incoming)
         {
-            Id = Guid.NewGuid(),
-            ProductCustomizationGroupId = group.Id,
-            ProductIngredientId = option.ProductIngredientId,
-            DisplayOrder = option.DisplayOrder,
-            IsDefault = option.IsDefault,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = auditIdentifier
-        }).ToList();
-        group.ProductOptions = dto.ProductOptions.Select(option => new ProductCustomizationProductOption
+            var option = dto.Id.HasValue
+                ? group.IngredientOptions.FirstOrDefault(candidate => candidate.Id == dto.Id.Value)
+                    ?? throw new BadRequestException("An ingredient membership does not belong to this group")
+                : new ProductCustomizationIngredientOption
+                {
+                    Id = Guid.NewGuid(),
+                    ProductCustomizationGroupId = group.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = auditIdentifier
+                };
+            option.ProductIngredientId = dto.ProductIngredientId;
+            option.DisplayOrder = dto.DisplayOrder;
+            option.IsDefault = dto.IsDefault;
+            option.UpdatedAt = DateTime.UtcNow;
+            option.UpdatedBy = auditIdentifier;
+            if (!dto.Id.HasValue)
+                group.IngredientOptions.Add(option);
+        }
+    }
+
+    private static void SyncProductOptions(
+        ApplicationDbContext context,
+        ProductCustomizationGroup group,
+        IReadOnlyCollection<ProductCustomizationProductOptionDto> incoming,
+        string auditIdentifier)
+    {
+        var incomingIds = incoming.Select(option => option.Id).OfType<Guid>().ToHashSet();
+        context.ProductCustomizationProductOptions.RemoveRange(
+            group.ProductOptions.Where(option => !incomingIds.Contains(option.Id)).ToList());
+
+        foreach (var dto in incoming)
         {
-            Id = Guid.NewGuid(),
-            ProductCustomizationGroupId = group.Id,
-            OptionProductId = option.OptionProductId,
-            AdditionalPrice = option.AdditionalPrice,
-            DisplayOrder = option.DisplayOrder,
-            IsDefault = option.IsDefault,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = auditIdentifier
-        }).ToList();
+            var option = dto.Id.HasValue
+                ? group.ProductOptions.FirstOrDefault(candidate => candidate.Id == dto.Id.Value)
+                    ?? throw new BadRequestException("A product membership does not belong to this group")
+                : new ProductCustomizationProductOption
+                {
+                    Id = Guid.NewGuid(),
+                    ProductCustomizationGroupId = group.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = auditIdentifier
+                };
+            option.OptionProductId = dto.OptionProductId;
+            option.AdditionalPrice = dto.AdditionalPrice;
+            option.DisplayOrder = dto.DisplayOrder;
+            option.IsDefault = dto.IsDefault;
+            option.UpdatedAt = DateTime.UtcNow;
+            option.UpdatedBy = auditIdentifier;
+            if (!dto.Id.HasValue)
+                group.ProductOptions.Add(option);
+        }
     }
 
     private static void ValidateShape(IReadOnlyCollection<ProductCustomizationGroupDto> groups)

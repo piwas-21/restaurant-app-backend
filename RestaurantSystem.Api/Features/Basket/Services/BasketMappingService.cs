@@ -216,6 +216,7 @@ public class BasketMappingService : IBasketMappingService
         {
             Id = child.Id,
             ProductId = child.ProductId,
+            ProductCustomizationOptionId = child.ProductCustomizationOptionId,
             ProductName = child.Product?.Name,
             Quantity = child.Quantity,
             UnitPrice = child.UnitPrice,

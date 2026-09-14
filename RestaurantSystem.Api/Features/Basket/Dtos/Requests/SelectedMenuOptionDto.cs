@@ -10,4 +10,5 @@ public record SelectedMenuOptionDto
     public string? SpecialInstructions { get; set; }
     public List<Guid>? SelectedIngredients { get; set; }
     public Dictionary<Guid, int>? IngredientQuantities { get; set; }
+    public List<CustomizationGroupSelectionDto>? CustomizationSelections { get; set; }
 }

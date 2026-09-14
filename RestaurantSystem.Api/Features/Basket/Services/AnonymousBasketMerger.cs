@@ -233,8 +233,16 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
 
         var products = await _context.Products
             .Include(product => product.DetailedIngredients)
+            .Include(product => product.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+                    .ThenInclude(option => option.ProductIngredient)
+            .Include(product => product.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    .ThenInclude(option => option.OptionProduct)
             .Where(product => productIds.Contains(product.Id))
             .ToDictionaryAsync(product => product.Id);
+
+        var childrenByParent = ChildrenByParent(lines);
 
         foreach (var line in lines)
         {
@@ -242,6 +250,9 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
             {
                 line.Product = product;
                 SauceSelectionRule.EnsureWithinMaximum(line);
+                ExplicitCustomizationSelection.EnsurePersisted(
+                    product, line,
+                    childrenByParent.TryGetValue(line.Id, out var children) ? children : []);
             }
         }
     }
