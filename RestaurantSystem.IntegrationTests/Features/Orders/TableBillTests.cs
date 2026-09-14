@@ -43,9 +43,9 @@ public class TableBillTests : IAsyncLifetime
     [Fact]
     public async Task Bill_IsTheUnionOfOpenOrdersOldestFirst()
     {
-        // Three rounds on table 7, plus the decoys: a completed round (cleared),
-        // a cancelled one, and a takeaway that merely carries the table number
-        // for delivery notes. Only the two open DineIn rounds may bill.
+        // Three DineIn rounds on table 7, including a completed-but-unpaid round, plus
+        // the decoys: a cancelled one and a takeaway that merely carries the table
+        // number for delivery notes. A completed unpaid round remains billable.
         var round1 = await SeedDineInOrderAsync(tableNumber: 7, total: 30m, orderedAt: Utc(12, 0));
         await SeedDineInOrderAsync(tableNumber: 7, total: 20m, orderedAt: Utc(12, 45));
         await SeedDineInOrderAsync(tableNumber: 7, total: 99m, orderedAt: Utc(11, 0), status: OrderStatus.Completed);
@@ -55,11 +55,11 @@ public class TableBillTests : IAsyncLifetime
         var bill = await GetBillAsync(7);
 
         bill.Should().NotBeNull();
-        bill!.OrderCount.Should().Be(2, "two open DineIn rounds — completed/cancelled/takeaway never bill");
+        bill!.OrderCount.Should().Be(3, "completed unpaid rounds remain billable; cancelled/takeaway rows do not");
         bill.Orders.Single(o => o.Id == round1).OrderDate.Should().Be(
             Utc(12, 0), "the bill reads in the order the table ordered");
-        bill.Total.Should().Be(50m);
-        bill.Remaining.Should().Be(50m);
+        bill.Total.Should().Be(149m);
+        bill.Remaining.Should().Be(149m);
         bill.TotalPaid.Should().Be(0m);
     }
 
@@ -198,18 +198,26 @@ public class TableBillTests : IAsyncLifetime
         var response = await PayBillAsync(2, amount: 1m);
 
         response.Success.Should().BeFalse();
-        response.Errors.Should().ContainSingle().Which.Should().Contain("no outstanding balance");
+        response.Errors.Should().ContainSingle().Which.Should().Match(error =>
+            error.Contains("no outstanding balance", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("No open orders", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
-    public async Task BillPayment_WithNoOpenOrders_IsRefused()
+    public async Task BillPayment_CompletedUnpaidLegacyRound_IsCollectible()
     {
-        await SeedDineInOrderAsync(tableNumber: 1, total: 30m, orderedAt: Utc(12, 0), status: OrderStatus.Completed);
+        var orderId = await SeedDineInOrderAsync(
+            tableNumber: 1, total: 30m, orderedAt: Utc(12, 0), status: OrderStatus.Completed);
 
         var response = await PayBillAsync(1, amount: 10m);
 
-        response.Success.Should().BeFalse();
-        response.Errors.Should().ContainSingle().Which.Should().Contain("No open orders");
+        response.Success.Should().BeTrue();
+        response.Data!.Remaining.Should().Be(20m);
+        await using var verify = _fixture.CreateContext();
+        var order = await verify.Orders.Include(value => value.Payments).SingleAsync(value => value.Id == orderId);
+        order.TotalPaid.Should().Be(10m);
+        order.RemainingAmount.Should().Be(20m);
+        order.Payments.Should().ContainSingle();
     }
 
     // ---------------------------------------------------------------------

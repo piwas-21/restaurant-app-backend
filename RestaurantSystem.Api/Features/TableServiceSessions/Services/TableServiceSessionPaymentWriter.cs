@@ -40,9 +40,8 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
 
         var orders = await _context.Orders
             .Where(order => !order.IsDeleted
-                && order.ServiceSessionId == session.Id
-                && order.Status != OrderStatus.Cancelled
-                && order.RemainingAmount > 0)
+                && order.ServiceSessionId == session.Id)
+            .Where(OrderSettlementEligibility.CanCollectQuery())
             .OrderBy(order => order.OrderDate)
             .ThenBy(order => order.OrderNumber)
             .Select(order => new BillRound(order.Id, order.RemainingAmount))

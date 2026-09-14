@@ -56,7 +56,8 @@ public interface ILineCustomizationBuilder
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities,
         int sauceIncludedFree = 0,
-        int? sauceMax = null);
+        int? sauceMax = null,
+        ICollection<ProductCustomizationGroup>? explicitGroups = null);
 }
 
 public class LineCustomizationBuilder : ILineCustomizationBuilder
@@ -74,7 +75,8 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities,
         int sauceIncludedFree = 0,
-        int? sauceMax = null)
+        int? sauceMax = null,
+        ICollection<ProductCustomizationGroup>? explicitGroups = null)
     {
         SauceSelectionRule.EnsureWithinMaximum(detailedIngredients, selectedIngredients, sauceMax);
 
@@ -93,7 +95,7 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
 
         var customizationPrice = expressedAnIngredientChoice
             ? _basketPricingService.CalculateIngredientCustomizationPrice(
-                detailedIngredients, selectedIngredients, ingredientQuantities, sauceIncludedFree)
+                detailedIngredients, selectedIngredients, ingredientQuantities, sauceIncludedFree, explicitGroups)
             : 0m;
 
         var resolvedQuantities = ResolveIngredientQuantities(

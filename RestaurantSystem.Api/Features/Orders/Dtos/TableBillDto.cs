@@ -24,8 +24,17 @@ public record TableBillDto
     /// <summary>Server clock instant the bill was assembled (UTC).</summary>
     public DateTime GeneratedAt { get; set; }
 
-    /// <summary>Bill rounds, oldest first.</summary>
+    /// <summary>Settlement-annotated rounds, oldest first.</summary>
+    public List<TableBillRoundDto> Rounds { get; set; } = new();
+
+    /// <summary>Compatibility projection of the rounds' orders, oldest first.</summary>
     public List<OrderDto> Orders { get; set; } = new();
+
+    /// <summary>Outstanding amount on rounds that are currently eligible for collection.</summary>
+    public decimal EligibleOutstanding { get; set; }
+
+    /// <summary>Net overpayment credit across the bill's rounds.</summary>
+    public decimal Credit { get; set; }
 
     public int OrderCount { get; set; }
 

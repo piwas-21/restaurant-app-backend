@@ -619,6 +619,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("parent_basket_item_id");
 
+                    b.Property<Guid?>("ProductCustomizationOptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_customization_option_id");
+
                     b.Property<Guid?>("ProductId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_id");
@@ -3651,6 +3655,265 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("product_categories");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<int>("IncludedFreeUnits")
+                        .HasColumnType("integer")
+                        .HasColumnName("included_free_units");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<int>("MaxSelection")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_selection");
+
+                    b.Property<int>("MinSelection")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_selection");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_customization_groups");
+
+                    b.HasIndex("ProductId", "DisplayOrder");
+
+                    b.ToTable("product_customization_groups", t =>
+                        {
+                            t.HasCheckConstraint("ck_product_customization_group_free", "included_free_units >= 0");
+
+                            t.HasCheckConstraint("ck_product_customization_group_max", "max_selection >= min_selection");
+
+                            t.HasCheckConstraint("ck_product_customization_group_min", "min_selection >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationGroupDescription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("ProductCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_customization_group_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_customization_group_descriptions");
+
+                    b.HasIndex("ProductCustomizationGroupId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("product_customization_group_descriptions");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationIngredientOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<Guid>("ProductCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_customization_group_id");
+
+                    b.Property<Guid>("ProductIngredientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_ingredient_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_customization_ingredient_options");
+
+                    b.HasIndex("ProductIngredientId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_product_customization_ingredient_options_product_ingredient~");
+
+                    b.HasIndex("ProductCustomizationGroupId", "DisplayOrder");
+
+                    b.ToTable("product_customization_ingredient_options");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationProductOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("AdditionalPrice")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("additional_price");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<Guid>("OptionProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_product_id");
+
+                    b.Property<Guid>("ProductCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_customization_group_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_product_customization_product_options");
+
+                    b.HasIndex("OptionProductId")
+                        .HasDatabaseName("ix_product_customization_product_options_option_product_id");
+
+                    b.HasIndex("ProductCustomizationGroupId", "DisplayOrder");
+
+                    b.HasIndex("ProductCustomizationGroupId", "OptionProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_product_customization_product_options_product_customizatio~1");
+
+                    b.ToTable("product_customization_product_options", t =>
+                        {
+                            t.HasCheckConstraint("ck_product_customization_product_option_price", "additional_price >= 0");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductDescription", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5944,6 +6207,72 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", "Product")
+                        .WithMany("CustomizationGroups")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_customization_groups_products_product_id");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationGroupDescription", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", "ProductCustomizationGroup")
+                        .WithMany("Descriptions")
+                        .HasForeignKey("ProductCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_customization_group_descriptions_product_customizat~");
+
+                    b.Navigation("ProductCustomizationGroup");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationIngredientOption", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", "ProductCustomizationGroup")
+                        .WithMany("IngredientOptions")
+                        .HasForeignKey("ProductCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_customization_ingredient_options_product_customizat~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductIngredient", "ProductIngredient")
+                        .WithMany("CustomizationOptionMemberships")
+                        .HasForeignKey("ProductIngredientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_customization_ingredient_options_productingredients~");
+
+                    b.Navigation("ProductCustomizationGroup");
+
+                    b.Navigation("ProductIngredient");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationProductOption", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", "OptionProduct")
+                        .WithMany("CustomizationOptionMemberships")
+                        .HasForeignKey("OptionProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_customization_product_options_products_option_produ~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", "ProductCustomizationGroup")
+                        .WithMany("ProductOptions")
+                        .HasForeignKey("ProductCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_customization_product_options_product_customization~");
+
+                    b.Navigation("OptionProduct");
+
+                    b.Navigation("ProductCustomizationGroup");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductDescription", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Product", "Product")
@@ -6289,6 +6618,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Product", b =>
                 {
+                    b.Navigation("CustomizationGroups");
+
+                    b.Navigation("CustomizationOptionMemberships");
+
                     b.Navigation("Descriptions");
 
                     b.Navigation("DetailedIngredients");
@@ -6306,8 +6639,19 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Variations");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", b =>
+                {
+                    b.Navigation("Descriptions");
+
+                    b.Navigation("IngredientOptions");
+
+                    b.Navigation("ProductOptions");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductIngredient", b =>
                 {
+                    b.Navigation("CustomizationOptionMemberships");
+
                     b.Navigation("Descriptions");
                 });
 

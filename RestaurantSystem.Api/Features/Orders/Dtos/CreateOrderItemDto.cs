@@ -1,5 +1,6 @@
 ﻿
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 
 namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
@@ -33,6 +34,7 @@ public record CreateOrderItemDto
     // "priced as before" for every caller that exists today, which is what keeps the anonymous path
     // byte-identical.
     public List<Guid>? SelectedIngredientIds { get; set; }
+    public List<CustomizationGroupSelectionDto>? CustomizationSelections { get; set; }
 
     // The menu section that owns this option. Staff bundle children must carry it so the server
     // prices the exact section membership rather than choosing the first matching product across

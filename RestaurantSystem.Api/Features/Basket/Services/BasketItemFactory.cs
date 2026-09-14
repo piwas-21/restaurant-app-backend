@@ -17,7 +17,7 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 /// <see cref="ApplicationDbContext"/>; the ingredient customisation state (price + quantities JSON)
 /// is delegated to the single shared <see cref="ILineCustomizationBuilder"/>.
 /// </summary>
-public class BasketItemFactory : IBasketItemFactory
+public partial class BasketItemFactory : IBasketItemFactory
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
@@ -36,17 +36,25 @@ public class BasketItemFactory : IBasketItemFactory
     public async Task<BasketItem> BuildRegularItemAsync(
         Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
-        // Calculate unit price
+        var explicitSelection = ExplicitCustomizationSelection.Resolve(product, item.CustomizationSelections);
+        var (selectedIngredients, ingredientQuantities) = ResolveIngredientSelection(
+            product, explicitSelection, item.SelectedIngredients, item.IngredientQuantities);
+
+        foreach (var option in explicitSelection.ProductOptions)
+            BasketChannelGuard.EnsureOrderable(option.Product, basketOrderType);
+
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
 
         // Ingredient customization (price + quantities JSON) via the single shared writer, so the
         // regular and bundle-child paths can never diverge on a new field. Regular items keep the
         // verbatim-client-map precedence; the sauce allowance (plan D10) is this product's own.
         var customization = _lineCustomizationBuilder.Build(
-            product.DetailedIngredients, item.SelectedIngredients,
-            item.IngredientQuantities, preferProvidedQuantities: true,
-            sauceIncludedFree: product.SauceIncludedFree, sauceMax: product.SauceMax);
+            product.DetailedIngredients, selectedIngredients,
+            ingredientQuantities, preferProvidedQuantities: true,
+            sauceIncludedFree: product.SauceIncludedFree, sauceMax: product.SauceMax,
+            explicitGroups: product.CustomizationGroups);
         decimal customizationPrice = customization.CustomizationPrice;
+        customizationPrice += explicitSelection.ProductOptions.Sum(option => option.AdditionalPrice);
 
         // Calculate side items price. Drop non-positive quantities first: side-item
         // quantities are client-supplied, and a negative quantity would otherwise
@@ -96,7 +104,7 @@ public class BasketItemFactory : IBasketItemFactory
             selectedSideItemsJson = resolvedSides.Count > 0 ? JsonSerializer.Serialize(resolvedSides) : null;
         }
 
-        return new BasketItem
+        var basketItem = new BasketItem
         {
             BasketId = basketId,
             ProductId = item.ProductId,
@@ -113,6 +121,30 @@ public class BasketItemFactory : IBasketItemFactory
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier()
         };
+
+        foreach (var option in explicitSelection.ProductOptions)
+        {
+            basketItem.ChildBasketItems.Add(new BasketItem
+            {
+                BasketId = basketId,
+                ProductId = option.Product.Id,
+                ParentBasketItem = basketItem,
+                ProductCustomizationOptionId = option.MembershipId,
+                Quantity = item.Quantity,
+                UnitPrice = option.AdditionalPrice,
+                ItemTotal = 0,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = _currentUserService.GetAuditIdentifier()
+            });
+        }
+
+        if (basketItem.ChildBasketItems.Count > 0)
+        {
+            basketItem.UnitPrice += customizationPrice;
+            basketItem.ItemTotal = basketItem.UnitPrice * item.Quantity;
+        }
+
+        return basketItem;
     }
 
     public async Task<BasketItem> BuildMenuItemAsync(
@@ -149,7 +181,14 @@ public class BasketItemFactory : IBasketItemFactory
         // instead of one round-trip per option (avoids N+1).
         var childProductIds = selectedOptions.Select(o => o.ItemId).Distinct().ToList();
         var childProducts = await _context.Products
+            .AsSplitQuery()
             .Include(p => p.DetailedIngredients)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+                    .ThenInclude(membership => membership.ProductIngredient)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    .ThenInclude(membership => membership.OptionProduct)
             // See the side-item load: without the inheritance chain the guard below resolves every
             // inheriting option as unrestricted, which is worse than no guard — it looks like one.
             .Include(p => p.ProductCategories)
@@ -186,6 +225,16 @@ public class BasketItemFactory : IBasketItemFactory
             if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");
 
+            var explicitSelection = ExplicitCustomizationSelection.Resolve(
+                childProduct, option.CustomizationSelections);
+            var hasExplicitGroups = childProduct.CustomizationGroups.Any(group => group.IsActive);
+            var selectedIngredients = hasExplicitGroups
+                ? explicitSelection.SelectedIngredientIds
+                : option.SelectedIngredients;
+            var ingredientQuantities = hasExplicitGroups
+                ? explicitSelection.IngredientQuantities
+                : option.IngredientQuantities;
+
             // Ingredient customization (price + quantities JSON) via the single shared writer.
             // Bundle children keep the "backfill from the selection when present" precedence so a
             // deselected optional's "NO xxx" reaches the kitchen ticket (issue #150), while an
@@ -195,12 +244,14 @@ public class BasketItemFactory : IBasketItemFactory
             // not the parent bundle's — the option IS that product, and the parent bundle owns no
             // sauce rows at all for a per-product allowance to be applied to.
             var childCustomization = _lineCustomizationBuilder.Build(
-                childProduct.DetailedIngredients, option.SelectedIngredients,
-                option.IngredientQuantities, preferProvidedQuantities: false,
-                sauceIncludedFree: childProduct.SauceIncludedFree, sauceMax: childProduct.SauceMax);
+                childProduct.DetailedIngredients, selectedIngredients,
+                ingredientQuantities, preferProvidedQuantities: false,
+                sauceIncludedFree: childProduct.SauceIncludedFree, sauceMax: childProduct.SauceMax,
+                explicitGroups: childProduct.CustomizationGroups);
 
-            // Add child customization price to total
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
+            totalCustomizationPrice += explicitSelection.ProductOptions.Sum(
+                selected => selected.AdditionalPrice * selected.Quantity * option.Quantity);
 
             var childItem = new BasketItem
             {
@@ -217,10 +268,24 @@ public class BasketItemFactory : IBasketItemFactory
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             };
+            foreach (var selected in explicitSelection.ProductOptions)
+            {
+                childItem.ChildBasketItems.Add(new BasketItem
+                {
+                    BasketId = basketId,
+                    ProductId = selected.Product.Id,
+                    ParentBasketItem = childItem,
+                    ProductCustomizationOptionId = selected.MembershipId,
+                    Quantity = item.Quantity * option.Quantity * selected.Quantity,
+                    UnitPrice = selected.AdditionalPrice,
+                    ItemTotal = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = auditIdentifier
+                });
+            }
             basketItem.ChildBasketItems.Add(childItem);
         }
 
-        // Update parent item's price to include customization prices from children
         basketItem.UnitPrice = menuTotalPrice + totalCustomizationPrice;
         basketItem.ItemTotal = basketItem.UnitPrice * item.Quantity;
         basketItem.CustomizationPrice = totalCustomizationPrice;

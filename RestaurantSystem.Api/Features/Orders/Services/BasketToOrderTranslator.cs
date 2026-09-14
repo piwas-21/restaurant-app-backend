@@ -155,7 +155,9 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
             CustomizationPrice = 0m,
             SpecialInstructions = child.SpecialInstructions,
             IngredientQuantities = BuildIngredientQuantities(child),
-            Kind = OrderItemKind.BundleChild,
+            Kind = child.ProductCustomizationOptionId.HasValue
+                ? OrderItemKind.CustomizationOption
+                : OrderItemKind.BundleChild,
         };
 
         if (child.ChildItems is { Count: > 0 })

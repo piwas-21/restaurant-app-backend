@@ -92,8 +92,16 @@ public class BasketService : IBasketService
         {
             // Validate product exists and is available
             var product = await _context.Products
+                .AsSplitQuery()
                 .Include(p => p.Variations)
                 .Include(p => p.DetailedIngredients)
+                .Include(p => p.CustomizationGroups)
+                    .ThenInclude(group => group.IngredientOptions)
+                        .ThenInclude(option => option.ProductIngredient)
+                .Include(p => p.CustomizationGroups)
+                    .ThenInclude(group => group.ProductOptions)
+                        .ThenInclude(option => option.OptionProduct.ProductCategories)
+                            .ThenInclude(pc => pc.Category)
                 // Needed so BasketChannelGuard can resolve availability inherited from the
                 // PRIMARY category (ORDER-TYPE-AVAILABILITY-PLAN §4.1).
                 .Include(p => p.ProductCategories)
@@ -141,6 +149,13 @@ public class BasketService : IBasketService
             // being re-reported as "pick an option" — `variation` is null in both cases here.
             BasketBaseProductGuard.EnsureVariationChosen(product, variation);
 
+            var explicitSelection = ExplicitCustomizationSelection.Resolve(product, item.CustomizationSelections);
+            if (product.CustomizationGroups.Any(group => group.IsActive))
+            {
+                item.SelectedIngredients = explicitSelection.SelectedIngredientIds;
+                item.IngredientQuantities = explicitSelection.IngredientQuantities;
+            }
+
             // Check if item with EXACT same customizations already exists in basket.
             //
             // ROOT ROWS ONLY. Without the ParentBasketItemId filter this matched a menu bundle's
@@ -177,6 +192,11 @@ public class BasketService : IBasketService
             if (exactMatch != null)
             {
                 // Update quantity of existing item with same customizations
+                BundleChildQuantityScaler.Rescale(
+                    exactMatch.ChildBasketItems,
+                    exactMatch.Quantity,
+                    exactMatch.Quantity + item.Quantity,
+                    _currentUserService.GetAuditIdentifier());
                 exactMatch.Quantity += item.Quantity;
                 // `Quantity * UnitPrice` here DROPPED the customization (#308): a regular item's
                 // UnitPrice excludes it, so re-ordering the same customised dish billed the second
@@ -211,6 +231,12 @@ public class BasketService : IBasketService
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
             .Include(bi => bi.Product.DetailedIngredients)
+            .Include(bi => bi.Product.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+                    .ThenInclude(option => option.ProductIngredient)
+            .Include(bi => bi.Product.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    .ThenInclude(option => option.OptionProduct)
             // Load-bearing for the rescale below (#305). Without it ChildBasketItems reads as an
             // EMPTY collection rather than throwing, so a bundle's children would silently keep
             // their add-time count and every test would still pass.
@@ -218,6 +244,14 @@ public class BasketService : IBasketService
             // what says whether UnitPrice already contains the customization.
             .Include(bi => bi.ChildBasketItems)
                 .ThenInclude(child => child.Product.DetailedIngredients)
+            .Include(bi => bi.ChildBasketItems)
+                .ThenInclude(child => child.Product.CustomizationGroups)
+                    .ThenInclude(group => group.IngredientOptions)
+                        .ThenInclude(option => option.ProductIngredient)
+            .Include(bi => bi.ChildBasketItems)
+                .ThenInclude(child => child.Product.CustomizationGroups)
+                    .ThenInclude(group => group.ProductOptions)
+                        .ThenInclude(option => option.OptionProduct)
             .AsSplitQuery()
             // ROOT ROWS ONLY, the same invariant the add-path dedup above now enforces. A bundle
             // child is not independently addressable: its quantity is DERIVED from the parent's,
@@ -244,9 +278,18 @@ public class BasketService : IBasketService
         // before SauceMax was server-enforced. Validate the root and each bundle child rather than
         // letting a legacy/crafted row become newly active through a later basket mutation.
         SauceSelectionRule.EnsureWithinMaximum(basketItem);
+        if (basketItem.Product != null)
+        {
+            ExplicitCustomizationSelection.EnsurePersisted(
+                basketItem.Product, basketItem, basketItem.ChildBasketItems.ToList());
+        }
         foreach (var child in basketItem.ChildBasketItems)
         {
             SauceSelectionRule.EnsureWithinMaximum(child);
+            if (child.Product != null)
+            {
+                ExplicitCustomizationSelection.EnsurePersisted(child.Product, child, []);
+            }
         }
 
         // Captured BEFORE the overwrite: it is the divisor that recovers each child's per-unit

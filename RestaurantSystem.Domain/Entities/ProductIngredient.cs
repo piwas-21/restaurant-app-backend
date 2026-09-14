@@ -63,4 +63,5 @@ public class ProductIngredient : Entity
     public virtual Product Product { get; set; } = null!;
     public virtual GlobalIngredient? GlobalIngredient { get; set; }
     public virtual ICollection<ProductIngredientDescription> Descriptions { get; set; } = [];
+    public virtual ICollection<ProductCustomizationIngredientOption> CustomizationOptionMemberships { get; set; } = [];
 }

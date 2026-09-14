@@ -30,6 +30,7 @@ public class GetMenuBundleByIdQueryHandler(
     public async Task<ApiResponse<MenuBundleDto>> Handle(GetMenuBundleByIdQuery query, CancellationToken cancellationToken)
     {
         var queryable = _context.Products
+            .AsSplitQuery()
             // Load-bearing: inheritance resolves through the PRIMARY category and an unloaded
             // collection reads as UNRESTRICTED. See the same include on the list query.
             .Include(p => p.ProductCategories)
@@ -40,6 +41,19 @@ public class GetMenuBundleByIdQueryHandler(
                         .ThenInclude(i => i.Product)
                             .ThenInclude(p => p.DetailedIngredients)
                                 .ThenInclude(di => di.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.CustomizationGroups)
+                        .ThenInclude(group => group.Descriptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.CustomizationGroups)
+                        .ThenInclude(group => group.IngredientOptions)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(s => s.Items)
+                    .ThenInclude(i => i.Product.CustomizationGroups)
+                        .ThenInclude(group => group.ProductOptions)
+                            .ThenInclude(option => option.OptionProduct)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
             .Where(p => p.Id == query.Id && !p.IsDeleted);

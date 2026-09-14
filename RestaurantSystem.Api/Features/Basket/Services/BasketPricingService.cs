@@ -98,7 +98,8 @@ public class BasketPricingService : IBasketPricingService
         IEnumerable<ProductIngredient>? detailedIngredients,
         IReadOnlyCollection<Guid>? selectedIngredientIds,
         IReadOnlyDictionary<Guid, int>? ingredientQuantities,
-        int sauceIncludedFree = 0)
+        int sauceIncludedFree = 0,
+        ICollection<ProductCustomizationGroup>? explicitGroups = null)
     {
         if (detailedIngredients is null)
         {
@@ -115,8 +116,9 @@ public class BasketPricingService : IBasketPricingService
         // Deliberately a list of units, not of rows: "2 sauces free" means two units, and a guest
         // who takes two of the same sauce has spent the allowance just as surely as one who took two
         // different ones.
+        var usesExplicitGroups = explicitGroups?.Any(group => group.IsActive) == true;
         List<(decimal Price, int DisplayOrder, Guid Id)>? chargeableSauceUnits =
-            sauceIncludedFree > 0 ? new List<(decimal, int, Guid)>() : null;
+            !usesExplicitGroups && sauceIncludedFree > 0 ? new List<(decimal, int, Guid)>() : null;
 
         foreach (var ingredient in detailedIngredients.Where(i => i.IsOptional && i.IsActive))
         {
@@ -202,6 +204,43 @@ public class BasketPricingService : IBasketPricingService
                 .Sum(u => u.Price);
         }
 
+        if (usesExplicitGroups)
+        {
+            customizationPrice -= ExplicitGroupAllowance(
+                explicitGroups!, detailedIngredients, selected, ingredientQuantities);
+        }
+
         return customizationPrice;
+    }
+
+    private static decimal ExplicitGroupAllowance(
+        IEnumerable<ProductCustomizationGroup> groups,
+        IEnumerable<ProductIngredient> ingredients,
+        HashSet<Guid> selected,
+        IReadOnlyDictionary<Guid, int>? quantities)
+    {
+        var ingredientById = ingredients.ToDictionary(ingredient => ingredient.Id);
+        decimal allowance = 0;
+        foreach (var group in groups.Where(group => group.IsActive && group.IncludedFreeUnits > 0))
+        {
+            var chargedUnits = new List<(decimal Price, int DisplayOrder, Guid Id)>();
+            foreach (var membership in group.IngredientOptions.Where(option =>
+                         selected.Contains(option.ProductIngredientId)
+                         && ingredientById.ContainsKey(option.ProductIngredientId)))
+            {
+                var ingredient = ingredientById[membership.ProductIngredientId];
+                var quantity = quantities?.GetValueOrDefault(ingredient.Id) ?? 1;
+                var count = ingredient.IsIncludedInBasePrice ? Math.Max(0, quantity - 1) : quantity;
+                for (var unit = 0; unit < count; unit++)
+                {
+                    chargedUnits.Add((ingredient.Price, membership.DisplayOrder, ingredient.Id));
+                }
+            }
+
+            allowance += chargedUnits.OrderByDescending(unit => unit.Price)
+                .ThenBy(unit => unit.DisplayOrder).ThenBy(unit => unit.Id)
+                .Take(group.IncludedFreeUnits).Sum(unit => unit.Price);
+        }
+        return allowance;
     }
 }

@@ -216,6 +216,7 @@ public class BasketMappingService : IBasketMappingService
         {
             Id = child.Id,
             ProductId = child.ProductId,
+            ProductCustomizationOptionId = child.ProductCustomizationOptionId,
             ProductName = child.Product?.Name,
             Quantity = child.Quantity,
             UnitPrice = child.UnitPrice,
@@ -230,6 +231,7 @@ public class BasketMappingService : IBasketMappingService
             SelectedIngredientNames = childSelectedNames,
             RemovedIngredientNames = BuildRemovedIngredientNames(
                 childIngredients, childQuantities, child.SelectedIngredients),
+            ChildItems = child.ChildBasketItems.Select(MapChildItem).ToList(),
         };
     }
 

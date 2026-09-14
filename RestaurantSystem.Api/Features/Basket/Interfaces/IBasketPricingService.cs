@@ -45,5 +45,6 @@ public interface IBasketPricingService
         IEnumerable<ProductIngredient>? detailedIngredients,
         IReadOnlyCollection<Guid>? selectedIngredientIds,
         IReadOnlyDictionary<Guid, int>? ingredientQuantities,
-        int sauceIncludedFree = 0);
+        int sauceIncludedFree = 0,
+        ICollection<ProductCustomizationGroup>? explicitGroups = null);
 }

@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServ
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetActiveTableServiceSessionsQuery;
+using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionQuery;
 
 namespace RestaurantSystem.Api.Features.TableServiceSessions;
@@ -46,6 +47,12 @@ public sealed class TableServiceSessionsController : ControllerBase
         command.ServiceSessionId = serviceSessionId;
         return Ok(await _mediator.SendCommand(command));
     }
+
+    [HttpGet("{serviceSessionId:guid}/payments/operations/{operationId:guid}")]
+    public async Task<ActionResult<ApiResponse<TableServiceSessionPaymentOperationLookupDto>>> GetPaymentOperation(
+        Guid serviceSessionId, Guid operationId)
+        => Ok(await _mediator.SendQuery(
+            new GetTableServiceSessionPaymentOperationQuery(serviceSessionId, operationId)));
 
     [HttpPost("{serviceSessionId:guid}/close")]
     public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> Close(
