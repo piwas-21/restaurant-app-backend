@@ -39,6 +39,21 @@ public class ExplicitGroupPricingTests
         price.Should().Be(1m);
     }
 
+    [Fact]
+    public void InactiveGroupsDoNotDisableTheLegacySauceAllowance()
+    {
+        var sauce = Ingredient("Sauce", 2m, 0);
+        sauce.Kind = RestaurantSystem.Domain.Common.Enums.IngredientKind.Sauce;
+        var inactiveGroup = Group(0, sauce);
+        inactiveGroup.IsActive = false;
+
+        var price = Sut().CalculateIngredientCustomizationPrice(
+            [sauce], [sauce.Id], null, sauceIncludedFree: 1,
+            explicitGroups: [inactiveGroup]);
+
+        price.Should().Be(0m);
+    }
+
     private static BasketPricingService Sut() => new(
         new Mock<ICustomerDiscountService>(MockBehavior.Strict).Object,
         Options.Create(new OrderSettings()), NullLogger<BasketPricingService>.Instance);

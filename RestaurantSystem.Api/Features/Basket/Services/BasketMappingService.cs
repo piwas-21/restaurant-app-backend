@@ -231,6 +231,7 @@ public class BasketMappingService : IBasketMappingService
             SelectedIngredientNames = childSelectedNames,
             RemovedIngredientNames = BuildRemovedIngredientNames(
                 childIngredients, childQuantities, child.SelectedIngredients),
+            ChildItems = child.ChildBasketItems.Select(MapChildItem).ToList(),
         };
     }
 

@@ -116,7 +116,7 @@ public class BasketPricingService : IBasketPricingService
         // Deliberately a list of units, not of rows: "2 sauces free" means two units, and a guest
         // who takes two of the same sauce has spent the allowance just as surely as one who took two
         // different ones.
-        var usesExplicitGroups = explicitGroups is { Count: > 0 };
+        var usesExplicitGroups = explicitGroups?.Any(group => group.IsActive) == true;
         List<(decimal Price, int DisplayOrder, Guid Id)>? chargeableSauceUnits =
             !usesExplicitGroups && sauceIncludedFree > 0 ? new List<(decimal, int, Guid)>() : null;
 

@@ -81,7 +81,16 @@ public static class ExplicitCustomizationSelection
         if (requested.Select(selection => selection.GroupId).Distinct().Count() != requested.Count)
             throw new BadRequestException("A customization group may be submitted only once");
 
-        var ingredientIds = new List<Guid>();
+        var managedIngredientIds = groups.Values
+            .SelectMany(group => group.IngredientOptions)
+            .Select(option => option.ProductIngredientId)
+            .ToHashSet();
+        var ingredientIds = product.DetailedIngredients
+            .Where(ingredient => ingredient.IsActive
+                && (!ingredient.IsOptional || ingredient.IsIncludedInBasePrice)
+                && !managedIngredientIds.Contains(ingredient.Id))
+            .Select(ingredient => ingredient.Id)
+            .ToList();
         var quantities = new Dictionary<Guid, int>();
         var productOptions = new List<ResolvedProductCustomization>();
 

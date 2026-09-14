@@ -48,7 +48,6 @@ public class BasketItemFactory : IBasketItemFactory
         foreach (var option in explicitSelection.ProductOptions)
             BasketChannelGuard.EnsureOrderable(option.Product, basketOrderType);
 
-        // Calculate unit price
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0);
 
         // Ingredient customization (price + quantities JSON) via the single shared writer, so the
@@ -232,8 +231,6 @@ public class BasketItemFactory : IBasketItemFactory
 
             var explicitSelection = ExplicitCustomizationSelection.Resolve(
                 childProduct, option.CustomizationSelections);
-            if (explicitSelection.ProductOptions.Count > 0)
-                throw new BadRequestException("Nested product customization options are not supported");
             var hasExplicitGroups = childProduct.CustomizationGroups.Any(group => group.IsActive);
             var selectedIngredients = hasExplicitGroups
                 ? explicitSelection.SelectedIngredientIds
@@ -256,8 +253,9 @@ public class BasketItemFactory : IBasketItemFactory
                 sauceIncludedFree: childProduct.SauceIncludedFree, sauceMax: childProduct.SauceMax,
                 explicitGroups: childProduct.CustomizationGroups);
 
-            // Add child customization price to total
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
+            totalCustomizationPrice += explicitSelection.ProductOptions.Sum(
+                selected => selected.AdditionalPrice * selected.Quantity * option.Quantity);
 
             var childItem = new BasketItem
             {
@@ -274,10 +272,24 @@ public class BasketItemFactory : IBasketItemFactory
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             };
+            foreach (var selected in explicitSelection.ProductOptions)
+            {
+                childItem.ChildBasketItems.Add(new BasketItem
+                {
+                    BasketId = basketId,
+                    ProductId = selected.Product.Id,
+                    ParentBasketItem = childItem,
+                    ProductCustomizationOptionId = selected.MembershipId,
+                    Quantity = item.Quantity * option.Quantity * selected.Quantity,
+                    UnitPrice = selected.AdditionalPrice,
+                    ItemTotal = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = auditIdentifier
+                });
+            }
             basketItem.ChildBasketItems.Add(childItem);
         }
 
-        // Update parent item's price to include customization prices from children
         basketItem.UnitPrice = menuTotalPrice + totalCustomizationPrice;
         basketItem.ItemTotal = basketItem.UnitPrice * item.Quantity;
         basketItem.CustomizationPrice = totalCustomizationPrice;
