@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Reservations.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -9,7 +10,8 @@ namespace RestaurantSystem.Api.Features.Reservations.Queries.GetTablesQuery;
 
 public record GetTablesQuery(
     bool? IsActive = null,
-    bool? IsOutdoor = null
+    bool? IsOutdoor = null,
+    bool IncludeOccupancy = false
 ) : IQuery<ApiResponse<List<TableDto>>>;
 
 public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<List<TableDto>>>
@@ -41,36 +43,11 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
 
             var now = DateTime.UtcNow;
 
-            // Define active order statuses (orders still at table)
-            var activeOrderStatuses = new[]
-            {
-                OrderStatus.Pending,
-                OrderStatus.Confirmed,
-                OrderStatus.Preparing,
-                OrderStatus.Ready,
-                OrderStatus.PendingApproval
-            };
-
-            // Get active dine-in orders grouped by table number
-            var activeOrdersByTable = await _context.Orders
-                .Where(o => o.TableNumber != null
-                    && o.Type == OrderType.DineIn
-                    && activeOrderStatuses.Contains(o.Status)
-                    && !o.IsDeleted)
-                .GroupBy(o => o.TableNumber!.Value)
-                .Select(g => new
-                {
-                    TableNumber = g.Key.ToString(),
-                    OrderCount = g.Count(),
-                    Occupants = g.Select(o => new TableOccupantDto
-                    {
-                        CustomerName = o.CustomerName,
-                        OrderNumber = o.OrderNumber,
-                        OrderDate = o.OrderDate,
-                        IsLoggedInUser = o.UserId != null
-                    }).ToList()
-                })
-                .ToDictionaryAsync(x => x.TableNumber, cancellationToken);
+            // Occupancy is a staff-only projection. The public availability route still returns
+            // the table catalogue and reservation status, but never live customer/order data.
+            var activeOrdersByTable = query.IncludeOccupancy
+                ? await ReadActiveOrdersByTableAsync(cancellationToken)
+                : new Dictionary<string, ActiveTableOrderInfo>();
 
             var tables = await tablesQuery
                 .OrderBy(t => t.TableNumber)
@@ -103,20 +80,16 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                 })
                 .ToListAsync(cancellationToken);
 
-            // Populate order-based occupancy for each table
-            foreach (var table in tables)
+            if (query.IncludeOccupancy)
             {
-                if (activeOrdersByTable.TryGetValue(table.TableNumber, out var orderInfo))
+                foreach (var table in tables)
                 {
-                    table.IsOccupied = true;
-                    table.ActiveOrderCount = orderInfo.OrderCount;
-                    table.Occupants = orderInfo.Occupants;
-                }
-                else
-                {
-                    table.IsOccupied = false;
-                    table.ActiveOrderCount = 0;
-                    table.Occupants = null;
+                    if (activeOrdersByTable.TryGetValue(table.TableNumber, out var orderInfo))
+                    {
+                        table.IsOccupied = true;
+                        table.ActiveOrderCount = orderInfo.OrderCount;
+                        table.Occupants = orderInfo.Occupants;
+                    }
                 }
             }
 
@@ -127,5 +100,98 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
             _logger.LogError(ex, "Error getting tables");
             return ApiResponse<List<TableDto>>.Failure("Failed to retrieve tables");
         }
+    }
+
+    private async Task<Dictionary<string, ActiveTableOrderInfo>> ReadActiveOrdersByTableAsync(
+        CancellationToken cancellationToken)
+    {
+        var activeOrderStatuses = new[]
+        {
+            OrderStatus.Pending,
+            OrderStatus.Confirmed,
+            OrderStatus.Preparing,
+            OrderStatus.Ready,
+            OrderStatus.PendingApproval
+        };
+        var allDineInOrders = _context.Orders
+            .AsNoTracking()
+            .Where(order => order.TableNumber != null
+                && order.Type == OrderType.DineIn
+                && !order.IsDeleted);
+        var liveOrders = allDineInOrders.Where(order => activeOrderStatuses.Contains(order.Status));
+        var completedUnpaidOrders = allDineInOrders
+            .Where(order => order.Status == OrderStatus.Completed)
+            .Where(OrderSettlementEligibility.CanCollectQuery());
+        var eligibleOrders = liveOrders.Concat(completedUnpaidOrders);
+
+        // Keep the exact occupancy count without materializing every occupant row. The second
+        // query returns one recent representative per table so the staff shape remains useful
+        // without turning a busy table into an unbounded PII payload.
+        var countRows = await eligibleOrders
+            .GroupBy(order => order.TableNumber!.Value)
+            .Select(group => new
+            {
+                TableNumber = group.Key,
+                OrderCount = group.Count()
+            })
+            .ToListAsync(cancellationToken);
+        var latestRows = await eligibleOrders
+            .GroupBy(order => order.TableNumber!.Value)
+            .Select(group => group
+                .OrderByDescending(order => order.OrderDate)
+                .ThenBy(order => order.Id)
+                .Select(order => new
+                {
+                    TableNumber = order.TableNumber!.Value,
+                    CustomerName = order.CustomerName,
+                    OrderNumber = order.OrderNumber,
+                    OrderDate = order.OrderDate,
+                    IsLoggedInUser = order.UserId != null
+                })
+                .First())
+            .ToListAsync(cancellationToken);
+        var latestByTable = latestRows.ToDictionary(
+            row => row.TableNumber,
+            row => new TableOccupantDto
+            {
+                CustomerName = row.CustomerName,
+                OrderNumber = row.OrderNumber,
+                OrderDate = row.OrderDate,
+                IsLoggedInUser = row.IsLoggedInUser
+            });
+
+        var openSessionTables = await _context.TableServiceSessions
+            .AsNoTracking()
+            .Where(session => session.Status == TableServiceSessionStatus.Open)
+            .Select(session => session.TableNumber.ToString())
+            .ToListAsync(cancellationToken);
+        var result = countRows.ToDictionary(
+            row => row.TableNumber.ToString(),
+            row => new ActiveTableOrderInfo
+            {
+                TableNumber = row.TableNumber.ToString(),
+                OrderCount = row.OrderCount,
+                Occupants = latestByTable.TryGetValue(row.TableNumber, out var occupant)
+                    ? [occupant]
+                    : []
+            });
+
+        foreach (var tableNumber in openSessionTables)
+        {
+            result.TryAdd(tableNumber, new ActiveTableOrderInfo
+            {
+                TableNumber = tableNumber,
+                Occupants = []
+            });
+        }
+
+        return result;
+    }
+
+    private sealed class ActiveTableOrderInfo
+    {
+        public string TableNumber { get; init; } = string.Empty;
+        public int OrderCount { get; init; }
+        public List<TableOccupantDto> Occupants { get; init; } = [];
     }
 }

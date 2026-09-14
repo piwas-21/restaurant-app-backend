@@ -71,30 +71,40 @@ public sealed class CloseTableServiceSessionCommandHandler
                 return Stale(session.Version);
             }
 
-            // Explicit membership is immutable. An old anonymous order at this table is therefore
-            // a second possible visit, not a round that may be silently closed with this session.
-            if (await HasActiveUnassignedOrdersAsync(session.TableNumber, cancellationToken))
+            // Legacy unassigned rounds are a separate visit and must be resolved explicitly.
+            var legacyOrders = await _context.Orders
+                .Where(order => !order.IsDeleted
+                    && order.Type == OrderType.DineIn
+                    && order.TableNumber == session.TableNumber
+                    && order.ServiceSessionId == null)
+                .Select(order => new { order.Status, order.RemainingAmount })
+                .ToListAsync(cancellationToken);
+            var memberRows = await _context.Orders
+                .Where(order => !order.IsDeleted && order.ServiceSessionId == session.Id)
+                .Select(order => new { order.Status, order.RemainingAmount, order.OrderNumber })
+                .ToListAsync(cancellationToken);
+            var assessment = TableServiceSessionCloseRules.Assess(
+                memberRows.Select(order =>
+                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount)),
+                legacyOrders.Select(order =>
+                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount)),
+                _paymentTolerance);
+            if (assessment.LegacyActiveOrderCount > 0)
             {
                 return Ambiguous();
             }
 
-            var orders = await _context.Orders
-                .Where(order => !order.IsDeleted && order.ServiceSessionId == session.Id)
-                .Select(order => new { order.Status, order.RemainingAmount, order.OrderNumber })
-                .ToListAsync(cancellationToken);
-            var outstanding = orders
-                .Where(order => order.Status != OrderStatus.Cancelled)
-                .Sum(order => Math.Max(0, order.RemainingAmount));
-            var unresolved = orders
-                .Where(order => order.Status is not OrderStatus.Completed and not OrderStatus.Cancelled)
+            var unresolved = memberRows
+                .Where(order => TableServiceSessionCloseRules.IsUnresolvedMemberOrder(
+                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount)))
                 .Select(order => order.OrderNumber)
                 .ToList();
-            if (outstanding > _paymentTolerance || unresolved.Count > 0)
+            if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
             {
                 var errors = new List<string>();
-                if (outstanding > _paymentTolerance)
+                if (assessment.Outstanding > _paymentTolerance)
                 {
-                    errors.Add($"The session still has an outstanding balance of {outstanding:0.00}.");
+                    errors.Add($"The session still has an outstanding balance of {assessment.Outstanding:0.00}.");
                 }
                 if (unresolved.Count > 0)
                 {
@@ -120,17 +130,6 @@ public sealed class CloseTableServiceSessionCommandHandler
             return await ResolveConcurrencyAsync(command.ServiceSessionId, transaction, cancellationToken);
         }
     }
-
-    private async Task<bool> HasActiveUnassignedOrdersAsync(
-        int tableNumber, CancellationToken cancellationToken) =>
-        await _context.Orders.AnyAsync(order =>
-            !order.IsDeleted
-            && order.Type == OrderType.DineIn
-            && order.TableNumber == tableNumber
-            && order.ServiceSessionId == null
-            && ((order.Status != OrderStatus.Completed && order.Status != OrderStatus.Cancelled)
-                || (order.Status == OrderStatus.Completed && order.RemainingAmount > _paymentTolerance)),
-            cancellationToken);
 
     private async Task<ApiResponse<TableServiceSessionDto>> ResolveConcurrencyAsync(
         Guid serviceSessionId, IDbContextTransaction transaction, CancellationToken cancellationToken)

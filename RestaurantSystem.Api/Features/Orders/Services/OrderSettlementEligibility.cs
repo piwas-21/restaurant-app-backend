@@ -67,6 +67,32 @@ public static class OrderSettlementEligibility
     /// </summary>
     public static Expression<Func<Order, bool>> CanCollectQuery() => CanCollectPredicate;
 
+    /// <summary>Returns the gross captured amount that was later refunded, if any.</summary>
+    public static decimal RefundedAmount(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return order.Payments.Sum(payment => payment.RefundedAmount
+            ?? (payment.IsRefunded ? payment.Amount : 0m));
+    }
+
+    /// <summary>Returns net credit left on an order after captured tenders and refunds.</summary>
+    public static decimal Credit(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        var netPaid = order.Payments.Count == 0
+            ? order.TotalPaid
+            : order.Payments.Where(payment => payment.Status.IsCaptured())
+                .Sum(payment => payment.Amount) - RefundedAmount(order);
+        return Math.Max(0m, netPaid - order.Total);
+    }
+
+    /// <summary>Returns the order's non-negative net balance due, without eligibility filtering.</summary>
+    public static decimal Outstanding(Order order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return Math.Max(0m, order.RemainingAmount);
+    }
+
     /// <summary>
     /// Returns unfinished orders of any age, plus completed orders that <see cref="CanCollect"/>.
     /// </summary>
