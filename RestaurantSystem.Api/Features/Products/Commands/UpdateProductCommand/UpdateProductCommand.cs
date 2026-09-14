@@ -60,6 +60,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     private readonly ILogger<UpdateProductCommandHandler> _logger;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GetProductByIdQueryHandler> _getProductlogger;
+    private readonly IProductCustomizationGroupSynchronizer _customizationGroupSynchronizer;
 
 
     public UpdateProductCommandHandler(
@@ -67,7 +68,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         ICurrentUserService currentUserService,
         ILogger<UpdateProductCommandHandler> logger,
         ILogger<GetProductByIdQueryHandler> getProductlogger,
-        IConfiguration configuration
+        IConfiguration configuration,
+        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer
         )
     {
         _context = context;
@@ -75,6 +77,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         _logger = logger;
         _getProductlogger = getProductlogger;
         _configuration = configuration;
+        _customizationGroupSynchronizer = customizationGroupSynchronizer;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -373,8 +376,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
         if (command.CustomizationGroups != null)
         {
-            await ProductCustomizationGroupSynchronizer.SyncAsync(
-                _context, product, command.CustomizationGroups,
+            await _customizationGroupSynchronizer.SyncAsync(
+                product, command.CustomizationGroups,
                 _currentUserService.GetAuditIdentifier(), cancellationToken);
         }
 

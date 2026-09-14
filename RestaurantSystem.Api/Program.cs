@@ -32,6 +32,7 @@ using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Services;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.Products.Services;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields.Services;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
@@ -638,6 +639,7 @@ builder.Services.AddScoped<IRefreshSessionService, RefreshSessionService>();
 builder.Services.AddEmailSender(builder.Configuration);   // IEmailSender transport (Smtp | Resend)
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailBrandingProvider, EmailBrandingProvider>();
+builder.Services.AddScoped<IProductCustomizationGroupSynchronizer, ProductCustomizationGroupSynchronizer>();
 builder.Services.AddScoped<IBasketService, BasketService>();
 builder.Services.AddScoped<IBasketPricingService, BasketPricingService>();
 builder.Services.AddScoped<ILineCustomizationBuilder, LineCustomizationBuilder>();

@@ -6,10 +6,10 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Services;
 
-internal static class ProductCustomizationGroupSynchronizer
+internal sealed class ProductCustomizationGroupSynchronizer(
+    ApplicationDbContext context) : IProductCustomizationGroupSynchronizer
 {
-    public static async Task SyncAsync(
-        ApplicationDbContext context,
+    public async Task SyncAsync(
         Product product,
         IReadOnlyCollection<ProductCustomizationGroupDto> incoming,
         string auditIdentifier,

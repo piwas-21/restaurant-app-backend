@@ -100,6 +100,7 @@ public class ProductCustomizationGroupSchemaTests : IntegrationTestBase
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var synchronizer = scope.ServiceProvider.GetRequiredService<IProductCustomizationGroupSynchronizer>();
         var owner = NewProduct("Stable IDs");
         var ingredient = NewIngredient(owner, "Cheddar");
         var group = NewGroup(owner, "Cheese", min: 0, max: 1);
@@ -115,7 +116,7 @@ public class ProductCustomizationGroupSchemaTests : IntegrationTestBase
             .Include(item => item.CustomizationGroups).ThenInclude(item => item.IngredientOptions)
             .Include(item => item.CustomizationGroups).ThenInclude(item => item.ProductOptions)
             .SingleAsync(item => item.Id == owner.Id);
-        await ProductCustomizationGroupSynchronizer.SyncAsync(context, product,
+        await synchronizer.SyncAsync(product,
         [
             new ProductCustomizationGroupDto
             {
