@@ -26,7 +26,8 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
     // ANONYMOUS (`POST /api/Orders` and `/from-basket` carry no [Authorize], and
     // Program.cs registers no fallback policy), so this list is the whole of what
     // stops a stranger asserting how they paid. Cash and CreditCard are on-site
-    // intents: they remain Pending until staff sees the money at the restaurant's
+    // intents where a restaurant can collect them: they remain Pending until staff sees the money
+    // at the restaurant's
     // till. OnlinePayment is safe because it settles at STRIPE: its tender is created
     // Processing, contributes nothing to TotalPaid, and only the settle path — which
     // re-fetches from Stripe before it writes — may complete it. Declaring any of
@@ -42,9 +43,16 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
         var auditId = _currentUserService.GetAuditIdentifier();
         var isStaff = _currentUserService.IsStaff;
         var now = DateTime.UtcNow;
+        var cardIsAllowed = order.Type is OrderType.DineIn or OrderType.Takeaway;
 
         foreach (var paymentDto in payments)
         {
+            if (!cardIsAllowed && paymentDto.PaymentMethod == PaymentMethod.CreditCard)
+            {
+                throw new BadRequestException(
+                    "Card at restaurant is only available for dine-in or takeaway orders.");
+            }
+
             if (!isStaff && !SelfServiceMethods.Contains(paymentDto.PaymentMethod))
             {
                 throw new BadRequestException(

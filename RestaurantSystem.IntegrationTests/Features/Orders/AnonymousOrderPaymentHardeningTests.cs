@@ -21,8 +21,9 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// <c>[Authorize]</c>, and <c>Program.cs</c> registers no fallback policy. Until this file existed,
 /// the payment a caller declared there was taken at face value twice over:
 /// <list type="number">
-/// <item>any method other than the on-site intents (<c>Cash</c> and <c>CreditCard</c>) or the
-/// separately settled <c>OnlinePayment</c> path was written straight to <c>PaymentStatus.Completed</c>,
+/// <item>any method other than the on-site intents (<c>Cash</c>, and <c>CreditCard</c> for DineIn or
+/// Takeaway) or the separately settled <c>OnlinePayment</c> path was written straight to
+/// <c>PaymentStatus.Completed</c>,
 /// so a stranger could hand themselves a paid order; and</item>
 /// <item><c>TransactionId</c>/<c>ReferenceNumber</c>/<c>CardLastFourDigits</c>/<c>CardType</c>/
 /// <c>PaymentGateway</c> were copied verbatim from the request body into the ledger, so the
@@ -186,6 +187,24 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
             "the declared amount is an on-site collection note until staff records the actual tender");
         order.TotalPaid.Should().Be(0m, "a Pending on-site intent is not captured");
         order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    [Fact]
+    public async Task A_guest_cannot_declare_an_on_site_card_intent_for_delivery()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync(
+            "/api/orders",
+            NewOrder(PaymentMethod.CreditCard, 12.99m, OrderType.Delivery));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Card at restaurant");
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.Orders.AsNoTracking().AnyAsync()).Should().BeFalse();
+        (await context.OrderPayments.AsNoTracking().AnyAsync()).Should().BeFalse();
     }
 
     [Fact]
@@ -594,6 +613,15 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
             CustomerName = "Guest",
             TableNumber = type == OrderType.DineIn ? 1 : null,
             Items = [new CreateOrderItemDto { ProductId = _pizzaId, Quantity = 1, UnitPrice = 12.99m }],
+            DeliveryAddress = type == OrderType.Delivery
+                ? new CreateOrderDeliveryAddressDto
+                {
+                    AddressLine1 = "1 Test Street",
+                    City = "Test City",
+                    PostalCode = "1000",
+                    Country = "CH"
+                }
+                : null,
             Payments = [new CreateOrderPaymentDto { PaymentMethod = method, Amount = amount }]
         };
 
