@@ -171,16 +171,21 @@ public sealed class BasketLineCustomization
                 return null;
             }
 
-            // Baskets are one level deep (see BasketLineChannelScan), so a child's own children are
-            // not expected; passing none keeps the recursion terminating either way.
-            var own = FromRow(child, Array.Empty<BasketItem>(), onUnreadable);
+            // A menu option can itself carry product customization options. Those grandchildren
+            // are part of the line's identity during login merges, just as they are during the
+            // original add; EF relationship fix-up populates this navigation from the basket's
+            // flat item load.
+            var own = FromRow(child, child.ChildBasketItems.ToList(), onUnreadable);
             if (own is null)
             {
                 return null;
             }
 
-            entries.Add(string.Create(CultureInfo.InvariantCulture,
-                $"{child.ProductId}|{child.ProductVariationId}|{child.Quantity / parent.Quantity}|{own.Key()}"));
+            entries.Add(child.ProductCustomizationOptionId.HasValue
+                ? string.Create(CultureInfo.InvariantCulture,
+                    $"{child.ProductCustomizationOptionId}|{child.Quantity / parent.Quantity}")
+                : string.Create(CultureInfo.InvariantCulture,
+                    $"{child.ProductId}|{child.ProductVariationId}|{child.Quantity / parent.Quantity}|{own.Key()}"));
         }
 
         entries.Sort(StringComparer.Ordinal);
@@ -211,13 +216,17 @@ public sealed class BasketLineCustomization
             .Select(s => (s.Id, s.Quantity))
             .ToList();
 
-        // No composition: a request that builds a BUNDLE returns from BasketService's Menu branch
-        // before dedup is ever reached, so an incoming request is always a regular line. That also
-        // means a stored bundle parent can no longer match one — which is the right answer for the
-        // retyped-product case #308 documents, where a stale bundle parent DOES fall into dedup.
+        var composition = (request.CustomizationSelections ?? [])
+            .SelectMany(group => group.Options
+                .Where(option => option.Kind == Domain.Common.Enums.CustomizationOptionKind.Product)
+                .Select(option => string.Create(CultureInfo.InvariantCulture,
+                    $"{option.OptionId}|{option.Quantity}")))
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToList();
+
         return new BasketLineCustomization(
             request.SpecialInstructions, request.SelectedIngredients, request.AddedIngredients,
-            requestedSides, request.IngredientQuantities, new List<string>());
+            requestedSides, request.IngredientQuantities, composition);
     }
 
     /// <summary>

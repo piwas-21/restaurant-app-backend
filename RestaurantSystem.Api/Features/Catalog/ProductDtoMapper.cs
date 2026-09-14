@@ -109,6 +109,10 @@ public static class ProductDtoMapper
                 IsRequired = si.IsRequired,
                 DisplayOrder = si.DisplayOrder
             }).ToList(),
+            CustomizationGroups = product.CustomizationGroups
+                .OrderBy(group => group.DisplayOrder)
+                .Select(MapCustomizationGroup)
+                .ToList(),
             // #468: one projection for a bundle's sections, shared with the two Menus reads and
             // with `GetProductByIdQuery`. This is a WRITE-path echo, so the caller must load
             // sections → items → product → detailed-ingredients or the echo states a recipe the
@@ -129,6 +133,40 @@ public static class ProductDtoMapper
         }
         return dto;
     }
+
+    public static ProductCustomizationGroupDto MapCustomizationGroup(ProductCustomizationGroup group)
+        => new()
+        {
+            Id = group.Id,
+            Name = group.Name,
+            Description = group.Description,
+            DisplayOrder = group.DisplayOrder,
+            IsRequired = group.IsRequired,
+            MinSelection = group.MinSelection,
+            MaxSelection = group.MaxSelection,
+            IncludedFreeUnits = group.IncludedFreeUnits,
+            IsActive = group.IsActive,
+            Content = ToLocalizedContent(group.Descriptions, d => d.LanguageCode,
+                d => new ProductCustomizationGroupContentDto { Name = d.Name, Description = d.Description }),
+            IngredientOptions = group.IngredientOptions.OrderBy(option => option.DisplayOrder)
+                .Select(option => new ProductCustomizationIngredientOptionDto
+                {
+                    Id = option.Id,
+                    ProductIngredientId = option.ProductIngredientId,
+                    DisplayOrder = option.DisplayOrder,
+                    IsDefault = option.IsDefault
+                }).ToList(),
+            ProductOptions = group.ProductOptions.OrderBy(option => option.DisplayOrder)
+                .Select(option => new ProductCustomizationProductOptionDto
+                {
+                    Id = option.Id,
+                    OptionProductId = option.OptionProductId,
+                    OptionProductName = option.OptionProduct.Name,
+                    AdditionalPrice = option.AdditionalPrice,
+                    DisplayOrder = option.DisplayOrder,
+                    IsDefault = option.IsDefault
+                }).ToList()
+        };
 
     /// <summary>
     /// Projects a set of localized descriptions into a language-code → content map, taking the

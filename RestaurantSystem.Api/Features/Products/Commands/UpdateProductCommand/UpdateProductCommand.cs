@@ -49,7 +49,8 @@ public record UpdateProductCommand(
     // A bundle COMPONENT: not listed in the catalogue and not orderable on its own (see
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
-    bool IsComponent = false
+    bool IsComponent = false,
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -59,6 +60,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     private readonly ILogger<UpdateProductCommandHandler> _logger;
     private readonly IConfiguration _configuration;
     private readonly ILogger<GetProductByIdQueryHandler> _getProductlogger;
+    private readonly IProductCustomizationGroupSynchronizer _customizationGroupSynchronizer;
 
 
     public UpdateProductCommandHandler(
@@ -66,7 +68,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         ICurrentUserService currentUserService,
         ILogger<UpdateProductCommandHandler> logger,
         ILogger<GetProductByIdQueryHandler> getProductlogger,
-        IConfiguration configuration
+        IConfiguration configuration,
+        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer
         )
     {
         _context = context;
@@ -74,6 +77,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         _logger = logger;
         _getProductlogger = getProductlogger;
         _configuration = configuration;
+        _customizationGroupSynchronizer = customizationGroupSynchronizer;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -89,6 +93,12 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             .Include(p => p.SuggestedSideItems)
             .Include(p => p.DetailedIngredients)
                 .ThenInclude(di => di.Descriptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.Descriptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+            .Include(p => p.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
             .Include(p => p.MenuDefinition)
             .FirstOrDefaultAsync(p => p.Id == command.Id && !p.IsDeleted, cancellationToken);
 
@@ -362,6 +372,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 _currentUserService.GetAuditIdentifier(),
                 _logger,
                 cancellationToken);
+        }
+
+        if (command.CustomizationGroups != null)
+        {
+            await _customizationGroupSynchronizer.SyncAsync(
+                product, command.CustomizationGroups,
+                _currentUserService.GetAuditIdentifier(), cancellationToken);
         }
 
         // Update Menu Definition.

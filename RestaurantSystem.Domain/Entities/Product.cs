@@ -12,7 +12,6 @@ public class Product : SoftDeleteEntity
     public bool IsActive { get; set; } = true;
     public bool IsAvailable { get; set; } = true;
     public bool IsSpecial { get; set; } // Is this a special menu (e.g., holiday menu)
-
     /// <summary>
     /// When <c>true</c>, the synthetic "base product" option (ordering with no variation) is not
     /// offered: the guest must pick one of the variations. Stored as-is; the EFFECTIVE rule adds
@@ -38,7 +37,6 @@ public class Product : SoftDeleteEntity
     public List<string>? Ingredients { get; set; } // JSON array of ingredients
     public List<string>? Allergens { get; set; } // JSON array of allergens
     public int DisplayOrder { get; set; }
-
     /// <summary>
     /// The <see cref="Common.Enums.OrderChannels"/> bitmask this product may be ordered through.
     /// <c>null</c> = INHERIT from the primary category (which may itself be null = every channel).
@@ -94,6 +92,8 @@ public class Product : SoftDeleteEntity
     public virtual ICollection<ProductVariation> Variations { get; set; } = [];
     public virtual ICollection<ProductSideItem> SuggestedSideItems { get; set; } = [];
     public virtual ICollection<ProductIngredient> DetailedIngredients { get; set; } = [];
+    public virtual ICollection<ProductCustomizationGroup> CustomizationGroups { get; set; } = [];
+    public virtual ICollection<ProductCustomizationProductOption> CustomizationOptionMemberships { get; set; } = [];
     public virtual ICollection<MenuItem> MenuProducts { get; set; } = [];
     public virtual ICollection<ProductDescription> Descriptions { get; set; } = [];
     public virtual MenuDefinition? MenuDefinition { get; set; }

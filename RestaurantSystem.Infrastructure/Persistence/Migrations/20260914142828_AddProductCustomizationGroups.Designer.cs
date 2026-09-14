@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914142828_AddProductCustomizationGroups")]
+    partial class AddProductCustomizationGroups
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -618,10 +621,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ParentBasketItemId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_basket_item_id");
-
-                    b.Property<Guid?>("ProductCustomizationOptionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("product_customization_option_id");
 
                     b.Property<Guid?>("ProductId")
                         .HasColumnType("uuid")

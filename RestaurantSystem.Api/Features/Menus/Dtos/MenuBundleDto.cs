@@ -148,6 +148,7 @@ public class MenuBundleSectionItemDto
     public List<string>? Allergens { get; set; }
     public List<MenuBundleIngredientDto>? DetailedIngredients { get; set; }
     public List<MenuBundleSuggestedSideItemDto>? SuggestedSideItems { get; set; }
+    public List<ProductCustomizationGroupDto> CustomizationGroups { get; set; } = [];
 
     /// <summary>
     /// The OPTION PRODUCT's own sauce group rule (S6, plan D9/D9a/D10), copied from its product row:

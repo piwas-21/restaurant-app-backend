@@ -564,4 +564,75 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         var childRow = await context.BasketItems.SingleAsync(bi => bi.Id == pizzaChild.Id);
         childRow.SelectedSideItemsJson.Should().BeNull();
     }
+
+    [Fact]
+    public async Task BundleChild_ProductCustomization_IsPricedAndRoundTripsAsNestedChild()
+    {
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pizza = await context.Products.SingleAsync(product => product.Id == _testPizza.Id);
+            var group = new ProductCustomizationGroup
+            {
+                Id = Guid.NewGuid(),
+                ProductId = pizza.Id,
+                Product = pizza,
+                Name = "Extras",
+                IsActive = true,
+                MinSelection = 0,
+                MaxSelection = 1,
+                CreatedBy = "test"
+            };
+            group.ProductOptions.Add(new ProductCustomizationProductOption
+            {
+                Id = Guid.NewGuid(),
+                ProductCustomizationGroup = group,
+                ProductCustomizationGroupId = group.Id,
+                OptionProductId = _testCola.Id,
+                AdditionalPrice = 3m,
+                CreatedBy = "test"
+            });
+            context.ProductCustomizationGroups.Add(group);
+            await context.SaveChangesAsync();
+        }
+
+        ProductCustomizationGroup storedGroup;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            storedGroup = await context.ProductCustomizationGroups
+                .Include(group => group.ProductOptions)
+                .SingleAsync(group => group.ProductId == _testPizza.Id);
+        }
+        Client.DefaultRequestHeaders.Add("X-Session-Id", _sessionId);
+        var response = await AddMenuToBasketAsync(new SelectedMenuOptionDto
+        {
+            SectionId = _mainSection.Id,
+            ItemId = _testPizza.Id,
+            Quantity = 1,
+            CustomizationSelections =
+            [
+                new()
+                {
+                    GroupId = storedGroup.Id,
+                    Options =
+                    [
+                        new()
+                        {
+                            Kind = CustomizationOptionKind.Product,
+                            OptionId = storedGroup.ProductOptions.Single().Id
+                        }
+                    ]
+                }
+            ]
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(response);
+        var pizzaChild = GetChildItem(basket!.Data!, _menuProduct.Id, _testPizza.Id);
+        pizzaChild.ChildItems.Should().ContainSingle()
+            .Which.ProductCustomizationOptionId.Should().Be(storedGroup.ProductOptions.Single().Id);
+        basket.Data!.Items.Single(item => item.ProductId == _menuProduct.Id)
+            .UnitPrice.Should().Be(ExpectedMenuUnitPrice + 3m);
+    }
 }

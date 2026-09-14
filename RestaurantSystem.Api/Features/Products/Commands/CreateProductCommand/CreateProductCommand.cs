@@ -47,7 +47,8 @@ public record CreateProductCommand(
     // A bundle COMPONENT: not listed in the catalogue and not orderable on its own (see
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
-    bool IsComponent = false
+    bool IsComponent = false,
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -67,12 +68,18 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateProductCommandHandler> _logger;
+    private readonly IProductCustomizationGroupSynchronizer _customizationGroupSynchronizer;
 
-    public CreateProductCommandHandler(ApplicationDbContext context, ICurrentUserService currentUserService, ILogger<CreateProductCommandHandler> logger)
+    public CreateProductCommandHandler(
+        ApplicationDbContext context,
+        ICurrentUserService currentUserService,
+        ILogger<CreateProductCommandHandler> logger,
+        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer)
     {
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
+        _customizationGroupSynchronizer = customizationGroupSynchronizer;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -256,6 +263,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 {
                     var ingredient = new ProductIngredient
                     {
+                        Id = ingredientDto.Id ?? Guid.NewGuid(),
                         ProductId = product.Id,
                         Name = ingredientDto.Name,
                         IsOptional = ingredientDto.IsOptional,
@@ -305,6 +313,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     }
                 }
 
+            }
+
+            if (command.CustomizationGroups != null)
+            {
+                await _customizationGroupSynchronizer.SyncAsync(
+                    product, command.CustomizationGroups,
+                    _currentUserService.GetAuditIdentifier(), cancellationToken);
             }
 
             await _context.SaveChangesAsync(cancellationToken);

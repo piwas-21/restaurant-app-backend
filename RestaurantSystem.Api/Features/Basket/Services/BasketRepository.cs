@@ -52,6 +52,10 @@ public class BasketRepository : IBasketRepository
                         // and are unaffected, so #150's round-trip does not depend on this line.
                         .ThenInclude(p => p!.DetailedIngredients)
             .Include(b => b.Items)
+                .ThenInclude(bi => bi.ChildBasketItems)
+                    .ThenInclude(c => c.ChildBasketItems)
+                        .ThenInclude(c => c.Product)
+            .Include(b => b.Items)
             .Where(b => !b.IsDeleted);
 
         var owned = ApplyOwnerFilter(query, sessionId, userId);

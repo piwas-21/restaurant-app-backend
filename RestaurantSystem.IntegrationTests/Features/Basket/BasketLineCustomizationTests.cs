@@ -289,6 +289,29 @@ public class BasketLineCustomizationTests
     }
 
     [Fact]
+    public void BundlesWithDifferentNestedProductCustomizations_AreDifferentLines()
+    {
+        var first = Bundle(1, (Cola, 1));
+        var second = Bundle(1, (Cola, 1));
+        first.Children[0].ChildBasketItems.Add(new BasketItem
+        {
+            Id = Guid.NewGuid(),
+            CreatedBy = "test",
+            Quantity = 1,
+            ProductCustomizationOptionId = Onion
+        });
+        second.Children[0].ChildBasketItems.Add(new BasketItem
+        {
+            Id = Guid.NewGuid(),
+            CreatedBy = "test",
+            Quantity = 1,
+            ProductCustomizationOptionId = Cheese
+        });
+
+        Same(first, second).Should().BeFalse();
+    }
+
+    [Fact]
     public void TwoBundlesWithTheSameOptions_AreTheSameLine()
     {
         var cola = Guid.NewGuid();

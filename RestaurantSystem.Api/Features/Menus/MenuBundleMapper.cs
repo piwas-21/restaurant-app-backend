@@ -161,6 +161,10 @@ public static class MenuBundleMapper
         SauceMin = item.Product?.SauceMin ?? 0,
         SauceMax = item.Product?.SauceMax,
         SauceIncludedFree = item.Product?.SauceIncludedFree ?? 0,
+        CustomizationGroups = item.Product?.CustomizationGroups
+            .OrderBy(group => group.DisplayOrder)
+            .Select(ProductDtoMapper.MapCustomizationGroup)
+            .ToList() ?? [],
         DetailedIngredients = item.Product?.DetailedIngredients
             .Where(di => di.IsActive)
             .OrderBy(di => di.DisplayOrder)

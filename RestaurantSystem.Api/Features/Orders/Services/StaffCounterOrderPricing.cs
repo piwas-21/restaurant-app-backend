@@ -65,10 +65,14 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         // de-select a required variation, and an inactive variation cannot keep its old modifier.
         BasketBaseProductGuard.EnsureVariationChosen(product, variation);
 
+        var explicitCustomization = StaffExplicitCustomization.Resolve(product, source);
         var customization = _customizations.Build(
-            product.DetailedIngredients, source.SelectedIngredientIds, source.IngredientQuantities,
-            preferProvidedQuantities: false, product.SauceIncludedFree, product.SauceMax);
-        var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m);
+            product.DetailedIngredients, explicitCustomization.SelectedIngredientIds,
+            explicitCustomization.IngredientQuantities,
+            preferProvidedQuantities: false, product.SauceIncludedFree, product.SauceMax,
+            product.CustomizationGroups);
+        var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m)
+            + explicitCustomization.ProductOptionPrice;
         var children = source.ChildItems;
 
         if (product.Type == ProductType.Menu)
@@ -85,12 +89,14 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
                 // OrderItemFactory adds CustomizationPrice once, after UnitPrice * Quantity. The
                 // builder returns a per-unit figure, so the staff DTO must carry a line-absolute one.
                 CustomizationPrice = customization.CustomizationPrice * source.Quantity,
-                IngredientQuantities = customization.IngredientQuantities
+                IngredientQuantities = customization.IngredientQuantities,
+                ChildItems = explicitCustomization.ProductOptionChildren
             };
         }
 
-        return PriceSideItems(
-            source, unitPrice, customization, children, products);
+        var priced = PriceSideItems(source, unitPrice, customization, children, products);
+        priced.ChildItems!.AddRange(explicitCustomization.ProductOptionChildren);
+        return priced;
     }
 
     private CreateOrderItemDto PriceBundle(
@@ -141,6 +147,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         // this helper are per parent unit; the staff wire keeps child quantities line-absolute.
         var optionsPerParent = MenuBundleSelectionRules.ValidateAndSumOptionPrices(sections, selections);
         var pricedChildren = new List<CreateOrderItemDto>(sectionItems.Count);
+        decimal nestedOptionPricesPerParent = 0m;
         foreach (var (child, sectionItem) in sectionItems)
         {
             var childProduct = products.GetValueOrDefault(child.ProductId!.Value)
@@ -153,6 +160,9 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
             // (or any composed surcharge already resolved on that option).
             var childUnitPrice = sectionItem.AdditionalPrice
                 + (pricedChild.UnitPrice - childProduct.BasePrice);
+            nestedOptionPricesPerParent += (pricedChild.UnitPrice
+                - childProduct.BasePrice - (childVariation?.PriceModifier ?? 0m))
+                * (child.Quantity / source.Quantity);
             pricedChildren.Add(pricedChild with
             {
                 UnitPrice = childUnitPrice,
@@ -162,7 +172,8 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
 
         return source with
         {
-            UnitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m) + optionsPerParent,
+            UnitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m)
+                + optionsPerParent + nestedOptionPricesPerParent,
             // The parent can carry its own map-only/selection customization. It is per unit in the
             // shared builder and line-absolute in CreateOrderItemDto.
             CustomizationPrice = customization.CustomizationPrice * source.Quantity,
@@ -244,6 +255,12 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         var products = await _context.Products
             .Include(item => item.Variations)
             .Include(item => item.DetailedIngredients)
+            .Include(item => item.CustomizationGroups)
+                .ThenInclude(group => group.IngredientOptions)
+                    .ThenInclude(option => option.ProductIngredient)
+            .Include(item => item.CustomizationGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    .ThenInclude(option => option.OptionProduct)
             .Include(item => item.MenuDefinition!.Sections)
                     .ThenInclude(section => section.Items)
             .AsSplitQuery()
