@@ -21,17 +21,18 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// <c>[Authorize]</c>, and <c>Program.cs</c> registers no fallback policy. Until this file existed,
 /// the payment a caller declared there was taken at face value twice over:
 /// <list type="number">
-/// <item>any method other than <c>Cash</c> was written straight to <c>PaymentStatus.Completed</c>, so
-/// a stranger could hand themselves a paid order; and</item>
+/// <item>any method other than the on-site intents (<c>Cash</c> and <c>CreditCard</c>) or the
+/// separately settled <c>OnlinePayment</c> path was written straight to <c>PaymentStatus.Completed</c>,
+/// so a stranger could hand themselves a paid order; and</item>
 /// <item><c>TransactionId</c>/<c>ReferenceNumber</c>/<c>CardLastFourDigits</c>/<c>CardType</c>/
 /// <c>PaymentGateway</c> were copied verbatim from the request body into the ledger, so the
 /// fabricated payment came with a fabricated reference to match.</item>
 /// </list>
 /// <para>
-/// The only thing standing in the way was <c>disabled: true</c> on the non-cash radios in
-/// <c>frontend/src/config/paymentMethods.ts</c> — a client-side default, not a control. Nothing in
-/// the suite posted a non-cash order, which is why the hole survived a payment refactor and a
-/// dedicated authorization pass.
+/// The client must expose only the two on-site intents and the separately settled online method.
+/// The server-side allow-list remains the control: <c>disabled: true</c> in
+/// <c>frontend/src/config/paymentMethods.ts</c> is not authorization. The suite keeps refusal
+/// cases for unsupported methods so the allow-list cannot silently widen to every enum member.
 /// </para>
 /// <para>
 /// The staff cases are here deliberately. A blanket "no non-cash tenders" rule would satisfy every
@@ -49,7 +50,8 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     }
 
     /// <summary>
-    /// Every tender a guest is not allowed to assert.
+    /// Every tender a guest is not allowed to assert. CreditCard is deliberately absent: it is
+    /// the on-site card intent and has its own unpaid assertion below.
     /// </summary>
     /// <remarks>
     /// <c>OnlinePayment</c> USED to be in this list, with a note saying that if a future change ever
@@ -63,11 +65,10 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     /// <see cref="The_amount_of_an_online_tender_is_the_orders_not_the_callers"/>.
     /// </remarks>
     [Theory]
-    [InlineData(PaymentMethod.CreditCard)]
     [InlineData(PaymentMethod.DebitCard)]
     [InlineData(PaymentMethod.MobilePayment)]
     [InlineData(PaymentMethod.BankTransfer)]
-    public async Task A_guest_cannot_declare_a_non_cash_tender_when_placing_an_order(PaymentMethod method)
+    public async Task A_guest_cannot_declare_an_unsupported_tender_when_placing_an_order(PaymentMethod method)
     {
         AuthenticateAsAnonymous();
 
@@ -88,7 +89,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     {
         AuthenticateAsAnonymous();
 
-        await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 12.99m));
+        await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.DebitCard, 12.99m));
 
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -110,7 +111,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     /// </para>
     /// </summary>
     [Fact]
-    public async Task The_from_basket_entry_point_refuses_the_same_tender()
+    public async Task The_from_basket_entry_point_refuses_an_unsupported_card_tender()
     {
         AuthenticateAsAnonymous();
         Client.DefaultRequestHeaders.Remove("X-Session-Id");
@@ -128,12 +129,12 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         {
             Type = OrderType.Takeaway,
             CustomerName = "Guest",
-            Payments = [new CreateOrderPaymentDto { PaymentMethod = PaymentMethod.CreditCard, Amount = 12.99m }]
+            Payments = [new CreateOrderPaymentDto { PaymentMethod = PaymentMethod.DebitCard, Amount = 12.99m }]
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await response.Content.ReadAsStringAsync())
-            .Should().Contain(nameof(PaymentMethod.CreditCard),
+            .Should().Contain(nameof(PaymentMethod.DebitCard),
                 "the refusal must be about the tender, not about some earlier validation failure");
     }
 
@@ -158,6 +159,77 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         payment.Status.Should().Be(PaymentStatus.Pending, "cash is counted at the till, not on the wire");
         order.TotalPaid.Should().Be(0m, "a Pending tender is not captured, so it cannot count as money held");
         order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    /// <summary>
+    /// CreditCard is the on-site card intent. It is safe on anonymous creation because it remains
+    /// Pending until a staff member records the card actually accepted at the restaurant.
+    /// </summary>
+    [Fact]
+    public async Task A_guest_may_declare_an_on_site_card_intent_and_it_is_not_paid()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 0.01m));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var payment = await context.OrderPayments.AsNoTracking().SingleAsync();
+        var order = await context.Orders.AsNoTracking().SingleAsync();
+
+        payment.PaymentMethod.Should().Be(PaymentMethod.CreditCard);
+        payment.Status.Should().Be(PaymentStatus.Pending,
+            "the card is accepted at the restaurant, not by this anonymous request");
+        payment.Amount.Should().Be(0.01m,
+            "the declared amount is an on-site collection note until staff records the actual tender");
+        order.TotalPaid.Should().Be(0m, "a Pending on-site intent is not captured");
+        order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    /// <summary>
+    /// The intent becomes money only through the staff-only collection endpoint. This guards both
+    /// halves of the contract: guests can request on-site card payment, but only staff can mark a
+    /// real terminal transaction as completed.
+    /// </summary>
+    [Fact]
+    public async Task Staff_recording_the_card_tender_is_what_completes_the_on_site_intent()
+    {
+        AuthenticateAsAnonymous();
+        var created = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 12.99m));
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Guid orderId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
+        }
+
+        AuthenticateAsAdmin();
+        var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
+        {
+            operationId = Guid.NewGuid(),
+            paymentMethod = nameof(PaymentMethod.CreditCard),
+            amount = 12.99m,
+            transactionId = "onsite-terminal-0099"
+        });
+        paid.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var after = Factory.Services.CreateScope();
+        var afterContext = after.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var order = await afterContext.Orders
+            .Include(value => value.Payments)
+            .AsNoTracking()
+            .SingleAsync();
+
+        order.Payments.Should().ContainSingle(payment =>
+            payment.PaymentMethod == PaymentMethod.CreditCard
+            && payment.Status == PaymentStatus.Completed
+            && payment.TransactionId == "onsite-terminal-0099");
+        order.TotalPaid.Should().Be(12.99m);
+        order.PaymentStatus.Should().Be(PaymentStatus.Completed);
     }
 
     /// <summary>
@@ -357,7 +429,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     {
         AuthenticateAsUser();
 
-        var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 12.99m));
+        var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.DebitCard, 12.99m));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
             "having an account is not the same as standing behind the till");
