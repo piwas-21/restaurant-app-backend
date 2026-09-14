@@ -394,6 +394,8 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.IOnlinePaymentIntentGuard,
+    RestaurantSystem.Api.Features.Payments.Services.OnlinePaymentIntentGuard>();
 // What an order costs at Stripe — the amount and Sofra's cut of it, together. Scoped rather than
 // singleton only to match its neighbours; it reads options and holds no per-request state.
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutChargeResolver,

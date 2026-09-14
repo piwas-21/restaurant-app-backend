@@ -167,11 +167,12 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
     /// Pending until a staff member records the card actually accepted at the restaurant.
     /// </summary>
     [Fact]
-    public async Task A_guest_may_declare_an_on_site_card_intent_and_it_is_not_paid()
+    public async Task A_takeaway_guest_may_declare_an_on_site_card_intent_and_it_is_not_paid()
     {
         AuthenticateAsAnonymous();
 
-        var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 0.01m));
+        var response = await PostAsJsonAsync(
+            "/api/orders", NewOrder(PaymentMethod.CreditCard, 0.01m, OrderType.Takeaway));
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = Factory.Services.CreateScope();
@@ -180,6 +181,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         var payment = await context.OrderPayments.AsNoTracking().SingleAsync();
         var order = await context.Orders.AsNoTracking().SingleAsync();
 
+        order.Type.Should().Be(OrderType.Takeaway);
         payment.PaymentMethod.Should().Be(PaymentMethod.CreditCard);
         payment.Status.Should().Be(PaymentStatus.Pending,
             "the card is accepted at the restaurant, not by this anonymous request");
@@ -187,6 +189,23 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
             "the declared amount is an on-site collection note until staff records the actual tender");
         order.TotalPaid.Should().Be(0m, "a Pending on-site intent is not captured");
         order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+    }
+
+    [Fact]
+    public async Task A_guest_cannot_place_an_order_with_the_default_order_type()
+    {
+        AuthenticateAsAnonymous();
+        var invalid = NewOrder(PaymentMethod.Cash, 12.99m);
+        invalid.Type = (OrderType)0;
+
+        var response = await PostAsJsonAsync("/api/orders", invalid);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Unable to convert");
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.Orders.AsNoTracking().AnyAsync()).Should().BeFalse();
     }
 
     [Fact]
