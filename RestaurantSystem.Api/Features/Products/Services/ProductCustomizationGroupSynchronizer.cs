@@ -24,13 +24,14 @@ internal sealed class ProductCustomizationGroupSynchronizer(
 
         foreach (var dto in incoming)
         {
-            var group = ResolveGroup(product, dto, auditIdentifier);
+            var group = ResolveGroup(context, product, dto, auditIdentifier);
             ApplyFields(group, dto, auditIdentifier);
             ReplaceChildren(context, group, dto, auditIdentifier);
         }
     }
 
     private static ProductCustomizationGroup ResolveGroup(
+        ApplicationDbContext context,
         Product product,
         ProductCustomizationGroupDto dto,
         string auditIdentifier)
@@ -45,6 +46,7 @@ internal sealed class ProductCustomizationGroupSynchronizer(
                 CreatedBy = auditIdentifier
             };
             product.CustomizationGroups.Add(created);
+            context.ProductCustomizationGroups.Add(created);
             return created;
         }
 
@@ -87,6 +89,7 @@ internal sealed class ProductCustomizationGroupSynchronizer(
             CreatedAt = DateTime.UtcNow,
             CreatedBy = auditIdentifier
         }).ToList();
+        context.ProductCustomizationGroupDescriptions.AddRange(group.Descriptions);
 
         SyncIngredientOptions(context, group, dto.IngredientOptions, auditIdentifier);
         SyncProductOptions(context, group, dto.ProductOptions, auditIdentifier);
@@ -120,7 +123,10 @@ internal sealed class ProductCustomizationGroupSynchronizer(
             option.UpdatedAt = DateTime.UtcNow;
             option.UpdatedBy = auditIdentifier;
             if (!dto.Id.HasValue)
+            {
                 group.IngredientOptions.Add(option);
+                context.ProductCustomizationIngredientOptions.Add(option);
+            }
         }
     }
 
@@ -153,7 +159,10 @@ internal sealed class ProductCustomizationGroupSynchronizer(
             option.UpdatedAt = DateTime.UtcNow;
             option.UpdatedBy = auditIdentifier;
             if (!dto.Id.HasValue)
+            {
                 group.ProductOptions.Add(option);
+                context.ProductCustomizationProductOptions.Add(option);
+            }
         }
     }
 
