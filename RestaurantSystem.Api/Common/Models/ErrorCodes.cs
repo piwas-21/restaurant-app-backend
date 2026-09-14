@@ -189,6 +189,12 @@ public static class ErrorCodes
     /// <summary>Returned when an order changed after a caller read its version token.</summary>
     public const string OrderVersionConflict = "OrderVersionConflict";
     public const string KitchenReleaseRequired = "KitchenReleaseRequired";
+
+    /// <summary>Returned when an operational queue synchronization cursor is malformed, tampered with, or reused with different filters.</summary>
+    public const string InvalidOperationalQueueCursor = "InvalidOperationalQueueCursor";
+
+    /// <summary>Returned when an operational queue synchronization cursor is past its retention window.</summary>
+    public const string ExpiredOperationalQueueCursor = "ExpiredOperationalQueueCursor";
 }
 
 

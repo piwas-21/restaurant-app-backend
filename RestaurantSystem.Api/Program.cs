@@ -440,6 +440,11 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.IE
 builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.ITenantClock,
     RestaurantSystem.Api.Common.Services.TenantClock>();
 
+// Protected cursors bind the operational queue walk to this tenant instance and expire so a
+// captured URL cannot be replayed indefinitely. The tenant discriminator is supplied by
+// provisioning through OperationalQueueSync__TenantKey; the legacy install leaves it empty.
+builder.Services.AddOperationalQueueSync();
+
 // Freezes that language onto the row being created (S4). Scoped, unlike the resolver: it reads the
 // account's stored preference from the request's DbContext.
 builder.Services.AddScoped<RestaurantSystem.Api.Common.Services.Interfaces.IPreferredLanguageCapture,

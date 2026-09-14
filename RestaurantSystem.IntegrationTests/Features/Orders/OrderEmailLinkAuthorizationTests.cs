@@ -238,10 +238,12 @@ public class OrderEmailLinkAuthorizationTests : IntegrationTestBase
 
         var handler = new GetOrdersQueryHandler(
             context,
+            new AnonymousCurrentUser(),
             scope.ServiceProvider.GetRequiredService<ITenantClock>(),
             scope.ServiceProvider.GetRequiredService<IOrderMappingService>(),
-            NullLogger<GetOrdersQueryHandler>.Instance,
-            new AnonymousCurrentUser());
+            scope.ServiceProvider.GetRequiredService<IOperationalQueueCursor>(),
+            scope.ServiceProvider.GetRequiredService<IOperationalQueueSyncReader>(),
+            NullLogger<GetOrdersQueryHandler>.Instance);
 
         var result = await handler.Handle(
             new GetOrdersQuery(

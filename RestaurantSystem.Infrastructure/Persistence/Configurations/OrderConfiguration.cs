@@ -95,9 +95,16 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasDefaultValue(1)
             .IsConcurrencyToken();
 
+        // The trigger allocates this value for every order write. EF must refresh it after inserts
+        // and updates, but must never send a stale value back in a later update.
+        builder.Property(o => o.LastChangeSequence)
+            .ValueGeneratedOnAddOrUpdate()
+            .HasDefaultValue(0L);
+
         // Indexes
         builder.HasIndex(o => o.UserId);
         builder.HasIndex(o => o.OrderDate);
+        builder.HasIndex(o => o.LastChangeSequence);
         builder.HasIndex(o => o.Status);
         builder.HasIndex(o => new { o.UserId, o.OrderDate });
         builder.HasIndex(o => o.ServiceSessionId);

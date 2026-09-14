@@ -13,7 +13,6 @@ public partial class Order : SoftDeleteEntity
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
-
     // Order Type
     public OrderType Type { get; set; } // Dine-In, Takeaway, Delivery
     public int? TableNumber { get; set; } // For dine-in orders
@@ -76,6 +75,7 @@ public partial class Order : SoftDeleteEntity
 
     // Timestamps
     public DateTime OrderDate { get; set; }
+    public long LastChangeSequence { get; set; } // Latest tenant-scoped order-change sequence.
     public DateTime? EstimatedDeliveryTime { get; set; }
     public DateTime? ActualDeliveryTime { get; set; }
 

@@ -1,4 +1,6 @@
-﻿namespace RestaurantSystem.Api.Common.Models;
+using System.Text.Json.Serialization;
+
+namespace RestaurantSystem.Api.Common.Models;
 
 public record PagedResult<T>(
     List<T> Items,
@@ -6,4 +8,12 @@ public record PagedResult<T>(
     int Page,
     int PageSize,
     int TotalPages
-);
+)
+{
+    /// <summary>
+    /// Optional operational queue synchronization metadata. It is absent on every legacy paged
+    /// endpoint and is therefore additive for existing consumers.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PageSyncMetadata? Sync { get; init; }
+}
