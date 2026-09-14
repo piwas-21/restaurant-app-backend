@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -14,30 +15,47 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly IFidelityPointsService _fidelityPointsService;
+    private readonly IOrderPaymentReplayResolver _replayResolver;
     private readonly ILogger<OrderPaymentApplicator> _logger;
+    private readonly decimal _paymentTolerance;
 
     public OrderPaymentApplicator(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
         IFidelityPointsService fidelityPointsService,
-        ILogger<OrderPaymentApplicator> logger)
+        IOrderPaymentReplayResolver replayResolver,
+        ILogger<OrderPaymentApplicator> logger,
+        IOptions<TableServiceSessionSettings>? settings = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _fidelityPointsService = fidelityPointsService;
+        _replayResolver = replayResolver;
         _logger = logger;
+        _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// Behavior moved verbatim from <c>AddPaymentToOrderCommandHandler</c> when the table-bill
-    /// flow needed the same sequence, so there is exactly one money-path implementation. The
-    /// two-phase save (placeholders removed first, then reload) is deliberate — a stale
-    /// placeholder reference after a single save produced double-counted totals once already.
+    /// Since #523 the whole write — placeholder removal, tender insert, summary recompute — is
+    /// ONE <c>SaveChanges</c> inside one transaction (its own for the till flow, the bill
+    /// flow's ambient SERIALIZABLE one when present), so a timeout can no longer leave
+    /// placeholders removed with no tender banked. The summary recompute reads an explicitly
+    /// projected payment set — never the tracked navigation, whose contents move under EF
+    /// fixup at DetectChanges time (baf121a's double-counted totals).
     /// </remarks>
     public async Task<PaymentApplicationResult> ApplyToOrderAsync(
         Guid orderId, OrderPaymentTender tender, CancellationToken cancellationToken)
     {
+        // Idempotency resolves BEFORE eligibility on purpose: the original tender may already
+        // have completed the order, and its retry must see SUCCESS (the money is banked), not
+        // "cannot add payment to Completed order" — the timeout-after-commit shape of #523.
+        var resolved = await _replayResolver.ResolveOutcomeAsync(orderId, tender, cancellationToken);
+        if (resolved is not null)
+        {
+            return resolved;
+        }
+
         var order = await _context.Orders
             .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted, cancellationToken);
@@ -47,122 +65,38 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound);
         }
 
-        if (order.Status == OrderStatus.Cancelled || order.Status == OrderStatus.Completed)
+        if (tender.ExpectedVersion.HasValue && order.Version != tender.ExpectedVersion.Value)
+        {
+            return PaymentApplicationResult.VersionConflict();
+        }
+
+        if (order.Payments.Any(payment =>
+                payment.PaymentMethod == PaymentMethod.OnlinePayment
+                && payment.Status == PaymentStatus.Processing)
+            || !OrderSettlementEligibility.CanCollect(order))
         {
             return PaymentApplicationResult.NotPayable(order.Status.ToString());
         }
 
-        // Remove any existing Pending placeholder payments from order creation
-        // These are placeholder payments that should be replaced when the actual payment is added
-        var pendingPlaceholders = order.Payments.Where(p => p.Status == PaymentStatus.Pending).ToList();
-        foreach (var placeholder in pendingPlaceholders)
+        var applicationResult = await OrderPaymentApplicationPersistence.ApplyAsync(
+            _context, _currentUserService, _replayResolver, order, tender, _paymentTolerance, cancellationToken);
+        if (applicationResult is not null)
         {
-            _context.OrderPayments.Remove(placeholder);
+            return applicationResult;
         }
 
-        // Save the removal of placeholder payments first
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Reload order to get fresh payment collection without stale placeholder references
-        order = await _context.Orders
-            .Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted, cancellationToken);
+        // Reload order to ensure clean state and accurate payment calculations, and so the
+        // response reflects the committed rows rather than the tracked mutation.
+        order = await _replayResolver.LoadOrderForResponseAsync(orderId, cancellationToken);
 
         if (order == null)
         {
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound);
         }
-
-        var payment = new OrderPayment
-        {
-            OrderId = order.Id,
-            PaymentMethod = tender.PaymentMethod,
-            Amount = tender.Amount, // Allow overpayment - it will be flagged in payment status
-            Status = PaymentStatus.Pending,
-            TransactionId = tender.TransactionId,
-            ReferenceNumber = tender.ReferenceNumber,
-            CardLastFourDigits = tender.CardLastFourDigits,
-            CardType = tender.CardType,
-            PaymentNotes = tender.PaymentNotes,
-            PaymentDate = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = _currentUserService.GetAuditIdentifier()
-        };
-
-        _context.OrderPayments.Add(payment);
-
-        // Every payment is recorded as already completed: cash is taken at the till, and
-        // card is captured on the terminal before the cashier enters it here. There is no
-        // gateway integration, so there is nothing to branch on — the two arms of the
-        // if/else this replaces were byte-identical (Sonar S3923). Re-introduce the branch
-        // WITH the gateway call, not before it.
-        payment.Status = PaymentStatus.Completed;
-
-        order.UpdatedAt = DateTime.UtcNow;
-        order.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Reload order to ensure clean state and accurate payment calculations
-        order = await _context.Orders
-            .Include(o => o.Payments)
-            .Include(o => o.Items)
-            .Include(o => o.StatusHistory)
-            .Include(o => o.DeliveryAddress)
-            .AsSplitQuery() // sibling collections on one entity: rows multiply otherwise (S8733)
-            .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted, cancellationToken);
-
-        if (order == null)
-        {
-            return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound);
-        }
-
-        RecomputePaymentSummary(order);
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Payment {PaymentId} added to order {OrderNumber} by user {UserId}",
-            payment.Id, order.OrderNumber, _currentUserService.UserId);
 
         await AwardFidelityPointsIfCompletedAsync(order, cancellationToken);
 
         return PaymentApplicationResult.Applied(order);
-    }
-
-    /// <summary>
-    /// Calculated from the fresh data. Captured, not Completed: an order can already carry a
-    /// refunded payment when a new tender is added, and subtracting its refund from a sum it
-    /// was excluded from would push TotalPaid below what the till actually holds.
-    /// </summary>
-    private void RecomputePaymentSummary(Order order)
-    {
-        var capturedPayments = order.Payments.Where(p => p.Status.IsCaptured()).Sum(p => p.Amount);
-        var refundedAmounts = order.Payments.Where(p => p.RefundedAmount.HasValue).Sum(p => p.RefundedAmount ?? 0);
-
-        order.TotalPaid = capturedPayments - refundedAmounts;
-        order.RemainingAmount = order.Total - order.TotalPaid;
-
-        // Update payment status with proper tolerance for floating point precision
-        const decimal tolerance = 0.01m;
-
-        if (order.RemainingAmount > tolerance)
-        {
-            // Still outstanding balance
-            order.PaymentStatus = order.TotalPaid > 0 ? PaymentStatus.PartiallyPaid : PaymentStatus.Pending;
-        }
-        else if (order.RemainingAmount <= -tolerance)
-        {
-            // Overpaid (remaining is negative)
-            order.PaymentStatus = PaymentStatus.Overpaid;
-        }
-        else
-        {
-            // Remaining is within tolerance of zero - fully paid
-            order.PaymentStatus = PaymentStatus.Completed;
-        }
-
-        order.UpdatedAt = DateTime.UtcNow;
-        order.UpdatedBy = _currentUserService.GetAuditIdentifier();
     }
 
     /// <summary>Check if we should award fidelity points now that payment is updated.</summary>

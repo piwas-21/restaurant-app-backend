@@ -33,6 +33,9 @@ public class TillTenderCustodyTests : IntegrationTestBase
 {
     private Guid _orderId;
 
+    /// <summary>A stable operation id for the one tender this class takes.</summary>
+    private static readonly Guid OperationId = Guid.NewGuid();
+
     public TillTenderCustodyTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
     {
@@ -47,6 +50,7 @@ public class TillTenderCustodyTests : IntegrationTestBase
             $"/api/Orders/{_orderId}/payments",
             new
             {
+                operationId = OperationId,
                 paymentMethod = "Cash",
                 amount = 10.0m,
                 paymentGateway = "Stripe",

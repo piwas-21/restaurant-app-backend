@@ -4,6 +4,13 @@ public record OrderPaymentDto
 {
     public Guid Id { get; set; }
     public Guid OrderId { get; set; }
+
+    /// <summary>
+    /// Client operation key for staff payment reconciliation. Null on historical and table-bill
+    /// rows that predate an operation key; the field is additive to existing payment consumers.
+    /// </summary>
+    public Guid? OperationId { get; set; }
+
     public string PaymentMethod { get; set; } = null!;
     public decimal Amount { get; set; }
     public string Status { get; set; } = null!;

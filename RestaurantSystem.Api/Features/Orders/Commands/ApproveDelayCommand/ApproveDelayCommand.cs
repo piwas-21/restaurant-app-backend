@@ -9,7 +9,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.ApproveDelayCommand;
 
-public record ApproveDelayCommand(Guid OrderId) : ICommand<ApiResponse<OrderDto>>;
+public record ApproveDelayCommand(Guid OrderId) : ICommand<ApiResponse<OrderDto>>
+{
+    /// <summary>Optional detail version; legacy email links may omit it.</summary>
+    public int? ExpectedVersion { get; init; }
+}
 
 public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, ApiResponse<OrderDto>>
 {
@@ -17,17 +21,20 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
     private readonly IOrderEventService _orderEventService;
     private readonly IOrderMappingService _mappingService;
     private readonly ILogger<ApproveDelayCommandHandler> _logger;
+    private readonly IOrderPermittedActionsService? _permittedActionsService;
 
     public ApproveDelayCommandHandler(
         ApplicationDbContext context,
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
-        ILogger<ApproveDelayCommandHandler> logger)
+        ILogger<ApproveDelayCommandHandler> logger,
+        IOrderPermittedActionsService? permittedActionsService = null)
     {
         _context = context;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
         _logger = logger;
+        _permittedActionsService = permittedActionsService;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(ApproveDelayCommand command, CancellationToken cancellationToken)
@@ -43,9 +50,29 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
+        if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before approving the delay.",
+                ErrorCodes.OrderVersionConflict);
+        }
+
         if (order.Status != OrderStatus.PendingApproval)
         {
             return ApiResponse<OrderDto>.Failure("Order is not pending approval");
+        }
+
+        if (!order.IsKitchenReleased)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "Release this held order through the staff release operation before approving it.",
+                ErrorCodes.KitchenReleaseRequired);
+        }
+
+        if (OnlinePaymentIntent.IsAwaitingPayment(order))
+        {
+            return ApiResponse<OrderDto>.Failure(
+                "This order is awaiting an online payment and cannot be confirmed yet.");
         }
 
         var previousStatus = order.Status.ToString();
@@ -90,13 +117,26 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
             order.EstimatedDeliveryTime = DateTime.UtcNow.AddMinutes(30);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before approving the delay.",
+                ErrorCodes.OrderVersionConflict);
+        }
 
         // Notify Admin (via email or just status change event)
         // We can send an email to admin saying customer approved.
         // For now, just the status change event.
 
         var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
+        if (_permittedActionsService is not null)
+        {
+            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
+        }
 
         await _orderEventService.NotifyOrderStatusChanged(orderDto, previousStatus);
 

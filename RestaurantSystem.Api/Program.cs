@@ -303,6 +303,16 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services
+    .AddOptions<PrinterFeedSettings>()
+    .Bind(builder.Configuration.GetSection(PrinterFeedSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services
+    .AddOptions<TableServiceSessionSettings>()
+    .Bind(builder.Configuration.GetSection(TableServiceSessionSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // Said ONCE, at boot, when the printer endpoints have no key to check (#475).
 //
@@ -384,6 +394,8 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Features.Payments.Interfaces.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutSessionReuse,
     RestaurantSystem.Api.Features.Payments.Services.CheckoutSessionReuse>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.IOnlinePaymentIntentGuard,
+    RestaurantSystem.Api.Features.Payments.Services.OnlinePaymentIntentGuard>();
 // What an order costs at Stripe — the amount and Sofra's cut of it, together. Scoped rather than
 // singleton only to match its neighbours; it reads options and holds no per-request state.
 builder.Services.AddScoped<RestaurantSystem.Api.Features.Payments.Interfaces.ICheckoutChargeResolver,
@@ -429,6 +441,11 @@ builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.IE
 // language resolver: one tenant per container, so the zone is fixed for the process lifetime.
 builder.Services.AddSingleton<RestaurantSystem.Api.Common.Services.Interfaces.ITenantClock,
     RestaurantSystem.Api.Common.Services.TenantClock>();
+
+// Protected cursors bind the operational queue walk to this tenant instance and expire so a
+// captured URL cannot be replayed indefinitely. The tenant discriminator is supplied by
+// provisioning through OperationalQueueSync__TenantKey; the legacy install leaves it empty.
+builder.Services.AddOperationalQueueSync();
 
 // Freezes that language onto the row being created (S4). Scoped, unlike the resolver: it reads the
 // account's stored preference from the request's DbContext.
@@ -633,6 +650,9 @@ builder.Services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
 builder.Services.AddScoped<IAnonymousBasketMerger, AnonymousBasketMerger>();
 builder.Services.AddScoped<IBasketMergeService, BasketMergeService>();
 builder.Services.AddScoped<IOrderMappingService, OrderMappingService>();
+// One scoped instance per request caches the RestaurantInfo singleton's currency on first use,
+// so the per-row mapper loop in the staff list stays at one tenant lookup, not N.
+builder.Services.AddScoped<IOrderDisplayCurrencyResolver, OrderDisplayCurrencyResolver>();
 builder.Services.AddScoped<IOrderDisplayTranslator, OrderDisplayTranslator>();
 builder.Services.AddScoped<IOrderAddressFactory, OrderAddressFactory>();
 builder.Services.AddScoped<IOrderFactory, OrderFactory>();
@@ -659,8 +679,9 @@ builder.Services.AddScoped<IGuestOrderReceiptSender, GuestOrderReceiptSender>();
 builder.Services.AddSingleton<IOutboundEmailLedger, OutboundEmailLedger>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
 builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationService>();
-builder.Services.AddScoped<IOrderPaymentApplicator, OrderPaymentApplicator>();
-builder.Services.AddScoped<ITableBillAssembler, TableBillAssembler>();
+builder.Services.AddOrderPaymentServices();
+builder.Services.AddOrderDetailServices();
+builder.Services.AddStaffOrderServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
@@ -696,8 +717,10 @@ builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
 builder.Services.AddScoped<LoginEventHandler>();
 // Register background services
 builder.Services.Configure<ReservationRetentionSettings>(builder.Configuration.GetSection("ReservationRetention"));
-builder.Services.Configure<CheckoutReconciliationSettings>(
-    builder.Configuration.GetSection(CheckoutReconciliationSettings.SectionName));
+builder.Services.AddOptions<CheckoutReconciliationSettings>()
+    .Bind(builder.Configuration.GetSection(CheckoutReconciliationSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.Configure<DeviceTelemetryRetentionSettings>(builder.Configuration.GetSection("DeviceTelemetryRetention"));
 builder.Services.Configure<FleetPushSettings>(builder.Configuration.GetSection("FleetPush"));
 builder.Services.AddHostedService<BasketCleanupService>();

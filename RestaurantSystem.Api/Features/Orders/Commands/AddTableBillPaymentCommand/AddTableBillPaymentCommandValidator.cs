@@ -14,8 +14,17 @@ public class AddTableBillPaymentCommandValidator : AbstractValidator<AddTableBil
             .IsInEnum()
             .WithMessage("Invalid payment method");
 
+        RuleFor(x => x.OperationId)
+            .NotEmpty()
+            .WithMessage("Operation id is required");
+
         RuleFor(x => x.Amount)
             .GreaterThan(0)
             .WithMessage("Payment amount must be greater than 0");
+
+        RuleFor(x => x.Currency)
+            .Matches("^[a-zA-Z]{3}$")
+            .When(x => x.Currency != null)
+            .WithMessage("Currency must be a 3-letter ISO-4217 code.");
     }
 }

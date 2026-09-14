@@ -20,6 +20,19 @@ public class RecordPrintAcksCommandValidator : AbstractValidator<RecordPrintAcks
             a.RuleFor(x => x.Status).IsInEnum();
             a.RuleFor(x => x.Copies).GreaterThanOrEqualTo(0);
             a.RuleFor(x => x.FailureReason).MaximumLength(500);
+
+            // A null JobId is the old order-receipt contract. New jobs carry a complete identity so
+            // an update can never fall back to the order-only dedup key by accident.
+            a.When(x => x.JobId.HasValue, () =>
+            {
+                a.RuleFor(x => x.Revision).NotNull().GreaterThan(0);
+                a.RuleFor(x => x.JobType).NotNull().IsInEnum();
+            });
+            a.When(x => !x.JobId.HasValue, () =>
+            {
+                a.RuleFor(x => x.Revision).Null();
+                a.RuleFor(x => x.JobType).Null();
+            });
         });
     }
 }

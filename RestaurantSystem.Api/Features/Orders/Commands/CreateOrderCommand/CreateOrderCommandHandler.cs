@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using RestaurantSystem.Api.Abstraction.Messaging;
+﻿using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -23,6 +22,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderTableReservationService _tableReservation;
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderNotificationService _notifications;
+    private readonly IOrderPermittedActionsService _permittedActionsService;
     private readonly IOrderFactory _orderFactory;
     private readonly IPreferredLanguageCapture _languages;
 
@@ -36,6 +36,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderTableReservationService tableReservation,
         IOrderFidelityCoordinator fidelity,
         IOrderNotificationService notifications,
+        IOrderPermittedActionsService permittedActionsService,
         IOrderFactory orderFactory,
         IPreferredLanguageCapture languages,
         ILogger<CreateOrderCommandHandler> logger)
@@ -51,6 +52,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _tableReservation = tableReservation;
         _fidelity = fidelity;
         _notifications = notifications;
+        _permittedActionsService = permittedActionsService;
         _logger = logger;
     }
 
@@ -127,6 +129,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             await transaction.CommitAsync(cancellationToken);
 
             var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
+            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
 
             await _notifications.NotifyOrderCreatedAsync(orderDto);
             await _notifications.NotifyFocusOrderUpdateAsync(orderDto);

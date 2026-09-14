@@ -48,8 +48,10 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
-    /// Batched order print acknowledgements — upserts by <c>(OrderId, DeviceId, Target)</c> so an
-    /// at-least-once outbox is idempotent. Feeds the backend's served-vs-acked missed-order detector.
+    /// Batched print acknowledgements — legacy payloads upsert by <c>(OrderId, DeviceId, Target)</c>;
+    /// update jobs use nullable <c>(JobId, Revision, Target)</c> fields so an at-least-once outbox
+    /// is idempotent without overwriting the original receipt. Feeds the backend's served-vs-acked
+    /// missed-order detector.
     /// </summary>
     [HttpPost("print-acks")]
     [ApiKeyAuthFilter]
@@ -62,7 +64,7 @@ public class DevicesController : ControllerBase
     {
         var result = await _mediator.SendCommand(
             command with { DeviceId = deviceId ?? string.Empty }, cancellationToken);
-        return Ok(result);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
     /// <summary>

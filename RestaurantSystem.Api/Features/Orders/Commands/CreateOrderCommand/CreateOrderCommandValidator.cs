@@ -10,6 +10,10 @@ public class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
 {
     public CreateOrderCommandValidator()
     {
+        RuleFor(c => c.Type)
+            .IsInEnum()
+            .WithMessage("Invalid order type.");
+
         RuleFor(c => c.Items)
             .NotEmpty()
             .WithMessage("Order must contain at least one item.");

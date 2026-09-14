@@ -11,6 +11,7 @@
         "customerPhone": null,
         "type": "DineIn",
         "tableNumber": 7,
+        "serviceSessionId": null,
         "subTotal": 24.00,
         "tax": 0.00,
         "deliveryFee": 0.00,
@@ -22,6 +23,10 @@
         "totalPaid": 0.00,
         "remainingAmount": 0.00,
         "isFullyPaid": true,
+        "isKitchenReleased": true,
+        "kitchenReleasedAt": null,
+        "kitchenReleasedBy": null,
+        "version": 1,
         "status": "Confirmed",
         "paymentStatus": "Pending",
         "isFocusOrder": false,
@@ -43,6 +48,7 @@
         "promoCode": null,
         "hasUserLimitDiscount": false,
         "userLimitAmount": 0.00,
+        "currency": null,
         "items": [
           {
             "id": "__volatile__",
@@ -123,6 +129,7 @@
         "customerPhone": null,
         "type": "Delivery",
         "tableNumber": null,
+        "serviceSessionId": null,
         "subTotal": 15.00,
         "tax": 0.00,
         "deliveryFee": 5.00,
@@ -134,6 +141,10 @@
         "totalPaid": 20.00,
         "remainingAmount": 0.00,
         "isFullyPaid": true,
+        "isKitchenReleased": true,
+        "kitchenReleasedAt": null,
+        "kitchenReleasedBy": null,
+        "version": 1,
         "status": "Confirmed",
         "paymentStatus": "Completed",
         "isFocusOrder": false,
@@ -171,6 +182,7 @@
         "promoCode": null,
         "hasUserLimitDiscount": false,
         "userLimitAmount": 0.00,
+        "currency": null,
         "items": [
           {
             "id": "__volatile__",
@@ -193,6 +205,7 @@
           {
             "id": "__volatile__",
             "orderId": "__volatile__",
+            "operationId": null,
             "paymentMethod": "CreditCard",
             "amount": 20.00,
             "status": "Completed",

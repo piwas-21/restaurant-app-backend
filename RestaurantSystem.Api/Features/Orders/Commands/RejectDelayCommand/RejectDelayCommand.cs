@@ -9,7 +9,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.RejectDelayCommand;
 
-public record RejectDelayCommand(Guid OrderId) : ICommand<ApiResponse<OrderDto>>;
+public record RejectDelayCommand(Guid OrderId) : ICommand<ApiResponse<OrderDto>>
+{
+    /// <summary>Optional detail version; legacy email links may omit it.</summary>
+    public int? ExpectedVersion { get; init; }
+}
 
 public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, ApiResponse<OrderDto>>
 {
@@ -17,17 +21,20 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
     private readonly IOrderEventService _orderEventService;
     private readonly IOrderMappingService _mappingService;
     private readonly ILogger<RejectDelayCommandHandler> _logger;
+    private readonly IOrderPermittedActionsService? _permittedActionsService;
 
     public RejectDelayCommandHandler(
         ApplicationDbContext context,
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
-        ILogger<RejectDelayCommandHandler> logger)
+        ILogger<RejectDelayCommandHandler> logger,
+        IOrderPermittedActionsService? permittedActionsService = null)
     {
         _context = context;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
         _logger = logger;
+        _permittedActionsService = permittedActionsService;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(RejectDelayCommand command, CancellationToken cancellationToken)
@@ -41,6 +48,13 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
         if (order == null)
         {
             return ApiResponse<OrderDto>.Failure("Order not found");
+        }
+
+        if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before rejecting the delay.",
+                ErrorCodes.OrderVersionConflict);
         }
 
         if (order.Status != OrderStatus.PendingApproval)
@@ -71,12 +85,25 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
         order.UpdatedBy = "Customer";
         order.CancellationReason = "Customer rejected delay";
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before rejecting the delay.",
+                ErrorCodes.OrderVersionConflict);
+        }
 
         // Notify Admin (via email or just status change event)
         // We can send an email to admin saying customer rejected.
 
         var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
+        if (_permittedActionsService is not null)
+        {
+            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
+        }
 
         await _orderEventService.NotifyOrderStatusChanged(orderDto, previousStatus);
 

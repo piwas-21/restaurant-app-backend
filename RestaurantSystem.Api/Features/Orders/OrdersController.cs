@@ -137,14 +137,12 @@ public class OrdersController : ControllerBase
 
     [HttpDelete("{id}")]
     [RequireAdmin]
-    public async Task<ActionResult<ApiResponse<bool>>> DeleteOrder(Guid id)
-        => Ok(await _mediator.SendCommand(new DeleteOrderCommand(id)));
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteOrder(
+        Guid id, [FromQuery] int? expectedVersion = null)
+        => Ok(await _mediator.SendCommand(new DeleteOrderCommand(id)
+        {
+            ExpectedVersion = expectedVersion,
+        }));
 
-    // Routes moved out as part of the Sprint 2 god-class decomposition:
-    //   /api/orders/printer-feed                  -> PrinterFeedController        (task 2.3)
-    //   /api/orders/{id}/send-confirmation-email  -> OrderEmailController         (task 2.4)
-    //   /api/orders/{n}/quick-confirm|quick-cancel
-    //   /api/orders/{id}/approve-delay|reject-delay
-    //                                             -> OrderQuickActionsController  (task 2.5)
-    //   /api/orders/table/{n}/bill{,/payments}    -> TableBillController (one-bill-per-table)
+    // Printer, email, quick-action, and table-bill routes live in their focused controllers.
 }

@@ -25,7 +25,7 @@ namespace RestaurantSystem.Api.Features.Catalog;
 /// </remarks>
 public static class BaseProductVisibility
 {
-    /// <summary>True when the guest must choose a variation because the base row is not offered.</summary>
+    /// <summary>True when the guest must choose an available variation because the base row is not offered.</summary>
     public static bool IsBaseHidden(Product product) =>
-        product.HideBaseProduct && product.Variations.Any(v => v.IsActive);
+        product.HideBaseProduct && product.Variations.Any(v => v.IsActive && !v.IsDeleted);
 }

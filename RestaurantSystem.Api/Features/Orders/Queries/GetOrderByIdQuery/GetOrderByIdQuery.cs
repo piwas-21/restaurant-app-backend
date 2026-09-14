@@ -39,17 +39,20 @@ public class GetOrderByIdQueryHandler : IQueryHandler<GetOrderByIdQuery, ApiResp
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetOrderByIdQueryHandler> _logger;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderPermittedActionsService _permittedActionsService;
     private readonly ICurrentUserService _currentUserService;
 
     public GetOrderByIdQueryHandler(
         ApplicationDbContext context,
         IOrderMappingService mappingService,
+        IOrderPermittedActionsService permittedActionsService,
         ILogger<GetOrderByIdQueryHandler> logger,
         ICurrentUserService currentUserService)
     {
         _context = context;
         _logger = logger;
         _mappingService = mappingService;
+        _permittedActionsService = permittedActionsService;
         _currentUserService = currentUserService;
     }
 
@@ -85,6 +88,7 @@ public class GetOrderByIdQueryHandler : IQueryHandler<GetOrderByIdQuery, ApiResp
         }
 
         var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
+        orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
 
         _logger.LogInformation("Retrieved order {OrderNumber} with ID {OrderId}", order.OrderNumber, query.Id);
 

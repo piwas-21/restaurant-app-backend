@@ -131,7 +131,8 @@ public class BasketService : IBasketService
             ProductVariation? variation = null;
             if (item.ProductVariationId.HasValue)
             {
-                variation = product.Variations.FirstOrDefault(v => v.Id == item.ProductVariationId.Value && v.IsActive);
+                variation = product.Variations.FirstOrDefault(
+                    v => v.Id == item.ProductVariationId.Value && v.IsActive && !v.IsDeleted);
                 if (variation == null)
                     throw new NotFoundException("Product variation not found or unavailable");
             }

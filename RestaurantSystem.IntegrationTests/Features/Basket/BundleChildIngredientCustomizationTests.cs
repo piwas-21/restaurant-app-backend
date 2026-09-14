@@ -427,6 +427,92 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         pizzaItemTwo.IngredientQuantities![_mushrooms.Id].Should().Be(2);
     }
 
+    [Fact]
+    public async Task StaffBundle_Rejects_missing_and_wrong_child_sections_before_persisting()
+    {
+        AuthenticateAsAdmin();
+        var missingSection = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Takeaway",
+            items = new[]
+            {
+                new
+                {
+                    productId = _menuProduct.Id,
+                    quantity = 1,
+                    childItems = new object[]
+                    {
+                        new { productId = _testPizza.Id, quantity = 1 },
+                        new { productId = _testCola.Id, quantity = 1, sectionId = _drinkSection.Id }
+                    }
+                }
+            }
+        });
+        var wrongSection = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Takeaway",
+            items = new[]
+            {
+                new
+                {
+                    productId = _menuProduct.Id,
+                    quantity = 1,
+                    childItems = new[]
+                    {
+                        new { productId = _testPizza.Id, quantity = 1, sectionId = _drinkSection.Id },
+                        new { productId = _testCola.Id, quantity = 1, sectionId = _drinkSection.Id }
+                    }
+                }
+            }
+        });
+
+        missingSection.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        wrongSection.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task StaffBundle_Customization_scales_with_parent_quantity()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Takeaway",
+            items = new[]
+            {
+                new
+                {
+                    productId = _menuProduct.Id,
+                    quantity = 2,
+                    childItems = new object[]
+                    {
+                        new
+                        {
+                            productId = _testPizza.Id,
+                            quantity = 2,
+                            sectionId = _mainSection.Id,
+                            selectedIngredientIds = new[] { _cheese.Id, _mushrooms.Id, _tomatoSauce.Id },
+                            ingredientQuantities = new Dictionary<Guid, int> { [_mushrooms.Id] = 1 }
+                        },
+                        new { productId = _testCola.Id, quantity = 2, sectionId = _drinkSection.Id }
+                    }
+                }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);
+        result!.Data!.Total.Should().Be((MenuBasePrice + MainAdditional + DrinkAdditional) * 2 + 4.00m);
+    }
+
     // Slice 1 (#151): the per-option `SelectedSideItems` field was removed from
     // SelectedMenuOptionDto (bundle-child sides were never persisted or displayed).
     // A stale client that still sends it must not break — System.Text.Json ignores

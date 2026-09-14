@@ -88,13 +88,33 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        // The detail contract echoes this value and write handlers optionally require it. It is
+        // an application-managed concurrency token: the DbContext increments it for every tracked
+        // order update, while the migration supplies 1 to historical rows.
+        builder.Property(o => o.Version)
+            .HasDefaultValue(1)
+            .IsConcurrencyToken();
+
+        // The trigger allocates this value for every order write. EF must refresh it after inserts
+        // and updates, but must never send a stale value back in a later update.
+        builder.Property(o => o.LastChangeSequence)
+            .ValueGeneratedOnAddOrUpdate()
+            .HasDefaultValue(0L);
+
         // Indexes
         builder.HasIndex(o => o.UserId);
         builder.HasIndex(o => o.OrderDate);
+        builder.HasIndex(o => o.LastChangeSequence);
         builder.HasIndex(o => o.Status);
         builder.HasIndex(o => new { o.UserId, o.OrderDate });
+        builder.HasIndex(o => o.ServiceSessionId);
 
         // Relationships
+        builder.HasOne(o => o.ServiceSession)
+            .WithMany(session => session.Orders)
+            .HasForeignKey(o => o.ServiceSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(o => o.User)
             .WithMany()
             .HasForeignKey(o => o.UserId)
@@ -115,6 +135,13 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.RemainingAmount)
             .HasColumnType("decimal(10,2)");
+
+        builder.Property(o => o.IsKitchenReleased)
+            .HasDefaultValue(true);
+
+        builder.Property(o => o.KitchenReleasedBy)
+            .HasMaxLength(100);
+
 
         // Focus shares the Orders row rather than getting a table of its own: it is read on every
         // order fetch, so a join would cost more than the five columns it saves. Column names are

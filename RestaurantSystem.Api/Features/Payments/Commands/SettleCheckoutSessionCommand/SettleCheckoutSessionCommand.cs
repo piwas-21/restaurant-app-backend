@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Payments.Dtos;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -11,10 +13,8 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.Payments.Commands.SettleCheckoutSessionCommand;
 
 /// <summary>
-/// Settles one Stripe hosted-Checkout session. Idempotent, and deliberately so: there is no webhook
-/// in v1 (plan §4, measured — the platform may not register one on a connected account), so this
-/// has TWO callers that can arrive in either order or at the same time — the diner's
-/// <c>success_url</c> return trip (S9) and the polling reconciler (S7).
+/// Settles one Stripe hosted-Checkout session idempotently for either caller: the diner's
+/// <c>success_url</c> return trip or the polling reconciler used while no webhook is available.
 /// </summary>
 public record SettleCheckoutSessionCommand : ICommand<ApiResponse<CheckoutSettlementDto>>
 {
@@ -30,19 +30,22 @@ public class SettleCheckoutSessionCommandHandler
     private readonly ICheckoutSettlementWriter _writer;
     private readonly ICheckoutSessionRetirement _retirement;
     private readonly ILogger<SettleCheckoutSessionCommandHandler> _logger;
+    private readonly int _maxAttempts;
 
     public SettleCheckoutSessionCommandHandler(
         ApplicationDbContext context,
         IStripeCheckoutClient checkout,
         ICheckoutSettlementWriter writer,
         ICheckoutSessionRetirement retirement,
-        ILogger<SettleCheckoutSessionCommandHandler> logger)
+        ILogger<SettleCheckoutSessionCommandHandler> logger,
+        IOptions<CheckoutReconciliationSettings>? settings = null)
     {
         _context = context;
         _checkout = checkout;
         _writer = writer;
         _retirement = retirement;
         _logger = logger;
+        _maxAttempts = (settings?.Value ?? new CheckoutReconciliationSettings()).SettlementMaxAttempts;
     }
 
     public async Task<ApiResponse<CheckoutSettlementDto>> Handle(
@@ -92,8 +95,8 @@ public class SettleCheckoutSessionCommandHandler
         if (remote.AmountTotalMinor != session.AmountMinor)
         {
             _logger.LogError(
-                "Checkout session {SessionId} settled for {Actual} but expected {Expected} {Currency}",
-                session.SessionId, remote.AmountTotalMinor, session.AmountMinor, session.Currency);
+                "Checkout for order {OrderId} settled for {Actual} but expected {Expected} {Currency}",
+                session.OrderId, remote.AmountTotalMinor, session.AmountMinor, session.Currency);
 
             return await RetireAsync(
                 session, CheckoutSessionStatus.Failed,
@@ -101,11 +104,51 @@ public class SettleCheckoutSessionCommandHandler
                 cancellationToken);
         }
 
-        var settled = await _writer.SettleAsync(
-            session, remote.PaymentIntentId, remote.AmountTotalMinor, cancellationToken);
+        // A failed concurrency claim rolls back. Retry from a fresh snapshot up to the configured
+        // bound; a persistent race returns a stable refusal from this idempotent endpoint.
+        for (var attempt = 1; attempt <= _maxAttempts; attempt++)
+        {
+            try
+            {
+                var settled = await _writer.SettleAsync(
+                    session, remote.PaymentIntentId, remote.AmountTotalMinor, cancellationToken);
+                return ApiResponse<CheckoutSettlementDto>.SuccessWithData(settled);
+            }
+            catch (DbUpdateConcurrencyException ex) when (attempt < _maxAttempts)
+            {
+                _context.ChangeTracker.Clear();
+                _logger.LogWarning(ex,
+                    "Checkout for order {OrderId} lost order version race; reloading for retry",
+                    session.OrderId);
+                session = await _context.OrderCheckoutSessions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Id == session.Id, cancellationToken)
+                    ?? throw new NotFoundException("Checkout session not found");
 
-        return ApiResponse<CheckoutSettlementDto>.SuccessWithData(settled);
+                if (session.Status != CheckoutSessionStatus.Created)
+                {
+                    return await DescribeAsync(session, cancellationToken);
+                }
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                _context.ChangeTracker.Clear();
+                _logger.LogWarning(ex,
+                    "Checkout for order {OrderId} repeatedly lost the order version race",
+                    session.OrderId);
+                return ApiResponse<CheckoutSettlementDto>.FailureWithCode(
+                    "The order changed while payment was settling. Please retry.",
+                    ErrorCodes.OrderVersionConflict);
+            }
+        }
+
+        return ApiResponse<CheckoutSettlementDto>.FailureWithCode(
+            "The order changed while payment was settling. Please retry.",
+            ErrorCodes.OrderVersionConflict);
     }
+
+    private async Task<ApiResponse<CheckoutSettlementDto>> DescribeAsync(OrderCheckoutSession session, CancellationToken cancellationToken)
+        => ApiResponse<CheckoutSettlementDto>.SuccessWithData(await _writer.DescribeAsync(session.OrderId, cancellationToken));
 
     /// <summary>
     /// Checkout has not completed. Either it is still payable, or it is over.
@@ -154,18 +197,4 @@ public class SettleCheckoutSessionCommandHandler
         return await DescribeAsync(session, cancellationToken);
     }
 
-    /// <summary>Reports the order's current state without changing anything.</summary>
-    private async Task<ApiResponse<CheckoutSettlementDto>> DescribeAsync(
-        OrderCheckoutSession session, CancellationToken cancellationToken)
-    {
-        // FirstOrDefault, not First: an order soft-deleted while the diner was at Stripe would
-        // otherwise throw InvalidOperationException — a 500 on a path a diner reaches, and against
-        // §5.4. NotFound is the honest answer, and it is diagnosable rather than a stack trace.
-        var order = await _context.Orders
-            .AsNoTracking()
-            .FirstOrDefaultAsync(o => o.Id == session.OrderId, cancellationToken)
-            ?? throw new NotFoundException("Order not found");
-
-        return ApiResponse<CheckoutSettlementDto>.SuccessWithData(CheckoutSettlementDto.From(order));
-    }
 }

@@ -41,7 +41,8 @@ public static class RestaurantInfoMapper
             // Lowercase wire values — the frontend's `MenuLayout` union is written against them,
             // exactly like the landing page's background mode.
             info.MenuLayout.ToString().ToLowerInvariant(),
-            info.ShowMenuBundlesOnAllTab);
+            info.ShowMenuBundlesOnAllTab,
+            info.Currency);
 
     /// <summary>
     /// Joins a stored logo path onto the storage base URL, collapsing "no logo" to null.

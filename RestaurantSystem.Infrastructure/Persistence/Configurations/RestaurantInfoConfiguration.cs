@@ -38,6 +38,10 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
             .HasDefaultValue(MenuLayout.Tabs);
         // Default false: the guest All tab stays products-only for every existing tenant.
         builder.Property(r => r.ShowMenuBundlesOnAllTab).HasDefaultValue(false);
+        // ISO-4217 alpha-3, same bound as OrderPayment.Currency. Nullable: null is a STATE
+        // ("no display currency declared"), not a default to paper over — the resolver on the
+        // order side must be able to tell "unset" from a value.
+        builder.Property(r => r.Currency).HasMaxLength(3);
         // Percent coordinates (0–100) — 2 decimal places is ample granularity.
 
         builder.HasMany(r => r.PhoneNumbers)

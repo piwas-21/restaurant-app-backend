@@ -40,9 +40,9 @@ public interface IOrderPaymentBuilder
     /// </para>
     /// </remarks>
     /// <exception cref="Common.Exceptions.BadRequestException">
-    /// A non-staff caller declared a tender other than Cash or OnlinePayment. This throw
-    /// IS the security control: order creation is anonymous, so the declared tender is a
-    /// claim, and those two are the only ones that settle somewhere a human or a gateway
+    /// A non-staff caller declared a tender other than Cash, CreditCard, or OnlinePayment. This
+    /// throw IS the security control: order creation is anonymous, so the declared tender is a
+    /// claim, and those three are the only ones that settle somewhere a human or a gateway
     /// verifies them.
     /// </exception>
     void AddPayments(Order order, IReadOnlyCollection<CreateOrderPaymentDto> payments);

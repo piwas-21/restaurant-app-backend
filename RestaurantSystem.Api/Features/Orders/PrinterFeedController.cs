@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
+using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedUpdatesQuery;
 
 namespace RestaurantSystem.Api.Features.Orders;
 
@@ -16,8 +17,8 @@ namespace RestaurantSystem.Api.Features.Orders;
 // Response shape: legacy printer-app contract — HTTP 200 always, with
 // `success: false` and the error message in the body on failure. The
 // printer-app branches on the body's `success` field, so 5xx responses
-// would break it. Do not change without coordinating with the printer-app
-// repo.
+// would break it. The `data.updates` member is additive; legacy `items`,
+// `totalCount`, `page`, and `pageSize` retain their existing meaning.
 //
 // ONE carve-out: [RequireModule] below answers 404 when the tenant has no
 // `printing` module. That is deliberate and terminal, not a transient
@@ -39,13 +40,16 @@ public class PrinterFeedController : ControllerBase
     }
 
     /// <summary>
-    /// Returns confirmed orders for the printer-app to print.
+    /// Returns legacy order tickets and additive kitchen update jobs for the printer-app.
+    /// <paramref name="modifiedSince"/> remains the initial update boundary; subsequent update
+    /// pages use <paramref name="updateCursor"/>.
     /// </summary>
     [HttpGet]
     [ApiKeyAuthFilter]
     public async Task<ActionResult<object>> Get(
         [FromQuery] DateTime? modifiedSince,
         [FromQuery] string? language,
+        [FromQuery] string? updateCursor,
         CancellationToken cancellationToken)
     {
         try
@@ -53,6 +57,8 @@ public class PrinterFeedController : ControllerBase
             var orderDtos = await _mediator.SendQuery(
                 new PrinterFeedQuery(modifiedSince, language),
                 cancellationToken);
+            var updatePage = await _mediator.SendQuery(
+                new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
 
             return Ok(new
             {
@@ -62,7 +68,10 @@ public class PrinterFeedController : ControllerBase
                     items = orderDtos,
                     totalCount = orderDtos.Count,
                     page = 1,
-                    pageSize = PrinterFeedQuery.MaxOrdersPerPoll
+                    pageSize = PrinterFeedQuery.MaxOrdersPerPoll,
+                    updates = updatePage.Items,
+                    nextUpdateCursor = updatePage.NextUpdateCursor,
+                    hasMoreUpdates = updatePage.HasMoreUpdates
                 }
             });
         }
@@ -73,8 +82,16 @@ public class PrinterFeedController : ControllerBase
             {
                 success = false,
                 message = ex.Message,
-                data = new { items = Array.Empty<object>(), totalCount = 0 }
+                data = new
+                {
+                    items = Array.Empty<object>(),
+                    totalCount = 0,
+                    updates = Array.Empty<object>(),
+                    nextUpdateCursor = (string?)null,
+                    hasMoreUpdates = false
+                }
             });
         }
     }
+
 }

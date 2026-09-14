@@ -13,6 +13,10 @@ public record ToggleFocusOrderCommand : ICommand<ApiResponse<OrderDto>>
 {
     public Guid OrderId { get; set; }
     public bool IsFocusOrder { get; set; }
+
+    /// <summary>Optional detail version; old clients may omit it.</summary>
+    public int? ExpectedVersion { get; set; }
+
     public int? Priority { get; set; }
     public string? FocusReason { get; set; }
 }
@@ -23,6 +27,7 @@ public class ToggleFocusOrderCommandHandler : ICommandHandler<ToggleFocusOrderCo
     private readonly IOrderEventService _orderEventService;
     private readonly ILogger<ToggleFocusOrderCommandHandler> _logger;
     private readonly IOrderMappingService _mappingService;
+    private readonly IOrderPermittedActionsService? _permittedActionsService;
 
 
     public ToggleFocusOrderCommandHandler(
@@ -30,13 +35,15 @@ public class ToggleFocusOrderCommandHandler : ICommandHandler<ToggleFocusOrderCo
         ICurrentUserService currentUserService,
         IOrderEventService orderEventService,
         IOrderMappingService mappingService,
-        ILogger<ToggleFocusOrderCommandHandler> logger)
+        ILogger<ToggleFocusOrderCommandHandler> logger,
+        IOrderPermittedActionsService? permittedActionsService = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _orderEventService = orderEventService;
         _mappingService = mappingService;
         _logger = logger;
+        _permittedActionsService = permittedActionsService;
     }
 
 
@@ -51,6 +58,13 @@ public class ToggleFocusOrderCommandHandler : ICommandHandler<ToggleFocusOrderCo
         if (order == null)
         {
             return ApiResponse<OrderDto>.Failure("Order not found");
+        }
+
+        if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before changing its urgency.",
+                ErrorCodes.OrderVersionConflict);
         }
 
         // Un-focusing is now dropping the record rather than clearing four columns one by one,
@@ -68,9 +82,22 @@ public class ToggleFocusOrderCommandHandler : ICommandHandler<ToggleFocusOrderCo
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before changing its urgency.",
+                ErrorCodes.OrderVersionConflict);
+        }
 
         var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
+        if (_permittedActionsService is not null)
+        {
+            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
+        }
 
         await _orderEventService.NotifyFocusOrderUpdate(orderDto);
 

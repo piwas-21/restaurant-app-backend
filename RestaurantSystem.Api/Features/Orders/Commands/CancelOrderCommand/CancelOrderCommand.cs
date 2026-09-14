@@ -14,6 +14,10 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 public record CancelOrderCommand : ICommand<ApiResponse<OrderDto>>
 {
     public Guid OrderId { get; set; }
+
+    /// <summary>Optional detail version; old clients may omit it.</summary>
+    public int? ExpectedVersion { get; set; }
+
     public string CancellationReason { get; set; } = null!;
 }
 
@@ -25,6 +29,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
     private readonly IOrderMappingService _mappingService;
     private readonly IEmailService _emailService;
     private readonly IEmailLanguageResolver _languages;
+    private readonly IOrderPermittedActionsService? _permittedActionsService;
 
     public CancelOrderCommandHandler(
         ApplicationDbContext context,
@@ -32,7 +37,8 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         IOrderMappingService mappingService,
         IEmailService emailService,
         IEmailLanguageResolver languages,
-        ILogger<CancelOrderCommandHandler> logger)
+        ILogger<CancelOrderCommandHandler> logger,
+        IOrderPermittedActionsService? permittedActionsService = null)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -40,6 +46,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         _mappingService = mappingService;
         _emailService = emailService;
         _languages = languages;
+        _permittedActionsService = permittedActionsService;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(CancelOrderCommand command, CancellationToken cancellationToken)
@@ -53,6 +60,13 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         if (order == null)
         {
             return ApiResponse<OrderDto>.Failure("Order not found");
+        }
+
+        if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before cancelling.",
+                ErrorCodes.OrderVersionConflict);
         }
 
         if (order.Status == OrderStatus.Completed)
@@ -123,9 +137,22 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
                 order.OrderNumber, payment.Amount, payment.PaymentGateway, payment.TransactionId);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "The order changed. Refresh it before cancelling.",
+                ErrorCodes.OrderVersionConflict);
+        }
 
         var orderDto = await _mappingService.MapToOrderDtoAsync(order, cancellationToken);
+        if (_permittedActionsService is not null)
+        {
+            orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
+        }
 
         // Send cancellation email to customer
         if (!string.IsNullOrEmpty(order.CustomerEmail))

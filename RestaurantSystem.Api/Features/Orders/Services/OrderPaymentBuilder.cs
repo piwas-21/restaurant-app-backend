@@ -25,13 +25,15 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
     // The tenders a caller may declare when the order is created. Order creation is
     // ANONYMOUS (`POST /api/Orders` and `/from-basket` carry no [Authorize], and
     // Program.cs registers no fallback policy), so this list is the whole of what
-    // stops a stranger asserting how they paid. Cash is safe because it settles at
-    // the till, where a human counts it. OnlinePayment is safe because it settles at
-    // STRIPE: its tender is created Processing, contributes nothing to TotalPaid, and
-    // only the settle path — which re-fetches from Stripe before it writes — may
-    // complete it. Declaring one buys a caller nothing except a slower order.
+    // stops a stranger asserting how they paid. Cash and CreditCard are on-site
+    // intents where a restaurant can collect them: they remain Pending until staff sees the money
+    // at the restaurant's
+    // till. OnlinePayment is safe because it settles at STRIPE: its tender is created
+    // Processing, contributes nothing to TotalPaid, and only the settle path — which
+    // re-fetches from Stripe before it writes — may complete it. Declaring any of
+    // these buys a caller nothing except a slower order.
     private static readonly HashSet<PaymentMethod> SelfServiceMethods =
-        [PaymentMethod.Cash, PaymentMethod.OnlinePayment];
+        [PaymentMethod.Cash, PaymentMethod.CreditCard, PaymentMethod.OnlinePayment];
 
     public void AddPayments(Order order, IReadOnlyCollection<CreateOrderPaymentDto> payments)
     {
@@ -41,9 +43,16 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
         var auditId = _currentUserService.GetAuditIdentifier();
         var isStaff = _currentUserService.IsStaff;
         var now = DateTime.UtcNow;
+        var cardIsAllowed = order.Type is OrderType.DineIn or OrderType.Takeaway;
 
         foreach (var paymentDto in payments)
         {
+            if (!cardIsAllowed && paymentDto.PaymentMethod == PaymentMethod.CreditCard)
+            {
+                throw new BadRequestException(
+                    "Card at restaurant is only available for dine-in or takeaway orders.");
+            }
+
             if (!isStaff && !SelfServiceMethods.Contains(paymentDto.PaymentMethod))
             {
                 throw new BadRequestException(

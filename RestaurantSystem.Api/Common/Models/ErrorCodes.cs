@@ -158,4 +158,45 @@ public static class ErrorCodes
     /// too narrow" (this) without parsing prose.
     /// </summary>
     public const string MissingScope = "MissingScope";
+
+    /// <summary>
+    /// Returned by the till endpoint (<c>POST /api/Orders/&#123;id&#125;/payments</c>) when a tender's
+    /// client operation id already banked a payment on THIS order with a DIFFERENT method or
+    /// amount (#523). The original payment stands; the code lets the frontend show the cashier
+    /// "already paid with different details" instead of a generic failure, and tells a retry
+    /// bug (payload drifting between retries) apart from a double tap.
+    /// </summary>
+    public const string PaymentOperationPayloadMismatch = "PaymentOperationPayloadMismatch";
+
+    /// <summary>
+    /// Returned by the till endpoint when a tender's client operation id already banked a
+    /// payment on a DIFFERENT order — one Guid per cashier action is the client contract, so
+    /// this is a client generation bug, not a user mistake (#523).
+    /// </summary>
+    public const string PaymentOperationIdReused = "PaymentOperationIdReused";
+    public const string TableServiceSessionNotFound = "TableServiceSessionNotFound";
+    public const string TableServiceSessionAmbiguous = "TableServiceSessionAmbiguous";
+    public const string TableServiceSessionStale = "TableServiceSessionStale";
+    public const string TableServiceSessionCurrencyMismatch = "TableServiceSessionCurrencyMismatch";
+    public const string TableServiceSessionNotClosable = "TableServiceSessionNotClosable";
+    public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
+    public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+
+    public const string StaffOrderOperationPayloadMismatch = "StaffOrderOperationPayloadMismatch";
+    public const string StaffOrderOperationIdReused = "StaffOrderOperationIdReused";
+    public const string StaffOrderVersionConflict = "StaffOrderVersionConflict";
+
+    /// <summary>Returned when an order changed after a caller read its version token.</summary>
+    public const string OrderVersionConflict = "OrderVersionConflict";
+    public const string KitchenReleaseRequired = "KitchenReleaseRequired";
+
+    /// <summary>Returned when an operational queue synchronization cursor is malformed, tampered with, or reused with different filters.</summary>
+    public const string InvalidOperationalQueueCursor = "InvalidOperationalQueueCursor";
+
+    /// <summary>Returned when an operational queue synchronization cursor is past its retention window.</summary>
+    public const string ExpiredOperationalQueueCursor = "ExpiredOperationalQueueCursor";
 }
+
+
+// Table-service-session codes are additive to the POS contract. They are kept as strings so old
+// clients can continue to display Errors[0] while the redesigned cashier branches safely.

@@ -8,11 +8,16 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 public class OrderMappingService : IOrderMappingService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly ILogger<OrderMappingService> _logger;
 
-    public OrderMappingService(ApplicationDbContext context, ILogger<OrderMappingService> logger)
+    public OrderMappingService(
+        ApplicationDbContext context,
+        IOrderDisplayCurrencyResolver currencyResolver,
+        ILogger<OrderMappingService> logger)
     {
         _context = context;
+        _currencyResolver = currencyResolver;
         _logger = logger;
     }
 
@@ -45,6 +50,7 @@ public class OrderMappingService : IOrderMappingService
             CustomerPhone = order.CustomerPhone,
             Type = order.Type.ToString(),
             TableNumber = order.TableNumber,
+            ServiceSessionId = order.ServiceSessionId,
             SubTotal = order.SubTotal,
             Tax = order.Tax,
             DeliveryFee = order.DeliveryFee,
@@ -56,11 +62,16 @@ public class OrderMappingService : IOrderMappingService
             TotalPaid = order.TotalPaid,
             RemainingAmount = order.RemainingAmount,
             IsFullyPaid = order.IsFullyPaid,
+            IsKitchenReleased = order.IsKitchenReleased,
+            KitchenReleasedAt = order.KitchenReleasedAt,
+            KitchenReleasedBy = order.KitchenReleasedBy,
             PromoCode = order.PromoCode,
             HasUserLimitDiscount = order.HasUserLimitDiscount,
             UserLimitAmount = order.UserLimitAmount,
+            Currency = _currencyResolver.Resolve(order),
             Status = order.Status.ToString(),
             PaymentStatus = order.PaymentStatus.ToString(),
+            Version = order.Version,
             IsFocusOrder = order.Focus is not null,
             Priority = order.Focus?.Priority,
             FocusReason = order.Focus?.Reason,
@@ -179,6 +190,7 @@ public class OrderMappingService : IOrderMappingService
         {
             Id = payment.Id,
             OrderId = payment.OrderId,
+            OperationId = payment.OperationId,
             PaymentMethod = payment.PaymentMethod.ToString(),
             Amount = payment.Amount,
             Status = payment.Status.ToString(),

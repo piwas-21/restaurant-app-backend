@@ -16,6 +16,9 @@ public interface IStripeCheckoutClient
     /// <summary>Mints a hosted Checkout session on the connected account.</summary>
     Task<StripeCheckoutSession> CreateAsync(CheckoutSessionRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Expires a newly-created page that lost a local settlement race.</summary>
+    Task ExpireAsync(string sessionId, CancellationToken cancellationToken);
+
     /// <summary>
     /// Re-reads a session by id. Null <b>only</b> when Stripe does not know the id — which is a
     /// real state (a key or connected account swapped underneath us, a database restored across

@@ -43,5 +43,6 @@ public interface IOrderItemFactory
     /// <c>ResolvePricing</c>.
     /// </param>
     Task<string?> AddItemAsync(
-        Order order, CreateOrderItemDto itemDto, bool itemsAreServerPriced, CancellationToken cancellationToken);
+        Order order, CreateOrderItemDto itemDto, bool itemsAreServerPriced,
+        CancellationToken cancellationToken, bool allowStaffPrices = true);
 }

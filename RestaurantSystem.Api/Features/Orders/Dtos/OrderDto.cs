@@ -1,17 +1,22 @@
-﻿namespace RestaurantSystem.Api.Features.Orders.Dtos;
+using System.Text.Json.Serialization;
+
+namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
 public record OrderDto
 {
     public Guid Id { get; set; }
-    public string OrderNumber { get; set; } = null!;
+    public string OrderNumber { get; set; } = string.Empty;
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
 
     // Order Type
-    public string Type { get; set; } = null!;
+    public string Type { get; set; } = string.Empty;
     public int? TableNumber { get; set; }
+
+    /// <summary>Explicit table-visit membership. Null means a legacy/anonymous order.</summary>
+    public Guid? ServiceSessionId { get; set; }
 
     // Pricing
     public decimal SubTotal { get; set; }
@@ -28,9 +33,20 @@ public record OrderDto
     public decimal RemainingAmount { get; set; }
     public bool IsFullyPaid { get; set; }
 
+    // Staff counter release state. Additive so older clients can ignore it.
+    public bool IsKitchenReleased { get; set; }
+    public DateTime? KitchenReleasedAt { get; set; }
+    public string? KitchenReleasedBy { get; set; }
+
+    /// <summary>Server-issued aggregate version for conditional order mutations.</summary>
+    public int Version { get; set; }
+
     // Status
-    public string Status { get; set; } = null!;
-    public string PaymentStatus { get; set; } = null!;
+    public string Status { get; set; } = string.Empty;
+    public string PaymentStatus { get; set; } = string.Empty;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<OrderPermittedActionDto>? PermittedActions { get; set; }
 
     // Focus Order
     public bool IsFocusOrder { get; set; }
@@ -74,6 +90,17 @@ public record OrderDto
     public string? PromoCode { get; set; }
     public bool HasUserLimitDiscount { get; set; }
     public decimal UserLimitAmount { get; set; } // Threshold for discount
+
+    /// <summary>
+    /// The currency this order's money amounts are DISPLAYED in (POS plan C18) — never an input
+    /// to pricing or rounding. Resolution lives in <see cref="Services.OrderDisplayCurrencyResolver"/>:
+    /// the first payment tender carrying a currency (any status) wins, else the tenant's declared
+    /// <see cref="RestaurantInfo.Currency"/>, else null — a consumer must not invent a label
+    /// (receipts used to hardcode CHF on a EUR tenant's paper). Additive and read-only: older
+    /// printer-app / frontend builds ignore it. A tender value is lower-case as Stripe stores it;
+    /// consumers render case-insensitively.
+    /// </summary>
+    public string? Currency { get; set; }
 
     // Related Data
     public List<OrderItemDto> Items { get; set; } = new();

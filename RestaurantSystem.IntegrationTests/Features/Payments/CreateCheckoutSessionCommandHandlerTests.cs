@@ -208,6 +208,11 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         var dead = await verify.OrderCheckoutSessions.SingleAsync(s => s.SessionId == first.Data!.SessionId);
         dead.Status.Should().Be(CheckoutSessionStatus.Expired);
         dead.LastError.Should().Contain("expired");
+        var onlinePayments = await verify.OrderPayments
+            .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.OnlinePayment)
+            .ToListAsync();
+        onlinePayments.Should().ContainSingle();
+        onlinePayments.Single().Status.Should().Be(PaymentStatus.Processing);
     }
 
     /// <summary>
@@ -278,6 +283,11 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         var dead = await verify.OrderCheckoutSessions.SingleAsync(s => s.SessionId == first.Data!.SessionId);
         dead.Status.Should().Be(CheckoutSessionStatus.Expired);
         dead.LastError.Should().Contain("unknown");
+        var onlinePayments = await verify.OrderPayments
+            .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.OnlinePayment)
+            .ToListAsync();
+        onlinePayments.Should().ContainSingle();
+        onlinePayments.Single().Status.Should().Be(PaymentStatus.Processing);
     }
 
     /// <summary>
@@ -308,6 +318,28 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
 
         captured[0].IdempotencyKey.Should().Be($"checkout:{orderId}:1");
         second[0].IdempotencyKey.Should().Be($"checkout:{orderId}:2");
+    }
+
+    [Theory]
+    [InlineData(PaymentMethod.Cash)]
+    [InlineData(PaymentMethod.CreditCard)]
+    public async Task An_on_site_tender_is_refused_before_any_stripe_call(PaymentMethod method)
+    {
+        var orderId = await SeedOrderAsync(total: 10m, paymentMethod: method, paymentStatus: PaymentStatus.Pending);
+        await SeedLiveSessionAsync(orderId);
+        var checkout = FakeCheckout(out var captured);
+
+        var act = async () => await HandleAsync(orderId, checkout);
+
+        await act.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("*online payment intent*");
+        captured.Should().BeEmpty("an on-site tender must never mint a Stripe checkout");
+        checkout.Verify(c => c.CreateAsync(
+            It.IsAny<CheckoutSessionRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        checkout.Verify(c => c.GetAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        checkout.Verify(c => c.ExpireAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -354,7 +386,11 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         (await verify.OrderCheckoutSessions.AnyAsync()).Should().BeFalse();
     }
 
-    private async Task<Guid> SeedOrderAsync(decimal total, OrderStatus status = OrderStatus.Pending)
+    private async Task<Guid> SeedOrderAsync(
+        decimal total,
+        OrderStatus status = OrderStatus.Pending,
+        PaymentMethod paymentMethod = PaymentMethod.OnlinePayment,
+        PaymentStatus paymentStatus = PaymentStatus.Processing)
     {
         await using var seed = _fixture.CreateContext();
         var order = new Order
@@ -370,10 +406,38 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             CreatedAt = DateTime.UtcNow,
             CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
         };
+        order.Payments.Add(new OrderPayment
+        {
+            PaymentMethod = paymentMethod,
+            Amount = total,
+            Status = paymentStatus,
+            PaymentDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
+        });
 
         seed.Orders.Add(order);
         await seed.SaveChangesAsync();
         return order.Id;
+    }
+
+    private async Task SeedLiveSessionAsync(Guid orderId)
+    {
+        await using var seed = _fixture.CreateContext();
+        seed.OrderCheckoutSessions.Add(new OrderCheckoutSession
+        {
+            OrderId = orderId,
+            SessionId = $"cs_test_existing_{Guid.NewGuid():N}",
+            Status = CheckoutSessionStatus.Created,
+            Currency = "chf",
+            AmountMinor = 1000,
+            IdempotencyKey = $"checkout:{orderId}:1",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(31),
+            ConnectedAccountId = ConnectedAccount,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
+        });
+        await seed.SaveChangesAsync();
     }
 
     /// <summary>
@@ -443,7 +507,14 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             checkout.Object,
             // The REAL reuse service, not a stub. It is what stands between a diner and paying
             // twice, so faking it here would delete the property most of these tests exist for.
-            new CheckoutSessionReuse(ctx, checkout.Object),
+            new CheckoutSessionReuse(
+                ctx,
+                checkout.Object,
+                new CheckoutSessionRetirement(
+                    ctx,
+                    currentUser.Object,
+                    NullLogger<CheckoutSessionRetirement>.Instance)),
+            new OnlinePaymentIntentGuard(ctx, currentUser.Object),
             currentUser.Object,
             // The REAL resolver, not a stub — same reasoning as CheckoutSessionReuse below it. It is
             // what turns order.Total into the amount AND the fee, so faking it would delete the

@@ -13,15 +13,18 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRetainedCustomerDataScrubber _retainedDataScrubber;
     private readonly ILogger<DeleteUserCommandHandler> _logger;
 
     public DeleteUserCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
+        IRetainedCustomerDataScrubber retainedDataScrubber,
         ILogger<DeleteUserCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _retainedDataScrubber = retainedDataScrubber;
         _logger = logger;
     }
 
@@ -50,28 +53,7 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand, ApiRe
             using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
             try
             {
-                // Unlink Orders (set UserId to null)
-                await _context.Orders
-                    .Where(o => o.UserId == command.UserId)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(o => o.UserId, (Guid?)null), cancellationToken);
-
-                // Unlink Reservations
-                await _context.Reservations
-                    .Where(r => r.CustomerId == command.UserId)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(r => r.CustomerId, (Guid?)null), cancellationToken);
-
-                // Unlink Customer Discount Rules from Orders
-                var userDiscountRuleIds = await _context.CustomerDiscountRules
-                    .Where(r => r.UserId == command.UserId)
-                    .Select(r => r.Id)
-                    .ToListAsync(cancellationToken);
-
-                if (userDiscountRuleIds.Any())
-                {
-                    await _context.Orders
-                        .Where(o => o.CustomerDiscountRuleId.HasValue && userDiscountRuleIds.Contains(o.CustomerDiscountRuleId.Value))
-                        .ExecuteUpdateAsync(setters => setters.SetProperty(o => o.CustomerDiscountRuleId, (Guid?)null), cancellationToken);
-                }
+                await _retainedDataScrubber.ScrubAsync(command.UserId, cancellationToken);
 
                 // Delete dependencies (Hard Delete) - MUST IgnoreQueryFilters to ensure soft-deleted items are also removed
                 await _context.Baskets.IgnoreQueryFilters().Where(x => x.UserId == command.UserId).ExecuteDeleteAsync(cancellationToken);

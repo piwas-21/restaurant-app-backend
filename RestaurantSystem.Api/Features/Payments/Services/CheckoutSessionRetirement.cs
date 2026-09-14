@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
@@ -35,6 +36,8 @@ public class CheckoutSessionRetirement : ICheckoutSessionRetirement
 
         var now = DateTime.UtcNow;
         var auditId = _currentUser.GetAuditIdentifier();
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
 
         var retired = await _context.OrderCheckoutSessions
             .Where(s => s.Id == session.Id && s.Status == CheckoutSessionStatus.Created)
@@ -53,6 +56,7 @@ public class CheckoutSessionRetirement : ICheckoutSessionRetirement
         {
             // Something else moved the row first — almost certainly a settle that got there before
             // this sweep. Leave the tender alone: it belongs to whatever won.
+            await transaction.RollbackAsync(cancellationToken);
             _logger.LogInformation(
                 "Checkout session {SessionId} was no longer claimable when retiring as {Status}",
                 session.SessionId, status);
@@ -60,6 +64,7 @@ public class CheckoutSessionRetirement : ICheckoutSessionRetirement
         }
 
         await FailTenderAsync(session, now, auditId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         _logger.LogWarning(
             "Checkout session {SessionId} retired as {Status}: {Reason}", session.SessionId, status, reason);
@@ -83,28 +88,32 @@ public class CheckoutSessionRetirement : ICheckoutSessionRetirement
     private async Task FailTenderAsync(
         OrderCheckoutSession session, DateTime now, string auditId, CancellationToken cancellationToken)
     {
-        // A second live session for the same order means the tender is still covering THAT one —
-        // retiring this session says nothing about it. Rare (the mint path reuses a live session
-        // rather than adding a second), but the cost of getting it wrong is voiding a tender for a
-        // payment currently in progress.
-        var anotherSessionIsLive = await _context.OrderCheckoutSessions.AnyAsync(
-            s => s.OrderId == session.OrderId
-                && s.Id != session.Id
-                && s.Status == CheckoutSessionStatus.Created,
-            cancellationToken);
-
-        if (anotherSessionIsLive)
-        {
-            return;
-        }
-
+        // A second live session means the Processing tender may still be covering THAT one. Keep
+        // the check inside the same serializable write as the tender update; a preflight read would
+        // let a concurrent checkout mint race through and void money that is still in progress.
         await _context.OrderPayments
             .Where(p => p.OrderId == session.OrderId
                 && p.PaymentMethod == PaymentMethod.OnlinePayment
-                && p.Status == PaymentStatus.Processing)
+                && p.Status == PaymentStatus.Processing
+                && !_context.OrderCheckoutSessions.Any(other =>
+                    other.OrderId == session.OrderId
+                    && other.Id != session.Id
+                    && other.Status == CheckoutSessionStatus.Created))
             .ExecuteUpdateAsync(
                 p => p
                     .SetProperty(x => x.Status, PaymentStatus.Failed)
+                    .SetProperty(x => x.UpdatedAt, now)
+                    .SetProperty(x => x.UpdatedBy, auditId),
+                cancellationToken);
+
+        // Both the session claim and the optional tender release are order-detail mutations, but
+        // they are one retirement operation. The set-based writes bypass the change tracker, so
+        // bump the owner explicitly exactly once, even when no Processing tender was present.
+        await _context.Orders
+            .Where(o => o.Id == session.OrderId)
+            .ExecuteUpdateAsync(
+                o => o
+                    .SetProperty(x => x.Version, x => x.Version + 1)
                     .SetProperty(x => x.UpdatedAt, now)
                     .SetProperty(x => x.UpdatedBy, auditId),
                 cancellationToken);

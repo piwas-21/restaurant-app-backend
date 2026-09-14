@@ -34,6 +34,13 @@ public class GetTableBillQueryHandler : IQueryHandler<GetTableBillQuery, ApiResp
             return ApiResponse<TableBillDto>.Failure($"No open orders found for table {query.TableNumber}");
         }
 
+        if (bill.IsAmbiguous)
+        {
+            return ApiResponse<TableBillDto>.FailureWithCode(
+                "This table has more than one possible service session. Use the explicit service session id.",
+                ErrorCodes.TableServiceSessionAmbiguous);
+        }
+
         return ApiResponse<TableBillDto>.SuccessWithData(bill, "Table bill retrieved successfully");
     }
 }

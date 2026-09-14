@@ -6,9 +6,18 @@ public class AddPaymentToOrderCommandValidator : AbstractValidator<AddPaymentToO
 {
     public AddPaymentToOrderCommandValidator()
     {
+        RuleFor(x => x.ExpectedVersion)
+            .GreaterThan(0)
+            .When(x => x.ExpectedVersion.HasValue)
+            .WithMessage("Expected version must be greater than zero");
+
         RuleFor(x => x.OrderId)
             .NotEmpty()
             .WithMessage("Order ID is required");
+
+        RuleFor(x => x.OperationId)
+            .NotEmpty()
+            .WithMessage("Operation ID is required");
 
         RuleFor(x => x.PaymentMethod)
             .IsInEnum()
