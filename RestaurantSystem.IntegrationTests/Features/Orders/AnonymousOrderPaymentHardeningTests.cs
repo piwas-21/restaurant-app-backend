@@ -188,6 +188,74 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         order.PaymentStatus.Should().Be(PaymentStatus.Pending);
     }
 
+    [Fact]
+    public async Task An_anonymous_caller_cannot_settle_the_card_intent()
+    {
+        AuthenticateAsAnonymous();
+        var created = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 12.99m));
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Guid orderId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
+        }
+
+        var response = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
+        {
+            operationId = Guid.NewGuid(),
+            paymentMethod = nameof(PaymentMethod.CreditCard),
+            amount = 12.99m,
+            transactionId = "forged-anonymous-tender"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await AssertCardIntentRemainsPendingAsync(orderId);
+    }
+
+    [Fact]
+    public async Task An_authenticated_customer_cannot_settle_their_card_intent()
+    {
+        AuthenticateAsUser();
+        var created = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.CreditCard, 12.99m));
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        Guid orderId;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
+        }
+
+        var response = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
+        {
+            operationId = Guid.NewGuid(),
+            paymentMethod = nameof(PaymentMethod.CreditCard),
+            amount = 12.99m,
+            transactionId = "forged-customer-tender"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await AssertCardIntentRemainsPendingAsync(orderId);
+    }
+
+    private async Task AssertCardIntentRemainsPendingAsync(Guid orderId)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var order = await context.Orders
+            .Include(value => value.Payments)
+            .AsNoTracking()
+            .SingleAsync(value => value.Id == orderId);
+
+        order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+        order.TotalPaid.Should().Be(0m);
+        order.Payments.Should().ContainSingle(payment =>
+            payment.PaymentMethod == PaymentMethod.CreditCard && payment.Status == PaymentStatus.Pending);
+        order.Payments.Should().NotContain(payment => payment.Status == PaymentStatus.Completed);
+    }
+
     /// <summary>
     /// The intent becomes money only through the staff-only collection endpoint. This guards both
     /// halves of the contract: guests can request on-site card payment, but only staff can mark a
@@ -207,7 +275,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
             orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
         }
 
-        AuthenticateAsAdmin();
+        AuthenticateAsRole(UserRole.Cashier);
         var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
         {
             operationId = Guid.NewGuid(),
@@ -228,6 +296,8 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
             payment.PaymentMethod == PaymentMethod.CreditCard
             && payment.Status == PaymentStatus.Completed
             && payment.TransactionId == "onsite-terminal-0099");
+        order.Payments.Should().NotContain(payment => payment.Status == PaymentStatus.Pending,
+            "collecting the real tender must remove the on-site intent placeholder atomically");
         order.TotalPaid.Should().Be(12.99m);
         order.PaymentStatus.Should().Be(PaymentStatus.Completed);
     }
@@ -351,7 +421,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
                 && payment.Status == PaymentStatus.Processing);
         }
 
-        AuthenticateAsAdmin();
+        AuthenticateAsRole(UserRole.Cashier);
         var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
         {
             operationId = Guid.NewGuid(),
@@ -471,7 +541,7 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var orderId = (await context.Orders.AsNoTracking().SingleAsync()).Id;
 
-        AuthenticateAsAdmin();
+        AuthenticateAsRole(UserRole.Cashier);
         var paid = await PostAsJsonAsync($"/api/Orders/{orderId}/payments", new
         {
             operationId = Guid.NewGuid(),
@@ -489,6 +559,9 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
 
         card.Status.Should().Be(PaymentStatus.Completed);
         card.TransactionId.Should().Be("till-terminal-0099", "the staff path is where a real reference belongs");
+        (await afterContext.OrderPayments.AsNoTracking()
+            .AnyAsync(payment => payment.OrderId == orderId && payment.Status == PaymentStatus.Pending))
+            .Should().BeFalse("the cashier collection must remove the pending placeholder");
     }
 
     /// <summary>
