@@ -137,6 +137,40 @@ public class ProductCustomizationGroupSchemaTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Fresh_sync_inserts_the_group_graph_instead_of_updating_missing_rows()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var synchronizer = scope.ServiceProvider.GetRequiredService<IProductCustomizationGroupSynchronizer>();
+        var owner = NewProduct("Fresh group");
+        var ingredient = NewIngredient(owner, "Cheddar");
+        context.AddRange(owner, ingredient);
+        await context.SaveChangesAsync();
+
+        await synchronizer.SyncAsync(owner,
+        [
+            new ProductCustomizationGroupDto
+            {
+                Name = "Extras", MinSelection = 0, MaxSelection = 1, IsActive = true,
+                Content = new() { ["fr"] = new() { Name = "Suppléments" } },
+                IngredientOptions =
+                [
+                    new ProductCustomizationIngredientOptionDto { ProductIngredientId = ingredient.Id }
+                ]
+            }
+        ], "test", CancellationToken.None);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var stored = await context.ProductCustomizationGroups
+            .Include(group => group.Descriptions)
+            .Include(group => group.IngredientOptions)
+            .SingleAsync(group => group.ProductId == owner.Id);
+        stored.Descriptions.Should().ContainSingle(description => description.LanguageCode == "fr");
+        stored.IngredientOptions.Should().ContainSingle(option => option.ProductIngredientId == ingredient.Id);
+    }
+
+    [Fact]
     public void The_migration_drops_every_new_table_on_rollback()
     {
         var migration = File.ReadAllText(Directory
