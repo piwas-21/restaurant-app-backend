@@ -120,6 +120,36 @@ public class ExplicitCustomizationBasketTests : IntegrationTestBase
         line.ChildItems.Single().Quantity.Should().Be(2);
     }
 
+    [Fact]
+    public async Task StaffOrder_UsesTheSameGroupValidationPriceAndComposition()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Takeaway",
+            items = new[]
+            {
+                new
+                {
+                    productId = _tacos.Id,
+                    quantity = 1,
+                    customizationSelections = Request(includeSauce: true, includeMeat: true)
+                        .CustomizationSelections
+                }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var order = await context.Orders.Include(item => item.Items).SingleAsync();
+        order.Total.Should().Be(14m);
+        order.Items.Should().ContainSingle(item => item.Kind == OrderItemKind.CustomizationOption)
+            .Which.ProductId.Should().Be(_extraMeat.OptionProductId);
+    }
+
     private AddToBasketDto Request(bool includeSauce, bool includeMeat = false)
     {
         var selections = new List<CustomizationGroupSelectionDto>();
