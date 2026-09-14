@@ -51,6 +51,7 @@ public class CreateCheckoutSessionCommandHandler
     private readonly IStripeGateway _gateway;
     private readonly IStripeCheckoutClient _checkout;
     private readonly ICheckoutSessionReuse _reuse;
+    private readonly IOnlinePaymentIntentGuard _intentGuard;
     private readonly ICurrentUserService _currentUser;
     private readonly ICheckoutChargeResolver _charge;
     private readonly ILogger<CreateCheckoutSessionCommandHandler> _logger;
@@ -60,6 +61,7 @@ public class CreateCheckoutSessionCommandHandler
         IStripeGateway gateway,
         IStripeCheckoutClient checkout,
         ICheckoutSessionReuse reuse,
+        IOnlinePaymentIntentGuard intentGuard,
         ICurrentUserService currentUser,
         ICheckoutChargeResolver charge,
         ILogger<CreateCheckoutSessionCommandHandler> logger)
@@ -70,6 +72,7 @@ public class CreateCheckoutSessionCommandHandler
         _gateway = gateway;
         _checkout = checkout;
         _reuse = reuse;
+        _intentGuard = intentGuard;
         _currentUser = currentUser;
         _charge = charge;
         _logger = logger;
@@ -87,34 +90,31 @@ public class CreateCheckoutSessionCommandHandler
         {
             throw new BadRequestException("Online payment is not available for this restaurant.");
         }
-
         // Track the order so adding a session bumps its aggregate version.
         var order = await _context.Orders
             .FirstOrDefaultAsync(o => o.Id == command.OrderId && !o.IsDeleted, cancellationToken)
             ?? throw new NotFoundException("Order not found");
-
         OnlinePaymentEligibility.EnsurePayable(order);
-
+        await _intentGuard.EnsureProcessingAsync(order.Id, cancellationToken);
         // One call for both numbers: the amount is still the PERSISTED order total and nothing
         // else, and the fee is a share of that same amount. See ICheckoutChargeResolver.
         var (amount, applicationFeeMinor) = _charge.Resolve(order.Total);
-
         var existing = await _context.OrderCheckoutSessions
             .Where(s => s.OrderId == order.Id)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
-
         var reused = await _reuse.TryReuseAsync(existing, amount, cancellationToken);
         if (reused is not null) return ApiResponse<CheckoutSessionDto>.SuccessWithData(reused);
-
         // Retirement uses set-based writes and may have bumped this tracked aggregate's version.
         // Reload before adding the replacement session so its aggregate touch cannot write stale state.
         await _context.Entry(order).ReloadAsync(cancellationToken);
         OnlinePaymentEligibility.EnsurePayable(order);
-
+        await _intentGuard.ReactivateLatestFailedAsync(order.Id, cancellationToken);
+        await _context.Entry(order).ReloadAsync(cancellationToken);
+        OnlinePaymentEligibility.EnsurePayable(order);
+        await _intentGuard.EnsureProcessingAsync(order.Id, cancellationToken);
         var now = DateTime.UtcNow;
         var expiresAt = now.Add(SessionLifetime);
-
         // A derived attempt key makes Stripe replay concurrent creates for the same order.
         var idempotencyKey = $"checkout:{order.Id}:{existing.Count + 1}";
 
@@ -138,13 +138,13 @@ public class CreateCheckoutSessionCommandHandler
         {
             await _context.Entry(order).ReloadAsync(cancellationToken);
             OnlinePaymentEligibility.EnsurePayable(order);
+            await _intentGuard.EnsureProcessingAsync(order.Id, cancellationToken);
         }
         catch
         {
             await ExpireOrLogAsync(session.Id, order.Id, cancellationToken);
             throw;
         }
-
         _context.OrderCheckoutSessions.Add(new OrderCheckoutSession
         {
             OrderId = order.Id,
@@ -184,6 +184,7 @@ public class CreateCheckoutSessionCommandHandler
         return ApiResponse<CheckoutSessionDto>.SuccessWithData(
             CheckoutSessionDto.From(session.Id, session.Url, expiresAt, amount.Currency, amount.Minor));
     }
+
     private async Task ExpireOrLogAsync(
         string sessionId, Guid orderId, CancellationToken cancellationToken)
     {
@@ -196,5 +197,4 @@ public class CreateCheckoutSessionCommandHandler
             _logger.LogError(ex, "Failed to expire orphaned Stripe checkout for order {OrderId}", orderId);
         }
     }
-
 }
