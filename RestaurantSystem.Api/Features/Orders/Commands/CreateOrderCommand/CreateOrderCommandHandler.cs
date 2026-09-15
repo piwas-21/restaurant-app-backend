@@ -108,7 +108,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             {
                 FromStatus = OrderStatus.Pending,
                 ToStatus = order.Status,
-                Notes = OnlinePaymentIntent.InitialStatusNote(command.Type, paysOnline),
+                Notes = OnlinePaymentIntent.InitialStatusNote(command.Type, order.TableNumber, paysOnline),
                 ChangedAt = now,
                 ChangedBy = auditId,
                 CreatedAt = now,

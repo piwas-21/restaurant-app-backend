@@ -186,13 +186,13 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The deferred confirm. Dine-in gives up its creation-time auto-confirm while payment is in
-    /// flight, so settling is what finally hands the ticket to the kitchen.
+    /// The deferred confirm. Table-based dine-in gives up its creation-time auto-confirm while
+    /// payment is in flight, so settling is what finally hands the ticket to the kitchen.
     /// </summary>
     [Fact]
     public async Task Settling_performs_the_confirm_that_creation_deferred()
     {
-        var seeded = await SeedAsync(total: 42.50m, type: OrderType.DineIn);
+        var seeded = await SeedAsync(total: 42.50m, type: OrderType.DineIn, tableNumber: 12);
         var notifier = new Mock<ISettlementNotifier>();
 
         await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250), notifier: notifier);
@@ -236,6 +236,25 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
             n => n.NotifyConfirmedAsync(It.IsAny<Order>(), It.IsAny<OrderStatus>(), It.IsAny<CancellationToken>()),
             Times.Never,
             "nothing was confirmed, so there is no confirmation to announce");
+    }
+
+    [Fact]
+    public async Task Settling_a_tableless_dine_in_order_does_not_bypass_staff()
+    {
+        var seeded = await SeedAsync(total: 42.50m, type: OrderType.DineIn, tableNumber: null);
+        var notifier = new Mock<ISettlementNotifier>();
+
+        await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250), notifier: notifier);
+
+        await using var verify = _fixture.CreateContext();
+        var order = await verify.Orders.AsNoTracking().SingleAsync();
+
+        order.Status.Should().Be(OrderStatus.Pending);
+        order.PaymentStatus.Should().Be(PaymentStatus.Completed, "payment and acceptance are separate decisions");
+        notifier.Verify(
+            value => value.NotifyConfirmedAsync(
+                It.IsAny<Order>(), It.IsAny<OrderStatus>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     /// <summary>
@@ -480,7 +499,8 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         decimal total,
         OrderType type = OrderType.Takeaway,
         bool withUser = false,
-        OrderStatus status = OrderStatus.Pending)
+        OrderStatus status = OrderStatus.Pending,
+        int? tableNumber = null)
     {
         await using var seed = _fixture.CreateContext();
 
@@ -508,6 +528,7 @@ public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         {
             OrderNumber = $"S5-{Guid.NewGuid():N}"[..12],
             Type = type,
+            TableNumber = tableNumber,
             // Pending for both types — that is what an online order looks like at creation.
             Status = status,
             PaymentStatus = PaymentStatus.Pending,

@@ -433,6 +433,25 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
         order.Status.Should().Be(OrderStatus.Confirmed);
     }
 
+    [Fact]
+    public async Task A_tableless_dine_in_cash_order_waits_for_staff()
+    {
+        AuthenticateAsAnonymous();
+        var request = NewOrder(PaymentMethod.Cash, 12.99m, OrderType.DineIn);
+        request.TableNumber = null;
+
+        var response = await PostAsJsonAsync("/api/orders", request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var order = await context.Orders.AsNoTracking().SingleAsync();
+
+        order.TableNumber.Should().BeNull();
+        order.Status.Should().Be(OrderStatus.Pending,
+            "reservationless dine-in must be accepted or declined like other remote orders");
+    }
+
     /// <summary>
     /// Cash must not be recorded while a Stripe tender can still settle. Staff reconcile or retire
     /// that attempt first; otherwise the later Stripe completion would double-charge the order.
