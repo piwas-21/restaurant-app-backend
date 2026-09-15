@@ -120,11 +120,9 @@ public class OrderNotificationService : IOrderNotificationService
         _adminAlerts.Queue(orderDto);
         _receipts.Queue(orderDto);
 
-        // Dine-in auto-confirms, so it gets the confirmed mail too — exactly what
-        // CreateOrderCommandHandler did inline before GAP-11 moved the decision in here. Still
-        // awaited, as it has always been; the two queued mails above are the ones that used to be
-        // the browser's problem and must not become the request's.
-        if (order.Type == OrderType.DineIn)
+        // Send this only after creation policy has confirmed the order. Tableless dine-in waits
+        // for staff, while explicit-table dine-in keeps the existing immediate confirmation.
+        if (order.Status == OrderStatus.Confirmed)
         {
             await SendOrderConfirmedAsync(order, DefaultDineInPreparationMinutes, cancellationToken);
         }

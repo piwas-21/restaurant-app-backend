@@ -373,6 +373,7 @@ public class CheckoutExpirySweepTests : IAsyncLifetime
         {
             OrderNumber = $"S7-{Guid.NewGuid():N}"[..12],
             Type = OrderType.DineIn,
+            TableNumber = 12,
             Status = orderStatus,
             PaymentStatus = PaymentStatus.Pending,
             SubTotal = total,

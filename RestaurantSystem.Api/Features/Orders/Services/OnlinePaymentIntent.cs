@@ -34,37 +34,43 @@ public static class OnlinePaymentIntent
     /// The status an order starts in.
     /// </summary>
     /// <remarks>
-    /// Dine-in normally auto-confirms at creation, and <c>PrinterFeedQuery</c> puts a
-    /// <c>Confirmed</c> order in front of the kitchen. An order that has not been paid for yet must
-    /// not get that far, so an online tender holds ALL THREE order types at <c>Pending</c> until the
-    /// settle path confirms — the one behavioural change online payment makes to order creation.
+    /// A dine-in order with an assigned table auto-confirms at creation, and
+    /// <c>PrinterFeedQuery</c> puts a <c>Confirmed</c> order in front of the kitchen. Tableless
+    /// dine-in follows the same staff accept/decline queue as takeaway and delivery. An order that
+    /// has not been paid for yet must not reach the kitchen either, so an online tender holds all
+    /// three order types at <c>Pending</c> until the appropriate next step.
     ///
     /// <para>
     /// This has to be decided HERE rather than when the Stripe session is minted, and that is the
-    /// whole reason the tender is created at order time. A dine-in order is <c>Confirmed</c> — and
-    /// therefore printed — before <c>POST /api/payments/checkout-session</c> is ever called. There
-    /// is no later point at which a ticket can be un-printed.
+    /// whole reason the tender is created at order time. A table-based dine-in order is otherwise
+    /// <c>Confirmed</c> — and therefore printed — before
+    /// <c>POST /api/payments/checkout-session</c> is ever called. There is no later point at which
+    /// a ticket can be un-printed.
     /// </para>
     /// </remarks>
-    public static OrderStatus InitialStatus(OrderType type, bool paysOnline)
+    public static OrderStatus InitialStatus(OrderType type, int? tableNumber, bool paysOnline)
     {
         if (paysOnline)
         {
             return OrderStatus.Pending;
         }
 
-        return type == OrderType.DineIn ? OrderStatus.Confirmed : OrderStatus.Pending;
+        return type == OrderType.DineIn && tableNumber.HasValue
+            ? OrderStatus.Confirmed
+            : OrderStatus.Pending;
     }
 
     /// <summary>The status-history note explaining <see cref="InitialStatus"/>.</summary>
-    public static string InitialStatusNote(OrderType type, bool paysOnline)
+    public static string InitialStatusNote(OrderType type, int? tableNumber, bool paysOnline)
     {
         if (paysOnline)
         {
             return "Order created, awaiting online payment";
         }
 
-        return type == OrderType.DineIn ? "Order created and auto-confirmed (Dine-in)" : "Order created";
+        return type == OrderType.DineIn && tableNumber.HasValue
+            ? "Order created and auto-confirmed (Dine-in table)"
+            : "Order created";
     }
 
     /// <summary>
