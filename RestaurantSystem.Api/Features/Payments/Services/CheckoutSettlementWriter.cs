@@ -152,9 +152,10 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     /// Performs the confirm that order creation deferred, and reports whether it did.
     /// </summary>
     /// <remarks>
-    /// Only Dine-in, because only Dine-in auto-confirms at creation — Takeaway and Delivery are
-    /// Pending until staff confirm them whether or not they were paid online, and confirming them
-    /// here would put orders in the kitchen that the restaurant never accepted.
+    /// Only table-based Dine-in, because only that flow auto-confirms at creation — tableless
+    /// Dine-in, Takeaway and Delivery are Pending until staff confirm them whether or not they were
+    /// paid online, and confirming them here would put orders in the kitchen that the restaurant
+    /// never accepted.
     ///
     /// <para>
     /// The status guard is not ceremony: by the time a diner returns from Stripe a cashier may
@@ -165,7 +166,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     /// </remarks>
     private bool ConfirmIfDeferred(Order order)
     {
-        if (!order.IsKitchenReleased || order.Type != OrderType.DineIn ||
+        if (!order.IsKitchenReleased || order.Type != OrderType.DineIn || !order.TableNumber.HasValue ||
             !OrderStatusTransitions.IsValid(order.Status, OrderStatus.Confirmed))
         {
             return false;

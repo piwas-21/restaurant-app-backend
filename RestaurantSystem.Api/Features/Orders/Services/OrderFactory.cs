@@ -39,7 +39,6 @@ public class OrderFactory : IOrderFactory
         var now = DateTime.UtcNow;
         // Holds Dine-in at Pending so an unpaid order never reaches the kitchen feed.
         var paysOnline = OnlinePaymentIntent.IsDeclaredIn(command.Payments);
-
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -81,7 +80,7 @@ public class OrderFactory : IOrderFactory
             Notes = command.Notes,
             OrderDate = now,
             Tip = command.Tip,
-            Status = OnlinePaymentIntent.InitialStatus(command.Type, paysOnline),
+            Status = OnlinePaymentIntent.InitialStatus(command.Type, command.TableNumber, paysOnline),
             PaymentStatus = PaymentStatus.Pending,
             EstimatedDeliveryTime = command.Type == OrderType.Delivery ? now.AddMinutes(45) : null,
             CreatedAt = now,
