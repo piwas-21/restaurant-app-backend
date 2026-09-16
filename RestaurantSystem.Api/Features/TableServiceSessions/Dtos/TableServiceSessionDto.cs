@@ -6,7 +6,9 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 public record TableServiceSessionDto
 {
     public Guid ServiceSessionId { get; init; }
-    public int TableNumber { get; init; }
+    public Guid? TableId { get; init; }
+    public int? TableNumber { get; init; }
+    public string TableLabel { get; init; } = string.Empty;
     public string? Currency { get; init; }
     public string Status { get; init; } = string.Empty;
     public int Version { get; init; }

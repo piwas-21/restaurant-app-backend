@@ -13,6 +13,7 @@ public static class StaffOrderOperationFingerprint
         var payload = new
         {
             request.Type,
+            request.TableId,
             request.TableNumber,
             request.ServiceSessionId,
             CustomerUserId = request.EffectiveCustomerUserId,

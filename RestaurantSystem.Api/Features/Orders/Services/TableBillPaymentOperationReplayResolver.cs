@@ -34,7 +34,15 @@ public class TableBillPaymentOperationReplayResolver : ITableBillPaymentOperatio
                 "This operation id was already used for a different table or payment payload");
         }
 
-        var bill = await _billAssembler.AssembleAsync(operation.TableNumber, cancellationToken);
+        TableBillDto? bill = null;
+        if (operation.ServiceSessionId.HasValue)
+        {
+            bill = await _billAssembler.AssembleAsync(operation.ServiceSessionId.Value, cancellationToken);
+        }
+        else if (operation.TableNumber.HasValue)
+        {
+            bill = await _billAssembler.AssembleAsync(operation.TableNumber.Value, cancellationToken);
+        }
         return bill is null
             ? ApiResponse<TableBillDto>.Failure(
                 "The payment was already recorded, but the bill could not be refreshed. Please reopen the bill")

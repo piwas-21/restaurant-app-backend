@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -37,6 +38,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var session = await _context.TableServiceSessions
             .AsNoTracking()
+            .Include(value => value.Table)
             .SingleOrDefaultAsync(value => value.Id == serviceSessionId, cancellationToken);
         if (session is null)
         {
@@ -48,6 +50,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             ?? new TableBillDto
             {
                 TableNumber = session.TableNumber,
+                TableId = session.TableId,
+                TableLabel = session.Table?.TableNumber,
                 ServiceSessionId = session.Id,
                 ServiceSessionVersion = session.Version,
                 Currency = currency,
@@ -58,7 +62,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         bill.ServiceSessionVersion = session.Version;
         bill.Currency = currency;
         bill.GeneratedAt = now;
-        var legacy = await ReadLegacyOrdersAsync(session.TableNumber, cancellationToken);
+        var legacy = await ReadLegacyOrdersAsync(
+            session.TableId, session.TableNumber, cancellationToken);
         return ToDto(session, bill, legacy, now);
     }
 
@@ -68,12 +73,12 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var sessionRows = await _context.TableServiceSessions
             .AsNoTracking()
+            .Include(value => value.Table)
             .Where(value => value.Status == TableServiceSessionStatus.Open)
             .OrderBy(value => value.TableNumber)
             .ToListAsync(cancellationToken);
         var bills = await _bills.AssembleManyAsync(sessionRows, cancellationToken);
-        var legacyByTable = await ReadLegacyOrdersByTableAsync(
-            sessionRows.Select(session => session.TableNumber).Distinct().ToArray(), cancellationToken);
+        var legacyBySession = await ReadLegacyOrdersBySessionAsync(sessionRows, cancellationToken);
         var sessions = new List<TableServiceSessionDto>(sessionRows.Count);
 
         for (var index = 0; index < sessionRows.Count; index++)
@@ -83,6 +88,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             var bill = bills[index] ?? new TableBillDto
             {
                 TableNumber = session.TableNumber,
+                TableId = session.TableId,
+                TableLabel = session.Table?.TableNumber,
                 ServiceSessionId = session.Id,
                 ServiceSessionVersion = session.Version,
                 Currency = currency,
@@ -92,7 +99,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             bill.ServiceSessionVersion = session.Version;
             bill.Currency = currency;
             bill.GeneratedAt = now;
-            legacyByTable.TryGetValue(session.TableNumber, out var legacy);
+            legacyBySession.TryGetValue(session.Id, out var legacy);
             sessions.Add(ToDto(session, bill, legacy ?? [], now));
         }
 
@@ -100,23 +107,35 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
     }
 
     private async Task<List<TableServiceSessionOrderState>> ReadLegacyOrdersAsync(
-        int tableNumber, CancellationToken cancellationToken)
+        Guid? tableId, int? tableNumber, CancellationToken cancellationToken)
     {
-        var rows = await _context.Orders
+        var query = _context.Orders
             .AsNoTracking()
             .Where(order => !order.IsDeleted
                 && order.Type == OrderType.DineIn
-                && order.TableNumber == tableNumber
-                && order.ServiceSessionId == null)
+                && order.ServiceSessionId == null);
+        query = TableServiceSessionCloseRules.ForUnassignedSession(
+            query, tableId, tableNumber);
+        var rows = await query
             .Select(order => new { order.Status, order.RemainingAmount })
             .ToListAsync(cancellationToken);
         return rows.Select(row => new TableServiceSessionOrderState(row.Status, row.RemainingAmount)).ToList();
     }
 
-    private async Task<Dictionary<int, List<TableServiceSessionOrderState>>> ReadLegacyOrdersByTableAsync(
-        int[] tableNumbers, CancellationToken cancellationToken)
+    private async Task<Dictionary<Guid, List<TableServiceSessionOrderState>>> ReadLegacyOrdersBySessionAsync(
+        IReadOnlyList<TableServiceSession> sessions, CancellationToken cancellationToken)
     {
-        if (tableNumbers.Length == 0)
+        var tableIds = sessions
+            .Where(session => session.TableId.HasValue)
+            .Select(session => session.TableId!.Value)
+            .Distinct()
+            .ToArray();
+        var tableNumbers = sessions
+            .Where(session => session.TableNumber.HasValue)
+            .Select(session => session.TableNumber!.Value)
+            .Distinct()
+            .ToArray();
+        if (tableIds.Length == 0 && tableNumbers.Length == 0)
         {
             return [];
         }
@@ -125,15 +144,40 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             .AsNoTracking()
             .Where(order => !order.IsDeleted
                 && order.Type == OrderType.DineIn
-                && order.TableNumber.HasValue
-                && tableNumbers.Contains(order.TableNumber.Value)
                 && order.ServiceSessionId == null)
-            .Select(order => new { TableNumber = order.TableNumber!.Value, order.Status, order.RemainingAmount })
+            .Where(order => (order.TableId.HasValue && tableIds.Contains(order.TableId.Value))
+                || (!order.TableId.HasValue && order.TableNumber.HasValue
+                    && tableNumbers.Contains(order.TableNumber.Value)))
+            .Select(order => new
+            {
+                order.TableId,
+                order.TableNumber,
+                order.Status,
+                order.RemainingAmount
+            })
             .ToListAsync(cancellationToken);
-        return rows.GroupBy(row => row.TableNumber)
-            .ToDictionary(group => group.Key, group => group
+        var byTableId = rows
+            .Where(row => row.TableId.HasValue)
+            .GroupBy(row => row.TableId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var byTableNumber = rows
+            .Where(row => !row.TableId.HasValue && row.TableNumber.HasValue)
+            .GroupBy(row => row.TableNumber!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        return sessions.ToDictionary(session => session.Id, session =>
+        {
+            var stableRows = session.TableId.HasValue
+                && byTableId.TryGetValue(session.TableId.Value, out var idRows)
+                ? idRows
+                : [];
+            var legacyRows = session.TableNumber.HasValue
+                && byTableNumber.TryGetValue(session.TableNumber.Value, out var numberRows)
+                ? numberRows
+                : [];
+            return stableRows.Concat(legacyRows)
                 .Select(row => new TableServiceSessionOrderState(row.Status, row.RemainingAmount))
-                .ToList());
+                .ToList();
+        });
     }
 
     private TableServiceSessionDto ToDto(
@@ -149,7 +193,11 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         return new TableServiceSessionDto
         {
             ServiceSessionId = session.Id,
+            TableId = session.TableId,
             TableNumber = session.TableNumber,
+            TableLabel = session.Table?.TableNumber
+                ?? session.TableNumber?.ToString(CultureInfo.InvariantCulture)
+                ?? string.Empty,
             Currency = CurrencyCode.Normalize(session.Currency),
             Status = session.Status.ToString(),
             Version = session.Version,

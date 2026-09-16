@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Commands.AddTableBillPaymentCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries.GetTableBillQuery;
@@ -20,6 +21,7 @@ namespace RestaurantSystem.Api.Features.Orders;
 // receipt or tender path. The guest surfaces keep seeing only their own orders.
 [ApiController]
 [Route("api/orders/table")]
+[RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
 public class TableBillController : ControllerBase
 {
     private readonly CustomMediator _mediator;
@@ -44,6 +46,7 @@ public class TableBillController : ControllerBase
     [HttpPost("{tableNumber}/bill/payments")]
     [Authorize]
     [RequireTableServiceStaff]
+    [RequireAdminOrCashier]
     public async Task<ActionResult<ApiResponse<TableBillDto>>> AddTableBillPayment(
         int tableNumber, [FromBody] AddTableBillPaymentCommand command)
     {

@@ -28,12 +28,21 @@ public class TableServiceSessionConfiguration : IEntityTypeConfiguration<TableSe
             .IsUnique()
             .HasFilter("\"status\" = 'Open'");
 
+        builder.HasIndex(session => session.TableId)
+            .IsUnique()
+            .HasFilter("\"status\" = 'Open' AND \"table_id\" IS NOT NULL");
+
         builder.HasIndex(session => session.Status);
         builder.HasIndex(session => session.OpenedAt);
 
         builder.HasMany(session => session.Orders)
             .WithOne(order => order.ServiceSession)
             .HasForeignKey(order => order.ServiceSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(session => session.Table)
+            .WithMany()
+            .HasForeignKey(session => session.TableId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

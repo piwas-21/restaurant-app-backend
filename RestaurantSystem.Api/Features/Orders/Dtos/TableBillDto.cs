@@ -7,7 +7,9 @@ namespace RestaurantSystem.Api.Features.Orders.Dtos;
 /// </summary>
 public record TableBillDto
 {
-    public int TableNumber { get; set; }
+    public int? TableNumber { get; set; }
+    public Guid? TableId { get; set; }
+    public string? TableLabel { get; set; }
 
     /// <summary>Explicit visit identity. Null on the legacy table-number bill.</summary>
     public Guid? ServiceSessionId { get; set; }

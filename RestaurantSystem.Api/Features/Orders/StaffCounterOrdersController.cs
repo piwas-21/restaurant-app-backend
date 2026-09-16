@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.ReleaseStaffCounterOrderCommand;
@@ -14,7 +15,8 @@ namespace RestaurantSystem.Api.Features.Orders;
 [ApiController]
 [Route("api/staff/orders")]
 [Authorize]
-[RequireStaff]
+[RequireTableServiceStaff]
+[RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
 public sealed class StaffCounterOrdersController : ControllerBase
 {
     private readonly CustomMediator _mediator;

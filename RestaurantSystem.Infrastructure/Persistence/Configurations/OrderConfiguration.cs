@@ -36,6 +36,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CustomerPhone)
             .HasMaxLength(20);
 
+        builder.Property(o => o.TableLabel)
+            .HasMaxLength(100);
+
         // Safety net for the STORED value, with the same two limits spelled out in
         // ApplicationUserConfiguration: it rewrites the SQL parameter and not the object in
         // memory, and it is EF-scoped. S4 still resolves and assigns a canonical code.
@@ -108,11 +111,17 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(o => o.Status);
         builder.HasIndex(o => new { o.UserId, o.OrderDate });
         builder.HasIndex(o => o.ServiceSessionId);
+        builder.HasIndex(o => o.TableId);
 
         // Relationships
         builder.HasOne(o => o.ServiceSession)
             .WithMany(session => session.Orders)
             .HasForeignKey(o => o.ServiceSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(o => o.Table)
+            .WithMany()
+            .HasForeignKey(o => o.TableId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(o => o.User)

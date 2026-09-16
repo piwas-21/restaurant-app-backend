@@ -45,9 +45,9 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
 
             // Occupancy is a staff-only projection. The public availability route still returns
             // the table catalogue and reservation status, but never live customer/order data.
-            var activeOrdersByTable = query.IncludeOccupancy
+            var activeOrders = query.IncludeOccupancy
                 ? await ReadActiveOrdersByTableAsync(cancellationToken)
-                : new Dictionary<string, ActiveTableOrderInfo>();
+                : ActiveTableOrderProjection.Empty;
 
             var tables = await tablesQuery
                 .OrderBy(t => t.TableNumber)
@@ -84,7 +84,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
             {
                 foreach (var table in tables)
                 {
-                    if (activeOrdersByTable.TryGetValue(table.TableNumber, out var orderInfo))
+                    if (activeOrders.TryGet(table, out var orderInfo))
                     {
                         table.IsOccupied = true;
                         table.ActiveOrderCount = orderInfo.OrderCount;
@@ -102,7 +102,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
         }
     }
 
-    private async Task<Dictionary<string, ActiveTableOrderInfo>> ReadActiveOrdersByTableAsync(
+    private async Task<ActiveTableOrderProjection> ReadActiveOrdersByTableAsync(
         CancellationToken cancellationToken)
     {
         var activeOrderStatuses = new[]
@@ -115,9 +115,8 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
         };
         var allDineInOrders = _context.Orders
             .AsNoTracking()
-            .Where(order => order.TableNumber != null
-                && order.Type == OrderType.DineIn
-                && !order.IsDeleted);
+            .Where(order => order.Type == OrderType.DineIn && !order.IsDeleted
+                && (order.TableId != null || order.TableNumber != null));
         var liveOrders = allDineInOrders.Where(order => activeOrderStatuses.Contains(order.Status));
         var completedUnpaidOrders = allDineInOrders
             .Where(order => order.Status == OrderStatus.Completed)
@@ -128,21 +127,31 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
         // query returns one recent representative per table so the staff shape remains useful
         // without turning a busy table into an unbounded PII payload.
         var countRows = await eligibleOrders
-            .GroupBy(order => order.TableNumber!.Value)
+            .GroupBy(order => new
+            {
+                order.TableId,
+                TableNumber = order.TableId.HasValue ? (int?)null : order.TableNumber
+            })
             .Select(group => new
             {
-                TableNumber = group.Key,
+                group.Key.TableId,
+                group.Key.TableNumber,
                 OrderCount = group.Count()
             })
             .ToListAsync(cancellationToken);
         var latestRows = await eligibleOrders
-            .GroupBy(order => order.TableNumber!.Value)
+            .GroupBy(order => new
+            {
+                order.TableId,
+                TableNumber = order.TableId.HasValue ? (int?)null : order.TableNumber
+            })
             .Select(group => group
                 .OrderByDescending(order => order.OrderDate)
                 .ThenBy(order => order.Id)
                 .Select(order => new
                 {
-                    TableNumber = order.TableNumber!.Value,
+                    group.Key.TableId,
+                    group.Key.TableNumber,
                     CustomerName = order.CustomerName,
                     OrderNumber = order.OrderNumber,
                     OrderDate = order.OrderDate,
@@ -151,7 +160,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                 .First())
             .ToListAsync(cancellationToken);
         var latestByTable = latestRows.ToDictionary(
-            row => row.TableNumber,
+            row => new TableOrderKey(row.TableId, row.TableNumber),
             row => new TableOccupantDto
             {
                 CustomerName = row.CustomerName,
@@ -163,35 +172,29 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
         var openSessionTables = await _context.TableServiceSessions
             .AsNoTracking()
             .Where(session => session.Status == TableServiceSessionStatus.Open)
-            .Select(session => session.TableNumber.ToString())
+            .Select(session => new
+            {
+                session.TableId,
+                TableNumber = session.TableId.HasValue ? (int?)null : session.TableNumber
+            })
+            .Where(session => session.TableId.HasValue || session.TableNumber.HasValue)
             .ToListAsync(cancellationToken);
         var result = countRows.ToDictionary(
-            row => row.TableNumber.ToString(),
+            row => new TableOrderKey(row.TableId, row.TableNumber),
             row => new ActiveTableOrderInfo
             {
-                TableNumber = row.TableNumber.ToString(),
                 OrderCount = row.OrderCount,
-                Occupants = latestByTable.TryGetValue(row.TableNumber, out var occupant)
+                Occupants = latestByTable.TryGetValue(
+                    new TableOrderKey(row.TableId, row.TableNumber), out var occupant)
                     ? [occupant]
                     : []
             });
-
-        foreach (var tableNumber in openSessionTables)
+        foreach (var session in openSessionTables)
         {
-            result.TryAdd(tableNumber, new ActiveTableOrderInfo
-            {
-                TableNumber = tableNumber,
-                Occupants = []
-            });
+            result.TryAdd(new TableOrderKey(session.TableId, session.TableNumber),
+                new ActiveTableOrderInfo());
         }
 
-        return result;
-    }
-
-    private sealed class ActiveTableOrderInfo
-    {
-        public string TableNumber { get; init; } = string.Empty;
-        public int OrderCount { get; init; }
-        public List<TableOccupantDto> Occupants { get; init; } = [];
+        return new ActiveTableOrderProjection(result);
     }
 }
