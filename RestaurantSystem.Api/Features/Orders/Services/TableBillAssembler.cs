@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries;
@@ -61,6 +62,7 @@ public class TableBillAssembler : ITableBillAssembler
     {
         var session = await _context.TableServiceSessions
             .AsNoTracking()
+            .Include(value => value.Table)
             .SingleOrDefaultAsync(value => value.Id == serviceSessionId, cancellationToken);
         if (session is null)
         {
@@ -69,7 +71,9 @@ public class TableBillAssembler : ITableBillAssembler
 
         var orders = await QueryOrders(o => o.ServiceSessionId == serviceSessionId
             && o.Status != OrderStatus.Cancelled, cancellationToken);
-        return BuildBill(orders, session.TableNumber, session.Id, session.Version, session.Currency);
+        return BuildBill(
+            orders, session.TableNumber, session.TableId, session.Table?.TableNumber,
+            session.Id, session.Version, session.Currency);
     }
 
     /// <summary>
@@ -94,7 +98,9 @@ public class TableBillAssembler : ITableBillAssembler
             .ToDictionary(group => group.Key, group => group.ToList());
 
         return sessions.Select(session => ordersBySession.TryGetValue(session.Id, out var members)
-                ? BuildBill(members, session.TableNumber, session.Id, session.Version, session.Currency)
+                ? BuildBill(
+                    members, session.TableNumber, session.TableId, session.Table?.TableNumber,
+                    session.Id, session.Version, session.Currency)
                 : null)
             .ToList();
     }
@@ -108,7 +114,7 @@ public class TableBillAssembler : ITableBillAssembler
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
             && o.ServiceSessionId == null, cancellationToken,
             OrderSettlementEligibility.OperationalQueuePredicate());
-        return BuildBill(orders, tableNumber, null, null, null);
+        return BuildBill(orders, tableNumber, null, null, null, null, null);
     }
 
     private async Task<List<Order>> QueryOrders(
@@ -135,7 +141,9 @@ public class TableBillAssembler : ITableBillAssembler
 
     private TableBillDto? BuildBill(
         List<Order> orders,
-        int tableNumber,
+        int? tableNumber,
+        Guid? tableId,
+        string? tableLabel,
         Guid? serviceSessionId,
         int? serviceSessionVersion,
         string? currency)
@@ -148,6 +156,8 @@ public class TableBillAssembler : ITableBillAssembler
         var bill = new TableBillDto
         {
             TableNumber = tableNumber,
+            TableId = tableId,
+            TableLabel = tableLabel ?? tableNumber?.ToString(CultureInfo.InvariantCulture),
             ServiceSessionId = serviceSessionId,
             ServiceSessionVersion = serviceSessionVersion,
             Currency = CurrencyCode.Normalize(currency),

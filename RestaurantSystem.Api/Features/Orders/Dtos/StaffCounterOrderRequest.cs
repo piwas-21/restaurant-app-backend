@@ -8,6 +8,7 @@ public record StaffCounterOrderRequest
 {
     [JsonRequired]
     public OrderType Type { get; set; }
+    public Guid? TableId { get; set; }
     public int? TableNumber { get; set; }
     public Guid? ServiceSessionId { get; set; }
 

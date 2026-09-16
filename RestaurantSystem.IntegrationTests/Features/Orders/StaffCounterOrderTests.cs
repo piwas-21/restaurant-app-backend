@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -90,11 +91,139 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Dine_in_create_without_an_open_session_is_rejected()
+    {
+        var tableId = Guid.NewGuid();
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            context.Tables.Add(new Table
+            {
+                Id = tableId,
+                TableNumber = "T-QA",
+                MaxGuests = 4,
+                IsActive = true,
+                CreatedBy = "test"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        AuthenticateAsRole(UserRole.Server);
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "DineIn",
+            tableId,
+            paymentState = "PayLater",
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Alphanumeric_session_open_can_receive_a_staff_round()
+    {
+        var tableId = Guid.NewGuid();
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            context.Tables.Add(new Table
+            {
+                Id = tableId,
+                TableNumber = "T-QA",
+                MaxGuests = 4,
+                IsActive = true,
+                CreatedBy = "test"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        AuthenticateAsRole(UserRole.Server);
+        var opened = await PostAsJsonAsync("/api/table-service-sessions", new { tableId });
+        var openedBody = (await ReadResponseAsync<ApiResponse<TableServiceSessionDto>>(opened))!;
+        openedBody.Success.Should().BeTrue();
+
+        var created = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "DineIn",
+            tableId,
+            serviceSessionId = openedBody.Data!.ServiceSessionId,
+            paymentState = "PayLater",
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        });
+        var createdBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(created))!;
+
+        createdBody.Success.Should().BeTrue();
+        createdBody.Data!.TableId.Should().Be(tableId);
+        createdBody.Data.TableNumber.Should().BeNull();
+        createdBody.Data.TableLabel.Should().Be("T-QA");
+        createdBody.Data.ServiceSessionId.Should().Be(openedBody.Data.ServiceSessionId);
+    }
+
+    [Fact]
+    public async Task Dine_in_create_rejects_a_closed_session()
+    {
+        var tableId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            context.Tables.Add(new Table
+            {
+                Id = tableId,
+                TableNumber = "44",
+                MaxGuests = 4,
+                IsActive = true,
+                CreatedBy = "test"
+            });
+            context.TableServiceSessions.Add(new TableServiceSession
+            {
+                Id = sessionId,
+                TableId = tableId,
+                TableNumber = 44,
+                Status = TableServiceSessionStatus.Closed,
+                Version = 2,
+                OpenedAt = DateTime.UtcNow.AddHours(-1),
+                ClosedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        AuthenticateAsRole(UserRole.Server);
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "DineIn",
+            tableId,
+            serviceSessionId = sessionId,
+            paymentState = "PayLater",
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task DineIn_create_assigns_only_the_matching_open_service_session()
     {
         var sessionId = Guid.NewGuid();
         await using (var context = DatabaseFixture.CreateContext())
         {
+            context.Tables.Add(new Table
+            {
+                Id = Guid.NewGuid(),
+                TableNumber = "9",
+                MaxGuests = 4,
+                IsActive = true,
+                CreatedBy = "test"
+            });
             context.TableServiceSessions.Add(new TableServiceSession
             {
                 Id = sessionId,

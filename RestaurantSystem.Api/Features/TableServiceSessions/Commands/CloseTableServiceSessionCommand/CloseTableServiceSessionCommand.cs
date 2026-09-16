@@ -72,10 +72,13 @@ public sealed class CloseTableServiceSessionCommandHandler
             }
 
             // Legacy unassigned rounds are a separate visit and must be resolved explicitly.
-            var legacyOrders = await _context.Orders
+            var legacyQuery = _context.Orders
+                .AsQueryable();
+            legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
+                legacyQuery, session.TableId, session.TableNumber);
+            var legacyOrders = await legacyQuery
                 .Where(order => !order.IsDeleted
                     && order.Type == OrderType.DineIn
-                    && order.TableNumber == session.TableNumber
                     && order.ServiceSessionId == null)
                 .Select(order => new { order.Status, order.RemainingAmount })
                 .ToListAsync(cancellationToken);

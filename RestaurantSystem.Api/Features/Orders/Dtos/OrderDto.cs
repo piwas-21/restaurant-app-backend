@@ -14,6 +14,8 @@ public record OrderDto
     // Order Type
     public string Type { get; set; } = string.Empty;
     public int? TableNumber { get; set; }
+    public Guid? TableId { get; set; }
+    public string? TableLabel { get; set; }
 
     /// <summary>Explicit table-visit membership. Null means a legacy/anonymous order.</summary>
     public Guid? ServiceSessionId { get; set; }

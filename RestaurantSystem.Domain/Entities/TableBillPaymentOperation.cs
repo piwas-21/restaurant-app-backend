@@ -9,7 +9,7 @@ namespace RestaurantSystem.Domain.Entities;
 public class TableBillPaymentOperation : Entity
 {
     public Guid OperationId { get; set; }
-    public int TableNumber { get; set; }
+    public int? TableNumber { get; set; }
 
     /// <summary>Non-null for the durable service-session bill flow; null for legacy table-number tenders.</summary>
     public Guid? ServiceSessionId { get; set; }

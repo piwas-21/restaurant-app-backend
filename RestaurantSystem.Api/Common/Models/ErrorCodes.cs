@@ -180,7 +180,12 @@ public static class ErrorCodes
     public const string TableServiceSessionCurrencyMismatch = "TableServiceSessionCurrencyMismatch";
     public const string TableServiceSessionNotClosable = "TableServiceSessionNotClosable";
     public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
+    public const string TableServiceSessionRequired = "TableServiceSessionRequired";
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+    public const string TableServiceTableRequired = "TableServiceTableRequired";
+    public const string TableServiceTableNotFound = "TableServiceTableNotFound";
+    public const string TableServiceTableInactive = "TableServiceTableInactive";
+    public const string TableServiceTableMismatch = "TableServiceTableMismatch";
 
     public const string StaffOrderOperationPayloadMismatch = "StaffOrderOperationPayloadMismatch";
     public const string StaffOrderOperationIdReused = "StaffOrderOperationIdReused";

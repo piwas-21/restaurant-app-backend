@@ -20,7 +20,7 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions;
 [ApiController]
 [Route("api/table-service-sessions")]
 [RequireTableServiceStaff]
-[RequireModule(ModuleIds.Cashier)]
+[RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
 public sealed class TableServiceSessionsController : ControllerBase
 {
     private readonly CustomMediator _mediator;
@@ -41,6 +41,7 @@ public sealed class TableServiceSessionsController : ControllerBase
         => Ok(await _mediator.SendQuery(new GetTableServiceSessionQuery(serviceSessionId)));
 
     [HttpPost("{serviceSessionId:guid}/payments")]
+    [RequireAdminOrCashier]
     public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> Pay(
         Guid serviceSessionId, [FromBody] AddTableServiceSessionPaymentCommand command)
     {

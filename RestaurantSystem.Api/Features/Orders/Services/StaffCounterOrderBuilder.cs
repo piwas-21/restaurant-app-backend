@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
+using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -24,6 +25,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
     private readonly IOrderPricingService _pricing;
     private readonly IOrderPaymentBuilder _payments;
     private readonly IOrderFidelityCoordinator _fidelity;
+    private readonly ITableIdentityResolver _tables;
 
     [SuppressMessage("Maintainability", "S107:Methods should not have too many parameters",
         Justification = "These DI-only collaborators are the existing order construction pipeline; a parameter object or service locator would conceal required pricing and fidelity dependencies.")]
@@ -32,7 +34,8 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         IPreferredLanguageCapture languages, IOrderFactory orderFactory,
         IOrderItemFactory itemFactory, IStaffCounterOrderPricing serverPricing,
         IOrderPricingService pricing,
-        IOrderPaymentBuilder payments, IOrderFidelityCoordinator fidelity)
+        IOrderPaymentBuilder payments, IOrderFidelityCoordinator fidelity,
+        ITableIdentityResolver tables)
     {
         _context = context;
         _currentUser = currentUser;
@@ -43,6 +46,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         _pricing = pricing;
         _payments = payments;
         _fidelity = fidelity;
+        _tables = tables;
     }
 
     public async Task<StaffCounterOrderBuild> BuildAsync(
@@ -55,10 +59,11 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             throw new BadRequestException("Points redemption is not supported for staff counter orders.");
         }
 
+        var target = await ResolveTableTargetAsync(request, cancellationToken);
         var customer = await ResolveCustomerAsync(request.EffectiveCustomerUserId, cancellationToken);
         var customerId = customer?.Id;
         var pricedItems = await _serverPricing.PriceAsync(request.Items, cancellationToken);
-        var legacy = ToLegacyCommand(request, customer, pricedItems);
+        var legacy = ToLegacyCommand(request, customer, pricedItems, target?.Identity.Number);
         var language = await _languages.ForUserAsync(customerId, cancellationToken);
         var draft = await _orderFactory.CreateAsync(legacy, customerId, language, cancellationToken);
 
@@ -68,7 +73,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         }
 
         var order = draft.Order;
-        await AssignServiceSessionAsync(order, request, cancellationToken);
+        AssignTableIdentity(order, target);
         // The factory allocates the aggregate id before building delivery-address children, so the
         // operation ledger and every child FK reference the same order before the first save.
         foreach (var item in legacy.Items)
@@ -106,31 +111,79 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
         return new StaffCounterOrderBuild(order, legacy, customerId);
     }
 
-    private async Task AssignServiceSessionAsync(
-        Order order, StaffCounterOrderRequest request, CancellationToken cancellationToken)
+    private async Task<TableOrderTarget?> ResolveTableTargetAsync(
+        StaffCounterOrderRequest request, CancellationToken cancellationToken)
     {
+        if (request.Type != OrderType.DineIn)
+        {
+            return null;
+        }
+
         if (!request.ServiceSessionId.HasValue)
         {
-            return;
+            throw new BadRequestException(
+                "A dine-in staff order requires an open table service session.",
+                ErrorCodes.TableServiceSessionRequired);
         }
 
         var session = await _context.TableServiceSessions
             .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == request.ServiceSessionId.Value
-                && candidate.Status == TableServiceSessionStatus.Open, cancellationToken);
-        if (session == null)
+            .SingleOrDefaultAsync(candidate => candidate.Id == request.ServiceSessionId.Value,
+                cancellationToken);
+        if (session is null)
         {
             throw new NotFoundException(
                 "The open table service session was not found.", ErrorCodes.TableServiceSessionNotFound);
         }
-        if (request.Type != OrderType.DineIn || request.TableNumber != session.TableNumber)
+
+        if (session.Status != TableServiceSessionStatus.Open)
+        {
+            throw new BadRequestException(
+                "The table service session is no longer open.", ErrorCodes.TableServiceSessionStale);
+        }
+
+        if (request.TableNumber.HasValue
+            && request.TableNumber != session.TableNumber)
         {
             throw new BadRequestException(
                 "The table service session does not match this dine-in order.",
                 ErrorCodes.TableServiceSessionAmbiguous);
         }
 
-        order.ServiceSessionId = session.Id;
+        if (session.TableId.HasValue && request.TableId.HasValue
+            && request.TableId != session.TableId)
+        {
+            throw new BadRequestException(
+                "The table service session does not match this dine-in order.",
+                ErrorCodes.TableServiceSessionAmbiguous);
+        }
+
+        var table = await _tables.ResolveActiveAsync(
+            request.TableId ?? session.TableId,
+            request.TableNumber ?? session.TableNumber,
+            cancellationToken);
+        if (session.TableNumber != table.Number
+            || (session.TableId.HasValue && session.TableId != table.Id))
+        {
+            throw new BadRequestException(
+                "The table service session does not match this dine-in order.",
+                ErrorCodes.TableServiceSessionAmbiguous);
+        }
+
+        return new TableOrderTarget(table, session.Id);
+    }
+
+    private static void AssignTableIdentity(Order order, TableOrderTarget? target)
+    {
+        if (target is null)
+        {
+            return;
+        }
+
+        order.TableId = target.Identity.Id;
+        order.TableNumber = target.Identity.Number;
+        order.TableLabel = target.Identity.Label;
+        order.ServiceSessionId = target.ServiceSessionId;
     }
 
     private async Task<ApplicationUser?> ResolveCustomerAsync(Guid? customerId, CancellationToken cancellationToken)
@@ -163,7 +216,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
 
     private static CreateOrderCommand ToLegacyCommand(
         StaffCounterOrderRequest request, ApplicationUser? customer,
-        List<CreateOrderItemDto> pricedItems) => new()
+        List<CreateOrderItemDto> pricedItems, int? tableNumber) => new()
         {
             CustomerName = customer == null
                 ? request.CustomerName
@@ -171,7 +224,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             CustomerEmail = customer?.Email ?? request.CustomerEmail,
             CustomerPhone = customer?.PhoneNumber ?? request.CustomerPhone,
             Type = request.Type,
-            TableNumber = request.TableNumber,
+            TableNumber = tableNumber,
             PromoCode = request.PromoCode,
             PointsToRedeem = request.PointsToRedeem,
             Tip = request.Tip ?? 0m,
@@ -180,6 +233,8 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             ItemsAreServerPriced = true,
             Payments = [],
         };
+
+    private sealed record TableOrderTarget(TableIdentity Identity, Guid? ServiceSessionId);
 
     private static void ApplyReleaseState(Order order, bool releaseToKitchen, OrderDraft draft)
     {

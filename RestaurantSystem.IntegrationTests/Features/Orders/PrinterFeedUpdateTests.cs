@@ -20,6 +20,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 public class PrinterFeedUpdateTests : IntegrationTestBase
 {
     private Guid _confirmedOrderId;
+    private Guid _confirmedTableId;
     private Guid _preparingOrderId;
     private Guid _pendingOrderId;
     private Guid _cancelledOrderId;
@@ -47,6 +48,8 @@ public class PrinterFeedUpdateTests : IntegrationTestBase
         update["jobId"]!.GetValue<Guid>().Should().NotBeEmpty();
         update["revision"]!.GetValue<int>().Should().Be(1);
         update["jobType"]!.GetValue<string>().Should().Be(nameof(DevicePrintJobType.Update));
+        update["tableId"]!.GetValue<Guid>().Should().Be(_confirmedTableId);
+        update["tableLabel"]!.GetValue<string>().Should().Be("T-QA");
         update["target"]!.GetValue<string>().Should().Be(nameof(DevicePrintTarget.General));
         update["audience"]!.GetValue<string>().Should().Be(nameof(OrderNoteAudience.Kitchen));
         update["text"]!.GetValue<string>().Should().Be("Kitchen instruction");
@@ -197,13 +200,25 @@ public class PrinterFeedUpdateTests : IntegrationTestBase
         await base.SeedTestData();
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var table = new Table
+        {
+            Id = Guid.NewGuid(),
+            TableNumber = "T-QA",
+            MaxGuests = 4,
+            CreatedBy = "test",
+        };
         var confirmed = NewOrder("PF-UPDATE-CONFIRMED", OrderStatus.Confirmed);
+        confirmed.Type = OrderType.DineIn;
+        confirmed.TableId = table.Id;
+        confirmed.TableLabel = table.TableNumber;
         var preparing = NewOrder("PF-UPDATE-PREPARING", OrderStatus.Preparing);
         var pending = NewOrder("PF-UPDATE-PENDING", OrderStatus.Pending);
         var cancelled = NewOrder("PF-UPDATE-CANCELLED", OrderStatus.Cancelled);
+        context.Tables.Add(table);
         context.Orders.AddRange(confirmed, preparing, pending, cancelled);
         await context.SaveChangesAsync();
         _confirmedOrderId = confirmed.Id;
+        _confirmedTableId = table.Id;
         _preparingOrderId = preparing.Id;
         _pendingOrderId = pending.Id;
         _cancelledOrderId = cancelled.Id;
