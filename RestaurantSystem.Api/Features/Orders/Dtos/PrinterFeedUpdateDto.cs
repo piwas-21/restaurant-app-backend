@@ -15,6 +15,8 @@ public record PrinterFeedUpdateDto
     public DevicePrintTarget Target { get; init; } = DevicePrintTarget.General;
     public Guid OrderId { get; init; }
     public string OrderNumber { get; init; } = string.Empty;
+    public Guid? TableId { get; init; }
+    public string? TableLabel { get; init; }
     public int? TableNumber { get; init; }
     public string Audience { get; init; } = nameof(OrderNoteAudience.Kitchen);
     public string Text { get; init; } = string.Empty;

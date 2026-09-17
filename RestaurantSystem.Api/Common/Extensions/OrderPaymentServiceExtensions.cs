@@ -16,6 +16,7 @@ public static class OrderPaymentServiceExtensions
         services.AddScoped<ITableServiceSessionPaymentReplayResolver, TableServiceSessionPaymentReplayResolver>();
         services.AddScoped<ITableServiceSessionPaymentWriter, TableServiceSessionPaymentWriter>();
         services.AddScoped<ITableServiceSessionCurrencyPolicy, TableServiceSessionCurrencyPolicy>();
+        services.AddScoped<ITableIdentityResolver, TableIdentityResolver>();
         return services;
     }
 }

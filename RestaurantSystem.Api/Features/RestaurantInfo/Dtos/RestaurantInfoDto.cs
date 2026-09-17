@@ -24,7 +24,9 @@ public record RestaurantInfoDto(
     /// The tenant's declared display currency (ISO-4217 alpha-3), or null while undeclared
     /// (POS plan C18). Display metadata only; the admin edits it through the PUT below.
     /// </summary>
-    string? Currency);
+    string? Currency,
+    /// <summary>Serialised as <c>legacySeparate</c> or <c>categoryOffers</c>.</summary>
+    string BundlePresentationMode);
 
 /// <summary>Which of the two stored logos an upload or delete is addressing.</summary>
 /// <remarks>

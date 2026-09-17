@@ -45,7 +45,6 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
 
             return source with { UnitPrice = 0m, CustomizationPrice = 0m };
         }
-
         var product = products.GetValueOrDefault(source.ProductId.Value)
             ?? throw new NotFoundException($"Product {source.ProductId.Value} not found");
         var variation = ResolveVariation(product, source.ProductVariationId);
@@ -74,7 +73,6 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m)
             + explicitCustomization.ProductOptionPrice;
         var children = source.ChildItems;
-
         if (product.Type == ProductType.Menu)
         {
             return PriceBundle(
@@ -130,12 +128,13 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
 
             var optionQuantity = child.Quantity / source.Quantity;
             var sectionItem = MenuBundleSelectionRules.ResolveSectionItem(
-                sections, child.SectionId.Value, child.ProductId.Value);
+                sections, child.SectionId.Value, child.ProductId.Value, child.ProductVariationId);
             sectionItems.Add((child, sectionItem));
             selections.Add(new SelectedMenuOptionDto
             {
                 SectionId = child.SectionId.Value,
                 ItemId = child.ProductId.Value,
+                ProductVariationId = sectionItem.ProductVariationId,
                 Quantity = optionQuantity,
                 SpecialInstructions = child.SpecialInstructions,
                 SelectedIngredients = child.SelectedIngredientIds,
@@ -263,6 +262,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
                     .ThenInclude(option => option.OptionProduct)
             .Include(item => item.MenuDefinition!.Sections)
                     .ThenInclude(section => section.Items)
+                        .ThenInclude(item => item.ProductVariation)
             .AsSplitQuery()
             .Where(item => ids.Contains(item.Id) && !item.IsDeleted)
             .ToListAsync(cancellationToken);

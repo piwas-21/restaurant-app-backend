@@ -2033,6 +2033,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_always_available");
 
+                    b.Property<Guid?>("ParentOfferProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_offer_product_id");
+
+                    b.Property<Guid?>("ParentOfferVariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_offer_variation_id");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_id");
@@ -2052,9 +2060,22 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_menu_definitions");
 
+                    b.HasIndex("ParentOfferProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_menu_definitions_parent_offer_product_id")
+                        .HasFilter("\"parent_offer_product_id\" IS NOT NULL AND \"parent_offer_variation_id\" IS NULL");
+
+                    b.HasIndex("ParentOfferVariationId")
+                        .HasDatabaseName("ix_menu_definitions_parent_offer_variation_id");
+
                     b.HasIndex("ProductId")
                         .IsUnique()
                         .HasDatabaseName("ix_menu_definitions_product_id");
+
+                    b.HasIndex("ParentOfferProductId", "ParentOfferVariationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_menu_definitions_parent_offer_variation")
+                        .HasFilter("\"parent_offer_product_id\" IS NOT NULL AND \"parent_offer_variation_id\" IS NOT NULL");
 
                     b.ToTable("menu_definitions");
                 });
@@ -2238,6 +2259,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("product_id");
 
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variation_id");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -2254,6 +2279,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductId")
                         .HasDatabaseName("ix_menu_section_items_product_id");
+
+                    b.HasIndex("ProductVariationId")
+                        .HasDatabaseName("ix_menu_section_items_product_variation_id");
 
                     b.ToTable("menu_section_items");
                 });
@@ -2438,6 +2466,15 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("sub_total");
 
+                    b.Property<Guid?>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<string>("TableLabel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("table_label");
+
                     b.Property<int?>("TableNumber")
                         .HasColumnType("integer")
                         .HasColumnName("table_number");
@@ -2507,6 +2544,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_orders_service_session_id");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TableId")
+                        .HasDatabaseName("ix_orders_table_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_orders_user_id");
@@ -4608,6 +4648,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("address_line2");
 
+                    b.Property<string>("BundlePresentationMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("LegacySeparate")
+                        .HasColumnName("bundle_presentation_mode");
+
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -5147,7 +5195,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("service_session_id");
 
-                    b.Property<int>("TableNumber")
+                    b.Property<int?>("TableNumber")
                         .HasColumnType("integer")
                         .HasColumnName("table_number");
 
@@ -5290,7 +5338,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
-                    b.Property<int>("TableNumber")
+                    b.Property<Guid?>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<int?>("TableNumber")
                         .HasColumnType("integer")
                         .HasColumnName("table_number");
 
@@ -5313,6 +5365,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("OpenedAt");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TableId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_table_service_sessions_table_id")
+                        .HasFilter("\"status\" = 'Open' AND \"table_id\" IS NOT NULL");
 
                     b.HasIndex("TableNumber")
                         .IsUnique()
@@ -5909,12 +5966,28 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.MenuDefinition", b =>
                 {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", "ParentOfferProduct")
+                        .WithMany("MenuAlternatives")
+                        .HasForeignKey("ParentOfferProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_menu_definitions_products_parent_offer_product_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductVariation", "ParentOfferVariation")
+                        .WithMany("MenuAlternatives")
+                        .HasForeignKey("ParentOfferVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_menu_definitions_productvariations_parent_offer_variation_id");
+
                     b.HasOne("RestaurantSystem.Domain.Entities.Product", "Product")
                         .WithOne("MenuDefinition")
                         .HasForeignKey("RestaurantSystem.Domain.Entities.MenuDefinition", "ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_menu_definitions_products_product_id");
+
+                    b.Navigation("ParentOfferProduct");
+
+                    b.Navigation("ParentOfferVariation");
 
                     b.Navigation("Product");
                 });
@@ -5975,9 +6048,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_menu_section_items_products_product_id");
 
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductVariation", "ProductVariation")
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_menu_section_items_productvariations_product_variation_id");
+
                     b.Navigation("MenuSection");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariation");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
@@ -5992,6 +6073,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ServiceSessionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_orders_tableservicesessions_service_session_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Table", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_orders_tables_table_id");
 
                     b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", "User")
                         .WithMany()
@@ -6039,6 +6126,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Focus");
 
                     b.Navigation("ServiceSession");
+
+                    b.Navigation("Table");
 
                     b.Navigation("User");
                 });
@@ -6509,6 +6598,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Table");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServiceSession", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Table", "Table")
+                        .WithMany()
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_table_service_sessions_tables_table_id");
+
+                    b.Navigation("Table");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.UserAddress", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", "User")
@@ -6628,6 +6728,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.Navigation("Images");
 
+                    b.Navigation("MenuAlternatives");
+
                     b.Navigation("MenuDefinition");
 
                     b.Navigation("MenuProducts");
@@ -6658,6 +6760,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ProductVariation", b =>
                 {
                     b.Navigation("Descriptions");
+
+                    b.Navigation("MenuAlternatives");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Reservation", b =>

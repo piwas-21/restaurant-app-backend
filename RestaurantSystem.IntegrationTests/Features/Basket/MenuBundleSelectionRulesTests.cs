@@ -123,4 +123,59 @@ public sealed class MenuBundleSelectionRulesTests
         act.Should().Throw<BadRequestException>()
             .WithMessage("Invalid quantity for item in section 'Main'");
     }
+
+    [Fact]
+    public void Prices_a_variation_aware_section_item_and_rejects_inactive_variations()
+    {
+        var variationId = Guid.NewGuid();
+        var section = new MenuSection
+        {
+            Id = Guid.NewGuid(),
+            Name = "Main",
+            IsRequired = true,
+            MinSelection = 1,
+            MaxSelection = 1,
+            CreatedBy = nameof(MenuBundleSelectionRulesTests)
+        };
+        section.Items.Add(new MenuSectionItem
+        {
+            Id = Guid.NewGuid(),
+            ProductId = MainProduct,
+            ProductVariationId = variationId,
+            ProductVariation = new ProductVariation
+            {
+                Id = variationId,
+                ProductId = MainProduct,
+                Name = "Large",
+                PriceModifier = 2.50m,
+                IsActive = true,
+                CreatedBy = nameof(MenuBundleSelectionRulesTests)
+            },
+            AdditionalPrice = 1.50m,
+            CreatedBy = nameof(MenuBundleSelectionRulesTests)
+        });
+
+        var total = MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            new[] { section },
+            new[] { new SelectedMenuOptionDto
+            {
+                SectionId = section.Id,
+                ItemId = MainProduct,
+                ProductVariationId = variationId
+            } });
+
+        total.Should().Be(4m);
+
+        section.Items.Single().ProductVariation!.IsActive = false;
+        var act = () => MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            new[] { section },
+            new[] { new SelectedMenuOptionDto
+            {
+                SectionId = section.Id,
+                ItemId = MainProduct,
+                ProductVariationId = variationId
+            } });
+
+        act.Should().Throw<BadRequestException>();
+    }
 }

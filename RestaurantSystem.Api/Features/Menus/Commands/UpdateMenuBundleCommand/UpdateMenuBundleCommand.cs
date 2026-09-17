@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
@@ -50,7 +51,8 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateMenuBundleCommand command, CancellationToken cancellationToken)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
 
         try
         {
@@ -69,6 +71,19 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             if (product.Type != ProductType.Menu)
             {
                 return ApiResponse<ProductDto>.Failure("Product is not a menu bundle");
+            }
+
+            await MenuOfferLinkRules.EnsureCanDeactivateAsync(
+                _context, product.Id, command.IsActive, cancellationToken);
+
+            if (command.MenuDefinition.OfferParentSpecified)
+            {
+                await MenuOfferLinkRules.EnsureValidAsync(
+                    _context,
+                    product.Id,
+                    command.MenuDefinition.ParentOfferProductId,
+                    command.MenuDefinition.ParentOfferVariationId,
+                    cancellationToken);
             }
 
             // Validate categories
@@ -226,6 +241,8 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 
+            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
+
             MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -243,7 +260,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
 
             return ApiResponse<ProductDto>.SuccessWithData(productDto, "Menu Bundle updated successfully");
         }
-        catch
+        catch (Exception exception)
         {
             try { await transaction.RollbackAsync(cancellationToken); }
             catch (Exception rollbackEx)
@@ -252,6 +269,8 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 // below; rollback failure here is logged but mustn't shadow it.
                 _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle update");
             }
+
+            MenuOfferLinkConflict.ThrowIfExpected(exception);
             throw;
         }
     }

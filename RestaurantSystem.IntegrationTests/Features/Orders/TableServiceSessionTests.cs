@@ -4,12 +4,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Queries.GetTableBillQuery;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
@@ -33,6 +35,122 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
 
     public Task InitializeAsync() => _fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task Open_by_stable_table_id_preserves_alphanumeric_label_and_replays_authoritative_session()
+    {
+        var tableId = await SeedTableAsync("T-QA");
+        await using var context = _fixture.CreateContext();
+        var handler = OpenHandler(context);
+
+        var first = await handler.Handle(new OpenTableServiceSessionCommand
+        {
+            TableId = tableId,
+            Currency = "CHF"
+        }, CancellationToken.None);
+        var retry = await handler.Handle(new OpenTableServiceSessionCommand
+        {
+            TableId = tableId,
+            Currency = "CHF"
+        }, CancellationToken.None);
+
+        first.Success.Should().BeTrue();
+        first.Data!.TableId.Should().Be(tableId);
+        first.Data.TableNumber.Should().BeNull();
+        first.Data.TableLabel.Should().Be("T-QA");
+        retry.Success.Should().BeTrue();
+        retry.Data!.ServiceSessionId.Should().Be(first.Data.ServiceSessionId);
+        (await context.TableServiceSessions.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Leading_zero_label_does_not_claim_a_numeric_compatibility_number()
+    {
+        var tableId = await SeedTableAsync("007");
+
+        await using var context = _fixture.CreateContext();
+        var result = await OpenHandler(context).Handle(
+            new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Data!.TableId.Should().Be(tableId);
+        result.Data.TableNumber.Should().BeNull();
+        result.Data.TableLabel.Should().Be("007");
+    }
+
+    [Fact]
+    public async Task Stable_session_read_and_close_only_consider_unassigned_orders_for_that_table()
+    {
+        var tableId = await SeedTableAsync("T-QA");
+        var otherTableId = await SeedTableAsync("T-OTHER");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        await SeedStableOrderAsync(null, tableId, "T-QA", 10m, Utc(12, 0));
+        await SeedStableOrderAsync(null, otherTableId, "T-OTHER", 20m, Utc(12, 1));
+
+        await using var context = _fixture.CreateContext();
+        var reader = new TableServiceSessionReader(context, Assembler());
+        var dto = await reader.ReadAsync(sessionId, CancellationToken.None);
+
+        dto.Should().NotBeNull();
+        dto!.HasUnassignedActiveOrders.Should().BeTrue();
+        dto.LegacyActiveOrderCount.Should().Be(1);
+        dto.CanClose.Should().BeFalse();
+
+        var close = await CloseAsync(sessionId, expectedVersion: 1);
+
+        close.Success.Should().BeFalse();
+        close.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionAmbiguous);
+        close.Errors.Should().ContainSingle(TableBillTargetResolver.AmbiguousMessage);
+    }
+
+    [Fact]
+    public async Task Stable_session_ignores_unassigned_orders_for_another_alphanumeric_table()
+    {
+        var tableId = await SeedTableAsync("T-QA");
+        var otherTableId = await SeedTableAsync("T-OTHER");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        await SeedStableOrderAsync(null, otherTableId, "T-OTHER", 20m, Utc(12, 1));
+
+        await using var context = _fixture.CreateContext();
+        var dto = await new TableServiceSessionReader(context, Assembler())
+            .ReadAsync(sessionId, CancellationToken.None);
+
+        dto.Should().NotBeNull();
+        dto!.HasUnassignedActiveOrders.Should().BeFalse();
+        dto.CanClose.Should().BeTrue();
+
+        var close = await CloseAsync(sessionId, expectedVersion: 1);
+        close.Success.Should().BeTrue();
+        close.Data!.Status.Should().Be(nameof(TableServiceSessionStatus.Closed));
+    }
+
+    [Fact]
+    public async Task Concurrent_stable_table_opens_return_the_same_authoritative_session()
+    {
+        var tableId = await SeedTableAsync("42");
+        var results = await Task.WhenAll(OpenStableTableAsync(tableId), OpenStableTableAsync(tableId));
+
+        results.Should().OnlyContain(result => result.Success);
+        results.Select(result => result.Data!.ServiceSessionId).Distinct().Should().ContainSingle();
+        await using var context = _fixture.CreateContext();
+        (await context.TableServiceSessions.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Stable_table_open_rejects_missing_and_inactive_tables()
+    {
+        var inactiveId = await SeedTableAsync("43", isActive: false);
+
+        await using var context = _fixture.CreateContext();
+        var handler = OpenHandler(context);
+        var inactive = await Assert.ThrowsAsync<BadRequestException>(() => handler.Handle(
+            new OpenTableServiceSessionCommand { TableId = inactiveId }, CancellationToken.None));
+        var missing = await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(
+            new OpenTableServiceSessionCommand { TableId = Guid.NewGuid() }, CancellationToken.None));
+
+        inactive.ErrorCode.Should().Be(ErrorCodes.TableServiceTableInactive);
+        missing.ErrorCode.Should().Be(ErrorCodes.TableServiceTableNotFound);
+    }
 
     [Fact]
     public async Task SessionBill_ContainsOnlyImmutableMultiRoundMembers()
@@ -477,6 +595,24 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         return id;
     }
 
+    private async Task<Guid> SeedStableSessionAsync(Guid tableId)
+    {
+        var id = Guid.NewGuid();
+        await using var context = _fixture.CreateContext();
+        context.TableServiceSessions.Add(new TableServiceSession
+        {
+            Id = id,
+            TableId = tableId,
+            Status = TableServiceSessionStatus.Open,
+            Version = 1,
+            OpenedAt = Utc(11, 0),
+            CreatedAt = Utc(11, 0),
+            CreatedBy = nameof(TableServiceSessionTests),
+        });
+        await context.SaveChangesAsync();
+        return id;
+    }
+
     private async Task<Guid> SeedOrderAsync(Guid? sessionId, int table, decimal total, DateTime orderedAt)
     {
         var id = Guid.NewGuid();
@@ -487,6 +623,32 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             OrderNumber = $"TS-{id:N}"[..12],
             Type = OrderType.DineIn,
             TableNumber = table,
+            ServiceSessionId = sessionId,
+            Status = OrderStatus.Confirmed,
+            PaymentStatus = PaymentStatus.Pending,
+            SubTotal = total,
+            Total = total,
+            RemainingAmount = total,
+            OrderDate = orderedAt,
+            CreatedAt = orderedAt,
+            CreatedBy = nameof(TableServiceSessionTests),
+        });
+        await context.SaveChangesAsync();
+        return id;
+    }
+
+    private async Task<Guid> SeedStableOrderAsync(
+        Guid? sessionId, Guid tableId, string label, decimal total, DateTime orderedAt)
+    {
+        var id = Guid.NewGuid();
+        await using var context = _fixture.CreateContext();
+        context.Orders.Add(new Order
+        {
+            Id = id,
+            OrderNumber = $"TS-{id:N}"[..12],
+            Type = OrderType.DineIn,
+            TableId = tableId,
+            TableLabel = label,
             ServiceSessionId = sessionId,
             Status = OrderStatus.Confirmed,
             PaymentStatus = PaymentStatus.Pending,
@@ -532,6 +694,47 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var order = await context.Orders.SingleAsync(value => value.Id == orderId);
         order.Status = OrderStatus.Completed;
         await context.SaveChangesAsync();
+    }
+
+    private async Task<Guid> SeedTableAsync(string label, bool isActive = true)
+    {
+        var id = Guid.NewGuid();
+        await using var context = _fixture.CreateContext();
+        context.Tables.Add(new Table
+        {
+            Id = id,
+            TableNumber = label,
+            MaxGuests = 4,
+            IsActive = isActive,
+            CreatedAt = Utc(10, 0),
+            CreatedBy = nameof(TableServiceSessionTests),
+        });
+        await context.SaveChangesAsync();
+        return id;
+    }
+
+    private async Task<ApiResponse<TableServiceSessionDto>> OpenStableTableAsync(Guid tableId)
+    {
+        await using var context = _fixture.CreateContext();
+        return await OpenHandler(context).Handle(
+            new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+    }
+
+    private OpenTableServiceSessionCommandHandler OpenHandler(ApplicationDbContext context)
+    {
+        var mapping = new OrderMappingService(
+            context, new OrderDisplayCurrencyResolver(context),
+            NullLogger<OrderMappingService>.Instance);
+        var assembler = new TableBillAssembler(
+            context, mapping, NullLogger<TableBillAssembler>.Instance);
+        var current = new Mock<ICurrentUserService>();
+        current.Setup(value => value.GetAuditIdentifier()).Returns(nameof(TableServiceSessionTests));
+        current.Setup(value => value.UserId).Returns(Guid.NewGuid());
+        return new OpenTableServiceSessionCommandHandler(
+            context,
+            current.Object,
+            new TableServiceSessionReader(context, assembler),
+            new TableIdentityResolver(context));
     }
 
     private static DateTime Utc(int hour, int minute) => new(2026, 9, 11, hour, minute, 0, DateTimeKind.Utc);

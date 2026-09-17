@@ -83,6 +83,7 @@ public class GetProductsQueryHandler : IQueryHandler<GetProductsQuery, ApiRespon
                 .ThenInclude(pc => pc.Category)
             .Include(p => p.Variations.Where(v => v.IsActive))
                 .ThenInclude(v => v.Descriptions)
+            .Include(p => p.MenuDefinition)
             // Split: 2+ collection Includes over MANY roots multiply rows (S8733). Placed in
             // THIS chain, beside the Includes it is about, rather than on the materialising
             // statement below — behaviour is identical (it is query metadata, not a positional

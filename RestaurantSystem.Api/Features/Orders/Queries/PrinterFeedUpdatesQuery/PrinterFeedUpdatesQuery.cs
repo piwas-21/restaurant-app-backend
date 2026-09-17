@@ -84,6 +84,8 @@ public class PrinterFeedUpdatesQueryHandler
                 Target = DevicePrintTarget.General,
                 OrderId = note.OrderId,
                 OrderNumber = note.Order.OrderNumber,
+                TableId = note.Order.TableId,
+                TableLabel = note.Order.TableLabel,
                 TableNumber = note.Order.TableNumber,
                 Audience = nameof(OrderNoteAudience.Kitchen),
                 Text = note.Text,

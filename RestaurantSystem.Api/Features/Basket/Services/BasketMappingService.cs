@@ -218,6 +218,11 @@ public class BasketMappingService : IBasketMappingService
             ProductId = child.ProductId,
             ProductCustomizationOptionId = child.ProductCustomizationOptionId,
             ProductName = child.Product?.Name,
+            ProductVariationId = child.ProductVariationId,
+            VariationName = child.ProductVariation?.Name,
+            VariationContent = child.ProductVariation?.Descriptions.ToDictionary(
+                description => description.LanguageCode,
+                description => new BasketItemVariationContentDto(description.Name, description.Description)),
             Quantity = child.Quantity,
             UnitPrice = child.UnitPrice,
             ItemTotal = child.ItemTotal,

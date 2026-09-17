@@ -99,6 +99,7 @@ public static class MenuSectionWriter
                 {
                     MenuSection = section,
                     ProductId = itemDto.ProductId,
+                    ProductVariationId = itemDto.ProductVariationId,
                     AdditionalPrice = itemDto.AdditionalPrice,
                     DisplayOrder = itemDto.DisplayOrder,
                     IsDefault = itemDto.IsDefault,

@@ -9,7 +9,11 @@ namespace RestaurantSystem.Domain.Entities;
 /// </summary>
 public class TableServiceSession : Entity
 {
-    public int TableNumber { get; set; }
+    /// <summary>Numeric compatibility value; null for configured labels such as T-QA.</summary>
+    public int? TableNumber { get; set; }
+
+    /// <summary>Stable configured-table identity; null is retained for legacy visits.</summary>
+    public Guid? TableId { get; set; }
 
     /// <summary>
     /// Optional ISO-4217 code captured for this visit. Null is intentional when the tenant has
@@ -25,5 +29,6 @@ public class TableServiceSession : Entity
     public DateTime OpenedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
 
+    public virtual Table? Table { get; set; }
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 }

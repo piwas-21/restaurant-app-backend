@@ -37,9 +37,6 @@ public class ModuleGateCoverageTests
         // Class-level, unlike the order controllers: every route on PaymentsController exists only
         // because the tenant bought online payments, so there is no core surface to take away.
         { "PaymentsController", ModuleIds.OnlinePayments },
-        // Explicit table visits are the cashier/table-service surface; the class-level gate covers
-        // list, open, read, pay and close together.
-        { "TableServiceSessionsController", ModuleIds.Cashier },
     };
 
     public static TheoryData<string, string, string> GatedActions() => new()
@@ -72,6 +69,26 @@ public class ModuleGateCoverageTests
     }
 
     [Fact]
+    public void Table_service_contract_is_shared_by_server_and_cashier_modules()
+    {
+        var gate = Controller("TableServiceSessionsController")
+            .GetCustomAttribute<RequireModuleAttribute>();
+
+        gate.Should().NotBeNull();
+        gate!.ModuleIdsRequired.Should().BeEquivalentTo(new[] { ModuleIds.Server, ModuleIds.Cashier });
+    }
+
+    [Fact]
+    public void Staff_table_occupancy_is_shared_by_server_and_cashier_modules()
+    {
+        var gate = Controller("TablesController").GetMethod("GetStaffTables")!
+            .GetCustomAttribute<RequireModuleAttribute>();
+
+        gate.Should().NotBeNull();
+        gate!.ModuleIdsRequired.Should().BeEquivalentTo(new[] { ModuleIds.Server, ModuleIds.Cashier });
+    }
+
+    [Fact]
     public void Legacy_table_bill_routes_exclude_kitchen_staff()
     {
         var actions = new[] { "GetTableBill", "AddTableBillPayment" }
@@ -84,6 +101,19 @@ public class ModuleGateCoverageTests
             gate.Should().NotBeNull();
             gate!.Roles.Should().Be("Admin,Cashier,Server");
         }
+    }
+
+    [Fact]
+    public void Table_payments_require_admin_or_cashier_while_server_may_close_a_settled_visit()
+    {
+        var sessionController = Controller("TableServiceSessionsController");
+        sessionController.GetMethod("Pay")!
+            .GetCustomAttribute<RequireAdminOrCashierAttribute>().Should().NotBeNull();
+        sessionController.GetMethod("Close")!
+            .GetCustomAttribute<RequireAdminOrCashierAttribute>().Should().BeNull();
+
+        Controller("TableBillController").GetMethod("AddTableBillPayment")!
+            .GetCustomAttribute<RequireAdminOrCashierAttribute>().Should().NotBeNull();
     }
 
     [Fact]

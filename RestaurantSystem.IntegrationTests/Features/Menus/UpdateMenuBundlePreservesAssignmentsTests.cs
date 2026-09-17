@@ -34,6 +34,7 @@ public class UpdateMenuBundlePreservesAssignmentsTests : IntegrationTestBase
     private Guid _bundleId;
     private Guid _categoryA;
     private Guid _categoryB;
+    private Guid _parentOfferId;
 
     public UpdateMenuBundlePreservesAssignmentsTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -65,6 +66,20 @@ public class UpdateMenuBundlePreservesAssignmentsTests : IntegrationTestBase
             CreatedBy = "test"
         };
         _bundleId = bundle.Id;
+        var parentOffer = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Parent Offer",
+            BasePrice = 10m,
+            Type = ProductType.MainItem,
+            IsActive = true,
+            IsAvailable = true,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        _parentOfferId = parentOffer.Id;
 
         // A bundle that HAS categories + translations — the state the wipe destroyed.
         bundle.ProductCategories.Add(new ProductCategory
@@ -88,12 +103,13 @@ public class UpdateMenuBundlePreservesAssignmentsTests : IntegrationTestBase
         bundle.MenuDefinition = new MenuDefinition
         {
             ProductId = bundle.Id,
+            ParentOfferProductId = _parentOfferId,
             IsAlwaysAvailable = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "test"
         };
 
-        context.Products.Add(bundle);
+        context.Products.AddRange(parentOffer, bundle);
         await context.SaveChangesAsync();
     }
 
@@ -177,6 +193,26 @@ public class UpdateMenuBundlePreservesAssignmentsTests : IntegrationTestBase
         var (categories, _, _) = await ReadBundleAsync();
         categories.Select(c => c.CategoryId).Should().BeEquivalentTo(new[] { _categoryA });
         categories.Single().IsPrimary.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task OmittedOfferParentFields_PreserveExistingFamilyLink()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await Client.PutAsJsonAsync(
+            $"/api/Menus/{_bundleId}",
+            UpdatePayload(Array.Empty<Guid>(), new Dictionary<string, object>()),
+            JsonOptions);
+
+        response.EnsureSuccessStatusCode();
+
+        await using var context = DatabaseFixture.CreateContext();
+        var parentId = await context.MenuDefinitions
+            .Where(definition => definition.ProductId == _bundleId)
+            .Select(definition => definition.ParentOfferProductId)
+            .SingleAsync();
+        parentId.Should().Be(_parentOfferId);
     }
 
     // The capability must survive the fix: a real list still replaces.

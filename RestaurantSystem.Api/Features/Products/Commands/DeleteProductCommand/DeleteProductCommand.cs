@@ -1,7 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.DeleteProductCommand;
@@ -25,24 +27,47 @@ public class DeleteProductCommandHandler : ICommandHandler<DeleteProductCommand,
 
     public async Task<ApiResponse<string>> Handle(DeleteProductCommand command, CancellationToken cancellationToken)
     {
-
-        var product = await _context.Products
-            .Include(c => c.ProductCategories)
-            .FirstOrDefaultAsync(c => c.Id == command.Id && !c.IsDeleted, cancellationToken);
-
-        if (product == null)
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
+        try
         {
-            return ApiResponse<string>.Failure("Product not found");
+            // Load and validate inside the same serializable transaction as the soft delete. This
+            // makes a concurrent link/type/component writer either serialize before this decision
+            // or receive a clean retryable conflict instead of preserving a stale relationship.
+            var product = await _context.Products
+                .FirstOrDefaultAsync(c => c.Id == command.Id && !c.IsDeleted, cancellationToken);
+
+            if (product == null)
+            {
+                return ApiResponse<string>.Failure("Product not found");
+            }
+
+            await MenuOfferLinkRules.EnsureCanDeactivateAsync(
+                _context, product.Id, isActive: false, cancellationToken);
+
+            product.IsDeleted = true;
+            product.DeletedAt = DateTime.UtcNow;
+            product.DeletedBy = _currentUserService.GetAuditIdentifier();
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            _logger.LogInformation("Product {ProductId} deleted successfully", product.Id);
+            return ApiResponse<string>.SuccessWithData("Product deleted successfully");
         }
+        catch (Exception exception)
+        {
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (Exception rollbackEx)
+            {
+                _logger.LogWarning(rollbackEx, "Transaction rollback failed during product delete");
+            }
 
-        // Soft delete
-        product.IsDeleted = true;
-        product.DeletedAt = DateTime.UtcNow;
-        product.DeletedBy = _currentUserService.GetAuditIdentifier();
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Product {ProductId} deleted successfully", product.Id);
-        return ApiResponse<string>.SuccessWithData("Product deleted successfully");
+            MenuOfferLinkConflict.ThrowIfExpected(exception);
+            throw;
+        }
     }
 }

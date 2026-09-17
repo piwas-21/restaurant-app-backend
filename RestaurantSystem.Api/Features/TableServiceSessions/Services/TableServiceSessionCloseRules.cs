@@ -1,10 +1,27 @@
 using RestaurantSystem.Domain.Common.Enums;
 
+using RestaurantSystem.Domain.Entities;
+
 namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
 
 /// <summary>Shared read/write close predicates for explicit table service sessions.</summary>
 public static class TableServiceSessionCloseRules
 {
+    public static IQueryable<Order> ForUnassignedSession(
+        IQueryable<Order> orders, Guid? tableId, int? tableNumber)
+    {
+        if (tableId.HasValue)
+        {
+            return orders.Where(order => order.TableId == tableId
+                || (!order.TableId.HasValue && tableNumber.HasValue
+                    && order.TableNumber == tableNumber));
+        }
+
+        return tableNumber.HasValue
+            ? orders.Where(order => !order.TableId.HasValue && order.TableNumber == tableNumber)
+            : orders.Where(_ => false);
+    }
+
     public static bool IsBlockingLegacyOrder(
         TableServiceSessionOrderState order, decimal paymentTolerance) =>
         order.Status is not OrderStatus.Completed and not OrderStatus.Cancelled

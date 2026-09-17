@@ -183,6 +183,7 @@ public partial class BasketItemFactory : IBasketItemFactory
         var childProducts = await _context.Products
             .AsSplitQuery()
             .Include(p => p.DetailedIngredients)
+            .Include(p => p.Variations)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.IngredientOptions)
                     .ThenInclude(membership => membership.ProductIngredient)
@@ -220,7 +221,10 @@ public partial class BasketItemFactory : IBasketItemFactory
             // The shared rule already validated this exact section/item pair. Resolve through the
             // same helper here so the child row cannot silently drift to another section's price.
             var sectionItem = MenuBundleSelectionRules.ResolveSectionItem(
-                product.MenuDefinition.Sections, option.SectionId, option.ItemId);
+                product.MenuDefinition.Sections,
+                option.SectionId,
+                option.ItemId,
+                option.ProductVariationId);
 
             if (!childProducts.TryGetValue(option.ItemId, out var childProduct))
                 throw new NotFoundException($"Child product not found: {option.ItemId}");
@@ -259,7 +263,8 @@ public partial class BasketItemFactory : IBasketItemFactory
                 ProductId = option.ItemId, // The actual product ID of the option (e.g., Coke)
                 ParentBasketItem = basketItem,
                 Quantity = item.Quantity * option.Quantity, // Scale by main item quantity
-                UnitPrice = sectionItem.AdditionalPrice, // Section-level additional price
+                ProductVariationId = sectionItem.ProductVariationId,
+                UnitPrice = MenuBundleSelectionRules.PriceFor(sectionItem),
                 ItemTotal = 0, // Included in parent total to avoid double counting in recalculation
                 CustomizationPrice = childCustomization.CustomizationPrice, // Store customization price for this child
                 SpecialInstructions = option.SpecialInstructions,

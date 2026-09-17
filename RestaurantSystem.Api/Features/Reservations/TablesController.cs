@@ -46,7 +46,7 @@ public class TablesController : ControllerBase
     /// </summary>
     [HttpGet("occupancy")]
     [RequireTableServiceStaff]
-    [RequireModule(ModuleIds.Cashier)]
+    [RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
     public async Task<ActionResult<ApiResponse<List<TableDto>>>> GetStaffTables(
         [FromQuery] bool? isActive = null,
         [FromQuery] bool? isOutdoor = null)

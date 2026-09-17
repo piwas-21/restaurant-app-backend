@@ -16,9 +16,10 @@ public partial class Order : SoftDeleteEntity
     // Order Type
     public OrderType Type { get; set; } // Dine-In, Takeaway, Delivery
     public int? TableNumber { get; set; } // For dine-in orders
-
+    /// <summary>Stable configured-table identity; null is retained for legacy orders.</summary>
+    public Guid? TableId { get; set; }
+    public string? TableLabel { get; set; }
     public Guid? ServiceSessionId { get; set; } // Immutable visit membership; null is legacy/anonymous.
-
     // Pricing
     public decimal SubTotal { get; set; }
     public decimal Tax { get; set; }
@@ -27,17 +28,14 @@ public partial class Order : SoftDeleteEntity
     public decimal DiscountPercentage { get; set; } // Applied percentage
     public decimal Tip { get; set; }
     public decimal Total { get; set; }
-
     // Payment Summary (calculated from OrderPayments)
     public decimal TotalPaid { get; set; }
     public decimal RemainingAmount { get; set; }
     public bool IsFullyPaid => RemainingAmount <= 0;
-
     // Discount Details
     public string? PromoCode { get; set; }
     public bool HasUserLimitDiscount { get; set; }
     public decimal UserLimitAmount { get; set; } // Threshold for discount
-
     // Fidelity Points & Discounts
     public int FidelityPointsEarned { get; set; } // Points earned from this order
     public int FidelityPointsRedeemed { get; set; } // Points used for discount
@@ -89,6 +87,7 @@ public partial class Order : SoftDeleteEntity
 
     // Navigation properties
     public virtual ApplicationUser? User { get; set; }
+    public virtual Table? Table { get; set; }
     public virtual TableServiceSession? ServiceSession { get; set; }
     public virtual OrderAddress? DeliveryAddress { get; set; } // One-to-one relationship
     public virtual CustomerDiscountRule? CustomerDiscountRule { get; set; }

@@ -24,6 +24,16 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetProductsQuery;
 /// </remarks>
 internal static class GuestAllViewVisibility
 {
+    /// <summary>
+    /// Applies the same live-hidden-category rule to an already loaded product. A stale join to a
+    /// soft-deleted category is deliberately treated as visible: the database query above only
+    /// collects ids of live hidden categories, so that link cannot prove an owner's hide decision.
+    /// </summary>
+    public static bool IsVisibleInAll(Product product) =>
+        product.ProductCategories.Any(pc => pc.Category is not
+        { IsDeleted: false, IsHiddenFromAllTab: true })
+        || !product.ProductCategories.Any();
+
     public static async Task<IQueryable<Product>> ExcludeHiddenAsync(
         ApplicationDbContext context,
         IQueryable<Product> productsQuery,

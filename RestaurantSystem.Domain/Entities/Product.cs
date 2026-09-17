@@ -86,7 +86,6 @@ public class Product : SoftDeleteEntity
     /// </remarks>
     public int SauceIncludedFree { get; set; }
 
-    // Navigation properties
     public virtual ICollection<ProductImage> Images { get; set; } = [];
     public virtual ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();
     public virtual ICollection<ProductVariation> Variations { get; set; } = [];
@@ -97,4 +96,5 @@ public class Product : SoftDeleteEntity
     public virtual ICollection<MenuItem> MenuProducts { get; set; } = [];
     public virtual ICollection<ProductDescription> Descriptions { get; set; } = [];
     public virtual MenuDefinition? MenuDefinition { get; set; }
+    public virtual ICollection<MenuDefinition> MenuAlternatives { get; set; } = new List<MenuDefinition>();
 }
