@@ -83,7 +83,16 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
             LinkAsync(_cycleAId, _cycleBId),
             LinkAsync(_cycleBId, _cycleAId));
 
-        responses.Count(response => response.IsSuccessStatusCode).Should().BeLessThan(2);
+        responses.Count(response => response.IsSuccessStatusCode).Should().Be(1,
+            "exactly one concurrent relationship write must win");
+        var loser = responses.Single(response => !response.IsSuccessStatusCode);
+        loser.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Conflict);
+        var loserBody = await loser.Content.ReadAsStringAsync();
+        (loserBody.Contains(MenuOfferLinkConflict.DuplicateMessage)
+            || loserBody.Contains(MenuOfferLinkConflict.ConcurrentMessage)
+            || loserBody.Contains("A linked menu cannot be used as another offer's parent")
+            || loserBody.Contains("A menu with alternatives cannot be linked upward"))
+            .Should().BeTrue("the loser must receive the relationship conflict reason");
         foreach (var response in responses)
         {
             response.Dispose();

@@ -1,6 +1,5 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -76,32 +75,20 @@ public sealed class SetMenuOfferParentCommandHandler
                 menu.MenuDefinition.ParentOfferVariationId);
             return ApiResponse<MenuOfferLinkDto>.SuccessWithData(link);
         }
-        catch (Exception exception) when (IsOfferLinkConflict(exception))
+        catch (Exception exception)
         {
-            throw new BadRequestException(
-                "This parent offer already has a menu alternative for that variation");
-        }
-    }
-
-    private static bool IsOfferLinkConflict(Exception exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is not PostgresException postgres)
+            try
             {
-                continue;
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch
+            {
+                // The original exception determines the API result; disposing the transaction
+                // still rolls back when an explicit rollback is unavailable.
             }
 
-            if (postgres.SqlState is PostgresErrorCodes.UniqueViolation
-                or PostgresErrorCodes.SerializationFailure
-                or PostgresErrorCodes.DeadlockDetected)
-            {
-                return postgres.SqlState != PostgresErrorCodes.UniqueViolation
-                    || postgres.ConstraintName is "ux_menu_definitions_parent_offer_product_id"
-                        or "ux_menu_definitions_parent_offer_variation";
-            }
+            MenuOfferLinkConflict.ThrowIfExpected(exception);
+            throw;
         }
-
-        return false;
     }
 }

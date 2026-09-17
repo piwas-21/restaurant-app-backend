@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Data;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
@@ -82,6 +83,35 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
     {
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
+
+        try
+        {
+            var result = await HandleWithinTransactionAsync(command, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (Exception rollbackEx)
+            {
+                _logger.LogWarning(rollbackEx, "Transaction rollback failed during product update");
+            }
+
+            MenuOfferLinkConflict.ThrowIfExpected(exception);
+            throw;
+        }
+    }
+
+    private async Task<ApiResponse<ProductDto>> HandleWithinTransactionAsync(
+        UpdateProductCommand command,
+        CancellationToken cancellationToken)
+    {
         var product = await _context.Products
             // Multiple collection includes below — split to avoid a cartesian
             // explosion (matches GetProductByIdQueryHandler).
@@ -107,6 +137,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             return ApiResponse<ProductDto>.Failure("Product not found");
         }
 
+        MenuOfferLinkRules.EnsureCanChangeType(product, command.Type);
         await MenuOfferLinkRules.EnsureCanDeactivateAsync(
             _context, product.Id, command.IsActive, cancellationToken);
         await MenuOfferLinkRules.EnsureCanBecomeComponentAsync(
@@ -424,9 +455,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             // arrive; the throw keeps that true loudly rather than defaulting back into the wipe.
             //
             // Hoisted above the assignments rather than left beside its use because this handler
-            // runs in NO transaction: throwing after the schedule fields were written would still
-            // be safe today (the single SaveChangesAsync is further down), but failing before
-            // touching the entity at all does not depend on that staying true.
+            // runs inside the serializable update transaction: throwing after the schedule fields
+            // were written would still roll the whole request back, but failing before touching
+            // the entity at all keeps this guard independent of transaction implementation.
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 

@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Menus;
+using RestaurantSystem.Api.Features.Products.Queries.GetProductsQuery;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -26,8 +27,8 @@ internal static class CatalogOfferFamilyBuilder
             .GroupBy(product => product.MenuDefinition!.ParentOfferProductId!.Value)
             .ToDictionary(group => group.Key, group => group.ToList());
         var roots = products
-            .Where(product => IsRoot(product, byId))
-            .Where(product => product.IsActive || HasActiveChild(product, byId, childrenByParent))
+            .Where(product => IsPublicAnchor(product) || IsRoot(product, byId))
+            .Where(product => product.IsActive && !product.IsDeleted && !product.IsComponent)
             .Where(product => IsPlacedInCategory(product, categoryId))
             .Where(product => IsVisibleAtSchedule(product, byId, childrenByParent, schedule))
             .OrderBy(PrimaryCategoryOrder)
@@ -75,7 +76,12 @@ internal static class CatalogOfferFamilyBuilder
             .Select(category => category.CategoryId)
             .ToList();
 
-        var anchor = ProductSummaryMapper.MapToSummaryDto(root, baseUrl, requestedOrderType);
+        // A linked menu whose inactive/component/deleted parent was not public is intentionally
+        // mapped as an independent card. Do not return the stale relationship fields in that
+        // card: they would leak the unavailable anchor's identity and invite the client to group
+        // the menu back into a family it must not render.
+        var anchor = ProductSummaryMapper.MapToSummaryDto(
+            root, baseUrl, requestedOrderType, exposeOfferParentLink: false);
         var startingPrice = StartingPrice(root, menuOffers, requestedOrderType, schedule);
 
         return new CatalogOfferFamilyDto
@@ -98,7 +104,7 @@ internal static class CatalogOfferFamilyBuilder
             return true;
         }
 
-        if (!byId.TryGetValue(parentId.Value, out var parent) || !CanAnchor(parent))
+        if (!byId.TryGetValue(parentId.Value, out var parent) || !IsPublicAnchor(parent))
         {
             return true;
         }
@@ -111,15 +117,9 @@ internal static class CatalogOfferFamilyBuilder
         return false;
     }
 
-    private static bool CanAnchor(Product product) =>
-        product.MenuDefinition?.ParentOfferProductId is null;
-
-    private static bool HasActiveChild(
-        Product parent,
-        Dictionary<Guid, Product> byId,
-        Dictionary<Guid, List<Product>> childrenByParent) =>
-        childrenByParent.TryGetValue(parent.Id, out var children)
-        && children.Any(child => child.IsActive && IsValidChild(child, parent, byId));
+    private static bool IsPublicAnchor(Product product) =>
+        product.IsActive && !product.IsDeleted && !product.IsComponent
+        && product.MenuDefinition?.ParentOfferProductId is null;
 
     private static bool IsValidChild(
         Product child,
@@ -148,8 +148,7 @@ internal static class CatalogOfferFamilyBuilder
     }
 
     private static bool IsVisibleInAll(Product product) =>
-        LiveProductCategories.Of(product).Any(category => !category.Category.IsHiddenFromAllTab)
-        || !LiveProductCategories.Of(product).Any();
+        GuestAllViewVisibility.IsVisibleInAll(product);
 
     private static bool IsVisibleAtSchedule(
         Product root,

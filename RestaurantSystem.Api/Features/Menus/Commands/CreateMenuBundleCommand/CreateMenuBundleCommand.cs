@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
@@ -47,7 +48,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateMenuBundleCommand command, CancellationToken cancellationToken)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
 
         try
         {
@@ -176,7 +178,7 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             return ApiResponse<ProductDto>.SuccessWithData(productDto, "Menu Bundle created successfully");
         }
-        catch
+        catch (Exception exception)
         {
             try { await transaction.RollbackAsync(cancellationToken); }
             catch (Exception rollbackEx)
@@ -185,6 +187,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 // below; rollback failure here is logged but mustn't shadow it.
                 _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle create");
             }
+
+            MenuOfferLinkConflict.ThrowIfExpected(exception);
             throw;
         }
     }

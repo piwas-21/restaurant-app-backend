@@ -46,6 +46,7 @@ public sealed class GetCatalogQueryHandler(
                 && (p.IsActive
                     || _context.MenuDefinitions.Any(definition =>
                         definition.ParentOfferProductId == p.Id)))
+            .OrderBy(p => p.Id)
             .Take(CatalogQueryLimits.MaxProducts + 1)
             .ToListAsync(cancellationToken);
 

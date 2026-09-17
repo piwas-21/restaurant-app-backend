@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Menus;
@@ -140,6 +141,27 @@ public static class MenuOfferLinkRules
         {
             throw new BadRequestException(
                 "Unlink or reassign this offer's menu alternatives before making it a component");
+        }
+
+        var isLinkedAlternative = await context.MenuDefinitions
+            .AnyAsync(definition => definition.ProductId == productId
+                && definition.ParentOfferProductId.HasValue,
+                cancellationToken);
+
+        if (isLinkedAlternative)
+        {
+            throw new BadRequestException(
+                "Unlink this menu alternative before making it a component");
+        }
+    }
+
+    public static void EnsureCanChangeType(Product product, ProductType targetType)
+    {
+        if (targetType != ProductType.Menu
+            && product.MenuDefinition?.ParentOfferProductId.HasValue == true)
+        {
+            throw new BadRequestException(
+                "Unlink this menu alternative before changing its product type");
         }
     }
 

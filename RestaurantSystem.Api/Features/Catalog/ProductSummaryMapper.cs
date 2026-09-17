@@ -25,7 +25,11 @@ public static class ProductSummaryMapper
     /// The channel the guest is ordering through, or <c>null</c> when they have not chosen one yet
     /// (the dominant browse state) — nothing is reported as blocked in that case.
     /// </param>
-    public static ProductSummaryDto MapToSummaryDto(Product product, string baseUrl, OrderType? requestedOrderType)
+    public static ProductSummaryDto MapToSummaryDto(
+        Product product,
+        string baseUrl,
+        OrderType? requestedOrderType,
+        bool exposeOfferParentLink = true)
     {
         var dto = new ProductSummaryDto
         {
@@ -39,8 +43,8 @@ public static class ProductSummaryMapper
             HideBaseProduct = product.HideBaseProduct,
             IsComponent = product.IsComponent,
             Type = product.Type,
-            ParentOfferProductId = product.MenuDefinition?.ParentOfferProductId,
-            ParentOfferVariationId = product.MenuDefinition?.ParentOfferVariationId,
+            ParentOfferProductId = exposeOfferParentLink ? product.MenuDefinition?.ParentOfferProductId : null,
+            ParentOfferVariationId = exposeOfferParentLink ? product.MenuDefinition?.ParentOfferVariationId : null,
             Allergens = product.Allergens,
             Ingredients = product.Ingredients,
             DetailedIngredients = [],

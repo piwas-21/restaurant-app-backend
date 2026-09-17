@@ -129,7 +129,7 @@ public sealed class CatalogOfferFamilyBuilderTests
     }
 
     [Fact]
-    public void Keeps_one_inactive_anchor_family_with_all_active_menu_children()
+    public void Makes_active_menu_children_independent_when_anchor_is_inactive()
     {
         var anchor = Product("Tacos", 8m, ProductType.MainItem);
         anchor.IsActive = false;
@@ -151,11 +151,11 @@ public sealed class CatalogOfferFamilyBuilderTests
         var families = CatalogOfferFamilyBuilder.Build(
             new[] { anchor, generic, large }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
 
-        families.Should().ContainSingle();
-        families[0].Id.Should().Be(anchor.Id);
-        families[0].Anchor.IsActive.Should().BeFalse();
-        families[0].Anchor.Availability.CanOrder.Should().BeFalse();
-        families[0].MenuOffers.Should().HaveCount(2);
+        families.Should().HaveCount(2);
+        families.Select(family => family.Id)
+            .Should().BeEquivalentTo(new[] { generic.Id, large.Id });
+        families.Should().OnlyContain(family => family.MenuOffers.Count == 0);
+        families.Should().OnlyContain(family => family.Anchor.ParentOfferProductId == null);
     }
 
     [Fact]
@@ -330,6 +330,61 @@ public sealed class CatalogOfferFamilyBuilderTests
         allFamilies[0].CategoryIds.Should().ContainSingle().Which.Should().Be(hidden.Id);
         hiddenTabFamilies.Should().ContainSingle().Which.Id.Should().Be(anchor.Id);
         unrelatedCategoryFamilies.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Visible_in_all_treats_a_stale_deleted_category_link_as_visible()
+    {
+        var liveHidden = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Live Internal",
+            IsHiddenFromAllTab = true,
+            CreatedBy = "test"
+        };
+        var deletedHidden = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Deleted Internal",
+            IsHiddenFromAllTab = true,
+            IsDeleted = true,
+            CreatedBy = "test"
+        };
+        var anchor = Product("Stale category link", 10m, ProductType.MainItem, liveHidden);
+        anchor.ProductCategories.Add(new ProductCategory
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Product = anchor,
+            CategoryId = deletedHidden.Id,
+            Category = deletedHidden,
+            IsPrimary = false,
+            CreatedBy = "test"
+        });
+
+        var family = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "")
+            .Should().ContainSingle().Which;
+
+        family.VisibleInAll.Should().BeTrue(
+            "GuestAllViewVisibility treats a stale link as no live hide decision");
+    }
+
+    [Fact]
+    public void Makes_a_linked_menu_independent_when_anchor_is_not_public()
+    {
+        var anchor = Product("Component anchor", 10m, ProductType.MainItem);
+        anchor.IsComponent = true;
+        var menu = Product("Public menu", 12m, ProductType.Menu);
+        menu.MenuDefinition = Definition(menu, anchor.Id);
+
+        var family = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor, menu }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "")
+            .Should().ContainSingle().Which;
+
+        family.Id.Should().Be(menu.Id);
+        family.MenuOffers.Should().BeEmpty();
+        family.Anchor.ParentOfferProductId.Should().BeNull();
     }
 
     [Fact]
