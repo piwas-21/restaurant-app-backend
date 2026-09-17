@@ -83,7 +83,8 @@ public class BundleReadContractAgreementTests : IntegrationTestBase
 
         var expected = new[]
         {
-            "id", "productId", "productName", "additionalPrice", "displayOrder", "isDefault",
+            "id", "productId", "productVariationId", "productVariationName",
+            "productVariationPriceModifier", "productName", "additionalPrice", "displayOrder", "isDefault",
             "ingredients", "allergens", "detailedIngredients", "suggestedSideItems",
             "customizationGroups",
             "sauceMin", "sauceMax", "sauceIncludedFree"
