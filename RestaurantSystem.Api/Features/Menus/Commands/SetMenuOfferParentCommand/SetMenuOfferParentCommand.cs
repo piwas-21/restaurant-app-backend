@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RestaurantSystem.Api.Common.Exceptions;
@@ -50,7 +51,8 @@ public sealed class SetMenuOfferParentCommandHandler
             return ApiResponse<MenuOfferLinkDto>.Failure("Product is not a menu bundle");
         }
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
         try
         {
             await MenuOfferLinkRules.EnsureValidAsync(
@@ -74,18 +76,32 @@ public sealed class SetMenuOfferParentCommandHandler
                 menu.MenuDefinition.ParentOfferVariationId);
             return ApiResponse<MenuOfferLinkDto>.SuccessWithData(link);
         }
-        catch (DbUpdateException exception) when (IsOfferLinkConflict(exception))
+        catch (Exception exception) when (IsOfferLinkConflict(exception))
         {
             throw new BadRequestException(
                 "This parent offer already has a menu alternative for that variation");
         }
     }
 
-    private static bool IsOfferLinkConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException
+    private static bool IsOfferLinkConflict(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
         {
-            SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "ux_menu_definitions_parent_offer_product_id"
-                or "ux_menu_definitions_parent_offer_variation"
-        };
+            if (current is not PostgresException postgres)
+            {
+                continue;
+            }
+
+            if (postgres.SqlState is PostgresErrorCodes.UniqueViolation
+                or PostgresErrorCodes.SerializationFailure
+                or PostgresErrorCodes.DeadlockDetected)
+            {
+                return postgres.SqlState != PostgresErrorCodes.UniqueViolation
+                    || postgres.ConstraintName is "ux_menu_definitions_parent_offer_product_id"
+                        or "ux_menu_definitions_parent_offer_variation";
+            }
+        }
+
+        return false;
+    }
 }

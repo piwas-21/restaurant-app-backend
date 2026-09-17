@@ -19,6 +19,9 @@ public sealed record CatalogOfferFamilyDto
     /// <summary>Whether the anchor target is inside its own menu schedule right now.</summary>
     public bool AnchorScheduleAvailable { get; init; }
 
+    /// <summary>Whether this family should appear in the public All category.</summary>
+    public bool VisibleInAll { get; init; }
+
     /// <summary>Live category assignments of the anchor; menu categories never add placements.</summary>
     public List<Guid> CategoryIds { get; init; } = [];
 

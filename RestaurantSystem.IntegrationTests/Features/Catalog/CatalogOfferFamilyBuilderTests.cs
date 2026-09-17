@@ -301,8 +301,35 @@ public sealed class CatalogOfferFamilyBuilderTests
 
         allFamilies.Should().ContainSingle();
         allFamilies[0].CategoryIds.Should().Contain(new[] { visible.Id, hidden.Id });
+        allFamilies[0].VisibleInAll.Should().BeTrue();
         hiddenTabFamilies.Should().ContainSingle();
         hiddenTabFamilies[0].Id.Should().Be(anchor.Id);
+    }
+
+    [Fact]
+    public void Includes_hidden_only_family_in_all_but_keeps_it_on_its_category_tab()
+    {
+        var hidden = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Internal",
+            IsHiddenFromAllTab = true,
+            CreatedBy = "test"
+        };
+        var anchor = Product("Staff Special", 10m, ProductType.MainItem, hidden);
+
+        var allFamilies = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+        var hiddenTabFamilies = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor }, hidden.Id, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+        var unrelatedCategoryFamilies = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor }, Guid.NewGuid(), null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+
+        allFamilies.Should().ContainSingle();
+        allFamilies[0].VisibleInAll.Should().BeFalse();
+        allFamilies[0].CategoryIds.Should().ContainSingle().Which.Should().Be(hidden.Id);
+        hiddenTabFamilies.Should().ContainSingle().Which.Id.Should().Be(anchor.Id);
+        unrelatedCategoryFamilies.Should().BeEmpty();
     }
 
     [Fact]

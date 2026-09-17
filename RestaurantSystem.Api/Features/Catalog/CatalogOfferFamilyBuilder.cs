@@ -84,6 +84,7 @@ internal static class CatalogOfferFamilyBuilder
             Anchor = anchor,
             MenuOffers = menuOffers,
             AnchorScheduleAvailable = schedule(root),
+            VisibleInAll = IsVisibleInAll(root),
             CategoryIds = categoryIds,
             StartingPrice = startingPrice
         };
@@ -143,9 +144,12 @@ internal static class CatalogOfferFamilyBuilder
             return categories.Any(category => category.CategoryId == categoryId.Value);
         }
 
-        return categories.Count == 0
-            || categories.Any(category => !category.Category.IsHiddenFromAllTab);
+        return true;
     }
+
+    private static bool IsVisibleInAll(Product product) =>
+        LiveProductCategories.Of(product).Any(category => !category.Category.IsHiddenFromAllTab)
+        || !LiveProductCategories.Of(product).Any();
 
     private static bool IsVisibleAtSchedule(
         Product root,

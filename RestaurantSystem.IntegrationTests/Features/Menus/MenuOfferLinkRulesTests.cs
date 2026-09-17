@@ -24,6 +24,8 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
     private Guid _variationChildId;
     private Guid _movingChildId;
     private Guid _replacementAnchorId;
+    private Guid _cycleAId;
+    private Guid _cycleBId;
 
     public MenuOfferLinkRulesTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }
 
@@ -70,6 +72,29 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
 
         await action.Should().ThrowAsync<BadRequestException>()
             .WithMessage("*menu references*");
+    }
+
+    [Fact]
+    public async Task Concurrent_cross_links_cannot_create_a_parent_cycle()
+    {
+        AuthenticateAsAdmin();
+
+        var responses = await Task.WhenAll(
+            LinkAsync(_cycleAId, _cycleBId),
+            LinkAsync(_cycleBId, _cycleAId));
+
+        responses.Count(response => response.IsSuccessStatusCode).Should().BeLessThan(2);
+        foreach (var response in responses)
+        {
+            response.Dispose();
+        }
+
+        await using var context = DatabaseFixture.CreateContext();
+        var links = await context.MenuDefinitions
+            .Where(definition => definition.ProductId == _cycleAId || definition.ProductId == _cycleBId)
+            .ToDictionaryAsync(definition => definition.ProductId, definition => definition.ParentOfferProductId);
+        (links[_cycleAId] == _cycleBId && links[_cycleBId] == _cycleAId)
+            .Should().BeFalse("serializable link writes must not create a two-node parent cycle");
     }
 
     protected override async Task SeedTestData()
@@ -135,8 +160,12 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
         var moving = Menu("Moving child");
         moving.MenuDefinition = Definition(moving, _replacementAnchorId);
         _movingChildId = moving.Id;
+        var cycleA = Menu("Cycle A");
+        var cycleB = Menu("Cycle B");
+        _cycleAId = cycleA.Id;
+        _cycleBId = cycleB.Id;
 
-        context.Products.AddRange(anchor, generic, variationChild, moving, replacement);
+        context.Products.AddRange(anchor, generic, variationChild, moving, replacement, cycleA, cycleB);
         await context.SaveChangesAsync();
     }
 

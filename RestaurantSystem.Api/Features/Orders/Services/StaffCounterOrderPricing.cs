@@ -135,7 +135,6 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
                 SectionId = child.SectionId.Value,
                 ItemId = child.ProductId.Value,
                 ProductVariationId = sectionItem.ProductVariationId,
-                ProductVariationPriceModifier = sectionItem.ProductVariation?.PriceModifier,
                 Quantity = optionQuantity,
                 SpecialInstructions = child.SpecialInstructions,
                 SelectedIngredients = child.SelectedIngredientIds,

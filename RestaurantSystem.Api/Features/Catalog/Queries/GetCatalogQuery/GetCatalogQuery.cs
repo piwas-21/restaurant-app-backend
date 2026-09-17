@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog.Dtos;
@@ -45,7 +46,14 @@ public sealed class GetCatalogQueryHandler(
                 && (p.IsActive
                     || _context.MenuDefinitions.Any(definition =>
                         definition.ParentOfferProductId == p.Id)))
+            .Take(CatalogQueryLimits.MaxProducts + 1)
             .ToListAsync(cancellationToken);
+
+        if (products.Count > CatalogQueryLimits.MaxProducts)
+        {
+            throw new BadRequestException(
+                $"Catalogue exceeds the supported limit of {CatalogQueryLimits.MaxProducts} products");
+        }
 
         var now = _clock.Now;
         var families = CatalogOfferFamilyBuilder.Build(
