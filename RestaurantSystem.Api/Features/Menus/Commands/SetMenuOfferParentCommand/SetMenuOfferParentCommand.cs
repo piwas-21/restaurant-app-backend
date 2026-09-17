@@ -35,25 +35,28 @@ public sealed class SetMenuOfferParentCommandHandler
         SetMenuOfferParentCommand command,
         CancellationToken cancellationToken)
     {
-        var menu = await _context.Products
-            .Include(product => product.MenuDefinition)
-            .FirstOrDefaultAsync(product => product.Id == command.MenuProductId && !product.IsDeleted,
-                cancellationToken);
-
-        if (menu is null)
-        {
-            return ApiResponse<MenuOfferLinkDto>.Failure("Menu bundle not found");
-        }
-
-        if (menu.Type != ProductType.Menu || menu.MenuDefinition is null)
-        {
-            return ApiResponse<MenuOfferLinkDto>.Failure("Product is not a menu bundle");
-        }
-
         await using var transaction = await _context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
         try
         {
+            // The child must be loaded only after the serializable transaction begins. A stale
+            // pre-transaction read could approve a normal menu while a concurrent product update
+            // turns it into a component, leaving an unorderable offer-family relationship.
+            var menu = await _context.Products
+                .Include(product => product.MenuDefinition)
+                .FirstOrDefaultAsync(product => product.Id == command.MenuProductId && !product.IsDeleted,
+                    cancellationToken);
+
+            if (menu is null)
+            {
+                return ApiResponse<MenuOfferLinkDto>.Failure("Menu bundle not found");
+            }
+
+            if (menu.Type != ProductType.Menu || menu.MenuDefinition is null)
+            {
+                return ApiResponse<MenuOfferLinkDto>.Failure("Product is not a menu bundle");
+            }
+
             await MenuOfferLinkRules.EnsureValidAsync(
                 _context,
                 menu.Id,

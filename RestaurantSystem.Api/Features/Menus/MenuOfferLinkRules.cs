@@ -18,7 +18,8 @@ public static class MenuOfferLinkRules
         Guid menuProductId,
         Guid? parentOfferProductId,
         Guid? parentOfferVariationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool? menuIsComponent = null)
     {
         if (!parentOfferProductId.HasValue && parentOfferVariationId.HasValue)
         {
@@ -33,6 +34,23 @@ public static class MenuOfferLinkRules
         if (menuProductId == parentOfferProductId.Value)
         {
             throw new BadRequestException("A menu cannot be linked to itself");
+        }
+
+        // Read the child in the same transaction as the relationship write. This matters for the
+        // narrow PATCH path: a caller can otherwise read a non-component menu before a concurrent
+        // product update turns it into a component, then leave an invalid component alternative
+        // behind. UpdateProduct passes the requested component state as an override because its
+        // own product row has not been mutated yet.
+        var menuState = await context.Products
+            .AsNoTracking()
+            .Where(product => product.Id == menuProductId && !product.IsDeleted)
+            .Select(product => new { product.Type, product.IsComponent })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (menuState?.IsComponent == true || menuIsComponent == true)
+        {
+            throw new BadRequestException(
+                "Unlink this menu before making it a component");
         }
 
         // The child being linked must not already anchor alternatives. This is distinct from the
@@ -113,13 +131,24 @@ public static class MenuOfferLinkRules
             return;
         }
 
-        var hasAlternatives = await context.MenuDefinitions
+        var hasParentAlternatives = await context.MenuDefinitions
             .AnyAsync(definition => definition.ParentOfferProductId == productId, cancellationToken);
 
-        if (hasAlternatives)
+        var isLinkedAlternative = await context.MenuDefinitions
+            .AnyAsync(definition => definition.ProductId == productId
+                && definition.ParentOfferProductId.HasValue,
+                cancellationToken);
+
+        if (hasParentAlternatives)
         {
             throw new BadRequestException(
                 "Unlink or reassign this offer's menu alternatives before archiving it");
+        }
+
+        if (isLinkedAlternative)
+        {
+            throw new BadRequestException(
+                "Unlink this menu alternative before archiving it");
         }
     }
 
@@ -155,13 +184,24 @@ public static class MenuOfferLinkRules
         }
     }
 
-    public static void EnsureCanChangeType(Product product, ProductType targetType)
+    public static async Task EnsureCanChangeTypeAsync(
+        ApplicationDbContext context,
+        Product product,
+        ProductType targetType,
+        CancellationToken cancellationToken)
     {
-        if (targetType != ProductType.Menu
-            && product.MenuDefinition?.ParentOfferProductId.HasValue == true)
+        if (targetType == ProductType.Menu)
+        {
+            return;
+        }
+
+        var hasParentAlternatives = await context.MenuDefinitions
+            .AnyAsync(definition => definition.ParentOfferProductId == product.Id, cancellationToken);
+
+        if (product.MenuDefinition?.ParentOfferProductId.HasValue == true || hasParentAlternatives)
         {
             throw new BadRequestException(
-                "Unlink this menu alternative before changing its product type");
+                "Unlink this menu relationship before changing its product type");
         }
     }
 

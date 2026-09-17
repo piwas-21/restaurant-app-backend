@@ -137,7 +137,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             return ApiResponse<ProductDto>.Failure("Product not found");
         }
 
-        MenuOfferLinkRules.EnsureCanChangeType(product, command.Type);
+        await MenuOfferLinkRules.EnsureCanChangeTypeAsync(
+            _context, product, command.Type, cancellationToken);
         await MenuOfferLinkRules.EnsureCanDeactivateAsync(
             _context, product.Id, command.IsActive, cancellationToken);
         await MenuOfferLinkRules.EnsureCanBecomeComponentAsync(
@@ -468,7 +469,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                     product.Id,
                     command.MenuDefinition.ParentOfferProductId,
                     command.MenuDefinition.ParentOfferVariationId,
-                    cancellationToken);
+                    cancellationToken,
+                    command.IsComponent);
             }
 
             await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);

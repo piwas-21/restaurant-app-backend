@@ -26,6 +26,7 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
     private Guid _replacementAnchorId;
     private Guid _cycleAId;
     private Guid _cycleBId;
+    private Guid _raceChildId;
 
     public MenuOfferLinkRulesTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }
 
@@ -106,6 +107,43 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
             .Should().BeFalse("serializable link writes must not create a two-node parent cycle");
     }
 
+    [Fact]
+    public async Task Concurrent_link_and_delete_cannot_leave_a_deleted_child_linked()
+    {
+        AuthenticateAsAdmin();
+
+        var linkTask = LinkAsync(_raceChildId, _anchorId);
+        var deleteTask = Client.DeleteAsync($"/api/Menus/{_raceChildId}");
+        var responses = await Task.WhenAll(linkTask, deleteTask);
+
+        responses.Count(response => response.IsSuccessStatusCode).Should().Be(1);
+        var loser = responses.Single(response => !response.IsSuccessStatusCode);
+        loser.StatusCode.Should().BeOneOf(
+            HttpStatusCode.BadRequest,
+            HttpStatusCode.NotFound,
+            HttpStatusCode.Conflict);
+
+        foreach (var response in responses)
+        {
+            response.Dispose();
+        }
+
+        await using var context = DatabaseFixture.CreateContext();
+        var child = await context.Products
+            .IgnoreQueryFilters()
+            .Include(product => product.MenuDefinition)
+            .SingleAsync(product => product.Id == _raceChildId);
+
+        if (child.IsDeleted)
+        {
+            child.MenuDefinition!.ParentOfferProductId.Should().BeNull();
+        }
+        else
+        {
+            child.MenuDefinition!.ParentOfferProductId.Should().Be(_anchorId);
+        }
+    }
+
     protected override async Task SeedTestData()
     {
         await base.SeedTestData();
@@ -173,8 +211,10 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
         var cycleB = Menu("Cycle B");
         _cycleAId = cycleA.Id;
         _cycleBId = cycleB.Id;
+        var raceChild = Menu("Race child");
+        _raceChildId = raceChild.Id;
 
-        context.Products.AddRange(anchor, generic, variationChild, moving, replacement, cycleA, cycleB);
+        context.Products.AddRange(anchor, generic, variationChild, moving, replacement, cycleA, cycleB, raceChild);
         await context.SaveChangesAsync();
     }
 
