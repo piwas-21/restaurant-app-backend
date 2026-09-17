@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -48,24 +50,42 @@ public sealed class SetMenuOfferParentCommandHandler
             return ApiResponse<MenuOfferLinkDto>.Failure("Product is not a menu bundle");
         }
 
-        await MenuOfferLinkRules.EnsureValidAsync(
-            _context,
-            menu.Id,
-            command.ParentOfferProductId,
-            command.ParentOfferVariationId,
-            cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await MenuOfferLinkRules.EnsureValidAsync(
+                _context,
+                menu.Id,
+                command.ParentOfferProductId,
+                command.ParentOfferVariationId,
+                cancellationToken);
 
-        menu.MenuDefinition.ParentOfferProductId = command.ParentOfferProductId;
-        menu.MenuDefinition.ParentOfferVariationId = command.ParentOfferVariationId;
-        menu.MenuDefinition.UpdatedAt = DateTime.UtcNow;
-        menu.MenuDefinition.UpdatedBy = _currentUserService.GetAuditIdentifier();
+            menu.MenuDefinition.ParentOfferProductId = command.ParentOfferProductId;
+            menu.MenuDefinition.ParentOfferVariationId = command.ParentOfferVariationId;
+            menu.MenuDefinition.UpdatedAt = DateTime.UtcNow;
+            menu.MenuDefinition.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
-        await _context.SaveChangesAsync(cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
-        var link = new MenuOfferLinkDto(
-            menu.Id,
-            menu.MenuDefinition.ParentOfferProductId,
-            menu.MenuDefinition.ParentOfferVariationId);
-        return ApiResponse<MenuOfferLinkDto>.SuccessWithData(link);
+            var link = new MenuOfferLinkDto(
+                menu.Id,
+                menu.MenuDefinition.ParentOfferProductId,
+                menu.MenuDefinition.ParentOfferVariationId);
+            return ApiResponse<MenuOfferLinkDto>.SuccessWithData(link);
+        }
+        catch (DbUpdateException exception) when (IsOfferLinkConflict(exception))
+        {
+            throw new BadRequestException(
+                "This parent offer already has a menu alternative for that variation");
+        }
     }
+
+    private static bool IsOfferLinkConflict(DbUpdateException exception) =>
+        exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ux_menu_definitions_parent_offer_product_id"
+                or "ux_menu_definitions_parent_offer_variation"
+        };
 }

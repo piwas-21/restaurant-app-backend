@@ -38,7 +38,13 @@ public sealed class GetCatalogQueryHandler(
             .Include(p => p.Variations.Where(v => !v.IsDeleted && v.IsActive).OrderBy(v => v.DisplayOrder))
                 .ThenInclude(v => v.Descriptions)
             .Include(p => p.MenuDefinition)
-            .Where(p => !p.IsDeleted && p.IsActive && !p.IsComponent)
+            // Keep inactive anchors when they own linked menu offers so the builder can render a
+            // single, disabled family card with the still-usable alternatives. Inactive
+            // standalone products and inactive child menus remain excluded by the builder.
+            .Where(p => !p.IsDeleted && !p.IsComponent
+                && (p.IsActive
+                    || _context.MenuDefinitions.Any(definition =>
+                        definition.ParentOfferProductId == p.Id)))
             .ToListAsync(cancellationToken);
 
         var now = _clock.Now;

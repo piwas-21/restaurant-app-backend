@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 public record MenuDefinitionDto
@@ -10,8 +12,11 @@ public record MenuDefinitionDto
     public const string SectionsRequiredMessage = "Menu definition sections are required (send [] to remove them all)";
 
     public Guid? Id { get; init; }
-    public Guid? ParentOfferProductId { get; init; }
-    public Guid? ParentOfferVariationId { get; init; }
+    private Guid? _parentOfferProductId, _parentOfferVariationId;
+    private bool _offerParentSpecified;
+    public Guid? ParentOfferProductId { get => _parentOfferProductId; init { _parentOfferProductId = value; _offerParentSpecified = true; } }
+    public Guid? ParentOfferVariationId { get => _parentOfferVariationId; init { _parentOfferVariationId = value; _offerParentSpecified = true; } }
+    [JsonIgnore] public bool OfferParentSpecified => _offerParentSpecified;
     public bool IsAlwaysAvailable { get; init; }
     public TimeSpan? StartTime { get; init; }
     public TimeSpan? EndTime { get; init; }

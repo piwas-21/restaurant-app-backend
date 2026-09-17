@@ -126,13 +126,10 @@ public class MenusController : ControllerBase
     [RequireAdmin]
     public async Task<ActionResult<ApiResponse<MenuOfferLinkDto>>> SetOfferParent(
         Guid id,
-        [FromBody] SetMenuOfferParentCommand command)
+        [FromBody] MenuOfferParentRequestDto request)
     {
-        if (id != command.MenuProductId)
-        {
-            return BadRequest(ApiResponse<MenuOfferLinkDto>.Failure("Menu bundle ID mismatch"));
-        }
-
+        var command = new SetMenuOfferParentCommand(
+            id, request.ParentOfferProductId, request.ParentOfferVariationId);
         var result = await _mediator.SendCommand(command);
         return Ok(result);
     }

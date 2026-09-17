@@ -72,12 +72,15 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             _context.Products.Add(product);
 
-            await MenuOfferLinkRules.EnsureValidAsync(
-                _context,
-                product.Id,
-                command.MenuDefinition.ParentOfferProductId,
-                command.MenuDefinition.ParentOfferVariationId,
-                cancellationToken);
+            if (command.MenuDefinition.OfferParentSpecified)
+            {
+                await MenuOfferLinkRules.EnsureValidAsync(
+                    _context,
+                    product.Id,
+                    command.MenuDefinition.ParentOfferProductId,
+                    command.MenuDefinition.ParentOfferVariationId,
+                    cancellationToken);
+            }
 
             var displayOrder = 0;
 

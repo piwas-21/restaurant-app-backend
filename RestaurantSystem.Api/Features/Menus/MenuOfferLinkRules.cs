@@ -67,12 +67,6 @@ public static class MenuOfferLinkRules
             throw new BadRequestException("A linked menu cannot be used as another offer's parent");
         }
 
-        if (parent.Type == ProductType.Menu && await context.MenuDefinitions
-                .AnyAsync(definition => definition.ParentOfferProductId == parent.Id, cancellationToken))
-        {
-            throw new BadRequestException("A menu that already has alternatives cannot be linked upward");
-        }
-
         if (parentOfferVariationId.HasValue)
         {
             var variation = await context.ProductVariations
@@ -161,12 +155,14 @@ public static class MenuOfferLinkRules
         }
 
         var hasAlternatives = await context.MenuDefinitions
-            .AnyAsync(definition => definition.ParentOfferVariationId == variationId, cancellationToken);
+            .AnyAsync(definition => definition.ParentOfferVariationId == variationId, cancellationToken)
+            || await context.MenuSectionItems
+                .AnyAsync(item => item.ProductVariationId == variationId, cancellationToken);
 
         if (hasAlternatives)
         {
             throw new BadRequestException(
-                "Unlink or reassign this variation's menu alternatives before archiving it");
+                "Unlink or reassign this variation's menu references before archiving it");
         }
     }
 }

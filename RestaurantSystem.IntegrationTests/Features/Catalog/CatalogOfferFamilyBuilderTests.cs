@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using FluentAssertions;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Domain.Common.Enums;
@@ -97,26 +98,64 @@ public sealed class CatalogOfferFamilyBuilderTests
     }
 
     [Fact]
-    public void Falls_back_to_independent_menu_when_anchor_is_unavailable()
+    public void Keeps_one_unavailable_anchor_family_with_all_active_menu_children()
     {
         var anchor = Product("Tacos", 8m, ProductType.MainItem);
         anchor.IsAvailable = false;
-        var menu = Product("Menu Tacos", 11m, ProductType.Menu);
-        menu.MenuDefinition = new MenuDefinition
+        var variation = new ProductVariation
         {
             Id = Guid.NewGuid(),
-            ProductId = menu.Id,
-            ParentOfferProductId = anchor.Id,
-            Product = menu,
+            ProductId = anchor.Id,
+            Name = "Large",
+            IsActive = true,
             CreatedBy = "test"
         };
+        anchor.Variations.Add(variation);
+        var generic = Product("Menu Tacos", 11m, ProductType.Menu);
+        generic.MenuDefinition = Definition(generic, anchor.Id);
+        var large = Product("Menu Tacos Large", 13m, ProductType.Menu);
+        large.MenuDefinition = Definition(large, anchor.Id, variation.Id);
 
         var families = CatalogOfferFamilyBuilder.Build(
-            new[] { anchor, menu }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+            new[] { anchor, generic, large }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
 
-        families.Should().HaveCount(2);
-        families.Single(family => family.Id == anchor.Id).MenuOffers.Should().BeEmpty();
-        families.Single(family => family.Id == menu.Id).MenuOffers.Should().BeEmpty();
+        families.Should().ContainSingle();
+        families[0].Id.Should().Be(anchor.Id);
+        families[0].Anchor.IsAvailable.Should().BeFalse();
+        families[0].Anchor.Availability.CanOrder.Should().BeFalse();
+        families[0].MenuOffers.Should().HaveCount(2);
+        families[0].MenuOffers.Select(offer => offer.ProductId)
+            .Should().BeEquivalentTo(new[] { generic.Id, large.Id });
+    }
+
+    [Fact]
+    public void Keeps_one_inactive_anchor_family_with_all_active_menu_children()
+    {
+        var anchor = Product("Tacos", 8m, ProductType.MainItem);
+        anchor.IsActive = false;
+        anchor.IsAvailable = false;
+        var variation = new ProductVariation
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Name = "Large",
+            IsActive = true,
+            CreatedBy = "test"
+        };
+        anchor.Variations.Add(variation);
+        var generic = Product("Menu Tacos", 11m, ProductType.Menu);
+        generic.MenuDefinition = Definition(generic, anchor.Id);
+        var large = Product("Menu Tacos Large", 13m, ProductType.Menu);
+        large.MenuDefinition = Definition(large, anchor.Id, variation.Id);
+
+        var families = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor, generic, large }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+
+        families.Should().ContainSingle();
+        families[0].Id.Should().Be(anchor.Id);
+        families[0].Anchor.IsActive.Should().BeFalse();
+        families[0].Anchor.Availability.CanOrder.Should().BeFalse();
+        families[0].MenuOffers.Should().HaveCount(2);
     }
 
     [Fact]
@@ -156,8 +195,81 @@ public sealed class CatalogOfferFamilyBuilderTests
         families[0].MenuOffers.Should().ContainSingle();
         families[0].MenuOffers[0].ParentVariationId.Should().Be(variation.Id);
         families[0].MenuOffers[0].ScheduleAvailable.Should().BeTrue();
+        families[0].AnchorScheduleAvailable.Should().BeTrue();
         families[0].StartingPrice.Should().Be(8m);
         families[0].Anchor.Variations![0].FinalPrice.Should().Be(9m);
+    }
+
+    [Fact]
+    public void Keeps_a_closed_menu_anchor_card_when_an_open_child_exists()
+    {
+        var anchor = Product("Lunch Combo", 10m, ProductType.Menu);
+        anchor.MenuDefinition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Product = anchor,
+            IsAlwaysAvailable = false,
+            AvailableMonday = true,
+            StartTime = new TimeSpan(18, 0, 0),
+            EndTime = new TimeSpan(22, 0, 0),
+            CreatedBy = "test"
+        };
+        var menu = Product("Lunch Combo Dinner", 12m, ProductType.Menu);
+        menu.MenuDefinition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            ProductId = menu.Id,
+            ParentOfferProductId = anchor.Id,
+            Product = menu,
+            IsAlwaysAvailable = true,
+            CreatedBy = "test"
+        };
+
+        var families = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor, menu }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+
+        families.Should().ContainSingle();
+        families[0].Id.Should().Be(anchor.Id);
+        families[0].AnchorScheduleAvailable.Should().BeFalse();
+        families[0].Anchor.Availability.CanOrder.Should().BeTrue();
+        families[0].MenuOffers.Should().ContainSingle();
+        families[0].MenuOffers[0].ScheduleAvailable.Should().BeTrue();
+        families[0].StartingPrice.Should().Be(12m);
+    }
+
+    [Fact]
+    public void Allows_generic_and_variation_menu_children_of_a_standalone_bundle_anchor()
+    {
+        var anchor = Product("Family Combo", 10m, ProductType.Menu);
+        anchor.MenuDefinition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Product = anchor,
+            CreatedBy = "test"
+        };
+        var generic = Product("Family Combo Generic", 12m, ProductType.Menu);
+        generic.MenuDefinition = Definition(generic, anchor.Id);
+        var variation = new ProductVariation
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Name = "Large",
+            IsActive = true,
+            CreatedBy = "test"
+        };
+        anchor.Variations.Add(variation);
+        var large = Product("Family Combo Large", 14m, ProductType.Menu);
+        large.MenuDefinition = Definition(large, anchor.Id, variation.Id);
+
+        var family = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor, generic, large }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "")
+            .Should().ContainSingle().Which;
+
+        family.MenuOffers.Should().HaveCount(2);
+        family.MenuOffers.Select(offer => offer.ParentVariationId)
+            .Should().BeEquivalentTo(new Guid?[] { null, variation.Id });
     }
 
     [Fact]
@@ -193,6 +305,31 @@ public sealed class CatalogOfferFamilyBuilderTests
         hiddenTabFamilies[0].Id.Should().Be(anchor.Id);
     }
 
+    [Fact]
+    public void Indexes_children_before_mapping_a_bounded_catalogue()
+    {
+        const int familyCount = 3000;
+        var products = new List<Product>(familyCount * 2);
+        for (var index = 0; index < familyCount; index++)
+        {
+            var anchor = Product($"Dish {index}", 10m, ProductType.MainItem);
+            var menu = Product($"Menu Dish {index}", 12m, ProductType.Menu);
+            menu.MenuDefinition = Definition(menu, anchor.Id);
+            products.Add(anchor);
+            products.Add(menu);
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        var families = CatalogOfferFamilyBuilder.Build(
+            products, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+        stopwatch.Stop();
+
+        families.Should().HaveCount(familyCount);
+        families.Select(family => family.Id).Should().OnlyHaveUniqueItems();
+        families.Should().OnlyContain(family => family.MenuOffers.Count == 1);
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
+    }
+
     private static Product Product(string name, decimal price, ProductType type, params Category[] categories)
     {
         var product = new Product
@@ -225,4 +362,14 @@ public sealed class CatalogOfferFamilyBuilderTests
 
         return product;
     }
+
+    private static MenuDefinition Definition(Product menu, Guid parentId, Guid? variationId = null) => new()
+    {
+        Id = Guid.NewGuid(),
+        ProductId = menu.Id,
+        ParentOfferProductId = parentId,
+        ParentOfferVariationId = variationId,
+        Product = menu,
+        CreatedBy = "test"
+    };
 }

@@ -71,12 +71,15 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 return ApiResponse<ProductDto>.Failure("Product is not a menu bundle");
             }
 
-            await MenuOfferLinkRules.EnsureValidAsync(
-                _context,
-                product.Id,
-                command.MenuDefinition.ParentOfferProductId,
-                command.MenuDefinition.ParentOfferVariationId,
-                cancellationToken);
+            if (command.MenuDefinition.OfferParentSpecified)
+            {
+                await MenuOfferLinkRules.EnsureValidAsync(
+                    _context,
+                    product.Id,
+                    command.MenuDefinition.ParentOfferProductId,
+                    command.MenuDefinition.ParentOfferVariationId,
+                    cancellationToken);
+            }
 
             // Validate categories
             if (command.CategoryIds?.Any() == true)

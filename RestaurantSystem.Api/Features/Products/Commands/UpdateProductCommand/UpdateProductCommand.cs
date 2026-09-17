@@ -430,12 +430,15 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 
-            await MenuOfferLinkRules.EnsureValidAsync(
-                _context,
-                product.Id,
-                command.MenuDefinition.ParentOfferProductId,
-                command.MenuDefinition.ParentOfferVariationId,
-                cancellationToken);
+            if (command.MenuDefinition.OfferParentSpecified)
+            {
+                await MenuOfferLinkRules.EnsureValidAsync(
+                    _context,
+                    product.Id,
+                    command.MenuDefinition.ParentOfferProductId,
+                    command.MenuDefinition.ParentOfferVariationId,
+                    cancellationToken);
+            }
 
             await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 

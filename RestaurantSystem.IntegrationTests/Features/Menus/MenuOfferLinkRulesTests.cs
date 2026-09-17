@@ -1,0 +1,177 @@
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.Menus;
+using RestaurantSystem.Api.Features.Menus.Dtos;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.IntegrationTests.Infrastructure;
+
+namespace RestaurantSystem.IntegrationTests.Features.Menus;
+
+[Collection("Database Lane 2")]
+public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
+{
+    private Guid _anchorId;
+    private Guid _anchorVariationId;
+    private Guid _secondAnchorVariationId;
+    private Guid _genericChildId;
+    private Guid _variationChildId;
+    private Guid _movingChildId;
+    private Guid _replacementAnchorId;
+
+    public MenuOfferLinkRulesTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }
+
+    [Fact]
+    public async Task Standalone_menu_anchor_allows_generic_and_variation_children()
+    {
+        AuthenticateAsAdmin();
+
+        var generic = await LinkAsync(_genericChildId, _anchorId);
+        var variation = await LinkAsync(_variationChildId, _anchorId, _anchorVariationId);
+
+        generic.StatusCode.Should().Be(HttpStatusCode.OK);
+        variation.StatusCode.Should().Be(HttpStatusCode.OK);
+        await using var context = DatabaseFixture.CreateContext();
+        var links = await context.MenuDefinitions
+            .Where(definition => definition.ParentOfferProductId == _anchorId)
+            .Select(definition => definition.ParentOfferVariationId)
+            .ToListAsync();
+        links.Should().BeEquivalentTo(new Guid?[] { null, _anchorVariationId });
+    }
+
+    [Fact]
+    public async Task Existing_child_can_be_reassigned_to_another_standalone_anchor()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await LinkAsync(_movingChildId, _anchorId, _secondAnchorVariationId);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<MenuOfferLinkDto>>(JsonOptions);
+        body!.Data!.ParentOfferProductId.Should().Be(_anchorId);
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.MenuDefinitions.SingleAsync(definition => definition.ProductId == _movingChildId))
+            .ParentOfferProductId.Should().Be(_anchorId);
+    }
+
+    [Fact]
+    public async Task Variation_referenced_by_a_menu_section_cannot_be_archived()
+    {
+        await using var context = DatabaseFixture.CreateContext();
+
+        Func<Task> action = () => MenuOfferLinkRules.EnsureCanDeactivateVariationAsync(
+            context, _secondAnchorVariationId, false, CancellationToken.None);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("*menu references*");
+    }
+
+    protected override async Task SeedTestData()
+    {
+        await base.SeedTestData();
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var anchor = Menu("Anchor menu");
+        var variation = new ProductVariation
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Name = "Large",
+            IsActive = true,
+            CreatedBy = "test"
+        };
+        anchor.Variations.Add(variation);
+        _anchorId = anchor.Id;
+        _anchorVariationId = variation.Id;
+        var secondVariation = new ProductVariation
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Name = "Small",
+            IsActive = true,
+            CreatedBy = "test"
+        };
+        anchor.Variations.Add(secondVariation);
+        _secondAnchorVariationId = secondVariation.Id;
+        var section = new MenuSection
+        {
+            Id = Guid.NewGuid(),
+            MenuDefinition = anchor.MenuDefinition!,
+            Name = "Choose size",
+            IsRequired = true,
+            MinSelection = 1,
+            MaxSelection = 1,
+            CreatedBy = "test"
+        };
+        section.Items.Add(new MenuSectionItem
+        {
+            Id = Guid.NewGuid(),
+            MenuSection = section,
+            Product = anchor,
+            ProductId = anchor.Id,
+            ProductVariation = secondVariation,
+            ProductVariationId = secondVariation.Id,
+            CreatedBy = "test"
+        });
+        anchor.MenuDefinition!.Sections.Add(section);
+
+        var generic = Menu("Generic child");
+        generic.MenuDefinition = Definition(generic, anchor.Id);
+        _genericChildId = generic.Id;
+
+        var variationChild = Menu("Variation child");
+        variationChild.MenuDefinition = Definition(variationChild, anchor.Id, variation.Id);
+        _variationChildId = variationChild.Id;
+
+        var replacement = Menu("Replacement anchor");
+        _replacementAnchorId = replacement.Id;
+        var moving = Menu("Moving child");
+        moving.MenuDefinition = Definition(moving, _replacementAnchorId);
+        _movingChildId = moving.Id;
+
+        context.Products.AddRange(anchor, generic, variationChild, moving, replacement);
+        await context.SaveChangesAsync();
+    }
+
+    private Task<HttpResponseMessage> LinkAsync(Guid menuId, Guid parentId, Guid? variationId = null) =>
+        Client.SendAsync(new HttpRequestMessage(HttpMethod.Patch, $"/api/Menus/{menuId}/offer-parent")
+        {
+            Content = JsonContent.Create(new
+            {
+                parentOfferProductId = parentId,
+                parentOfferVariationId = variationId
+            }, options: JsonOptions)
+        });
+
+    private static Product Menu(string name) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        BasePrice = 10m,
+        Type = ProductType.Menu,
+        IsActive = true,
+        IsAvailable = true,
+        Ingredients = [],
+        Allergens = [],
+        CreatedBy = "test",
+        MenuDefinition = new MenuDefinition { IsAlwaysAvailable = true, CreatedBy = "test" }
+    };
+
+    private static MenuDefinition Definition(Product menu, Guid parentId, Guid? variationId = null) => new()
+    {
+        Id = Guid.NewGuid(),
+        ProductId = menu.Id,
+        ParentOfferProductId = parentId,
+        ParentOfferVariationId = variationId,
+        Product = menu,
+        IsAlwaysAvailable = true,
+        CreatedBy = "test"
+    };
+}

@@ -21,10 +21,15 @@ internal static class CatalogOfferFamilyBuilder
         var schedule = (Product product) => product.Type != ProductType.Menu
             || product.MenuDefinition is null
             || menuSchedule(product);
+        var childrenByParent = products
+            .Where(product => product.MenuDefinition?.ParentOfferProductId is not null)
+            .GroupBy(product => product.MenuDefinition!.ParentOfferProductId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
         var roots = products
             .Where(product => IsRoot(product, byId))
+            .Where(product => product.IsActive || HasActiveChild(product, byId, childrenByParent))
             .Where(product => IsPlacedInCategory(product, categoryId))
-            .Where(product => IsVisibleAtSchedule(product, byId, schedule))
+            .Where(product => IsVisibleAtSchedule(product, byId, childrenByParent, schedule))
             .OrderBy(PrimaryCategoryOrder)
             .ThenBy(product => product.DisplayOrder)
             .ThenBy(product => product.Name)
@@ -32,22 +37,22 @@ internal static class CatalogOfferFamilyBuilder
             .ToList();
 
         return roots
-            .Select(root => MapFamily(root, products, byId, requestedOrderType, schedule, baseUrl))
+            .Select(root => MapFamily(root, byId, childrenByParent, requestedOrderType, schedule, baseUrl))
             .ToList();
     }
 
     private static CatalogOfferFamilyDto MapFamily(
         Product root,
-        IReadOnlyCollection<Product> products,
         Dictionary<Guid, Product> byId,
+        Dictionary<Guid, List<Product>> childrenByParent,
         OrderType? requestedOrderType,
         Func<Product, bool> schedule,
         string baseUrl)
     {
-        var menuOffers = root.IsAvailable
-            ? products
-            .Where(product => product.Type == ProductType.Menu
-                && product.MenuDefinition?.ParentOfferProductId == root.Id
+        var menuOffers = childrenByParent.TryGetValue(root.Id, out var children)
+            ? children
+            .Where(product => product.IsActive
+                && product.Type == ProductType.Menu
                 && IsValidChild(product, root, byId))
             .OrderBy(product => product.MenuDefinition!.ParentOfferVariationId.HasValue)
             .ThenBy(product => product.DisplayOrder)
@@ -78,6 +83,7 @@ internal static class CatalogOfferFamilyBuilder
             Id = root.Id,
             Anchor = anchor,
             MenuOffers = menuOffers,
+            AnchorScheduleAvailable = schedule(root),
             CategoryIds = categoryIds,
             StartingPrice = startingPrice
         };
@@ -96,11 +102,23 @@ internal static class CatalogOfferFamilyBuilder
             return true;
         }
 
-        return !IsValidChild(product, parent, byId);
+        if (!IsValidChild(product, parent, byId))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static bool CanAnchor(Product product) =>
-        product.IsAvailable && product.MenuDefinition?.ParentOfferProductId is null;
+        product.MenuDefinition?.ParentOfferProductId is null;
+
+    private static bool HasActiveChild(
+        Product parent,
+        Dictionary<Guid, Product> byId,
+        Dictionary<Guid, List<Product>> childrenByParent) =>
+        childrenByParent.TryGetValue(parent.Id, out var children)
+        && children.Any(child => child.IsActive && IsValidChild(child, parent, byId));
 
     private static bool IsValidChild(
         Product child,
@@ -132,6 +150,7 @@ internal static class CatalogOfferFamilyBuilder
     private static bool IsVisibleAtSchedule(
         Product root,
         Dictionary<Guid, Product> byId,
+        Dictionary<Guid, List<Product>> childrenByParent,
         Func<Product, bool> schedule)
     {
         if (root.Type != ProductType.Menu || schedule(root))
@@ -139,8 +158,9 @@ internal static class CatalogOfferFamilyBuilder
             return true;
         }
 
-        return byId.Values.Any(product => product.Type == ProductType.Menu
-            && product.MenuDefinition?.ParentOfferProductId == root.Id
+        return childrenByParent.TryGetValue(root.Id, out var children)
+            && children.Any(product => product.IsActive
+            && product.Type == ProductType.Menu
             && IsValidChild(product, root, byId)
             && schedule(product));
     }
@@ -153,6 +173,7 @@ internal static class CatalogOfferFamilyBuilder
     {
         var orderable = new List<decimal>();
         if (!BaseProductVisibility.IsBaseHidden(root)
+            && root.IsActive
             && root.IsAvailable
             && schedule(root)
             && OrderTypeAvailability.Resolve(root, requestedOrderType).CanOrder)
@@ -161,7 +182,7 @@ internal static class CatalogOfferFamilyBuilder
         }
 
         orderable.AddRange(root.Variations
-            .Where(variation => variation.IsActive && !variation.IsDeleted && root.IsAvailable
+            .Where(variation => variation.IsActive && !variation.IsDeleted && root.IsActive && root.IsAvailable
                 && schedule(root)
                 && OrderTypeAvailability.Resolve(root, requestedOrderType).CanOrder)
             .Select(variation => root.BasePrice + variation.PriceModifier));

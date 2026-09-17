@@ -16,6 +16,9 @@ public sealed record CatalogOfferFamilyDto
     /// <summary>Menu products linked to this anchor, one per supported source variation.</summary>
     public List<CatalogMenuOfferDto> MenuOffers { get; init; } = [];
 
+    /// <summary>Whether the anchor target is inside its own menu schedule right now.</summary>
+    public bool AnchorScheduleAvailable { get; init; }
+
     /// <summary>Live category assignments of the anchor; menu categories never add placements.</summary>
     public List<Guid> CategoryIds { get; init; } = [];
 
