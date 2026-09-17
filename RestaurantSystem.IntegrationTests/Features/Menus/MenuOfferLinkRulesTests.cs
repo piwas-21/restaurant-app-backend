@@ -130,14 +130,16 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
 
         await using var context = DatabaseFixture.CreateContext();
         var child = await context.Products
-            // soft-delete-bypass: the concurrency assertion must inspect which terminal state won.
-            .IgnoreQueryFilters()
             .Include(product => product.MenuDefinition)
-            .SingleAsync(product => product.Id == _raceChildId);
+            .SingleOrDefaultAsync(product => product.Id == _raceChildId);
 
-        if (child.IsDeleted)
+        if (child is null)
         {
-            child.MenuDefinition!.ParentOfferProductId.Should().BeNull();
+            // Soft-deleted products are hidden by the normal query filter. Their menu definition
+            // remains queryable and must still be detached from the deleted child.
+            var deletedChildDefinition = await context.MenuDefinitions
+                .SingleAsync(definition => definition.ProductId == _raceChildId);
+            deletedChildDefinition.ParentOfferProductId.Should().BeNull();
         }
         else
         {

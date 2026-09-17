@@ -322,14 +322,20 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         IReadOnlyCollection<UpdateProductVariationDto> incomingVariations,
         CancellationToken cancellationToken)
     {
-        // Keep the first matching incoming row semantics of the original lookup while iterating
-        // over the persisted variation ids, which avoids carrying full entities into this check.
-        foreach (var variationId in product.Variations.Select(variation => variation.Id))
-        {
-            var incoming = incomingVariations.FirstOrDefault(candidate => candidate.Id == variationId);
-            await MenuOfferLinkRules.EnsureCanDeactivateVariationAsync(
-                _context, variationId, incoming?.IsActive == true, cancellationToken);
-        }
+        // Keep the first matching incoming row semantics of the original lookup while collecting
+        // all inactive ids for the two set-based relationship checks.
+        var variationIdsToCheck = product.Variations
+            .Select(variation => new
+            {
+                variation.Id,
+                Incoming = incomingVariations.FirstOrDefault(candidate => candidate.Id == variation.Id)
+            })
+            .Where(entry => entry.Incoming?.IsActive != true)
+            .Select(entry => entry.Id)
+            .ToList();
+
+        await MenuOfferLinkRules.EnsureCanDeactivateVariationsAsync(
+            _context, variationIdsToCheck, cancellationToken);
     }
 
     private async Task UpdateVariationAsync(

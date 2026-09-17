@@ -261,12 +261,35 @@ public static class MenuOfferLinkRules
             return;
         }
 
-        var hasAlternatives = await context.MenuDefinitions
-            .AnyAsync(definition => definition.ParentOfferVariationId == variationId, cancellationToken)
-            || await context.MenuSectionItems
-                .AnyAsync(item => item.ProductVariationId == variationId, cancellationToken);
+        await EnsureCanDeactivateVariationsAsync(context, [variationId], cancellationToken);
+    }
 
-        if (hasAlternatives)
+    public static async Task EnsureCanDeactivateVariationsAsync(
+        ApplicationDbContext context,
+        IReadOnlyCollection<Guid> variationIds,
+        CancellationToken cancellationToken)
+    {
+        if (variationIds.Count == 0)
+        {
+            return;
+        }
+
+        var menuReferences = await context.MenuDefinitions
+            .Where(definition => definition.ParentOfferVariationId.HasValue
+                && variationIds.Contains(definition.ParentOfferVariationId ?? Guid.Empty))
+            .Select(definition => definition.ParentOfferVariationId)
+            .ToListAsync(cancellationToken);
+        var sectionReferences = await context.MenuSectionItems
+            .Where(item => item.ProductVariationId.HasValue
+                && variationIds.Contains(item.ProductVariationId ?? Guid.Empty))
+            .Select(item => item.ProductVariationId)
+            .ToListAsync(cancellationToken);
+
+        var referencedVariationIds = menuReferences
+            .Concat(sectionReferences)
+            .OfType<Guid>()
+            .ToHashSet();
+        if (referencedVariationIds.Overlaps(variationIds))
         {
             throw new BadRequestException(
                 "Unlink or reassign this variation's menu references before archiving it");
