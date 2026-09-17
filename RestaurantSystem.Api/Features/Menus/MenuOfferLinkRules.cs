@@ -21,33 +21,55 @@ public static class MenuOfferLinkRules
         CancellationToken cancellationToken,
         bool? menuIsComponent = null)
     {
-        if (!parentOfferProductId.HasValue && parentOfferVariationId.HasValue)
-        {
-            throw new BadRequestException("A parent offer product is required when a variation is supplied");
-        }
+        EnsureParentReferenceIsValid(menuProductId, parentOfferProductId, parentOfferVariationId);
 
         if (!parentOfferProductId.HasValue)
         {
             return;
         }
 
-        if (menuProductId == parentOfferProductId.Value)
+        await EnsureMenuCanBeLinkedAsync(context, menuProductId, menuIsComponent, cancellationToken);
+        await EnsureParentCanBeAnchorAsync(context, parentOfferProductId.Value, cancellationToken);
+        await EnsureParentVariationCanBeLinkedAsync(
+            context, parentOfferProductId.Value, parentOfferVariationId, cancellationToken);
+        await EnsureNoDuplicateAlternativeAsync(
+            context, menuProductId, parentOfferProductId.Value, parentOfferVariationId, cancellationToken);
+    }
+
+    private static void EnsureParentReferenceIsValid(
+        Guid menuProductId,
+        Guid? parentOfferProductId,
+        Guid? parentOfferVariationId)
+    {
+        if (!parentOfferProductId.HasValue && parentOfferVariationId.HasValue)
+        {
+            throw new BadRequestException("A parent offer product is required when a variation is supplied");
+        }
+
+        if (parentOfferProductId.HasValue && menuProductId == parentOfferProductId.Value)
         {
             throw new BadRequestException("A menu cannot be linked to itself");
         }
+    }
 
+    private static async Task EnsureMenuCanBeLinkedAsync(
+        ApplicationDbContext context,
+        Guid menuProductId,
+        bool? menuIsComponent,
+        CancellationToken cancellationToken)
+    {
         // Read the child in the same transaction as the relationship write. This matters for the
         // narrow PATCH path: a caller can otherwise read a non-component menu before a concurrent
         // product update turns it into a component, then leave an invalid component alternative
         // behind. UpdateProduct passes the requested component state as an override because its
         // own product row has not been mutated yet.
-        var menuState = await context.Products
+        var storedIsComponent = await context.Products
             .AsNoTracking()
             .Where(product => product.Id == menuProductId && !product.IsDeleted)
-            .Select(product => new { product.Type, product.IsComponent })
+            .Select(product => product.IsComponent)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (menuState?.IsComponent == true || menuIsComponent == true)
+        if (storedIsComponent || menuIsComponent == true)
         {
             throw new BadRequestException(
                 "Unlink this menu before making it a component");
@@ -63,10 +85,16 @@ public static class MenuOfferLinkRules
         {
             throw new BadRequestException("A menu with alternatives cannot be linked upward");
         }
+    }
 
+    private static async Task EnsureParentCanBeAnchorAsync(
+        ApplicationDbContext context,
+        Guid parentOfferProductId,
+        CancellationToken cancellationToken)
+    {
         var parent = await context.Products
             .Include(product => product.MenuDefinition)
-            .FirstOrDefaultAsync(product => product.Id == parentOfferProductId.Value, cancellationToken);
+            .FirstOrDefaultAsync(product => product.Id == parentOfferProductId, cancellationToken);
 
         if (parent is null || parent.IsDeleted)
         {
@@ -85,36 +113,53 @@ public static class MenuOfferLinkRules
         {
             throw new BadRequestException("A linked menu cannot be used as another offer's parent");
         }
+    }
 
-        if (parentOfferVariationId.HasValue)
+    private static async Task EnsureParentVariationCanBeLinkedAsync(
+        ApplicationDbContext context,
+        Guid parentOfferProductId,
+        Guid? parentOfferVariationId,
+        CancellationToken cancellationToken)
+    {
+        if (!parentOfferVariationId.HasValue)
         {
-            var variation = await context.ProductVariations
-                .FirstOrDefaultAsync(candidate => candidate.Id == parentOfferVariationId.Value
-                    && !candidate.IsDeleted, cancellationToken);
-
-            if (variation is null)
-            {
-                throw new NotFoundException("Parent offer variation not found");
-            }
-
-            if (variation.ProductId != parentOfferProductId.Value)
-            {
-                throw new BadRequestException("Parent offer variation does not belong to the parent product");
-            }
-
-            if (!variation.IsActive)
-            {
-                throw new BadRequestException("Parent offer variation is not active");
-            }
+            return;
         }
 
+        var variation = await context.ProductVariations
+            .FirstOrDefaultAsync(candidate => candidate.Id == parentOfferVariationId.Value
+                && !candidate.IsDeleted, cancellationToken);
+
+        if (variation is null)
+        {
+            throw new NotFoundException("Parent offer variation not found");
+        }
+
+        if (variation.ProductId != parentOfferProductId)
+        {
+            throw new BadRequestException("Parent offer variation does not belong to the parent product");
+        }
+
+        if (!variation.IsActive)
+        {
+            throw new BadRequestException("Parent offer variation is not active");
+        }
+    }
+
+    private static async Task EnsureNoDuplicateAlternativeAsync(
+        ApplicationDbContext context,
+        Guid menuProductId,
+        Guid parentOfferProductId,
+        Guid? parentOfferVariationId,
+        CancellationToken cancellationToken)
+    {
         var existingLinks = await context.MenuDefinitions
-            .Where(definition => definition.ParentOfferProductId == parentOfferProductId.Value
+            .Where(definition => definition.ParentOfferProductId == parentOfferProductId
                 && definition.ProductId != menuProductId)
             .Select(definition => definition.ParentOfferVariationId)
             .ToListAsync(cancellationToken);
 
-        if (existingLinks.Any(existingVariationId => existingVariationId == parentOfferVariationId))
+        if (existingLinks.Contains(parentOfferVariationId))
         {
             throw new BadRequestException("This parent offer already has a menu alternative for that variation");
         }

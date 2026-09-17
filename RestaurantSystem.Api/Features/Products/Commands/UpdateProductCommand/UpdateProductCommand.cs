@@ -178,228 +178,15 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
         // Update categories
         _context.ProductCategories.RemoveRange(product.ProductCategories);
+        AddProductCategories(product, command);
 
-        var displayOrder = 0;
-        foreach (var categoryId in command.CategoryIds)
-        {
-            var productCategory = new ProductCategory
-            {
-                ProductId = product.Id,
-                CategoryId = categoryId,
-                IsPrimary = categoryId == command.PrimaryCategoryId,
-                DisplayOrder = displayOrder++,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier()
-            };
-            _context.ProductCategories.Add(productCategory);
-        }
-
-
-        // Content may be omitted from the request body (e.g. an edit that does not
-        // touch translations); treat that as "no translation changes" rather than NRE-ing.
-        var contentMap = command.Content ?? new ProductDescriptionsDto();
-
-        // The duplicate-language-code check that used to stand here was DEAD and has been dropped
-        // (#193), matching UpdateMenuBundleCommandHandler, which dropped its identical copy in #192.
-        //
-        // Dead by the TYPE's invariant, not merely by how requests happen to arrive — but the
-        // invariant needs stating precisely, because the loose version of it is false.
-        // Dictionary<string, …> CAN hold two ordinally-equal keys if it is constructed with a
-        // comparer finer than ordinal (reference equality, say), and the old check grouped with
-        // `GroupBy(x => x)`, i.e. the ordinal default — so such a dictionary would have made it
-        // fire. What closes that door here is that ProductDescriptionsDto declares NO constructor:
-        // C# does not inherit constructors, so the `Dictionary(IEqualityComparer<string>)` overload
-        // is not callable on it and every instance carries the ordinal comparer. Verified by
-        // reflection — exactly one public constructor, zero parameters.
-        //
-        // With the comparer pinned, grouping the keys and keeping groups of size > 1 yields an empty
-        // list for EVERY possible value of `contentMap`, including one built in C# rather than
-        // deserialized. The reachability argument therefore does not depend on the transport:
-        // `[FromBody]` is the only production route today, but a future internal caller constructing
-        // the command directly could not revive this branch either.
-        //
-        // On the transport specifically, and UNDER THE DEFAULT `AllowDuplicateProperties` (true on
-        // .NET 10), System.Text.Json collapses duplicate JSON keys through the indexer, last-wins,
-        // rather than throwing — a duplicate is silently merged, not rejected upstream. That is the
-        // current default, not a property of the serializer: setting it false makes the same body a
-        // JsonException, which only makes this branch more unreachable, but would turn the
-        // last-wins test red. Measured both ways.
-        //
-        // Measured through this endpoint rather than reasoned: a raw body with two "fr" entries
-        // answers 200 and writes ONE French description carrying the second entry's values. Forcing
-        // the old branch to fire made it report `Duplicate language codes found: ` — with an empty
-        // list, because the collection it interpolates was empty even on that body.
-        //
-        // Pinned by ProductUpdateContentTests, which also covers the two guards that are NOT dead
-        // and share this block: the null coalesce above, and the `Any()` below. Both exist so an
-        // edit that does not touch translations cannot wipe them all (#190).
-        //
-        // NOTE: TWO more copies of this same dead check still stand, both on CREATE paths —
-        // CreateProductCommandHandler and CreateMenuBundleCommandHandler. `grep -rn "Duplicate
-        // language codes"` finds both; do not treat this note as naming a single remaining site.
-        //
-        // Left alone because they are create paths with no content coverage of their own, NOT
-        // because their `Content` is declared non-nullable. That distinction would be worthless:
-        // UpdateMenuBundleCommand also declares `ProductDescriptionsDto Content` non-nullable and
-        // still coalesces it, precisely because System.Text.Json binds an omitted JSON property to
-        // null on a positional record parameter whatever the annotation says (#190). Both create
-        // handlers instead dereference `command.Content` unguarded and neither validator requires
-        // it — so an omitted `content` on a POST looks like a separate, pre-existing defect rather
-        // than a safe contract. Tracked with the other content-validation gaps in #306.
-        if (contentMap.Any())
-        {
-            _context.ProductDescriptions.RemoveRange(product.Descriptions);
-        }
-
-        foreach (var key in contentMap.Keys)
-        {
-
-            var content = contentMap[key];
-            var productDescription = new ProductDescription()
-            {
-                UpdatedBy = _currentUserService.GetAuditIdentifier(),
-                UpdatedAt = DateTime.UtcNow,
-                CreatedBy = _currentUserService.GetAuditIdentifier(),
-                CreatedAt = DateTime.UtcNow,
-                Description = content.Description,
-                Lang = key,
-                Name = content.Name,
-                Product = product,
-                ProductId = product.Id
-            };
-            await _context.ProductDescriptions.AddAsync(productDescription, cancellationToken);
-        }
+        await UpdateProductContentAsync(product, command.Content, cancellationToken);
 
         // Update variations
-        if (command.Variations != null)
-        {
-            foreach (var variation in product.Variations)
-            {
-                var incoming = command.Variations.FirstOrDefault(candidate => candidate.Id == variation.Id);
-                var remainsActive = incoming is not null && incoming.IsActive;
-                await MenuOfferLinkRules.EnsureCanDeactivateVariationAsync(
-                    _context, variation.Id, remainsActive, cancellationToken);
-            }
-
-            // S4 provenance, resolved once for the payload — see GlobalVariationProvenance for why a
-            // link the row already carries is never re-checked.
-            var variationProvenance = await GlobalVariationProvenance.ResolveAsync(
-                _context,
-                command.Variations.Select(v => v.GlobalVariationId),
-                _logger,
-                cancellationToken);
-
-            // …and one for the rows the payload does NOT link — see CustomVariationPromotion.
-            var variationPromotion = await CustomVariationPromotion.PrepareAsync(
-                _context,
-                command.Variations.Select(v => (v.GlobalVariationId, v.Name, v.Content)),
-                _currentUserService.GetAuditIdentifier(),
-                cancellationToken);
-
-            var incomingVariationIds = command.Variations
-                .Where(v => v.Id.HasValue)
-                .Select(v => v.Id!.Value)
-                .ToList();
-
-            // Remove variations not in the incoming list
-            var variationsToRemove = product.Variations
-                .Where(v => !incomingVariationIds.Contains(v.Id))
-                .ToList();
-            _context.ProductVariations.RemoveRange(variationsToRemove);
-
-            foreach (var variationDto in command.Variations)
-            {
-                ProductVariation? variation;
-
-                if (variationDto.Id.HasValue)
-                {
-                    // Update existing variation
-                    variation = product.Variations.FirstOrDefault(v => v.Id == variationDto.Id.Value);
-                    if (variation == null)
-                    {
-                        // Variation ID was provided but not found, skip or log error
-                        _logger.LogWarning("Variation with ID {VariationId} not found for product {ProductId}",
-                            variationDto.Id.Value, product.Id);
-                        continue;
-                    }
-
-                    // Update properties
-                    variation.Name = variationDto.Name;
-                    variation.Description = variationDto.Description;
-                    variation.PriceModifier = variationDto.PriceModifier;
-                    variation.IsActive = variationDto.IsActive;
-                    variation.DisplayOrder = variationDto.DisplayOrder;
-                    variation.GlobalVariationId = variationProvenance.LinkFor(
-                        variationDto.GlobalVariationId, variationDto.Name, variation.GlobalVariationId)
-                        ?? variationPromotion.IdFor(variationDto.Name);
-                    variation.UpdatedAt = DateTime.UtcNow;
-                    variation.UpdatedBy = _currentUserService.GetAuditIdentifier();
-
-                    // Remove and recreate descriptions for existing variations
-                    var existingDescriptions = await _context.ProductVariationDescriptions
-                        .Where(d => d.ProductVariationId == variation.Id)
-                        .ToListAsync(cancellationToken);
-                    _context.ProductVariationDescriptions.RemoveRange(existingDescriptions);
-                }
-                else
-                {
-                    // Create new variation
-                    variation = new ProductVariation
-                    {
-                        ProductId = product.Id,
-                        Name = variationDto.Name,
-                        Description = variationDto.Description,
-                        PriceModifier = variationDto.PriceModifier,
-                        IsActive = variationDto.IsActive,
-                        DisplayOrder = variationDto.DisplayOrder,
-                        GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name)
-                            ?? variationPromotion.IdFor(variationDto.Name),
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-                    await _context.ProductVariations.AddAsync(variation, cancellationToken);
-                }
-
-                // Add variation descriptions
-                if (variationDto.Content != null)
-                {
-                    foreach (var (languageCode, content) in variationDto.Content)
-                    {
-                        var description = new ProductVariationDescription
-                        {
-                            ProductVariation = variation,
-                            LanguageCode = languageCode,
-                            Name = content.Name,
-                            Description = content.Description,
-                            CreatedAt = DateTime.UtcNow,
-                            CreatedBy = _currentUserService.GetAuditIdentifier()
-                        };
-                        await _context.ProductVariationDescriptions.AddAsync(description, cancellationToken);
-                    }
-                }
-            }
-        }
+        await UpdateVariationsAsync(product, command.Variations, cancellationToken);
 
         // Update suggested side items
-        if (command.SuggestedSideItemIds != null)
-        {
-            _context.ProductSideItems.RemoveRange(product.SuggestedSideItems);
-
-            var sideItemDisplayOrder = 0;
-            foreach (var sideItemId in command.SuggestedSideItemIds)
-            {
-                var productSideItem = new ProductSideItem
-                {
-                    MainProductId = product.Id,
-                    SideItemProductId = sideItemId,
-                    IsRequired = false,
-                    DisplayOrder = sideItemDisplayOrder++,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-                await _context.ProductSideItems.AddAsync(productSideItem, cancellationToken);
-            }
-        }
+        await UpdateSuggestedSideItemsAsync(product, command.SuggestedSideItemIds, cancellationToken);
 
         // Update detailed ingredients — BY ID, never remove-and-recreate.
         //
@@ -408,23 +195,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // rows on every save silently blanked the ingredient detail of every past order. The diff
         // lives in ProductIngredientSynchronizer with the full argument; §4 also forbids growing
         // this file, which is already baselined over its 200-line limit.
-        if (command.DetailedIngredients != null)
-        {
-            await ProductIngredientSynchronizer.SyncAsync(
-                _context,
-                product,
-                command.DetailedIngredients,
-                _currentUserService.GetAuditIdentifier(),
-                _logger,
-                cancellationToken);
-        }
-
-        if (command.CustomizationGroups != null)
-        {
-            await _customizationGroupSynchronizer.SyncAsync(
-                product, command.CustomizationGroups,
-                _currentUserService.GetAuditIdentifier(), cancellationToken);
-        }
+        await UpdateDetailedIngredientsAsync(product, command.DetailedIngredients, cancellationToken);
+        await UpdateCustomizationGroupsAsync(product, command.CustomizationGroups, cancellationToken);
 
         // Update Menu Definition.
         //
@@ -445,58 +217,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // produces. The defect was reachable only by an API client that omits detailedIngredients —
         // a supported shape, since the field is nullable on the command and means "no ingredient
         // instruction", not "no menu instruction".
-        if (command.Type == ProductType.Menu && command.MenuDefinition != null)
-        {
-            // Resolved FIRST, before any query or mutation — the same dead guard, and the same
-            // wipe, as the bundle handler carried (#191). Fixing only
-            // UpdateMenuBundleCommandHandler would have left this path able to erase a bundle's
-            // sections: `PUT /api/Products` on a Menu-type product reaches here, and
-            // MenuDefinitionDto is the same shared DTO. UpdateProductCommandValidator requires the
-            // key whenever a menu definition is sent for a Menu-type product, so null cannot
-            // arrive; the throw keeps that true loudly rather than defaulting back into the wipe.
-            //
-            // Hoisted above the assignments rather than left beside its use because this handler
-            // runs inside the serializable update transaction: throwing after the schedule fields
-            // were written would still roll the whole request back, but failing before touching
-            // the entity at all keeps this guard independent of transaction implementation.
-            var sections = command.MenuDefinition.Sections
-                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
-
-            if (command.MenuDefinition.OfferParentSpecified)
-            {
-                await MenuOfferLinkRules.EnsureValidAsync(
-                    _context,
-                    product.Id,
-                    command.MenuDefinition.ParentOfferProductId,
-                    command.MenuDefinition.ParentOfferVariationId,
-                    cancellationToken,
-                    command.IsComponent);
-            }
-
-            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
-
-            // A SECOND query, deliberately: the product query above includes MenuDefinition but not
-            // its Sections, and ReplaceSections reads an un-included collection as empty rather
-            // than null — it would append instead of replacing, with no exception anywhere. The
-            // bundle handler gets the same guarantee from its own ThenInclude. EF returns the
-            // already-tracked instance here, so this populates the navigation rather than
-            // producing a second entity.
-            var existing = await _context.MenuDefinitions
-                .Include(m => m.Sections)
-                    .ThenInclude(s => s.Items)
-                .FirstOrDefaultAsync(m => m.ProductId == product.Id, cancellationToken);
-
-            var auditIdentifier = _currentUserService.GetAuditIdentifier();
-            var menuDef = MenuDefinitionWriter.Upsert(
-                _context, existing, product.Id, command.MenuDefinition, auditIdentifier);
-
-            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
-        }
-        else if (product.MenuDefinition != null && command.Type != ProductType.Menu)
-        {
-            // If type changed from Menu to something else, remove definition
-            _context.MenuDefinitions.Remove(product.MenuDefinition);
-        }
+        await UpdateMenuDefinitionAsync(product, command, cancellationToken);
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -507,6 +228,294 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             product.Id, _currentUserService.UserId);
 
         return result;
+    }
+
+    private void AddProductCategories(Product product, UpdateProductCommand command)
+    {
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        var categories = command.CategoryIds.Select((categoryId, displayOrder) => new ProductCategory
+        {
+            ProductId = product.Id,
+            CategoryId = categoryId,
+            IsPrimary = categoryId == command.PrimaryCategoryId,
+            DisplayOrder = displayOrder,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = auditIdentifier
+        });
+
+        _context.ProductCategories.AddRange(categories);
+    }
+
+    private async Task UpdateProductContentAsync(
+        Product product,
+        ProductDescriptionsDto? content,
+        CancellationToken cancellationToken)
+    {
+        // An omitted content map means "no translation changes". A non-empty map replaces the
+        // complete set, matching the previous inline update behavior.
+        var contentMap = content ?? new ProductDescriptionsDto();
+        if (!contentMap.Any())
+        {
+            return;
+        }
+
+        _context.ProductDescriptions.RemoveRange(product.Descriptions);
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        foreach (var (languageCode, value) in contentMap)
+        {
+            var productDescription = new ProductDescription
+            {
+                UpdatedBy = auditIdentifier,
+                UpdatedAt = DateTime.UtcNow,
+                CreatedBy = auditIdentifier,
+                CreatedAt = DateTime.UtcNow,
+                Description = value.Description,
+                Lang = languageCode,
+                Name = value.Name,
+                Product = product,
+                ProductId = product.Id
+            };
+            await _context.ProductDescriptions.AddAsync(productDescription, cancellationToken);
+        }
+    }
+
+    private async Task UpdateVariationsAsync(
+        Product product,
+        List<UpdateProductVariationDto>? variations,
+        CancellationToken cancellationToken)
+    {
+        if (variations is null)
+        {
+            return;
+        }
+
+        await EnsureVariationsCanBeDeactivatedAsync(product, variations, cancellationToken);
+        var variationProvenance = await GlobalVariationProvenance.ResolveAsync(
+            _context,
+            variations.Select(variation => variation.GlobalVariationId),
+            _logger,
+            cancellationToken);
+        var variationPromotion = await CustomVariationPromotion.PrepareAsync(
+            _context,
+            variations.Select(variation => (variation.GlobalVariationId, variation.Name, variation.Content)),
+            _currentUserService.GetAuditIdentifier(),
+            cancellationToken);
+
+        var incomingVariationIds = variations
+            .Where(variation => variation.Id.HasValue)
+            .Select(variation => variation.Id!.Value)
+            .ToList();
+        var variationsToRemove = product.Variations
+            .Where(variation => !incomingVariationIds.Contains(variation.Id))
+            .ToList();
+        _context.ProductVariations.RemoveRange(variationsToRemove);
+
+        foreach (var variationDto in variations)
+        {
+            await UpdateVariationAsync(product, variationDto, variationProvenance, variationPromotion,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureVariationsCanBeDeactivatedAsync(
+        Product product,
+        IReadOnlyCollection<UpdateProductVariationDto> incomingVariations,
+        CancellationToken cancellationToken)
+    {
+        // Keep the first matching incoming row semantics of the original lookup while iterating
+        // over the persisted variation ids, which avoids carrying full entities into this check.
+        foreach (var variationId in product.Variations.Select(variation => variation.Id))
+        {
+            var incoming = incomingVariations.FirstOrDefault(candidate => candidate.Id == variationId);
+            await MenuOfferLinkRules.EnsureCanDeactivateVariationAsync(
+                _context, variationId, incoming?.IsActive == true, cancellationToken);
+        }
+    }
+
+    private async Task UpdateVariationAsync(
+        Product product,
+        UpdateProductVariationDto variationDto,
+        GlobalVariationProvenance variationProvenance,
+        CustomVariationPromotion variationPromotion,
+        CancellationToken cancellationToken)
+    {
+        ProductVariation? variation;
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+
+        if (variationDto.Id.HasValue)
+        {
+            variation = product.Variations.FirstOrDefault(candidate => candidate.Id == variationDto.Id.Value);
+            if (variation is null)
+            {
+                _logger.LogWarning("Variation with ID {VariationId} not found for product {ProductId}",
+                    variationDto.Id.Value, product.Id);
+                return;
+            }
+
+            variation.Name = variationDto.Name;
+            variation.Description = variationDto.Description;
+            variation.PriceModifier = variationDto.PriceModifier;
+            variation.IsActive = variationDto.IsActive;
+            variation.DisplayOrder = variationDto.DisplayOrder;
+            variation.GlobalVariationId = variationProvenance.LinkFor(
+                variationDto.GlobalVariationId, variationDto.Name, variation.GlobalVariationId)
+                ?? variationPromotion.IdFor(variationDto.Name);
+            variation.UpdatedAt = DateTime.UtcNow;
+            variation.UpdatedBy = auditIdentifier;
+
+            var existingDescriptions = await _context.ProductVariationDescriptions
+                .Where(description => description.ProductVariationId == variation.Id)
+                .ToListAsync(cancellationToken);
+            _context.ProductVariationDescriptions.RemoveRange(existingDescriptions);
+        }
+        else
+        {
+            variation = new ProductVariation
+            {
+                ProductId = product.Id,
+                Name = variationDto.Name,
+                Description = variationDto.Description,
+                PriceModifier = variationDto.PriceModifier,
+                IsActive = variationDto.IsActive,
+                DisplayOrder = variationDto.DisplayOrder,
+                GlobalVariationId = variationProvenance.LinkFor(variationDto.GlobalVariationId, variationDto.Name)
+                    ?? variationPromotion.IdFor(variationDto.Name),
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = auditIdentifier
+            };
+            await _context.ProductVariations.AddAsync(variation, cancellationToken);
+        }
+
+        if (variationDto.Content is null)
+        {
+            return;
+        }
+
+        foreach (var (languageCode, content) in variationDto.Content)
+        {
+            var description = new ProductVariationDescription
+            {
+                ProductVariation = variation,
+                LanguageCode = languageCode,
+                Name = content.Name,
+                Description = content.Description,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = auditIdentifier
+            };
+            await _context.ProductVariationDescriptions.AddAsync(description, cancellationToken);
+        }
+    }
+
+    private async Task UpdateSuggestedSideItemsAsync(
+        Product product,
+        List<Guid>? suggestedSideItemIds,
+        CancellationToken cancellationToken)
+    {
+        if (suggestedSideItemIds is null)
+        {
+            return;
+        }
+
+        _context.ProductSideItems.RemoveRange(product.SuggestedSideItems);
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        var sideItems = suggestedSideItemIds.Select((sideItemId, displayOrder) => new ProductSideItem
+        {
+            MainProductId = product.Id,
+            SideItemProductId = sideItemId,
+            IsRequired = false,
+            DisplayOrder = displayOrder,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = auditIdentifier
+        });
+        await _context.ProductSideItems.AddRangeAsync(sideItems, cancellationToken);
+    }
+
+    private async Task UpdateDetailedIngredientsAsync(
+        Product product,
+        List<ProductIngredientDto>? detailedIngredients,
+        CancellationToken cancellationToken)
+    {
+        if (detailedIngredients is null)
+        {
+            return;
+        }
+
+        await ProductIngredientSynchronizer.SyncAsync(
+            _context,
+            product,
+            detailedIngredients,
+            _currentUserService.GetAuditIdentifier(),
+            _logger,
+            cancellationToken);
+    }
+
+    private async Task UpdateCustomizationGroupsAsync(
+        Product product,
+        List<ProductCustomizationGroupDto>? customizationGroups,
+        CancellationToken cancellationToken)
+    {
+        if (customizationGroups is null)
+        {
+            return;
+        }
+
+        await _customizationGroupSynchronizer.SyncAsync(
+            product,
+            customizationGroups,
+            _currentUserService.GetAuditIdentifier(),
+            cancellationToken);
+    }
+
+    private async Task UpdateMenuDefinitionAsync(
+        Product product,
+        UpdateProductCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (command.Type == ProductType.Menu && command.MenuDefinition is not null)
+        {
+            await WriteMenuDefinitionAsync(product, command.MenuDefinition, command.IsComponent, cancellationToken);
+            return;
+        }
+
+        if (product.MenuDefinition is not null && command.Type != ProductType.Menu)
+        {
+            _context.MenuDefinitions.Remove(product.MenuDefinition);
+        }
+    }
+
+    private async Task WriteMenuDefinitionAsync(
+        Product product,
+        MenuDefinitionDto menuDefinition,
+        bool isComponent,
+        CancellationToken cancellationToken)
+    {
+        var sections = menuDefinition.Sections
+            ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+
+        if (menuDefinition.OfferParentSpecified)
+        {
+            await MenuOfferLinkRules.EnsureValidAsync(
+                _context,
+                product.Id,
+                menuDefinition.ParentOfferProductId,
+                menuDefinition.ParentOfferVariationId,
+                cancellationToken,
+                isComponent);
+        }
+
+        await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
+
+        // Menu sections are loaded separately because the product query intentionally includes only
+        // the definition. The tracked instance is reused by EF for the replacement operation.
+        var existing = await _context.MenuDefinitions
+            .Include(menu => menu.Sections)
+                .ThenInclude(section => section.Items)
+            .FirstOrDefaultAsync(menu => menu.ProductId == product.Id, cancellationToken);
+
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        var menuDef = MenuDefinitionWriter.Upsert(
+            _context, existing, product.Id, menuDefinition, auditIdentifier);
+        MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
     }
 }
 
