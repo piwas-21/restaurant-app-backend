@@ -22,13 +22,16 @@ public sealed class SetMenuOfferParentCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<SetMenuOfferParentCommandHandler> _logger;
 
     public SetMenuOfferParentCommandHandler(
         ApplicationDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        ILogger<SetMenuOfferParentCommandHandler> logger)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<MenuOfferLinkDto>> Handle(
@@ -84,10 +87,14 @@ public sealed class SetMenuOfferParentCommandHandler
             {
                 await transaction.RollbackAsync(cancellationToken);
             }
-            catch
+            catch (Exception rollbackException)
             {
                 // The original exception determines the API result; disposing the transaction
                 // still rolls back when an explicit rollback is unavailable.
+                _logger.LogWarning(
+                    rollbackException,
+                    "Transaction rollback failed while updating menu offer parent for {MenuProductId}",
+                    command.MenuProductId);
             }
 
             MenuOfferLinkConflict.ThrowIfExpected(exception);

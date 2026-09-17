@@ -16,7 +16,7 @@ public sealed class CatalogController(CustomMediator mediator) : ControllerBase
 {
     [HttpGet]
     [ApiScope(ApiTokenScopes.MenuRead)]
-    [AllowAnonymous]
+    [AllowAnonymous] // Public by design: this is the guest menu read model and exposes no admin-only fields.
     [ProducesResponseType(typeof(ApiResponse<PagedResult<CatalogOfferFamilyDto>>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<PagedResult<CatalogOfferFamilyDto>>>> GetCatalog(
         [FromQuery] int page = 1,

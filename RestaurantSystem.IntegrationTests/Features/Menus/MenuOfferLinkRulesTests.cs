@@ -130,6 +130,7 @@ public sealed class MenuOfferLinkRulesTests : IntegrationTestBase
 
         await using var context = DatabaseFixture.CreateContext();
         var child = await context.Products
+            // soft-delete-bypass: the concurrency assertion must inspect which terminal state won.
             .IgnoreQueryFilters()
             .Include(product => product.MenuDefinition)
             .SingleAsync(product => product.Id == _raceChildId);

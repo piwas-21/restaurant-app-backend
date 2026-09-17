@@ -12,7 +12,7 @@ public sealed class CatalogOfferFamilySchemaTests
     public void Model_contains_offer_links_variation_items_and_presentation_mode()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql("Host=localhost;Database=not-used;Username=not-used;Password=not-used")
+            .UseNpgsql()
             .Options;
         using var context = new ApplicationDbContext(options);
 

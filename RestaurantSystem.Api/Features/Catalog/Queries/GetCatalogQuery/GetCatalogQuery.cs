@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -17,12 +19,12 @@ public sealed record GetCatalogQuery(
 
 public sealed class GetCatalogQueryHandler(
     ApplicationDbContext context,
-    IConfiguration configuration,
+    IOptions<AWSSettings> awsSettings,
     ITenantClock clock)
     : IQueryHandler<GetCatalogQuery, ApiResponse<PagedResult<CatalogOfferFamilyDto>>>
 {
     private readonly ApplicationDbContext _context = context;
-    private readonly string _baseUrl = configuration["AWS:S3:BaseUrl"] ?? string.Empty;
+    private readonly string _baseUrl = awsSettings.Value.S3.BaseUrl ?? string.Empty;
     private readonly ITenantClock _clock = clock;
 
     public async Task<ApiResponse<PagedResult<CatalogOfferFamilyDto>>> Handle(
