@@ -39,6 +39,8 @@ public static class ProductSummaryMapper
             HideBaseProduct = product.HideBaseProduct,
             IsComponent = product.IsComponent,
             Type = product.Type,
+            ParentOfferProductId = product.MenuDefinition?.ParentOfferProductId,
+            ParentOfferVariationId = product.MenuDefinition?.ParentOfferVariationId,
             Allergens = product.Allergens,
             Ingredients = product.Ingredients,
             DetailedIngredients = [],
@@ -64,7 +66,7 @@ public static class ProductSummaryMapper
             Variations = product.Variations
                 .Where(v => v.IsActive)
                 .OrderBy(v => v.DisplayOrder)
-                .Select(MapVariation)
+                .Select(variation => MapVariation(variation, product.BasePrice))
                 .ToList(),
             SuggestedSideItems = [],
             Content = new(),
@@ -84,12 +86,13 @@ public static class ProductSummaryMapper
         return dto;
     }
 
-    private static ProductVariationDto MapVariation(ProductVariation variation) => new()
+    private static ProductVariationDto MapVariation(ProductVariation variation, decimal basePrice) => new()
     {
         Id = variation.Id,
         Name = variation.Name,
         Description = variation.Description,
         PriceModifier = variation.PriceModifier,
+        FinalPrice = basePrice + variation.PriceModifier,
         IsActive = variation.IsActive,
         DisplayOrder = variation.DisplayOrder,
         Content = variation.Descriptions

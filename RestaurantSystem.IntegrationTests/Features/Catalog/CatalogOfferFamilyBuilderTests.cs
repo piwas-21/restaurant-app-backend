@@ -35,6 +35,36 @@ public sealed class CatalogOfferFamilyBuilderTests
     }
 
     [Fact]
+    public void Product_summary_exposes_explicit_offer_parent_links()
+    {
+        var anchor = Product("Tacos", 9m, ProductType.MainItem);
+        var variation = new ProductVariation
+        {
+            Id = Guid.NewGuid(),
+            ProductId = anchor.Id,
+            Name = "Large",
+            IsActive = true,
+            CreatedBy = "test"
+        };
+        anchor.Variations.Add(variation);
+        var menu = Product("Menu Tacos", 12m, ProductType.Menu);
+        menu.MenuDefinition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            ProductId = menu.Id,
+            ParentOfferProductId = anchor.Id,
+            ParentOfferVariationId = variation.Id,
+            Product = menu,
+            CreatedBy = "test"
+        };
+
+        var summary = ProductSummaryMapper.MapToSummaryDto(menu, "", null);
+
+        summary.ParentOfferProductId.Should().Be(anchor.Id);
+        summary.ParentOfferVariationId.Should().Be(variation.Id);
+    }
+
+    [Fact]
     public void Keeps_an_invalid_parent_variation_menu_as_an_independent_fallback_card()
     {
         var anchor = Product("6 Nuggets", 6m, ProductType.MainItem);
@@ -64,6 +94,29 @@ public sealed class CatalogOfferFamilyBuilderTests
         families.Should().HaveCount(2);
         families.Select(family => family.Id).Should().Contain(new[] { anchor.Id, menu.Id });
         families.Single(family => family.Id == anchor.Id).MenuOffers.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Falls_back_to_independent_menu_when_anchor_is_unavailable()
+    {
+        var anchor = Product("Tacos", 8m, ProductType.MainItem);
+        anchor.IsAvailable = false;
+        var menu = Product("Menu Tacos", 11m, ProductType.Menu);
+        menu.MenuDefinition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            ProductId = menu.Id,
+            ParentOfferProductId = anchor.Id,
+            Product = menu,
+            CreatedBy = "test"
+        };
+
+        var families = CatalogOfferFamilyBuilder.Build(
+            new[] { anchor, menu }, null, null, DayOfWeek.Monday, new TimeSpan(12, 0, 0), "");
+
+        families.Should().HaveCount(2);
+        families.Single(family => family.Id == anchor.Id).MenuOffers.Should().BeEmpty();
+        families.Single(family => family.Id == menu.Id).MenuOffers.Should().BeEmpty();
     }
 
     [Fact]
@@ -104,6 +157,7 @@ public sealed class CatalogOfferFamilyBuilderTests
         families[0].MenuOffers[0].ParentVariationId.Should().Be(variation.Id);
         families[0].MenuOffers[0].ScheduleAvailable.Should().BeTrue();
         families[0].StartingPrice.Should().Be(8m);
+        families[0].Anchor.Variations![0].FinalPrice.Should().Be(9m);
     }
 
     [Fact]

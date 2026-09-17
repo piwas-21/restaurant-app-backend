@@ -44,7 +44,8 @@ internal static class CatalogOfferFamilyBuilder
         Func<Product, bool> schedule,
         string baseUrl)
     {
-        var menuOffers = products
+        var menuOffers = root.IsAvailable
+            ? products
             .Where(product => product.Type == ProductType.Menu
                 && product.MenuDefinition?.ParentOfferProductId == root.Id
                 && IsValidChild(product, root, byId))
@@ -61,7 +62,8 @@ internal static class CatalogOfferFamilyBuilder
                 ScheduleAvailable = schedule(menu),
                 Allergens = menu.Allergens
             })
-            .ToList();
+            .ToList()
+            : [];
 
         var categoryIds = LiveProductCategories.Of(root)
             .OrderBy(category => category.DisplayOrder)
@@ -98,7 +100,7 @@ internal static class CatalogOfferFamilyBuilder
     }
 
     private static bool CanAnchor(Product product) =>
-        product.MenuDefinition?.ParentOfferProductId is null;
+        product.IsAvailable && product.MenuDefinition?.ParentOfferProductId is null;
 
     private static bool IsValidChild(
         Product child,
