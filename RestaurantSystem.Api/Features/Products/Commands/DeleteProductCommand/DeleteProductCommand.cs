@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Products.Commands.DeleteProductCommand;
@@ -34,6 +35,9 @@ public class DeleteProductCommandHandler : ICommandHandler<DeleteProductCommand,
         {
             return ApiResponse<string>.Failure("Product not found");
         }
+
+        await MenuOfferLinkRules.EnsureCanDeactivateAsync(
+            _context, product.Id, isActive: false, cancellationToken);
 
         // Soft delete
         product.IsDeleted = true;

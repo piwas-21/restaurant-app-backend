@@ -71,6 +71,13 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 return ApiResponse<ProductDto>.Failure("Product is not a menu bundle");
             }
 
+            await MenuOfferLinkRules.EnsureValidAsync(
+                _context,
+                product.Id,
+                command.MenuDefinition.ParentOfferProductId,
+                command.MenuDefinition.ParentOfferVariationId,
+                cancellationToken);
+
             // Validate categories
             if (command.CategoryIds?.Any() == true)
             {
@@ -225,6 +232,8 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             // 400 for a 500.
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+
+            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 
             MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
 

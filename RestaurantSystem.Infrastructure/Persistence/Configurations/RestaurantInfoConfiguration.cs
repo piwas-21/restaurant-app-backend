@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -38,6 +39,10 @@ public class RestaurantInfoConfiguration : IEntityTypeConfiguration<RestaurantIn
             .HasDefaultValue(MenuLayout.Tabs);
         // Default false: the guest All tab stays products-only for every existing tenant.
         builder.Property(r => r.ShowMenuBundlesOnAllTab).HasDefaultValue(false);
+        builder.Property(r => r.BundlePresentationMode)
+            .HasConversion<string>()
+            .HasMaxLength(24)
+            .HasDefaultValue(BundlePresentationMode.LegacySeparate);
         // ISO-4217 alpha-3, same bound as OrderPayment.Currency. Nullable: null is a STATE
         // ("no display currency declared"), not a default to paper over — the resolver on the
         // order side must be able to tell "unset" from a value.

@@ -107,6 +107,11 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             return ApiResponse<ProductDto>.Failure("Product not found");
         }
 
+        await MenuOfferLinkRules.EnsureCanDeactivateAsync(
+            _context, product.Id, command.IsActive, cancellationToken);
+        await MenuOfferLinkRules.EnsureCanBecomeComponentAsync(
+            _context, product.Id, command.IsComponent, cancellationToken);
+
         // Validate categories
         var categories = await _context.Categories
             .Where(c => command.CategoryIds.Contains(c.Id))
@@ -236,6 +241,14 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // Update variations
         if (command.Variations != null)
         {
+            foreach (var variation in product.Variations)
+            {
+                var incoming = command.Variations.FirstOrDefault(candidate => candidate.Id == variation.Id);
+                var remainsActive = incoming is not null && incoming.IsActive;
+                await MenuOfferLinkRules.EnsureCanDeactivateVariationAsync(
+                    _context, variation.Id, remainsActive, cancellationToken);
+            }
+
             // S4 provenance, resolved once for the payload — see GlobalVariationProvenance for why a
             // link the row already carries is never re-checked.
             var variationProvenance = await GlobalVariationProvenance.ResolveAsync(
@@ -416,6 +429,15 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             // touching the entity at all does not depend on that staying true.
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+
+            await MenuOfferLinkRules.EnsureValidAsync(
+                _context,
+                product.Id,
+                command.MenuDefinition.ParentOfferProductId,
+                command.MenuDefinition.ParentOfferVariationId,
+                cancellationToken);
+
+            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 
             // A SECOND query, deliberately: the product query above includes MenuDefinition but not
             // its Sections, and ReplaceSections reads an un-included collection as empty rather

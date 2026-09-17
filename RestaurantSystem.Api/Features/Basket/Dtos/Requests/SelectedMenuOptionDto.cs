@@ -4,6 +4,7 @@ public record SelectedMenuOptionDto
 {
     public Guid SectionId { get; set; }
     public Guid ItemId { get; set; }
+    public Guid? ProductVariationId { get; set; }
     public int Quantity { get; set; } = 1;
 
     // Nested customization for this item

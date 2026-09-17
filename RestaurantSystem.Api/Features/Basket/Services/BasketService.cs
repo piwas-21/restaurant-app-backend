@@ -110,6 +110,9 @@ public class BasketService : IBasketService
                     .ThenInclude(md => md!.Sections)
                         .ThenInclude(s => s.Items)
                             .ThenInclude(i => i.Product)
+                .Include(p => p.MenuDefinition!.Sections)
+                    .ThenInclude(s => s.Items)
+                        .ThenInclude(i => i.ProductVariation)
                 .FirstOrDefaultAsync(p => p.Id == item.ProductId && p.IsActive && p.IsAvailable);
 
             if (product == null)

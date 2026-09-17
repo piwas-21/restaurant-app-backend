@@ -6,6 +6,18 @@ public class MenuDefinition : Entity
 {
     public Guid ProductId { get; set; }
 
+    /// <summary>
+    /// Optional commercial offer that this menu upgrades. The menu remains an independent Product
+    /// operationally; this relation only controls catalogue presentation and authoring.
+    /// </summary>
+    public Guid? ParentOfferProductId { get; set; }
+
+    /// <summary>
+    /// When set, the menu applies only to this variation of <see cref="ParentOfferProductId"/>.
+    /// Null applies to the parent's base offer and is also the legacy-compatible value.
+    /// </summary>
+    public Guid? ParentOfferVariationId { get; set; }
+
     // Scheduling
     public bool IsAlwaysAvailable { get; set; } = true;
     public TimeSpan? StartTime { get; set; }
@@ -23,5 +35,7 @@ public class MenuDefinition : Entity
 
     // Navigation
     public virtual Product Product { get; set; } = null!;
+    public virtual Product? ParentOfferProduct { get; set; }
+    public virtual ProductVariation? ParentOfferVariation { get; set; }
     public virtual ICollection<MenuSection> Sections { get; set; } = new List<MenuSection>();
 }

@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -73,6 +74,8 @@ public class RestaurantInfo : Entity
     /// </summary>
     public bool ShowMenuBundlesOnAllTab { get; set; }
 
+    /// <summary>Public bundle presentation mode; LegacySeparate preserves existing behavior.</summary>
+    public BundlePresentationMode BundlePresentationMode { get; set; } = BundlePresentationMode.LegacySeparate;
     /// <summary>
     /// The tenant's declared display currency (ISO-4217 alpha-3, e.g. "CHF", "EUR"),
     /// edited by the admin through restaurant-info settings. Null = the tenant has not

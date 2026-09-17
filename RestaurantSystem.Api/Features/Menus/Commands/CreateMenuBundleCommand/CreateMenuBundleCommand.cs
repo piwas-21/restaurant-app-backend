@@ -72,6 +72,13 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             _context.Products.Add(product);
 
+            await MenuOfferLinkRules.EnsureValidAsync(
+                _context,
+                product.Id,
+                command.MenuDefinition.ParentOfferProductId,
+                command.MenuDefinition.ParentOfferVariationId,
+                cancellationToken);
+
             var displayOrder = 0;
 
             if (command.CategoryIds != null)
@@ -120,6 +127,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             var menuDef = new MenuDefinition
             {
                 ProductId = product.Id,
+                ParentOfferProductId = command.MenuDefinition.ParentOfferProductId,
+                ParentOfferVariationId = command.MenuDefinition.ParentOfferVariationId,
                 IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable,
                 StartTime = command.MenuDefinition.StartTime,
                 EndTime = command.MenuDefinition.EndTime,
@@ -143,6 +152,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             // leaving create silently tolerant would put a second, quieter contract on one DTO.
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+
+            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 
             MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
 

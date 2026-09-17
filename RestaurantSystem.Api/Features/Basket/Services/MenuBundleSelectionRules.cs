@@ -46,7 +46,8 @@ public static class MenuBundleSelectionRules
             }
 
             optionsPrice += sectionSelections.Sum(selection =>
-                ResolveSectionItem(sectionList, selection.SectionId, selection.ItemId).AdditionalPrice
+                PriceFor(ResolveSectionItem(
+                    sectionList, selection.SectionId, selection.ItemId, selection.ProductVariationId))
                 * selection.Quantity);
         }
 
@@ -59,14 +60,37 @@ public static class MenuBundleSelectionRules
     /// happens to contain the same product.
     /// </summary>
     public static MenuSectionItem ResolveSectionItem(
-        IEnumerable<MenuSection> sections, Guid sectionId, Guid itemId)
+        IEnumerable<MenuSection> sections,
+        Guid sectionId,
+        Guid itemId,
+        Guid? productVariationId = null)
     {
         ArgumentNullException.ThrowIfNull(sections);
         var section = sections.FirstOrDefault(candidate => candidate.Id == sectionId)
             ?? throw new BadRequestException($"Invalid section '{sectionId}' for this menu");
 
-        return section.Items.FirstOrDefault(item => item.ProductId == itemId)
+        return section.Items.FirstOrDefault(item => item.ProductId == itemId
+                && item.ProductVariationId == productVariationId)
             ?? throw new NotFoundException($"Item not found in section '{section.Name}'");
+    }
+
+    /// <summary>Returns the section surcharge plus the fixed variation modifier, when present.</summary>
+    public static decimal PriceFor(MenuSectionItem item)
+    {
+        if (item.ProductVariationId.HasValue && item.ProductVariation is null)
+        {
+            throw new BadRequestException(
+                $"Variation '{item.ProductVariationId}' is not loaded for menu item '{item.ProductId}'");
+        }
+
+        if (item.ProductVariation is { } variation
+            && (variation.ProductId != item.ProductId || variation.IsDeleted || !variation.IsActive))
+        {
+            throw new BadRequestException(
+                $"Variation '{variation.Id}' is not active for menu item '{item.ProductId}'");
+        }
+
+        return item.AdditionalPrice + (item.ProductVariation?.PriceModifier ?? 0m);
     }
 
     private static void ValidateMembership(
@@ -84,7 +108,8 @@ public static class MenuBundleSelectionRules
                     $"Invalid quantity for item in section '{section.Name}'");
             }
 
-            _ = ResolveSectionItem(sections, selection.SectionId, selection.ItemId);
+            _ = ResolveSectionItem(
+                sections, selection.SectionId, selection.ItemId, selection.ProductVariationId);
         }
     }
 }

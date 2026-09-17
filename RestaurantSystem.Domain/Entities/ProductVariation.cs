@@ -26,4 +26,5 @@ public class ProductVariation : SoftDeleteEntity
     public virtual Product Product { get; set; } = null!;
     public virtual GlobalVariation? GlobalVariation { get; set; }
     public virtual ICollection<ProductVariationDescription> Descriptions { get; set; } = [];
+    public virtual ICollection<MenuDefinition> MenuAlternatives { get; set; } = new List<MenuDefinition>();
 }

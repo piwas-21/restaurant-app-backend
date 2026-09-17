@@ -40,6 +40,9 @@ public class DeleteMenuBundleCommandHandler : ICommandHandler<DeleteMenuBundleCo
             return ApiResponse<string>.Failure("Product is not a menu bundle");
         }
 
+        await MenuOfferLinkRules.EnsureCanDeactivateAsync(
+            _context, product.Id, isActive: false, cancellationToken);
+
         // Soft delete
         product.IsDeleted = true;
         product.DeletedAt = DateTime.UtcNow;

@@ -10,6 +10,8 @@ public record MenuDefinitionDto
     public const string SectionsRequiredMessage = "Menu definition sections are required (send [] to remove them all)";
 
     public Guid? Id { get; init; }
+    public Guid? ParentOfferProductId { get; init; }
+    public Guid? ParentOfferVariationId { get; init; }
     public bool IsAlwaysAvailable { get; init; }
     public TimeSpan? StartTime { get; init; }
     public TimeSpan? EndTime { get; init; }
