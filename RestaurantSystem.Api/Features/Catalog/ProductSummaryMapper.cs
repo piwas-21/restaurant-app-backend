@@ -25,7 +25,11 @@ public static class ProductSummaryMapper
     /// The channel the guest is ordering through, or <c>null</c> when they have not chosen one yet
     /// (the dominant browse state) — nothing is reported as blocked in that case.
     /// </param>
-    public static ProductSummaryDto MapToSummaryDto(Product product, string baseUrl, OrderType? requestedOrderType)
+    public static ProductSummaryDto MapToSummaryDto(
+        Product product,
+        string baseUrl,
+        OrderType? requestedOrderType,
+        bool exposeOfferParentLink = true)
     {
         var dto = new ProductSummaryDto
         {
@@ -39,6 +43,8 @@ public static class ProductSummaryMapper
             HideBaseProduct = product.HideBaseProduct,
             IsComponent = product.IsComponent,
             Type = product.Type,
+            ParentOfferProductId = exposeOfferParentLink ? product.MenuDefinition?.ParentOfferProductId : null,
+            ParentOfferVariationId = exposeOfferParentLink ? product.MenuDefinition?.ParentOfferVariationId : null,
             Allergens = product.Allergens,
             Ingredients = product.Ingredients,
             DetailedIngredients = [],
@@ -64,7 +70,7 @@ public static class ProductSummaryMapper
             Variations = product.Variations
                 .Where(v => v.IsActive)
                 .OrderBy(v => v.DisplayOrder)
-                .Select(MapVariation)
+                .Select(variation => MapVariation(variation, product.BasePrice))
                 .ToList(),
             SuggestedSideItems = [],
             Content = new(),
@@ -84,12 +90,13 @@ public static class ProductSummaryMapper
         return dto;
     }
 
-    private static ProductVariationDto MapVariation(ProductVariation variation) => new()
+    private static ProductVariationDto MapVariation(ProductVariation variation, decimal basePrice) => new()
     {
         Id = variation.Id,
         Name = variation.Name,
         Description = variation.Description,
         PriceModifier = variation.PriceModifier,
+        FinalPrice = basePrice + variation.PriceModifier,
         IsActive = variation.IsActive,
         DisplayOrder = variation.DisplayOrder,
         Content = variation.Descriptions

@@ -31,6 +31,8 @@ public record ProductSummaryDto
     public bool IsComponent { get; init; }
 
     public ProductType Type { get; init; }
+    public Guid? ParentOfferProductId { get; init; }
+    public Guid? ParentOfferVariationId { get; init; }
     public List<string>? Ingredients { get; init; } = [];
     public List<ProductIngredientDto>? DetailedIngredients { get; init; } = [];
     public List<string>? Allergens { get; init; } = [];

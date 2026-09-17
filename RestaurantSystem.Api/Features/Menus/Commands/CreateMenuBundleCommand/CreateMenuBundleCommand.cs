@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
@@ -47,7 +48,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateMenuBundleCommand command, CancellationToken cancellationToken)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable, cancellationToken);
 
         try
         {
@@ -71,6 +73,16 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             };
 
             _context.Products.Add(product);
+
+            if (command.MenuDefinition.OfferParentSpecified)
+            {
+                await MenuOfferLinkRules.EnsureValidAsync(
+                    _context,
+                    product.Id,
+                    command.MenuDefinition.ParentOfferProductId,
+                    command.MenuDefinition.ParentOfferVariationId,
+                    cancellationToken);
+            }
 
             var displayOrder = 0;
 
@@ -120,6 +132,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             var menuDef = new MenuDefinition
             {
                 ProductId = product.Id,
+                ParentOfferProductId = command.MenuDefinition.ParentOfferProductId,
+                ParentOfferVariationId = command.MenuDefinition.ParentOfferVariationId,
                 IsAlwaysAvailable = command.MenuDefinition.IsAlwaysAvailable,
                 StartTime = command.MenuDefinition.StartTime,
                 EndTime = command.MenuDefinition.EndTime,
@@ -144,6 +158,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
 
+            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
+
             MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -162,7 +178,7 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             return ApiResponse<ProductDto>.SuccessWithData(productDto, "Menu Bundle created successfully");
         }
-        catch
+        catch (Exception exception)
         {
             try { await transaction.RollbackAsync(cancellationToken); }
             catch (Exception rollbackEx)
@@ -171,6 +187,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 // below; rollback failure here is logged but mustn't shadow it.
                 _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle create");
             }
+
+            MenuOfferLinkConflict.ThrowIfExpected(exception);
             throw;
         }
     }

@@ -73,6 +73,11 @@ public static class MenuDefinitionWriter
         }
 
         menuDefinition.IsAlwaysAvailable = dto.IsAlwaysAvailable;
+        if (dto.OfferParentSpecified)
+        {
+            menuDefinition.ParentOfferProductId = dto.ParentOfferProductId;
+            menuDefinition.ParentOfferVariationId = dto.ParentOfferVariationId;
+        }
         menuDefinition.StartTime = dto.StartTime;
         menuDefinition.EndTime = dto.EndTime;
         menuDefinition.AvailableMonday = dto.AvailableMonday;

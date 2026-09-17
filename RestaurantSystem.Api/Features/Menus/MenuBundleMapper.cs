@@ -108,6 +108,8 @@ public static class MenuBundleMapper
         return new MenuBundleDefinitionDto
         {
             Id = definition.Id,
+            ParentOfferProductId = definition.ParentOfferProductId,
+            ParentOfferVariationId = definition.ParentOfferVariationId,
             IsAlwaysAvailable = definition.IsAlwaysAvailable,
             StartTime = definition.StartTime?.ToString(@"hh\:mm\:ss"),
             EndTime = definition.EndTime?.ToString(@"hh\:mm\:ss"),
@@ -149,6 +151,9 @@ public static class MenuBundleMapper
     {
         Id = item.Id,
         ProductId = item.ProductId,
+        ProductVariationId = item.ProductVariationId,
+        ProductVariationName = item.ProductVariation?.Name,
+        ProductVariationPriceModifier = item.ProductVariation?.PriceModifier,
         ProductName = item.Product?.Name,
         AdditionalPrice = item.AdditionalPrice,
         DisplayOrder = item.DisplayOrder,

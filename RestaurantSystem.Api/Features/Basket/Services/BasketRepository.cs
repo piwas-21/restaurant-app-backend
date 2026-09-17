@@ -40,9 +40,9 @@ public class BasketRepository : IBasketRepository
             .Include(b => b.Items)
                 .ThenInclude(bi => bi.Menu)
                 .ThenInclude(b => b!.MenuItems)
-            .Include(b => b.Items)
-                .ThenInclude(bi => bi.ChildBasketItems)
-                    .ThenInclude(c => c.Product)
+                .Include(b => b.Items)
+                    .ThenInclude(bi => bi.ChildBasketItems)
+                        .ThenInclude(c => c.Product)
                         // Added for #363, and silent if dropped: BasketMappingService needs a
                         // component's ingredient metadata to say which of its saved zeroes are
                         // REMOVALS, and an un-included collection reads as EMPTY rather than null —
@@ -51,6 +51,9 @@ public class BasketRepository : IBasketRepository
                         // SelectedIngredients and IngredientQuantities come straight off the entity
                         // and are unaffected, so #150's round-trip does not depend on this line.
                         .ThenInclude(p => p!.DetailedIngredients)
+            .Include(b => b.Items)
+                .ThenInclude(bi => bi.ChildBasketItems)
+                    .ThenInclude(c => c.ProductVariation!.Descriptions)
             .Include(b => b.Items)
                 .ThenInclude(bi => bi.ChildBasketItems)
                     .ThenInclude(c => c.ChildBasketItems)

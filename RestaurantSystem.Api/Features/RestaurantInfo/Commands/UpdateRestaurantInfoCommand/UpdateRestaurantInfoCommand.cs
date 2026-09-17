@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
@@ -35,7 +36,10 @@ public record UpdateRestaurantInfoCommand(
     bool ShowMenuBundlesOnAllTab = false,
     // The tenant's declared display currency (ISO-4217 alpha-3, POS plan C18). Null clears —
     // same full-replace semantics as ThemePaletteKey: the PUT sends the whole settings form.
-    string? Currency = null
+    string? Currency = null,
+    // Nullable for backward-compatible full-replacement writes: an older admin client that does
+    // not know this field must not reset a tenant that has opted into categoryOffers.
+    string? BundlePresentationMode = null
 ) : ICommand<ApiResponse<RestaurantInfoDto>>;
 
 public class UpdateRestaurantInfoCommandHandler
@@ -84,6 +88,11 @@ public class UpdateRestaurantInfoCommandHandler
         // The validator has already pinned MenuLayout to a known name; the parse cannot fail here.
         info.MenuLayout = Enum.Parse<MenuLayout>(command.MenuLayout, ignoreCase: true);
         info.ShowMenuBundlesOnAllTab = command.ShowMenuBundlesOnAllTab;
+        if (command.BundlePresentationMode is not null)
+        {
+            info.BundlePresentationMode = Enum.Parse<BundlePresentationMode>(
+                command.BundlePresentationMode, ignoreCase: true);
+        }
         // Trimmed so " EUR " cannot enter the column; null clears, matching the full-replace
         // contract every other field on this command follows.
         info.Currency = command.Currency?.Trim();

@@ -18,6 +18,11 @@ public class MenuSectionItemConfiguration : IEntityTypeConfiguration<MenuSection
             .HasForeignKey(i => i.ProductId)
             .OnDelete(DeleteBehavior.Restrict); // Don't delete item if product is deleted (or maybe SetNull? Restrict is safer)
 
+        builder.HasOne(i => i.ProductVariation)
+            .WithMany()
+            .HasForeignKey(i => i.ProductVariationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(i => i.AdditionalPrice)
             .HasColumnType("decimal(18,2)");
     }

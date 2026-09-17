@@ -105,6 +105,8 @@ public class MenuBundleContentDto
 public class MenuBundleDefinitionDto
 {
     public Guid Id { get; set; }
+    public Guid? ParentOfferProductId { get; set; }
+    public Guid? ParentOfferVariationId { get; set; }
     public bool IsAlwaysAvailable { get; set; }
     public string? StartTime { get; set; }
     public string? EndTime { get; set; }
@@ -140,6 +142,9 @@ public class MenuBundleSectionItemDto
 {
     public Guid Id { get; set; }
     public Guid ProductId { get; set; }
+    public Guid? ProductVariationId { get; set; }
+    public string? ProductVariationName { get; set; }
+    public decimal? ProductVariationPriceModifier { get; set; }
     public string? ProductName { get; set; }
     public decimal AdditionalPrice { get; set; }
     public int DisplayOrder { get; set; }
