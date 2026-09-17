@@ -305,6 +305,11 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
 builder.Services
+    .AddOptions<CatalogSettings>()
+    .Bind(builder.Configuration.GetSection(CatalogSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services
     .AddOptions<PrinterFeedSettings>()
     .Bind(builder.Configuration.GetSection(PrinterFeedSettings.SectionName))
     .ValidateDataAnnotations()

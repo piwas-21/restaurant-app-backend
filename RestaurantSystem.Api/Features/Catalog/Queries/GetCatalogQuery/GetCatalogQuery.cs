@@ -20,11 +20,13 @@ public sealed record GetCatalogQuery(
 public sealed class GetCatalogQueryHandler(
     ApplicationDbContext context,
     IOptions<AWSSettings> awsSettings,
+    IOptions<CatalogSettings> catalogSettings,
     ITenantClock clock)
     : IQueryHandler<GetCatalogQuery, ApiResponse<PagedResult<CatalogOfferFamilyDto>>>
 {
     private readonly ApplicationDbContext _context = context;
     private readonly string _baseUrl = awsSettings.Value.S3.BaseUrl ?? string.Empty;
+    private readonly CatalogSettings _catalogSettings = catalogSettings.Value;
     private readonly ITenantClock _clock = clock;
 
     public async Task<ApiResponse<PagedResult<CatalogOfferFamilyDto>>> Handle(
@@ -49,13 +51,13 @@ public sealed class GetCatalogQueryHandler(
                     || _context.MenuDefinitions.Any(definition =>
                         definition.ParentOfferProductId == p.Id)))
             .OrderBy(p => p.Id)
-            .Take(CatalogQueryLimits.MaxProducts + 1)
+            .Take(_catalogSettings.MaxProducts + 1)
             .ToListAsync(cancellationToken);
 
-        if (products.Count > CatalogQueryLimits.MaxProducts)
+        if (products.Count > _catalogSettings.MaxProducts)
         {
             throw new BadRequestException(
-                $"Catalogue exceeds the supported limit of {CatalogQueryLimits.MaxProducts} products");
+                $"Catalogue exceeds the supported limit of {_catalogSettings.MaxProducts} products");
         }
 
         var now = _clock.Now;
@@ -71,7 +73,7 @@ public sealed class GetCatalogQueryHandler(
         // The one-page guest catalogue requests 200 rows. Keep a bounded server-side guard while
         // matching that established page size; a future virtualized client can simply request
         // smaller pages without changing the family contract.
-        var pageSize = Math.Clamp(query.PageSize, 1, 200);
+        var pageSize = Math.Clamp(query.PageSize, 1, _catalogSettings.MaxPageSize);
         var totalPages = (int)Math.Ceiling(families.Count / (double)pageSize);
         var items = families
             .Skip((page - 1) * pageSize)
