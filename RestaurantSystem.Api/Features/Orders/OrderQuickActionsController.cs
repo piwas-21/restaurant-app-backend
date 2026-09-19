@@ -78,7 +78,7 @@ public class OrderQuickActionsController : ControllerBase
         [FromQuery] string? token,
         CancellationToken cancellationToken)
     {
-        var status = await _mediator.SendQuery(new GetGuestOrderStatusQuery(orderId, token));
+        var status = await _mediator.SendQuery(new GetGuestOrderStatusQuery(orderId, token), cancellationToken);
         if (status is null)
         {
             // The same answer for "no such order" and "wrong token" — neither can be told apart
