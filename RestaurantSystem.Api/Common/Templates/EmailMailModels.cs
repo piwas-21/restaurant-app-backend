@@ -46,6 +46,11 @@ public readonly record struct EmailLinks(string ApiBaseUrl, string FrontendBaseU
 /// </param>
 /// <param name="SpecialInstructions">Guest's note, or null.</param>
 /// <param name="DeliveryAddress">Set for a delivery order, null otherwise.</param>
+/// <param name="ReviewWindowMinutes">
+/// The acknowledge flow's promised review window, in minutes. Null (the default) renders the
+/// historical "pending confirmation" copy; a value renders the "received — under review for about
+/// N minutes" copy instead.
+/// </param>
 public sealed record OrderMailDetails(
     string Number,
     string Type,
@@ -54,7 +59,8 @@ public sealed record OrderMailDetails(
     string Currency = "",
     string? QuickActionToken = null,
     string? SpecialInstructions = null,
-    string? DeliveryAddress = null);
+    string? DeliveryAddress = null,
+    int? ReviewWindowMinutes = null);
 
 /// <summary>The reservation a mail is about — the operator's alert and the guest's own copy alike.</summary>
 /// <param name="Date">The calendar day booked, on the RESTAURANT's clock. Never converted (#369).</param>

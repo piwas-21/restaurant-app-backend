@@ -109,4 +109,13 @@
   <data name="Track" xml:space="preserve">
     <value>Den Status Ihrer Bestellung können Sie in Ihrem Konto verfolgen. Bei Fragen erreichen Sie uns unter {0}</value>
   </data>
+  <data name="AckTitle" xml:space="preserve">
+    <value>Bestellung erhalten — in Prüfung</value>
+  </data>
+  <data name="AckTitleUpper" xml:space="preserve">
+    <value>BESTELLUNG ERHALTEN — IN PRÜFUNG</value>
+  </data>
+  <data name="AckBody" xml:space="preserve">
+    <value>Wir haben Ihre Bestellung erhalten und prüfen sie innerhalb von ca. {0} Minuten. Sie erhalten eine weitere E-Mail, sobald sie freigegeben ist – inklusive der Uhrzeit, zu der Ihre Bestellung fertig ist.</value>
+  </data>
 </root>

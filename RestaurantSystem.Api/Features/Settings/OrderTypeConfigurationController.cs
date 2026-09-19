@@ -44,6 +44,20 @@ public class OrderTypeConfigurationController : ControllerBase
     }
 
     /// <summary>
+    /// The confirmation behaviour per order type, readable WITHOUT an account: the guest's
+    /// acknowledgement screen animates the review window from here, and the flow tells it which
+    /// state copy to expect (received-then-approved vs the historical direct confirmation).
+    /// </summary>
+    [HttpGet("public")]
+    [AllowAnonymous]
+    public async Task<ApiResponse<List<OrderTypeConfirmationPublicDto>>> GetPublicConfirmationConfigurations(
+        CancellationToken cancellationToken)
+    {
+        var configurations = await _service.GetPublicConfirmationConfigurationsAsync(cancellationToken);
+        return ApiResponse<List<OrderTypeConfirmationPublicDto>>.SuccessWithData(configurations);
+    }
+
+    /// <summary>
     /// Update order type configuration (admin only)
     /// </summary>
     [HttpPut]
@@ -56,6 +70,8 @@ public class OrderTypeConfigurationController : ControllerBase
             dto.OrderType,
             dto.IsEnabled,
             dto.EnforceOpeningHours,
+            dto.ConfirmationFlow,
+            dto.ReviewWindowMinutes,
             cancellationToken);
         return ApiResponse<OrderTypeConfigurationDto>.SuccessWithData(
             updated,

@@ -1,13 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.ApproveDelayCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.RejectDelayCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand;
+using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Queries.GetGuestOrderStatusQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrderForQuickActionQuery;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
@@ -57,6 +61,32 @@ public class OrderQuickActionsController : ControllerBase
         _html = html;
         _emailSettings = emailSettings.Value;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// The guest's own status poll for the confirmation screen (order confirmation flows). The
+    /// URL carries the order id plus the <c>QuickActionToken</c> the guest received at creation —
+    /// an unknown id and a wrong token are indistinguishable, and an empty token is refused before
+    /// any lookup. Shares the checkout-status per-IP bucket: a confirmation page polling every
+    /// few seconds is the intended caller, and its budget is sized for exactly that.
+    /// </summary>
+    [HttpGet("guest-status")]
+    [AllowAnonymous]
+    [EnableRateLimiting("checkout-status")]
+    public async Task<ActionResult<ApiResponse<GuestOrderStatusDto>>> GuestStatus(
+        [FromQuery] Guid orderId,
+        [FromQuery] string? token,
+        CancellationToken cancellationToken)
+    {
+        var status = await _mediator.SendQuery(new GetGuestOrderStatusQuery(orderId, token), cancellationToken);
+        if (status is null)
+        {
+            // The same answer for "no such order" and "wrong token" — neither can be told apart
+            // from the outside (see the controller header note).
+            return NotFound(ApiResponse<GuestOrderStatusDto>.Failure("Order not found"));
+        }
+
+        return Ok(ApiResponse<GuestOrderStatusDto>.SuccessWithData(status));
     }
 
     /// <summary>Quick confirm order from email link.</summary>
