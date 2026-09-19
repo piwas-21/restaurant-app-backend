@@ -236,6 +236,78 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Single_read_falls_back_to_the_tenant_currency_when_the_session_has_none()
+    {
+        var sessionId = await SeedSessionAsync(34);
+        var original = await TenantCurrencyAsync();
+        try
+        {
+            await SetTenantCurrencyAsync("CHF");
+
+            await using var context = _fixture.CreateContext();
+            var dto = await new TableServiceSessionReader(context, Assembler())
+                .ReadAsync(sessionId, CancellationToken.None);
+
+            dto.Should().NotBeNull();
+            dto!.Currency.Should().Be("CHF");
+            dto.Bill.Currency.Should().Be("CHF");
+        }
+        finally
+        {
+            await SetTenantCurrencyAsync(original);
+        }
+    }
+
+    [Fact]
+    public async Task Session_currency_wins_over_the_tenant_default()
+    {
+        var sessionId = await SeedSessionAsync(35, currency: "eur");
+        var original = await TenantCurrencyAsync();
+        try
+        {
+            await SetTenantCurrencyAsync("CHF");
+
+            await using var context = _fixture.CreateContext();
+            var dto = await new TableServiceSessionReader(context, Assembler())
+                .ReadAsync(sessionId, CancellationToken.None);
+
+            dto.Should().NotBeNull();
+            dto!.Currency.Should().Be("EUR");
+            dto.Bill.Currency.Should().Be("EUR");
+        }
+        finally
+        {
+            await SetTenantCurrencyAsync(original);
+        }
+    }
+
+    [Fact]
+    public async Task Active_read_falls_back_to_the_tenant_currency_only_for_sessions_without_one()
+    {
+        var withOwnCurrencyId = await SeedSessionAsync(36, currency: "eur");
+        var withoutCurrencyId = await SeedSessionAsync(37);
+        var original = await TenantCurrencyAsync();
+        try
+        {
+            await SetTenantCurrencyAsync("CHF");
+
+            await using var context = _fixture.CreateContext();
+            var sessions = await new TableServiceSessionReader(context, Assembler())
+                .ReadActiveAsync(CancellationToken.None);
+
+            sessions.Single(session => session.ServiceSessionId == withOwnCurrencyId).Currency
+                .Should().Be("EUR");
+            var healed = sessions.Single(session => session.ServiceSessionId == withoutCurrencyId);
+            healed.Currency.Should().Be("CHF");
+            healed.Bill.Currency.Should().Be("CHF");
+        }
+        finally
+        {
+            await SetTenantCurrencyAsync(original);
+        }
+    }
+
+    [Fact]
     public async Task LegacyTableBill_RefusesOldUnassignedRoundMixedWithExplicitVisit()
     {
         var sessionId = await SeedSessionAsync(8);
@@ -611,6 +683,22 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         });
         await context.SaveChangesAsync();
         return id;
+    }
+
+    // RestaurantInfo is a Respawn-ignored singleton, so a currency set here must be restored by
+    // the caller. ExecuteUpdate bypasses the audit interceptor — same restore path the
+    // RestaurantInfoSeederTests use — so the row's UpdatedAt stays pristine.
+    private async Task<string?> TenantCurrencyAsync()
+    {
+        await using var context = _fixture.CreateContext();
+        return await context.RestaurantInfo.Select(info => info.Currency).SingleAsync();
+    }
+
+    private async Task SetTenantCurrencyAsync(string? currency)
+    {
+        await using var context = _fixture.CreateContext();
+        await context.RestaurantInfo.ExecuteUpdateAsync(setters =>
+            setters.SetProperty(info => info.Currency, currency));
     }
 
     private async Task<Guid> SeedOrderAsync(Guid? sessionId, int table, decimal total, DateTime orderedAt)
