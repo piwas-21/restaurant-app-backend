@@ -225,6 +225,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             CustomerPhone = customer?.PhoneNumber ?? request.CustomerPhone,
             Type = request.Type,
             TableNumber = tableNumber,
+            DeliveryAddress = request.DeliveryAddress,
             PromoCode = request.PromoCode,
             PointsToRedeem = request.PointsToRedeem,
             Tip = request.Tip ?? 0m,

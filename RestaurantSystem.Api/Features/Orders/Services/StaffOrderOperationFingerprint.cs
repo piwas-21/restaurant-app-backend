@@ -25,6 +25,9 @@ public static class StaffOrderOperationFingerprint
             Tip = request.Tip ?? 0m,
             request.Notes,
             request.PaymentState,
+            // Part of the payload: two creates sharing one operation id but shipping different
+            // addresses are different operations, and only the hash can tell them apart.
+            request.DeliveryAddress,
             request.Items,
             releaseToKitchen
         };

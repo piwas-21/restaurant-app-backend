@@ -12,6 +12,11 @@ public record StaffCounterOrderRequest
     public int? TableNumber { get; set; }
     public Guid? ServiceSessionId { get; set; }
 
+    // Same payload the legacy CreateOrderCommand carries: explicit inline fields or UseAddressId.
+    // Required for Delivery (see StaffCounterDeliveryAddressRule); OrderFactory refuses a delivery
+    // order that reaches it without one.
+    public CreateOrderDeliveryAddressDto? DeliveryAddress { get; init; }
+
     // CustomerUserId is the canonical name. CustomerId remains an additive alias for clients that
     // use the existing reservation/customer vocabulary; the handler rejects conflicting values.
     public Guid? CustomerUserId { get; set; }
