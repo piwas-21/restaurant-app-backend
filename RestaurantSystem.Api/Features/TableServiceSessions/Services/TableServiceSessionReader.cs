@@ -45,7 +45,13 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             return null;
         }
 
-        var currency = CurrencyCode.Normalize(session.Currency);
+        // A session opened before the Currency column shipped (or while RestaurantInfo.Currency was
+        // still null) carries Currency = null, which the cashier's Tables screen rendered as
+        // "Currency unavailable". Fall back to the tenant's declared currency — the same fallback
+        // OpenTableServiceSessionCommand uses when opening NEW sessions — so this only heals
+        // historical rows; a session's own value still wins.
+        var tenantCurrency = await ReadTenantCurrencyAsync(cancellationToken);
+        var currency = CurrencyCode.Normalize(session.Currency) ?? tenantCurrency;
         var bill = await _bills.AssembleAsync(serviceSessionId, cancellationToken)
             ?? new TableBillDto
             {
@@ -64,13 +70,16 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         bill.GeneratedAt = now;
         var legacy = await ReadLegacyOrdersAsync(
             session.TableId, session.TableNumber, cancellationToken);
-        return ToDto(session, bill, legacy, now);
+        return ToDto(session, bill, legacy, now, currency);
     }
 
     public async Task<IReadOnlyList<TableServiceSessionDto>> ReadActiveAsync(
         CancellationToken cancellationToken)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+        // One row, resolved once per call so the session loop below never queries per session. See
+        // ReadAsync for why the fallback is safe.
+        var tenantCurrency = await ReadTenantCurrencyAsync(cancellationToken);
         var sessionRows = await _context.TableServiceSessions
             .AsNoTracking()
             .Include(value => value.Table)
@@ -84,7 +93,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         for (var index = 0; index < sessionRows.Count; index++)
         {
             var session = sessionRows[index];
-            var currency = CurrencyCode.Normalize(session.Currency);
+            var currency = CurrencyCode.Normalize(session.Currency) ?? tenantCurrency;
             var bill = bills[index] ?? new TableBillDto
             {
                 TableNumber = session.TableNumber,
@@ -100,11 +109,19 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             bill.Currency = currency;
             bill.GeneratedAt = now;
             legacyBySession.TryGetValue(session.Id, out var legacy);
-            sessions.Add(ToDto(session, bill, legacy ?? [], now));
+            sessions.Add(ToDto(session, bill, legacy ?? [], now, currency));
         }
 
         return sessions;
     }
+
+    // The same precedence OpenTableServiceSessionCommand applies when opening a session: the
+    // session's own normalized value first, then the tenant's declared currency.
+    private async Task<string?> ReadTenantCurrencyAsync(CancellationToken cancellationToken) =>
+        CurrencyCode.Normalize(await _context.RestaurantInfo
+            .AsNoTracking()
+            .Select(info => info.Currency)
+            .FirstOrDefaultAsync(cancellationToken));
 
     private async Task<List<TableServiceSessionOrderState>> ReadLegacyOrdersAsync(
         Guid? tableId, int? tableNumber, CancellationToken cancellationToken)
@@ -184,7 +201,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         TableServiceSession session,
         TableBillDto bill,
         IReadOnlyCollection<TableServiceSessionOrderState> legacy,
-        DateTime now)
+        DateTime now,
+        string? currency)
     {
         var members = bill.Rounds.Select(round =>
             new TableServiceSessionOrderState(ParseStatus(round.Order.Status), round.Order.RemainingAmount));
@@ -198,7 +216,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             TableLabel = session.Table?.TableNumber
                 ?? session.TableNumber?.ToString(CultureInfo.InvariantCulture)
                 ?? string.Empty,
-            Currency = CurrencyCode.Normalize(session.Currency),
+            Currency = currency,
             Status = session.Status.ToString(),
             Version = session.Version,
             OpenedAt = session.OpenedAt,

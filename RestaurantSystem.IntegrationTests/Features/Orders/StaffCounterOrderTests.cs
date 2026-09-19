@@ -312,6 +312,89 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Delivery_create_without_an_address_is_refused_with_the_street_message()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Delivery",
+            paymentState = "PayLater",
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        });
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.Success.Should().BeFalse();
+        body.Errors.Should().Contain(
+            "A delivery counter order requires a delivery address with a street.");
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Delivery_create_with_an_explicit_address_persists_it_on_the_order()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Delivery",
+            paymentState = "PayLater",
+            deliveryAddress = new
+            {
+                addressLine1 = "Rue du Grand-Pré 45",
+                city = "Genève",
+                postalCode = "1202",
+                country = "Switzerland"
+            },
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        });
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        body.Success.Should().BeTrue();
+        body.Data!.DeliveryAddress!.AddressLine1.Should().Be("Rue du Grand-Pré 45");
+
+        await using var context = DatabaseFixture.CreateContext();
+        var order = await context.Orders.Include(value => value.DeliveryAddress).SingleAsync();
+        order.Type.Should().Be(OrderType.Delivery);
+        order.DeliveryAddress.Should().NotBeNull();
+        order.DeliveryAddress!.AddressLine1.Should().Be("Rue du Grand-Pré 45");
+        order.DeliveryAddress.City.Should().Be("Genève");
+        (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Takeaway_create_carrying_a_delivery_address_is_refused()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/staff/orders", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            releaseToKitchen = false,
+            type = "Takeaway",
+            paymentState = "PayLater",
+            deliveryAddress = new
+            {
+                addressLine1 = "Rue du Grand-Pré 45",
+                city = "Genève",
+                postalCode = "1202",
+                country = "Switzerland"
+            },
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        });
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.Success.Should().BeFalse();
+        body.Errors.Should().Contain("A delivery address is valid only for delivery orders.");
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Customer_association_is_authorized_and_server_authored()
     {
         AuthenticateAsRole(UserRole.Server);

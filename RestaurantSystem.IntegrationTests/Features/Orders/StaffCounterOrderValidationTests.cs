@@ -19,6 +19,14 @@ public sealed class StaffCounterOrderValidationTests
         Items = [new CreateOrderItemDto { ProductId = Guid.NewGuid(), Quantity = 1 }]
     };
 
+    private static CreateOrderDeliveryAddressDto Address() => new()
+    {
+        AddressLine1 = "Rue du Grand-Pré 45",
+        City = "Genève",
+        PostalCode = "1202",
+        Country = "Switzerland"
+    };
+
     [Fact]
     public void Positive_points_are_rejected_before_staff_pricing()
     {
@@ -35,6 +43,48 @@ public sealed class StaffCounterOrderValidationTests
     {
         _requestValidator.Validate(Request(0)).IsValid.Should().BeTrue();
         _requestValidator.Validate(Request(-1)).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Delivery_without_a_street_address_is_rejected()
+    {
+        var missing = _requestValidator.Validate(Request(0) with { Type = OrderType.Delivery });
+        var blank = _requestValidator.Validate(Request(0) with
+        {
+            Type = OrderType.Delivery,
+            DeliveryAddress = new CreateOrderDeliveryAddressDto { AddressLine1 = "   " }
+        });
+
+        missing.IsValid.Should().BeFalse();
+        missing.Errors.Should().Contain(error =>
+            error.PropertyName == nameof(StaffCounterOrderRequest.DeliveryAddress)
+            && error.ErrorMessage == "A delivery counter order requires a delivery address with a street.");
+        blank.IsValid.Should().BeFalse();
+        blank.Errors.Should().Contain(error =>
+            error.ErrorMessage == "A delivery counter order requires a delivery address with a street.");
+    }
+
+    [Fact]
+    public void Delivery_with_an_explicit_street_address_passes_the_request_rules()
+    {
+        var result = _requestValidator.Validate(Request(0) with
+        {
+            Type = OrderType.Delivery,
+            DeliveryAddress = Address()
+        });
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Takeaway_carrying_a_delivery_address_is_rejected()
+    {
+        var result = _requestValidator.Validate(Request(0) with { DeliveryAddress = Address() });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error =>
+            error.PropertyName == nameof(StaffCounterOrderRequest.DeliveryAddress)
+            && error.ErrorMessage == "A delivery address is valid only for delivery orders.");
     }
 
     [Fact]
