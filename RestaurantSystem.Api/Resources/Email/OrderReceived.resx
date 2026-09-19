@@ -109,4 +109,13 @@
   <data name="Track" xml:space="preserve">
     <value>You can track your order status in your account. If you have any questions, please contact us at {0}</value>
   </data>
+  <data name="AckTitle" xml:space="preserve">
+    <value>Order received — under review</value>
+  </data>
+  <data name="AckTitleUpper" xml:space="preserve">
+    <value>ORDER RECEIVED — UNDER REVIEW</value>
+  </data>
+  <data name="AckBody" xml:space="preserve">
+    <value>We have received your order and will review it within about {0} minutes. You will get another email as soon as it is approved, including the time your order will be ready.</value>
+  </data>
 </root>

@@ -47,6 +47,9 @@ public class OrderFactory : IOrderFactory
             // orders get mailed is a runtime decision made later and elsewhere, and an order
             // that reaches the template without a token would render dead links.
             QuickActionToken = QuickActionTokens.Generate(),
+            // A separate read-only secret for the guest's own status screen: the quick-action
+            // token above authorises confirm/cancel and must stay operator-only.
+            GuestStatusToken = QuickActionTokens.Generate(),
             UserId = userId,
             CustomerName = command.CustomerName,
             CustomerEmail = command.CustomerEmail,

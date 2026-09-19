@@ -109,4 +109,13 @@
   <data name="Track" xml:space="preserve">
     <value>Vous pouvez suivre l'état de votre commande depuis votre compte. Pour toute question, écrivez-nous à {0}</value>
   </data>
+  <data name="AckTitle" xml:space="preserve">
+    <value>Commande reçue — en cours de vérification</value>
+  </data>
+  <data name="AckTitleUpper" xml:space="preserve">
+    <value>COMMANDE REÇUE — EN COURS DE VÉRIFICATION</value>
+  </data>
+  <data name="AckBody" xml:space="preserve">
+    <value>Nous avons bien reçu votre commande et la vérifions sous environ {0} minutes. Vous recevrez un autre e-mail dès qu’elle sera approuvée, avec l’heure à laquelle votre commande sera prête.</value>
+  </data>
 </root>

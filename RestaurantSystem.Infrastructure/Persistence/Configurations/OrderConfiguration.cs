@@ -21,6 +21,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.QuickActionToken)
             .HasMaxLength(64);
 
+        // The guest status poll's bearer secret: same entropy budget as the quick-action token,
+        // but it authorises a READ-ONLY projection, so it is safe to hand to the guest who just
+        // placed the order. Looked up by order id (unique) with the token as the check.
+        builder.Property(o => o.GuestStatusToken)
+            .HasMaxLength(64);
+
         // Unique so a generator regression that emitted a constant or repeated token fails the
         // INSERT instead of silently making one link open several orders. Postgres treats NULLs
         // as distinct, so the pre-column rows (all null) do not collide with each other.

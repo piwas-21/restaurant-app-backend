@@ -6,6 +6,14 @@ public record OrderDto
 {
     public Guid Id { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Bearer secret for the guest's OWN status poll (order confirmation flows): the checkout
+    /// hands it to the confirmation URL, whose polling endpoint accepts id + this token and
+    /// returns nothing but lifecycle state. Read-only by construction — the operator-only
+    /// QuickActionToken stays out of this DTO on purpose.
+    /// </summary>
+    public string? GuestStatusToken { get; set; }
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }

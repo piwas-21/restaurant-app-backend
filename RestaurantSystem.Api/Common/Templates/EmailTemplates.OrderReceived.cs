@@ -17,7 +17,7 @@ public static partial class EmailTemplates
         public static string GetHtmlBody(
             CultureInfo culture, EmailBranding brand, string customerName, OrderMailDetails order, string contactEmail)
         {
-            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress) = order;
+            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress, _) = order;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var itemsSection = string.Join("", items.Select(item =>
@@ -80,8 +80,10 @@ public static partial class EmailTemplates
             </div>
 
             <div class='pending'>
-                <strong>⏳ {t["PendingTitle"]}</strong><br>
-                {t["PendingBody"]}
+                <strong>⏳ {(order.ReviewWindowMinutes.HasValue ? t["AckTitle"] : t["PendingTitle"])}</strong><br>
+                {(order.ReviewWindowMinutes.HasValue
+                    ? t.Format("AckBody", order.ReviewWindowMinutes.Value)
+                    : t["PendingBody"])}
             </div>
 
             <div class='info-box'>
@@ -122,7 +124,7 @@ public static partial class EmailTemplates
         public static string GetTextBody(
             CultureInfo culture, EmailBranding brand, string customerName, OrderMailDetails order, string contactEmail)
         {
-            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress) = order;
+            var (orderNumber, orderType, total, items, currency, _, specialInstructions, deliveryAddress, _) = order;
             var t = EmailText.For(culture, Set);
             var email = contactEmail;
             var (itemsSection, instructionsSection, deliverySection) =
@@ -141,8 +143,10 @@ public static partial class EmailTemplates
 
 {Labelled(t, t["OrderNumberLabel"], orderNumber)}
 
-{t["PendingTitleUpper"]}
-{t["PendingBody"]}
+{(order.ReviewWindowMinutes.HasValue ? t["AckTitleUpper"] : t["PendingTitleUpper"])}
+{(order.ReviewWindowMinutes.HasValue
+    ? t.Format("AckBody", order.ReviewWindowMinutes.Value)
+    : t["PendingBody"])}
 
 {t["OrderTypeLabel"]} {orderTypeText}
 {t["TotalLabel"]} {currency} {total:F2}

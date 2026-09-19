@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Settings.Dtos;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
@@ -38,7 +39,28 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
             OrderType = c.OrderType,
             IsEnabled = c.IsEnabled,
             DisplayOrder = c.DisplayOrder,
-            EnforceOpeningHours = c.EnforceOpeningHours
+            EnforceOpeningHours = c.EnforceOpeningHours,
+            ConfirmationFlow = c.ConfirmationFlow,
+            ReviewWindowMinutes = c.ReviewWindowMinutes
+        }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<List<OrderTypeConfirmationPublicDto>> GetPublicConfirmationConfigurationsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAllOrderTypesExistAsync(cancellationToken);
+
+        var configurations = await _context.OrderTypeConfigurations
+            .AsNoTracking()
+            .OrderBy(c => c.DisplayOrder)
+            .ToListAsync(cancellationToken);
+
+        return configurations.Select(c => new OrderTypeConfirmationPublicDto
+        {
+            OrderType = c.OrderType,
+            ConfirmationFlow = c.ConfirmationFlow,
+            ReviewWindowMinutes = c.ReviewWindowMinutes
         }).ToList();
     }
 
@@ -66,6 +88,8 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
                 // A row that vanished (or a type added later) must come back with the gating that
                 // type has ALWAYS had, not with a blanket on/off (#448).
                 EnforceOpeningHours = OrderTypeConfiguration.EnforcedByDefault(type),
+                ConfirmationFlow = OrderTypeConfiguration.DefaultConfirmationFlow,
+                ReviewWindowMinutes = OrderTypeConfiguration.DefaultReviewWindowMinutes,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = auditIdentifier
             });
@@ -110,8 +134,24 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
         OrderType orderType,
         bool isEnabled,
         bool? enforceOpeningHours = null,
+        string? confirmationFlow = null,
+        int? reviewWindowMinutes = null,
         CancellationToken cancellationToken = default)
     {
+        // The flow/window values are validated BEFORE the row lookup: a hostile or buggy caller
+        // must learn its payload is wrong (400), not whether the row exists (404) — and the
+        // self-seeding read path means the row may legitimately not exist yet on the first save.
+        if (confirmationFlow is not null && !OrderConfirmationFlows.IsValid(confirmationFlow))
+        {
+            throw new BadRequestException($"Unknown confirmation flow '{confirmationFlow}'.");
+        }
+
+        if (reviewWindowMinutes is < 1 or > OrderTypeConfiguration.MaxReviewWindowMinutes)
+        {
+            throw new BadRequestException(
+                $"Review window must be between 1 and {OrderTypeConfiguration.MaxReviewWindowMinutes} minutes.");
+        }
+
         var configuration = await _context.OrderTypeConfigurations
             .FirstOrDefaultAsync(c => c.OrderType == orderType, cancellationToken);
 
@@ -130,6 +170,19 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
             configuration.EnforceOpeningHours = enforceOpeningHours.Value;
         }
 
+        // Same under-posting contract for the confirmation-flow pair as for the hours gate: an
+        // older client omits both, and an omitted value must never flip a tenant that opted into
+        // the acknowledge flow back to direct (or rewrite its window).
+        if (confirmationFlow is not null)
+        {
+            configuration.ConfirmationFlow = confirmationFlow;
+        }
+
+        if (reviewWindowMinutes.HasValue)
+        {
+            configuration.ReviewWindowMinutes = reviewWindowMinutes.Value;
+        }
+
         configuration.UpdatedAt = DateTime.UtcNow;
         configuration.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
@@ -140,7 +193,9 @@ public class OrderTypeConfigurationService : IOrderTypeConfigurationService
             OrderType = configuration.OrderType,
             IsEnabled = configuration.IsEnabled,
             DisplayOrder = configuration.DisplayOrder,
-            EnforceOpeningHours = configuration.EnforceOpeningHours
+            EnforceOpeningHours = configuration.EnforceOpeningHours,
+            ConfirmationFlow = configuration.ConfirmationFlow,
+            ReviewWindowMinutes = configuration.ReviewWindowMinutes
         };
     }
 }
