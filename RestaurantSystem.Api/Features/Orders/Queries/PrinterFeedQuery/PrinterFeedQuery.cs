@@ -112,6 +112,14 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 
         var orderDtos = orders.Select(_mappingService.MapToOrderDto).ToList();
 
+        // The guest status poll's token is the GUEST'S secret, minted for one read-only screen.
+        // It has no business on printer wire (paper, network captures, spooler logs) and the
+        // printer renders nothing it would read — strip it from this feed's projection.
+        foreach (var dto in orderDtos)
+        {
+            dto.GuestStatusToken = null;
+        }
+
         _logger.LogInformation("Printer feed returning {Count} confirmed orders", orderDtos.Count);
 
         return orderDtos;

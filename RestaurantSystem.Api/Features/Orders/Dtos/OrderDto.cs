@@ -12,7 +12,13 @@ public record OrderDto
     /// hands it to the confirmation URL, whose polling endpoint accepts id + this token and
     /// returns nothing but lifecycle state. Read-only by construction — the operator-only
     /// QuickActionToken stays out of this DTO on purpose.
+    /// <para>
+    /// Omitted on the wire when null: the printer feed strips the token before serializing
+    /// (a guest secret has no business on paper or spooler logs), and the golden wire snapshot
+    /// must stay byte-identical to the pre-feature feed.
+    /// </para>
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? GuestStatusToken { get; set; }
     public Guid? UserId { get; set; }
     public string? CustomerName { get; set; }
