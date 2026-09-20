@@ -44,6 +44,7 @@ public class OrderMappingService : IOrderMappingService
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
+            GuestStatusToken = order.GuestStatusToken,
             UserId = order.UserId,
             CustomerName = order.CustomerName,
             CustomerEmail = order.CustomerEmail,

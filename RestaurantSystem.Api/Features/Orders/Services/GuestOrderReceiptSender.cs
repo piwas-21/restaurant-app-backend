@@ -3,6 +3,9 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Api.Common.Templates;
+using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -14,6 +17,7 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
     private readonly IEmailLanguageResolver _languages;
     private readonly IOutboundEmailLedger _ledger;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<GuestOrderReceiptSender> _logger;
 
     public GuestOrderReceiptSender(
@@ -21,12 +25,14 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
         IEmailLanguageResolver languages,
         IOutboundEmailLedger ledger,
         IServiceScopeFactory scopeFactory,
+        ApplicationDbContext context,
         ILogger<GuestOrderReceiptSender> logger)
     {
         _emailService = emailService;
         _languages = languages;
         _ledger = ledger;
         _scopeFactory = scopeFactory;
+        _context = context;
         _logger = logger;
     }
 
@@ -34,6 +40,21 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
     public async Task SendAsync(OrderDto order)
     {
         ArgumentNullException.ThrowIfNull(order);
+
+        // The acknowledge flow's promised review window rides into the mail copy. Resolved in the
+        // caller's scope (this is already inside the queue's fresh scope): one small query per
+        // order, same table the settings screen writes.
+        int? reviewWindowMinutes = null;
+        if (Enum.TryParse<OrderType>(order.Type, ignoreCase: true, out var orderType))
+        {
+            var configuration = await _context.OrderTypeConfigurations
+                .AsNoTracking()
+                .SingleOrDefaultAsync(c => c.OrderType == orderType);
+            if (configuration is { ConfirmationFlow: OrderConfirmationFlows.Acknowledge })
+            {
+                reviewWindowMinutes = configuration.ReviewWindowMinutes;
+            }
+        }
 
         if (string.IsNullOrWhiteSpace(order.CustomerEmail))
         {
@@ -74,7 +95,8 @@ public class GuestOrderReceiptSender : IGuestOrderReceiptSender
                     order.Total,
                     OrderEmailComposer.ComposeItems(order),
                     SpecialInstructions: order.Notes,
-                    DeliveryAddress: OrderEmailComposer.ComposeDeliveryAddress(order)));
+                    DeliveryAddress: OrderEmailComposer.ComposeDeliveryAddress(order),
+                    ReviewWindowMinutes: reviewWindowMinutes));
 
             await _ledger.MarkSentAsync(OutboundEmailTypes.OrderReceived, order.Id);
         }

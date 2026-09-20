@@ -1,13 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common;
+using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.ApproveDelayCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.RejectDelayCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand;
+using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Queries.GetGuestOrderStatusQuery;
 using RestaurantSystem.Api.Features.Orders.Queries.GetOrderForQuickActionQuery;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
@@ -34,29 +38,53 @@ namespace RestaurantSystem.Api.Features.Orders;
 [Route("api/orders")]
 public class OrderQuickActionsController : ControllerBase
 {
-    // Orders with prep time above this threshold need explicit customer
-    // approval before transitioning to Confirmed; below this they
-    // auto-confirm. Promote to config (e.g. OrderSettings:DelayThresholdMinutes)
-    // if it ever needs to vary per deployment.
-    private const int DelayThresholdMinutes = 10;
     private const int ConfirmRedirectSeconds = 5;
     private const int CancelRedirectSeconds = 3;
 
     private readonly CustomMediator _mediator;
     private readonly IHtmlResponseBuilder _html;
     private readonly EmailSettings _emailSettings;
+    private readonly OrderWorkflowSettings _workflow;
     private readonly ILogger<OrderQuickActionsController> _logger;
 
     public OrderQuickActionsController(
         CustomMediator mediator,
         IHtmlResponseBuilder html,
         IOptions<EmailSettings> emailSettings,
-        ILogger<OrderQuickActionsController> logger)
+        ILogger<OrderQuickActionsController> logger,
+        IOptions<OrderWorkflowSettings>? workflow = null)
     {
         _mediator = mediator;
         _html = html;
         _emailSettings = emailSettings.Value;
+        _workflow = workflow?.Value ?? new OrderWorkflowSettings();
         _logger = logger;
+    }
+
+    /// <summary>
+    /// The guest's own status poll for the confirmation screen (order confirmation flows). The
+    /// URL carries the order id plus the <c>QuickActionToken</c> the guest received at creation —
+    /// an unknown id and a wrong token are indistinguishable, and an empty token is refused before
+    /// any lookup. Shares the checkout-status per-IP bucket: a confirmation page polling every
+    /// few seconds is the intended caller, and its budget is sized for exactly that.
+    /// </summary>
+    [HttpGet("guest-status")]
+    [AllowAnonymous]
+    [EnableRateLimiting("checkout-status")]
+    public async Task<ActionResult<ApiResponse<GuestOrderStatusDto>>> GuestStatus(
+        [FromQuery] Guid orderId,
+        [FromQuery] string? token,
+        CancellationToken cancellationToken)
+    {
+        var status = await _mediator.SendQuery(new GetGuestOrderStatusQuery(orderId, token), cancellationToken);
+        if (status is null)
+        {
+            // The same answer for "no such order" and "wrong token" — neither can be told apart
+            // from the outside (see the controller header note).
+            return NotFound(ApiResponse<GuestOrderStatusDto>.Failure("Order not found"));
+        }
+
+        return Ok(ApiResponse<GuestOrderStatusDto>.SuccessWithData(status));
     }
 
     /// <summary>Quick confirm order from email link.</summary>
@@ -86,11 +114,11 @@ public class OrderQuickActionsController : ControllerBase
                 });
             }
 
-            var newStatus = minutes > DelayThresholdMinutes
+            var newStatus = minutes > _workflow.DelayApprovalThresholdMinutes
                 ? OrderStatus.PendingApproval
                 : OrderStatus.Confirmed;
 
-            var statusNote = minutes > DelayThresholdMinutes
+            var statusNote = minutes > _workflow.DelayApprovalThresholdMinutes
                 ? $"Pending customer approval for {minutes} min preparation time"
                 : $"Confirmed via email with {minutes} min preparation time";
 
@@ -106,7 +134,7 @@ public class OrderQuickActionsController : ControllerBase
 
             var redirect = new HtmlRedirect($"{_emailSettings.FrontendBaseUrl}/admin/orders-management", ConfirmRedirectSeconds);
             var safeOrderNumber = _html.Escape(order.OrderNumber);
-            return minutes > DelayThresholdMinutes
+            return minutes > _workflow.DelayApprovalThresholdMinutes
                 ? Html(new HtmlStatusPage
                 {
                     Title = "Pending Customer Approval",
