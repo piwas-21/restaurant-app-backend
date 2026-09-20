@@ -88,6 +88,35 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
         body.Data!.Type.Should().Be(OrderType.Takeaway);
     }
 
+    [Theory]
+    [InlineData(10, OrderStatus.Confirmed)]
+    [InlineData(15, OrderStatus.PendingApproval)]
+    public async Task Approval_endpoint_owns_the_long_preparation_threshold(int preparationMinutes, OrderStatus expectedStatus)
+    {
+        var (orderId, _, _) = await PlaceTakeawayOrder();
+        AuthenticateAsAdmin();
+
+        var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new
+        {
+            preparationMinutes
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+        body.Data!.Status.Should().Be(expectedStatus.ToString());
+    }
+
+    [Fact]
+    public async Task Approval_endpoint_rejects_an_omitted_preparation_time()
+    {
+        var (orderId, _, _) = await PlaceTakeawayOrder();
+        AuthenticateAsAdmin();
+
+        var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new { });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task Guest_poll_with_a_wrong_token_is_indistinguishable_from_an_unknown_order()
     {

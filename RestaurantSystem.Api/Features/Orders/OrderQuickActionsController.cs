@@ -38,28 +38,26 @@ namespace RestaurantSystem.Api.Features.Orders;
 [Route("api/orders")]
 public class OrderQuickActionsController : ControllerBase
 {
-    // Orders with prep time above this threshold need explicit customer
-    // approval before transitioning to Confirmed; below this they
-    // auto-confirm. Promote to config (e.g. OrderSettings:DelayThresholdMinutes)
-    // if it ever needs to vary per deployment.
-    private const int DelayThresholdMinutes = 10;
     private const int ConfirmRedirectSeconds = 5;
     private const int CancelRedirectSeconds = 3;
 
     private readonly CustomMediator _mediator;
     private readonly IHtmlResponseBuilder _html;
     private readonly EmailSettings _emailSettings;
+    private readonly OrderWorkflowSettings _workflow;
     private readonly ILogger<OrderQuickActionsController> _logger;
 
     public OrderQuickActionsController(
         CustomMediator mediator,
         IHtmlResponseBuilder html,
         IOptions<EmailSettings> emailSettings,
-        ILogger<OrderQuickActionsController> logger)
+        ILogger<OrderQuickActionsController> logger,
+        IOptions<OrderWorkflowSettings>? workflow = null)
     {
         _mediator = mediator;
         _html = html;
         _emailSettings = emailSettings.Value;
+        _workflow = workflow?.Value ?? new OrderWorkflowSettings();
         _logger = logger;
     }
 
@@ -116,11 +114,11 @@ public class OrderQuickActionsController : ControllerBase
                 });
             }
 
-            var newStatus = minutes > DelayThresholdMinutes
+            var newStatus = minutes > _workflow.DelayApprovalThresholdMinutes
                 ? OrderStatus.PendingApproval
                 : OrderStatus.Confirmed;
 
-            var statusNote = minutes > DelayThresholdMinutes
+            var statusNote = minutes > _workflow.DelayApprovalThresholdMinutes
                 ? $"Pending customer approval for {minutes} min preparation time"
                 : $"Confirmed via email with {minutes} min preparation time";
 
@@ -136,7 +134,7 @@ public class OrderQuickActionsController : ControllerBase
 
             var redirect = new HtmlRedirect($"{_emailSettings.FrontendBaseUrl}/admin/orders-management", ConfirmRedirectSeconds);
             var safeOrderNumber = _html.Escape(order.OrderNumber);
-            return minutes > DelayThresholdMinutes
+            return minutes > _workflow.DelayApprovalThresholdMinutes
                 ? Html(new HtmlStatusPage
                 {
                     Title = "Pending Customer Approval",
