@@ -91,16 +91,14 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
     [Theory]
     [InlineData(10, OrderStatus.Confirmed)]
     [InlineData(15, OrderStatus.PendingApproval)]
-    public async Task Server_owns_the_long_preparation_threshold(int preparationMinutes, OrderStatus expectedStatus)
+    public async Task Approval_endpoint_owns_the_long_preparation_threshold(int preparationMinutes, OrderStatus expectedStatus)
     {
         var (orderId, _, _) = await PlaceTakeawayOrder();
         AuthenticateAsAdmin();
 
-        var response = await Client.PutAsJsonAsync($"/api/orders/{orderId}/status", new
+        var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new
         {
-            orderId,
-            newStatus = OrderStatus.Confirmed.ToString(),
-            estimatedPreparationMinutes = preparationMinutes
+            preparationMinutes
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

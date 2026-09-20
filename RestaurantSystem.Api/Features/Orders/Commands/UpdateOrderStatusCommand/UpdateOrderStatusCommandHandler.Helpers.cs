@@ -9,20 +9,6 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand
 
 public partial class UpdateOrderStatusCommandHandler
 {
-    /// <summary>
-    /// The server owns the long-preparation decision. Clients always request Confirmed with their
-    /// chosen minutes; this handler promotes the request to PendingApproval when customer consent
-    /// is required, so web/mobile/printer clients cannot drift on the threshold.
-    /// </summary>
-    private void NormalizePreparationApprovalStatus(UpdateOrderStatusCommand command)
-    {
-        if (command.NewStatus == OrderStatus.Confirmed &&
-            command.EstimatedPreparationMinutes > _workflow.DelayApprovalThresholdMinutes)
-        {
-            command.NewStatus = OrderStatus.PendingApproval;
-        }
-    }
-
     private static ApiResponse<OrderDto>? ValidateOrderStatusUpdate(
         Order order, UpdateOrderStatusCommand command)
     {

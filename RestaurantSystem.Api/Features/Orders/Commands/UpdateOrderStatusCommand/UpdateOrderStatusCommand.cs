@@ -65,7 +65,6 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
-        NormalizePreparationApprovalStatus(command);
         var validationFailure = ValidateOrderStatusUpdate(order, command);
         if (validationFailure is not null)
         {
