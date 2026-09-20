@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common;
@@ -11,7 +12,10 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.ApproveOrderCommand;
 
 public sealed record ApproveOrderCommand : ICommand<ApiResponse<OrderDto>>
 {
+    [JsonIgnore]
     public Guid OrderId { get; set; }
+
+    [JsonRequired]
     public int PreparationMinutes { get; set; }
     public string? Notes { get; set; }
     public int? ExpectedVersion { get; set; }

@@ -107,6 +107,17 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Approval_endpoint_rejects_an_omitted_preparation_time()
+    {
+        var (orderId, _, _) = await PlaceTakeawayOrder();
+        AuthenticateAsAdmin();
+
+        var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new { });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Guest_poll_with_a_wrong_token_is_indistinguishable_from_an_unknown_order()
     {
         var (orderId, _, _) = await PlaceTakeawayOrder();
