@@ -42,10 +42,10 @@ public class GetMissedOrdersQueryHandler
 
         // Served = Confirmed (the printer-feed's eligibility filter) + not soft-deleted. Explicit
         // !IsDeleted mirrors PrinterFeedQuery so the read intent is unambiguous. Routed orders are
-        // accounted for only when every durable route is Printed; routed acks carry JobId/Revision
-        // and therefore do not use the old receipt key. Orders without route rows retain the
-        // legacy fallback of any non-update Printed receipt on any device. Update tickets do not
-        // prove that the original order printed.
+        // Accounted routed work is based only on assigned required routes. An unassigned optional
+        // destination (most commonly a missing cashier printer) is not evidence that kitchen work
+        // was missed. Routed acks carry JobId/Revision and therefore do not use the old receipt key.
+        // Orders without route rows retain the legacy fallback of any non-update Printed receipt.
         var missed = await _context.Orders
             .AsNoTracking()
             .Where(o => !o.IsDeleted
@@ -60,6 +60,7 @@ public class GetMissedOrdersQueryHandler
                         && receipt.Status == DevicePrintStatus.Printed))
                     || (_context.OrderRoutingStates.Any(state => state.OrderId == o.Id)
                         && _context.OrderRoutingStates.Any(state => state.OrderId == o.Id
+                            && state.DeviceId != null
                             && state.Status != DevicePrintStatus.Printed))))
             .OrderBy(o => o.OrderDate)
             .Take(GetMissedOrdersQuery.MaxResults)

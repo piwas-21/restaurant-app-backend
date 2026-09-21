@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.Devices.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -50,13 +51,18 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 
     public async Task<List<OrderDto>> Handle(PrinterFeedQuery query, CancellationToken cancellationToken)
     {
-        var deviceId = NormalizeDeviceId(query.DeviceId);
+        var deviceId = DeviceIdNormalizer.Normalize(query.DeviceId);
+        if (query.DeviceId is not null && deviceId is null)
+        {
+            throw new BadRequestException("The X-Device-Id header cannot be empty.");
+        }
+
         _logger.LogInformation("Printer feed request - modifiedSince: {Since}, device: {DeviceId}",
             query.ModifiedSince, deviceId ?? "legacy");
 
         if (deviceId is not null)
         {
-            if (deviceId.Length > 64)
+            if (deviceId.Length > DeviceIdNormalizer.MaxLength)
             {
                 throw new BadRequestException("The X-Device-Id header is too long.");
             }
@@ -72,6 +78,7 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             // A released order may have been created before this installation first reported its
             // capabilities. Reconcile only this device's pending routes before reading the feed so
             // an offline release becomes printable after the device comes back online.
+            await _routing.BackfillActiveReleasedRoutesAsync(cancellationToken);
             await _routing.ReconcileDeviceRoutesAsync(deviceId, cancellationToken);
         }
 
@@ -169,8 +176,5 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
 
         return orderDtos;
     }
-
-    private static string? NormalizeDeviceId(string? deviceId) =>
-        string.IsNullOrWhiteSpace(deviceId) ? null : deviceId.Trim();
 
 }

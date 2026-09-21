@@ -93,6 +93,41 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Intermediate_order_acknowledgement_is_rejected_before_terminal_ack()
+    {
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        var order = await CreateReleasedOrderAsync();
+        var route = order.RoutingStates!.Single(value => value.Target == DevicePrintTarget.General);
+
+        (await PostAckAsync(deviceId, order.Id, route, DevicePrintStatus.Received))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using (var unchanged = DatabaseFixture.CreateContext())
+        {
+            var state = await unchanged.OrderRoutingStates.SingleAsync(value => value.Id == route.Id);
+            state.Status.Should().Be(DevicePrintStatus.Queued);
+        }
+
+        (await PostAckAsync(deviceId, order.Id, route, DevicePrintStatus.Printed))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Unconfigured_order_acknowledgement_is_normalized_to_skipped()
+    {
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        var order = await CreateReleasedOrderAsync();
+        var route = order.RoutingStates!.Single(value => value.Target == DevicePrintTarget.General);
+
+        (await PostAckAsync(deviceId, order.Id, route, DevicePrintStatus.NotConfigured))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var verify = DatabaseFixture.CreateContext();
+        var state = await verify.OrderRoutingStates.SingleAsync(value => value.Id == route.Id);
+        state.Status.Should().Be(DevicePrintStatus.Skipped);
+    }
+
+    [Fact]
     public async Task Concurrent_duplicate_acknowledgements_are_idempotent()
     {
         var deviceId = await RegisterReadyGeneralDeviceAsync();
@@ -192,6 +227,52 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Device_feed_backfills_pre_migration_released_order_before_routing_filter()
+    {
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        AuthenticateAsRole(UserRole.Server);
+        var response = await PostAsJsonAsync("/api/staff/orders", CreateBody(Guid.NewGuid(), false));
+        var order = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!.Data!;
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var persisted = await context.Orders.SingleAsync(item => item.Id == order.Id);
+            persisted.IsKitchenReleased = true;
+            persisted.Status = OrderStatus.Confirmed;
+            await context.SaveChangesAsync();
+            (await context.OrderRoutingStates.CountAsync(state => state.OrderId == order.Id))
+                .Should().Be(0);
+        }
+
+        var feed = await FetchPrinterFeedAsync(deviceId);
+        OrderNumbers(feed).Should().ContainSingle(order.OrderNumber);
+        RoutesFor(feed, order.OrderNumber).Should().HaveCount(2)
+            .And.OnlyContain(route => route!["deviceId"]!.GetValue<string>() == deviceId);
+
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.OrderRoutingStates.CountAsync(state => state.OrderId == order.Id))
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Capabilityless_legacy_device_is_not_assigned_durable_routes()
+    {
+        var legacyDeviceId = "legacy-" + Guid.NewGuid().ToString("N");
+        await RegisterLegacyDeviceAsync(legacyDeviceId);
+        var order = await CreateReleasedOrderAsync();
+
+        order.RoutingStates.Should().HaveCount(2)
+            .And.OnlyContain(route => route.DeviceId == null
+                && route.Status == DevicePrintStatus.NotConfigured);
+
+        var legacyFeed = await FetchPrinterFeedAsync();
+        OrderNumbers(legacyFeed).Should().Contain(order.OrderNumber);
+        legacyFeed["data"]!["items"]!.AsArray()
+            .Single(item => item!["orderNumber"]!.GetValue<string>() == order.OrderNumber)
+            !["routingStates"].Should().BeNull();
+    }
+
+    [Fact]
     public async Task Device_feed_includes_only_assigned_routes_and_legacy_poll_keeps_broadcast_compatibility()
     {
         var firstDevice = await RegisterReadyGeneralDeviceAsync();
@@ -288,7 +369,12 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
 
         var unknown = await FetchPrinterFeedAsync("never-registered-device");
         unknown["success"]!.GetValue<bool>().Should().BeFalse();
+        unknown["message"]!.GetValue<string>().Should().NotContain("not registered");
         unknown["data"]!["items"]!.AsArray().Should().BeEmpty();
+
+        var empty = await FetchPrinterFeedAsync("   ");
+        empty["success"]!.GetValue<bool>().Should().BeFalse();
+        empty["message"]!.GetValue<string>().Should().NotContain("header cannot be empty");
 
         var legacy = await FetchPrinterFeedAsync();
         legacy["success"]!.GetValue<bool>().Should().BeTrue();
@@ -330,7 +416,7 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
     {
         AuthenticateAsDevice();
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/orders/printer-feed");
-        if (!string.IsNullOrWhiteSpace(deviceId))
+        if (deviceId is not null)
         {
             request.Headers.Add("X-Device-Id", deviceId);
         }
@@ -377,6 +463,22 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
                 kitchenRoutingMode = routingMode,
                 kitchenPrinter = "general:9100",
                 targetCapabilities = capabilities
+            })
+        };
+        request.Headers.Add("X-Device-Id", deviceId);
+        (await Client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    private async Task RegisterLegacyDeviceAsync(string deviceId)
+    {
+        AuthenticateAsDevice();
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                lastSuccessfulPollAt = DateTime.UtcNow,
+                kitchenPrinter = "legacy:9100"
             })
         };
         request.Headers.Add("X-Device-Id", deviceId);

@@ -67,12 +67,10 @@ public class RecordHeartbeatCommandHandler
         device.Platform = command.Platform;
         device.AppVersion = command.AppVersion;
         device.FeedRunning = command.FeedRunning ?? false;
-        // Normalise the only client-supplied timestamp to UTC Kind — the column is `timestamptz`
-        // and Npgsql rejects a non-UTC Kind. The app reports UTC instants, so relabel (SpecifyKind)
-        // rather than convert — matching Groups/UserGroupService's client-DateTime handling.
-        device.LastSuccessfulPollAt = command.LastSuccessfulPollAt.HasValue
-            ? DateTime.SpecifyKind(command.LastSuccessfulPollAt.Value, DateTimeKind.Utc)
-            : null;
+        // The client reports the last completed poll, but the server owns the upper bound. A clock
+        // set into the future must never make a device look fresh indefinitely.
+        var now = DateTime.UtcNow;
+        device.LastSuccessfulPollAt = BoundPollTimestamp(command.LastSuccessfulPollAt, now);
         device.ApiBaseUrl = command.ApiBaseUrl;
         device.KitchenPrinter = command.KitchenPrinter;
         device.CashierPrinter = command.CashierPrinter;
@@ -80,7 +78,7 @@ public class RecordHeartbeatCommandHandler
         {
             device.KitchenRoutingMode = command.KitchenRoutingMode.Value;
         }
-        device.LastHeartbeatAt = DateTime.UtcNow;
+        device.LastHeartbeatAt = now;
 
         if (command.TargetCapabilities is not null)
         {
@@ -90,6 +88,17 @@ public class RecordHeartbeatCommandHandler
 
         await _context.SaveChangesAsync(cancellationToken);
         return ApiResponse<bool>.SuccessWithData(true, "Heartbeat recorded.");
+    }
+
+    private static DateTime? BoundPollTimestamp(DateTime? value, DateTime serverNow)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        var candidate = DateTime.SpecifyKind(value.Value, DateTimeKind.Utc);
+        return candidate > serverNow ? serverNow : candidate;
     }
 
     private async Task UpsertCapabilitiesAsync(

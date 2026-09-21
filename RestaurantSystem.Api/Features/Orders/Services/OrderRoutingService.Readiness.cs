@@ -110,33 +110,9 @@ public sealed partial class OrderRoutingService
             return capabilities;
         }
 
-        // Once a device has opted into the additive capability contract, a missing target means
-        // genuinely unconfigured. Falling back to its generic KitchenPrinter in that case would
-        // silently print a back-kitchen ticket on the front station. The fallback below is only
-        // for pre-capability installations.
-        var hasRelevantCapability = await _context.PrinterDeviceTargetCapabilities
-            .AsNoTracking()
-            .Where(capability => capability.Target == DevicePrintTarget.General
-                || capability.Target == DevicePrintTarget.FrontKitchen
-                || capability.Target == DevicePrintTarget.BackKitchen)
-            .Join(_context.PrinterDevices.AsNoTracking(), capability => capability.DeviceId,
-                device => device.DeviceId, (capability, device) => new { capability, device })
-            .AnyAsync(pair => pair.device.FeedRunning && pair.device.LastHeartbeatAt >= readinessCutoff
-                && pair.device.LastSuccessfulPollAt >= readinessCutoff,
-                cancellationToken);
-        if (hasRelevantCapability || target is DevicePrintTarget.Cashier or DevicePrintTarget.Default)
-        {
-            return null;
-        }
-
-        return await _context.PrinterDevices
-            .AsNoTracking()
-            .Where(device => device.FeedRunning && device.KitchenPrinter != null
-                && device.LastHeartbeatAt >= readinessCutoff
-                && device.LastSuccessfulPollAt >= readinessCutoff)
-            .OrderByDescending(device => device.LastHeartbeatAt)
-            .Select(device => device.DeviceId)
-            .FirstOrDefaultAsync(cancellationToken);
+        // Capability-less installations are legacy broadcast clients. They may continue using the
+        // headerless feed, but must never become the durable owner of a routed job.
+        return null;
     }
 
     private async Task ReconcileReadinessAsync(Order order, CancellationToken cancellationToken)
@@ -268,8 +244,9 @@ public sealed partial class OrderRoutingService
                     && capability.AutoPrintEnabled, cancellationToken);
         }
 
-        return target is not (DevicePrintTarget.Cashier or DevicePrintTarget.Default)
-            && !string.IsNullOrWhiteSpace(device.KitchenPrinter);
+        // A device with no capability snapshot is a legacy broadcast client. Its old generic
+        // printer settings are deliberately not enough to claim a durable route.
+        return false;
     }
 
     private static bool IsRoutable(Order order) =>

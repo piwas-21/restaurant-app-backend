@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Queries;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
@@ -66,6 +68,42 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
         }
     }
 
+    public async Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken)
+    {
+        var orderIds = await _context.Orders
+            .AsNoTracking()
+            .Where(order => order.IsKitchenReleased
+                && order.Status != OrderStatus.Cancelled
+                && order.Status != OrderStatus.Refunded
+                && order.Status != OrderStatus.Completed
+                && !_context.OrderRoutingStates.Any(state => state.OrderId == order.Id))
+            .Select(order => order.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var orderId in orderIds)
+        {
+            var order = await _context.Orders
+                .IncludeOrderLineGraph()
+                .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
+            if (order is null || order.RoutingStates.Count > 0)
+            {
+                continue;
+            }
+
+            await EnsureRoutesAsync(order, cancellationToken);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (IsRouteUniqueViolation(exception))
+            {
+                // Another feed request won the same pre-migration race. Its route set is already
+                // authoritative, so discard this context's pending graph and continue.
+                _context.ChangeTracker.Clear();
+            }
+        }
+    }
+
     public async Task<IReadOnlyList<OrderRoutingStateDto>> ProjectAsync(
         Guid orderId, CancellationToken cancellationToken)
     {
@@ -108,6 +146,12 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
     public async Task ApplyAcknowledgementAsync(
         string deviceId, PrintAckDto acknowledgement, CancellationToken cancellationToken)
     {
+        if (acknowledgement.JobType == DevicePrintJobType.Order
+            && acknowledgement.Status is DevicePrintStatus.Received or DevicePrintStatus.Sent)
+        {
+            throw new BadRequestException("Order route acknowledgements must use a final status.");
+        }
+
         var query = _context.OrderRoutingStates
             .Where(state => state.Target == acknowledgement.Target);
         var state = acknowledgement.JobId.HasValue
@@ -185,4 +229,9 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
     private static OrderRoutingStateDto ToDto(OrderRoutingState state) => new(
         state.Id, state.JobId, state.Revision, state.Target, state.Status, state.DeviceId,
         state.FailureReason, state.LastAcknowledgedAt, state.Version);
+
+    private static bool IsRouteUniqueViolation(DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
+        && (pg.ConstraintName?.Contains("OrderRoutingStates", StringComparison.OrdinalIgnoreCase) == true
+            || pg.ConstraintName?.Contains("order_routing_states", StringComparison.OrdinalIgnoreCase) == true);
 }

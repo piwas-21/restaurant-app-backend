@@ -77,8 +77,9 @@ public class RecordPrintAcksCommandHandler
                 .ToDictionary(group => group.Key, group => group.First().OrderId);
             var auditId = _currentUserService.GetAuditIdentifier();
 
-            foreach (var ack in command.Acks)
+            foreach (var originalAck in command.Acks)
             {
+                var ack = PrintAckNormalizer.NormalizeOrderAcknowledgement(originalAck);
                 string? error = null;
                 var receipt = ack.JobId.HasValue
                     ? ResolveJobReceipt(ack, command.DeviceId, auditId, byJobKey, byJobOrder, out error)

@@ -10,6 +10,9 @@ public interface IOrderRoutingService
     /// <summary>Adds the complete route set for a released order to the current transaction.</summary>
     Task EnsureRoutesAsync(Order order, CancellationToken cancellationToken);
 
+    /// <summary>Idempotently migrates active released orders created before durable routing.</summary>
+    Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken);
+
     /// <summary>Reconciles readiness only; this method never creates a missing route row.</summary>
     Task<IReadOnlyList<OrderRoutingStateDto>> ProjectAsync(
         Guid orderId, CancellationToken cancellationToken);

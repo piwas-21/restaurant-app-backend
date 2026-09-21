@@ -113,6 +113,41 @@ public class DeviceHeartbeatTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Heartbeat_TrimsDeviceId_AndClampsFuturePollTimestampToServerNow()
+    {
+        var deviceId = "dev-" + Guid.NewGuid().ToString("N");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                lastSuccessfulPollAt = DateTime.UtcNow.AddHours(4)
+            })
+        };
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        request.Headers.Add("X-Device-Id", $"  {deviceId}  ");
+
+        var before = DateTime.UtcNow;
+        (await Client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var after = DateTime.UtcNow;
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var device = db.PrinterDevices.Single(d => d.DeviceId == deviceId);
+        device.LastSuccessfulPollAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+    }
+
+    [Fact]
+    public async Task Heartbeat_WhitespaceOrOversizedNormalizedDeviceId_IsRejected()
+    {
+        var empty = await PostHeartbeatAsync("   ");
+        empty.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var oversized = await PostHeartbeatAsync("  " + new string('x', 65) + "  ");
+        oversized.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Heartbeat_CapabilitiesAndRoutingMode_ArePersistedAdditively()
     {
         var deviceId = "dev-" + Guid.NewGuid().ToString("N");

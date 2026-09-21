@@ -103,6 +103,41 @@ public sealed class OrderRoutingTargetResolverTests
     }
 
     [Fact]
+    public void UnassignedChildren_InheritNearestStationInsteadOfDefault()
+    {
+        var root = Item(KitchenType.FrontKitchen);
+        var child = Item(KitchenType.None);
+        var grandchild = Item(KitchenType.None);
+        child.ParentOrderItemId = root.Id = Guid.NewGuid();
+        grandchild.ParentOrderItemId = child.Id = Guid.NewGuid();
+        child.ChildOrderItems.Add(grandchild);
+        root.ChildOrderItems.Add(child);
+
+        var order = new Order { CreatedBy = "test", Items = [root, child, grandchild] };
+
+        OrderRoutingTargetResolver.ResolveTargets(order, DeviceKitchenRoutingMode.Stations)
+            .Should().BeEquivalentTo([DevicePrintTarget.Cashier, DevicePrintTarget.FrontKitchen]);
+    }
+
+    [Fact]
+    public void ExplicitChildStation_BecomesNearestParentForItsUnassignedChild()
+    {
+        var root = Item(KitchenType.None);
+        var child = Item(KitchenType.BackKitchen);
+        var grandchild = Item(KitchenType.None);
+        child.ParentOrderItemId = root.Id = Guid.NewGuid();
+        grandchild.ParentOrderItemId = child.Id = Guid.NewGuid();
+        child.ChildOrderItems.Add(grandchild);
+        root.ChildOrderItems.Add(child);
+
+        var order = new Order { CreatedBy = "test", Items = [root, child, grandchild] };
+
+        OrderRoutingTargetResolver.ResolveTargets(order, DeviceKitchenRoutingMode.Stations)
+            .Should().BeEquivalentTo([DevicePrintTarget.Cashier, DevicePrintTarget.Default,
+                DevicePrintTarget.BackKitchen]);
+    }
+
+    [Fact]
     public void NoKitchenDesignation_UsesGeneralRoute()
     {
         var order = new Order { CreatedBy = "test", Items = [Item(KitchenType.None)] };
@@ -131,7 +166,7 @@ public sealed class OrderRoutingTargetResolverTests
         OrderRoutingTargetResolver.CanApply(DevicePrintStatus.Printed, DevicePrintStatus.Failed)
             .Should().BeFalse();
         OrderRoutingTargetResolver.CanApply(DevicePrintStatus.Queued, DevicePrintStatus.Sent)
-            .Should().BeTrue();
+            .Should().BeFalse();
     }
 
     [Fact]

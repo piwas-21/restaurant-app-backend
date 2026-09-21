@@ -55,8 +55,11 @@ public class PrinterFeedController : ControllerBase
     {
         try
         {
+            var submittedDeviceId = Request.Headers.ContainsKey("X-Device-Id")
+                ? deviceId ?? string.Empty
+                : null;
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince, language, deviceId),
+                new PrinterFeedQuery(modifiedSince, language, submittedDeviceId),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
@@ -82,7 +85,7 @@ public class PrinterFeedController : ControllerBase
             return Ok(new
             {
                 success = false,
-                message = ex.Message,
+                message = "Printer feed request failed. Retry shortly.",
                 data = new
                 {
                     items = Array.Empty<object>(),

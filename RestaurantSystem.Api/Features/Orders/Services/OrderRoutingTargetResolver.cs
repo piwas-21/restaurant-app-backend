@@ -12,7 +12,7 @@ internal static class OrderRoutingTargetResolver
     {
         var targets = order.Items
             .Where(item => !item.ParentOrderItemId.HasValue)
-            .SelectMany(item => ResolveItemTargets(item, routingMode))
+            .SelectMany(item => ResolveItemTargets(item, routingMode, DevicePrintTarget.Default))
             .ToHashSet();
         // The cashier receipt is an independent operational destination. Keeping it in the
         // durable route set prevents a device-aware printer client from suppressing the cashier
@@ -22,7 +22,8 @@ internal static class OrderRoutingTargetResolver
     }
 
     internal static IEnumerable<DevicePrintTarget> ResolveItemTargets(
-        OrderItem item, DeviceKitchenRoutingMode routingMode)
+        OrderItem item, DeviceKitchenRoutingMode routingMode,
+        DevicePrintTarget inheritedTarget = DevicePrintTarget.Default)
     {
         var kitchenTypes = new List<KitchenType>();
         if (item.Product is not null)
@@ -37,41 +38,49 @@ internal static class OrderRoutingTargetResolver
                 .Select(menuItem => menuItem.Product!.KitchenType));
         }
 
-        var childTargets = item.ChildOrderItems
-            .SelectMany(child => ResolveItemTargets(child, routingMode))
-            .ToList();
         var declaredKitchenTypes = kitchenTypes
             .Where(kitchenType => kitchenType != KitchenType.None)
             .Distinct()
             .ToList();
 
+        if (routingMode == DeviceKitchenRoutingMode.SingleKitchen)
+        {
+            return new[] { DevicePrintTarget.General }
+                .Concat(item.ChildOrderItems.SelectMany(child =>
+                    ResolveItemTargets(child, routingMode, DevicePrintTarget.General)));
+        }
+
+        var ownTarget = declaredKitchenTypes
+            .Select(MapStationTarget)
+            .FirstOrDefault(inheritedTarget);
+        var childTargets = item.ChildOrderItems
+            .SelectMany(child => ResolveItemTargets(child, routingMode, ownTarget))
+            .ToList();
+
         // Order reads expose a root-only DTO tree, while release-side reads can contain the
         // tracked child rows as a navigation. Walk the complete tree so a nested bundle component
         // cannot disappear from its kitchen's route. A component without a kitchen inherits its
-        // parent's target in the printer app; it must not manufacture a General ticket here.
+        // nearest parent's target in the printer app; it must not manufacture a General ticket here.
         if (declaredKitchenTypes.Count == 0 && childTargets.Count > 0)
         {
-            return childTargets;
+            return new[] { ownTarget }.Concat(childTargets);
         }
 
         if (declaredKitchenTypes.Count == 0)
         {
-            declaredKitchenTypes.Add(KitchenType.None);
+            return new[] { ownTarget }.Concat(childTargets);
         }
 
-        return declaredKitchenTypes
-            .Select(kitchenType => kitchenType switch
-            {
-                KitchenType.FrontKitchen when routingMode == DeviceKitchenRoutingMode.Stations
-                    => DevicePrintTarget.FrontKitchen,
-                KitchenType.BackKitchen when routingMode == DeviceKitchenRoutingMode.Stations
-                    => DevicePrintTarget.BackKitchen,
-                KitchenType.None when routingMode == DeviceKitchenRoutingMode.Stations
-                    => DevicePrintTarget.Default,
-                _ => DevicePrintTarget.General
-            })
+        return declaredKitchenTypes.Select(MapStationTarget)
             .Concat(childTargets);
     }
+
+    private static DevicePrintTarget MapStationTarget(KitchenType kitchenType) => kitchenType switch
+    {
+        KitchenType.FrontKitchen => DevicePrintTarget.FrontKitchen,
+        KitchenType.BackKitchen => DevicePrintTarget.BackKitchen,
+        _ => DevicePrintTarget.Default,
+    };
 
     internal static Guid CreateStableJobId(Guid orderId, DevicePrintTarget target)
     {
@@ -88,8 +97,7 @@ internal static class OrderRoutingTargetResolver
 
         return current switch
         {
-            DevicePrintStatus.Queued => next is DevicePrintStatus.Received
-                or DevicePrintStatus.Sent or DevicePrintStatus.Printed
+            DevicePrintStatus.Queued => next is DevicePrintStatus.Printed
                 or DevicePrintStatus.Failed or DevicePrintStatus.Skipped or DevicePrintStatus.Unknown,
             DevicePrintStatus.Received or DevicePrintStatus.Sent or DevicePrintStatus.Unknown =>
                 next is DevicePrintStatus.Printed or DevicePrintStatus.Failed or DevicePrintStatus.Unknown
