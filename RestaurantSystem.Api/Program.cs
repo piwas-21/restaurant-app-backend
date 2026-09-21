@@ -701,6 +701,7 @@ builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationS
 builder.Services.AddOrderPaymentServices();
 builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
+builder.Services.AddServerWorkspaceServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
