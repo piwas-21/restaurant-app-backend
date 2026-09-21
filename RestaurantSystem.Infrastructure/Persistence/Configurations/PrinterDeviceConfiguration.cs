@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -18,6 +19,12 @@ public class PrinterDeviceConfiguration : IEntityTypeConfiguration<PrinterDevice
         builder.Property(d => d.ApiBaseUrl).HasMaxLength(300);
         builder.Property(d => d.KitchenPrinter).HasMaxLength(120);
         builder.Property(d => d.CashierPrinter).HasMaxLength(120);
+        builder.Property(d => d.KitchenRoutingMode)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .HasDefaultValue(DeviceKitchenRoutingMode.Stations)
+            .HasSentinel(DeviceKitchenRoutingMode.Stations)
+            .IsRequired();
 
         // The X-Device-Id is the natural upsert key — one row per installation.
         builder.HasIndex(d => d.DeviceId).IsUnique();

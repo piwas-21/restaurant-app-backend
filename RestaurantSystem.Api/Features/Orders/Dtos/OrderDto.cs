@@ -123,4 +123,8 @@ public record OrderDto
     public List<OrderPaymentDto> Payments { get; set; } = new();
     public List<OrderStatusHistoryDto> StatusHistory { get; set; } = new();
 
+    /// <summary>Durable printer-routing state when the staff projection loaded it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OrderRoutingStateDto>? RoutingStates { get; set; }
+
 }

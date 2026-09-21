@@ -9,6 +9,7 @@ public static class StaffOrderServiceExtensions
         services.AddScoped<IStaffCounterOrderBuilder, StaffCounterOrderBuilder>();
         services.AddScoped<IStaffCounterOrderPricing, StaffCounterOrderPricing>();
         services.AddScoped<IStaffOrderOperationStore, StaffOrderOperationStore>();
+        services.AddScoped<IOrderRoutingService, OrderRoutingService>();
         return services;
     }
 }

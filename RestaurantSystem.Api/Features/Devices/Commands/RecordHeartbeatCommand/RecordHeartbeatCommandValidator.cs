@@ -1,4 +1,5 @@
 using FluentValidation;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Devices.Commands.RecordHeartbeatCommand;
 
@@ -16,5 +17,19 @@ public class RecordHeartbeatCommandValidator : AbstractValidator<RecordHeartbeat
         RuleFor(x => x.ApiBaseUrl).MaximumLength(300);
         RuleFor(x => x.KitchenPrinter).MaximumLength(120);
         RuleFor(x => x.CashierPrinter).MaximumLength(120);
+        RuleFor(x => x.TargetCapabilities)
+            .Must(capabilities => capabilities is null
+                || capabilities.Count <= Enum.GetValues<DevicePrintTarget>().Length)
+            .WithMessage("A heartbeat may report each printer target at most once.");
+        RuleFor(x => x.TargetCapabilities)
+            .Must(capabilities => capabilities is null
+                || capabilities.Select(item => item.Target).Distinct().Count() == capabilities.Count)
+            .WithMessage("A heartbeat cannot contain duplicate printer targets.");
+        RuleForEach(x => x.TargetCapabilities).ChildRules(capability =>
+        {
+            capability.RuleFor(item => item.Target).IsInEnum();
+            capability.RuleFor(item => item.PrinterName).MaximumLength(120);
+        });
+        RuleFor(x => x.KitchenRoutingMode).IsInEnum();
     }
 }

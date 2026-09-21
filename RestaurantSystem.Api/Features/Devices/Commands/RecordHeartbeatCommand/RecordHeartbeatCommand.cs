@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Devices.Commands.RecordHeartbeatCommand;
@@ -25,7 +27,9 @@ public record RecordHeartbeatCommand(
     DateTime? LastSuccessfulPollAt,
     string? ApiBaseUrl,
     string? KitchenPrinter,
-    string? CashierPrinter
+    string? CashierPrinter,
+    List<PrinterTargetCapabilityDto>? TargetCapabilities = null,
+    DeviceKitchenRoutingMode? KitchenRoutingMode = null
 ) : ICommand<ApiResponse<bool>>;
 
 public class RecordHeartbeatCommandHandler
@@ -44,6 +48,7 @@ public class RecordHeartbeatCommandHandler
     public async Task<ApiResponse<bool>> Handle(
         RecordHeartbeatCommand command, CancellationToken cancellationToken)
     {
+        var auditId = _currentUserService.GetAuditIdentifier();
         var device = await _context.PrinterDevices
             .FirstOrDefaultAsync(d => d.DeviceId == command.DeviceId, cancellationToken);
 
@@ -52,7 +57,7 @@ public class RecordHeartbeatCommandHandler
             device = new PrinterDevice
             {
                 DeviceId = command.DeviceId,
-                CreatedBy = _currentUserService.GetAuditIdentifier(),
+                CreatedBy = auditId,
             };
             _context.PrinterDevices.Add(device);
         }
@@ -71,9 +76,93 @@ public class RecordHeartbeatCommandHandler
         device.ApiBaseUrl = command.ApiBaseUrl;
         device.KitchenPrinter = command.KitchenPrinter;
         device.CashierPrinter = command.CashierPrinter;
+        if (command.KitchenRoutingMode.HasValue)
+        {
+            device.KitchenRoutingMode = command.KitchenRoutingMode.Value;
+        }
         device.LastHeartbeatAt = DateTime.UtcNow;
+
+        if (command.TargetCapabilities is not null)
+        {
+            await UpsertCapabilitiesAsync(device.DeviceId, command.TargetCapabilities, auditId,
+                cancellationToken);
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
         return ApiResponse<bool>.SuccessWithData(true, "Heartbeat recorded.");
+    }
+
+    private async Task UpsertCapabilitiesAsync(
+        string deviceId, IReadOnlyCollection<PrinterTargetCapabilityDto> reports,
+        string auditId, CancellationToken cancellationToken)
+    {
+        var normalizedReports = reports
+            .GroupBy(report => report.Target)
+            .Select(group => group.Last())
+            .ToList();
+        var reportedAt = DateTime.UtcNow;
+        if (normalizedReports.Count == 0)
+        {
+            // An omitted list means an old client and deliberately preserves the last report. An
+            // explicit empty list comes from a capability-aware client with no usable targets;
+            // mark its previous rows unsupported immediately so a just-disabled printer cannot
+            // remain ready during the heartbeat freshness window.
+            var priorReports = await _context.PrinterDeviceTargetCapabilities
+                .Where(capability => capability.DeviceId == deviceId)
+                .ToListAsync(cancellationToken);
+            foreach (var capability in priorReports)
+            {
+                capability.IsSupported = false;
+                capability.IsConfigured = false;
+                capability.AutoPrintEnabled = false;
+                capability.ReportedAt = reportedAt;
+                capability.UpdatedAt = reportedAt;
+                capability.UpdatedBy = auditId;
+            }
+
+            return;
+        }
+
+        var existing = await _context.PrinterDeviceTargetCapabilities
+            .Where(capability => capability.DeviceId == deviceId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var report in normalizedReports)
+        {
+            var capability = existing.SingleOrDefault(item => item.Target == report.Target);
+            if (capability is null)
+            {
+                capability = new PrinterDeviceTargetCapability
+                {
+                    DeviceId = deviceId,
+                    Target = report.Target,
+                    CreatedBy = auditId
+                };
+                _context.PrinterDeviceTargetCapabilities.Add(capability);
+                existing.Add(capability);
+            }
+
+            capability.IsSupported = report.IsSupported;
+            capability.IsConfigured = report.IsConfigured;
+            capability.AutoPrintEnabled = report.AutoPrintEnabled;
+            capability.PrinterName = report.PrinterName;
+            capability.ReportedAt = reportedAt;
+            capability.UpdatedAt = reportedAt;
+            capability.UpdatedBy = auditId;
+        }
+
+        // A capability-aware heartbeat is a complete snapshot, not a patch. If a printer target
+        // disappears from the list (for example the front station was unplugged), leaving the old
+        // row ready would keep routing new orders to a destination the device can no longer print.
+        var reportedTargets = normalizedReports.Select(report => report.Target).ToHashSet();
+        foreach (var capability in existing.Where(item => !reportedTargets.Contains(item.Target)))
+        {
+            capability.IsSupported = false;
+            capability.IsConfigured = false;
+            capability.AutoPrintEnabled = false;
+            capability.ReportedAt = reportedAt;
+            capability.UpdatedAt = reportedAt;
+            capability.UpdatedBy = auditId;
+        }
     }
 }

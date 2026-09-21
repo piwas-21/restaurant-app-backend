@@ -46,6 +46,7 @@ public sealed class StaffOrderOperationStore : IStaffOrderOperationStore
             .Include(order => order.Payments)
             .Include(order => order.StatusHistory)
             .Include(order => order.DeliveryAddress)
+            .Include(order => order.RoutingStates)
             .AsSplitQuery()
             .SingleOrDefaultAsync(order => order.Id == orderId && !order.IsDeleted, cancellationToken);
 }

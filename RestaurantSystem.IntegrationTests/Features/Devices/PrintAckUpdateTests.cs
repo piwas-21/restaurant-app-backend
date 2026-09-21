@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Devices.Dtos;
@@ -163,6 +164,74 @@ public class PrintAckUpdateTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await ReadResponseAsync<ApiResponse<List<MissedOrderDto>>>(response);
         body!.Data.Should().Contain(order => order.OrderId == orderId);
+    }
+
+    [Fact]
+    public async Task A_routed_order_with_every_target_printed_is_not_reported_as_missed()
+    {
+        var orderId = Guid.NewGuid();
+        var old = DateTime.UtcNow.AddHours(-1);
+        var deviceId = NewDeviceId();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = Db(scope);
+            db.Orders.Add(new Order
+            {
+                Id = orderId,
+                OrderNumber = "ACK-ROUTED-PRINTED",
+                Type = OrderType.Takeaway,
+                Status = OrderStatus.Confirmed,
+                PaymentStatus = PaymentStatus.Pending,
+                IsKitchenReleased = true,
+                Total = 10m,
+                OrderDate = old,
+                CreatedBy = "test",
+            });
+            await db.SaveChangesAsync();
+
+            var routes = new[] { DevicePrintTarget.Cashier, DevicePrintTarget.General }
+                .Select(target => new OrderRoutingState
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = orderId,
+                    JobId = Guid.NewGuid(),
+                    Revision = 1,
+                    Version = 2,
+                    Target = target,
+                    Status = DevicePrintStatus.Printed,
+                    DeviceId = deviceId,
+                    LastAcknowledgedAt = old,
+                    CreatedBy = "test",
+                })
+                .ToArray();
+            db.OrderRoutingStates.AddRange(routes);
+            db.DeviceOrderReceipts.AddRange(routes.Select(route => new DeviceOrderReceipt
+            {
+                DeviceId = deviceId,
+                OrderId = orderId,
+                JobId = route.JobId,
+                Revision = route.Revision,
+                JobType = DevicePrintJobType.Order,
+                Target = route.Target,
+                Status = DevicePrintStatus.Printed,
+                ReceivedAt = old,
+                PrintedAt = old,
+                Copies = 1,
+                CreatedBy = "test",
+            }));
+            await db.SaveChangesAsync();
+
+            var stored = await db.Orders.SingleAsync(order => order.Id == orderId);
+            stored.CreatedAt = old;
+            stored.OrderDate = old;
+            await db.SaveChangesAsync();
+        }
+
+        AuthenticateAsAdmin();
+        var response = await Client.GetAsync("/api/devices/missed-orders?graceMinutes=15");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await ReadResponseAsync<ApiResponse<List<MissedOrderDto>>>(response);
+        body!.Data.Should().NotContain(order => order.OrderId == orderId);
     }
 
     [Fact]

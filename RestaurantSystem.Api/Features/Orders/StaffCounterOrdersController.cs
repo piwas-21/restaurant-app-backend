@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffCounterOrderComma
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.ReleaseStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 
 namespace RestaurantSystem.Api.Features.Orders;
 
@@ -20,8 +21,13 @@ namespace RestaurantSystem.Api.Features.Orders;
 public sealed class StaffCounterOrdersController : ControllerBase
 {
     private readonly CustomMediator _mediator;
+    private readonly IOrderRoutingService _routing;
 
-    public StaffCounterOrdersController(CustomMediator mediator) => _mediator = mediator;
+    public StaffCounterOrdersController(CustomMediator mediator, IOrderRoutingService routing)
+    {
+        _mediator = mediator;
+        _routing = routing;
+    }
 
     [HttpPost("quote")]
     public async Task<ActionResult<ApiResponse<OrderDto>>> Quote(
@@ -40,4 +46,11 @@ public sealed class StaffCounterOrdersController : ControllerBase
         command.OrderId = orderId;
         return Ok(await _mediator.SendCommand(command));
     }
+
+    /// <summary>Returns the authoritative route lifecycle for a staff-visible order.</summary>
+    [HttpGet("{orderId:guid}/routing")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<OrderRoutingStateDto>>>> Routing(
+        Guid orderId, CancellationToken cancellationToken)
+        => Ok(ApiResponse<IReadOnlyList<OrderRoutingStateDto>>.SuccessWithData(
+            await _routing.ProjectAsync(orderId, cancellationToken), "Routing state loaded."));
 }

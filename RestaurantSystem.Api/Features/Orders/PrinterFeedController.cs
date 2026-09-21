@@ -50,12 +50,13 @@ public class PrinterFeedController : ControllerBase
         [FromQuery] DateTime? modifiedSince,
         [FromQuery] string? language,
         [FromQuery] string? updateCursor,
+        [FromHeader(Name = "X-Device-Id")] string? deviceId,
         CancellationToken cancellationToken)
     {
         try
         {
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince, language),
+                new PrinterFeedQuery(modifiedSince, language, deviceId),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);

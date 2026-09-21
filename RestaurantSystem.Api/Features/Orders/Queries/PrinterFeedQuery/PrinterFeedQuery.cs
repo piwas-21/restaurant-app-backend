@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -17,7 +18,10 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
 /// PreferredLanguage within the same set; anything else (or absent) is today's behaviour — the
 /// frozen single-language names. See <see cref="OrderDisplayTranslator"/>.
 /// </summary>
-public record PrinterFeedQuery(DateTime? ModifiedSince, string? Language = null) : IQuery<List<OrderDto>>
+public record PrinterFeedQuery(
+    DateTime? ModifiedSince,
+    string? Language = null,
+    string? DeviceId = null) : IQuery<List<OrderDto>>
 {
     public const int MaxOrdersPerPoll = 50;
 }
@@ -27,23 +31,49 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
     private readonly ApplicationDbContext _context;
     private readonly IOrderMappingService _mappingService;
     private readonly IOrderDisplayTranslator _displayTranslator;
+    private readonly IOrderRoutingService _routing;
     private readonly ILogger<PrinterFeedQueryHandler> _logger;
 
     public PrinterFeedQueryHandler(
         ApplicationDbContext context,
         IOrderMappingService mappingService,
         IOrderDisplayTranslator displayTranslator,
+        IOrderRoutingService routing,
         ILogger<PrinterFeedQueryHandler> logger)
     {
         _context = context;
         _mappingService = mappingService;
         _displayTranslator = displayTranslator;
+        _routing = routing;
         _logger = logger;
     }
 
     public async Task<List<OrderDto>> Handle(PrinterFeedQuery query, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Printer feed request - modifiedSince: {Since}", query.ModifiedSince);
+        var deviceId = NormalizeDeviceId(query.DeviceId);
+        _logger.LogInformation("Printer feed request - modifiedSince: {Since}, device: {DeviceId}",
+            query.ModifiedSince, deviceId ?? "legacy");
+
+        if (deviceId is not null)
+        {
+            if (deviceId.Length > 64)
+            {
+                throw new BadRequestException("The X-Device-Id header is too long.");
+            }
+
+            var knownDevice = await _context.PrinterDevices
+                .AsNoTracking()
+                .AnyAsync(device => device.DeviceId == deviceId, cancellationToken);
+            if (!knownDevice)
+            {
+                throw new BadRequestException("The X-Device-Id header is not registered.");
+            }
+
+            // A released order may have been created before this installation first reported its
+            // capabilities. Reconcile only this device's pending routes before reading the feed so
+            // an offline release becomes printable after the device comes back online.
+            await _routing.ReconcileDeviceRoutesAsync(deviceId, cancellationToken);
+        }
 
         // Explicit !IsDeleted filter mirrors the original inline code; the
         // global query filter would also handle this but we keep it explicit
@@ -72,6 +102,20 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             // continuously by the printer app, so the row blow-up is not a one-off cost.
             .AsSplitQuery()
             .AsQueryable();
+
+        if (deviceId is not null)
+        {
+            // Device-aware clients receive legacy/unrouted orders plus only Queued route jobs
+            // assigned to this device. The filtered include is intentional: returning terminal,
+            // uncertain, or another device's states would make the client print a completed job or
+            // fall back to a broadcast path. Missing X-Device-Id keeps the legacy projection.
+            ordersQuery = ordersQuery
+                .Include(o => o.RoutingStates.Where(state =>
+                    state.DeviceId == deviceId && state.Status == DevicePrintStatus.Queued))
+                .Where(o => !o.RoutingStates.Any()
+                    || o.RoutingStates.Any(state => state.DeviceId == deviceId
+                        && state.Status == DevicePrintStatus.Queued));
+        }
 
         // Kind-normalised first: a cursor with no offset (`?modifiedSince=2026-08-27`) binds
         // Unspecified, which Npgsql will not compare with the timestamptz column — the poll then
@@ -120,8 +164,13 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             dto.GuestStatusToken = null;
         }
 
-        _logger.LogInformation("Printer feed returning {Count} confirmed orders", orderDtos.Count);
+        _logger.LogInformation("Printer feed returning {Count} confirmed orders for {Device}",
+            orderDtos.Count, deviceId ?? "legacy");
 
         return orderDtos;
     }
+
+    private static string? NormalizeDeviceId(string? deviceId) =>
+        string.IsNullOrWhiteSpace(deviceId) ? null : deviceId.Trim();
+
 }

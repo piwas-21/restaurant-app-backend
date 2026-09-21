@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 using Xunit;
@@ -109,5 +110,146 @@ public class DeviceHeartbeatTests : IntegrationTestBase
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         db.PrinterDevices.Single(d => d.DeviceId == deviceId).LastSuccessfulPollAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Heartbeat_CapabilitiesAndRoutingMode_ArePersistedAdditively()
+    {
+        var deviceId = "dev-" + Guid.NewGuid().ToString("N");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                kitchenPrinter = "front:9100",
+                kitchenRoutingMode = "Stations",
+                targetCapabilities = new[]
+                {
+                    new { target = "FrontKitchen", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true, printerName = "front" },
+                    new { target = "BackKitchen", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true, printerName = "back" }
+                }
+            })
+        };
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        request.Headers.Add("X-Device-Id", deviceId);
+
+        (await Client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.PrinterDevices.Single(d => d.DeviceId == deviceId)
+            .KitchenRoutingMode.Should().Be(DeviceKitchenRoutingMode.Stations);
+        db.PrinterDeviceTargetCapabilities.Count(c => c.DeviceId == deviceId).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Heartbeat_DuplicateCapabilities_AreRejectedBeforeUniqueIndex()
+    {
+        var deviceId = "dev-" + Guid.NewGuid().ToString("N");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                targetCapabilities = new[]
+                {
+                    new { target = "General", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true },
+                    new { target = "General", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true }
+                }
+            })
+        };
+        request.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        request.Headers.Add("X-Device-Id", deviceId);
+
+        (await Client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Heartbeat_ExplicitEmptyCapabilities_StalesPreviousTargets()
+    {
+        var deviceId = "dev-" + Guid.NewGuid().ToString("N");
+        var first = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                targetCapabilities = new[]
+                {
+                    new { target = "General", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true }
+                }
+            })
+        };
+        first.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        first.Headers.Add("X-Device-Id", deviceId);
+        (await Client.SendAsync(first)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var empty = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new { feedRunning = true, targetCapabilities = Array.Empty<object>() })
+        };
+        empty.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        empty.Headers.Add("X-Device-Id", deviceId);
+        (await Client.SendAsync(empty)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var capability = db.PrinterDeviceTargetCapabilities
+            .Single(item => item.DeviceId == deviceId && item.Target == DevicePrintTarget.General);
+        capability.IsSupported.Should().BeFalse();
+        capability.IsConfigured.Should().BeFalse();
+        capability.AutoPrintEnabled.Should().BeFalse();
+        capability.ReportedAt.Should().BeAfter(DateTime.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task Heartbeat_PartialCapabilitySnapshot_StalesTargetsRemovedFromList()
+    {
+        var deviceId = "dev-" + Guid.NewGuid().ToString("N");
+        var first = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                targetCapabilities = new[]
+                {
+                    new { target = "General", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true },
+                    new { target = "FrontKitchen", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true }
+                }
+            })
+        };
+        first.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        first.Headers.Add("X-Device-Id", deviceId);
+        (await Client.SendAsync(first)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var second = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                targetCapabilities = new[]
+                {
+                    new { target = "General", isSupported = true, isConfigured = true,
+                        autoPrintEnabled = true }
+                }
+            })
+        };
+        second.Headers.Add(DeviceApiKeyHeader, TestPrinterApiKey);
+        second.Headers.Add("X-Device-Id", deviceId);
+        (await Client.SendAsync(second)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var removed = db.PrinterDeviceTargetCapabilities
+            .Single(item => item.DeviceId == deviceId && item.Target == DevicePrintTarget.FrontKitchen);
+        removed.IsSupported.Should().BeFalse();
+        removed.IsConfigured.Should().BeFalse();
+        removed.AutoPrintEnabled.Should().BeFalse();
     }
 }
