@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -15,13 +16,13 @@ namespace RestaurantSystem.Api.Features.Orders.Queries.GetGuestOrderStatusQuery;
 /// </summary>
 /// <remarks>
 /// Same shape and same guard as <see cref="GetOrderForQuickActionQuery"/>: the anonymous lookup is
-/// authorised by the order's 128-bit id PLUS its <c>QuickActionToken</c> bearer secret, both of
+/// authorised by the order's 128-bit id PLUS its <c>GuestStatusToken</c> bearer secret, both of
 /// which the guest received on the confirmation URL at creation. A wrong token renders the same
 /// empty result as an unknown order, so neither route can be used to test whether a given order
 /// exists.
 /// </remarks>
 /// <param name="OrderId">The order's aggregate id, from the confirmation URL.</param>
-/// <param name="Token">The order's <c>QuickActionToken</c>, from the confirmation URL. Null/empty never matches.</param>
+/// <param name="Token">The order's <c>GuestStatusToken</c>, from the confirmation URL. Null/empty never matches.</param>
 public record GetGuestOrderStatusQuery(Guid OrderId, string? Token) : IQuery<GuestOrderStatusDto?>;
 
 public class GetGuestOrderStatusQueryHandler : IQueryHandler<GetGuestOrderStatusQuery, GuestOrderStatusDto?>
@@ -52,7 +53,16 @@ public class GetGuestOrderStatusQueryHandler : IQueryHandler<GetGuestOrderStatus
         var match = await _context.Orders
             .AsNoTracking()
             .Where(o => o.Id == query.OrderId)
-            .Select(o => new { o.Id, o.OrderNumber, o.Type, o.Status, o.EstimatedDeliveryTime, o.GuestStatusToken })
+            .Select(o => new
+            {
+                o.Id,
+                o.OrderNumber,
+                o.Type,
+                o.Status,
+                o.OrderDate,
+                o.EstimatedDeliveryTime,
+                o.GuestStatusToken
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (match is null || !QuickActionTokens.Matches(match.GuestStatusToken, query.Token))
@@ -65,6 +75,27 @@ public class GetGuestOrderStatusQueryHandler : IQueryHandler<GetGuestOrderStatus
             return null;
         }
 
-        return new GuestOrderStatusDto(match.OrderNumber, match.Type, match.Status, match.EstimatedDeliveryTime);
+        var configuration = await _context.OrderTypeConfigurations
+            .AsNoTracking()
+            .Where(c => c.OrderType == match.Type)
+            .Select(c => new { c.ConfirmationFlow, c.ReviewWindowMinutes })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var confirmationFlow = configuration?.ConfirmationFlow
+            ?? OrderTypeConfiguration.DefaultConfirmationFlow;
+        var reviewWindowMinutes = configuration?.ReviewWindowMinutes
+            ?? OrderTypeConfiguration.DefaultReviewWindowMinutes;
+        var reviewDeadlineUtc = confirmationFlow == OrderConfirmationFlows.Acknowledge
+            ? match.OrderDate.AddMinutes(reviewWindowMinutes)
+            : (DateTime?)null;
+
+        return new GuestOrderStatusDto(
+            match.OrderNumber,
+            match.Type,
+            match.Status,
+            match.EstimatedDeliveryTime,
+            confirmationFlow,
+            reviewWindowMinutes,
+            reviewDeadlineUtc);
     }
 }
