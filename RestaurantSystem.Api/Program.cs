@@ -597,6 +597,18 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(rateLimiter.CheckoutStatusWindowMinutes),
             QueueLimit = 0
         }));
+
+    // The live guest review screen is intentionally more responsive than payment settlement and
+    // reads only our local order projection. Keep it out of checkout-status so several guests on
+    // the venue's Wi-Fi cannot throttle one another or a diner returning from Stripe.
+    options.AddPolicy("guest-order-status", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = rateLimiter.GuestOrderStatusPermitLimit,
+            Window = TimeSpan.FromMinutes(rateLimiter.GuestOrderStatusWindowMinutes),
+            QueueLimit = 0
+        }));
 });
 
 builder.Services.AddInfrastructureRegistration();

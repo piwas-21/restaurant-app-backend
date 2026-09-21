@@ -70,7 +70,7 @@ public class OrderQuickActionsController : ControllerBase
     /// </summary>
     [HttpGet("guest-status")]
     [AllowAnonymous]
-    [EnableRateLimiting("checkout-status")]
+    [EnableRateLimiting("guest-order-status")]
     public async Task<ActionResult<ApiResponse<GuestOrderStatusDto>>> GuestStatus(
         [FromQuery] Guid orderId,
         [FromQuery] string? token,
