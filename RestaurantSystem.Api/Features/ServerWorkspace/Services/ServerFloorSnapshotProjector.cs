@@ -74,14 +74,11 @@ internal sealed class ServerFloorSnapshotProjector
         var legacy = LegacyForTable(table, orders);
         var legacyOperational = legacy.Where(IsOccupyingLegacy).ToList();
         var hasLegacyAmbiguity = legacy.Any(IsBlockingLegacy);
-        var summary = session is null ? null : SummarizeSession(session, orders, legacy, serverTime);
+        var summary = session is null ? null : SummarizeSession(session, legacy, serverTime);
         var readyCount = summary?.ReadyRoundCount ?? legacyOperational.Count(IsReady);
-        var state = !table.IsActive ? "Inactive"
-            : readyCount > 0 ? "Ready"
-            : summary is not null ? "Open"
-            : hasLegacyAmbiguity ? "Ambiguous"
-            : reservation?.IsCurrent == true ? "Reserved"
-            : "Available";
+        var state = DetermineTableState(
+            table.IsActive, readyCount, summary is not null,
+            hasLegacyAmbiguity, reservation?.IsCurrent == true);
         var legacyDto = legacyOperational.Count == 0 ? null : new ServerFloorLegacySummaryDto
         {
             OrderCount = legacyOperational.Count,
@@ -119,7 +116,6 @@ internal sealed class ServerFloorSnapshotProjector
 
     private ServerFloorSessionSummaryDto SummarizeSession(
         FloorSessionRow session,
-        IReadOnlyCollection<FloorOrderRow> orders,
         IReadOnlyCollection<FloorOrderRow> legacy,
         DateTime serverTime)
     {
@@ -148,6 +144,20 @@ internal sealed class ServerFloorSnapshotProjector
             CanClose = assessment.CanClose,
             HasLegacyAmbiguity = assessment.LegacyActiveOrderCount > 0
         };
+    }
+
+    private static string DetermineTableState(
+        bool isActive,
+        int readyCount,
+        bool hasOpenSession,
+        bool hasLegacyAmbiguity,
+        bool hasCurrentReservation)
+    {
+        if (!isActive) return "Inactive";
+        if (readyCount > 0) return "Ready";
+        if (hasOpenSession) return "Open";
+        if (hasLegacyAmbiguity) return "Ambiguous";
+        return hasCurrentReservation ? "Reserved" : "Available";
     }
 
     private List<string> PermittedActions(
