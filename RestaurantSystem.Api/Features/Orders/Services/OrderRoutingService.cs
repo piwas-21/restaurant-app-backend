@@ -68,8 +68,13 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
         }
     }
 
+    /// <summary>
+    /// Returns the durable tenant opt-in signal from the first capability-aware printer app.
+    /// This activation is intentionally irreversible: stale or unsupported-only devices must not
+    /// restore legacy broadcast, because a capable device could later claim the same order and
+    /// print duplicate paper. An explicit future operational reset is required to opt out.
+    /// </summary>
     public Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken) =>
-        // A capability row is the durable opt-in signal from a capability-aware printer app.
         // Merely having OrderRoutingStates is not enough: those rows are created for every new
         // released order, including tenants that still run only legacy broadcast clients.
         _context.PrinterDeviceTargetCapabilities.AsNoTracking().AnyAsync(cancellationToken);

@@ -18,6 +18,17 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 // Existing routes predate the distinction and were all treated as delivery work.
                 // Preserve that safety posture; newly created cashier routes explicitly set false.
                 defaultValue: true);
+
+            // Historical cashier routes are optional; the default only protects new or unknown
+            // rows while this migration backfills the target-specific meaning of existing rows.
+            migrationBuilder.Sql(
+                """
+                UPDATE "OrderRoutingStates"
+                SET "is_required" = CASE
+                    WHEN "target" = 'Cashier' THEN FALSE
+                    ELSE TRUE
+                END;
+                """);
         }
 
         /// <inheritdoc />

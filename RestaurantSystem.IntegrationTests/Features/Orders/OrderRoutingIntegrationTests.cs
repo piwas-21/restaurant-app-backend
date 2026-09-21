@@ -420,6 +420,20 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Routing_activation_remains_suppressed_after_capability_becomes_unsupported()
+    {
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        await ClearDeviceCapabilitiesAsync(deviceId);
+        var order = await CreateReleasedOrderAsync();
+
+        // The first capability heartbeat is an irreversible tenant opt-in for this rollout.
+        // Stale or unsupported-only devices keep legacy broadcast suppressed until an explicit
+        // future operational reset, so a later capable device cannot duplicate the same paper.
+        var legacyFeed = await FetchPrinterFeedAsync();
+        OrderNumbers(legacyFeed).Should().NotContain(order.OrderNumber);
+    }
+
+    [Fact]
     public async Task Device_feed_rejects_unknown_identity_but_missing_identity_keeps_legacy_orders()
     {
         var order = await CreateReleasedOrderAsync();
@@ -597,6 +611,21 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         };
         request.Headers.Add("X-Device-Id", deviceId);
         return await Client.SendAsync(request);
+    }
+
+    private async Task ClearDeviceCapabilitiesAsync(string deviceId)
+    {
+        AuthenticateAsDevice();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/devices/heartbeat")
+        {
+            Content = JsonContent.Create(new
+            {
+                feedRunning = true,
+                targetCapabilities = Array.Empty<object>()
+            })
+        };
+        request.Headers.Add("X-Device-Id", deviceId);
+        (await Client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private object CreateBody(Guid operationId, bool releaseToKitchen) => new
