@@ -81,6 +81,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         futureReserved.Reservation!.IsCurrent.Should().BeFalse();
         futureReserved.State.Should().Be("Available",
             "tomorrow's reservation is context, not a claim that the table is occupied now");
+        futureReserved.PermittedActions.Should().Contain("StartTable");
     }
 
     [Fact]
@@ -95,6 +96,8 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
 
         numeric.Session.Should().NotBeNull();
         leadingZero.Session.Should().BeNull();
+        leadingZero.State.Should().Be("Available");
+        leadingZero.PermittedActions.Should().Contain("StartTable");
     }
 
     [Fact]
@@ -435,8 +438,10 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         after!.Data!.Version.Should().NotBe(before.Data.Version);
         after.Data.Tables.Single(table => table.TableId == _futureReservedTableId)
             .Reservation!.IsCurrent.Should().BeTrue();
-        after.Data.Tables.Single(table => table.TableId == _futureReservedTableId)
-            .State.Should().Be("Reserved");
+        var currentTable = after.Data.Tables.Single(table => table.TableId == _futureReservedTableId);
+        currentTable.State.Should().Be("Reserved");
+        currentTable.PermittedActions.Should().BeEmpty(
+            "a currently reserved table without a checked-in session must not offer StartTable");
     }
 
     [Fact]
@@ -561,8 +566,10 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
             NewLegacyOrder(legacyOnly, $"TERM-{index}", OrderStatus.Cancelled, 1m)));
         context.Orders.AddRange(Enumerable.Range(0, 250).Select(index =>
             NewLegacyOrder(legacyOnly, $"REF-{index}", OrderStatus.Refunded, 1m)));
-        context.Reservations.Add(NewReservation(stable.Id));
-        context.Reservations.Add(NewReservation(futureReserved.Id));
+        var tenantDate = DateOnly.FromDateTime(
+            _tenantClock.ToTenantTime(_serverTime.GetUtcNow().UtcDateTime).DateTime);
+        context.Reservations.Add(NewReservation(stable.Id, tenantDate.AddDays(1)));
+        context.Reservations.Add(NewReservation(futureReserved.Id, tenantDate.AddDays(1)));
         await context.SaveChangesAsync();
 
         _stableTableId = stable.Id;
@@ -664,13 +671,13 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
     private static string TestEmail(string localPart) =>
         string.Concat(localPart, "@", "example.test");
 
-    private static Reservation NewReservation(Guid tableId) => new()
+    private static Reservation NewReservation(Guid tableId, DateOnly localDate) => new()
     {
         Id = Guid.NewGuid(),
         TableId = tableId,
         CustomerName = "Snapshot guest",
         CustomerEmail = TestEmail("snapshot"),
-        ReservationDate = DateTime.SpecifyKind(DateTime.Today.AddDays(1), DateTimeKind.Utc),
+        ReservationDate = localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
         StartTime = TimeSpan.FromHours(12),
         EndTime = TimeSpan.FromHours(13),
         NumberOfGuests = 2,
