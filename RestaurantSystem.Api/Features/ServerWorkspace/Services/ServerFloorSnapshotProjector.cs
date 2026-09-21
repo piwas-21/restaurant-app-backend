@@ -110,10 +110,10 @@ internal sealed class ServerFloorSnapshotProjector
             HasLegacyAmbiguity = hasLegacyAmbiguity,
             Reservation = reservation,
             PermittedActions = PermittedActions(
-                table, summary, hasLegacyAmbiguity, legacyDto is not null, readyCount)
+                table, summary, hasLegacyAmbiguity, legacyDto is not null, readyCount,
+                reservation?.IsCurrent == true)
         };
     }
-
     private ServerFloorSessionSummaryDto SummarizeSession(
         FloorSessionRow session,
         IReadOnlyCollection<FloorOrderRow> legacy,
@@ -145,7 +145,6 @@ internal sealed class ServerFloorSnapshotProjector
             HasLegacyAmbiguity = assessment.LegacyActiveOrderCount > 0
         };
     }
-
     private static string DetermineTableState(
         bool isActive,
         int readyCount,
@@ -165,7 +164,8 @@ internal sealed class ServerFloorSnapshotProjector
         ServerFloorSessionSummaryDto? session,
         bool hasLegacyAmbiguity,
         bool hasLegacyOrders,
-        int readyCount)
+        int readyCount,
+        bool hasCurrentReservation)
     {
         if (!table.IsActive)
         {
@@ -174,7 +174,8 @@ internal sealed class ServerFloorSnapshotProjector
 
         if (session is null)
         {
-            return hasLegacyOrders || hasLegacyAmbiguity ? ["ReviewLegacy"] : ["StartTable"];
+            if (hasLegacyOrders || hasLegacyAmbiguity) return ["ReviewLegacy"];
+            return hasCurrentReservation ? [] : ["StartTable"];
         }
 
         var actions = new List<string> { "AddRound", "ViewBill" };
