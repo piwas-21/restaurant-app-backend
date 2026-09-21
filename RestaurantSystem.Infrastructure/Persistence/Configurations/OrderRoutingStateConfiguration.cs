@@ -10,6 +10,7 @@ public sealed class OrderRoutingStateConfiguration : IEntityTypeConfiguration<Or
     {
         builder.ToTable("OrderRoutingStates");
         builder.Property(state => state.Target).HasConversion<string>().HasMaxLength(40).IsRequired();
+        builder.Property(state => state.IsRequired).IsRequired();
         builder.Property(state => state.Status).HasConversion<string>().HasMaxLength(40).IsRequired();
         builder.Property(state => state.Version).IsConcurrencyToken();
         builder.Property(state => state.DeviceId).HasMaxLength(64);

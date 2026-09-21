@@ -45,6 +45,9 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         var state = body.Data.RoutingStates!.Single(route => route.Target == DevicePrintTarget.General);
         state.Status.Should().Be(DevicePrintStatus.Queued);
         state.DeviceId.Should().Be(deviceId);
+        state.IsRequired.Should().BeTrue();
+        body.Data.RoutingStates.Single(route => route.Target == DevicePrintTarget.Cashier)
+            .IsRequired.Should().BeFalse();
 
         var projected = await Client.GetFromJsonAsync<ApiResponse<List<OrderRoutingStateDto>>>(
             $"/api/staff/orders/{body.Data.Id}/routing", JsonOptions);
@@ -110,6 +113,44 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
 
         (await PostAckAsync(deviceId, order.Id, route, DevicePrintStatus.Printed))
             .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Theory]
+    [InlineData("Received")]
+    [InlineData("Sent")]
+    public async Task Legacy_shaped_ack_cannot_write_an_intermediate_routed_state(string status)
+    {
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        var order = await CreateReleasedOrderAsync();
+        var route = order.RoutingStates!.Single(value => value.Target == DevicePrintTarget.General);
+
+        AuthenticateAsDevice();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/devices/print-acks")
+        {
+            Content = JsonContent.Create(new
+            {
+                acks = new[]
+                {
+                    new
+                    {
+                        orderId = order.Id,
+                        target = route.Target.ToString(),
+                        status,
+                        receivedAt = DateTime.UtcNow,
+                        printedAt = (DateTime?)null,
+                        failureReason = (string?)null,
+                        copies = 0
+                    }
+                }
+            })
+        };
+        request.Headers.Add("X-Device-Id", deviceId);
+
+        (await Client.SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        await using var verify = DatabaseFixture.CreateContext();
+        var state = await verify.OrderRoutingStates.SingleAsync(value => value.Id == route.Id);
+        state.Status.Should().Be(DevicePrintStatus.Queued);
+        state.Version.Should().Be(1);
     }
 
     [Fact]
@@ -290,8 +331,9 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         OrderNumbers(firstFeed).Should().NotContain(secondOrder.OrderNumber);
         OrderNumbers(secondFeed).Should().ContainSingle(secondOrder.OrderNumber);
         OrderNumbers(secondFeed).Should().NotContain(firstOrder.OrderNumber);
-        OrderNumbers(legacyFeed).Should().Contain(firstOrder.OrderNumber)
-            .And.Contain(secondOrder.OrderNumber);
+        OrderNumbers(legacyFeed).Should().NotContain(firstOrder.OrderNumber)
+            .And.NotContain(secondOrder.OrderNumber,
+                "a capability-aware tenant suppresses legacy broadcast to prevent duplicate paper");
 
         RoutesFor(firstFeed, firstOrder.OrderNumber).Should().OnlyContain(route =>
             route!["deviceId"]!.GetValue<string>() == firstDevice);
@@ -360,6 +402,21 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         RoutesFor(feed, order.OrderNumber).Should().HaveCount(2)
             .And.OnlyContain(route => route!["deviceId"]!.GetValue<string>() == deviceId
                 && route["status"]!.GetValue<string>() == nameof(DevicePrintStatus.Queued));
+    }
+
+    [Fact]
+    public async Task Legacy_order_created_before_routing_activation_is_not_broadcast_after_activation()
+    {
+        var order = await CreateReleasedOrderAsync();
+        order.RoutingStates.Should().OnlyContain(route =>
+            route.Status == DevicePrintStatus.NotConfigured && route.DeviceId == null);
+
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        var legacyFeed = await FetchPrinterFeedAsync();
+        OrderNumbers(legacyFeed).Should().NotContain(order.OrderNumber);
+
+        var deviceFeed = await FetchPrinterFeedAsync(deviceId);
+        OrderNumbers(deviceFeed).Should().ContainSingle(order.OrderNumber);
     }
 
     [Fact]

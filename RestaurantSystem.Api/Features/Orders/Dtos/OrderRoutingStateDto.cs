@@ -12,4 +12,5 @@ public sealed record OrderRoutingStateDto(
     string? DeviceId,
     string? FailureReason,
     DateTime? LastAcknowledgedAt,
-    int Version);
+    int Version,
+    bool IsRequired);

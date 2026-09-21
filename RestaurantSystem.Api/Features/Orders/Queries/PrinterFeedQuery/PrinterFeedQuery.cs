@@ -82,6 +82,19 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
             await _routing.ReconcileDeviceRoutesAsync(deviceId, cancellationToken);
         }
 
+        var routingActivated = deviceId is null
+            && await _routing.IsRoutingActivatedAsync(cancellationToken);
+        if (routingActivated)
+        {
+            // Rollout reconciliation: the first capability-aware heartbeat is the tenant's
+            // durable opt-in. Backfill before applying the suppression so pre-migration released
+            // orders cannot leak through the legacy broadcast projection. Once activated, a
+            // headerless client is not a safe owner of routed work: allowing it to broadcast and
+            // then letting a capable device claim the same queued route can print duplicate paper.
+            // Tenants with no capability row retain the original legacy feed unchanged.
+            await _routing.BackfillActiveReleasedRoutesAsync(cancellationToken);
+        }
+
         // Explicit !IsDeleted filter mirrors the original inline code; the
         // global query filter would also handle this but we keep it explicit
         // so the read intent is unambiguous when grepping for delete-aware paths.
@@ -122,6 +135,13 @@ public class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, List<Orde
                 .Where(o => !o.RoutingStates.Any()
                     || o.RoutingStates.Any(state => state.DeviceId == deviceId
                         && state.Status == DevicePrintStatus.Queued));
+        }
+        else if (routingActivated)
+        {
+            // An activated tenant must consume released work through device-aware route ownership.
+            // Keep unrouted rows visible only long enough for the backfill above to create their
+            // durable states; the query then suppresses every routed order from legacy clients.
+            ordersQuery = ordersQuery.Where(o => !o.RoutingStates.Any());
         }
 
         // Kind-normalised first: a cursor with no offset (`?modifiedSince=2026-08-27`) binds

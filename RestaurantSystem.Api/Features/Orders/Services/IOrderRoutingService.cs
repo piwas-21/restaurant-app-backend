@@ -10,6 +10,10 @@ public interface IOrderRoutingService
     /// <summary>Adds the complete route set for a released order to the current transaction.</summary>
     Task EnsureRoutesAsync(Order order, CancellationToken cancellationToken);
 
+    /// <summary>Returns true once any capability-aware printer has opted into durable routing.
+    /// </summary>
+    Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken);
+
     /// <summary>Idempotently migrates active released orders created before durable routing.</summary>
     Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken);
 

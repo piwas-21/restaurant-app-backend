@@ -68,6 +68,12 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
         }
     }
 
+    public Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken) =>
+        // A capability row is the durable opt-in signal from a capability-aware printer app.
+        // Merely having OrderRoutingStates is not enough: those rows are created for every new
+        // released order, including tenants that still run only legacy broadcast clients.
+        _context.PrinterDeviceTargetCapabilities.AsNoTracking().AnyAsync(cancellationToken);
+
     public async Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken)
     {
         var orderIds = await _context.Orders
@@ -173,6 +179,17 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
             return;
         }
 
+        if (acknowledgement.Status is DevicePrintStatus.Queued
+            or DevicePrintStatus.Received
+            or DevicePrintStatus.Sent)
+        {
+            // Once an acknowledgement resolves to a durable OrderRoutingState, it is an order
+            // route regardless of whether an old client omitted JobId/Revision/JobType. Legacy
+            // wire shape must not reopen the intermediate Received/Sent path (or persist Queued)
+            // on the server-owned route.
+            throw new BadRequestException("Order route acknowledgements must use a final status.");
+        }
+
         if (state.OrderId != acknowledgement.OrderId
             || state.DeviceId is null
             || state.DeviceId != deviceId)
@@ -219,6 +236,7 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
             Revision = 1,
             Version = 1,
             Target = target,
+            IsRequired = target != DevicePrintTarget.Cashier,
             Status = selection is null ? DevicePrintStatus.NotConfigured : DevicePrintStatus.Queued,
             DeviceId = selection,
             CreatedAt = now,
@@ -228,7 +246,7 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
 
     private static OrderRoutingStateDto ToDto(OrderRoutingState state) => new(
         state.Id, state.JobId, state.Revision, state.Target, state.Status, state.DeviceId,
-        state.FailureReason, state.LastAcknowledgedAt, state.Version);
+        state.FailureReason, state.LastAcknowledgedAt, state.Version, state.IsRequired);
 
     private static bool IsRouteUniqueViolation(DbUpdateException exception) =>
         exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg

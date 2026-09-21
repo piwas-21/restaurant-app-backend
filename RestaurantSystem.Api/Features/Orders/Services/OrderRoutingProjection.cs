@@ -11,6 +11,6 @@ internal static class OrderRoutingProjection
             .OrderBy(state => state.Target)
             .Select(state => new OrderRoutingStateDto(
                 state.Id, state.JobId, state.Revision, state.Target, state.Status, state.DeviceId,
-                state.FailureReason, state.LastAcknowledgedAt, state.Version))
+                state.FailureReason, state.LastAcknowledgedAt, state.Version, state.IsRequired))
             .ToList();
 }

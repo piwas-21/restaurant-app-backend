@@ -11,6 +11,12 @@ public class OrderRoutingState : Entity
     public int Revision { get; set; } = 1;
     public int Version { get; set; } = 1;
     public DevicePrintTarget Target { get; set; }
+    /// <summary>
+    /// Whether this destination is required for the order's kitchen work to be considered
+    /// delivered. Kitchen routes are required; the cashier copy is optional because a missing
+    /// cashier printer must not hide otherwise successful kitchen output.
+    /// </summary>
+    public bool IsRequired { get; set; } = true;
     public DevicePrintStatus Status { get; set; }
     public string? DeviceId { get; set; }
     public string? FailureReason { get; set; }
