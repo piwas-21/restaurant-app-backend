@@ -29,6 +29,7 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
     private readonly ITableBillAssembler _bills;
     private readonly TimeProvider _timeProvider;
     private readonly decimal _paymentTolerance;
+    private readonly int _reservationLookAheadDays;
 
     public ServerFloorSnapshotReader(
         ApplicationDbContext context,
@@ -43,7 +44,9 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         _currentUser = currentUser;
         _bills = bills;
         _timeProvider = timeProvider ?? TimeProvider.System;
-        _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
+        var sessionSettings = settings?.Value ?? new TableServiceSessionSettings();
+        _paymentTolerance = sessionSettings.PaymentTolerance;
+        _reservationLookAheadDays = sessionSettings.FloorReservationLookAheadDays;
     }
 
     public async Task<ServerFloorSnapshotDto> ReadAsync(CancellationToken cancellationToken)
@@ -188,7 +191,7 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
     {
         var start = DateOnly.FromDateTime(tenantTime.DateTime)
             .ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var end = start.AddDays(2);
+        var end = start.AddDays(_reservationLookAheadDays);
         return await _context.Reservations.AsNoTracking()
             .Where(reservation => reservation.ReservationDate >= start
                 && reservation.ReservationDate < end

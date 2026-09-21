@@ -5,11 +5,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.ServerWorkspace.Dtos;
 using RestaurantSystem.Api.Features.ServerWorkspace.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -467,6 +469,46 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         var snapshot = await readTask;
         snapshot.Tables.Single(table => table.TableId == _stableTableId)
             .Session!.Remaining.Should().Be(25m);
+    }
+
+    [Fact]
+    public async Task Snapshot_respects_the_configured_reservation_look_ahead()
+    {
+        _serverTime.Current = new DateTimeOffset(2026, 5, 10, 12, 0, 0, TimeSpan.Zero);
+        await using var context = DatabaseFixture.CreateContext();
+        var localDate = DateOnly.FromDateTime(
+            _tenantClock.ToTenantTime(_serverTime.GetUtcNow().UtcDateTime).DateTime);
+        context.Reservations.Add(new Reservation
+        {
+            Id = Guid.NewGuid(),
+            TableId = _futureReservedTableId,
+            CustomerName = "Configured horizon guest",
+            CustomerEmail = "horizon@example.test",
+            ReservationDate = localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+            StartTime = TimeSpan.FromHours(12),
+            EndTime = TimeSpan.FromHours(13),
+            NumberOfGuests = 2,
+            Status = ReservationStatus.Confirmed,
+            CreatedBy = "test"
+        });
+        await context.SaveChangesAsync();
+
+        using var scope = Factory.Services.CreateScope();
+        var reader = new ServerFloorSnapshotReader(
+            context,
+            _tenantClock,
+            new TestCurrentUser(UserRole.Admin),
+            new TableBillAssembler(
+                context,
+                scope.ServiceProvider.GetRequiredService<IOrderMappingService>(),
+                scope.ServiceProvider.GetRequiredService<ILogger<TableBillAssembler>>()),
+            _serverTime,
+            Options.Create(new TableServiceSessionSettings { FloorReservationLookAheadDays = 1 }));
+
+        var snapshot = await reader.ReadAsync(CancellationToken.None);
+
+        snapshot.Tables.Single(table => table.TableId == _futureReservedTableId)
+            .Reservation.Should().BeNull();
     }
 
     [Fact]
