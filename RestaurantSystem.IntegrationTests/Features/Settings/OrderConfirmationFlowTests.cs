@@ -86,6 +86,8 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
         body.Data!.OrderNumber.Should().Be(orderNumber);
         body.Data!.Status.Should().Be(OrderStatus.Pending);
         body.Data!.Type.Should().Be(OrderType.Takeaway);
+        body.Data!.ConfirmationFlow.Should().Be(OrderConfirmationFlows.Direct);
+        body.Data!.ReviewDeadlineUtc.Should().BeNull();
     }
 
     [Theory]
@@ -107,6 +109,25 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Confirm_now_uses_the_configured_default_preparation_time()
+    {
+        var (orderId, _, _) = await PlaceTakeawayOrder();
+        AuthenticateAsAdmin();
+        var beforeApproval = DateTime.UtcNow;
+
+        var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new
+        {
+            preparationMinutes = 0
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+        body.Data!.Status.Should().Be(OrderStatus.Confirmed.ToString());
+        body.Data!.EstimatedDeliveryTime.Should().BeOnOrAfter(beforeApproval.AddMinutes(20));
+        body.Data!.EstimatedDeliveryTime.Should().BeBefore(DateTime.UtcNow.AddMinutes(20).AddSeconds(10));
+    }
+
+    [Fact]
     public async Task Approval_endpoint_rejects_an_omitted_preparation_time()
     {
         var (orderId, _, _) = await PlaceTakeawayOrder();
@@ -115,6 +136,33 @@ public sealed class OrderConfirmationFlowTests : IntegrationTestBase
         var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new { });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Acknowledge_flow_approval_accepts_a_long_preparation_time_without_customer_consent()
+    {
+        await ConfigureFlow(OrderType.Takeaway, OrderConfirmationFlows.Acknowledge, 3);
+        var (orderId, token, _) = await PlaceTakeawayOrder();
+        AuthenticateAsAdmin();
+
+        var response = await Client.PostAsJsonAsync($"/api/orders/{orderId}/approve", new
+        {
+            preparationMinutes = 45
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+        body.Data!.Status.Should().Be(OrderStatus.Confirmed.ToString(),
+            "reviewed orders are decided by the restaurant, not sent back to the guest");
+
+        AuthenticateAsAnonymous();
+        var guestResponse = await Client.GetAsync(
+            $"/api/orders/guest-status?orderId={orderId}&token={Uri.EscapeDataString(token)}");
+        var guest = (await ReadResponseAsync<ApiResponse<GuestOrderStatusDto>>(guestResponse))!.Data!;
+        guest.ConfirmationFlow.Should().Be(OrderConfirmationFlows.Acknowledge);
+        guest.ReviewWindowMinutes.Should().Be(3);
+        guest.ReviewDeadlineUtc.Should().NotBeNull();
+        guest.EstimatedDeliveryTime.Should().NotBeNull();
     }
 
     [Fact]

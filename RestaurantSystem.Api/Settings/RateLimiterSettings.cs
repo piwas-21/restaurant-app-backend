@@ -80,4 +80,12 @@ public class RateLimiterSettings
     public int CheckoutStatusPermitLimit { get; set; } = 120;
     [Range(1, int.MaxValue)]
     public int CheckoutStatusWindowMinutes { get; set; } = 15;
+
+    // /api/orders/guest-status, per IP. A reviewed order polls every five seconds while the
+    // guest is waiting. This projection uses only local indexed reads (never a Stripe call), and a
+    // restaurant Wi-Fi can put several diners behind one address, so it has its own wider bucket.
+    [Range(1, int.MaxValue)]
+    public int GuestOrderStatusPermitLimit { get; set; } = 600;
+    [Range(1, int.MaxValue)]
+    public int GuestOrderStatusWindowMinutes { get; set; } = 15;
 }

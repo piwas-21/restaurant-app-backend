@@ -12,4 +12,7 @@ public sealed record GuestOrderStatusDto(
     string OrderNumber,
     OrderType Type,
     OrderStatus Status,
-    DateTime? EstimatedDeliveryTime);
+    DateTime? EstimatedDeliveryTime,
+    string ConfirmationFlow,
+    int ReviewWindowMinutes,
+    DateTime? ReviewDeadlineUtc);
