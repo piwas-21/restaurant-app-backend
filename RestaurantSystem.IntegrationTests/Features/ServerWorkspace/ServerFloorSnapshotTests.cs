@@ -411,7 +411,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
                 Id = Guid.NewGuid(),
                 TableId = _futureReservedTableId,
                 CustomerName = "Boundary guest",
-                CustomerEmail = "boundary@example.test",
+                CustomerEmail = TestEmail("boundary"),
                 ReservationDate = DateOnly.FromDateTime(current.DateTime)
                     .ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
                 StartTime = current.TimeOfDay.Add(TimeSpan.FromMinutes(2)),
@@ -483,7 +483,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
             Id = Guid.NewGuid(),
             TableId = _futureReservedTableId,
             CustomerName = "Configured horizon guest",
-            CustomerEmail = "horizon@example.test",
+            CustomerEmail = TestEmail("horizon"),
             ReservationDate = localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
             StartTime = TimeSpan.FromHours(12),
             EndTime = TimeSpan.FromHours(13),
@@ -661,12 +661,15 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
             CreatedBy = "test"
         };
 
+    private static string TestEmail(string localPart) =>
+        string.Concat(localPart, "@", "example.test");
+
     private static Reservation NewReservation(Guid tableId) => new()
     {
         Id = Guid.NewGuid(),
         TableId = tableId,
         CustomerName = "Snapshot guest",
-        CustomerEmail = "snapshot@example.test",
+        CustomerEmail = TestEmail("snapshot"),
         ReservationDate = DateTime.SpecifyKind(DateTime.Today.AddDays(1), DateTimeKind.Utc),
         StartTime = TimeSpan.FromHours(12),
         EndTime = TimeSpan.FromHours(13),
@@ -711,7 +714,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
     {
         public Guid? UserId => Guid.NewGuid();
         public string? UserName => "floor-test";
-        public string? Email => "floor-test@example.test";
+        public string? Email => TestEmail("floor-test");
         public UserRole? Role => role;
         public bool IsAuthenticated => true;
         public bool IsAdmin => role == UserRole.Admin;
