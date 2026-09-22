@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -88,6 +89,35 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.Orders.CountAsync()).Should().Be(1);
         (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
         (await context.Orders.Select(order => order.IsKitchenReleased).SingleAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Notes_at_the_column_limit_persist_and_longer_notes_are_rejected_before_persistence()
+    {
+        AuthenticateAsAdmin();
+        var accepted = await PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(
+                Guid.NewGuid(), false, notes: new string('x', OrderFieldLimits.NotesMaxLength)));
+        var acceptedBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(accepted))!;
+
+        acceptedBody.Success.Should().BeTrue();
+        acceptedBody.Data!.Notes.Should().HaveLength(OrderFieldLimits.NotesMaxLength);
+
+        var rejected = await PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(
+                Guid.NewGuid(), false, notes: new string('x', OrderFieldLimits.NotesMaxLength + 1)));
+        var rejectedBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(rejected))!;
+
+        rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        rejectedBody.Success.Should().BeFalse();
+        rejectedBody.Errors.Should().Contain(
+            $"Notes cannot exceed {OrderFieldLimits.NotesMaxLength} characters.");
+
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(1);
+        (await context.Orders.Select(order => order.Notes).SingleAsync())
+            .Should().HaveLength(OrderFieldLimits.NotesMaxLength);
+        (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
     }
 
     [Fact]
@@ -470,13 +500,15 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     }
 
     private object CreateBody(
-        Guid operationId, bool releaseToKitchen, Guid? customerId = null, int? pointsToRedeem = null) => new
+        Guid operationId, bool releaseToKitchen, Guid? customerId = null, int? pointsToRedeem = null,
+        string? notes = null) => new
         {
             clientOperationId = operationId,
             releaseToKitchen,
             type = "Takeaway",
             customerUserId = customerId,
             pointsToRedeem,
+            notes,
             paymentState = "PayLater",
             items = new[] { new { productId = _productId, quantity = 1, unitPrice = 0.01m } }
         };

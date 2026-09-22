@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffRoundCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -44,6 +45,27 @@ public sealed class StaffCounterOrderValidationTests
     {
         _requestValidator.Validate(Request(0)).IsValid.Should().BeTrue();
         _requestValidator.Validate(Request(-1)).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Notes_at_the_order_column_limit_are_accepted()
+    {
+        var result = _requestValidator.Validate(
+            Request(0) with { Notes = new string('x', OrderFieldLimits.NotesMaxLength) });
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Notes_over_the_order_column_limit_are_rejected()
+    {
+        var result = _requestValidator.Validate(
+            Request(0) with { Notes = new string('x', OrderFieldLimits.NotesMaxLength + 1) });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error =>
+            error.PropertyName == nameof(StaffCounterOrderRequest.Notes)
+            && error.ErrorMessage == $"Notes cannot exceed {OrderFieldLimits.NotesMaxLength} characters.");
     }
 
     [Fact]
