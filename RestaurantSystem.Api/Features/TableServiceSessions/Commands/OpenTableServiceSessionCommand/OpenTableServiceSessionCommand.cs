@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
 
@@ -26,18 +29,21 @@ public sealed class OpenTableServiceSessionCommandHandler
     private readonly ITableServiceSessionReader _reader;
     private readonly ITableIdentityResolver _tables;
     private readonly TimeProvider _timeProvider;
+    private readonly decimal _paymentTolerance;
 
     public OpenTableServiceSessionCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         ITableServiceSessionReader reader,
         ITableIdentityResolver tables,
+        IOptions<TableServiceSessionSettings>? settings = null,
         TimeProvider? timeProvider = null)
     {
         _context = context;
         _currentUser = currentUser;
         _reader = reader;
         _tables = tables;
+        _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -57,6 +63,23 @@ public sealed class OpenTableServiceSessionCommandHandler
                     ErrorCodes.TableServiceSessionNotFound)
                 : ApiResponse<TableServiceSessionDto>.SuccessWithData(
                     authoritative, "Table service session already open");
+        }
+
+        var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
+            _context.Orders.AsNoTracking(), table.Id, table.Number);
+        var hasBlockingLegacyRound = await legacyQuery.AnyAsync(order =>
+            !order.IsDeleted
+            && order.Type == Domain.Common.Enums.OrderType.DineIn
+            && order.ServiceSessionId == null
+            && (order.Status != Domain.Common.Enums.OrderStatus.Completed
+                && order.Status != Domain.Common.Enums.OrderStatus.Cancelled
+                || order.Status == Domain.Common.Enums.OrderStatus.Completed
+                && order.RemainingAmount > _paymentTolerance), cancellationToken);
+        if (hasBlockingLegacyRound)
+        {
+            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                TableBillTargetResolver.AmbiguousMessage,
+                ErrorCodes.TableServiceSessionAmbiguous);
         }
 
         var tenantCurrency = await _context.RestaurantInfo

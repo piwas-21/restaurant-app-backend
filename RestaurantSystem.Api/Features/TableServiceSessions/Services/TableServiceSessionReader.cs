@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common;
@@ -19,17 +20,20 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
     private readonly ITableBillAssembler _bills;
     private readonly TimeProvider _timeProvider;
     private readonly decimal _paymentTolerance;
+    private readonly ICurrentUserService? _currentUser;
 
     public TableServiceSessionReader(
         ApplicationDbContext context,
         ITableBillAssembler bills,
         TimeProvider? timeProvider = null,
-        IOptions<TableServiceSessionSettings>? settings = null)
+        IOptions<TableServiceSessionSettings>? settings = null,
+        ICurrentUserService? currentUser = null)
     {
         _context = context;
         _bills = bills;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
+        _currentUser = currentUser;
     }
 
     public async Task<TableServiceSessionDto?> ReadAsync(
@@ -70,7 +74,9 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         bill.GeneratedAt = now;
         var legacy = await ReadLegacyOrdersAsync(
             session.TableId, session.TableNumber, cancellationToken);
-        return ToDto(session, bill, legacy, now, currency);
+        var handoff = await TableServicePaymentHandoffReader.ReadLatestAsync(
+            _context, session, cancellationToken);
+        return ToDto(session, bill, legacy, handoff, now, currency);
     }
 
     public async Task<IReadOnlyList<TableServiceSessionDto>> ReadActiveAsync(
@@ -88,6 +94,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             .ToListAsync(cancellationToken);
         var bills = await _bills.AssembleManyAsync(sessionRows, cancellationToken);
         var legacyBySession = await ReadLegacyOrdersBySessionAsync(sessionRows, cancellationToken);
+        var handoffs = await TableServicePaymentHandoffReader.ReadLatestManyAsync(
+            _context, sessionRows, cancellationToken);
         var sessions = new List<TableServiceSessionDto>(sessionRows.Count);
 
         for (var index = 0; index < sessionRows.Count; index++)
@@ -109,7 +117,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             bill.Currency = currency;
             bill.GeneratedAt = now;
             legacyBySession.TryGetValue(session.Id, out var legacy);
-            sessions.Add(ToDto(session, bill, legacy ?? [], now, currency));
+            handoffs.TryGetValue(session.Id, out var handoff);
+            sessions.Add(ToDto(session, bill, legacy ?? [], handoff, now, currency));
         }
 
         return sessions;
@@ -201,6 +210,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         TableServiceSession session,
         TableBillDto bill,
         IReadOnlyCollection<TableServiceSessionOrderState> legacy,
+        TableServicePaymentHandoffDto? handoff,
         DateTime now,
         string? currency)
     {
@@ -208,6 +218,10 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             new TableServiceSessionOrderState(ParseStatus(round.Order.Status), round.Order.RemainingAmount));
         var assessment = TableServiceSessionCloseRules.Assess(members, legacy, _paymentTolerance);
         var isOpen = session.Status == TableServiceSessionStatus.Open;
+        var hasPendingHandoff = handoff?.Status == nameof(TableServicePaymentHandoffStatus.Requested);
+        var hasTenderRole = _currentUser is null
+            || _currentUser.IsAdmin
+            || _currentUser.Role == UserRole.Cashier;
         return new TableServiceSessionDto
         {
             ServiceSessionId = session.Id,
@@ -225,11 +239,15 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             AgeMinutes = Math.Max(0, (int)(now - session.OpenedAt).TotalMinutes),
             Outstanding = bill.Remaining,
             EligibleOutstanding = bill.EligibleOutstanding,
-            CanCollect = isOpen && bill.EligibleOutstanding > _paymentTolerance,
-            CanClose = isOpen && assessment.CanClose,
+            CanCollect = hasTenderRole && isOpen && bill.EligibleOutstanding > _paymentTolerance,
+            CanRequestPaymentHandoff = !hasTenderRole && isOpen
+                && bill.EligibleOutstanding > _paymentTolerance && !hasPendingHandoff,
+            HasPendingPaymentHandoff = hasPendingHandoff,
+            CanClose = isOpen && assessment.CanClose && !hasPendingHandoff,
             HasUnassignedActiveOrders = assessment.LegacyActiveOrderCount > 0,
             LegacyActiveOrderCount = assessment.LegacyActiveOrderCount,
             Bill = bill,
+            PaymentHandoff = handoff,
         };
     }
 

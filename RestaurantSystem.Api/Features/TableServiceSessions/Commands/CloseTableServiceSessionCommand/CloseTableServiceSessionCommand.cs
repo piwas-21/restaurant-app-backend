@@ -73,11 +73,16 @@ public sealed class CloseTableServiceSessionCommandHandler
                 return Stale(session.Version);
             }
 
-            // Legacy unassigned rounds are a separate visit and must be resolved explicitly.
-            var legacyQuery = _context.Orders
-                .AsQueryable();
-            legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
-                legacyQuery, session.TableId, session.TableNumber);
+            if (await TableServicePaymentHandoffRules.HasPendingAsync(
+                _context, session.Id, cancellationToken))
+            {
+                return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                    "Resolve the pending cashier collection request before closing the session.",
+                    ErrorCodes.TableServicePaymentHandoffPending);
+            }
+
+            var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
+                _context.Orders, session.TableId, session.TableNumber);
             var legacyOrders = await legacyQuery
                 .Where(order => !order.IsDeleted
                     && order.Type == OrderType.DineIn

@@ -4,10 +4,13 @@ using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CancelTableServicePaymentHandoffCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RequestTableServicePaymentHandoffCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetActiveTableServiceSessionsQuery;
+using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetPendingTableServicePaymentHandoffsQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionQuery;
 
@@ -31,6 +34,11 @@ public sealed class TableServiceSessionsController : ControllerBase
     public async Task<ActionResult<ApiResponse<List<TableServiceSessionDto>>>> List()
         => Ok(await _mediator.SendQuery(new GetActiveTableServiceSessionsQuery()));
 
+    [HttpGet("payment-handoffs")]
+    [RequireAdminOrCashier]
+    public async Task<ActionResult<ApiResponse<List<TableServicePaymentHandoffDto>>>> ListPaymentHandoffs()
+        => Ok(await _mediator.SendQuery(new GetPendingTableServicePaymentHandoffsQuery()));
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> Open(
         [FromBody] OpenTableServiceSessionCommand command)
@@ -44,6 +52,24 @@ public sealed class TableServiceSessionsController : ControllerBase
     [RequireAdminOrCashier]
     public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> Pay(
         Guid serviceSessionId, [FromBody] AddTableServiceSessionPaymentCommand command)
+    {
+        command.ServiceSessionId = serviceSessionId;
+        return Ok(await _mediator.SendCommand(command));
+    }
+
+    [HttpPost("{serviceSessionId:guid}/payment-handoff")]
+    [RequireServer]
+    public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> RequestPaymentHandoff(
+        Guid serviceSessionId, [FromBody] RequestTableServicePaymentHandoffCommand command)
+    {
+        command.ServiceSessionId = serviceSessionId;
+        return Ok(await _mediator.SendCommand(command));
+    }
+
+    [HttpPost("{serviceSessionId:guid}/payment-handoff/cancel")]
+    [RequireTableServiceStaff]
+    public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> CancelPaymentHandoff(
+        Guid serviceSessionId, [FromBody] CancelTableServicePaymentHandoffCommand command)
     {
         command.ServiceSessionId = serviceSessionId;
         return Ok(await _mediator.SendCommand(command));

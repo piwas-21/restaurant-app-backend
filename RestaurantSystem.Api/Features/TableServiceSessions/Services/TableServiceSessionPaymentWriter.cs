@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Settings;
@@ -16,14 +17,17 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
     private readonly decimal _paymentTolerance;
     private readonly ApplicationDbContext _context;
     private readonly IOrderPaymentApplicator _payments;
+    private readonly ICurrentUserService _currentUser;
 
     public TableServiceSessionPaymentWriter(
         ApplicationDbContext context,
         IOrderPaymentApplicator payments,
+        ICurrentUserService currentUser,
         IOptions<TableServiceSessionSettings>? settings = null)
     {
         _context = context;
         _payments = payments;
+        _currentUser = currentUser;
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
     }
 
@@ -73,7 +77,7 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
             CardLastFourDigits = command.CardLastFourDigits,
             CardType = command.CardType,
             PaymentNotes = command.PaymentNotes,
-            CreatedBy = string.Empty,
+            CreatedBy = _currentUser.GetAuditIdentifier(),
         };
         _context.TableBillPaymentOperations.Add(operation);
 

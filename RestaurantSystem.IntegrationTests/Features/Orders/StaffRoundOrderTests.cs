@@ -221,10 +221,8 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
             paymentMethod = nameof(PaymentMethod.Cash),
             amount = created.Total
         });
-        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
 
-        body.Success.Should().BeFalse();
-        body.ErrorCode.Should().Be(ErrorCodes.CashierRequired);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         await using var context = DatabaseFixture.CreateContext();
         (await context.OrderPayments.CountAsync(payment => payment.OrderId == created.Id)).Should().Be(0);
     }

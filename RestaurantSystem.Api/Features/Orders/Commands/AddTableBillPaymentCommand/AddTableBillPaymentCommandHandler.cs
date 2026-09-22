@@ -3,13 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
-
 namespace RestaurantSystem.Api.Features.Orders.Commands.AddTableBillPaymentCommand;
 
 public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPaymentCommand, ApiResponse<TableBillDto>>
@@ -19,8 +18,10 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
     private readonly IOrderPaymentApplicator _paymentApplicator;
     private readonly ITableBillAssembler _billAssembler;
     private readonly ITableBillPaymentOperationReplayResolver _replayResolver;
-    private readonly ITableBillTargetResolver _targetResolver;
-    private readonly ITableServiceSessionCurrencyPolicy _currencyPolicy;
+    private readonly TableBillTargetResolver _targetResolver;
+    private readonly TableServiceSessionCurrencyPolicy _currencyPolicy;
+    private readonly ITableBillPaymentSessionCoordinator _sessionCoordinator;
+    private readonly ICurrentUserService _currentUser;
     private readonly ILogger<AddTableBillPaymentCommandHandler> _logger;
 
     public AddTableBillPaymentCommandHandler(
@@ -29,20 +30,27 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         ITableBillAssembler billAssembler,
         ITableBillPaymentOperationReplayResolver replayResolver,
         ILogger<AddTableBillPaymentCommandHandler> logger,
-        ITableBillTargetResolver? targetResolver = null,
-        ITableServiceSessionCurrencyPolicy? currencyPolicy = null)
+        ICurrentUserService currentUser,
+        ITableBillPaymentSessionCoordinator sessionCoordinator)
     {
         _context = context;
         _paymentApplicator = paymentApplicator;
         _billAssembler = billAssembler;
         _replayResolver = replayResolver;
-        _targetResolver = targetResolver ?? new TableBillTargetResolver(context);
-        _currencyPolicy = currencyPolicy ?? new TableServiceSessionCurrencyPolicy(context);
+        _targetResolver = new TableBillTargetResolver(context);
+        _currencyPolicy = new TableServiceSessionCurrencyPolicy(context);
+        _sessionCoordinator = sessionCoordinator;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
     public async Task<ApiResponse<TableBillDto>> Handle(AddTableBillPaymentCommand command, CancellationToken cancellationToken)
     {
+        var replay = await _replayResolver.ResolveAsync(command, cancellationToken);
+        if (replay is not null)
+        {
+            return replay;
+        }
         var target = await _targetResolver.ResolveAsync(command.TableNumber, cancellationToken);
         if (target.IsAmbiguous)
         {
@@ -50,7 +58,6 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 target.Reason ?? "Use the explicit service session id for this table.",
                 ErrorCodes.TableServiceSessionAmbiguous);
         }
-
         command.ServiceSessionId = target.ServiceSessionId;
         var currency = await _currencyPolicy.ResolveAsync(
             command.ServiceSessionId, command.Currency, cancellationToken);
@@ -60,15 +67,14 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 currency.Error!, ErrorCodes.TableServiceSessionCurrencyMismatch);
         }
         command.Currency = currency.Currency;
-        var replay = await _replayResolver.ResolveAsync(command, cancellationToken);
-        if (replay is not null)
-        {
-            return replay;
-        }
-
         await using var transaction = await _context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
-
+        var session = await _sessionCoordinator.LockOpenAsync(command.ServiceSessionId, cancellationToken);
+        if (command.ServiceSessionId.HasValue && session is null)
+        {
+            return ApiResponse<TableBillDto>.FailureWithCode(
+                "The table service session is no longer open.", ErrorCodes.TableServiceSessionNotFound);
+        }
         var openOrders = await _context.Orders
             .Where(o => !o.IsDeleted
                 && o.Type == OrderType.DineIn
@@ -83,7 +89,6 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         {
             return ApiResponse<TableBillDto>.Failure($"No open orders found for table {command.TableNumber}");
         }
-
         var billRemaining = openOrders.Sum(o => Math.Max(0, o.RemainingAmount));
         if (billRemaining <= 0)
         {
@@ -97,10 +102,10 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 $"Payment amount exceeds the bill's remaining balance of {billRemaining:0.00}");
         }
 
-        var operation = new TableBillPaymentOperation
+        var operation = new RestaurantSystem.Domain.Entities.TableBillPaymentOperation
         {
             Id = Guid.NewGuid(),
-            CreatedBy = string.Empty,
+            CreatedBy = _currentUser.GetAuditIdentifier(),
             OperationId = command.OperationId,
             TableNumber = command.TableNumber,
             ServiceSessionId = command.ServiceSessionId,
@@ -137,13 +142,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
                 return ApiResponse<TableBillDto>.Failure(
                     "The bill changed while the payment was being applied. Please review the bill and try again");
             }
-            if (command.ServiceSessionId.HasValue)
-            {
-                var session = await _context.TableServiceSessions
-                    .SingleAsync(value => value.Id == command.ServiceSessionId.Value, cancellationToken);
-                session.Version++;
-                await _context.SaveChangesAsync(cancellationToken);
-            }
+            await _sessionCoordinator.CompleteAsync(session, command.OperationId, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
@@ -174,26 +173,7 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         _logger.LogInformation(
             "Bill payment {Amount} applied across {OrderCount} orders on table {TableNumber}: {Orders}",
             appliedTotal, allocation.Orders.Count, command.TableNumber, string.Join(", ", allocation.Orders));
-
-        TableBillDto? bill;
-        try
-        {
-            bill = await _billAssembler.AssembleAsync(command.TableNumber, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Bill for table {TableNumber} could not be re-read after a committed payment",
-                command.TableNumber);
-            return ApiResponse<TableBillDto>.Failure(
-                "The payment was recorded, but the bill could not be refreshed. Please reopen the bill");
-        }
-
-        if (bill == null)
-        {
-            return ApiResponse<TableBillDto>.Failure(
-                "The payment was recorded, but the bill could not be refreshed. Please reopen the bill");
-        }
-        return ApiResponse<TableBillDto>.SuccessWithData(
-            bill, $"Payment of {appliedTotal:0.00} applied across {allocation.Orders.Count} order(s)");
+        return await TableBillPaymentResponseReader.ReadAsync(
+            _billAssembler, _logger, command, appliedTotal, allocation.Orders.Count, cancellationToken);
     }
 }
