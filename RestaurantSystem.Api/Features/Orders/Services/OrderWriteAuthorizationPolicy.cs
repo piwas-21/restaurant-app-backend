@@ -21,11 +21,11 @@ public static class OrderWriteAuthorizationPolicy
     }
 
     public static OrderWriteAuthorizationDecision ForPayment(UserRole? role) =>
-        role == UserRole.Server
-            ? OrderWriteAuthorizationDecision.Deny(
+        role is UserRole.Admin or UserRole.Cashier
+            ? OrderWriteAuthorizationDecision.Allow()
+            : OrderWriteAuthorizationDecision.Deny(
                 ErrorCodes.CashierRequired,
-                "Only a cashier or admin may record an order payment.")
-            : OrderWriteAuthorizationDecision.Allow();
+                "Only a cashier or admin may record an order payment.");
 
     public static OrderWriteAuthorizationDecision ForCancellation(UserRole? role, Order order) =>
         role == UserRole.Server && order.IsKitchenReleased

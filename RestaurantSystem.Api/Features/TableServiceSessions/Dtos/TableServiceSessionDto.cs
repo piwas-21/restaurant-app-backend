@@ -19,8 +19,11 @@ public record TableServiceSessionDto
     public decimal Outstanding { get; init; }
     public decimal EligibleOutstanding { get; init; }
     public bool CanCollect { get; init; }
+    public bool CanRequestPaymentHandoff { get; init; }
+    public bool HasPendingPaymentHandoff { get; init; }
     public bool CanClose { get; init; }
     public bool HasUnassignedActiveOrders { get; init; }
     public int LegacyActiveOrderCount { get; init; }
     public TableBillDto Bill { get; init; } = new();
+    public TableServicePaymentHandoffDto? PaymentHandoff { get; init; }
 }

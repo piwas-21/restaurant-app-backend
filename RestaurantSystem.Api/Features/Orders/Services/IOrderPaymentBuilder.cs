@@ -21,7 +21,7 @@ public interface IOrderPaymentBuilder
     /// <para>
     /// <b>Nothing here is ever Completed.</b> Order creation has not observed money
     /// changing hands — not even at the till, which completes through the
-    /// <c>[RequireStaff]</c> AddPaymentToOrder endpoint, where the transaction
+    /// <c>[RequireAdminOrCashier]</c> AddPaymentToOrder endpoint, where the transaction
     /// reference and the human who took the payment both live. This method used to
     /// mark non-Cash tenders Completed, which is what made a paid order something an
     /// anonymous caller could simply assert.

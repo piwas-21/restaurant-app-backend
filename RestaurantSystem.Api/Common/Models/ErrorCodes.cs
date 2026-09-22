@@ -182,6 +182,11 @@ public static class ErrorCodes
     public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
     public const string TableServiceSessionRequired = "TableServiceSessionRequired";
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+    public const string TableServicePaymentHandoffOperationMismatch = "TableServicePaymentHandoffOperationMismatch";
+    public const string TableServicePaymentHandoffAlreadyPending = "TableServicePaymentHandoffAlreadyPending";
+    public const string TableServicePaymentHandoffNotRequestable = "TableServicePaymentHandoffNotRequestable";
+    public const string TableServicePaymentHandoffPending = "TableServicePaymentHandoffPending";
+    public const string TableServicePaymentHandoffCancellationMismatch = "TableServicePaymentHandoffCancellationMismatch";
     public const string TableServiceTableRequired = "TableServiceTableRequired";
     public const string TableServiceTableNotFound = "TableServiceTableNotFound";
     public const string TableServiceTableInactive = "TableServiceTableInactive";
