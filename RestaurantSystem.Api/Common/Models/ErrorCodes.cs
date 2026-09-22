@@ -195,6 +195,7 @@ public static class ErrorCodes
     /// <summary>Returned when an order changed after a caller read its version token.</summary>
     public const string OrderVersionConflict = "OrderVersionConflict";
     public const string KitchenReleaseRequired = "KitchenReleaseRequired";
+    public const string RequiredRoutingUnresolved = "RequiredRoutingUnresolved";
     public const string KitchenRoleRequired = "KitchenRoleRequired";
     public const string CashierRequired = "CashierRequired";
 
