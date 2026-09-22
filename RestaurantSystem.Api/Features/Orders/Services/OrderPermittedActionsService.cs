@@ -58,17 +58,11 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
                 ? (false, OrderActionReasonCodes.KitchenRoleRequired)
                 : StatusAction(order, OrderStatus.Ready),
             OrderAction.HandOver => HandOverAction(order),
-            OrderAction.CollectPayment => IsServer
-                ? (false, OrderActionReasonCodes.CashierRequired)
-                : CollectPaymentAction(order),
+            OrderAction.CollectPayment => CollectPaymentAction(order),
             OrderAction.AddOperationalNote => RoleAction(
                 _currentUser.IsAdmin || _currentUser.Role == UserRole.Cashier,
                 OrderActionReasonCodes.AdminOrCashierRequired),
-            OrderAction.PrintKitchen => !IsServer && order.IsKitchenReleased
-                ? RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired)
-                : (false, IsServer
-                    ? OrderActionReasonCodes.KitchenRoleRequired
-                    : OrderActionReasonCodes.KitchenReleaseRequired),
+            OrderAction.PrintKitchen => KitchenPrintAction(order),
             OrderAction.PrintReceipt => RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired),
             OrderAction.RefundPayment => RefundPaymentAction(order),
             OrderAction.CancelOrder => CancelAction(order),
@@ -87,6 +81,13 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private (bool Allowed, string? ReasonCode) StatusAction(Order order, OrderStatus target)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForStatus(
+            _currentUser.Role, order, target);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
@@ -110,6 +111,13 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private (bool Allowed, string? ReasonCode) CancelAction(Order order)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(
+            _currentUser.Role, order);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
@@ -156,6 +164,12 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private (bool Allowed, string? ReasonCode) CollectPaymentAction(Order order)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForPayment(_currentUser.Role);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
@@ -178,6 +192,18 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         }
 
         return (false, OrderActionReasonCodes.NoOutstandingBalance);
+    }
+
+    private (bool Allowed, string? ReasonCode) KitchenPrintAction(Order order)
+    {
+        var authorization = OrderWriteAuthorizationPolicy.ForKitchenPrint(
+            _currentUser.Role, order);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
+        return RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
     }
 
     private (bool Allowed, string? ReasonCode) RefundPaymentAction(Order order)
@@ -216,8 +242,8 @@ public static class OrderActionReasonCodes
     public const string KitchenReleaseRequired = ErrorCodes.KitchenReleaseRequired;
     public const string AdminRequired = "AdminRequired";
     public const string AdminOrCashierRequired = "AdminOrCashierRequired";
-    public const string CashierRequired = "CashierRequired";
-    public const string KitchenRoleRequired = "KitchenRoleRequired";
+    public const string CashierRequired = ErrorCodes.CashierRequired;
+    public const string KitchenRoleRequired = ErrorCodes.KitchenRoleRequired;
     public const string InvalidStatusTransition = "InvalidStatusTransition";
     public const string OnlinePaymentPending = "OnlinePaymentPending";
     public const string SettlementClosed = "SettlementClosed";

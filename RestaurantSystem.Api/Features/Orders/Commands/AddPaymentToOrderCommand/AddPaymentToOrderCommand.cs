@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -39,20 +40,30 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
 {
     private readonly IOrderPaymentApplicator _paymentApplicator;
     private readonly IOrderMappingService _mappingService;
+    private readonly ICurrentUserService _currentUser;
     private readonly IOrderPermittedActionsService? _permittedActionsService;
 
     public AddPaymentToOrderCommandHandler(
         IOrderPaymentApplicator paymentApplicator,
         IOrderMappingService mappingService,
+        ICurrentUserService currentUser,
         IOrderPermittedActionsService? permittedActionsService = null)
     {
         _paymentApplicator = paymentApplicator;
         _mappingService = mappingService;
+        _currentUser = currentUser;
         _permittedActionsService = permittedActionsService;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(AddPaymentToOrderCommand command, CancellationToken cancellationToken)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForPayment(_currentUser.Role);
+        if (!authorization.Allowed)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                authorization.Message!, authorization.ErrorCode!);
+        }
+
         var result = await _paymentApplicator.ApplyToOrderAsync(
             command.OrderId,
             new OrderPaymentTender

@@ -62,6 +62,14 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
+        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(
+            _currentUserService.Role, order);
+        if (!authorization.Allowed)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                authorization.Message!, authorization.ErrorCode!);
+        }
+
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             return ApiResponse<OrderDto>.FailureWithCode(
