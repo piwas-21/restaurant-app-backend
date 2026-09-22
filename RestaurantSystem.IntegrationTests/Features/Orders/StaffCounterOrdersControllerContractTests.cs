@@ -23,6 +23,11 @@ public sealed class StaffCounterOrdersControllerContractTests
             .GetCustomAttribute<HttpPostAttribute>()!.Template.Should().Be("quote");
         controller.GetMethod(nameof(StaffCounterOrdersController.Create))!
             .GetCustomAttribute<HttpPostAttribute>()!.Template.Should().BeNull();
+        controller.GetMethod(nameof(StaffCounterOrdersController.CreateRound))!
+            .GetCustomAttribute<HttpPostAttribute>()!.Template.Should().Be("round");
+        controller.GetMethod(nameof(StaffCounterOrdersController.GetRoundOperation))!
+            .GetCustomAttribute<HttpGetAttribute>()!.Template.Should()
+            .Be("round/operations/{operationId:guid}");
         controller.GetMethod(nameof(StaffCounterOrdersController.Release))!
             .GetCustomAttribute<HttpPostAttribute>()!.Template.Should().Be("{orderId:guid}/release");
         controller.GetMethod("Routing").Should().BeNull();

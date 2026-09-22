@@ -5,9 +5,11 @@ using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffCounterOrderCommand;
+using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffRoundCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.ReleaseStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Queries.GetStaffRoundOperationQuery;
 
 namespace RestaurantSystem.Api.Features.Orders;
 
@@ -32,6 +34,16 @@ public sealed class StaffCounterOrdersController : ControllerBase
     public async Task<ActionResult<ApiResponse<OrderDto>>> Create(
         [FromBody] CreateStaffCounterOrderCommand command) =>
         Ok(await _mediator.SendCommand(command));
+
+    [HttpPost("round")]
+    public async Task<ActionResult<ApiResponse<OrderDto>>> CreateRound(
+        [FromBody] CreateStaffRoundCommand command) =>
+        Ok(await _mediator.SendCommand(command));
+
+    [HttpGet("round/operations/{operationId:guid}")]
+    public async Task<ActionResult<ApiResponse<StaffRoundOperationLookupDto>>> GetRoundOperation(
+        Guid operationId) =>
+        Ok(await _mediator.SendQuery(new GetStaffRoundOperationQuery(operationId)));
 
     [HttpPost("{orderId:guid}/release")]
     public async Task<ActionResult<ApiResponse<OrderDto>>> Release(

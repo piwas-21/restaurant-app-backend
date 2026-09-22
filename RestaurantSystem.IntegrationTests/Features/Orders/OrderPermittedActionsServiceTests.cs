@@ -56,9 +56,18 @@ public class OrderPermittedActionsServiceTests
 
     [Theory]
     [InlineData(OrderStatus.Preparing, OrderAction.MarkReady)]
+    public void Kitchen_actions_are_not_granted_to_server(OrderStatus status, OrderAction action)
+    {
+        var actions = Actions(NewOrder(status), UserRole.Server);
+
+        Action(actions, action).Allowed.Should().BeFalse();
+        Action(actions, action).ReasonCode.Should().Be(OrderActionReasonCodes.KitchenRoleRequired);
+    }
+
+    [Theory]
     [InlineData(OrderStatus.Ready, OrderAction.HandOver)]
     [InlineData(OrderStatus.OutForDelivery, OrderAction.HandOver)]
-    public void Exposes_only_the_next_valid_fulfilment_action(OrderStatus status, OrderAction action)
+    public void Server_can_only_advance_service_delivery_actions(OrderStatus status, OrderAction action)
     {
         var actions = Actions(NewOrder(status), UserRole.Server);
 

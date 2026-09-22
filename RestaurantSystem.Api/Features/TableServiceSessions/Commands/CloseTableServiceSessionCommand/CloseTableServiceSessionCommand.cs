@@ -1,4 +1,3 @@
-using System.Data;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -47,12 +46,15 @@ public sealed class CloseTableServiceSessionCommandHandler
         CloseTableServiceSessionCommand command, CancellationToken cancellationToken)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        await using var transaction = await _context.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
+        // The explicit service-session row lock below is the serialization point shared with staff
+        // round creation. Read committed is deliberate: a serializable snapshot taken before a
+        // waiting create commits would still fail to see that committed order after the lock is
+        // acquired and could close the visit incorrectly.
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var session = await _context.TableServiceSessions
-                .SingleOrDefaultAsync(value => value.Id == command.ServiceSessionId, cancellationToken);
+            var session = await TableServiceSessionRowLock.LoadAsync(
+                _context, command.ServiceSessionId, cancellationToken);
             if (session is null)
             {
                 return NotFound();
