@@ -153,11 +153,20 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
 
     private static IQueryable<ServerTaskOrderKey> BuildKeys(IQueryable<Order> candidates)
     {
-        var keyValues = candidates.Select(order => new
+        return SelectKeyValues(candidates).Select(order => new ServerTaskOrderKey
         {
-            order.Id,
-            order.OrderDate,
-            order.EstimatedDeliveryTime,
+            Id = order.Id,
+            BucketRank = (order.IsException ? 2 : 0)
+                + (order.IsException || order.IsReady ? 0 : 1),
+            ActionableAt = order.RouteTime ?? order.StatusTime ?? order.FallbackTime,
+        });
+    }
+
+    private static IQueryable<ServerTaskKeyValues> SelectKeyValues(
+        IQueryable<Order> candidates) =>
+        candidates.Select(order => new ServerTaskKeyValues
+        {
+            Id = order.Id,
             IsReady = order.Status == OrderStatus.Ready
                 || order.Status == OrderStatus.OutForDelivery,
             IsException = order.IsKitchenReleased && !order.RoutingStates.Any()
@@ -186,15 +195,6 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
                 ? order.OrderDate
                 : order.EstimatedDeliveryTime ?? order.OrderDate,
         });
-
-        return keyValues.Select(order => new ServerTaskOrderKey
-        {
-            Id = order.Id,
-            BucketRank = (order.IsException ? 2 : 0)
-                + (order.IsException || order.IsReady ? 0 : 1),
-            ActionableAt = order.RouteTime ?? order.StatusTime ?? order.FallbackTime,
-        });
-    }
 
     private IQueryable<Order> BuildCandidateQuery(long? upperSequence, DateTime serverTime)
     {
@@ -234,6 +234,16 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
         public Guid Id { get; init; }
         public int BucketRank { get; init; }
         public DateTime ActionableAt { get; init; }
+    }
+
+    private sealed class ServerTaskKeyValues
+    {
+        public Guid Id { get; init; }
+        public bool IsReady { get; init; }
+        public bool IsException { get; init; }
+        public DateTime? RouteTime { get; init; }
+        public DateTime? StatusTime { get; init; }
+        public DateTime FallbackTime { get; init; }
     }
 
 }
