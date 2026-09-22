@@ -37,38 +37,12 @@ public sealed partial class OrderRoutingService
             }
 
             lastStateId = states[^1].Id;
-            var changed = false;
-            foreach (var state in states)
-            {
-                var isAssignedToCaller = state.DeviceId == deviceId;
-                var isReady = readiness.IsDeviceReadyForTarget(deviceId, state.Target);
-
-                if (isAssignedToCaller && state.Status == DevicePrintStatus.Queued && !isReady)
-                {
-                    MarkNotConfigured(state);
-                    changed = true;
-                    continue;
-                }
-
-                if (isAssignedToCaller
-                    && state.Status is (DevicePrintStatus.Received or DevicePrintStatus.Sent)
-                    && !isReady)
-                {
-                    // Physical output may already have happened. Keep ownership and make the next
-                    // poll retryable, rather than assigning the same job to a second device.
-                    MarkUnknown(state);
-                    changed = true;
-                    continue;
-                }
-
-                if (state.DeviceId is null
-                    && state.Status == DevicePrintStatus.NotConfigured
-                    && isReady)
-                {
-                    MarkQueued(state, deviceId);
-                    changed = true;
-                }
-            }
+            // Materialize the results before Any collapses them; a lazy Select followed by Any
+            // would stop after the first route and leave sibling targets unassigned in the batch.
+            var changed = states
+                .Select(state => ReconcileDeviceRoute(state, deviceId, readiness))
+                .ToList()
+                .Any(reconciled => reconciled);
 
             if (!changed)
             {
@@ -90,6 +64,40 @@ public sealed partial class OrderRoutingService
             }
         }
     }
+
+    private bool ReconcileDeviceRoute(
+        OrderRoutingState state, string deviceId, RoutingReadinessSnapshot readiness)
+    {
+        var isAssignedToCaller = state.DeviceId == deviceId;
+        var isReady = readiness.IsDeviceReadyForTarget(deviceId, state.Target);
+
+        if (isAssignedToCaller && state.Status == DevicePrintStatus.Queued && !isReady)
+        {
+            MarkNotConfigured(state);
+            return true;
+        }
+
+        if (isAssignedToCaller && IsInFlight(state.Status) && !isReady)
+        {
+            // Physical output may already have happened. Keep ownership and make the next poll
+            // retryable, rather than assigning the same job to a second device.
+            MarkUnknown(state);
+            return true;
+        }
+
+        if (state.DeviceId is null
+            && state.Status == DevicePrintStatus.NotConfigured
+            && isReady)
+        {
+            MarkQueued(state, deviceId);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsInFlight(DevicePrintStatus status) =>
+        status is DevicePrintStatus.Received or DevicePrintStatus.Sent;
 
     private async Task ReconcileReadinessAsync(Order order, CancellationToken cancellationToken)
     {

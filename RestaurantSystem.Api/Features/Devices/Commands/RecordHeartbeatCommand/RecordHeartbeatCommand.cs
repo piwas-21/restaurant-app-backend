@@ -112,10 +112,9 @@ public class RecordHeartbeatCommandHandler
         var reportedAt = DateTime.UtcNow;
         if (normalizedReports.Count == 0)
         {
-            // An omitted list means an old client and deliberately preserves the last report. An
-            // explicit empty list comes from a capability-aware client with no usable targets;
-            // mark its previous rows unsupported immediately so a just-disabled printer cannot
-            // remain ready during the heartbeat freshness window.
+            // An old client omits the list, while a capability-aware client can report no usable
+            // targets. In the latter case, mark previous rows unsupported immediately so a
+            // just-disabled printer cannot remain ready during the heartbeat freshness window.
             var priorReports = await _context.PrinterDeviceTargetCapabilities
                 .Where(capability => capability.DeviceId == deviceId)
                 .ToListAsync(cancellationToken);

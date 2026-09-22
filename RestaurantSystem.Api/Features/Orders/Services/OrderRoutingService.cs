@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Queries;
 using RestaurantSystem.Api.Common.Modules;
@@ -62,10 +61,12 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
     /// restore legacy broadcast, because a capable device could later claim the same order and
     /// print duplicate paper. An explicit future operational reset is required to opt out.
     /// </summary>
-    public Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken) =>
+    public Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken)
+    {
         // Merely having OrderRoutingStates is not enough: those rows are created for every new
         // released order, including tenants that still run only legacy broadcast clients.
-        _context.PrinterDeviceTargetCapabilities.AsNoTracking().AnyAsync(cancellationToken);
+        return _context.PrinterDeviceTargetCapabilities.AsNoTracking().AnyAsync(cancellationToken);
+    }
 
     public async Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken)
     {
@@ -137,12 +138,7 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
         Guid orderId, CancellationToken cancellationToken)
     {
         var order = await _context.Orders
-            .Include(order => order.Items)
-                .ThenInclude(item => item.Product)
-            .Include(order => order.Items)
-                .ThenInclude(item => item.Menu)
-                    .ThenInclude(menu => menu!.MenuItems)
-                        .ThenInclude(menuItem => menuItem.Product)
+            .IncludeOrderLineGraph()
             .Include(order => order.RoutingStates)
             .SingleOrDefaultAsync(item => item.Id == orderId && !item.IsDeleted, cancellationToken);
         if (order is null)
@@ -170,80 +166,6 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
             .OrderBy(state => state.Target)
             .Select(state => ToDto(state))
             .ToListAsync(cancellationToken);
-    }
-
-    public async Task ApplyAcknowledgementAsync(
-        string deviceId, PrintAckDto acknowledgement, CancellationToken cancellationToken)
-    {
-        if (acknowledgement.JobType == DevicePrintJobType.Order
-            && acknowledgement.Status is DevicePrintStatus.Received or DevicePrintStatus.Sent)
-        {
-            throw new BadRequestException("Order route acknowledgements must use a final status.");
-        }
-
-        var query = _context.OrderRoutingStates
-            .Where(state => state.Target == acknowledgement.Target);
-        var state = acknowledgement.JobId.HasValue
-            ? await query.SingleOrDefaultAsync(candidate =>
-                candidate.JobId == acknowledgement.JobId.Value
-                && candidate.Revision == acknowledgement.Revision, cancellationToken)
-            : await query.SingleOrDefaultAsync(candidate =>
-                candidate.OrderId == acknowledgement.OrderId, cancellationToken);
-
-        if (state is null)
-        {
-            if (acknowledgement.JobType == DevicePrintJobType.Order)
-            {
-                throw new BadRequestException("The order print job is not known to this tenant.");
-            }
-
-            // Additive update jobs do not have an OrderRoutingState; their durable identity is the
-            // DeviceOrderReceipt row written by the caller.
-            return;
-        }
-
-        if (acknowledgement.Status is DevicePrintStatus.Queued
-            or DevicePrintStatus.Received
-            or DevicePrintStatus.Sent)
-        {
-            // Once an acknowledgement resolves to a durable OrderRoutingState, it is an order
-            // route regardless of whether an old client omitted JobId/Revision/JobType. Legacy
-            // wire shape must not reopen the intermediate Received/Sent path (or persist Queued)
-            // on the server-owned route.
-            throw new BadRequestException("Order route acknowledgements must use a final status.");
-        }
-
-        if (state.OrderId != acknowledgement.OrderId
-            || state.DeviceId is null
-            || state.DeviceId != deviceId)
-        {
-            throw new BadRequestException("The print acknowledgement does not match its route.");
-        }
-
-        if (acknowledgement.JobType is not null
-            && acknowledgement.JobType != DevicePrintJobType.Order)
-        {
-            throw new BadRequestException("The print acknowledgement job type does not match its route.");
-        }
-
-        // A same-status retry is idempotent, including its version and audit timestamps. This is
-        // important when two printer-feed flushes race after the first response was lost.
-        if (state.Status == acknowledgement.Status)
-        {
-            return;
-        }
-
-        if (!OrderRoutingTargetResolver.CanApply(state.Status, acknowledgement.Status))
-        {
-            throw new BadRequestException("The print acknowledgement is older than the route state.");
-        }
-
-        state.Status = acknowledgement.Status;
-        state.FailureReason = acknowledgement.FailureReason;
-        state.LastAcknowledgedAt = DateTime.UtcNow;
-        state.Version++;
-        state.UpdatedAt = DateTime.UtcNow;
-        state.UpdatedBy = _currentUser.GetAuditIdentifier();
     }
 
     private void AddMissingRoutes(

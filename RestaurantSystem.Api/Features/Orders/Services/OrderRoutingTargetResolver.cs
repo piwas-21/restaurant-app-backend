@@ -34,8 +34,9 @@ internal static class OrderRoutingTargetResolver
         if (item.Menu?.MenuItems is not null)
         {
             kitchenTypes.AddRange(item.Menu.MenuItems
-                .Where(menuItem => menuItem.Product is not null)
-                .Select(menuItem => menuItem.Product!.KitchenType));
+                .Select(menuItem => menuItem.Product)
+                .OfType<Product>()
+                .Select(product => product.KitchenType));
         }
 
         var declaredKitchenTypes = kitchenTypes

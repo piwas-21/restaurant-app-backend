@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
+using RestaurantSystem.Api.Features.Orders.Models;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedUpdatesQuery;
 
 namespace RestaurantSystem.Api.Features.Orders;
@@ -50,16 +51,17 @@ public class PrinterFeedController : ControllerBase
         [FromQuery] DateTime? modifiedSince,
         [FromQuery] string? language,
         [FromQuery] string? updateCursor,
-        [FromHeader(Name = "X-Device-Id")] string? deviceId,
+        [ModelBinder(Name = "X-Device-Id", BinderType = typeof(OptionalDeviceHeaderModelBinder))]
+        OptionalDeviceHeader deviceHeader,
         CancellationToken cancellationToken)
     {
         try
         {
-            var submittedDeviceId = Request.Headers.ContainsKey("X-Device-Id")
-                ? deviceId ?? string.Empty
+            var deviceId = deviceHeader.IsPresent
+                ? deviceHeader.Value ?? string.Empty
                 : null;
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince, language, submittedDeviceId),
+                new PrinterFeedQuery(modifiedSince, language, deviceId),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
