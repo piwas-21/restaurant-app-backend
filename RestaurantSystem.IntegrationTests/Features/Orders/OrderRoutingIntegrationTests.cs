@@ -30,6 +30,7 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         services.AddSingleton<ITenantModules>(new TenantModules(
             Options.Create(new ModuleSettings { Enabled = "core,server,printing", Enforce = true }),
             NullLogger<TenantModules>.Instance));
+        services.PostConfigure<OrderRoutingSettings>(settings => settings.ProcessingBatchSize = 2);
     }
 
     [Fact]
@@ -293,6 +294,68 @@ public sealed class OrderRoutingIntegrationTests : IntegrationTestBase
         await using var verify = DatabaseFixture.CreateContext();
         (await verify.OrderRoutingStates.CountAsync(state => state.OrderId == order.Id))
             .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Device_feed_backfills_active_orders_across_multiple_batches()
+    {
+        var deviceId = await RegisterReadyGeneralDeviceAsync();
+        AuthenticateAsRole(UserRole.Server);
+        var orders = new List<OrderDto>();
+        for (var index = 0; index < 3; index++)
+        {
+            var response = await PostAsJsonAsync(
+                "/api/staff/orders", CreateBody(Guid.NewGuid(), false));
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            orders.Add((await ReadResponseAsync<ApiResponse<OrderDto>>(response))!.Data!);
+        }
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var orderIds = orders.Select(order => order.Id).ToArray();
+            var persisted = await context.Orders
+                .Where(order => orderIds.Contains(order.Id))
+                .ToListAsync();
+            persisted.Should().HaveCount(orders.Count);
+            foreach (var order in persisted)
+            {
+                order.IsKitchenReleased = true;
+                order.Status = OrderStatus.Confirmed;
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        var feed = await FetchPrinterFeedAsync(deviceId);
+        OrderNumbers(feed).Should().BeEquivalentTo(orders.Select(order => order.OrderNumber));
+
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.OrderRoutingStates.CountAsync(state =>
+            orders.Select(order => order.Id).Contains(state.OrderId))).Should().Be(orders.Count * 2);
+    }
+
+    [Fact]
+    public async Task Device_feed_reconciles_unconfigured_routes_across_multiple_batches()
+    {
+        var orders = new[]
+        {
+            await CreateReleasedOrderAsync(),
+            await CreateReleasedOrderAsync(),
+            await CreateReleasedOrderAsync()
+        };
+        orders.SelectMany(order => order.RoutingStates!)
+            .Should().OnlyContain(route => route.Status == DevicePrintStatus.NotConfigured);
+
+        var deviceId = "routing-batched-recovery-" + Guid.NewGuid().ToString("N");
+        await RegisterDeviceAsync(deviceId, "SingleKitchen", "Cashier", "General");
+
+        var feed = await FetchPrinterFeedAsync(deviceId);
+        OrderNumbers(feed).Should().BeEquivalentTo(orders.Select(order => order.OrderNumber));
+        orders.Select(order => RoutesFor(feed, order.OrderNumber))
+            .SelectMany(routes => routes)
+            .Should().OnlyContain(route =>
+                route!["deviceId"]!.GetValue<string>() == deviceId
+                && route["status"]!.GetValue<string>() == nameof(DevicePrintStatus.Queued));
     }
 
     [Fact]

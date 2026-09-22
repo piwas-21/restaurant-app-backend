@@ -52,20 +52,8 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
             }
         }
 
-        var routingMode = await ResolveRoutingModeAsync(cancellationToken);
-        var targets = OrderRoutingTargetResolver.ResolveTargets(order, routingMode);
-        foreach (var target in targets)
-        {
-            if (existing.ContainsKey(target))
-            {
-                continue;
-            }
-
-            var route = await CreateRouteAsync(order, target, cancellationToken);
-            order.RoutingStates.Add(route);
-            _context.OrderRoutingStates.Add(route);
-            existing[target] = route;
-        }
+        var readiness = await LoadReadinessSnapshotAsync(cancellationToken);
+        AddMissingRoutes(order, existing, readiness);
     }
 
     /// <summary>
@@ -81,36 +69,66 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
 
     public async Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken)
     {
-        var orderIds = await _context.Orders
-            .AsNoTracking()
-            .Where(order => order.IsKitchenReleased
-                && order.Status != OrderStatus.Cancelled
-                && order.Status != OrderStatus.Refunded
-                && order.Status != OrderStatus.Completed
-                && !_context.OrderRoutingStates.Any(state => state.OrderId == order.Id))
-            .Select(order => order.Id)
-            .ToListAsync(cancellationToken);
-
-        foreach (var orderId in orderIds)
+        var lastOrderId = Guid.Empty;
+        while (true)
         {
-            var order = await _context.Orders
-                .IncludeOrderLineGraph()
-                .SingleOrDefaultAsync(item => item.Id == orderId, cancellationToken);
-            if (order is null || order.RoutingStates.Count > 0)
+            var batchStartOrderId = lastOrderId;
+            var orderIds = await _context.Orders
+                .AsNoTracking()
+                .Where(order => order.Id.CompareTo(lastOrderId) > 0
+                    && order.IsKitchenReleased
+                    && order.Status != OrderStatus.Cancelled
+                    && order.Status != OrderStatus.Refunded
+                    && order.Status != OrderStatus.Completed
+                    && !_context.OrderRoutingStates.Any(state => state.OrderId == order.Id))
+                .OrderBy(order => order.Id)
+                .Select(order => order.Id)
+                .Take(_settings.ProcessingBatchSize)
+                .ToListAsync(cancellationToken);
+            if (orderIds.Count == 0)
             {
+                return;
+            }
+
+            lastOrderId = orderIds[^1];
+            var orders = await _context.Orders
+                .IncludeOrderLineGraph()
+                .Include(order => order.RoutingStates)
+                .Where(order => orderIds.Contains(order.Id))
+                .OrderBy(order => order.Id)
+                .ToListAsync(cancellationToken);
+            var readiness = await LoadReadinessSnapshotAsync(cancellationToken);
+            var changed = false;
+
+            foreach (var order in orders)
+            {
+                if (order.RoutingStates.Count > 0)
+                {
+                    continue;
+                }
+
+                AddMissingRoutes(order, new Dictionary<DevicePrintTarget, OrderRoutingState>(), readiness);
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                _context.ChangeTracker.Clear();
                 continue;
             }
 
-            await EnsureRoutesAsync(order, cancellationToken);
             try
             {
                 await _context.SaveChangesAsync(cancellationToken);
+                _context.ChangeTracker.Clear();
             }
             catch (DbUpdateException exception) when (IsRouteUniqueViolation(exception))
             {
                 // Another feed request won the same pre-migration race. Its route set is already
-                // authoritative, so discard this context's pending graph and continue.
+                // authoritative. Retry the same keyset page so other orders in this transaction
+                // are not skipped when one concurrent insert rolls the whole batch back.
                 _context.ChangeTracker.Clear();
+                lastOrderId = batchStartOrderId;
             }
         }
     }
@@ -228,10 +246,29 @@ public sealed partial class OrderRoutingService : IOrderRoutingService
         state.UpdatedBy = _currentUser.GetAuditIdentifier();
     }
 
-    private async Task<OrderRoutingState> CreateRouteAsync(
-        Order order, DevicePrintTarget target, CancellationToken cancellationToken)
+    private void AddMissingRoutes(
+        Order order,
+        Dictionary<DevicePrintTarget, OrderRoutingState> existing,
+        RoutingReadinessSnapshot readiness)
     {
-        var selection = await SelectDeviceAsync(target, cancellationToken);
+        var targets = OrderRoutingTargetResolver.ResolveTargets(order, readiness.RoutingMode);
+        foreach (var target in targets)
+        {
+            if (existing.ContainsKey(target))
+            {
+                continue;
+            }
+
+            var route = CreateRoute(order, target, readiness.SelectDevice(target));
+            order.RoutingStates.Add(route);
+            _context.OrderRoutingStates.Add(route);
+            existing[target] = route;
+        }
+    }
+
+    private OrderRoutingState CreateRoute(
+        Order order, DevicePrintTarget target, string? selection)
+    {
         var now = DateTime.UtcNow;
         return new OrderRoutingState
         {
