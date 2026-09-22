@@ -46,11 +46,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
         var (allowed, reasonCode) = action switch
         {
-            OrderAction.Accept => !IsServer && order.IsKitchenReleased
-                ? StatusAction(order, OrderStatus.Confirmed)
-                : (false, IsServer
-                    ? OrderActionReasonCodes.KitchenRoleRequired
-                    : OrderActionReasonCodes.KitchenReleaseRequired),
+            OrderAction.Accept => AcceptAction(order),
             OrderAction.StartPreparing => IsServer
                 ? (false, OrderActionReasonCodes.KitchenRoleRequired)
                 : StatusAction(order, OrderStatus.Preparing),
@@ -107,6 +103,18 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         }
 
         return (true, null);
+    }
+
+    private (bool Allowed, string? ReasonCode) AcceptAction(Order order)
+    {
+        if (IsServer)
+        {
+            return (false, OrderActionReasonCodes.KitchenRoleRequired);
+        }
+
+        return order.IsKitchenReleased
+            ? StatusAction(order, OrderStatus.Confirmed)
+            : (false, OrderActionReasonCodes.KitchenReleaseRequired);
     }
 
     private (bool Allowed, string? ReasonCode) CancelAction(Order order)
