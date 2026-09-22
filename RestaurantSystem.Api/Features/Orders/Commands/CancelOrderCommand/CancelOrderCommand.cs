@@ -62,6 +62,12 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
+        var authorizationFailure = AuthorizeCancellation(order);
+        if (authorizationFailure is not null)
+        {
+            return authorizationFailure;
+        }
+
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             return ApiResponse<OrderDto>.FailureWithCode(
@@ -128,9 +134,6 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         foreach (var payment in gatewayHeld)
         {
             _logger.LogWarning(
-                // One {Gateway} placeholder, not two: a repeated name in a message template binds
-                // unreliably across sinks (S6677), so the sentence names the gateway once and then
-                // refers back to it.
                 "Order {OrderNumber} was cancelled holding {Amount} captured by {Gateway} "
                 + "(transaction {TransactionId}). It was NOT booked as refunded — issue the refund "
                 + "from that gateway's own dashboard",
@@ -154,30 +157,44 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             orderDto.PermittedActions = _permittedActionsService.GetPermittedActions(order);
         }
 
-        // Send cancellation email to customer
-        if (!string.IsNullOrEmpty(order.CustomerEmail))
-        {
-            try
-            {
-                // A cancellation is a staff action, so the order's frozen language is the guest's
-                // only voice here (§6.10).
-                await _emailService.SendOrderCancellationEmailAsync(
-                    _languages.ForGuest(order.PreferredLanguage),
-                    order.CustomerEmail,
-                    order.CustomerName ?? string.Empty,
-                    order.OrderNumber,
-                    command.CancellationReason
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send cancellation email for order {OrderNumber}", order.OrderNumber);
-            }
-        }
+        await SendCancellationEmailAsync(order, command.CancellationReason);
 
         _logger.LogInformation("Order {OrderNumber} cancelled by user {UserId}. Reason: {Reason}",
             order.OrderNumber, _currentUserService.UserId, command.CancellationReason);
 
         return ApiResponse<OrderDto>.SuccessWithData(orderDto, "Order cancelled successfully");
+    }
+
+    private ApiResponse<OrderDto>? AuthorizeCancellation(Order order)
+    {
+        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(
+            _currentUserService.Role, order);
+        return authorization.Allowed
+            ? null
+            : ApiResponse<OrderDto>.FailureWithCode(
+                authorization.Message!, authorization.ErrorCode!);
+    }
+
+    private async Task SendCancellationEmailAsync(Order order, string cancellationReason)
+    {
+        if (string.IsNullOrEmpty(order.CustomerEmail))
+        {
+            return;
+        }
+
+        try
+        {
+            await _emailService.SendOrderCancellationEmailAsync(
+                _languages.ForGuest(order.PreferredLanguage),
+                order.CustomerEmail,
+                order.CustomerName ?? string.Empty,
+                order.OrderNumber,
+                cancellationReason
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send cancellation email for order {OrderNumber}", order.OrderNumber);
+        }
     }
 }

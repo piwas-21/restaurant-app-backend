@@ -189,11 +189,14 @@ public static class ErrorCodes
 
     public const string StaffOrderOperationPayloadMismatch = "StaffOrderOperationPayloadMismatch";
     public const string StaffOrderOperationIdReused = "StaffOrderOperationIdReused";
+    public const string StaffOrderOperationUnknown = "StaffOrderOperationUnknown";
     public const string StaffOrderVersionConflict = "StaffOrderVersionConflict";
 
     /// <summary>Returned when an order changed after a caller read its version token.</summary>
     public const string OrderVersionConflict = "OrderVersionConflict";
     public const string KitchenReleaseRequired = "KitchenReleaseRequired";
+    public const string KitchenRoleRequired = "KitchenRoleRequired";
+    public const string CashierRequired = "CashierRequired";
 
     /// <summary>Returned when an operational queue synchronization cursor is malformed, tampered with, or reused with different filters.</summary>
     public const string InvalidOperationalQueueCursor = "InvalidOperationalQueueCursor";

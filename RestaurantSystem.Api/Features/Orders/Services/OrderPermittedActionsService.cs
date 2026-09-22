@@ -46,19 +46,19 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
         var (allowed, reasonCode) = action switch
         {
-            OrderAction.Accept => order.IsKitchenReleased
-                ? StatusAction(order, OrderStatus.Confirmed)
-                : (false, OrderActionReasonCodes.KitchenReleaseRequired),
-            OrderAction.StartPreparing => StatusAction(order, OrderStatus.Preparing),
-            OrderAction.MarkReady => StatusAction(order, OrderStatus.Ready),
+            OrderAction.Accept => AcceptAction(order),
+            OrderAction.StartPreparing => IsServer
+                ? (false, OrderActionReasonCodes.KitchenRoleRequired)
+                : StatusAction(order, OrderStatus.Preparing),
+            OrderAction.MarkReady => IsServer
+                ? (false, OrderActionReasonCodes.KitchenRoleRequired)
+                : StatusAction(order, OrderStatus.Ready),
             OrderAction.HandOver => HandOverAction(order),
             OrderAction.CollectPayment => CollectPaymentAction(order),
             OrderAction.AddOperationalNote => RoleAction(
                 _currentUser.IsAdmin || _currentUser.Role == UserRole.Cashier,
                 OrderActionReasonCodes.AdminOrCashierRequired),
-            OrderAction.PrintKitchen => order.IsKitchenReleased
-                ? RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired)
-                : (false, OrderActionReasonCodes.KitchenReleaseRequired),
+            OrderAction.PrintKitchen => KitchenPrintAction(order),
             OrderAction.PrintReceipt => RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired),
             OrderAction.RefundPayment => RefundPaymentAction(order),
             OrderAction.CancelOrder => CancelAction(order),
@@ -77,6 +77,13 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private (bool Allowed, string? ReasonCode) StatusAction(Order order, OrderStatus target)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForStatus(
+            _currentUser.Role, order, target);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
@@ -98,12 +105,36 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         return (true, null);
     }
 
+    private (bool Allowed, string? ReasonCode) AcceptAction(Order order)
+    {
+        if (IsServer)
+        {
+            return (false, OrderActionReasonCodes.KitchenRoleRequired);
+        }
+
+        return order.IsKitchenReleased
+            ? StatusAction(order, OrderStatus.Confirmed)
+            : (false, OrderActionReasonCodes.KitchenReleaseRequired);
+    }
+
     private (bool Allowed, string? ReasonCode) CancelAction(Order order)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(
+            _currentUser.Role, order);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
             return role;
+        }
+
+        if (IsServer && order.IsKitchenReleased && order.Status is not OrderStatus.Confirmed)
+        {
+            return (false, OrderActionReasonCodes.KitchenRoleRequired);
         }
 
         // The cancel endpoint intentionally has its own terminal guard rather than consulting the
@@ -141,6 +172,12 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private (bool Allowed, string? ReasonCode) CollectPaymentAction(Order order)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForPayment(_currentUser.Role);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
         var role = RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
         if (!role.Allowed)
         {
@@ -163,6 +200,18 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         }
 
         return (false, OrderActionReasonCodes.NoOutstandingBalance);
+    }
+
+    private (bool Allowed, string? ReasonCode) KitchenPrintAction(Order order)
+    {
+        var authorization = OrderWriteAuthorizationPolicy.ForKitchenPrint(
+            _currentUser.Role, order);
+        if (!authorization.Allowed)
+        {
+            return (false, authorization.ErrorCode);
+        }
+
+        return RoleAction(_currentUser.IsStaff, OrderActionReasonCodes.StaffRequired);
     }
 
     private (bool Allowed, string? ReasonCode) RefundPaymentAction(Order order)
@@ -190,6 +239,8 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
     private static (bool Allowed, string? ReasonCode) RoleAction(bool allowed, string reasonCode) =>
         allowed ? (true, null) : (false, reasonCode);
+
+    private bool IsServer => _currentUser.Role == UserRole.Server;
 }
 
 /// <summary>Stable machine-readable reasons for denied order actions.</summary>
@@ -199,6 +250,8 @@ public static class OrderActionReasonCodes
     public const string KitchenReleaseRequired = ErrorCodes.KitchenReleaseRequired;
     public const string AdminRequired = "AdminRequired";
     public const string AdminOrCashierRequired = "AdminOrCashierRequired";
+    public const string CashierRequired = ErrorCodes.CashierRequired;
+    public const string KitchenRoleRequired = ErrorCodes.KitchenRoleRequired;
     public const string InvalidStatusTransition = "InvalidStatusTransition";
     public const string OnlinePaymentPending = "OnlinePaymentPending";
     public const string SettlementClosed = "SettlementClosed";

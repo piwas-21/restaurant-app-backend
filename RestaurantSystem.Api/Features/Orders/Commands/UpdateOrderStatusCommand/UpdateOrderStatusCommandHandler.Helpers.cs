@@ -9,9 +9,17 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand
 
 public partial class UpdateOrderStatusCommandHandler
 {
-    private static ApiResponse<OrderDto>? ValidateOrderStatusUpdate(
+    private ApiResponse<OrderDto>? ValidateOrderStatusUpdate(
         Order order, UpdateOrderStatusCommand command)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForStatus(
+            _currentUserService.Role, order, command.NewStatus);
+        if (!authorization.Allowed)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                authorization.Message!, authorization.ErrorCode!);
+        }
+
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             return ApiResponse<OrderDto>.FailureWithCode(
