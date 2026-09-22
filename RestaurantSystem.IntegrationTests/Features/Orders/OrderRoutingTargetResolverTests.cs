@@ -173,7 +173,7 @@ public sealed class OrderRoutingTargetResolverTests
     public void RoutingStateVersion_IsAnOptimisticConcurrencyToken()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql("Host=unused;Database=unused")
+            .UseNpgsql()
             .Options;
         using var context = new ApplicationDbContext(options);
 
