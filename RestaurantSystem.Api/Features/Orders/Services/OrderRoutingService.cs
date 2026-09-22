@@ -1,219 +1,44 @@
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Npgsql;
-using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
-using RestaurantSystem.Api.Features.Orders.Queries;
-using RestaurantSystem.Api.Common.Modules;
-using RestaurantSystem.Api.Settings;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
-using RestaurantSystem.Infrastructure.Persistence;
-using Microsoft.Extensions.Options;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
-public sealed partial class OrderRoutingService : IOrderRoutingService
+/// <summary>Coordinates the separately scoped durable order-routing services.</summary>
+public sealed class OrderRoutingService : IOrderRoutingService
 {
-    private readonly ApplicationDbContext _context;
-    private readonly ICurrentUserService _currentUser;
-    private readonly ITenantModules _modules;
-    private readonly OrderRoutingSettings _settings;
+    private readonly IOrderRoutingLifecycleService _lifecycle;
+    private readonly IOrderRoutingReadinessService _readiness;
+    private readonly IOrderRoutingAcknowledgementService _acknowledgements;
 
     public OrderRoutingService(
-        ApplicationDbContext context, ICurrentUserService currentUser,
-        ITenantModules modules, IOptions<OrderRoutingSettings> settings)
+        IOrderRoutingLifecycleService lifecycle,
+        IOrderRoutingReadinessService readiness,
+        IOrderRoutingAcknowledgementService acknowledgements)
     {
-        _context = context;
-        _currentUser = currentUser;
-        _modules = modules;
-        _settings = settings.Value;
+        _lifecycle = lifecycle;
+        _readiness = readiness;
+        _acknowledgements = acknowledgements;
     }
 
-    public async Task EnsureRoutesAsync(Order order, CancellationToken cancellationToken)
-    {
-        if (!order.IsKitchenReleased)
-        {
-            return;
-        }
+    public Task EnsureRoutesAsync(Order order, CancellationToken cancellationToken) =>
+        _lifecycle.EnsureRoutesAsync(order, cancellationToken);
 
-        var existing = order.RoutingStates.ToDictionary(state => state.Target);
-        if (order.Id != Guid.Empty && order.RoutingStates.Count == 0)
-        {
-            var persisted = await _context.OrderRoutingStates
-                .Where(state => state.OrderId == order.Id)
-                .ToListAsync(cancellationToken);
-            foreach (var state in persisted)
-            {
-                existing[state.Target] = state;
-            }
-        }
+    public Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken) =>
+        _lifecycle.IsRoutingActivatedAsync(cancellationToken);
 
-        var readiness = await LoadReadinessSnapshotAsync(cancellationToken);
-        AddMissingRoutes(order, existing, readiness);
-    }
+    public Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken) =>
+        _lifecycle.BackfillActiveReleasedRoutesAsync(cancellationToken);
 
-    /// <summary>
-    /// Returns the durable tenant opt-in signal from the first capability-aware printer app.
-    /// This activation is intentionally irreversible: stale or unsupported-only devices must not
-    /// restore legacy broadcast, because a capable device could later claim the same order and
-    /// print duplicate paper. An explicit future operational reset is required to opt out.
-    /// </summary>
-    public Task<bool> IsRoutingActivatedAsync(CancellationToken cancellationToken)
-    {
-        // Merely having OrderRoutingStates is not enough: those rows are created for every new
-        // released order, including tenants that still run only legacy broadcast clients.
-        return _context.PrinterDeviceTargetCapabilities.AsNoTracking().AnyAsync(cancellationToken);
-    }
+    public Task<IReadOnlyList<OrderRoutingStateDto>> ProjectAsync(
+        Guid orderId, CancellationToken cancellationToken) =>
+        _lifecycle.ProjectAsync(orderId, cancellationToken);
 
-    public async Task BackfillActiveReleasedRoutesAsync(CancellationToken cancellationToken)
-    {
-        var lastOrderId = Guid.Empty;
-        while (true)
-        {
-            var batchStartOrderId = lastOrderId;
-            var orderIds = await _context.Orders
-                .AsNoTracking()
-                .Where(order => order.Id.CompareTo(lastOrderId) > 0
-                    && order.IsKitchenReleased
-                    && order.Status != OrderStatus.Cancelled
-                    && order.Status != OrderStatus.Refunded
-                    && order.Status != OrderStatus.Completed
-                    && !_context.OrderRoutingStates.Any(state => state.OrderId == order.Id))
-                .OrderBy(order => order.Id)
-                .Select(order => order.Id)
-                .Take(_settings.ProcessingBatchSize)
-                .ToListAsync(cancellationToken);
-            if (orderIds.Count == 0)
-            {
-                return;
-            }
+    public Task ReconcileDeviceRoutesAsync(
+        string deviceId, CancellationToken cancellationToken) =>
+        _readiness.ReconcileDeviceRoutesAsync(deviceId, cancellationToken);
 
-            lastOrderId = orderIds[^1];
-            var orders = await _context.Orders
-                .IncludeOrderLineGraph()
-                .Include(order => order.RoutingStates)
-                .Where(order => orderIds.Contains(order.Id))
-                .OrderBy(order => order.Id)
-                .ToListAsync(cancellationToken);
-            var readiness = await LoadReadinessSnapshotAsync(cancellationToken);
-            var changed = false;
-
-            foreach (var order in orders)
-            {
-                if (order.RoutingStates.Count > 0)
-                {
-                    continue;
-                }
-
-                AddMissingRoutes(order, new Dictionary<DevicePrintTarget, OrderRoutingState>(), readiness);
-                changed = true;
-            }
-
-            if (!changed)
-            {
-                _context.ChangeTracker.Clear();
-                continue;
-            }
-
-            try
-            {
-                await _context.SaveChangesAsync(cancellationToken);
-                _context.ChangeTracker.Clear();
-            }
-            catch (DbUpdateException exception) when (IsRouteUniqueViolation(exception))
-            {
-                // Another feed request won the same pre-migration race. Its route set is already
-                // authoritative. Retry the same keyset page so other orders in this transaction
-                // are not skipped when one concurrent insert rolls the whole batch back.
-                _context.ChangeTracker.Clear();
-                lastOrderId = batchStartOrderId;
-            }
-        }
-    }
-
-    public async Task<IReadOnlyList<OrderRoutingStateDto>> ProjectAsync(
-        Guid orderId, CancellationToken cancellationToken)
-    {
-        var order = await _context.Orders
-            .IncludeOrderLineGraph()
-            .Include(order => order.RoutingStates)
-            .SingleOrDefaultAsync(item => item.Id == orderId && !item.IsDeleted, cancellationToken);
-        if (order is null)
-        {
-            throw new NotFoundException("Order not found.");
-        }
-
-        // Releases before durable routing existed must not remain invisible forever. Only active,
-        // kitchen-released orders are backfilled; terminal and held orders are intentionally left
-        // without route rows so a historical read cannot create printer work.
-        if (IsRoutable(order))
-        {
-            var routeCountBeforeBackfill = order.RoutingStates.Count;
-            await EnsureRoutesAsync(order, cancellationToken);
-            if (order.RoutingStates.Count > routeCountBeforeBackfill)
-            {
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-        }
-
-        await ReconcileReadinessAsync(order, cancellationToken);
-        return await _context.OrderRoutingStates
-            .AsNoTracking()
-            .Where(state => state.OrderId == orderId)
-            .OrderBy(state => state.Target)
-            .Select(state => ToDto(state))
-            .ToListAsync(cancellationToken);
-    }
-
-    private void AddMissingRoutes(
-        Order order,
-        Dictionary<DevicePrintTarget, OrderRoutingState> existing,
-        RoutingReadinessSnapshot readiness)
-    {
-        var targets = OrderRoutingTargetResolver.ResolveTargets(order, readiness.RoutingMode);
-        foreach (var target in targets)
-        {
-            if (existing.ContainsKey(target))
-            {
-                continue;
-            }
-
-            var route = CreateRoute(order, target, readiness.SelectDevice(target));
-            order.RoutingStates.Add(route);
-            _context.OrderRoutingStates.Add(route);
-            existing[target] = route;
-        }
-    }
-
-    private OrderRoutingState CreateRoute(
-        Order order, DevicePrintTarget target, string? selection)
-    {
-        var now = DateTime.UtcNow;
-        return new OrderRoutingState
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            JobId = OrderRoutingTargetResolver.CreateStableJobId(order.Id, target),
-            Revision = 1,
-            Version = 1,
-            Target = target,
-            IsRequired = target != DevicePrintTarget.Cashier,
-            Status = selection is null ? DevicePrintStatus.NotConfigured : DevicePrintStatus.Queued,
-            DeviceId = selection,
-            CreatedAt = now,
-            CreatedBy = _currentUser.GetAuditIdentifier()
-        };
-    }
-
-    private static OrderRoutingStateDto ToDto(OrderRoutingState state) => new(
-        state.Id, state.JobId, state.Revision, state.Target, state.Status, state.DeviceId,
-        state.FailureReason, state.LastAcknowledgedAt, state.Version, state.IsRequired);
-
-    private static bool IsRouteUniqueViolation(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg
-        && (pg.ConstraintName?.Contains("OrderRoutingStates", StringComparison.OrdinalIgnoreCase) == true
-            || pg.ConstraintName?.Contains("order_routing_states", StringComparison.OrdinalIgnoreCase) == true);
+    public Task ApplyAcknowledgementAsync(
+        string deviceId, PrintAckDto acknowledgement, CancellationToken cancellationToken) =>
+        _acknowledgements.ApplyAcknowledgementAsync(deviceId, acknowledgement, cancellationToken);
 }

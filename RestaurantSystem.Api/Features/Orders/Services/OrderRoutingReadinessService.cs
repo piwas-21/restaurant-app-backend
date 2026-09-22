@@ -1,12 +1,32 @@
 using Microsoft.EntityFrameworkCore;
-using RestaurantSystem.Api.Common.Modules;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
-public sealed partial class OrderRoutingService
+internal sealed class OrderRoutingReadinessService : IOrderRoutingReadinessService
 {
+    private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IOrderRoutingReadinessSnapshotProvider _snapshotProvider;
+    private readonly OrderRoutingSettings _settings;
+
+    public OrderRoutingReadinessService(
+        ApplicationDbContext context,
+        ICurrentUserService currentUser,
+        IOrderRoutingReadinessSnapshotProvider snapshotProvider,
+        IOptions<OrderRoutingSettings> settings)
+    {
+        _context = context;
+        _currentUser = currentUser;
+        _snapshotProvider = snapshotProvider;
+        _settings = settings.Value;
+    }
+
     public async Task ReconcileDeviceRoutesAsync(
         string deviceId, CancellationToken cancellationToken)
     {
@@ -15,7 +35,7 @@ public sealed partial class OrderRoutingService
             return;
         }
 
-        var readiness = await LoadReadinessSnapshotAsync(cancellationToken);
+        var readiness = await _snapshotProvider.LoadAsync(cancellationToken);
         var lastStateId = Guid.Empty;
         while (true)
         {
@@ -37,8 +57,6 @@ public sealed partial class OrderRoutingService
             }
 
             lastStateId = states[^1].Id;
-            // Visit every route in the batch. A lazy projection followed by Any would stop after
-            // the first change and leave sibling targets unassigned.
             var changed = false;
             foreach (var state in states)
             {
@@ -58,54 +76,18 @@ public sealed partial class OrderRoutingService
             }
             catch (DbUpdateConcurrencyException)
             {
-                // Preserve the old retry semantics: the conflicted page remains eligible for a
-                // subsequent poll instead of advancing the cursor past a state we did not save.
                 _context.ChangeTracker.Clear();
                 return;
             }
         }
     }
 
-    private bool ReconcileDeviceRoute(
-        OrderRoutingState state, string deviceId, RoutingReadinessSnapshot readiness)
-    {
-        var isAssignedToCaller = state.DeviceId == deviceId;
-        var isReady = readiness.IsDeviceReadyForTarget(deviceId, state.Target);
-
-        if (isAssignedToCaller && state.Status == DevicePrintStatus.Queued && !isReady)
-        {
-            MarkNotConfigured(state);
-            return true;
-        }
-
-        if (isAssignedToCaller && IsInFlight(state.Status) && !isReady)
-        {
-            // Physical output may already have happened. Keep ownership and make the next poll
-            // retryable, rather than assigning the same job to a second device.
-            MarkUnknown(state);
-            return true;
-        }
-
-        if (state.DeviceId is null
-            && state.Status == DevicePrintStatus.NotConfigured
-            && isReady)
-        {
-            MarkQueued(state, deviceId);
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool IsInFlight(DevicePrintStatus status) =>
-        status is DevicePrintStatus.Received or DevicePrintStatus.Sent;
-
-    private async Task ReconcileReadinessAsync(Order order, CancellationToken cancellationToken)
+    public async Task ReconcileReadinessAsync(Order order, CancellationToken cancellationToken)
     {
         var states = await _context.OrderRoutingStates
             .Where(state => state.OrderId == order.Id)
             .ToListAsync(cancellationToken);
-        var readiness = await LoadReadinessSnapshotAsync(cancellationToken);
+        var readiness = await _snapshotProvider.LoadAsync(cancellationToken);
         var changed = false;
         foreach (var state in states)
         {
@@ -121,8 +103,6 @@ public sealed partial class OrderRoutingService
                 && state.Status is DevicePrintStatus.Received or DevicePrintStatus.Sent
                 && !readiness.IsDeviceReadyForTarget(state.DeviceId, state.Target))
             {
-                // The device may have accepted or sent the ticket before going stale. Keep its
-                // binding and surface uncertainty instead of reassigning work that could print twice.
                 MarkUnknown(state);
                 changed = true;
             }
@@ -154,11 +134,41 @@ public sealed partial class OrderRoutingService
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Another reader won the readiness transition. Its state is already authoritative;
-            // clear the losing tracker and let the subsequent projection read it afresh.
             _context.ChangeTracker.Clear();
         }
     }
+
+    private bool ReconcileDeviceRoute(
+        OrderRoutingState state, string deviceId, OrderRoutingReadinessSnapshot readiness)
+    {
+        var isAssignedToCaller = state.DeviceId == deviceId;
+        var isReady = readiness.IsDeviceReadyForTarget(deviceId, state.Target);
+
+        if (isAssignedToCaller && state.Status == DevicePrintStatus.Queued && !isReady)
+        {
+            MarkNotConfigured(state);
+            return true;
+        }
+
+        if (isAssignedToCaller && IsInFlight(state.Status) && !isReady)
+        {
+            MarkUnknown(state);
+            return true;
+        }
+
+        if (state.DeviceId is null
+            && state.Status == DevicePrintStatus.NotConfigured
+            && isReady)
+        {
+            MarkQueued(state, deviceId);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsInFlight(DevicePrintStatus status) =>
+        status is DevicePrintStatus.Received or DevicePrintStatus.Sent;
 
     private void MarkNotConfigured(OrderRoutingState state)
     {
@@ -186,8 +196,4 @@ public sealed partial class OrderRoutingService
         state.UpdatedAt = DateTime.UtcNow;
         state.UpdatedBy = _currentUser.GetAuditIdentifier();
     }
-
-    private static bool IsRoutable(Order order) =>
-        order.IsKitchenReleased
-        && order.Status is not (OrderStatus.Cancelled or OrderStatus.Refunded or OrderStatus.Completed);
 }

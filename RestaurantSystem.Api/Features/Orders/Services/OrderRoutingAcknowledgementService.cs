@@ -1,13 +1,25 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
-public sealed partial class OrderRoutingService
+internal sealed class OrderRoutingAcknowledgementService : IOrderRoutingAcknowledgementService
 {
+    private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
+
+    public OrderRoutingAcknowledgementService(
+        ApplicationDbContext context, ICurrentUserService currentUser)
+    {
+        _context = context;
+        _currentUser = currentUser;
+    }
+
     public async Task ApplyAcknowledgementAsync(
         string deviceId, PrintAckDto acknowledgement, CancellationToken cancellationToken)
     {

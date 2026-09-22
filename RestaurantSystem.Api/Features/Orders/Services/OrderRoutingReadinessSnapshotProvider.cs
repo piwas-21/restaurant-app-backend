@@ -1,37 +1,29 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Modules;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
-public sealed partial class OrderRoutingService
+internal sealed class OrderRoutingReadinessSnapshotProvider : IOrderRoutingReadinessSnapshotProvider
 {
-    private sealed class RoutingReadinessSnapshot
+    private readonly ApplicationDbContext _context;
+    private readonly ITenantModules _modules;
+    private readonly OrderRoutingSettings _settings;
+
+    public OrderRoutingReadinessSnapshotProvider(
+        ApplicationDbContext context,
+        ITenantModules modules,
+        IOptions<OrderRoutingSettings> settings)
     {
-        private readonly IReadOnlyDictionary<DevicePrintTarget, string> _selectedDevices;
-        private readonly IReadOnlySet<(string DeviceId, DevicePrintTarget Target)> _readyTargets;
-
-        public RoutingReadinessSnapshot(
-            DeviceKitchenRoutingMode routingMode,
-            IReadOnlyDictionary<DevicePrintTarget, string> selectedDevices,
-            IReadOnlySet<(string DeviceId, DevicePrintTarget Target)> readyTargets)
-        {
-            RoutingMode = routingMode;
-            _selectedDevices = selectedDevices;
-            _readyTargets = readyTargets;
-        }
-
-        public DeviceKitchenRoutingMode RoutingMode { get; }
-
-        public string? SelectDevice(DevicePrintTarget target) =>
-            _selectedDevices.GetValueOrDefault(target);
-
-        public bool IsDeviceReadyForTarget(string deviceId, DevicePrintTarget target) =>
-            _readyTargets.Contains((deviceId, target));
+        _context = context;
+        _modules = modules;
+        _settings = settings.Value;
     }
 
-    private async Task<RoutingReadinessSnapshot> LoadReadinessSnapshotAsync(
-        CancellationToken cancellationToken)
+    public async Task<OrderRoutingReadinessSnapshot> LoadAsync(CancellationToken cancellationToken)
     {
         var printingEnabled = _modules.IsEnabled(ModuleIds.Printing);
         var readinessCutoff = DateTime.UtcNow.AddMinutes(-_settings.HeartbeatFreshnessMinutes);
@@ -45,7 +37,7 @@ public sealed partial class OrderRoutingService
             .ToListAsync(cancellationToken);
         if (devices.Count == 0)
         {
-            return EmptyReadinessSnapshot();
+            return Empty();
         }
 
         var deviceIds = devices.Select(device => device.DeviceId).ToArray();
@@ -93,21 +85,15 @@ public sealed partial class OrderRoutingService
         var routingMode = newestCapableDevice?.KitchenRoutingMode
             ?? DeviceKitchenRoutingMode.SingleKitchen;
 
-        if (!printingEnabled)
-        {
-            // Keep the historical target shape even when printing is disabled. The old service
-            // still resolved the fleet's routing mode, while device selection itself failed closed
-            // at the module boundary.
-            return new RoutingReadinessSnapshot(
+        return printingEnabled
+            ? new OrderRoutingReadinessSnapshot(routingMode, selectedDevices, readyTargets)
+            : new OrderRoutingReadinessSnapshot(
                 routingMode,
                 new Dictionary<DevicePrintTarget, string>(),
                 new HashSet<(string DeviceId, DevicePrintTarget Target)>());
-        }
-
-        return new RoutingReadinessSnapshot(routingMode, selectedDevices, readyTargets);
     }
 
-    private static RoutingReadinessSnapshot EmptyReadinessSnapshot() =>
+    private static OrderRoutingReadinessSnapshot Empty() =>
         new(
             DeviceKitchenRoutingMode.SingleKitchen,
             new Dictionary<DevicePrintTarget, string>(),
