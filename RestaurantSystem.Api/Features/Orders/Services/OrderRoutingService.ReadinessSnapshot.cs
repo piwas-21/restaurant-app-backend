@@ -33,11 +33,7 @@ public sealed partial class OrderRoutingService
     private async Task<RoutingReadinessSnapshot> LoadReadinessSnapshotAsync(
         CancellationToken cancellationToken)
     {
-        if (!_modules.IsEnabled(ModuleIds.Printing))
-        {
-            return EmptyReadinessSnapshot();
-        }
-
+        var printingEnabled = _modules.IsEnabled(ModuleIds.Printing);
         var readinessCutoff = DateTime.UtcNow.AddMinutes(-_settings.HeartbeatFreshnessMinutes);
         var devices = await _context.PrinterDevices
             .AsNoTracking()
@@ -96,6 +92,17 @@ public sealed partial class OrderRoutingService
             .FirstOrDefault();
         var routingMode = newestCapableDevice?.KitchenRoutingMode
             ?? DeviceKitchenRoutingMode.SingleKitchen;
+
+        if (!printingEnabled)
+        {
+            // Keep the historical target shape even when printing is disabled. The old service
+            // still resolved the fleet's routing mode, while device selection itself failed closed
+            // at the module boundary.
+            return new RoutingReadinessSnapshot(
+                routingMode,
+                new Dictionary<DevicePrintTarget, string>(),
+                new HashSet<(string DeviceId, DevicePrintTarget Target)>());
+        }
 
         return new RoutingReadinessSnapshot(routingMode, selectedDevices, readyTargets);
     }
