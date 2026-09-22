@@ -43,49 +43,7 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
     {
         var candidates = ApplyBucket(
             BuildCandidateQuery(upperSequence, serverTime), serverTime, bucket);
-        var keys = candidates.Select(order => new
-        {
-            order.Id,
-            BucketRank = order.IsKitchenReleased && !order.RoutingStates.Any()
-                || order.RoutingStates.Any(state => state.IsRequired
-                    && RoutingExceptions.Contains(state.Status))
-                ? 2
-                : order.Status == OrderStatus.Ready || order.Status == OrderStatus.OutForDelivery
-                    ? 0
-                    : 1,
-            ActionableAt = order.IsKitchenReleased && !order.RoutingStates.Any()
-                || order.RoutingStates.Any(state => state.IsRequired
-                    && RoutingExceptions.Contains(state.Status))
-                ? order.RoutingStates
-                    .Where(state => RoutingExceptions.Contains(state.Status))
-                    .Where(state => (state.UpdatedAt ?? state.CreatedAt) != default)
-                    .Select(state => state.UpdatedAt ?? (DateTime?)state.CreatedAt)
-                    .OrderBy(value => value)
-                    .FirstOrDefault()
-                    ?? (order.Status == OrderStatus.Ready || order.Status == OrderStatus.OutForDelivery
-                        ? order.StatusHistory
-                            .Where(history => history.ToStatus == order.Status)
-                            .Select(history => (DateTime?)history.ChangedAt)
-                            .OrderByDescending(value => value)
-                            .FirstOrDefault() ?? order.OrderDate
-                        : order.EstimatedDeliveryTime ?? order.OrderDate)
-                : order.Status == OrderStatus.Ready || order.Status == OrderStatus.OutForDelivery
-                    ? order.StatusHistory
-                        .Where(history => history.ToStatus == order.Status)
-                        .Select(history => (DateTime?)history.ChangedAt)
-                        .OrderByDescending(value => value)
-                        .FirstOrDefault() ?? order.OrderDate
-                    : order.EstimatedDeliveryTime ?? order.OrderDate,
-        });
-        if (after is not null)
-        {
-            keys = keys.Where(candidate =>
-                candidate.BucketRank > after.BucketRank
-                || candidate.BucketRank == after.BucketRank
-                    && (candidate.ActionableAt > after.ActionableAt
-                        || candidate.ActionableAt == after.ActionableAt
-                            && candidate.Id.CompareTo(after.OrderId) > 0));
-        }
+        var keys = ApplyPosition(BuildKeys(candidates), after);
 
         var candidateRows = await keys
             .OrderBy(candidate => candidate.BucketRank)
@@ -176,6 +134,68 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
         return orders;
     }
 
+    private static IQueryable<ServerTaskOrderKey> ApplyPosition(
+        IQueryable<ServerTaskOrderKey> keys,
+        ServerTaskPagePosition? after)
+    {
+        if (after is null)
+        {
+            return keys;
+        }
+
+        return keys.Where(candidate =>
+            candidate.BucketRank > after.BucketRank
+            || candidate.BucketRank == after.BucketRank
+                && (candidate.ActionableAt > after.ActionableAt
+                    || candidate.ActionableAt == after.ActionableAt
+                        && candidate.Id.CompareTo(after.OrderId) > 0));
+    }
+
+    private static IQueryable<ServerTaskOrderKey> BuildKeys(IQueryable<Order> candidates)
+    {
+        var keyValues = candidates.Select(order => new
+        {
+            order.Id,
+            order.OrderDate,
+            order.EstimatedDeliveryTime,
+            IsReady = order.Status == OrderStatus.Ready
+                || order.Status == OrderStatus.OutForDelivery,
+            IsException = order.IsKitchenReleased && !order.RoutingStates.Any()
+                || order.RoutingStates.Any(state => state.IsRequired
+                    && RoutingExceptions.Contains(state.Status)),
+            RouteTime = order.RoutingStates
+                .Where(state => RoutingExceptions.Contains(state.Status))
+                .Where(state =>
+                    order.IsKitchenReleased && !order.RoutingStates.Any()
+                    || order.RoutingStates.Any(requiredState => requiredState.IsRequired
+                        && RoutingExceptions.Contains(requiredState.Status)))
+                .Where(state => (state.UpdatedAt ?? state.CreatedAt) != default)
+                .Select(state => state.UpdatedAt ?? (DateTime?)state.CreatedAt)
+                .OrderBy(value => value)
+                .FirstOrDefault(),
+            StatusTime = order.StatusHistory
+                .Where(history =>
+                    (order.Status == OrderStatus.Ready
+                        || order.Status == OrderStatus.OutForDelivery)
+                    && history.ToStatus == order.Status)
+                .Select(history => (DateTime?)history.ChangedAt)
+                .OrderByDescending(value => value)
+                .FirstOrDefault(),
+            FallbackTime = order.Status == OrderStatus.Ready
+                || order.Status == OrderStatus.OutForDelivery
+                ? order.OrderDate
+                : order.EstimatedDeliveryTime ?? order.OrderDate,
+        });
+
+        return keyValues.Select(order => new ServerTaskOrderKey
+        {
+            Id = order.Id,
+            BucketRank = (order.IsException ? 2 : 0)
+                + (order.IsException || order.IsReady ? 0 : 1),
+            ActionableAt = order.RouteTime ?? order.StatusTime ?? order.FallbackTime,
+        });
+    }
+
     private IQueryable<Order> BuildCandidateQuery(long? upperSequence, DateTime serverTime)
     {
         var query = _context.Orders
@@ -208,5 +228,12 @@ internal sealed class ServerTaskOrderReader : IServerTaskOrderReader
             .Include(order => order.RoutingStates)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
+
+    private sealed class ServerTaskOrderKey
+    {
+        public Guid Id { get; init; }
+        public int BucketRank { get; init; }
+        public DateTime ActionableAt { get; init; }
+    }
 
 }

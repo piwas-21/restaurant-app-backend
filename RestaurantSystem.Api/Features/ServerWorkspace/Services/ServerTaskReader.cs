@@ -63,9 +63,9 @@ public sealed class ServerTaskReader : IServerTaskReader
         var rows = await _orders.LoadPageAsync(
             upperSequence, serverTime, query.NormalizedBucket, query.PageSize, null, cancellationToken);
         var page = rows.Take(query.PageSize).ToList();
-        var nextCursor = CreateSnapshotCursor(
+        var nextCursor = CreateSnapshotCursor(new SnapshotCursorArguments(
             filterHash, upperSequence, serverTime, page,
-            rows.Count > page.Count, 1, query.PageSize, totalCount);
+            rows.Count > page.Count, 1, query.PageSize, totalCount));
 
         return new ServerTaskFeedDto
         {
@@ -91,9 +91,9 @@ public sealed class ServerTaskReader : IServerTaskReader
             new ServerTaskPagePosition(bucketRank, position, payload.PositionId!.Value),
             cancellationToken);
         var page = rows.Take(payload.PageSize).ToList();
-        var nextCursor = CreateSnapshotCursor(
+        var nextCursor = CreateSnapshotCursor(new SnapshotCursorArguments(
             payload.FilterHash, payload.UpperSequence, snapshotTime, page,
-            rows.Count > page.Count, payload.Page + 1, payload.PageSize, payload.TotalCount);
+            rows.Count > page.Count, payload.Page + 1, payload.PageSize, payload.TotalCount));
 
         return new ServerTaskFeedDto
         {
@@ -176,35 +176,27 @@ public sealed class ServerTaskReader : IServerTaskReader
         };
     }
 
-    private string? CreateSnapshotCursor(
-        string filterHash,
-        long upperSequence,
-        DateTime snapshotTime,
-        List<ServerServiceTaskDto> page,
-        bool hasMore,
-        int pageNumber,
-        int pageSize,
-        int totalCount) =>
-        hasMore && page.Count > 0
+    private string? CreateSnapshotCursor(SnapshotCursorArguments arguments) =>
+        arguments.HasMore && arguments.Page.Count > 0
             ? _cursor.Protect(new OperationalQueueCursorRequest
             {
                 Mode = OperationalQueueSyncModes.Snapshot,
-                FilterHash = filterHash,
-                UpperSequence = upperSequence,
-                Position = EncodeSnapshotPosition(page[^1], snapshotTime),
-                PositionId = page[^1].OrderId,
-                Page = pageNumber,
-                PageSize = pageSize,
-                TotalCount = totalCount,
+                FilterHash = arguments.FilterHash,
+                UpperSequence = arguments.UpperSequence,
+                Position = EncodeSnapshotPosition(arguments.Page[^1], arguments.SnapshotTime),
+                PositionId = arguments.Page[^1].OrderId,
+                Page = arguments.PageNumber,
+                PageSize = arguments.PageSize,
+                TotalCount = arguments.TotalCount,
             })
             : _cursor.Protect(new OperationalQueueCursorRequest
             {
                 Mode = OperationalQueueSyncModes.Watermark,
-                FilterHash = filterHash,
-                UpperSequence = upperSequence,
+                FilterHash = arguments.FilterHash,
+                UpperSequence = arguments.UpperSequence,
                 Page = 1,
-                PageSize = pageSize,
-                TotalCount = totalCount,
+                PageSize = arguments.PageSize,
+                TotalCount = arguments.TotalCount,
             });
 
     private static string EncodeSnapshotPosition(ServerServiceTaskDto task, DateTime snapshotTime) =>
@@ -222,7 +214,10 @@ public sealed class ServerTaskReader : IServerTaskReader
             throw InvalidCursor();
         }
 
-        return (bucketRank, Utc(new DateTime(positionTicks)), Utc(new DateTime(snapshotTicks)));
+        return (
+            bucketRank,
+            new DateTime(positionTicks, DateTimeKind.Utc),
+            new DateTime(snapshotTicks, DateTimeKind.Utc));
     }
 
     private static long ParseChangePosition(string? value)
@@ -255,6 +250,15 @@ public sealed class ServerTaskReader : IServerTaskReader
         "The operational queue synchronization cursor is invalid.",
         ErrorCodes.InvalidOperationalQueueCursor);
 
-    private static DateTime Utc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
     private DateTime UtcNow => _timeProvider.GetUtcNow().UtcDateTime;
+
+    private sealed record SnapshotCursorArguments(
+        string FilterHash,
+        long UpperSequence,
+        DateTime SnapshotTime,
+        List<ServerServiceTaskDto> Page,
+        bool HasMore,
+        int PageNumber,
+        int PageSize,
+        int TotalCount);
 }

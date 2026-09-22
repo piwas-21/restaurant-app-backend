@@ -40,4 +40,7 @@ public sealed class ServerWorkspaceController : ControllerBase
             new DeliverServerTaskCommand(orderId, request.ExpectedVersion), cancellationToken));
 }
 
-public sealed record DeliverServerTaskRequest(int ExpectedVersion);
+public sealed record DeliverServerTaskRequest
+{
+    public required int ExpectedVersion { get; init; }
+}

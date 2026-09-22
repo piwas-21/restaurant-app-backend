@@ -22,23 +22,15 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
         var requiredException = ServerTaskRoutingPolicy.HasRequiredException(order);
         var optionalException = order.RoutingStates.Any(state =>
             ServerTaskRoutingPolicy.IsException(state) && !state.IsRequired);
-        var ready = order.Status is OrderStatus.Ready or OrderStatus.OutForDelivery;
-        var bucket = requiredException
-            ? "Exception"
-            : ready ? "Ready" : "Overdue";
+        var bucket = ResolveBucket(order, requiredException);
         var actionableAt = ResolveActionableAt(order, bucket);
         var handOver = _actions.GetPermittedActions(order)
             .Single(action => action.Action == nameof(OrderAction.HandOver));
         var table = order.Type == OrderType.DineIn;
 
         var deliveryAllowed = !requiredException && order.IsKitchenReleased && handOver.Allowed;
-        var deliveryReason = deliveryAllowed
-            ? null
-            : requiredException
-                ? ErrorCodes.RequiredRoutingUnresolved
-            : !order.IsKitchenReleased
-                ? ErrorCodes.KitchenReleaseRequired
-                : handOver.ReasonCode;
+        var deliveryReason = ResolveDeliveryReason(
+            deliveryAllowed, requiredException, order.IsKitchenReleased, handOver.ReasonCode);
 
         return new ServerServiceTaskDto
         {
@@ -75,16 +67,6 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
             .ThenBy(task => task.ActionableAt)
             .ThenBy(task => task.OrderId)
             .ToList();
-
-    public bool IsAfter(
-        ServerServiceTaskDto task,
-        int bucketRank,
-        DateTime position,
-        Guid positionId) =>
-        BucketRank(task.Bucket) > bucketRank
-        || BucketRank(task.Bucket) == bucketRank
-            && (task.ActionableAt > position
-                || task.ActionableAt == position && task.OrderId.CompareTo(positionId) > 0);
 
     public static int BucketRank(string bucket) => bucket switch
     {
@@ -123,6 +105,42 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
         return Utc(order.EstimatedDeliveryTime ?? order.OrderDate);
     }
 
+    private static string ResolveBucket(Order order, bool requiredException)
+    {
+        if (requiredException)
+        {
+            return "Exception";
+        }
+
+        return order.Status is OrderStatus.Ready or OrderStatus.OutForDelivery
+            ? "Ready"
+            : "Overdue";
+    }
+
+    private static string? ResolveDeliveryReason(
+        bool deliveryAllowed,
+        bool requiredException,
+        bool kitchenReleased,
+        string? handOverReason)
+    {
+        if (deliveryAllowed)
+        {
+            return null;
+        }
+
+        if (requiredException)
+        {
+            return ErrorCodes.RequiredRoutingUnresolved;
+        }
+
+        if (!kitchenReleased)
+        {
+            return ErrorCodes.KitchenReleaseRequired;
+        }
+
+        return handOverReason;
+    }
+
     private static string ResolveRoutingState(
         ICollection<OrderRoutingState> states,
         bool requiredException,
@@ -139,12 +157,20 @@ internal sealed class ServerTaskProjector : IServerTaskProjector
         return "Unknown";
     }
 
-    private static OrderStatus? ResolveTargetStatus(Order order) =>
-        order.Status == OrderStatus.Ready && order.Type == OrderType.Delivery
-            ? OrderStatus.OutForDelivery
-            : order.Status is OrderStatus.Ready or OrderStatus.OutForDelivery
-                ? OrderStatus.Completed
-                : null;
+    private static OrderStatus? ResolveTargetStatus(Order order)
+    {
+        if (order.Status == OrderStatus.Ready && order.Type == OrderType.Delivery)
+        {
+            return OrderStatus.OutForDelivery;
+        }
+
+        if (order.Status is OrderStatus.Ready or OrderStatus.OutForDelivery)
+        {
+            return OrderStatus.Completed;
+        }
+
+        return null;
+    }
 
     private static OrderRoutingStateDto ToRoutingDto(OrderRoutingState state) => new(
         state.Id, state.JobId, state.Revision, state.Target, state.Status, state.DeviceId,
