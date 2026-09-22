@@ -37,12 +37,13 @@ public sealed partial class OrderRoutingService
             }
 
             lastStateId = states[^1].Id;
-            // Materialize the results before Any collapses them; a lazy Select followed by Any
-            // would stop after the first route and leave sibling targets unassigned in the batch.
-            var changed = states
-                .Select(state => ReconcileDeviceRoute(state, deviceId, readiness))
-                .ToList()
-                .Any(reconciled => reconciled);
+            // Visit every route in the batch. A lazy projection followed by Any would stop after
+            // the first change and leave sibling targets unassigned.
+            var changed = false;
+            foreach (var state in states)
+            {
+                changed |= ReconcileDeviceRoute(state, deviceId, readiness);
+            }
 
             if (!changed)
             {

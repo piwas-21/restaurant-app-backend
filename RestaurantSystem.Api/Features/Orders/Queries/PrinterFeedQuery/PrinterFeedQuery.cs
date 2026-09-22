@@ -187,7 +187,8 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
             .Include(o => o.Items).ThenInclude(i => i.Product!.Descriptions)
             .Include(o => o.Items).ThenInclude(i => i.Product!.DetailedIngredients)
                 .ThenInclude(pi => pi.Descriptions)
-            .Include(o => o.Items).ThenInclude(i => i.ProductVariation!.Descriptions);
+            .Include(o => o.Items).ThenInclude(i => i.ProductVariation!.Descriptions)
+            .AsSplitQuery();
     }
 
     private static Task<List<Order>> ReadOrdersAsync(
@@ -196,5 +197,4 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
         .ThenBy(o => o.Id)
         .Take(PrinterFeedQuery.MaxOrdersPerPoll)
         .ToListAsync(cancellationToken);
-
 }

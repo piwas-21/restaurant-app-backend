@@ -2,7 +2,12 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace RestaurantSystem.Api.Features.Orders.Models;
 
-public readonly record struct OptionalDeviceHeader(bool IsPresent, string? Value);
+public sealed record OptionalDeviceHeader
+{
+    public required bool IsPresent { get; init; }
+
+    public string? Value { get; init; }
+}
 
 public sealed class OptionalDeviceHeaderModelBinder : IModelBinder
 {
@@ -12,15 +17,21 @@ public sealed class OptionalDeviceHeaderModelBinder : IModelBinder
             bindingContext.ModelName, out var value);
         if (!isPresent)
         {
-            bindingContext.Result = ModelBindingResult.Success(new OptionalDeviceHeader(false, null));
+            bindingContext.Result = ModelBindingResult.Success(new OptionalDeviceHeader
+            {
+                IsPresent = false,
+            });
             return Task.CompletedTask;
         }
 
         bindingContext.ModelState.SetModelValue(
             bindingContext.ModelName,
             new ValueProviderResult(value));
-        bindingContext.Result = ModelBindingResult.Success(
-            new OptionalDeviceHeader(true, value.ToString()));
+        bindingContext.Result = ModelBindingResult.Success(new OptionalDeviceHeader
+        {
+            IsPresent = true,
+            Value = value.ToString(),
+        });
         return Task.CompletedTask;
     }
 }
