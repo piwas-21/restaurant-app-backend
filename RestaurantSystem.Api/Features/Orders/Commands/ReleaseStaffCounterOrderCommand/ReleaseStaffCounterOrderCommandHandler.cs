@@ -21,17 +21,19 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
     private readonly IStaffOrderOperationStore _operations;
     private readonly IOrderResponseProjector _responses;
     private readonly IOrderNotificationService _notifications;
+    private readonly IOrderRoutingService _routing;
 
     public ReleaseStaffCounterOrderCommandHandler(
         ApplicationDbContext context, ICurrentUserService currentUser,
         IStaffOrderOperationStore operations, IOrderResponseProjector responses,
-        IOrderNotificationService notifications)
+        IOrderNotificationService notifications, IOrderRoutingService routing)
     {
         _context = context;
         _currentUser = currentUser;
         _operations = operations;
         _responses = responses;
         _notifications = notifications;
+        _routing = routing;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(
@@ -45,7 +47,6 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
         {
             return await ReplayAsync(replay, cancellationToken);
         }
-
         await using var transaction = await _context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
         try
@@ -93,8 +94,8 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
                     CreatedAt = now,
                     CreatedBy = _currentUser.GetAuditIdentifier()
                 });
+                await _routing.EnsureRoutesAsync(order, cancellationToken);
             }
-
             _context.StaffOrderOperations.Add(new StaffOrderOperation
             {
                 OperationId = command.ClientOperationId,
@@ -167,8 +168,8 @@ public sealed class ReleaseStaffCounterOrderCommandHandler
             ErrorCodes.StaffOrderVersionConflict);
     }
 
-    private static bool IsConcurrencyAbort(Exception exception) =>
-        exception is DbUpdateConcurrencyException || PostgresConcurrencyAborts.IsMatch(exception, out _);
+    private static bool IsConcurrencyAbort(Exception exception) => exception is DbUpdateConcurrencyException
+        || PostgresConcurrencyAborts.IsMatch(exception, out _);
 
     private async Task<ApiResponse<OrderDto>> ReplayAsync(
         StaffOrderOperationReplay replay, CancellationToken cancellationToken)

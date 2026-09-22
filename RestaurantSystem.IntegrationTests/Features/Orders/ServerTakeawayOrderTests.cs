@@ -79,6 +79,13 @@ public sealed class ServerTakeawayOrderTests : IntegrationTestBase
         firstBody.Data.RemainingAmount.Should().Be(firstBody.Data.Total);
         firstBody.Data.IsKitchenReleased.Should().BeTrue();
         firstBody.Data.Status.Should().Be(nameof(OrderStatus.Confirmed));
+        firstBody.Data.RoutingStates.Should().HaveCount(2);
+        firstBody.Data.RoutingStates!.Should().Contain(state =>
+            state.Target == DevicePrintTarget.Cashier
+            && state.Status == DevicePrintStatus.NotConfigured);
+        firstBody.Data.RoutingStates.Should().Contain(state =>
+            state.Target == DevicePrintTarget.General
+            && state.Status == DevicePrintStatus.NotConfigured);
 
         var retry = await PostAsJsonAsync("/api/staff/orders", request);
         var retryBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(retry))!;
@@ -98,6 +105,48 @@ public sealed class ServerTakeawayOrderTests : IntegrationTestBase
         stored.IsKitchenReleased.Should().BeTrue();
         stored.TotalPaid.Should().Be(0m);
         stored.RemainingAmount.Should().Be(stored.Total);
+        (await context.OrderRoutingStates.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Held_takeaway_creates_no_route_until_release_and_release_is_exactly_once()
+    {
+        AuthenticateAsRole(UserRole.Server);
+        var create = await PostAsJsonAsync(
+            "/api/staff/orders", TakeawayBody(Guid.NewGuid(), releaseToKitchen: false));
+        var created = (await ReadResponseAsync<ApiResponse<OrderDto>>(create))!.Data!;
+
+        created.RoutingStates.Should().BeNull();
+        created.Version.Should().Be(1);
+        await using (var beforeRelease = DatabaseFixture.CreateContext())
+        {
+            (await beforeRelease.OrderRoutingStates.CountAsync()).Should().Be(0);
+            (await beforeRelease.Orders.Where(order => order.Id == created.Id)
+                .Select(order => order.Version).SingleAsync()).Should().Be(created.Version);
+        }
+
+        var release = await PostAsJsonAsync($"/api/staff/orders/{created.Id}/release", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            expectedVersion = created.Version
+        });
+        var releasedResponse = (await ReadResponseAsync<ApiResponse<OrderDto>>(release))!;
+        releasedResponse.Success.Should().BeTrue();
+        var released = releasedResponse.Data!;
+        released.RoutingStates.Should().HaveCount(2);
+
+        var repeated = await PostAsJsonAsync($"/api/staff/orders/{created.Id}/release", new
+        {
+            clientOperationId = Guid.NewGuid(),
+            expectedVersion = created.Version
+        });
+        var repeatedBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(repeated))!.Data!;
+        repeatedBody.RoutingStates.Should().HaveCount(2);
+        repeatedBody.RoutingStates!.Select(state => state.Id)
+            .Should().BeEquivalentTo(released.RoutingStates!.Select(state => state.Id));
+
+        await using var afterRelease = DatabaseFixture.CreateContext();
+        (await afterRelease.OrderRoutingStates.CountAsync()).Should().Be(2);
     }
 
     private object TakeawayBody(Guid? operationId = null, bool? releaseToKitchen = null) => new

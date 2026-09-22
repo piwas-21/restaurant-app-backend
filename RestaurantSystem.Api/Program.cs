@@ -305,6 +305,10 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services.AddOptions<OrderRoutingSettings>()
+    .Bind(builder.Configuration.GetSection(OrderRoutingSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services
     .AddOptions<CatalogSettings>()
     .Bind(builder.Configuration.GetSection(CatalogSettings.SectionName))

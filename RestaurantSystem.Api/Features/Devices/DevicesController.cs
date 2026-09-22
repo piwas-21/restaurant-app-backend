@@ -11,6 +11,7 @@ using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Api.Features.Devices.Queries.GetDeviceEventsQuery;
 using RestaurantSystem.Api.Features.Devices.Queries.GetDevicesQuery;
 using RestaurantSystem.Api.Features.Devices.Queries.GetMissedOrdersQuery;
+using RestaurantSystem.Api.Features.Devices.Services;
 
 namespace RestaurantSystem.Api.Features.Devices;
 
@@ -42,8 +43,9 @@ public class DevicesController : ControllerBase
         [FromHeader(Name = "X-Device-Id")] string? deviceId,
         CancellationToken cancellationToken)
     {
+        var normalizedDeviceId = DeviceIdNormalizer.Normalize(deviceId);
         var result = await _mediator.SendCommand(
-            command with { DeviceId = deviceId ?? string.Empty }, cancellationToken);
+            command with { DeviceId = normalizedDeviceId ?? string.Empty }, cancellationToken);
         return Ok(result);
     }
 
@@ -62,8 +64,9 @@ public class DevicesController : ControllerBase
         [FromHeader(Name = "X-Device-Id")] string? deviceId,
         CancellationToken cancellationToken)
     {
+        var normalizedDeviceId = DeviceIdNormalizer.Normalize(deviceId);
         var result = await _mediator.SendCommand(
-            command with { DeviceId = deviceId ?? string.Empty }, cancellationToken);
+            command with { DeviceId = normalizedDeviceId ?? string.Empty }, cancellationToken);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
@@ -80,8 +83,9 @@ public class DevicesController : ControllerBase
         [FromHeader(Name = "X-Device-Id")] string? deviceId,
         CancellationToken cancellationToken)
     {
+        var normalizedDeviceId = DeviceIdNormalizer.Normalize(deviceId);
         var result = await _mediator.SendCommand(
-            command with { DeviceId = deviceId ?? string.Empty }, cancellationToken);
+            command with { DeviceId = normalizedDeviceId ?? string.Empty }, cancellationToken);
         return Ok(result);
     }
 

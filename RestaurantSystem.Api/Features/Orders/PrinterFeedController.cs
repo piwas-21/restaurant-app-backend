@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Filters;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedQuery;
+using RestaurantSystem.Api.Features.Orders.Models;
 using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedUpdatesQuery;
 
 namespace RestaurantSystem.Api.Features.Orders;
@@ -50,12 +51,17 @@ public class PrinterFeedController : ControllerBase
         [FromQuery] DateTime? modifiedSince,
         [FromQuery] string? language,
         [FromQuery] string? updateCursor,
+        [ModelBinder(Name = "X-Device-Id", BinderType = typeof(OptionalDeviceHeaderModelBinder))]
+        OptionalDeviceHeader deviceHeader,
         CancellationToken cancellationToken)
     {
         try
         {
+            var deviceId = deviceHeader.IsPresent
+                ? deviceHeader.Value ?? string.Empty
+                : null;
             var orderDtos = await _mediator.SendQuery(
-                new PrinterFeedQuery(modifiedSince, language),
+                new PrinterFeedQuery(modifiedSince, language, deviceId),
                 cancellationToken);
             var updatePage = await _mediator.SendQuery(
                 new PrinterFeedUpdatesQuery(modifiedSince, updateCursor), cancellationToken);
@@ -81,7 +87,7 @@ public class PrinterFeedController : ControllerBase
             return Ok(new
             {
                 success = false,
-                message = ex.Message,
+                message = "Printer feed request failed. Retry shortly.",
                 data = new
                 {
                     items = Array.Empty<object>(),

@@ -24,6 +24,7 @@ public sealed class CreateStaffCounterOrderCommandHandler
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderNotificationService _notifications;
     private readonly IOrderTableReservationService _tableReservation;
+    private readonly IOrderRoutingService _routing;
 
     [SuppressMessage("Maintainability", "S107:Methods should not have too many parameters",
         Justification = "The handler composes transaction, identity, idempotency, pricing, fidelity, mapping, live events, and table reservation services; wrapping DI-only dependencies would hide the transaction boundary without reducing responsibility.")]
@@ -31,7 +32,8 @@ public sealed class CreateStaffCounterOrderCommandHandler
         ApplicationDbContext context, ICurrentUserService currentUser,
         IStaffCounterOrderBuilder builder, IStaffOrderOperationStore operations,
         IOrderResponseProjector responses, IOrderFidelityCoordinator fidelity,
-        IOrderNotificationService notifications, IOrderTableReservationService tableReservation)
+        IOrderNotificationService notifications, IOrderTableReservationService tableReservation,
+        IOrderRoutingService routing)
     {
         _context = context;
         _currentUser = currentUser;
@@ -41,6 +43,7 @@ public sealed class CreateStaffCounterOrderCommandHandler
         _fidelity = fidelity;
         _notifications = notifications;
         _tableReservation = tableReservation;
+        _routing = routing;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(
@@ -67,6 +70,7 @@ public sealed class CreateStaffCounterOrderCommandHandler
         {
             var build = await _builder.BuildAsync(command, command.ReleaseToKitchen, cancellationToken);
             _context.Orders.Add(build.Order);
+            await _routing.EnsureRoutesAsync(build.Order, cancellationToken);
             _context.StaffOrderOperations.Add(new StaffOrderOperation
             {
                 OperationId = command.ClientOperationId,

@@ -103,6 +103,7 @@ public class OrderMappingService : IOrderMappingService
                 ChangedAt = sh.CreatedAt,
                 ChangedBy = sh.CreatedBy
             }).ToList() ?? new List<OrderStatusHistoryDto>(),
+            RoutingStates = OrderRoutingProjection.Map(order),
             CreatedAt = order.CreatedAt,
             UpdatedAt = order.UpdatedAt
         };
@@ -344,6 +345,11 @@ public class OrderMappingService : IOrderMappingService
         if (!_context.Entry(order).Reference(o => o.DeliveryAddress).IsLoaded)
         {
             await _context.Entry(order).Reference(o => o.DeliveryAddress).LoadAsync(cancellationToken);
+        }
+
+        if (!_context.Entry(order).Collection(o => o.RoutingStates).IsLoaded)
+        {
+            await _context.Entry(order).Collection(o => o.RoutingStates).LoadAsync(cancellationToken);
         }
 
         return MapToOrderDto(order);
