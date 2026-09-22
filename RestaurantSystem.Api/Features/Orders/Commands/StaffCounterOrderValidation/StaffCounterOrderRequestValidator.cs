@@ -2,7 +2,6 @@ using FluentValidation;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
-
 namespace RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 
 public sealed class StaffCounterOrderRequestValidator : AbstractValidator<StaffCounterOrderRequest>
@@ -31,6 +30,7 @@ public sealed class StaffCounterOrderRequestValidator : AbstractValidator<StaffC
             .When(request => request.Type != OrderType.DineIn)
             .WithMessage("A table service session is valid only for dine-in orders.");
         this.ValidateDeliveryAddress();
+        this.ValidateNotesLength();
         RuleFor(request => request)
             .Must(request => !request.CustomerUserId.HasValue
                 || !request.CustomerId.HasValue
