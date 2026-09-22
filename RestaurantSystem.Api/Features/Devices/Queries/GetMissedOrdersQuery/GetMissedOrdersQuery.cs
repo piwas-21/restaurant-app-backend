@@ -41,10 +41,13 @@ public class GetMissedOrdersQueryHandler
         var lookbackFloor = now.AddHours(-Math.Max(1, query.LookbackHours));
 
         // Served = Confirmed (the printer-feed's eligibility filter) + not soft-deleted. Explicit
-        // !IsDeleted mirrors PrinterFeedQuery so the read intent is unambiguous. "Accounted for" =
-        // has at least one legacy (non-update) Printed receipt on any device — update tickets do
-        // not prove the original order printed. This is a correlated !Any() so EF emits a
-        // NOT EXISTS (more efficient in Postgres than NOT IN over an uncorrelated subquery).
+        // !IsDeleted mirrors PrinterFeedQuery so the read intent is unambiguous. Routed work is
+        // accounted for only when every required route is Printed. An unassigned required route
+        // is therefore missed, while an unassigned optional destination (most commonly a missing
+        // cashier printer) is not. Assigned Skipped/Failed/Unknown routes remain missed because
+        // no physical ticket was confirmed. Routed acks carry JobId/Revision and do not use the
+        // old receipt key.
+        // Orders without route rows retain the legacy fallback of any non-update Printed receipt.
         var missed = await _context.Orders
             .AsNoTracking()
             .Where(o => !o.IsDeleted
@@ -52,10 +55,15 @@ public class GetMissedOrdersQueryHandler
                 && o.Status == OrderStatus.Confirmed
                 && o.CreatedAt < graceCutoff
                 && o.CreatedAt >= lookbackFloor
-                && !_context.DeviceOrderReceipts.Any(r =>
-                    r.OrderId == o.Id
-                    && r.JobId == null
-                    && r.Status == DevicePrintStatus.Printed))
+                && ((!_context.OrderRoutingStates.Any(state => state.OrderId == o.Id)
+                    && !_context.DeviceOrderReceipts.Any(receipt =>
+                        receipt.OrderId == o.Id
+                        && receipt.JobId == null
+                        && receipt.Status == DevicePrintStatus.Printed))
+                    || (_context.OrderRoutingStates.Any(state => state.OrderId == o.Id)
+                        && _context.OrderRoutingStates.Any(state => state.OrderId == o.Id
+                            && state.IsRequired
+                            && state.Status != DevicePrintStatus.Printed))))
             .OrderBy(o => o.OrderDate)
             .Take(GetMissedOrdersQuery.MaxResults)
             .Select(o => new MissedOrderDto(

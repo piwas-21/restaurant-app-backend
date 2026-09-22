@@ -8,7 +8,8 @@ public enum StaffOrderOperationReplayOutcome
     None,
     Replay,
     PayloadMismatch,
-    OperationIdReused
+    OperationIdReused,
+    Unknown
 }
 
 public sealed record StaffOrderOperationReplay(
@@ -19,6 +20,10 @@ public interface IStaffOrderOperationStore
     Task<StaffOrderOperationReplay> ResolveAsync(
         Guid operationId, StaffOrderOperationKind kind, Guid? orderId,
         Guid? actorUserId, string payloadHash, CancellationToken cancellationToken);
+
+    Task<StaffOrderOperationReplay> LookupAsync(
+        Guid operationId, StaffOrderOperationKind kind, Guid? actorUserId,
+        CancellationToken cancellationToken);
 
     Task<Order?> LoadOrderAsync(Guid orderId, CancellationToken cancellationToken);
 }

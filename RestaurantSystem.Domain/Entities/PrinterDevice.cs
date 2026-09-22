@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -44,4 +45,7 @@ public class PrinterDevice : Entity
 
     /// <summary>Configured cashier printer target (IP or spooler name; non-secret).</summary>
     public string? CashierPrinter { get; set; }
+
+    /// <summary>Whether this installation routes kitchen tickets by station or one kitchen.</summary>
+    public DeviceKitchenRoutingMode KitchenRoutingMode { get; set; } = DeviceKitchenRoutingMode.Stations;
 }

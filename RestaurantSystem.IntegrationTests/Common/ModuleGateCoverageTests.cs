@@ -3,6 +3,8 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Modules;
+using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.IntegrationTests.Common;
 
@@ -114,6 +116,25 @@ public class ModuleGateCoverageTests
 
         Controller("TableBillController").GetMethod("AddTableBillPayment")!
             .GetCustomAttribute<RequireAdminOrCashierAttribute>().Should().NotBeNull();
+        Controller("OrdersController").GetMethod("AddPayment")!
+            .GetCustomAttribute<RequireAdminOrCashierAttribute>().Should().NotBeNull();
+
+        OrderWriteAuthorizationPolicy.ForPayment(UserRole.Admin).Allowed.Should().BeTrue();
+        OrderWriteAuthorizationPolicy.ForPayment(UserRole.Cashier).Allowed.Should().BeTrue();
+        OrderWriteAuthorizationPolicy.ForPayment(UserRole.Server).Allowed.Should().BeFalse();
+        OrderWriteAuthorizationPolicy.ForPayment(UserRole.KitchenStaff).Allowed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Payment_handoff_keeps_server_request_and_cashier_visibility_separate()
+    {
+        var controller = Controller("TableServiceSessionsController");
+        controller.GetMethod("RequestPaymentHandoff")!
+            .GetCustomAttribute<RequireServerAttribute>().Should().NotBeNull();
+        controller.GetMethod("ListPaymentHandoffs")!
+            .GetCustomAttribute<RequireAdminOrCashierAttribute>().Should().NotBeNull();
+        controller.GetMethod("CancelPaymentHandoff")!
+            .GetCustomAttribute<RequireTableServiceStaffAttribute>().Should().NotBeNull();
     }
 
     [Fact]

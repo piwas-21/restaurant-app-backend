@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Devices.Dtos;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Devices.Commands.RecordHeartbeatCommand;
@@ -25,7 +27,9 @@ public record RecordHeartbeatCommand(
     DateTime? LastSuccessfulPollAt,
     string? ApiBaseUrl,
     string? KitchenPrinter,
-    string? CashierPrinter
+    string? CashierPrinter,
+    List<PrinterTargetCapabilityDto>? TargetCapabilities = null,
+    DeviceKitchenRoutingMode? KitchenRoutingMode = null
 ) : ICommand<ApiResponse<bool>>;
 
 public class RecordHeartbeatCommandHandler
@@ -44,6 +48,7 @@ public class RecordHeartbeatCommandHandler
     public async Task<ApiResponse<bool>> Handle(
         RecordHeartbeatCommand command, CancellationToken cancellationToken)
     {
+        var auditId = _currentUserService.GetAuditIdentifier();
         var device = await _context.PrinterDevices
             .FirstOrDefaultAsync(d => d.DeviceId == command.DeviceId, cancellationToken);
 
@@ -52,7 +57,7 @@ public class RecordHeartbeatCommandHandler
             device = new PrinterDevice
             {
                 DeviceId = command.DeviceId,
-                CreatedBy = _currentUserService.GetAuditIdentifier(),
+                CreatedBy = auditId,
             };
             _context.PrinterDevices.Add(device);
         }
@@ -62,18 +67,110 @@ public class RecordHeartbeatCommandHandler
         device.Platform = command.Platform;
         device.AppVersion = command.AppVersion;
         device.FeedRunning = command.FeedRunning ?? false;
-        // Normalise the only client-supplied timestamp to UTC Kind — the column is `timestamptz`
-        // and Npgsql rejects a non-UTC Kind. The app reports UTC instants, so relabel (SpecifyKind)
-        // rather than convert — matching Groups/UserGroupService's client-DateTime handling.
-        device.LastSuccessfulPollAt = command.LastSuccessfulPollAt.HasValue
-            ? DateTime.SpecifyKind(command.LastSuccessfulPollAt.Value, DateTimeKind.Utc)
-            : null;
+        // The client reports the last completed poll, but the server owns the upper bound. A clock
+        // set into the future must never make a device look fresh indefinitely.
+        var now = DateTime.UtcNow;
+        device.LastSuccessfulPollAt = BoundPollTimestamp(command.LastSuccessfulPollAt, now);
         device.ApiBaseUrl = command.ApiBaseUrl;
         device.KitchenPrinter = command.KitchenPrinter;
         device.CashierPrinter = command.CashierPrinter;
-        device.LastHeartbeatAt = DateTime.UtcNow;
+        if (command.KitchenRoutingMode.HasValue)
+        {
+            device.KitchenRoutingMode = command.KitchenRoutingMode.Value;
+        }
+        device.LastHeartbeatAt = now;
+
+        if (command.TargetCapabilities is not null)
+        {
+            await UpsertCapabilitiesAsync(device.DeviceId, command.TargetCapabilities, auditId,
+                cancellationToken);
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
         return ApiResponse<bool>.SuccessWithData(true, "Heartbeat recorded.");
+    }
+
+    private static DateTime? BoundPollTimestamp(DateTime? value, DateTime serverNow)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        var candidate = DateTime.SpecifyKind(value.Value, DateTimeKind.Utc);
+        return candidate > serverNow ? serverNow : candidate;
+    }
+
+    private async Task UpsertCapabilitiesAsync(
+        string deviceId, IReadOnlyCollection<PrinterTargetCapabilityDto> reports,
+        string auditId, CancellationToken cancellationToken)
+    {
+        var normalizedReports = reports
+            .GroupBy(report => report.Target)
+            .Select(group => group.Last())
+            .ToList();
+        var reportedAt = DateTime.UtcNow;
+        if (normalizedReports.Count == 0)
+        {
+            // An old client omits the list, while a capability-aware client can report no usable
+            // targets. In the latter case, mark previous rows unsupported immediately so a
+            // just-disabled printer cannot remain ready during the heartbeat freshness window.
+            var priorReports = await _context.PrinterDeviceTargetCapabilities
+                .Where(capability => capability.DeviceId == deviceId)
+                .ToListAsync(cancellationToken);
+            foreach (var capability in priorReports)
+            {
+                capability.IsSupported = false;
+                capability.IsConfigured = false;
+                capability.AutoPrintEnabled = false;
+                capability.ReportedAt = reportedAt;
+                capability.UpdatedAt = reportedAt;
+                capability.UpdatedBy = auditId;
+            }
+
+            return;
+        }
+
+        var existing = await _context.PrinterDeviceTargetCapabilities
+            .Where(capability => capability.DeviceId == deviceId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var report in normalizedReports)
+        {
+            var capability = existing.SingleOrDefault(item => item.Target == report.Target);
+            if (capability is null)
+            {
+                capability = new PrinterDeviceTargetCapability
+                {
+                    DeviceId = deviceId,
+                    Target = report.Target,
+                    CreatedBy = auditId
+                };
+                _context.PrinterDeviceTargetCapabilities.Add(capability);
+                existing.Add(capability);
+            }
+
+            capability.IsSupported = report.IsSupported;
+            capability.IsConfigured = report.IsConfigured;
+            capability.AutoPrintEnabled = report.AutoPrintEnabled;
+            capability.PrinterName = report.PrinterName;
+            capability.ReportedAt = reportedAt;
+            capability.UpdatedAt = reportedAt;
+            capability.UpdatedBy = auditId;
+        }
+
+        // A capability-aware heartbeat is a complete snapshot, not a patch. If a printer target
+        // disappears from the list (for example the front station was unplugged), leaving the old
+        // row ready would keep routing new orders to a destination the device can no longer print.
+        var reportedTargets = normalizedReports.Select(report => report.Target).ToHashSet();
+        foreach (var capability in existing.Where(item => !reportedTargets.Contains(item.Target)))
+        {
+            capability.IsSupported = false;
+            capability.IsConfigured = false;
+            capability.AutoPrintEnabled = false;
+            capability.ReportedAt = reportedAt;
+            capability.UpdatedAt = reportedAt;
+            capability.UpdatedBy = auditId;
+        }
     }
 }

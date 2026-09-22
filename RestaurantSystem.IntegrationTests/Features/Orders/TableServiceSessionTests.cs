@@ -79,6 +79,22 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Opening_a_session_refuses_blocking_unassigned_legacy_rounds()
+    {
+        var tableId = await SeedTableAsync("T-LEGACY");
+        await SeedStableOrderAsync(null, tableId, "T-LEGACY", 12m, Utc(11, 0));
+
+        await using var context = _fixture.CreateContext();
+        var result = await OpenHandler(context).Handle(
+            new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionAmbiguous);
+        result.Errors.Should().ContainSingle(TableBillTargetResolver.AmbiguousMessage);
+        (await context.TableServiceSessions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Stable_session_read_and_close_only_consider_unassigned_orders_for_that_table()
     {
         var tableId = await SeedTableAsync("T-QA");
@@ -582,10 +598,11 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var reader = new TableServiceSessionReader(context, assembler);
         var handler = new AddTableServiceSessionPaymentCommandHandler(
             context,
-            new TableServiceSessionPaymentWriter(context, applicator),
+            new TableServiceSessionPaymentWriter(context, applicator, current.Object),
             new TableServiceSessionPaymentReplayResolver(context, reader),
             reader,
-            NullLogger<AddTableServiceSessionPaymentCommandHandler>.Instance);
+            NullLogger<AddTableServiceSessionPaymentCommandHandler>.Instance,
+            current.Object);
         return await handler.Handle(new AddTableServiceSessionPaymentCommand
         {
             ServiceSessionId = sessionId,
@@ -617,7 +634,9 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             writer.Object,
             new TableServiceSessionPaymentReplayResolver(context, reader),
             reader,
-            NullLogger<AddTableServiceSessionPaymentCommandHandler>.Instance);
+            NullLogger<AddTableServiceSessionPaymentCommandHandler>.Instance,
+            Mock.Of<ICurrentUserService>(user =>
+                user.GetAuditIdentifier() == nameof(TableServiceSessionTests)));
         return await handler.Handle(new AddTableServiceSessionPaymentCommand
         {
             ServiceSessionId = sessionId,

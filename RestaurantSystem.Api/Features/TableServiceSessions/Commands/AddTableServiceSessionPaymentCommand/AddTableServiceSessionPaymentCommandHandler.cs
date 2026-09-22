@@ -1,12 +1,15 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -21,19 +24,27 @@ public sealed class AddTableServiceSessionPaymentCommandHandler
     private readonly ITableServiceSessionPaymentReplayResolver _replays;
     private readonly ITableServiceSessionReader _reader;
     private readonly ILogger<AddTableServiceSessionPaymentCommandHandler> _logger;
+    private readonly ICurrentUserService _currentUser;
+    private readonly decimal _paymentTolerance;
+    private readonly TimeProvider _timeProvider;
 
     public AddTableServiceSessionPaymentCommandHandler(
         ApplicationDbContext context,
         ITableServiceSessionPaymentWriter writer,
         ITableServiceSessionPaymentReplayResolver replays,
         ITableServiceSessionReader reader,
-        ILogger<AddTableServiceSessionPaymentCommandHandler> logger)
+        ILogger<AddTableServiceSessionPaymentCommandHandler> logger,
+        ICurrentUserService currentUser,
+        IOptions<TableServiceSessionSettings>? settings = null)
     {
         _context = context;
         _writer = writer;
         _replays = replays;
         _reader = reader;
         _logger = logger;
+        _currentUser = currentUser;
+        _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
+        _timeProvider = TimeProvider.System;
     }
 
     public async Task<ApiResponse<TableServiceSessionDto>> Handle(
@@ -50,8 +61,8 @@ public sealed class AddTableServiceSessionPaymentCommandHandler
             IsolationLevel.Serializable, cancellationToken);
         try
         {
-            var session = await _context.TableServiceSessions
-                .SingleOrDefaultAsync(value => value.Id == command.ServiceSessionId, cancellationToken);
+            var session = await TableServiceSessionRowLock.LoadAsync(
+                _context, command.ServiceSessionId, cancellationToken);
             if (session is null)
             {
                 return NotFound();
@@ -78,6 +89,14 @@ public sealed class AddTableServiceSessionPaymentCommandHandler
                     : ApiResponse<TableServiceSessionDto>.Failure(write.Error!);
             }
 
+            await TableServicePaymentHandoffResolution.ResolveIfSettledAsync(
+                _context,
+                session.Id,
+                command.OperationId,
+                _currentUser.GetAuditIdentifier(),
+                _paymentTolerance,
+                _timeProvider,
+                cancellationToken);
             session.Version++;
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

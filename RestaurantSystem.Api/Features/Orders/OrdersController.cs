@@ -70,11 +70,10 @@ public class OrdersController : ControllerBase
         return Ok(await _mediator.SendCommand(command));
     }
 
-    // §9.19 follow-up: [RequireStaff], not [Authorize]. Taking a payment is a till action — there is
-    // no gateway behind this, the handler marks the payment Completed outright — so with only
-    // "is authenticated" any customer could mark ANY order paid and mint its fidelity points.
+    // Taking a payment is a till action: only Admin/Cashier may record the completed tender.
+    // Kitchen and Server roles remain operational readers/writers but do not control money.
     [HttpPost("{orderId}/payments")]
-    [RequireStaff]
+    [RequireAdminOrCashier]
     public async Task<ActionResult<ApiResponse<OrderDto>>> AddPayment(Guid orderId, [FromBody] AddPaymentToOrderCommand command)
     {
         command.OrderId = orderId;

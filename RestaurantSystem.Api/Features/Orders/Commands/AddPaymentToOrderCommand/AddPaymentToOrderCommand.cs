@@ -1,9 +1,12 @@
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.AddPaymentToOrderCommand;
 
@@ -38,21 +41,45 @@ public record AddPaymentToOrderCommand : ICommand<ApiResponse<OrderDto>>
 public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrderCommand, ApiResponse<OrderDto>>
 {
     private readonly IOrderPaymentApplicator _paymentApplicator;
+    private readonly ApplicationDbContext _context;
     private readonly IOrderMappingService _mappingService;
+    private readonly ICurrentUserService _currentUser;
     private readonly IOrderPermittedActionsService? _permittedActionsService;
 
     public AddPaymentToOrderCommandHandler(
+        ApplicationDbContext context,
         IOrderPaymentApplicator paymentApplicator,
         IOrderMappingService mappingService,
+        ICurrentUserService currentUser,
         IOrderPermittedActionsService? permittedActionsService = null)
     {
+        _context = context;
         _paymentApplicator = paymentApplicator;
         _mappingService = mappingService;
+        _currentUser = currentUser;
         _permittedActionsService = permittedActionsService;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(AddPaymentToOrderCommand command, CancellationToken cancellationToken)
     {
+        var authorization = OrderWriteAuthorizationPolicy.ForPayment(_currentUser.Role);
+        if (!authorization.Allowed)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                authorization.Message!, authorization.ErrorCode!);
+        }
+
+        var belongsToServiceSession = await _context.Orders
+            .AsNoTracking()
+            .Where(order => order.Id == command.OrderId && !order.IsDeleted)
+            .AnyAsync(order => order.ServiceSessionId.HasValue, cancellationToken);
+        if (belongsToServiceSession)
+        {
+            return ApiResponse<OrderDto>.FailureWithCode(
+                "Record this payment against the table service session bill.",
+                ErrorCodes.TableServiceSessionRequired);
+        }
+
         var result = await _paymentApplicator.ApplyToOrderAsync(
             command.OrderId,
             new OrderPaymentTender

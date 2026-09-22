@@ -3161,6 +3161,91 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("order_payments");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderRoutingState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<DateTime?>("LastAcknowledgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_acknowledged_at");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("target");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_routing_states");
+
+                    b.HasIndex("OrderId", "CreatedAt");
+
+                    b.HasIndex("JobId", "Revision", "Target")
+                        .IsUnique();
+
+                    b.ToTable("OrderRoutingStates", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3456,6 +3541,14 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("kitchen_printer");
 
+                    b.Property<string>("KitchenRoutingMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Stations")
+                        .HasColumnName("kitchen_routing_mode");
+
                     b.Property<string>("Label")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
@@ -3498,6 +3591,77 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantSlug");
 
                     b.ToTable("PrinterDevices", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.PrinterDeviceTargetCapability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("AutoPrintEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_print_enabled");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("device_id");
+
+                    b.Property<bool>("IsConfigured")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_configured");
+
+                    b.Property<bool>("IsSupported")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_supported");
+
+                    b.Property<string>("PrinterName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("printer_name");
+
+                    b.Property<DateTime>("ReportedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reported_at");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("target");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_printer_device_target_capabilities");
+
+                    b.HasIndex("DeviceId", "Target")
+                        .IsUnique();
+
+                    b.HasIndex("Target", "ReportedAt");
+
+                    b.ToTable("PrinterDeviceTargetCapabilities", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Product", b =>
@@ -5314,6 +5478,113 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("table_reservations");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServicePaymentHandoff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int?>("CancellationExpectedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("cancellation_expected_version");
+
+                    b.Property<Guid?>("CancellationOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancellation_operation_id");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<string>("CancelledBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("cancelled_by");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("ExpectedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_version");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<decimal>("RequestedAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("requested_amount");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("RequestedCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("requested_currency");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("ResolvedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("resolved_by");
+
+                    b.Property<Guid?>("ResolvedPaymentOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_payment_operation_id");
+
+                    b.Property<Guid>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_service_payment_handoffs");
+
+                    b.HasIndex("CancellationOperationId")
+                        .IsUnique();
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "RequestedAt");
+
+                    b.HasIndex("ServiceSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_table_service_payment_handoffs_service_session_id")
+                        .HasFilter("\"status\" = 'Requested'");
+
+                    b.ToTable("table_service_payment_handoffs");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServiceSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6277,6 +6548,18 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("TableBillPaymentOperation");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderRoutingState", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
+                        .WithMany("RoutingStates")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_routing_states_orders_order_id");
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderStatusHistory", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
@@ -6612,6 +6895,18 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Table");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServicePaymentHandoff", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_service_payment_handoffs_tableservicesessions_service~");
+
+                    b.Navigation("ServiceSession");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServiceSession", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Table", "Table")
@@ -6719,6 +7014,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("OperationalNotes");
 
                     b.Navigation("Payments");
+
+                    b.Navigation("RoutingStates");
 
                     b.Navigation("StatusHistory");
                 });

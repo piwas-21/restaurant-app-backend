@@ -79,7 +79,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderItemIngredient> OrderItemIngredients { get; set; }
         public DbSet<OrderPayment> OrderPayments { get; set; }
         public DbSet<TableBillPaymentOperation> TableBillPaymentOperations { get; set; }
+        public DbSet<TableServicePaymentHandoff> TableServicePaymentHandoffs { get; set; }
         public DbSet<OrderOperationalNote> OrderOperationalNotes { get; set; }
+        public DbSet<OrderRoutingState> OrderRoutingStates { get; set; }
         public DbSet<StaffOrderOperation> StaffOrderOperations { get; set; }
         public DbSet<OrderCheckoutSession> OrderCheckoutSessions { get; set; }
         public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
@@ -137,6 +139,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
         // Fleet observability
         public DbSet<PrinterDevice> PrinterDevices { get; set; }
+        public DbSet<PrinterDeviceTargetCapability> PrinterDeviceTargetCapabilities { get; set; }
         public DbSet<DeviceOrderReceipt> DeviceOrderReceipts { get; set; }
         public DbSet<DeviceEvent> DeviceEvents { get; set; }
 
@@ -396,6 +399,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
                     OrderCheckoutSession session => session.OrderId,
                     FidelityPointsTransaction points => points.OrderId ?? Guid.Empty,
                     OrderAddress address => address.OrderId,
+                    OrderRoutingState routingState => routingState.OrderId,
                     OrderItem item => item.OrderId,
                     OrderItemIngredient ingredient when orderItemEntries.TryGetValue(
                         ingredient.OrderItemId, out var ownerId) => ownerId,
@@ -436,6 +440,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
             TouchDirectOrderOwners<OrderCheckoutSession>(session => session.OrderId, orderEntries);
             TouchDirectOrderOwners<FidelityPointsTransaction>(points => points.OrderId, orderEntries);
             TouchDirectOrderOwners<OrderAddress>(address => address.OrderId, orderEntries);
+            TouchDirectOrderOwners<OrderRoutingState>(state => state.OrderId, orderEntries);
             TouchDirectOrderOwners<OrderItem>(item => item.OrderId, orderEntries);
             TouchOrderItemIngredientOwners(orderEntries, orderItemEntries);
             TouchOwnedOrderOwners(orderEntries);

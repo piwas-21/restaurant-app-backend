@@ -1,8 +1,10 @@
 using FluentAssertions;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffCounterOrderCommand;
+using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffRoundCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
@@ -43,6 +45,27 @@ public sealed class StaffCounterOrderValidationTests
     {
         _requestValidator.Validate(Request(0)).IsValid.Should().BeTrue();
         _requestValidator.Validate(Request(-1)).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Notes_at_the_order_column_limit_are_accepted()
+    {
+        var result = _requestValidator.Validate(
+            Request(0) with { Notes = new string('x', OrderFieldLimits.NotesMaxLength) });
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Notes_over_the_order_column_limit_are_rejected()
+    {
+        var result = _requestValidator.Validate(
+            Request(0) with { Notes = new string('x', OrderFieldLimits.NotesMaxLength + 1) });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error =>
+            error.PropertyName == nameof(StaffCounterOrderRequest.Notes)
+            && error.ErrorMessage == $"Notes cannot exceed {OrderFieldLimits.NotesMaxLength} characters.");
     }
 
     [Fact]
@@ -106,5 +129,32 @@ public sealed class StaffCounterOrderValidationTests
 
         new QuoteStaffCounterOrderCommandValidator().Validate(quote).IsValid.Should().BeFalse();
         new CreateStaffCounterOrderCommandValidator().Validate(create).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Staff_round_requires_dine_in_session_and_rejects_delivery_address()
+    {
+        var validator = new CreateStaffRoundCommandValidator();
+        var takeaway = new CreateStaffRoundCommand
+        {
+            ClientOperationId = Guid.NewGuid(),
+            ReleaseToKitchen = true,
+            Type = OrderType.Takeaway,
+            Items = Request(0).Items
+        };
+        var deliveryAddress = new CreateStaffRoundCommand
+        {
+            ClientOperationId = Guid.NewGuid(),
+            ReleaseToKitchen = true,
+            Type = OrderType.DineIn,
+            ServiceSessionId = Guid.NewGuid(),
+            DeliveryAddress = Address(),
+            Items = Request(0).Items
+        };
+
+        validator.Validate(takeaway).Errors.Should().Contain(error =>
+            error.ErrorMessage == "A staff round must be a dine-in order.");
+        validator.Validate(deliveryAddress).Errors.Should().Contain(error =>
+            error.ErrorMessage == "A delivery address is valid only for delivery orders.");
     }
 }

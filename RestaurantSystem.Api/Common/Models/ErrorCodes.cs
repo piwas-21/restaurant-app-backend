@@ -182,6 +182,11 @@ public static class ErrorCodes
     public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
     public const string TableServiceSessionRequired = "TableServiceSessionRequired";
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+    public const string TableServicePaymentHandoffOperationMismatch = "TableServicePaymentHandoffOperationMismatch";
+    public const string TableServicePaymentHandoffAlreadyPending = "TableServicePaymentHandoffAlreadyPending";
+    public const string TableServicePaymentHandoffNotRequestable = "TableServicePaymentHandoffNotRequestable";
+    public const string TableServicePaymentHandoffPending = "TableServicePaymentHandoffPending";
+    public const string TableServicePaymentHandoffCancellationMismatch = "TableServicePaymentHandoffCancellationMismatch";
     public const string TableServiceTableRequired = "TableServiceTableRequired";
     public const string TableServiceTableNotFound = "TableServiceTableNotFound";
     public const string TableServiceTableInactive = "TableServiceTableInactive";
@@ -189,11 +194,15 @@ public static class ErrorCodes
 
     public const string StaffOrderOperationPayloadMismatch = "StaffOrderOperationPayloadMismatch";
     public const string StaffOrderOperationIdReused = "StaffOrderOperationIdReused";
+    public const string StaffOrderOperationUnknown = "StaffOrderOperationUnknown";
     public const string StaffOrderVersionConflict = "StaffOrderVersionConflict";
 
     /// <summary>Returned when an order changed after a caller read its version token.</summary>
     public const string OrderVersionConflict = "OrderVersionConflict";
     public const string KitchenReleaseRequired = "KitchenReleaseRequired";
+    public const string RequiredRoutingUnresolved = "RequiredRoutingUnresolved";
+    public const string KitchenRoleRequired = "KitchenRoleRequired";
+    public const string CashierRequired = "CashierRequired";
 
     /// <summary>Returned when an operational queue synchronization cursor is malformed, tampered with, or reused with different filters.</summary>
     public const string InvalidOperationalQueueCursor = "InvalidOperationalQueueCursor";

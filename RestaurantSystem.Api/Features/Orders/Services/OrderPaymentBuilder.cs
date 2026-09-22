@@ -82,7 +82,7 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
 
                 // EVERY tender starts un-captured, including the till's. Nothing at
                 // order-creation time has observed money changing hands: the cashier
-                // completes through AddPaymentToOrder, which is [RequireStaff] and
+                // completes through AddPaymentToOrder, which is [RequireAdminOrCashier] and
                 // carries the transaction reference. Non-cash methods used to
                 // auto-complete right here, taking TransactionId/PaymentGateway
                 // verbatim from the request body — on an anonymous endpoint — so a

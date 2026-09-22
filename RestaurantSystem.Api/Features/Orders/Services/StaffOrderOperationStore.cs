@@ -26,6 +26,12 @@ public sealed class StaffOrderOperationStore : IStaffOrderOperationStore
         if (operation.Kind != kind || (orderId.HasValue && operation.OrderId != orderId.Value)
             || operation.ActorUserId != actorUserId)
         {
+            if (operation.ActorUserId != actorUserId)
+            {
+                return new StaffOrderOperationReplay(
+                    StaffOrderOperationReplayOutcome.Unknown, null, null);
+            }
+
             return new StaffOrderOperationReplay(
                 StaffOrderOperationReplayOutcome.OperationIdReused, operation, null);
         }
@@ -40,12 +46,31 @@ public sealed class StaffOrderOperationStore : IStaffOrderOperationStore
         return new StaffOrderOperationReplay(StaffOrderOperationReplayOutcome.Replay, operation, order);
     }
 
+    public async Task<StaffOrderOperationReplay> LookupAsync(
+        Guid operationId, StaffOrderOperationKind kind, Guid? actorUserId,
+        CancellationToken cancellationToken)
+    {
+        var operation = await _context.StaffOrderOperations.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.OperationId == operationId, cancellationToken);
+        if (operation is null || operation.Kind != kind || operation.ActorUserId != actorUserId)
+        {
+            return new StaffOrderOperationReplay(
+                StaffOrderOperationReplayOutcome.Unknown, null, null);
+        }
+
+        var order = await LoadOrderAsync(operation.OrderId, cancellationToken);
+        return order is null
+            ? new StaffOrderOperationReplay(StaffOrderOperationReplayOutcome.Unknown, null, null)
+            : new StaffOrderOperationReplay(StaffOrderOperationReplayOutcome.Replay, operation, order);
+    }
+
     public Task<Order?> LoadOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
         _context.Orders
             .IncludeOrderLineGraph()
             .Include(order => order.Payments)
             .Include(order => order.StatusHistory)
             .Include(order => order.DeliveryAddress)
+            .Include(order => order.RoutingStates)
             .AsSplitQuery()
             .SingleOrDefaultAsync(order => order.Id == orderId && !order.IsDeleted, cancellationToken);
 }

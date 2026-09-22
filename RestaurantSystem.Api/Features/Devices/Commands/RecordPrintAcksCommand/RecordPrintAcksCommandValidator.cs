@@ -1,4 +1,5 @@
 using FluentValidation;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Devices.Commands.RecordPrintAcksCommand;
 
@@ -27,6 +28,12 @@ public class RecordPrintAcksCommandValidator : AbstractValidator<RecordPrintAcks
             {
                 a.RuleFor(x => x.Revision).NotNull().GreaterThan(0);
                 a.RuleFor(x => x.JobType).NotNull().IsInEnum();
+                a.When(x => x.JobType == DevicePrintJobType.Order, () =>
+                {
+                    a.RuleFor(x => x.Status)
+                        .Must(IsFinalOrUnconfiguredOrderStatus)
+                        .WithMessage("Order route acknowledgements must use a final status.");
+                });
             });
             a.When(x => !x.JobId.HasValue, () =>
             {
@@ -35,4 +42,11 @@ public class RecordPrintAcksCommandValidator : AbstractValidator<RecordPrintAcks
             });
         });
     }
+
+    private static bool IsFinalOrUnconfiguredOrderStatus(DevicePrintStatus status) =>
+        status is DevicePrintStatus.Printed
+            or DevicePrintStatus.Failed
+            or DevicePrintStatus.Skipped
+            or DevicePrintStatus.Unknown
+            or DevicePrintStatus.NotConfigured;
 }

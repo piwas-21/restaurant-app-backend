@@ -7,6 +7,7 @@ using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.AddTableBillPaymentCommand;
 using RestaurantSystem.Api.Features.Orders.Queries.GetTableBillQuery;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -263,7 +264,9 @@ public class TableBillTests : IAsyncLifetime
         var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
             ctx, applicator, assembler, new TableBillPaymentOperationReplayResolver(ctx, assembler),
-            NullLogger<AddTableBillPaymentCommandHandler>.Instance);
+            NullLogger<AddTableBillPaymentCommandHandler>.Instance,
+            currentUser.Object,
+            new TableBillPaymentSessionCoordinator(ctx, currentUser.Object));
 
         return await handler.Handle(
             new AddTableBillPaymentCommand
@@ -443,7 +446,9 @@ public class TableBillTests : IAsyncLifetime
         var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
             ctx, applicator.Object, assembler, new TableBillPaymentOperationReplayResolver(ctx, assembler),
-            NullLogger<AddTableBillPaymentCommandHandler>.Instance);
+            NullLogger<AddTableBillPaymentCommandHandler>.Instance,
+            currentUser.Object,
+            new TableBillPaymentSessionCoordinator(ctx, currentUser.Object));
         var response = await handler.Handle(
             new AddTableBillPaymentCommand
             {
@@ -485,7 +490,9 @@ public class TableBillTests : IAsyncLifetime
         var assembler = Assembler();
         var handler = new AddTableBillPaymentCommandHandler(
             ctx, applicator.Object, assembler, new TableBillPaymentOperationReplayResolver(ctx, assembler),
-            NullLogger<AddTableBillPaymentCommandHandler>.Instance);
+            NullLogger<AddTableBillPaymentCommandHandler>.Instance,
+            currentUser.Object,
+            new TableBillPaymentSessionCoordinator(ctx, currentUser.Object));
         var response = await handler.Handle(
             new AddTableBillPaymentCommand
             {

@@ -24,6 +24,7 @@ using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Swagger;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Auth.Handlers;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
@@ -304,6 +305,10 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services.AddOptions<OrderRoutingSettings>()
+    .Bind(builder.Configuration.GetSection(OrderRoutingSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services
     .AddOptions<CatalogSettings>()
     .Bind(builder.Configuration.GetSection(CatalogSettings.SectionName))
@@ -356,6 +361,17 @@ builder.Services.AddAppleAuthentication(builder.Configuration);
 // tenant .env changes.
 builder.Services.Configure<ModuleSettings>(builder.Configuration.GetSection("Modules"));
 builder.Services.AddSingleton<ITenantModules, TenantModules>();
+
+// Server Workspace V2 is an emergency-safe rollout switch, not an entitlement or an
+// authorization boundary. The deploy template maps TENANT_SERVER_WORKSPACE_V2 onto this
+// section, and the frontend reads the additive anonymous tenant-features endpoint. A
+// malformed value fails configuration binding before the app starts rather than silently
+// selecting an unknown UI; the absent value defaults to false.
+builder.Services.AddOptions<TenantFeatureSettings>()
+    .Bind(builder.Configuration.GetSection(TenantFeatureSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddSingleton<ITenantFeatures, TenantFeatures>();
 
 // Partner attribution shown in the tenant footer (SOFRA-PARTNER-PLAN §11 / S4a). Same rail and
 // same lifetime as the modules above: the deploy repo's tenant compose template maps
@@ -701,6 +717,7 @@ builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationS
 builder.Services.AddOrderPaymentServices();
 builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
+builder.Services.AddServerWorkspaceServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
