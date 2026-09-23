@@ -52,6 +52,26 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
             .Should().Be(StaffOrderOperationKind.RoundCreate);
     }
 
+    [Theory]
+    [InlineData(UserRole.Server)]
+    [InlineData(UserRole.Cashier)]
+    public async Task Staff_can_attach_customer_to_a_staff_round(UserRole role)
+    {
+        AuthenticateAsRole(role);
+        var session = await OpenSessionAsync();
+        var customerId = Guid.Parse(RestaurantSystem.IntegrationTests.Common.TestAuthHandler.UserId);
+
+        var response = await PostAsJsonAsync("/api/staff/orders/round", Body(
+            session.ServiceSessionId, Guid.NewGuid(), releaseToKitchen: false, customerId: customerId));
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        body.Data!.UserId.Should().Be(customerId);
+        body.Data.CustomerName.Should().Be("Test User");
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.SingleAsync()).UserId.Should().Be(customerId);
+    }
+
     [Fact]
     public async Task Released_round_creates_durable_required_routes_before_response()
     {
@@ -359,17 +379,19 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
         return body.Data!;
     }
 
-    private object Body(Guid sessionId, Guid operationId, bool releaseToKitchen) => new
-    {
-        clientOperationId = operationId,
-        releaseToKitchen,
-        type = "DineIn",
-        tableId = _tableId,
-        serviceSessionId = sessionId,
-        paymentState = "Unpaid",
-        notes = "round test",
-        items = new[] { new { productId = _productId, quantity = 1 } }
-    };
+    private object Body(
+        Guid sessionId, Guid operationId, bool releaseToKitchen, Guid? customerId = null) => new
+        {
+            clientOperationId = operationId,
+            releaseToKitchen,
+            type = "DineIn",
+            tableId = _tableId,
+            serviceSessionId = sessionId,
+            customerUserId = customerId,
+            paymentState = "Unpaid",
+            notes = "round test",
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        };
 
     private async Task<OrderDto> CreateReleasedTakeawayAsync()
     {

@@ -1,14 +1,16 @@
 using FluentValidation;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateStaffRoundCommand;
 
 public sealed class CreateStaffRoundCommandValidator : AbstractValidator<CreateStaffRoundCommand>
 {
-    public CreateStaffRoundCommandValidator()
+    public CreateStaffRoundCommandValidator(IOptions<FidelitySettings> fidelitySettings)
     {
-        Include(new StaffCounterOrderRequestValidator());
+        Include(new StaffCounterOrderRequestValidator(fidelitySettings));
         RuleFor(command => command.ClientOperationId).NotEmpty();
         RuleFor(command => command.Type)
             .Equal(OrderType.DineIn)

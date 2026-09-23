@@ -49,13 +49,6 @@ public sealed class CreateStaffCounterOrderCommandHandler
     public async Task<ApiResponse<OrderDto>> Handle(
         CreateStaffCounterOrderCommand command, CancellationToken cancellationToken)
     {
-        // Keep this guard ahead of the operation ledger and transaction as a defense for callers that
-        // invoke the handler without the mediator validation behavior.
-        if (command.PointsToRedeem is > 0)
-        {
-            throw new BadRequestException("Points redemption is not supported for staff counter orders.");
-        }
-
         var hash = StaffOrderOperationFingerprint.Create(command, command.ReleaseToKitchen);
         var replay = await _operations.ResolveAsync(
             command.ClientOperationId, StaffOrderOperationKind.Create, null,
@@ -84,7 +77,8 @@ public sealed class CreateStaffCounterOrderCommandHandler
             });
             await _context.SaveChangesAsync(cancellationToken);
             await _fidelity.RedeemAsync(
-                build.Order, command.PointsToRedeem, build.CustomerUserId, cancellationToken);
+                build.Order, command.PointsToRedeem, build.CustomerUserId, cancellationToken,
+                failOnError: true);
             await transaction.CommitAsync(cancellationToken);
 
             return await PublishAsync(build.Order, "Counter order created", cancellationToken);

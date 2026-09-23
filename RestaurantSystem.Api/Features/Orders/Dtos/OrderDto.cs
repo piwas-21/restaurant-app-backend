@@ -41,6 +41,9 @@ public record OrderDto
     public decimal Discount { get; set; }
     public decimal DiscountPercentage { get; set; }
     public decimal CustomerDiscountAmount { get; set; }
+    public int FidelityPointsEarned { get; set; }
+    public int FidelityPointsRedeemed { get; set; }
+    public decimal FidelityPointsDiscount { get; set; }
     public decimal Tip { get; set; }
     public decimal Total { get; set; }
 
