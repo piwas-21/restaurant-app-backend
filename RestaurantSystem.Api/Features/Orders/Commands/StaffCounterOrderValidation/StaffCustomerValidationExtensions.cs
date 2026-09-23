@@ -1,6 +1,7 @@
 using System.Globalization;
 using FluentValidation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 
@@ -15,6 +16,19 @@ internal static class StaffCustomerValidationExtensions
                 || !request.CustomerId.HasValue
                 || request.CustomerUserId == request.CustomerId)
             .WithMessage("CustomerUserId and CustomerId must identify the same customer.");
+        validator.RuleFor(request => request.CustomerName)
+            .MaximumLength(OrderFieldLimits.CustomerNameMaxLength)
+            .When(request => request.CustomerName is not null)
+            .WithMessage($"CustomerName cannot exceed {OrderFieldLimits.CustomerNameMaxLength} characters.");
+        validator.RuleFor(request => request.CustomerEmail)
+            .MaximumLength(OrderFieldLimits.CustomerEmailMaxLength)
+            .EmailAddress()
+            .When(request => !string.IsNullOrEmpty(request.CustomerEmail))
+            .WithMessage("CustomerEmail must be a valid email address of 100 characters or fewer.");
+        validator.RuleFor(request => request.CustomerPhone)
+            .MaximumLength(OrderFieldLimits.CustomerPhoneMaxLength)
+            .When(request => request.CustomerPhone is not null)
+            .WithMessage($"CustomerPhone cannot exceed {OrderFieldLimits.CustomerPhoneMaxLength} characters.");
         validator.RuleFor(request => request.PointsToRedeem)
             .GreaterThanOrEqualTo(0)
             .When(request => request.PointsToRedeem.HasValue)
