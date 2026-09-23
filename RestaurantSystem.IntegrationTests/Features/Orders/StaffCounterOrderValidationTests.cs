@@ -1,9 +1,11 @@
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffRoundCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 
@@ -12,7 +14,8 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// <summary>Pure hostile coverage for staff-only request controls.</summary>
 public sealed class StaffCounterOrderValidationTests
 {
-    private readonly StaffCounterOrderRequestValidator _requestValidator = new();
+    private static readonly IOptions<FidelitySettings> FidelityOptions = Options.Create(new FidelitySettings());
+    private readonly StaffCounterOrderRequestValidator _requestValidator = new(FidelityOptions);
 
     private static StaffCounterOrderRequest Request(int? points) => new()
     {
@@ -146,14 +149,14 @@ public sealed class StaffCounterOrderValidationTests
             ClientOperationId = Guid.NewGuid()
         };
 
-        new QuoteStaffCounterOrderCommandValidator().Validate(quote).IsValid.Should().BeFalse();
-        new CreateStaffCounterOrderCommandValidator().Validate(create).IsValid.Should().BeFalse();
+        new QuoteStaffCounterOrderCommandValidator(FidelityOptions).Validate(quote).IsValid.Should().BeFalse();
+        new CreateStaffCounterOrderCommandValidator(FidelityOptions).Validate(create).IsValid.Should().BeFalse();
     }
 
     [Fact]
     public void Staff_round_requires_dine_in_session_and_rejects_delivery_address()
     {
-        var validator = new CreateStaffRoundCommandValidator();
+        var validator = new CreateStaffRoundCommandValidator(FidelityOptions);
         var takeaway = new CreateStaffRoundCommand
         {
             ClientOperationId = Guid.NewGuid(),

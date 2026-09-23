@@ -34,6 +34,7 @@ public sealed class GetStaffCustomerLookupQueryHandler
         var pattern = $"%{EscapeLikePattern(search)}%";
 
         var customers = await _context.Users
+            .AsNoTracking()
             .Where(user => !user.IsDeleted
                 && user.Role == UserRole.Customer
                 && (EF.Functions.ILike(user.Email ?? string.Empty, pattern, "\\")

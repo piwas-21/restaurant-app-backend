@@ -1,12 +1,14 @@
 using FluentValidation;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 namespace RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 
 public sealed class StaffCounterOrderRequestValidator : AbstractValidator<StaffCounterOrderRequest>
 {
-    public StaffCounterOrderRequestValidator()
+    public StaffCounterOrderRequestValidator(IOptions<FidelitySettings> fidelitySettings)
     {
         RuleFor(request => request.Type).IsInEnum(); RuleFor(request => request.Items).NotEmpty().WithMessage("A counter order must contain at least one item.");
         RuleFor(request => request.TableNumber)
@@ -31,7 +33,7 @@ public sealed class StaffCounterOrderRequestValidator : AbstractValidator<StaffC
             .WithMessage("A table service session is valid only for dine-in orders.");
         this.ValidateDeliveryAddress();
         this.ValidateNotesLength();
-        this.ValidateStaffCustomer();
+        this.ValidateStaffCustomer(fidelitySettings.Value.MaximumPointsPerRedemption);
         RuleFor(request => request.Tip)
             .GreaterThanOrEqualTo(0)
             .When(request => request.Tip.HasValue)

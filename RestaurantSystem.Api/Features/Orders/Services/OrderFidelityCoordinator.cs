@@ -1,23 +1,26 @@
+using System.Globalization;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
 /// <inheritdoc />
 public class OrderFidelityCoordinator : IOrderFidelityCoordinator
 {
-    private const int MaximumPointsPerRedemption = 100_000;
     private readonly IFidelityPointsService _fidelityPointsService;
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<OrderFidelityCoordinator> _logger;
     private readonly ITenantModules _modules;
+    private readonly FidelitySettings _settings;
 
     public OrderFidelityCoordinator(
         IFidelityPointsService fidelityPointsService,
@@ -25,7 +28,8 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         IOrderPaymentBuilder paymentBuilder,
         ApplicationDbContext context,
         ILogger<OrderFidelityCoordinator> logger,
-        ITenantModules modules)
+        ITenantModules modules,
+        IOptions<FidelitySettings> settings)
     {
         _fidelityPointsService = fidelityPointsService;
         _pricingService = pricingService;
@@ -33,6 +37,7 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         _context = context;
         _logger = logger;
         _modules = modules;
+        _settings = settings.Value;
     }
 
     public async Task CalculatePointsToEarnAsync(
@@ -145,9 +150,10 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
 
     private decimal ValidateDiscountFitsOrder(Order order, int pointsToRedeem)
     {
-        if (pointsToRedeem > MaximumPointsPerRedemption)
+        if (pointsToRedeem > _settings.MaximumPointsPerRedemption)
         {
-            throw new BadRequestException("Cannot redeem more than 100,000 points at once.");
+            throw new BadRequestException(
+                $"Cannot redeem more than {_settings.MaximumPointsPerRedemption.ToString("N0", CultureInfo.InvariantCulture)} points at once.");
         }
 
         var discountAmount = _fidelityPointsService.CalculateDiscountFromPoints(pointsToRedeem);

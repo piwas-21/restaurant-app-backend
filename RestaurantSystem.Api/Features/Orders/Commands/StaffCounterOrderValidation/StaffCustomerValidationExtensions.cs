@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentValidation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 
@@ -5,7 +6,9 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidat
 
 internal static class StaffCustomerValidationExtensions
 {
-    internal static void ValidateStaffCustomer(this AbstractValidator<StaffCounterOrderRequest> validator)
+    internal static void ValidateStaffCustomer(
+        this AbstractValidator<StaffCounterOrderRequest> validator,
+        int maximumPointsPerRedemption)
     {
         validator.RuleFor(request => request)
             .Must(request => !request.CustomerUserId.HasValue
@@ -17,9 +20,10 @@ internal static class StaffCustomerValidationExtensions
             .When(request => request.PointsToRedeem.HasValue)
             .WithMessage("PointsToRedeem cannot be negative.");
         validator.RuleFor(request => request.PointsToRedeem)
-            .LessThanOrEqualTo(100_000)
+            .LessThanOrEqualTo(maximumPointsPerRedemption)
             .When(request => request.PointsToRedeem.HasValue)
-            .WithMessage("Cannot redeem more than 100,000 points at once.");
+            .WithMessage(
+                $"Cannot redeem more than {maximumPointsPerRedemption.ToString("N0", CultureInfo.InvariantCulture)} points at once.");
         validator.RuleFor(request => request.PointsToRedeem)
             .Must((request, points) => points is null || points <= 0 || request.EffectiveCustomerUserId.HasValue)
             .When(request => request.PointsToRedeem.HasValue)
