@@ -12,6 +12,7 @@ using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RepairLegacyTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetTableServiceSessionPaymentOperationQuery;
@@ -92,6 +93,77 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         result.ErrorCode.Should().Be(ErrorCodes.TableServiceSessionAmbiguous);
         result.Errors.Should().ContainSingle(TableBillTargetResolver.AmbiguousMessage);
         (await context.TableServiceSessions.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Explicit_repair_adopts_only_blocking_legacy_orders_and_normalizes_identity()
+    {
+        var tableId = await SeedTableAsync("T-REPAIR");
+        var otherTableId = await SeedTableAsync("T-OTHER");
+        var legacyId = await SeedStableOrderAsync(null, tableId, "old-label", 12m, Utc(11, 0));
+        var cancelledId = await SeedStableOrderAsync(null, tableId, "old-label", 4m, Utc(11, 1));
+        var otherId = await SeedStableOrderAsync(null, otherTableId, "T-OTHER", 8m, Utc(11, 2));
+        await MarkCancelledAsync(cancelledId);
+
+        await using var context = _fixture.CreateContext();
+        var result = await RepairHandler(context).Handle(
+            new RepairLegacyTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Data!.TableId.Should().Be(tableId);
+        result.Data.TableLabel.Should().Be("T-REPAIR");
+        result.Data.RoundCount.Should().Be(1);
+        result.Data.HasUnassignedActiveOrders.Should().BeFalse();
+        await using var verify = _fixture.CreateContext();
+        var adopted = await verify.Orders.SingleAsync(order => order.Id == legacyId);
+        adopted.ServiceSessionId.Should().Be(result.Data.ServiceSessionId);
+        adopted.TableId.Should().Be(tableId);
+        adopted.TableNumber.Should().BeNull();
+        adopted.TableLabel.Should().Be("T-REPAIR");
+        (await verify.Orders.SingleAsync(order => order.Id == cancelledId)).ServiceSessionId.Should().BeNull();
+        (await verify.Orders.SingleAsync(order => order.Id == otherId)).ServiceSessionId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Explicit_repair_reuses_existing_session_and_replays_idempotently()
+    {
+        var tableId = await SeedTableAsync("42");
+        var sessionId = await SeedStableSessionAsync(tableId);
+        var legacyId = await SeedStableOrderAsync(null, tableId, "42", 12m, Utc(11, 0));
+
+        await using var firstContext = _fixture.CreateContext();
+        var first = await RepairHandler(firstContext).Handle(
+            new RepairLegacyTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+        await using var retryContext = _fixture.CreateContext();
+        var retry = await RepairHandler(retryContext).Handle(
+            new RepairLegacyTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+
+        first.Success.Should().BeTrue();
+        retry.Success.Should().BeTrue();
+        first.Data!.ServiceSessionId.Should().Be(sessionId);
+        retry.Data!.ServiceSessionId.Should().Be(sessionId);
+        retry.Data.LegacyActiveOrderCount.Should().Be(0);
+        await using var verify = _fixture.CreateContext();
+        (await verify.TableServiceSessions.CountAsync()).Should().Be(1);
+        (await verify.Orders.SingleAsync(order => order.Id == legacyId)).ServiceSessionId.Should().Be(sessionId);
+    }
+
+    [Fact]
+    public async Task Concurrent_repairs_return_one_authoritative_session()
+    {
+        var tableId = await SeedTableAsync("43");
+        var legacyId = await SeedOrderAsync(null, 43, 12m, Utc(11, 0));
+
+        var results = await Task.WhenAll(RepairStableTableAsync(tableId), RepairStableTableAsync(tableId));
+
+        results.Should().OnlyContain(result => result.Success);
+        results.Select(result => result.Data!.ServiceSessionId).Distinct().Should().ContainSingle();
+        await using var verify = _fixture.CreateContext();
+        (await verify.TableServiceSessions.CountAsync()).Should().Be(1);
+        (await verify.Orders.CountAsync(order => order.ServiceSessionId.HasValue)).Should().Be(1);
+        var adopted = await verify.Orders.SingleAsync(order => order.Id == legacyId);
+        adopted.TableId.Should().Be(tableId);
+        adopted.TableLabel.Should().Be("43");
     }
 
     [Fact]
@@ -803,6 +875,14 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         await context.SaveChangesAsync();
     }
 
+    private async Task MarkCancelledAsync(Guid orderId)
+    {
+        await using var context = _fixture.CreateContext();
+        var order = await context.Orders.SingleAsync(value => value.Id == orderId);
+        order.Status = OrderStatus.Cancelled;
+        await context.SaveChangesAsync();
+    }
+
     private async Task<Guid> SeedTableAsync(string label, bool isActive = true)
     {
         var id = Guid.NewGuid();
@@ -827,6 +907,13 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
             new OpenTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
     }
 
+    private async Task<ApiResponse<TableServiceSessionDto>> RepairStableTableAsync(Guid tableId)
+    {
+        await using var context = _fixture.CreateContext();
+        return await RepairHandler(context).Handle(
+            new RepairLegacyTableServiceSessionCommand { TableId = tableId }, CancellationToken.None);
+    }
+
     private OpenTableServiceSessionCommandHandler OpenHandler(ApplicationDbContext context)
     {
         var mapping = new OrderMappingService(
@@ -838,6 +925,23 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         current.Setup(value => value.GetAuditIdentifier()).Returns(nameof(TableServiceSessionTests));
         current.Setup(value => value.UserId).Returns(Guid.NewGuid());
         return new OpenTableServiceSessionCommandHandler(
+            context,
+            current.Object,
+            new TableServiceSessionReader(context, assembler),
+            new TableIdentityResolver(context));
+    }
+
+    private RepairLegacyTableServiceSessionCommandHandler RepairHandler(ApplicationDbContext context)
+    {
+        var mapping = new OrderMappingService(
+            context, new OrderDisplayCurrencyResolver(context),
+            NullLogger<OrderMappingService>.Instance);
+        var assembler = new TableBillAssembler(
+            context, mapping, NullLogger<TableBillAssembler>.Instance);
+        var current = new Mock<ICurrentUserService>();
+        current.Setup(value => value.GetAuditIdentifier()).Returns(nameof(TableServiceSessionTests));
+        current.Setup(value => value.UserId).Returns(Guid.NewGuid());
+        return new RepairLegacyTableServiceSessionCommandHandler(
             context,
             current.Object,
             new TableServiceSessionReader(context, assembler),

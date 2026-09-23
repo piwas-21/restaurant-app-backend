@@ -1,9 +1,11 @@
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateStaffRoundCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.QuoteStaffCounterOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Commands.StaffCounterOrderValidation;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
 
@@ -12,7 +14,8 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 /// <summary>Pure hostile coverage for staff-only request controls.</summary>
 public sealed class StaffCounterOrderValidationTests
 {
-    private readonly StaffCounterOrderRequestValidator _requestValidator = new();
+    private static readonly IOptions<FidelitySettings> FidelityOptions = Options.Create(new FidelitySettings());
+    private readonly StaffCounterOrderRequestValidator _requestValidator = new(FidelityOptions);
 
     private static StaffCounterOrderRequest Request(int? points) => new()
     {
@@ -30,14 +33,19 @@ public sealed class StaffCounterOrderValidationTests
     };
 
     [Fact]
-    public void Positive_points_are_rejected_before_staff_pricing()
+    public void Positive_points_require_a_registered_customer()
     {
         var result = _requestValidator.Validate(Request(1));
+        var customerResult = _requestValidator.Validate(Request(1) with
+        {
+            CustomerUserId = Guid.NewGuid()
+        });
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(error =>
             error.PropertyName == nameof(StaffCounterOrderRequest.PointsToRedeem)
-            && error.ErrorMessage == "Points redemption is not supported for staff counter orders.");
+            && error.ErrorMessage == "Points redemption requires a registered customer.");
+        customerResult.IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -45,6 +53,44 @@ public sealed class StaffCounterOrderValidationTests
     {
         _requestValidator.Validate(Request(0)).IsValid.Should().BeTrue();
         _requestValidator.Validate(Request(-1)).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Redemption_cannot_exceed_the_shared_single_order_cap()
+    {
+        var result = _requestValidator.Validate(Request(100_001) with
+        {
+            CustomerUserId = Guid.NewGuid()
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error =>
+            error.PropertyName == nameof(StaffCounterOrderRequest.PointsToRedeem)
+            && error.ErrorMessage == "Cannot redeem more than 100,000 points at once.");
+    }
+
+    [Fact]
+    public void Customer_contact_fields_match_the_order_storage_contract()
+    {
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerName = new string('n', OrderFieldLimits.CustomerNameMaxLength + 1)
+        }).IsValid.Should().BeFalse();
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerEmail = "not-an-email"
+        }).IsValid.Should().BeFalse();
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerPhone = new string('1', OrderFieldLimits.CustomerPhoneMaxLength + 1)
+        }).IsValid.Should().BeFalse();
+
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerName = new string('n', OrderFieldLimits.CustomerNameMaxLength),
+            CustomerEmail = "staff@example.test",
+            CustomerPhone = new string('1', OrderFieldLimits.CustomerPhoneMaxLength)
+        }).IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -127,14 +173,14 @@ public sealed class StaffCounterOrderValidationTests
             ClientOperationId = Guid.NewGuid()
         };
 
-        new QuoteStaffCounterOrderCommandValidator().Validate(quote).IsValid.Should().BeFalse();
-        new CreateStaffCounterOrderCommandValidator().Validate(create).IsValid.Should().BeFalse();
+        new QuoteStaffCounterOrderCommandValidator(FidelityOptions).Validate(quote).IsValid.Should().BeFalse();
+        new CreateStaffCounterOrderCommandValidator(FidelityOptions).Validate(create).IsValid.Should().BeFalse();
     }
 
     [Fact]
     public void Staff_round_requires_dine_in_session_and_rejects_delivery_address()
     {
-        var validator = new CreateStaffRoundCommandValidator();
+        var validator = new CreateStaffRoundCommandValidator(FidelityOptions);
         var takeaway = new CreateStaffRoundCommand
         {
             ClientOperationId = Guid.NewGuid(),

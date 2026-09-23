@@ -324,6 +324,11 @@ builder.Services
     .Bind(builder.Configuration.GetSection(TableServiceSessionSettings.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services
+    .AddOptions<FidelitySettings>()
+    .Bind(builder.Configuration.GetSection(FidelitySettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 // Said ONCE, at boot, when the printer endpoints have no key to check (#475).
 //

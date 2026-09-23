@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CancelTableSer
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.OpenTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RequestTableServicePaymentHandoffCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.RepairLegacyTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetActiveTableServiceSessionsQuery;
 using RestaurantSystem.Api.Features.TableServiceSessions.Queries.GetPendingTableServicePaymentHandoffsQuery;
@@ -42,6 +43,11 @@ public sealed class TableServiceSessionsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> Open(
         [FromBody] OpenTableServiceSessionCommand command)
+        => Ok(await _mediator.SendCommand(command));
+
+    [HttpPost("repair-legacy")]
+    public async Task<ActionResult<ApiResponse<TableServiceSessionDto>>> RepairLegacy(
+        [FromBody] RepairLegacyTableServiceSessionCommand command)
         => Ok(await _mediator.SendCommand(command));
 
     [HttpGet("{serviceSessionId:guid}")]

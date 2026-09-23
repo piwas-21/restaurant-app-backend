@@ -52,15 +52,13 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
     public async Task<StaffCounterOrderBuild> BuildAsync(
         StaffCounterOrderRequest request, bool releaseToKitchen, CancellationToken cancellationToken)
     {
-        // Staff counter orders do not expose the customer checkout's redemption flow. Reject a
-        // positive request before customer lookup, pricing, or any order mutation.
-        if (request.PointsToRedeem is > 0)
-        {
-            throw new BadRequestException("Points redemption is not supported for staff counter orders.");
-        }
-
         var target = await ResolveTableTargetAsync(request, cancellationToken);
         var customer = await ResolveCustomerAsync(request.EffectiveCustomerUserId, cancellationToken);
+        if (request.PointsToRedeem is > 0 && customer is null)
+        {
+            throw new BadRequestException("Points redemption requires a registered customer.");
+        }
+
         var customerId = customer?.Id;
         var pricedItems = await _serverPricing.PriceAsync(request.Items, cancellationToken);
         var legacy = ToLegacyCommand(request, customer, pricedItems, target?.Identity.Number);
@@ -193,9 +191,12 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             return null;
         }
 
-        if (!_currentUser.IsAdmin && _currentUser.Role != UserRole.Cashier)
+        if (!_currentUser.IsAdmin
+            && _currentUser.Role != UserRole.Cashier
+            && _currentUser.Role != UserRole.Server)
         {
-            throw new ForbiddenException("Only an admin or cashier may place an order on behalf of a customer.");
+            throw new ForbiddenException(
+                "Only an admin, cashier, or server may place an order on behalf of a customer.");
         }
 
         var customer = await _context.Users

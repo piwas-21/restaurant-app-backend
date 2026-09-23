@@ -35,13 +35,13 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .IsUnique();
 
         builder.Property(o => o.CustomerName)
-            .HasMaxLength(100);
+            .HasMaxLength(OrderFieldLimits.CustomerNameMaxLength);
 
         builder.Property(o => o.CustomerEmail)
-            .HasMaxLength(100);
+            .HasMaxLength(OrderFieldLimits.CustomerEmailMaxLength);
 
         builder.Property(o => o.CustomerPhone)
-            .HasMaxLength(20);
+            .HasMaxLength(OrderFieldLimits.CustomerPhoneMaxLength);
 
         builder.Property(o => o.TableLabel)
             .HasMaxLength(100);

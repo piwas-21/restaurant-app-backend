@@ -220,6 +220,17 @@ public class ModuleGateCoverageTests
     }
 
     [Fact]
+    public void Staff_customer_lookup_is_shared_by_server_and_cashier_modules()
+    {
+        var action = Controller("UserController").GetMethod("CustomerLookup")!;
+        var gate = action.GetCustomAttribute<RequireModuleAttribute>();
+
+        gate.Should().NotBeNull();
+        gate!.ModuleIdsRequired.Should().BeEquivalentTo(ModuleIds.Server, ModuleIds.Cashier);
+        action.GetCustomAttribute<RequireTableServiceStaffAttribute>().Should().NotBeNull();
+    }
+
+    [Fact]
     public void The_gated_types_are_controllers()
     {
         // Guards the reflection above against a rename that silently matches something else.

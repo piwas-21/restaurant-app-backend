@@ -56,19 +56,130 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Positive_points_are_rejected_by_quote_and_create_before_any_mutation()
+    public async Task Positive_points_quote_is_read_only_and_create_redeems_atomically()
     {
+        await SeedPointsAsync(100);
         AuthenticateAsAdmin();
         var quote = await PostAsJsonAsync(
-            "/api/staff/orders/quote", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 1));
-        var create = await PostAsJsonAsync(
-            "/api/staff/orders", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 1));
+            "/api/staff/orders/quote", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 100));
+        var quoteBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(quote))!;
 
-        quote.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        create.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        quote.StatusCode.Should().Be(HttpStatusCode.OK);
+        quoteBody.Success.Should().BeTrue();
+        quoteBody.Data!.FidelityPointsRedeemed.Should().Be(100);
+        quoteBody.Data.FidelityPointsDiscount.Should().Be(1m);
+        quoteBody.Data.Total.Should().Be(11.99m);
+
+        await using (var afterQuote = DatabaseFixture.CreateContext())
+        {
+            (await afterQuote.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(100);
+            (await afterQuote.FidelityPointsTransactions.CountAsync()).Should().Be(0);
+            (await afterQuote.Orders.CountAsync()).Should().Be(0);
+        }
+
+        var create = await PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 100));
+        var createBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(create))!;
+
+        create.StatusCode.Should().Be(HttpStatusCode.OK);
+        createBody.Success.Should().BeTrue();
+        createBody.Data!.FidelityPointsRedeemed.Should().Be(100);
+        createBody.Data.FidelityPointsDiscount.Should().Be(1m);
+        createBody.Data.Total.Should().Be(11.99m);
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(1);
+        (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
+        (await context.FidelityPointsTransactions.CountAsync()).Should().Be(1);
+        (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Insufficient_points_roll_back_the_order_and_operation()
+    {
+        await SeedPointsAsync(50);
+        AuthenticateAsRole(UserRole.Server);
+
+        var response = await PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 100));
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.Success.Should().BeFalse();
         await using var context = DatabaseFixture.CreateContext();
         (await context.Orders.CountAsync()).Should().Be(0);
         (await context.StaffOrderOperations.CountAsync()).Should().Be(0);
+        (await context.FidelityPointsTransactions.CountAsync()).Should().Be(0);
+        (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task Redemption_rejects_a_discount_larger_than_the_priced_order_in_quote_and_create()
+    {
+        await SeedPointsAsync(2_000);
+        AuthenticateAsRole(UserRole.Server);
+        var request = CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 2_000);
+
+        var quote = await PostAsJsonAsync("/api/staff/orders/quote", request);
+        var create = await PostAsJsonAsync("/api/staff/orders", request);
+        var quoteBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(quote))!;
+        var createBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(create))!;
+
+        quote.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        create.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        quoteBody.Errors.Should().ContainSingle().Which.Should()
+            .Contain("cannot exceed the order's discountable amount");
+        createBody.Errors.Should().BeEquivalentTo(quoteBody.Errors);
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(0);
+        (await context.StaffOrderOperations.CountAsync()).Should().Be(0);
+        (await context.FidelityPointsTransactions.CountAsync()).Should().Be(0);
+        (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(2_000);
+    }
+
+    [Fact]
+    public async Task Concurrent_redemptions_cannot_spend_the_same_balance_twice()
+    {
+        await SeedPointsAsync(100);
+        AuthenticateAsRole(UserRole.Cashier);
+        var first = PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 100));
+        var second = PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 100));
+
+        var responses = await Task.WhenAll(first, second);
+        responses.Select(response => response.StatusCode)
+            .Should().ContainSingle(status => status == HttpStatusCode.OK);
+        responses.Select(response => response.StatusCode)
+            .Should().ContainSingle(status => status == HttpStatusCode.BadRequest);
+
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(1);
+        (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
+        (await context.FidelityPointsTransactions.CountAsync()).Should().Be(1);
+        (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Redemption_retry_replays_without_a_second_ledger_debit()
+    {
+        await SeedPointsAsync(100);
+        AuthenticateAsRole(UserRole.Cashier);
+        var operationId = Guid.NewGuid();
+        var request = CreateBody(operationId, false, _customerId, pointsToRedeem: 100);
+
+        var first = await PostAsJsonAsync("/api/staff/orders", request);
+        var retry = await PostAsJsonAsync("/api/staff/orders", request);
+        var firstBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(first))!;
+        var retryBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(retry))!;
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        retry.StatusCode.Should().Be(HttpStatusCode.OK);
+        retryBody.Data!.Id.Should().Be(firstBody.Data!.Id);
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.CountAsync()).Should().Be(1);
+        (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
+        (await context.FidelityPointsTransactions.CountAsync()).Should().Be(1);
+        (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(0);
     }
 
     [Fact]
@@ -424,18 +535,16 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.Orders.CountAsync()).Should().Be(0);
     }
 
-    [Fact]
-    public async Task Customer_association_is_authorized_and_server_authored()
+    [Theory]
+    [InlineData(UserRole.Server)]
+    [InlineData(UserRole.Cashier)]
+    public async Task Customer_association_is_authorized_and_server_authored(UserRole role)
     {
-        AuthenticateAsRole(UserRole.Server);
-        var refused = await PostAsJsonAsync("/api/staff/orders", CreateBody(
-            Guid.NewGuid(), false, _customerId));
-        refused.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-
-        AuthenticateAsAdmin();
+        AuthenticateAsRole(role);
         var accepted = await PostAsJsonAsync("/api/staff/orders", CreateBody(
             Guid.NewGuid(), false, _customerId));
         var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(accepted))!;
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
         body.Data!.UserId.Should().Be(_customerId);
         body.Data.CustomerName.Should().Be("Test User");
     }
@@ -522,5 +631,20 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
             .Select(product => product.Id)
             .SingleAsync();
         _customerId = Guid.Parse(RestaurantSystem.IntegrationTests.Common.TestAuthHandler.UserId);
+    }
+
+    private async Task SeedPointsAsync(int points)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        context.FidelityPointBalances.Add(new FidelityPointBalance
+        {
+            UserId = _customerId,
+            CurrentPoints = points,
+            TotalEarnedPoints = points,
+            LastUpdated = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+        await context.SaveChangesAsync();
     }
 }
