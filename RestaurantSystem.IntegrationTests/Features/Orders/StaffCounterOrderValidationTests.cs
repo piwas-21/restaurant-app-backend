@@ -70,6 +70,30 @@ public sealed class StaffCounterOrderValidationTests
     }
 
     [Fact]
+    public void Customer_contact_fields_match_the_order_storage_contract()
+    {
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerName = new string('n', OrderFieldLimits.CustomerNameMaxLength + 1)
+        }).IsValid.Should().BeFalse();
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerEmail = "not-an-email"
+        }).IsValid.Should().BeFalse();
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerPhone = new string('1', OrderFieldLimits.CustomerPhoneMaxLength + 1)
+        }).IsValid.Should().BeFalse();
+
+        _requestValidator.Validate(Request(0) with
+        {
+            CustomerName = new string('n', OrderFieldLimits.CustomerNameMaxLength),
+            CustomerEmail = "staff@example.test",
+            CustomerPhone = new string('1', OrderFieldLimits.CustomerPhoneMaxLength)
+        }).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public void Notes_at_the_order_column_limit_are_accepted()
     {
         var result = _requestValidator.Validate(
