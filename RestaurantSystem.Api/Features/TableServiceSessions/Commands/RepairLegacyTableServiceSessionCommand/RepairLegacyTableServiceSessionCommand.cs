@@ -83,7 +83,6 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
         }
 
         table = ToIdentity(lockedTable);
-
         var session = await FindOpenSessionAsync(table, cancellationToken);
         var created = session is null;
         if (session is not null)
@@ -95,7 +94,6 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
                 created = true;
             }
         }
-
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         if (session is null)
         {
@@ -126,7 +124,6 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
                 session.Version++;
             }
         }
-
         var legacyOrders = await FindBlockingLegacyOrdersAsync(table, cancellationToken);
         foreach (var order in legacyOrders)
         {
@@ -145,14 +142,21 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
         await transaction.CommitAsync(cancellationToken);
 
         var result = await _reader.ReadAsync(session.Id, cancellationToken);
-        return result is null
-            ? ApiResponse<TableServiceSessionDto>.FailureWithCode(
+        return ToResponse(result, legacyOrders.Count);
+    }
+
+    private static ApiResponse<TableServiceSessionDto> ToResponse(TableServiceSessionDto? result, int adoptedOrderCount)
+    {
+        if (result is null)
+        {
+            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
                 "The repaired table service session could not be read back.",
-                ErrorCodes.TableServiceSessionNotFound)
-            : ApiResponse<TableServiceSessionDto>.SuccessWithData(
-                result, legacyOrders.Count == 0
-                    ? "Table service session already resolved"
-                    : "Legacy table orders adopted into the table service session");
+                ErrorCodes.TableServiceSessionNotFound);
+        }
+
+        return ApiResponse<TableServiceSessionDto>.SuccessWithData(result, adoptedOrderCount == 0
+            ? "Table service session already resolved"
+            : "Legacy table orders adopted into the table service session");
     }
 
     private Task<List<Order>> FindBlockingLegacyOrdersAsync(
