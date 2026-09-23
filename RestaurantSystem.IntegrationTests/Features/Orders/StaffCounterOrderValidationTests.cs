@@ -30,14 +30,19 @@ public sealed class StaffCounterOrderValidationTests
     };
 
     [Fact]
-    public void Positive_points_are_rejected_before_staff_pricing()
+    public void Positive_points_require_a_registered_customer()
     {
         var result = _requestValidator.Validate(Request(1));
+        var customerResult = _requestValidator.Validate(Request(1) with
+        {
+            CustomerUserId = Guid.NewGuid()
+        });
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(error =>
             error.PropertyName == nameof(StaffCounterOrderRequest.PointsToRedeem)
-            && error.ErrorMessage == "Points redemption is not supported for staff counter orders.");
+            && error.ErrorMessage == "Points redemption requires a registered customer.");
+        customerResult.IsValid.Should().BeTrue();
     }
 
     [Fact]
@@ -45,6 +50,20 @@ public sealed class StaffCounterOrderValidationTests
     {
         _requestValidator.Validate(Request(0)).IsValid.Should().BeTrue();
         _requestValidator.Validate(Request(-1)).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Redemption_cannot_exceed_the_shared_single_order_cap()
+    {
+        var result = _requestValidator.Validate(Request(100_001) with
+        {
+            CustomerUserId = Guid.NewGuid()
+        });
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error =>
+            error.PropertyName == nameof(StaffCounterOrderRequest.PointsToRedeem)
+            && error.ErrorMessage == "Cannot redeem more than 100,000 points at once.");
     }
 
     [Fact]

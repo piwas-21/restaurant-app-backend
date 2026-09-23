@@ -131,9 +131,11 @@ public class FidelityPointsService : IFidelityPointsService
 
         try
         {
-            // Get user's current balance
+            // Get and lock the current balance. Staff order creation owns an ambient transaction,
+            // so this row lock prevents two concurrent redemptions from spending the same points.
             var balance = await _context.FidelityPointBalances
-                .FirstOrDefaultAsync(b => b.UserId == userId, cancellationToken);
+                .FromSqlInterpolated($"SELECT * FROM fidelity_point_balances WHERE user_id = {userId} FOR UPDATE")
+                .SingleOrDefaultAsync(cancellationToken);
 
             if (balance == null || balance.CurrentPoints < pointsToRedeem)
             {

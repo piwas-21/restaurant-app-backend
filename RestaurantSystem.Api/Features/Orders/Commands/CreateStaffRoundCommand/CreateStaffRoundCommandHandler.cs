@@ -55,11 +55,6 @@ public sealed class CreateStaffRoundCommandHandler
             throw new BadRequestException("A staff round must be a dine-in order without a delivery address.");
         }
 
-        if (command.PointsToRedeem is > 0)
-        {
-            throw new BadRequestException("Points redemption is not supported for staff rounds.");
-        }
-
         if (!command.ServiceSessionId.HasValue)
         {
             throw new BadRequestException(
@@ -118,7 +113,8 @@ public sealed class CreateStaffRoundCommandHandler
             });
             await _context.SaveChangesAsync(cancellationToken);
             await _fidelity.RedeemAsync(
-                build.Order, command.PointsToRedeem, build.CustomerUserId, cancellationToken);
+                build.Order, command.PointsToRedeem, build.CustomerUserId, cancellationToken,
+                failOnError: true);
             await transaction.CommitAsync(cancellationToken);
 
             var dto = await _responses.ProjectAsync(build.Order, CancellationToken.None);

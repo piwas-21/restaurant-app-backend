@@ -7,6 +7,12 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
 /// <summary>Loads one service-session row with a PostgreSQL row lock for close/create serialization.</summary>
 public static class TableServiceSessionRowLock
 {
+    public static Task<Table?> LoadTableAsync(
+        ApplicationDbContext context, Guid tableId, CancellationToken cancellationToken) =>
+        context.Tables
+            .FromSqlInterpolated($"SELECT * FROM \"Tables\" WHERE id = {tableId} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
     public static Task<TableServiceSession?> LoadAsync(
         ApplicationDbContext context, Guid serviceSessionId, CancellationToken cancellationToken) =>
         context.TableServiceSessions

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Auth.Dtos;
 using RestaurantSystem.Api.Features.User.Commands.DeleteUserCommand;
 using RestaurantSystem.Api.Features.User.Commands.UpdateStaffCommand;
@@ -16,6 +17,7 @@ using RestaurantSystem.Api.Features.User.Commands.ConfirmAccountDeletionCommand;
 using RestaurantSystem.Api.Features.User.Commands.ReactivateUserCommand;
 using RestaurantSystem.Api.Features.User.Dtos;
 using RestaurantSystem.Api.Features.User.Queries.GetCurrentUserQuery;
+using RestaurantSystem.Api.Features.User.Queries.GetStaffCustomerLookupQuery;
 using RestaurantSystem.Api.Features.User.Queries.GetUsersQuery;
 using RestaurantSystem.Api.Features.User.Queries.GetUserStatisticsQuery;
 
@@ -41,6 +43,20 @@ public class UserController : ControllerBase
         [FromQuery] GetUsersQuery query)
     {
         var result = await _mediator.SendQuery(query);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Search active customer accounts by name or email for an authenticated staff order.
+    /// </summary>
+    [HttpGet("customer-lookup")]
+    [Authorize]
+    [RequireTableServiceStaff]
+    [RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<StaffCustomerLookupDto>>>> CustomerLookup(
+        [FromQuery] string search, [FromQuery] int pageSize = 10)
+    {
+        var result = await _mediator.SendQuery(new GetStaffCustomerLookupQuery(search, pageSize));
         return Ok(result);
     }
 

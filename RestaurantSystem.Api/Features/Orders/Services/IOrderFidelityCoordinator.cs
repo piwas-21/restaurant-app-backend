@@ -9,11 +9,10 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 ///    earnable points and stash on <c>Order.FidelityPointsEarned</c>.
 ///    Failures bubble (this is a pure calculation; if it can't run, the
 ///    order shouldn't ship with a half-set state).
-/// 2. <see cref="RedeemAsync"/> — post-save: if the customer asked to
-///    redeem points (<c>command.PointsToRedeem</c>), invoke the
-///    redemption service, persist the updated <c>FidelityPointsRedeemed</c>
-///    + <c>FidelityPointsDiscount</c>. Best-effort: failures logged, never
-///    thrown — the customer can contact support.
+/// 2. <see cref="PreviewRedemptionAsync"/> — read-only quote calculation;
+///    <see cref="RedeemAsync"/> writes the debit after order persistence.
+///    Staff callers make this strict inside their operation transaction;
+///    guest checkout retains best-effort behavior.
 /// 3. <see cref="AwardEarnedPointsAsync"/> — post-save: if the order has
 ///    earnable points AND the payment is settled, award them. Cash payments
 ///    that stay Pending defer awarding to payment-completion time.
@@ -26,8 +25,21 @@ public interface IOrderFidelityCoordinator
     /// <summary>Pre-save calculation (sets <c>Order.FidelityPointsEarned</c>).</summary>
     Task CalculatePointsToEarnAsync(Order order, decimal itemsTotal, Guid? userId, CancellationToken cancellationToken);
 
-    /// <summary>Post-save redemption (best-effort, persists via <c>SaveChangesAsync</c>).</summary>
-    Task RedeemAsync(Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Read-only redemption preview. It updates the transient quote aggregate but never writes a
+    /// points ledger row or balance.
+    /// </summary>
+    Task PreviewRedemptionAsync(
+        Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Post-save redemption. Staff creation requests strict failure so the ambient order
+    /// transaction rolls back when the balance cannot be redeemed; guest checkout retains the
+    /// historical best-effort behavior.
+    /// </summary>
+    Task RedeemAsync(
+        Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken,
+        bool failOnError = false);
 
     /// <summary>Post-save award if payment is Completed/Overpaid (best-effort).</summary>
     Task AwardEarnedPointsAsync(Order order, Guid? userId, CancellationToken cancellationToken);

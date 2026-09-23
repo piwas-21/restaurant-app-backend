@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
 
@@ -149,14 +150,68 @@ public sealed class ServerTakeawayOrderTests : IntegrationTestBase
         (await afterRelease.OrderRoutingStates.CountAsync()).Should().Be(2);
     }
 
-    private object TakeawayBody(Guid? operationId = null, bool? releaseToKitchen = null) => new
+    [Fact]
+    public async Task Server_can_attach_customer_when_loyalty_module_is_disabled()
     {
-        clientOperationId = operationId,
-        releaseToKitchen,
-        type = nameof(OrderType.Takeaway),
-        paymentState = nameof(StaffOrderPaymentState.Unpaid),
-        items = new[] { new { productId = _productId, quantity = 1 } }
-    };
+        AuthenticateAsRole(UserRole.Server);
+        var customerId = Guid.Parse(RestaurantSystem.IntegrationTests.Common.TestAuthHandler.UserId);
+
+        var response = await PostAsJsonAsync(
+            "/api/staff/orders", TakeawayBody(Guid.NewGuid(), false, customerId));
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        body.Data!.UserId.Should().Be(customerId);
+        body.Data.CustomerName.Should().Be("Test User");
+        body.Data.FidelityPointsEarned.Should().Be(0);
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Orders.SingleAsync()).UserId.Should().Be(customerId);
+    }
+
+    [Fact]
+    public async Task Server_redemption_fails_without_mutation_when_loyalty_module_is_disabled()
+    {
+        AuthenticateAsRole(UserRole.Server);
+        var customerId = Guid.Parse(RestaurantSystem.IntegrationTests.Common.TestAuthHandler.UserId);
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            context.FidelityPointBalances.Add(new FidelityPointBalance
+            {
+                UserId = customerId,
+                CurrentPoints = 100,
+                TotalEarnedPoints = 100,
+                LastUpdated = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = nameof(ServerTakeawayOrderTests)
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var response = await PostAsJsonAsync(
+            "/api/staff/orders", TakeawayBody(Guid.NewGuid(), false, customerId, pointsToRedeem: 100));
+        var body = (await ReadResponseAsync<ApiResponse<OrderDto>>(response))!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        body.ErrorCode.Should().Be(ErrorCodes.ModuleNotEnabled);
+        await using var after = DatabaseFixture.CreateContext();
+        (await after.Orders.CountAsync()).Should().Be(0);
+        (await after.StaffOrderOperations.CountAsync()).Should().Be(0);
+        (await after.FidelityPointsTransactions.CountAsync()).Should().Be(0);
+        (await after.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(100);
+    }
+
+    private object TakeawayBody(
+        Guid? operationId = null, bool? releaseToKitchen = null,
+        Guid? customerId = null, int? pointsToRedeem = null) => new
+        {
+            clientOperationId = operationId,
+            releaseToKitchen,
+            customerUserId = customerId,
+            pointsToRedeem,
+            type = nameof(OrderType.Takeaway),
+            paymentState = nameof(StaffOrderPaymentState.Unpaid),
+            items = new[] { new { productId = _productId, quantity = 1 } }
+        };
 
     protected override async Task SeedTestData()
     {
