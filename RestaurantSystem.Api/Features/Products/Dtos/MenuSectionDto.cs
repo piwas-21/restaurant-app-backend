@@ -5,7 +5,7 @@ namespace RestaurantSystem.Api.Features.Products.Dtos;
 public record MenuSectionDto
 {
     public Guid? Id { get; init; }
-    public string Name { get; init; } = null!;
+    public required string Name { get; init; }
     public string? Description { get; init; }
     public int DisplayOrder { get; init; }
 

@@ -76,6 +76,28 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
         await act.Should().NotThrowAsync();
     }
 
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task BundleOption_StaleUnavailableChoice_IsRefusedWithoutAChannel(
+        bool isActive,
+        bool isAvailable)
+    {
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Products
+                .Where(product => product.Id == BlockedOptionId)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(product => product.IsActive, isActive)
+                    .SetProperty(product => product.IsAvailable, isAvailable));
+        }
+
+        var act = () => BuildMenuAsync(null, BlockedOptionId);
+
+        await act.Should().ThrowAsync<BadRequestException>();
+    }
+
     [Fact]
     public async Task SideItem_BlockedOnTheBasketsChannel_IsRefused()
     {

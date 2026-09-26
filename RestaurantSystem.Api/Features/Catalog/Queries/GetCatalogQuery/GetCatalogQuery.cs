@@ -43,6 +43,13 @@ public sealed class GetCatalogQueryHandler(
             .Include(p => p.Variations.Where(v => !v.IsDeleted && v.IsActive).OrderBy(v => v.DisplayOrder))
                 .ThenInclude(v => v.Descriptions)
             .Include(p => p.MenuDefinition)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.Product.ProductCategories)
+                        .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.ProductVariation)
             // Keep inactive anchors when they own linked menu offers so the builder can render a
             // single, disabled family card with the still-usable alternatives. Inactive
             // standalone products and inactive child menus remain excluded by the builder.

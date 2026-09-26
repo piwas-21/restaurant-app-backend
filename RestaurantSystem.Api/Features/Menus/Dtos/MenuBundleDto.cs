@@ -52,12 +52,9 @@ public class MenuBundleDto
     /// the same resolver, that <c>ProductSummaryDto</c> carries (ORDER-TYPE-AVAILABILITY-PLAN §9.2).
     /// </summary>
     /// <remarks>
-    /// Judges the BUNDLE's own mask (its override, else its primary category's), not its options'.
-    /// A bundle whose optional side is takeaway-only is still orderable on dine-in — the guest picks
-    /// a different side — so intersecting the children here would block sellable combos. Making a
-    /// bundle unorderable when a REQUIRED section has no option on the channel is the genuinely
-    /// correct child-derived rule and is deferred (plan §8, "bundle ↔ child intersection"); until it
-    /// lands, <c>BasketChannelGuard</c> refuses the blocked component at add time (§9.3).
+    /// Judges the bundle's own mask and ensures every required section has enough distinct, active,
+    /// channel-orderable options to meet its minimum. Optional sections do not restrict bundle
+    /// availability because the guest can choose a different option or skip them.
     /// </remarks>
     public ItemAvailabilityDto Availability { get; set; } = new();
 
@@ -152,6 +149,7 @@ public class MenuBundleSectionItemDto
     public bool IsDefault { get; set; }
     public List<string>? Ingredients { get; set; }
     public List<string>? Allergens { get; set; }
+    public ItemAvailabilityDto Availability { get; set; } = new();
     public List<MenuBundleIngredientDto>? DetailedIngredients { get; set; }
     public List<MenuBundleSuggestedSideItemDto>? SuggestedSideItems { get; set; }
     public List<ProductCustomizationGroupDto> CustomizationGroups { get; set; } = [];
