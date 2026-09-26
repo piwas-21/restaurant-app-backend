@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Domain.Common.Enums;
 
@@ -16,8 +16,8 @@ public class CreateProductCommandValidator : AbstractValidator<CreateProductComm
             .MaximumLength(500).WithMessage("Description cannot exceed 500 characters");
 
         RuleFor(x => x.BasePrice)
-            .GreaterThan(0).WithMessage("Base price must be greater than 0");
-
+            .Must((command, price) => price > 0 || (command.IsComponent && price == 0))
+            .WithMessage("Base price must be positive unless this is an internal bundle component");
         RuleFor(x => x.PreparationTimeMinutes)
             .GreaterThanOrEqualTo(0).WithMessage("Preparation time cannot be negative");
 

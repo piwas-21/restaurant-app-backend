@@ -210,9 +210,21 @@ public class ProductsControllerTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateProductPrice_ZeroIsAccepted()
+    public async Task UpdateProductPrice_ZeroIsRejectedForSellableProducts()
     {
         var productId = await SeedPricedProductAsync("Free Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, 0m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_ZeroIsAcceptedForInternalComponents()
+    {
+        var productId = await SeedPricedProductAsync("Internal Cola", 10.00m, isComponent: true);
         AuthenticateAsAdmin();
 
         var response = await PatchPriceAsync(productId, 0m);
@@ -288,7 +300,8 @@ public class ProductsControllerTests : IntegrationTestBase
         variation.Content!["en"].Name.Should().BeOneOf("Large", "Large (duplicate language)");
     }
 
-    private async Task<Guid> SeedPricedProductAsync(string name, decimal price, bool isDeleted = false)
+    private async Task<Guid> SeedPricedProductAsync(
+        string name, decimal price, bool isDeleted = false, bool isComponent = false)
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -307,6 +320,7 @@ public class ProductsControllerTests : IntegrationTestBase
             Allergens = new List<string>(),
             DisplayOrder = 50,
             IsDeleted = isDeleted,
+            IsComponent = isComponent,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "test"
         };

@@ -102,13 +102,10 @@ public class BasketToOrderTranslator : IBasketToOrderTranslator
     /// </para>
     /// <para>
     /// THE PRECONDITION on "the order line equals the basket line", which is NOT unconditional:
-    /// <c>OrderItemFactory.ResolvePricing</c> echoes the DTO's <c>UnitPrice</c> only while it is
-    /// <c>&gt; 0</c>. At or below zero it re-prices from <c>product.BasePrice</c> READ AT CHECKOUT, and
-    /// pairs that with a customization derived here against the basket's <c>UnitPrice</c> of 0. So a
-    /// zero-priced product whose price an admin edits while the line sits in a live basket still
-    /// diverges — pre-existing in kind (the old copy diverged there too, by a different amount), and
-    /// left alone deliberately: <c>UnitPrice &lt;= 0</c> means "server, you price it" for a caller that
-    /// hand-builds <c>POST /api/orders</c>, which is a feature of that path rather than a bug.
+    /// <c>OrderItemFactory.ResolvePricing</c> echoes the DTO's <c>UnitPrice</c> for trusted basket
+    /// and staff prices when it is non-negative, including a legitimate zero-priced bundle
+    /// component. Untrusted hand-built <c>POST /api/orders</c> values are still repriced from the
+    /// catalogue. A negative trusted unit price retains the legacy catalogue fallback.
     /// </para>
     /// <para>
     /// The invariant the tests assert — <c>sum(order.Items.ItemTotal) == basket.SubTotal</c> — leans on

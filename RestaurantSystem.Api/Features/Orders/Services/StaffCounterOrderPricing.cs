@@ -47,6 +47,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         }
         var product = products.GetValueOrDefault(source.ProductId.Value)
             ?? throw new NotFoundException($"Product {source.ProductId.Value} not found");
+        BasketComponentGuard.EnsureNotOrderedAlone(product);
         var variation = ResolveVariation(product, source.ProductVariationId);
         return PriceLine(source, product, variation, products);
     }

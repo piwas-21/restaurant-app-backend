@@ -5,10 +5,14 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
+using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using System.Net;
 
 namespace RestaurantSystem.IntegrationTests.Features.Basket;
 
@@ -65,6 +69,52 @@ public class BasketComponentProductTests : IntegrationTestBase
         thrown.Should().BeOfType<BadRequestException>()
             .Which.ErrorCode.Should().Be(ErrorCodes.ComponentNotOrderable);
         (await LineCountAsync()).Should().Be(0, "a refused add must leave no line behind");
+    }
+
+    [Fact]
+    public async Task AnonymousOrderEndpoint_RefusesComponentAsRootProduct()
+    {
+        AuthenticateAsAnonymous();
+
+        var response = await PostAsJsonAsync("/api/orders", new CreateOrderCommand
+        {
+            Type = OrderType.Takeaway,
+            Items =
+            [
+                new CreateOrderItemDto
+                {
+                    ProductId = MeatIds[0],
+                    Quantity = 1,
+                    UnitPrice = 99m
+                }
+            ]
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);
+        result!.ErrorCode.Should().Be(ErrorCodes.ComponentNotOrderable);
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.Orders.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ParentBundleLookup_ListsBundleAndExactOptionReference()
+    {
+        AuthenticateAsAdmin();
+
+        var response = await Client.GetAsync($"/api/Products/{MeatIds[0]}/parent-bundles");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await ReadResponseAsync<ApiResponse<ProductParentBundlesDto>>(response);
+        result!.Success.Should().BeTrue();
+        result.Data!.Items.Should().ContainSingle();
+        var parent = result.Data.Items.Single();
+        parent.Id.Should().Be(TacosId);
+        parent.Name.Should().Be("Tacos Double Viandes");
+        parent.IsActive.Should().BeTrue();
+        parent.References.Should().ContainSingle(reference =>
+            reference.SectionId == SectionId && reference.ProductVariationId == null);
     }
 
     /// <summary>
