@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Validation;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using System.Text.Json;
@@ -57,16 +58,31 @@ public interface ILineCustomizationBuilder
         bool preferProvidedQuantities,
         int sauceIncludedFree = 0,
         int? sauceMax = null,
-        ICollection<ProductCustomizationGroup>? explicitGroups = null);
+        ICollection<ProductCustomizationGroup>? explicitGroups = null,
+        int sauceMin = 0);
+
+    /// <summary>Checks minimum sauces for a line after deserializing its legacy quantity map.</summary>
+    void EnsureAtLeastMinimum(BasketItem line);
+
+    /// <summary>Checks an incoming selection against the tenant's minimum-sauce policy.</summary>
+    void EnsureAtLeastMinimum(
+        IEnumerable<ProductIngredient>? detailedIngredients,
+        IReadOnlyCollection<Guid>? selectedIngredientIds,
+        IReadOnlyDictionary<Guid, int>? ingredientQuantities,
+        int sauceMin);
 }
 
 public class LineCustomizationBuilder : ILineCustomizationBuilder
 {
     private readonly IBasketPricingService _basketPricingService;
+    private readonly ITenantFeatures? _tenantFeatures;
 
-    public LineCustomizationBuilder(IBasketPricingService basketPricingService)
+    public LineCustomizationBuilder(
+        IBasketPricingService basketPricingService,
+        ITenantFeatures? tenantFeatures = null)
     {
         _basketPricingService = basketPricingService;
+        _tenantFeatures = tenantFeatures;
     }
 
     public LineCustomization Build(
@@ -76,9 +92,11 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         bool preferProvidedQuantities,
         int sauceIncludedFree = 0,
         int? sauceMax = null,
-        ICollection<ProductCustomizationGroup>? explicitGroups = null)
+        ICollection<ProductCustomizationGroup>? explicitGroups = null,
+        int sauceMin = 0)
     {
         SauceSelectionRule.EnsureWithinMaximum(detailedIngredients, selectedIngredients, sauceMax);
+        EnsureAtLeastMinimum(detailedIngredients, selectedIngredients, ingredientQuantities, sauceMin);
 
         // A payload carrying neither a selection nor a quantity map expressed no ingredient choice
         // at all, so there is nothing to record and nothing to price (#303). `useReorder` posts
@@ -109,6 +127,23 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
             IngredientQuantities = resolvedQuantities,
         };
     }
+
+    public void EnsureAtLeastMinimum(BasketItem line) =>
+        SauceSelectionRule.EnsureAtLeastMinimum(
+            line,
+            _tenantFeatures?.EnforceSauceMinimum == true);
+
+    public void EnsureAtLeastMinimum(
+        IEnumerable<ProductIngredient>? detailedIngredients,
+        IReadOnlyCollection<Guid>? selectedIngredientIds,
+        IReadOnlyDictionary<Guid, int>? ingredientQuantities,
+        int sauceMin) =>
+        SauceSelectionRule.EnsureAtLeastMinimum(
+            detailedIngredients,
+            selectedIngredientIds,
+            ingredientQuantities,
+            sauceMin,
+            _tenantFeatures?.EnforceSauceMinimum == true);
 
     /// <summary>
     /// The precedence rule itself, returning the MAP. Serialization moved to the single call site

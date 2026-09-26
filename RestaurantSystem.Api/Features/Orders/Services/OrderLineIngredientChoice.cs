@@ -65,6 +65,11 @@ internal sealed record OrderLineIngredientChoice(Dictionary<Guid, int>? Quantiti
         // legacy branch that would leave the declared price standing.
         if (itemDto.SelectedIngredientIds is null)
         {
+            builder.EnsureAtLeastMinimum(
+                product.DetailedIngredients,
+                selectedIngredientIds: null,
+                itemDto.IngredientQuantities,
+                product.SauceMin);
             return new OrderLineIngredientChoice(itemDto.IngredientQuantities, Price: null);
         }
 
@@ -86,7 +91,8 @@ internal sealed record OrderLineIngredientChoice(Dictionary<Guid, int>? Quantiti
             preferProvidedQuantities: false,
             sauceIncludedFree: product.SauceIncludedFree,
             sauceMax: product.SauceMax,
-            explicitGroups: product.CustomizationGroups);
+            explicitGroups: product.CustomizationGroups,
+            sauceMin: product.SauceMin);
 
         var serverCanPrice =
             isRootLine

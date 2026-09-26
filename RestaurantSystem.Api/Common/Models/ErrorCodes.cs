@@ -106,6 +106,12 @@ public static class ErrorCodes
     public const string SauceMaximumExceeded = "SauceMaximumExceeded";
 
     /// <summary>
+    /// Returned with a 400 when a tenant has enabled minimum-sauce validation and a line omits
+    /// enough distinct active sauce rows to meet its product's configured minimum.
+    /// </summary>
+    public const string SauceMinimumNotMet = "SauceMinimumNotMet";
+
+    /// <summary>
     /// Returned with a 400 when an add-to-basket names a product that hides its base row
     /// (<c>Product.HideBaseProduct</c>) but chooses no variation. The client hides that option, so
     /// reaching this means a stale tab, the waiter/POS de-select, or a crafted payload; the code is

@@ -55,7 +55,7 @@ public partial class BasketItemFactory : IBasketItemFactory
             product.DetailedIngredients, selectedIngredients,
             ingredientQuantities, preferProvidedQuantities: true,
             sauceIncludedFree: product.SauceIncludedFree, sauceMax: product.SauceMax,
-            explicitGroups: product.CustomizationGroups);
+            explicitGroups: product.CustomizationGroups, sauceMin: product.SauceMin);
         decimal customizationPrice = customization.CustomizationPrice;
         customizationPrice += explicitSelection.ProductOptions.Sum(option => option.AdditionalPrice);
 

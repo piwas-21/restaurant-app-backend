@@ -44,6 +44,44 @@ public class SauceSelectionRuleTests
         action.Should().NotThrow();
     }
 
+    [Fact]
+    public void MinimumEnforcementDisabled_PreservesLegacyNoSelectionBehavior()
+    {
+        var sauces = Rows(2, 0);
+
+        var action = () => SauceSelectionRule.EnsureAtLeastMinimum(
+            sauces, selectedIngredientIds: null, ingredientQuantities: null, sauceMin: 2,
+            enforcementEnabled: false);
+
+        action.Should().NotThrow();
+    }
+
+    [Fact]
+    public void MinimumEnforcementEnabled_RequiresDistinctActiveSauceRows()
+    {
+        var sauces = Rows(2, 0);
+
+        var exception = Assert.Throws<RestaurantSystem.Api.Common.Exceptions.BadRequestException>(() =>
+            SauceSelectionRule.EnsureAtLeastMinimum(
+                sauces, [sauces[0].Id, sauces[0].Id], ingredientQuantities: null, sauceMin: 2,
+                enforcementEnabled: true));
+
+        exception.ErrorCode.Should().Be(ErrorCodes.SauceMinimumNotMet);
+        exception.Message.Should().Be(SauceSelectionRule.MinimumNotMetMessage);
+    }
+
+    [Fact]
+    public void LegacyQuantityMap_CanSatisfyMinimumWhenSelectionListIsAbsent()
+    {
+        var sauces = Rows(2, 0);
+        var quantities = new Dictionary<Guid, int> { [sauces[0].Id] = 1, [sauces[1].Id] = 2 };
+
+        var action = () => SauceSelectionRule.EnsureAtLeastMinimum(
+            sauces, selectedIngredientIds: null, quantities, sauceMin: 2, enforcementEnabled: true);
+
+        action.Should().NotThrow();
+    }
+
     private static List<ProductIngredient> Rows(int sauces, int ingredients) =>
         Enumerable.Range(0, sauces + ingredients).Select(index => new ProductIngredient
         {

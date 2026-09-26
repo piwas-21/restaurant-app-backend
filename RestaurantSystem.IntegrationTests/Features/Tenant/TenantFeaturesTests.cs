@@ -20,6 +20,7 @@ public class TenantFeaturesTests
         var features = Create(new TenantFeatureSettings());
 
         features.ServerWorkspaceV2.Should().BeFalse();
+        features.EnforceSauceMinimum.Should().BeFalse();
     }
 
     [Fact]
@@ -31,6 +32,14 @@ public class TenantFeaturesTests
     }
 
     [Fact]
+    public void Sauce_minimum_enforcement_can_be_enabled_per_tenant()
+    {
+        var features = Create(new TenantFeatureSettings { EnforceSauceMinimum = true });
+
+        features.EnforceSauceMinimum.Should().BeTrue();
+    }
+
+    [Fact]
     public void Configuration_binding_rejects_an_invalid_boolean()
     {
         var services = new ServiceCollection();
@@ -39,6 +48,7 @@ public class TenantFeaturesTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     [$"{TenantFeatureSettings.SectionName}:ServerWorkspaceV2"] = "maybe",
+                    [$"{TenantFeatureSettings.SectionName}:EnforceSauceMinimum"] = "maybe",
                 })
                 .Build()
                 .GetSection(TenantFeatureSettings.SectionName))
@@ -59,6 +69,7 @@ public class TenantFeaturesTests
         var controller = new TenantFeaturesController(Create(new TenantFeatureSettings
         {
             ServerWorkspaceV2 = enabled,
+            EnforceSauceMinimum = enabled,
         }))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
@@ -69,6 +80,7 @@ public class TenantFeaturesTests
 
         body.Success.Should().BeTrue();
         body.Data!.ServerWorkspaceV2.Should().Be(enabled);
+        body.Data.EnforceSauceMinimum.Should().Be(enabled);
         controller.Response.Headers.CacheControl.ToString().Should().Be("no-store");
     }
 

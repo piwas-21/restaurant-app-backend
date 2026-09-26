@@ -35,6 +35,7 @@ public class BasketService : IBasketService
     private readonly IBasketItemFactory _basketItemFactory;
     private readonly IBasketRepository _basketRepository;
     private readonly IAnonymousBasketMerger _anonymousBasketMerger;
+    private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
     private readonly ILogger<BasketService> _logger;
 
     public BasketService(
@@ -44,6 +45,7 @@ public class BasketService : IBasketService
        IBasketItemFactory basketItemFactory,
        IBasketRepository basketRepository,
        IAnonymousBasketMerger anonymousBasketMerger,
+       ILineCustomizationBuilder lineCustomizationBuilder,
         ILogger<BasketService> logger)
     {
         _context = context;
@@ -52,6 +54,7 @@ public class BasketService : IBasketService
         _basketItemFactory = basketItemFactory;
         _basketRepository = basketRepository;
         _anonymousBasketMerger = anonymousBasketMerger;
+        _lineCustomizationBuilder = lineCustomizationBuilder;
         _logger = logger;
     }
 
@@ -260,6 +263,7 @@ public class BasketService : IBasketService
         // before SauceMax was server-enforced. Validate the root and each bundle child rather than
         // letting a legacy/crafted row become newly active through a later basket mutation.
         SauceSelectionRule.EnsureWithinMaximum(basketItem);
+        _lineCustomizationBuilder.EnsureAtLeastMinimum(basketItem);
         if (basketItem.Product != null)
         {
             ExplicitCustomizationSelection.EnsurePersisted(
@@ -268,6 +272,7 @@ public class BasketService : IBasketService
         foreach (var child in basketItem.ChildBasketItems)
         {
             SauceSelectionRule.EnsureWithinMaximum(child);
+            _lineCustomizationBuilder.EnsureAtLeastMinimum(child);
             if (child.Product != null)
             {
                 ExplicitCustomizationSelection.EnsurePersisted(child.Product, child, []);

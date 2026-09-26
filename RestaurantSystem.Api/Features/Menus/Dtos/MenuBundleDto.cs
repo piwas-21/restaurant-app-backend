@@ -174,7 +174,8 @@ public class MenuBundleSectionItemDto
     /// </para>
     /// <para>
     /// The read contract lets a guest sheet draw the rule. Server-side selection writers enforce
-    /// <c>SauceMax</c>; <c>SauceMin</c> remains a UI prompt.
+    /// <c>SauceMax</c>; <c>SauceMin</c> enforcement is controlled by the tenant compatibility switch,
+    /// which defaults off until guest, staff and mobile payloads have been verified.
     /// </para>
     /// </remarks>
     public int SauceMin { get; set; }

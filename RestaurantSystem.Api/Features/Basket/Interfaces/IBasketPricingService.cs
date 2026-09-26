@@ -37,7 +37,8 @@ public interface IBasketPricingService
     /// </para>
     /// <para>
     /// <b>This pricing method enforces no minimum or maximum.</b> Selection writers enforce
-    /// <c>SauceMax</c> through <c>SauceSelectionRule</c>; <c>SauceMin</c> remains a UI prompt.
+    /// <c>SauceMax</c> through <c>SauceSelectionRule</c>; <c>SauceMin</c> is enforced only when the
+    /// tenant's compatibility switch is enabled (off by default).
     /// Keeping that check outside this pure money calculation avoids a second selection authority.
     /// </para>
     /// </param>
