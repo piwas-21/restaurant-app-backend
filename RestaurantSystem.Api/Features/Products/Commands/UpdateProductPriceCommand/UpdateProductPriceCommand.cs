@@ -40,6 +40,11 @@ public class UpdateProductPriceCommandHandler
             .FirstOrDefaultAsync(p => p.Id == command.Id, cancellationToken)
             ?? throw new NotFoundException("Product", command.Id);
 
+        if (command.Price < 0m)
+        {
+            throw new BadRequestException("Price must be non-negative");
+        }
+
         if (command.Price == 0m)
         {
             if (!product.IsComponent)

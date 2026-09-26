@@ -95,6 +95,7 @@ public static class MenuSectionWriter
         }
 
         menuDefinition.AuthoringVersion++;
+        menuDefinition.VersionedSectionEditingStarted = true;
         menuDefinition.UpdatedAt = now;
         menuDefinition.UpdatedBy = auditIdentifier;
     }

@@ -57,10 +57,15 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
         try
         {
             var product = await _context.Products
+                .AsSplitQuery()
                 .Include(p => p.ProductCategories)
                 .Include(p => p.Descriptions)
                 .Include(p => p.MenuDefinition)
                     .ThenInclude(md => md!.Sections)
+                        .ThenInclude(section => section.Items)
+                .Include(p => p.MenuDefinition)
+                    .ThenInclude(md => md!.Sections)
+                        .ThenInclude(section => section.Translations)
                 .FirstOrDefaultAsync(p => p.Id == command.Id, cancellationToken);
 
             if (product == null)
@@ -97,6 +102,16 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                     return ApiResponse<ProductDto>.Failure("One or more categories not found");
                 }
             }
+
+            // Check a versioned menu's full-replacement snapshot against the persisted sections
+            // before Upsert mutates its schedule fields. A stale legacy PUT may still update
+            // unrelated bundle fields only when it echoes the current section snapshot.
+            var sections = command.MenuDefinition.Sections
+                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
+            var replaceSections = product.MenuDefinition is null
+                || MenuSectionReplacementGuard.ShouldReplaceSections(product.MenuDefinition, sections);
+
+            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 
             // Update product properties
             product.Name = command.Name;
@@ -225,7 +240,9 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 command.MenuDefinition,
                 _currentUserService.GetAuditIdentifier());
 
-            // Update Sections — a full replace, like every other field on this PUT.
+            // Update Sections — a full replace for legacy menus that have not opted into
+            // versioned editing. The pre-Upsert guard above allows a versioned menu's unchanged
+            // snapshot to accompany unrelated field edits without recreating stable section IDs.
             //
             // The null-check on Sections that used to wrap this block was DEAD (#191):
             // MenuDefinitionDto.Sections carried an initializer, so an omitted key
@@ -238,12 +255,10 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             // makes null unreachable here — but the throw is what keeps it unreachable SAFELY. A
             // `?? []` would silently restore the exact wipe this fixes, and a `!` would trade a
             // 400 for a 500.
-            var sections = command.MenuDefinition.Sections
-                ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
-
-            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
-
-            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
+            if (replaceSections)
+            {
+                MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
+            }
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

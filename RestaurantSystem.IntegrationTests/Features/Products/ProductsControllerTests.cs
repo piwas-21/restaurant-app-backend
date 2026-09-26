@@ -1,8 +1,12 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Api.Features.Products.Commands.UpdateProductPriceCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -182,6 +186,28 @@ public class ProductsControllerTests : IntegrationTestBase
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await GetPersistedBasePriceAsync(productId)).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPriceHandler_RejectsNegativePriceWithoutValidationPipeline()
+    {
+        var productId = await SeedPricedProductAsync("Handler Guard Cola", 10.00m);
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var handler = new UpdateProductPriceCommandHandler(
+            context,
+            scope.ServiceProvider.GetRequiredService<ICurrentUserService>(),
+            scope.ServiceProvider.GetRequiredService<ILogger<UpdateProductPriceCommandHandler>>());
+
+        var action = () => handler.Handle(
+            new UpdateProductPriceCommand(productId, -1m), CancellationToken.None);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Price must be non-negative");
+        (await context.Products.AsNoTracking()
+            .Where(product => product.Id == productId)
+            .Select(product => product.BasePrice)
+            .SingleAsync()).Should().Be(10m);
     }
 
     [Fact]

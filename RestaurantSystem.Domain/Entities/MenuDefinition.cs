@@ -10,6 +10,12 @@ public class MenuDefinition : Entity
     public int AuthoringVersion { get; set; } = 1;
 
     /// <summary>
+    /// Whether stable-ID section editing has been used for this definition. Legacy full-replacement
+    /// writers may update other fields only while their submitted section snapshot is unchanged.
+    /// </summary>
+    public bool VersionedSectionEditingStarted { get; set; }
+
+    /// <summary>
     /// Optional commercial offer that this menu upgrades. The menu remains an independent Product
     /// operationally; this relation only controls catalogue presentation and authoring.
     /// </summary>
