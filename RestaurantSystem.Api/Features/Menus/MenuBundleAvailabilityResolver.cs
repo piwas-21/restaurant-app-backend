@@ -13,6 +13,17 @@ public static class MenuBundleAvailabilityResolver
 {
     public static ItemAvailabilityDto Resolve(Product product, OrderType? requestedOrderType)
     {
+        if (product.IsDeleted || !product.IsActive)
+        {
+            return new ItemAvailabilityDto
+            {
+                CanOrder = false,
+                Reason = AvailabilityReason.Unavailable,
+                AllowedOrderTypes = [],
+                InheritsOrderTypes = product.AvailableOrderTypes is null
+            };
+        }
+
         var ownAvailability = OrderTypeAvailability.Resolve(product, requestedOrderType);
         var allowedOrderTypes = Enum.GetValues<OrderType>()
             .Where(orderType => IsBundleOrderable(product, orderType))
