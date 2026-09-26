@@ -163,9 +163,9 @@ public sealed class MenuSectionLocalizationAndQuoteTests : IntegrationTestBase
         using (var scope = Factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            (await context.Baskets.IgnoreQueryFilters().CountAsync()).Should().Be(0);
-            (await context.BasketItems.IgnoreQueryFilters().CountAsync()).Should().Be(0);
-            (await context.Orders.IgnoreQueryFilters().CountAsync()).Should().Be(0);
+            (await context.Baskets.CountAsync()).Should().Be(0);
+            (await context.BasketItems.CountAsync()).Should().Be(0);
+            (await context.Orders.CountAsync()).Should().Be(0);
         }
 
         var sessionId = Guid.NewGuid().ToString();
