@@ -113,6 +113,14 @@ public sealed class SauceMinimumEnforcementTests : IntegrationTestBase
         });
         twoLegacySauces.StatusCode.Should().Be(HttpStatusCode.OK);
 
+        var anonymousQuote = await PostAsJsonAsync($"/api/Products/{ProductId}/quote", new ProductQuoteRequestDto
+        {
+            Quantity = 1,
+            SelectedIngredients = [SauceOneId, SauceTwoId]
+        });
+        anonymousQuote.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        AuthenticateAsAdmin();
         var quote = await PostAsJsonAsync($"/api/Products/{ProductId}/quote", new ProductQuoteRequestDto
         {
             Quantity = 1,

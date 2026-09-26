@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
@@ -17,7 +16,7 @@ public sealed class ProductQuoteController(CustomMediator mediator) : Controller
 {
     [HttpPost("{id:guid}/quote")]
     [ApiScope(ApiTokenScopes.MenuRead)]
-    [AllowAnonymous]
+    [RequireAdmin]
     public async Task<ActionResult<ApiResponse<ProductQuoteDto>>> Quote(
         Guid id,
         [FromBody] ProductQuoteRequestDto request,

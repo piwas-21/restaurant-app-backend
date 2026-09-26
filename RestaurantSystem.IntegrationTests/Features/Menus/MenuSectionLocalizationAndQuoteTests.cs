@@ -132,7 +132,7 @@ public sealed class MenuSectionLocalizationAndQuoteTests : IntegrationTestBase
     [Fact]
     public async Task BundleQuoteMatchesBasketFactoryAndDoesNotCreateBasketOrOrderRows()
     {
-        AuthenticateAsAnonymous();
+        AuthenticateAsAdmin();
         var request = new ProductQuoteRequestDto
         {
             Quantity = 2,
@@ -155,6 +155,10 @@ public sealed class MenuSectionLocalizationAndQuoteTests : IntegrationTestBase
         var quote = await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse);
         quote!.Data!.UnitPrice.Should().Be(15m);
         quote.Data.TotalPrice.Should().Be(30m);
+
+        AuthenticateAsAnonymous();
+        var anonymousQuote = await PostAsJsonAsync($"/api/Products/{BundleId}/quote", request);
+        anonymousQuote.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         using (var scope = Factory.Services.CreateScope())
         {
