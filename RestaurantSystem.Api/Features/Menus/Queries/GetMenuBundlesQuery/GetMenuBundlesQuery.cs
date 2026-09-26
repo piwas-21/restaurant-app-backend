@@ -18,7 +18,8 @@ public record GetMenuBundlesQuery(
     int PageSize,
     Guid? CategoryId = null,
     bool IncludeUnavailable = false,
-    OrderType? RequestedOrderType = null) : IQuery<ApiResponse<PagedResult<MenuBundleDto>>>;
+    OrderType? RequestedOrderType = null,
+    string? Locale = null) : IQuery<ApiResponse<PagedResult<MenuBundleDto>>>;
 
 public class GetMenuBundlesQueryHandler(
     ApplicationDbContext context,
@@ -45,6 +46,8 @@ public class GetMenuBundlesQueryHandler(
                     .ThenInclude(s => s.Items)
                         .ThenInclude(item => item.Product.ProductCategories)
                             .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Translations)
             .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.ProductVariation)
@@ -99,7 +102,7 @@ public class GetMenuBundlesQueryHandler(
             .ToListAsync(cancellationToken);
 
         var dtos = products
-            .Select(p => MenuBundleMapper.MapToMenuBundleDto(p, _baseUrl, query.RequestedOrderType))
+            .Select(p => MenuBundleMapper.MapToMenuBundleDto(p, _baseUrl, query.RequestedOrderType, query.Locale))
             .ToList();
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);

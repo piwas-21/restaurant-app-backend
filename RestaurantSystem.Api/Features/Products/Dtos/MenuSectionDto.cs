@@ -13,6 +13,23 @@ public record MenuSectionDto
     public int MinSelection { get; init; }
     public int MaxSelection { get; init; }
 
+    private Dictionary<string, MenuSectionTranslationDto>? _translations = new();
+
+    /// <summary>Whether the localized label map appeared in the request.</summary>
+    [JsonIgnore]
+    public bool TranslationsSpecified { get; private set; }
+
+    /// <summary>Localized section labels and descriptions, keyed by language tag.</summary>
+    public Dictionary<string, MenuSectionTranslationDto>? Translations
+    {
+        get => _translations;
+        init
+        {
+            _translations = value;
+            TranslationsSpecified = true;
+        }
+    }
+
     private List<MenuSectionItemDto>? _items = new();
 
     /// <summary>
@@ -32,4 +49,10 @@ public record MenuSectionDto
             ItemsSpecified = true;
         }
     }
+}
+
+public sealed record MenuSectionTranslationDto
+{
+    public required string Name { get; init; }
+    public string? Description { get; init; }
 }

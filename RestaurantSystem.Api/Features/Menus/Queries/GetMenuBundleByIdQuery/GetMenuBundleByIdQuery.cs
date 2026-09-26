@@ -12,7 +12,7 @@ namespace RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundleByIdQuery;
 /// The channel the guest is ordering through, or <c>null</c> when they have not chosen one. Drives
 /// <see cref="MenuBundleDto.Availability"/> exactly as it does on the list query.
 /// </param>
-public record GetMenuBundleByIdQuery(Guid Id, OrderType? RequestedOrderType = null)
+public record GetMenuBundleByIdQuery(Guid Id, OrderType? RequestedOrderType = null, string? Locale = null)
     : IQuery<ApiResponse<MenuBundleDto>>;
 
 public class GetMenuBundleByIdQueryHandler(
@@ -40,6 +40,8 @@ public class GetMenuBundleByIdQueryHandler(
                     .ThenInclude(s => s.Items)
                         .ThenInclude(item => item.Product.ProductCategories)
                             .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Translations)
             .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.ProductVariation)
@@ -96,7 +98,7 @@ public class GetMenuBundleByIdQueryHandler(
             return ApiResponse<MenuBundleDto>.Failure("Product is not a menu bundle");
         }
 
-        var dto = MenuBundleMapper.MapToMenuBundleDto(product, _baseUrl, query.RequestedOrderType);
+        var dto = MenuBundleMapper.MapToMenuBundleDto(product, _baseUrl, query.RequestedOrderType, query.Locale);
         return ApiResponse<MenuBundleDto>.SuccessWithData(dto);
     }
 }

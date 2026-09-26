@@ -77,6 +77,11 @@ public static class MenuSectionWriter
             section.UpdatedAt = now;
             section.UpdatedBy = auditIdentifier;
 
+            if (sectionDto.TranslationsSpecified)
+            {
+                ReplaceTranslations(context, section, sectionDto.Translations ?? [], auditIdentifier, now);
+            }
+
             if (sectionDto.ItemsSpecified)
             {
                 ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
@@ -154,6 +159,7 @@ public static class MenuSectionWriter
                 IsRequired = sectionDto.IsRequired,
                 MinSelection = sectionDto.MinSelection,
                 MaxSelection = sectionDto.MaxSelection,
+                Translations = BuildTranslations(sectionDto.Translations ?? [], auditIdentifier, now),
                 CreatedAt = now,
                 CreatedBy = auditIdentifier
             };
@@ -186,6 +192,80 @@ public static class MenuSectionWriter
                 });
             }
         }
+    }
+
+    private static void ReplaceTranslations(
+        ApplicationDbContext context,
+        MenuSection section,
+        IReadOnlyDictionary<string, MenuSectionTranslationDto> translations,
+        string auditIdentifier,
+        DateTime now)
+    {
+        var normalized = NormalizeTranslations(translations);
+        context.MenuSectionTranslations.RemoveRange(section.Translations);
+        section.Translations.Clear();
+
+        foreach (var (languageCode, translation) in normalized)
+        {
+            var entity = new MenuSectionTranslation
+            {
+                MenuSection = section,
+                LanguageCode = languageCode,
+                Name = translation.Name.Trim(),
+                Description = string.IsNullOrWhiteSpace(translation.Description)
+                    ? null
+                    : translation.Description.Trim(),
+                CreatedAt = now,
+                CreatedBy = auditIdentifier
+            };
+            section.Translations.Add(entity);
+            context.MenuSectionTranslations.Add(entity);
+        }
+    }
+
+    private static List<MenuSectionTranslation> BuildTranslations(
+        IReadOnlyDictionary<string, MenuSectionTranslationDto> translations,
+        string auditIdentifier,
+        DateTime now) => NormalizeTranslations(translations)
+        .Select(pair => new MenuSectionTranslation
+        {
+            LanguageCode = pair.Key,
+            Name = pair.Value.Name.Trim(),
+            Description = string.IsNullOrWhiteSpace(pair.Value.Description) ? null : pair.Value.Description.Trim(),
+            CreatedAt = now,
+            CreatedBy = auditIdentifier
+        })
+        .ToList();
+
+    private static Dictionary<string, MenuSectionTranslationDto> NormalizeTranslations(
+        IReadOnlyDictionary<string, MenuSectionTranslationDto> translations)
+    {
+        var result = new Dictionary<string, MenuSectionTranslationDto>(StringComparer.Ordinal);
+        foreach (var (rawLanguageCode, translation) in translations)
+        {
+            var languageCode = rawLanguageCode.Trim().ToLowerInvariant();
+            if (!MenuSectionLocale.IsValidTag(languageCode))
+            {
+                throw new BadRequestException($"Invalid menu section language tag '{rawLanguageCode}'");
+            }
+
+            if (translation is null || string.IsNullOrWhiteSpace(translation.Name) || translation.Name.Length > 100)
+            {
+                throw new BadRequestException($"A translated section name of at most 100 characters is required for '{rawLanguageCode}'");
+            }
+
+            if (translation.Description?.Length > 500)
+            {
+                throw new BadRequestException($"The translated section description for '{rawLanguageCode}' cannot exceed 500 characters");
+            }
+
+            if (!result.TryAdd(languageCode, translation))
+            {
+                throw new BadRequestException($"Duplicate menu section language tag '{rawLanguageCode}'");
+            }
+        }
+
+        return result;
     }
 
     private static void ApplyItems(

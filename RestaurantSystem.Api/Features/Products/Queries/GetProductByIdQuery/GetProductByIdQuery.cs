@@ -14,7 +14,7 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 
 // RequestedOrderType resolves the item's `Availability` for the guest's channel; null (no type
 // chosen yet) reports it as orderable and still fills AllowedOrderTypes for the chip.
-public record GetProductByIdQuery(Guid Id, OrderType? RequestedOrderType = null) : IQuery<ApiResponse<ProductDto>>;
+public record GetProductByIdQuery(Guid Id, OrderType? RequestedOrderType = null, string? Locale = null) : IQuery<ApiResponse<ProductDto>>;
 
 public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, ApiResponse<ProductDto>>
 {
@@ -74,6 +74,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ThenInclude(section => section.Items)
                     .ThenInclude(item => item.Product.ProductCategories)
                         .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Translations)
             .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(section => section.Items)
                     .ThenInclude(item => item.ProductVariation)
@@ -233,7 +235,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             // customize, and the mobile client reading this contract got the same. The two reads now
             // cannot drift, because there is only one of them.
             MenuDefinition = product.MenuDefinition != null
-                ? MenuBundleMapper.MapDefinition(product.MenuDefinition, query.RequestedOrderType)
+                ? MenuBundleMapper.MapDefinition(product.MenuDefinition, query.RequestedOrderType, query.Locale)
                 : null,
             Content = new()
         };

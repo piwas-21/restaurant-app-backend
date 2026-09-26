@@ -39,6 +39,8 @@ public sealed class UpdateMenuSectionsCommandHandler(
         var definition = await _context.MenuDefinitions
             .Include(menu => menu.Product)
             .Include(menu => menu.Sections)
+                .ThenInclude(section => section.Translations)
+            .Include(menu => menu.Sections)
                 .ThenInclude(section => section.Items)
             .FirstOrDefaultAsync(menu => menu.ProductId == command.MenuProductId, cancellationToken);
 
@@ -97,6 +99,7 @@ public sealed class UpdateMenuSectionsCommandHandler(
         IsRequired = section.IsRequired,
         MinSelection = section.MinSelection,
         MaxSelection = section.MaxSelection,
+        Translations = MenuSectionLocale.ToDto(section.Translations),
         Items = section.Items
             .OrderBy(item => item.DisplayOrder)
             .Select(item => new MenuSectionItemDto

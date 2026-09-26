@@ -126,6 +126,9 @@ public class MenuBundleSectionDto
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public string? Description { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public string? DisplayDescription { get; set; }
+    public Dictionary<string, MenuSectionTranslationDto> Translations { get; set; } = new();
     public int DisplayOrder { get; set; }
     public bool IsRequired { get; set; }
     public int MinSelection { get; set; }

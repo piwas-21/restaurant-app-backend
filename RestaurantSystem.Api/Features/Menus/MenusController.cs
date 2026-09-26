@@ -48,7 +48,8 @@ public partial class MenusController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] bool includeUnavailable = false,
-        [FromQuery] OrderType? requestedOrderType = null)
+        [FromQuery] OrderType? requestedOrderType = null,
+        [FromQuery] string? locale = null)
     {
         // Only admins can view unavailable menus
         if (includeUnavailable && !User.IsInRole("Admin"))
@@ -56,7 +57,7 @@ public partial class MenusController : ControllerBase
             return Unauthorized(ApiResponse<PagedResult<MenuBundleDto>>.Failure("Only admins can view unavailable menus"));
         }
 
-        var query = new GetMenuBundlesQuery(page, pageSize, null, includeUnavailable, requestedOrderType);
+        var query = new GetMenuBundlesQuery(page, pageSize, null, includeUnavailable, requestedOrderType, locale);
         var result = await _mediator.SendQuery(query);
         return Ok(result);
     }
@@ -68,9 +69,10 @@ public partial class MenusController : ControllerBase
     [ApiScope(ApiTokenScopes.MenuRead)]
     public async Task<ActionResult<ApiResponse<MenuBundleDto>>> GetMenuBundleById(
         Guid id,
-        [FromQuery] OrderType? requestedOrderType = null)
+        [FromQuery] OrderType? requestedOrderType = null,
+        [FromQuery] string? locale = null)
     {
-        var query = new GetMenuBundleByIdQuery(id, requestedOrderType);
+        var query = new GetMenuBundleByIdQuery(id, requestedOrderType, locale);
         var result = await _mediator.SendQuery(query);
 
         if (!result.Success)

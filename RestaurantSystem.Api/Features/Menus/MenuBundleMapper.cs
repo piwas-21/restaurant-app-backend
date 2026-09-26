@@ -33,7 +33,11 @@ public static class MenuBundleMapper
     /// The channel the guest is ordering through, or <c>null</c> when they have not chosen one (the
     /// dominant browse state) — nothing is reported as blocked in that case.
     /// </param>
-    public static MenuBundleDto MapToMenuBundleDto(Product product, string baseUrl, OrderType? requestedOrderType)
+    public static MenuBundleDto MapToMenuBundleDto(
+        Product product,
+        string baseUrl,
+        OrderType? requestedOrderType,
+        string? locale = null)
     {
         var dto = new MenuBundleDto
         {
@@ -59,7 +63,7 @@ public static class MenuBundleMapper
             // everything" (#477).
             Allergens = product.Allergens,
             MenuDefinition = product.MenuDefinition != null
-                ? MapDefinition(product.MenuDefinition, requestedOrderType)
+                ? MapDefinition(product.MenuDefinition, requestedOrderType, locale)
                 : null,
             Content = new(),
             Images = product.Images.Select(i => new ProductImageDto
@@ -103,7 +107,8 @@ public static class MenuBundleMapper
     /// </remarks>
     public static MenuBundleDefinitionDto MapDefinition(
         MenuDefinition definition,
-        OrderType? requestedOrderType = null)
+        OrderType? requestedOrderType = null,
+        string? locale = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
@@ -125,30 +130,40 @@ public static class MenuBundleMapper
             AvailableSunday = definition.AvailableSunday,
             Sections = definition.Sections
                 .OrderBy(s => s.DisplayOrder)
-                .Select(section => MapSection(section, requestedOrderType))
+                .Select(section => MapSection(section, requestedOrderType, locale))
                 .ToList()
         };
     }
 
-    private static MenuBundleSectionDto MapSection(MenuSection section, OrderType? requestedOrderType) => new()
+    private static MenuBundleSectionDto MapSection(
+        MenuSection section,
+        OrderType? requestedOrderType,
+        string? locale)
     {
-        Id = section.Id,
-        Name = section.Name,
-        Description = section.Description,
-        DisplayOrder = section.DisplayOrder,
-        IsRequired = section.IsRequired,
-        MinSelection = section.MinSelection,
-        MaxSelection = section.MaxSelection,
-        // A section that lists a DELETED product went on offering it to guests, and the basket then
-        // refuses the line. The filter lives HERE and not in the callers' includes because one of
-        // those callers (`GetProductByIdQuery`) runs `IgnoreQueryFilters()`, which un-filters every
-        // include — so the soft-delete rule cannot be left to the global filter on that read.
-        Items = section.Items
+        var display = MenuSectionLocale.Resolve(section, locale);
+        return new MenuBundleSectionDto
+        {
+            Id = section.Id,
+            Name = section.Name,
+            Description = section.Description,
+            DisplayName = display.Name,
+            DisplayDescription = display.Description,
+            Translations = MenuSectionLocale.ToDto(section.Translations),
+            DisplayOrder = section.DisplayOrder,
+            IsRequired = section.IsRequired,
+            MinSelection = section.MinSelection,
+            MaxSelection = section.MaxSelection,
+            // A section that lists a DELETED product went on offering it to guests, and the basket then
+            // refuses the line. The filter lives HERE and not in the callers' includes because one of
+            // those callers (`GetProductByIdQuery`) runs `IgnoreQueryFilters()`, which un-filters every
+            // include — so the soft-delete rule cannot be left to the global filter on that read.
+            Items = section.Items
             .Where(i => i.Product != null && !i.Product.IsDeleted)
             .OrderBy(i => i.DisplayOrder)
             .Select(item => MapSectionItem(item, requestedOrderType))
             .ToList()
-    };
+        };
+    }
 
     private static MenuBundleSectionItemDto MapSectionItem(
         MenuSectionItem item,

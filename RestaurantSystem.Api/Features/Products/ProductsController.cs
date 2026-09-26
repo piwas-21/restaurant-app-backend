@@ -90,9 +90,10 @@ public class ProductsController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<ProductDto>>> GetProduct(
         Guid id,
-        [FromQuery] OrderType? requestedOrderType = null)
+        [FromQuery] OrderType? requestedOrderType = null,
+        [FromQuery] string? locale = null)
     {
-        var query = new GetProductByIdQuery(id, requestedOrderType);
+        var query = new GetProductByIdQuery(id, requestedOrderType, locale);
         var result = await _mediator.SendQuery(query);
         if (result.Data?.MenuDefinition is { } definition)
         {
