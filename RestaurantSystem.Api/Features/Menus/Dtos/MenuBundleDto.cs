@@ -105,6 +105,7 @@ public class MenuBundleContentDto
 public class MenuBundleDefinitionDto
 {
     public Guid Id { get; set; }
+    public int AuthoringVersion { get; set; } = 1;
     public Guid? ParentOfferProductId { get; set; }
     public Guid? ParentOfferVariationId { get; set; }
     public bool IsAlwaysAvailable { get; set; }

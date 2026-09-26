@@ -69,6 +69,7 @@ public sealed class SetMenuOfferParentCommandHandler
 
             menu.MenuDefinition.ParentOfferProductId = command.ParentOfferProductId;
             menu.MenuDefinition.ParentOfferVariationId = command.ParentOfferVariationId;
+            menu.MenuDefinition.AuthoringVersion++;
             menu.MenuDefinition.UpdatedAt = DateTime.UtcNow;
             menu.MenuDefinition.UpdatedBy = _currentUserService.GetAuditIdentifier();
 

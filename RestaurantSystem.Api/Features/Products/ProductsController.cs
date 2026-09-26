@@ -9,6 +9,7 @@ using RestaurantSystem.Api.Features.Products.Commands.DeleteProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductPriceCommand;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductImagesCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UploadProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -93,6 +94,11 @@ public class ProductsController : ControllerBase
     {
         var query = new GetProductByIdQuery(id, requestedOrderType);
         var result = await _mediator.SendQuery(query);
+        if (result.Data?.MenuDefinition is { } definition)
+        {
+            Response.Headers.ETag = MenuAuthoringVersionTag.Format(definition.AuthoringVersion);
+        }
+
         return Ok(result);
     }
 

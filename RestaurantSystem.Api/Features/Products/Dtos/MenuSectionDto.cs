@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 public record MenuSectionDto
@@ -11,5 +13,23 @@ public record MenuSectionDto
     public int MinSelection { get; init; }
     public int MaxSelection { get; init; }
 
-    public List<MenuSectionItemDto> Items { get; init; } = new();
+    private List<MenuSectionItemDto>? _items = new();
+
+    /// <summary>
+    /// Whether the nested option list appeared in the JSON body. The authoring PATCH treats an
+    /// omitted list as unchanged and an explicit [] as removal; legacy full-replacement writes
+    /// continue to treat a missing list as empty.
+    /// </summary>
+    [JsonIgnore]
+    public bool ItemsSpecified { get; private set; }
+
+    public List<MenuSectionItemDto>? Items
+    {
+        get => _items;
+        init
+        {
+            _items = value;
+            ItemsSpecified = true;
+        }
+    }
 }

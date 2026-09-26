@@ -97,6 +97,13 @@ public static class MenuBundleSelectionRules
         IReadOnlyCollection<MenuSection> sections,
         IReadOnlyCollection<SelectedMenuOptionDto> selectedOptions)
     {
+        if (selectedOptions
+            .GroupBy(selection => (selection.SectionId, selection.ItemId))
+            .Any(group => group.Count() > 1))
+        {
+            throw new BadRequestException("A menu option can only be selected once per section");
+        }
+
         foreach (var selection in selectedOptions)
         {
             var section = sections.FirstOrDefault(candidate => candidate.Id == selection.SectionId)

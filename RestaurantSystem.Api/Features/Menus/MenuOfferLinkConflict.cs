@@ -1,4 +1,5 @@
 using Npgsql;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 
 namespace RestaurantSystem.Api.Features.Menus;
@@ -19,8 +20,16 @@ public static class MenuOfferLinkConflict
     public const string ConcurrentMessage =
         "The offer family changed concurrently; reload and retry";
 
+    public const string MenuAuthoringMessage =
+        "The menu changed while you were editing it; reload before saving again";
+
     public static void ThrowIfExpected(Exception exception)
     {
+        if (exception is DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(MenuAuthoringMessage, exception);
+        }
+
         if (IsOfferLinkUniqueViolation(exception))
         {
             throw new BadRequestException(DuplicateMessage);

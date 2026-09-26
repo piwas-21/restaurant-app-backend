@@ -108,6 +108,7 @@ public static class MenuBundleMapper
         return new MenuBundleDefinitionDto
         {
             Id = definition.Id,
+            AuthoringVersion = definition.AuthoringVersion,
             ParentOfferProductId = definition.ParentOfferProductId,
             ParentOfferVariationId = definition.ParentOfferVariationId,
             IsAlwaysAvailable = definition.IsAlwaysAvailable,

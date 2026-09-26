@@ -6,7 +6,6 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Menus.Commands.CreateMenuBundleCommand;
 using RestaurantSystem.Api.Features.Menus.Commands.UpdateMenuBundleCommand;
 using RestaurantSystem.Api.Features.Menus.Commands.DeleteMenuBundleCommand;
-using RestaurantSystem.Api.Features.Menus.Commands.SetMenuOfferParentCommand;
 using RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundleByIdQuery;
 using RestaurantSystem.Api.Features.Menus.Queries.GetMenuBundlesQuery;
 using RestaurantSystem.Api.Features.Menus.Dtos;
@@ -18,7 +17,7 @@ namespace RestaurantSystem.Api.Features.Menus;
 
 [ApiController]
 [Route("api/[controller]")]
-public class MenusController : ControllerBase
+public partial class MenusController : ControllerBase
 {
     private readonly CustomMediator _mediator;
 
@@ -79,6 +78,11 @@ public class MenusController : ControllerBase
             return NotFound(result);
         }
 
+        if (result.Data?.MenuDefinition is { } definition)
+        {
+            Response.Headers.ETag = MenuAuthoringVersionTag.Format(definition.AuthoringVersion);
+        }
+
         return Ok(result);
     }
 
@@ -118,30 +122,4 @@ public class MenusController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Link a menu bundle to one product/variation offer, without rewriting its sections.
-    /// </summary>
-    [HttpPatch("{id}/offer-parent")]
-    [ApiScope(ApiTokenScopes.MenuWrite)]
-    [RequireAdmin]
-    public async Task<ActionResult<ApiResponse<MenuOfferLinkDto>>> SetOfferParent(
-        Guid id,
-        [FromBody] MenuOfferParentRequestDto request)
-    {
-        var command = new SetMenuOfferParentCommand(
-            id, request.ParentOfferProductId, request.ParentOfferVariationId);
-        var result = await _mediator.SendCommand(command);
-        return Ok(result);
-    }
-
-    /// <summary>Clear a menu's offer-family relationship while retaining the menu itself.</summary>
-    [HttpDelete("{id}/offer-parent")]
-    [ApiScope(ApiTokenScopes.MenuWrite)]
-    [RequireAdmin]
-    public async Task<ActionResult<ApiResponse<MenuOfferLinkDto>>> ClearOfferParent(Guid id)
-    {
-        var result = await _mediator.SendCommand(
-            new SetMenuOfferParentCommand(id, ParentOfferProductId: null));
-        return Ok(result);
-    }
 }

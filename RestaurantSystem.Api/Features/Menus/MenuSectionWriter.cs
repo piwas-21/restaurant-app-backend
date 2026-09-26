@@ -1,6 +1,8 @@
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace RestaurantSystem.Api.Features.Menus;
 
@@ -21,6 +23,77 @@ namespace RestaurantSystem.Api.Features.Menus;
 /// </summary>
 public static class MenuSectionWriter
 {
+    /// <summary>
+    /// Applies the editor's ID-preserving collection patch. Existing IDs are accepted only when
+    /// they belong to this definition; absent collection keys are handled by the caller as no-op,
+    /// and explicit empty lists remove the corresponding rows.
+    /// </summary>
+    public static void ApplyPatch(
+        ApplicationDbContext context,
+        MenuDefinition menuDefinition,
+        IReadOnlyCollection<MenuSectionDto> sections,
+        string auditIdentifier)
+    {
+        var existingSections = menuDefinition.Sections.ToDictionary(section => section.Id);
+        var retainedSections = new HashSet<Guid>();
+        var now = DateTime.UtcNow;
+
+        foreach (var sectionDto in sections)
+        {
+            MenuSection section;
+            if (sectionDto.Id is Guid sectionId)
+            {
+                if (!existingSections.TryGetValue(sectionId, out var existingSection))
+                {
+                    throw new BadRequestException($"Section '{sectionId}' does not belong to this menu");
+                }
+
+                section = existingSection;
+
+                if (!retainedSections.Add(sectionId))
+                {
+                    throw new BadRequestException($"Section '{sectionId}' appears more than once");
+                }
+            }
+            else
+            {
+                section = new MenuSection
+                {
+                    Id = Guid.NewGuid(),
+                    MenuDefinition = menuDefinition,
+                    CreatedAt = now,
+                    CreatedBy = auditIdentifier
+                };
+                menuDefinition.Sections.Add(section);
+                context.MenuSections.Add(section);
+            }
+
+            section.Name = sectionDto.Name;
+            section.Description = sectionDto.Description;
+            section.DisplayOrder = sectionDto.DisplayOrder;
+            section.IsRequired = sectionDto.IsRequired;
+            section.MinSelection = sectionDto.MinSelection;
+            section.MaxSelection = sectionDto.MaxSelection;
+            section.UpdatedAt = now;
+            section.UpdatedBy = auditIdentifier;
+
+            if (sectionDto.ItemsSpecified)
+            {
+                ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
+            }
+        }
+
+        foreach (var removed in existingSections.Values.Where(section => !retainedSections.Contains(section.Id)))
+        {
+            context.MenuSections.Remove(removed);
+            menuDefinition.Sections.Remove(removed);
+        }
+
+        menuDefinition.AuthoringVersion++;
+        menuDefinition.UpdatedAt = now;
+        menuDefinition.UpdatedBy = auditIdentifier;
+    }
+
     /// <summary>
     /// Replaces every section of <paramref name="menuDefinition"/> with <paramref name="sections"/>.
     /// A full replace, matching the PUT contract: an empty list clears them all, which is exactly
@@ -55,6 +128,11 @@ public static class MenuSectionWriter
         // sections. Cheaper than a second public overload that could be called where one was needed.
         context.MenuSections.RemoveRange(menuDefinition.Sections);
         AddSections(context, menuDefinition, sections, auditIdentifier);
+
+        if (context.Entry(menuDefinition).State != EntityState.Added)
+        {
+            menuDefinition.AuthoringVersion++;
+        }
     }
 
     private static void AddSections(
@@ -83,7 +161,7 @@ public static class MenuSectionWriter
             context.MenuSections.Add(section);
 
             // NOT a dead guard, despite reading like the `Sections` one #191 removed:
-            // MenuSectionDto.Items keeps its initializer, and STJ writes a literal `"items": null`
+            // The DTO's backing list has an empty default, and STJ writes a literal `"items": null`
             // straight over it (RespectNullableAnnotations is off — the very mechanism that made
             // `sections: null` the one preserving payload before #191). Nothing validates Items, so
             // this is all that stands between such a body and an NRE; removing it is a measured 500,
@@ -107,6 +185,62 @@ public static class MenuSectionWriter
                     CreatedBy = auditIdentifier
                 });
             }
+        }
+    }
+
+    private static void ApplyItems(
+        ApplicationDbContext context,
+        MenuSection section,
+        IReadOnlyCollection<MenuSectionItemDto> items,
+        string auditIdentifier,
+        DateTime now)
+    {
+        var existingItems = section.Items.ToDictionary(item => item.Id);
+        var retainedItems = new HashSet<Guid>();
+
+        foreach (var itemDto in items)
+        {
+            MenuSectionItem item;
+            if (itemDto.Id is Guid itemId)
+            {
+                if (!existingItems.TryGetValue(itemId, out var existingItem))
+                {
+                    throw new BadRequestException($"Option '{itemId}' does not belong to section '{section.Id}'");
+                }
+
+                item = existingItem;
+
+                if (!retainedItems.Add(itemId))
+                {
+                    throw new BadRequestException($"Option '{itemId}' appears more than once");
+                }
+            }
+            else
+            {
+                item = new MenuSectionItem
+                {
+                    Id = Guid.NewGuid(),
+                    MenuSection = section,
+                    CreatedAt = now,
+                    CreatedBy = auditIdentifier
+                };
+                section.Items.Add(item);
+                context.MenuSectionItems.Add(item);
+            }
+
+            item.ProductId = itemDto.ProductId;
+            item.ProductVariationId = itemDto.ProductVariationId;
+            item.AdditionalPrice = itemDto.AdditionalPrice;
+            item.DisplayOrder = itemDto.DisplayOrder;
+            item.IsDefault = itemDto.IsDefault;
+            item.UpdatedAt = now;
+            item.UpdatedBy = auditIdentifier;
+        }
+
+        foreach (var removed in existingItems.Values.Where(item => !retainedItems.Contains(item.Id)))
+        {
+            context.MenuSectionItems.Remove(removed);
+            section.Items.Remove(removed);
         }
     }
 }

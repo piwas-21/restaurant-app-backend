@@ -6,6 +6,9 @@ public class MenuDefinition : Entity
 {
     public Guid ProductId { get; set; }
 
+    /// <summary>Monotonic authoring revision used to reject stale menu edits.</summary>
+    public int AuthoringVersion { get; set; } = 1;
+
     /// <summary>
     /// Optional commercial offer that this menu upgrades. The menu remains an independent Product
     /// operationally; this relation only controls catalogue presentation and authoring.
