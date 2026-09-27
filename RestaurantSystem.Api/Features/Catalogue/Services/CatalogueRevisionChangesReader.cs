@@ -85,40 +85,48 @@ internal sealed class CatalogueRevisionChangesReader(
         var type = CatalogueRevisionTemplateTypes.ForEntity(adoption.LocalEntityType);
         if (type is null)
         {
-            return Result(adoption, null, null, false, null, "UnsupportedLocalRecord", [], null,
+            return Result(adoption, null, "UnsupportedLocalRecord", [], null,
                 "This tenant record type does not support selected text updates.");
         }
 
         if (published is null)
         {
-            return Result(adoption, null, null, false, null, "Unavailable", [], null,
+            return Result(adoption, null, "Unavailable", [], null,
                 "Catalogue status is temporarily unavailable; the tenant record was not changed.");
         }
 
         if (published.Status != "Available" || published.Metadata is null || published.Revision is null)
         {
-            return Result(adoption, published.Metadata?.Revision, published.Metadata?.ContentHash,
-                published.Status is "Withdrawn" or "AdoptedRevisionWithdrawn",
-                published.Metadata?.AdoptedRevisionWithdrawn, published.Status, [], null, published.Notice);
+            return Result(adoption, published, published.Status, [], null, published.Notice);
         }
 
         if (published.Revision.Type != type)
         {
-            return Result(adoption, published.Revision.Revision, published.Revision.ContentHash, false,
-                published.Metadata.AdoptedRevisionWithdrawn, "Unavailable", [], null,
+            return Result(adoption, published, "Unavailable", [], null,
                 "Catalogue returned a revision with a different template type; the tenant record was not changed.");
         }
 
         if (local is null || local.Count == 0)
         {
-            return Result(adoption, published.Revision.Revision, published.Revision.ContentHash, false,
-                published.Metadata.AdoptedRevisionWithdrawn, "LocalRecordMissing", [], null,
+            return Result(adoption, published, "LocalRecordMissing", [], null,
                 "The mapped tenant record or its text fields are no longer available.");
         }
 
+        return BuildAvailableItem(adoption, published, published.Revision, published.Metadata, local, type);
+    }
+
+    private static CatalogueRevisionChangeItemDto BuildAvailableItem(
+        CatalogueTemplateAdoption adoption,
+        CataloguePublishedRevisionResult published,
+        CentralCatalogueTemplateRevision revision,
+        CatalogueCurrentRevisionMetadata metadata,
+        Dictionary<string, string?> local,
+        string type)
+    {
+
         var baseline = CatalogueRevisionBaseline.Read(adoption.BaselineFieldsJson, type,
             adoption.SourceRevision, adoption.ContentHash);
-        var sourceFields = CatalogueRevisionBaseline.Fields(published.Revision, type);
+        var sourceFields = CatalogueRevisionBaseline.Fields(revision, type);
         var candidatePaths = baseline.Keys.Union(sourceFields.Keys, StringComparer.Ordinal)
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
@@ -139,11 +147,11 @@ internal sealed class CatalogueRevisionChangesReader(
                     !string.Equals(prior?.Value, localValue, StringComparison.Ordinal));
             }).ToArray();
         var hasTextChanges = fields.Any(field => !string.Equals(field.Baseline, field.Current, StringComparison.Ordinal));
-        var hasRevisionChanges = adoption.SourceRevision != published.Revision.Revision ||
-            !string.Equals(adoption.ContentHash, published.Revision.ContentHash, StringComparison.Ordinal);
+        var hasRevisionChanges = adoption.SourceRevision != revision.Revision ||
+            !string.Equals(adoption.ContentHash, revision.ContentHash, StringComparison.Ordinal);
         var status = "Current";
         if (hasTextChanges || hasRevisionChanges) status = "UpdateAvailable";
-        if (published.Metadata.AdoptedRevisionWithdrawn == true) status = "AdoptedRevisionWithdrawn";
+        if (metadata.AdoptedRevisionWithdrawn == true) status = "AdoptedRevisionWithdrawn";
         var notice = status switch
         {
             "AdoptedRevisionWithdrawn" => "The adopted revision is withdrawn. The newer revision is only a suggestion; local data is unchanged.",
@@ -157,8 +165,7 @@ internal sealed class CatalogueRevisionChangesReader(
             notice = string.IsNullOrWhiteSpace(notice) ? mappingNotice : $"{notice} {mappingNotice}";
         }
 
-        return Result(adoption, published.Revision.Revision, published.Revision.ContentHash, false,
-            published.Metadata.AdoptedRevisionWithdrawn, status, fields,
+        return Result(adoption, published, status, fields,
             CatalogueRevisionBaseline.ComputeLocalHash(local), notice);
     }
 
@@ -172,10 +179,7 @@ internal sealed class CatalogueRevisionChangesReader(
 
     private static CatalogueRevisionChangeItemDto Result(
         CatalogueTemplateAdoption adoption,
-        int? currentRevision,
-        string? currentHash,
-        bool withdrawn,
-        bool? adoptedWithdrawn,
+        CataloguePublishedRevisionResult? published,
         string status,
         IReadOnlyList<CatalogueRevisionFieldChangeDto> fields,
         string? localHash,
@@ -183,10 +187,10 @@ internal sealed class CatalogueRevisionChangesReader(
             adoption.SourceTemplateId,
             adoption.SourceRevision,
             adoption.ContentHash,
-            currentRevision,
-            currentHash,
-            withdrawn,
-            adoptedWithdrawn,
+            published?.Metadata?.Revision,
+            published?.Metadata?.ContentHash,
+            status is "Withdrawn" or "AdoptedRevisionWithdrawn",
+            published?.Metadata?.AdoptedRevisionWithdrawn,
             status,
             fields,
             notice,

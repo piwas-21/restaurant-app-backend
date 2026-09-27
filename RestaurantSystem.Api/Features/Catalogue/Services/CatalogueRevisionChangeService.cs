@@ -31,105 +31,12 @@ public sealed class CatalogueRevisionChangeService(
         CancellationToken cancellationToken)
     {
         ValidateRequest(request);
-        var loadedByTemplate = await revisionLoader.LoadBatchAsync(
-            [new CatalogueCurrentRevisionRequest(request.TemplateId, request.AdoptedRevision)], cancellationToken);
-        var loaded = loadedByTemplate.GetValueOrDefault(request.TemplateId);
-        if (loaded is null || loaded.Status != "Available" || loaded.Metadata is null ||
-            loaded.Metadata.Revision != request.CurrentRevision ||
-            loaded.Metadata.ContentHash != request.CurrentContentHash || loaded.Revision is null)
-        {
-            throw loaded?.Status == "Unavailable"
-                ? new ServiceUnavailableException(loaded.Notice ?? "Catalogue is temporarily unavailable.")
-                : new ConflictException(loaded?.Notice ?? "Catalogue revision changed. Reload revision changes.");
-        }
-
-        var revision = loaded.Revision;
+        var revision = await ResolvePublishedRevisionAsync(request, cancellationToken);
         await using var transaction = await context.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
         try
         {
-            var session = await context.CatalogueImportSessions.FirstOrDefaultAsync(
-                value => value.Id == sessionId, cancellationToken)
-                ?? throw new NotFoundException("Catalogue import session was not found");
-            if (session.Version != request.ExpectedSessionVersion)
-            {
-                throw new ConflictException("Import session changed. Reload it before applying revision fields.");
-            }
-
-            var adoption = await context.CatalogueTemplateAdoptions.FirstOrDefaultAsync(value =>
-                value.AdoptionId == session.AdoptionId && value.SourceTemplateId == request.TemplateId &&
-                value.SourceRevision == request.AdoptedRevision && value.SourceEntryId == null, cancellationToken)
-                ?? throw new ConflictException("The adopted tenant mapping changed. Reload revision changes.");
-            if (request.CurrentRevision < adoption.SourceRevision)
-            {
-                throw new ConflictException("A revision update cannot move an adoption backwards.");
-            }
-
-            var type = CatalogueRevisionTemplateTypes.ForEntity(adoption.LocalEntityType);
-            if (type is null || type != revision.Type)
-            {
-                throw new ConflictException("The source template type no longer matches its tenant mapping.");
-            }
-
-            var mappedEntries = await context.CatalogueTemplateAdoptions.Where(value =>
-                    value.AdoptionId == session.AdoptionId && value.SourceTemplateId == request.TemplateId &&
-                    value.SourceEntryId != null)
-                .OrderBy(value => value.SourceRevision)
-                .ThenBy(value => value.CreatedAt)
-                .ToListAsync(cancellationToken);
-            var entryMappings = mappedEntries
-                .GroupBy(value => (value.SourceEntryId, value.LocalEntityType))
-                .Select(group => group.Last())
-                .ToArray();
-            var baseline = CatalogueRevisionBaseline.Read(adoption.BaselineFieldsJson, type,
-                adoption.SourceRevision, adoption.ContentHash);
-            var sourceFields = CatalogueRevisionBaseline.Fields(revision, type);
-            var changedPaths = sourceFields.Keys.Union(baseline.Keys, StringComparer.Ordinal)
-                .Where(path => !baseline.TryGetValue(path, out var saved) ||
-                    !sourceFields.TryGetValue(path, out var latest) ||
-                    !string.Equals(saved.Value, latest, StringComparison.Ordinal))
-                .ToHashSet(StringComparer.Ordinal);
-            if (request.FieldPaths.Any(path => !changedPaths.Contains(path)))
-            {
-                throw new ConflictException("A selected field is no longer changed in the current revision.");
-            }
-
-            if (request.FieldPaths.Any(path => path.StartsWith("sections[", StringComparison.Ordinal) &&
-                    !sourceFields.ContainsKey(path)))
-            {
-                throw new ConflictException("Removed bundle sections cannot be changed through text-only revision updates.");
-            }
-
-            var localFields = await localTextReader.ReadAsync(adoption, type, entryMappings, cancellationToken);
-            if (localFields.Count == 0)
-            {
-                throw new ConflictException("The mapped tenant record no longer exists.");
-            }
-            var localHash = CatalogueRevisionBaseline.ComputeLocalHash(localFields);
-            if (!string.Equals(localHash, request.ExpectedLocalHash, StringComparison.Ordinal))
-            {
-                throw new ConflictException("Tenant text changed after the revision preview. Reload before applying.");
-            }
-
-            await localTextWriter.ApplyAsync(adoption, type, revision, entryMappings,
-                request.FieldPaths, cancellationToken);
-            var updated = await AdvanceAdoptionBaselineAsync(
-                session, adoption, entryMappings, revision, request.FieldPaths, cancellationToken);
-            session.Version++;
-            session.UpdatedAt = DateTime.UtcNow;
-            session.UpdatedBy = currentUser.GetAuditIdentifier();
-            await context.SaveChangesAsync(cancellationToken);
-            var updatedFields = await localTextReader.ReadAsync(updated, type, entryMappings, cancellationToken);
-            var result = new CatalogueRevisionFieldApplyResultDto(
-                session.Id,
-                session.Version,
-                request.TemplateId,
-                revision.Revision,
-                revision.ContentHash,
-                request.FieldPaths,
-                CatalogueRevisionBaseline.ComputeLocalHash(updatedFields));
-            await transaction.CommitAsync(cancellationToken);
-            return result;
+            return await ApplyWithinTransactionAsync(sessionId, request, revision, transaction, cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -143,6 +50,116 @@ public sealed class CatalogueRevisionChangeService(
         {
             throw new ConflictException("Import session or tenant mapping changed. Reload before applying revision fields.");
         }
+    }
+
+    private async Task<CentralCatalogueTemplateRevision> ResolvePublishedRevisionAsync(
+        ApplyCatalogueRevisionFieldsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var loadedByTemplate = await revisionLoader.LoadBatchAsync(
+            [new CatalogueCurrentRevisionRequest(request.TemplateId, request.AdoptedRevision)], cancellationToken);
+        var loaded = loadedByTemplate.GetValueOrDefault(request.TemplateId);
+        if (loaded is null || loaded.Status != "Available" || loaded.Metadata is null ||
+            loaded.Metadata.Revision != request.CurrentRevision ||
+            loaded.Metadata.ContentHash != request.CurrentContentHash || loaded.Revision is null)
+        {
+            throw loaded?.Status == "Unavailable"
+                ? new ServiceUnavailableException(loaded.Notice ?? "Catalogue is temporarily unavailable.")
+                : new ConflictException(loaded?.Notice ?? "Catalogue revision changed. Reload revision changes.");
+        }
+
+        return loaded.Revision;
+    }
+
+    private async Task<CatalogueRevisionFieldApplyResultDto> ApplyWithinTransactionAsync(
+        Guid sessionId,
+        ApplyCatalogueRevisionFieldsRequest request,
+        CentralCatalogueTemplateRevision revision,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var session = await context.CatalogueImportSessions.FirstOrDefaultAsync(
+            value => value.Id == sessionId, cancellationToken)
+            ?? throw new NotFoundException("Catalogue import session was not found");
+        if (session.Version != request.ExpectedSessionVersion)
+        {
+            throw new ConflictException("Import session changed. Reload it before applying revision fields.");
+        }
+
+        var adoption = await context.CatalogueTemplateAdoptions.FirstOrDefaultAsync(value =>
+            value.AdoptionId == session.AdoptionId && value.SourceTemplateId == request.TemplateId &&
+            value.SourceRevision == request.AdoptedRevision && value.SourceEntryId == null, cancellationToken)
+            ?? throw new ConflictException("The adopted tenant mapping changed. Reload revision changes.");
+        if (request.CurrentRevision < adoption.SourceRevision)
+        {
+            throw new ConflictException("A revision update cannot move an adoption backwards.");
+        }
+
+        var type = CatalogueRevisionTemplateTypes.ForEntity(adoption.LocalEntityType);
+        if (type is null || type != revision.Type)
+        {
+            throw new ConflictException("The source template type no longer matches its tenant mapping.");
+        }
+
+        var mappedEntries = await context.CatalogueTemplateAdoptions.Where(value =>
+                value.AdoptionId == session.AdoptionId && value.SourceTemplateId == request.TemplateId &&
+                value.SourceEntryId != null)
+            .OrderBy(value => value.SourceRevision)
+            .ThenBy(value => value.CreatedAt)
+            .ToListAsync(cancellationToken);
+        var entryMappings = mappedEntries
+            .GroupBy(value => (value.SourceEntryId, value.LocalEntityType))
+            .Select(group => group.Last())
+            .ToArray();
+        var baseline = CatalogueRevisionBaseline.Read(adoption.BaselineFieldsJson, type,
+            adoption.SourceRevision, adoption.ContentHash);
+        var sourceFields = CatalogueRevisionBaseline.Fields(revision, type);
+        var changedPaths = sourceFields.Keys.Union(baseline.Keys, StringComparer.Ordinal)
+            .Where(path => !baseline.TryGetValue(path, out var saved) ||
+                !sourceFields.TryGetValue(path, out var latest) ||
+                !string.Equals(saved.Value, latest, StringComparison.Ordinal))
+            .ToHashSet(StringComparer.Ordinal);
+        if (request.FieldPaths.Any(path => !changedPaths.Contains(path)))
+        {
+            throw new ConflictException("A selected field is no longer changed in the current revision.");
+        }
+
+        if (request.FieldPaths.Any(path => path.StartsWith("sections[", StringComparison.Ordinal) &&
+                !sourceFields.ContainsKey(path)))
+        {
+            throw new ConflictException("Removed bundle sections cannot be changed through text-only revision updates.");
+        }
+
+        var localFields = await localTextReader.ReadAsync(adoption, type, entryMappings, cancellationToken);
+        if (localFields.Count == 0)
+        {
+            throw new ConflictException("The mapped tenant record no longer exists.");
+        }
+        var localHash = CatalogueRevisionBaseline.ComputeLocalHash(localFields);
+        if (!string.Equals(localHash, request.ExpectedLocalHash, StringComparison.Ordinal))
+        {
+            throw new ConflictException("Tenant text changed after the revision preview. Reload before applying.");
+        }
+
+        await localTextWriter.ApplyAsync(adoption, type, revision, entryMappings,
+            request.FieldPaths, cancellationToken);
+        var updated = await AdvanceAdoptionBaselineAsync(
+            session, adoption, entryMappings, revision, request.FieldPaths, cancellationToken);
+        session.Version++;
+        session.UpdatedAt = DateTime.UtcNow;
+        session.UpdatedBy = currentUser.GetAuditIdentifier();
+        await context.SaveChangesAsync(cancellationToken);
+        var updatedFields = await localTextReader.ReadAsync(updated, type, entryMappings, cancellationToken);
+        var result = new CatalogueRevisionFieldApplyResultDto(
+            session.Id,
+            session.Version,
+            request.TemplateId,
+            revision.Revision,
+            revision.ContentHash,
+            request.FieldPaths,
+            CatalogueRevisionBaseline.ComputeLocalHash(updatedFields));
+        await transaction.CommitAsync(cancellationToken);
+        return result;
     }
 
     private async Task<CatalogueTemplateAdoption> AdvanceAdoptionBaselineAsync(
