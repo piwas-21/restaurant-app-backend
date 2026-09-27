@@ -189,29 +189,29 @@ public sealed class MenuAuthoringSearchTests : IntegrationTestBase
         var probes = new (string IndexName, string Sql)[]
         {
             ("ix_products_menu_authoring_name_trgm", """
-                SELECT id FROM "Products"
+                EXPLAIN (COSTS OFF) SELECT id FROM "Products"
                 WHERE is_active AND is_available AND NOT is_deleted
                     AND public.menu_authoring_search_normalize(name)
                         ILIKE public.menu_authoring_search_pattern(@searchText)
                 """),
             ("ix_global_ingredients_menu_authoring_name_trgm", """
-                SELECT id FROM global_ingredients
+                EXPLAIN (COSTS OFF) SELECT id FROM global_ingredients
                 WHERE is_active AND archived_at IS NULL AND NOT is_deleted
                     AND public.menu_authoring_search_normalize(default_name)
                         ILIKE public.menu_authoring_search_pattern(@searchText)
                 """),
             ("ix_global_ingredient_translations_menu_authoring_name_trgm", """
-                SELECT id FROM global_ingredient_translations
+                EXPLAIN (COSTS OFF) SELECT id FROM global_ingredient_translations
                 WHERE public.menu_authoring_search_normalize(name)
                     ILIKE public.menu_authoring_search_pattern(@searchText)
                 """),
             ("ix_option_sets_menu_authoring_name_trgm", """
-                SELECT id FROM "OptionSets"
+                EXPLAIN (COSTS OFF) SELECT id FROM "OptionSets"
                 WHERE status = 0 AND public.menu_authoring_search_normalize(name)
                     ILIKE public.menu_authoring_search_pattern(@searchText)
                 """),
             ("ix_option_set_translations_menu_authoring_name_trgm", """
-                SELECT id FROM "OptionSetTranslations"
+                EXPLAIN (COSTS OFF) SELECT id FROM "OptionSetTranslations"
                 WHERE public.menu_authoring_search_normalize(name)
                     ILIKE public.menu_authoring_search_pattern(@searchText)
                 """)
@@ -224,7 +224,7 @@ public sealed class MenuAuthoringSearchTests : IntegrationTestBase
             parameter.ParameterName = "searchText";
             parameter.Value = "Café-Probe";
             command.Parameters.Add(parameter);
-            command.CommandText = $"EXPLAIN (COSTS OFF) {probe.Sql}";
+            command.CommandText = probe.Sql;
             await using var reader = await command.ExecuteReaderAsync();
             var planLines = new List<string>();
             while (await reader.ReadAsync())
