@@ -131,8 +131,8 @@ internal static class CatalogueImportCommandMapper
             PreparationTimeMinutes: 0,
             Type: ParseProductType(decision.LocalProductType),
             KitchenType: decision.KitchenType ?? throw new BadRequestException("Kitchen type review is required"),
-            Ingredients: decision.Ingredients?.Select(value => value.Trim()).ToList() ?? [],
-            Allergens: decision.Allergens?.Select(value => value.Trim()).ToList() ?? [],
+            Ingredients: RequireReviewedList(decision.Ingredients, "ingredients"),
+            Allergens: RequireReviewedList(decision.Allergens, "allergens"),
             DisplayOrder: 0,
             CategoryIds: [categoryId],
             PrimaryCategoryId: categoryId,
@@ -184,9 +184,15 @@ internal static class CatalogueImportCommandMapper
             MenuDefinition: definition,
             Content: ProductContent(revision, locale, decision, localized),
             AvailableOrderTypes: decision.AvailableOrderTypes,
-            Allergens: decision.Allergens?.Select(value => value.Trim()).ToList() ?? [],
+            Allergens: RequireReviewedList(decision.Allergens, "allergens"),
             TranslationMetadata: CatalogueImportTranslationMapper.OwnerMetadata(revision));
     }
+
+    private static List<string> RequireReviewedList(List<string>? values, string fieldName) =>
+        values?.Select(value => value.Trim()).ToList()
+        ?? throw new BadRequestException(
+            $"The tenant-reviewed {fieldName} list must be explicit. Use an empty list to confirm there are no values.",
+            $"TENANT_{fieldName.ToUpperInvariant()}_REQUIRED");
 
     private static ProductDescriptionsDto ProductContent(
         CentralCatalogueTemplateRevision revision,

@@ -73,6 +73,19 @@ internal static class CatalogueImportReviewRules
             blockers.Add(Issue("TENANT_DESCRIPTION_TOO_LONG", "Product descriptions must be 500 characters or fewer."));
         }
 
+        if (type == "item")
+        {
+            AddReviewedListPresenceBlocker(decision.IngredientsReviewed, decision.Ingredients,
+                "TENANT_INGREDIENTS_REQUIRED",
+                "Record the tenant-reviewed ingredient list. Use an empty list if this item has no ingredients.",
+                blockers);
+        }
+
+        AddReviewedListPresenceBlocker(decision.AllergensReviewed, decision.Allergens,
+            "TENANT_ALLERGENS_REQUIRED",
+            "Record the tenant-reviewed allergen list. Use an empty list only after confirming this offer has no allergens.",
+            blockers);
+
         AddReviewBlocker(decision.IngredientsReviewed, "INGREDIENT_REVIEW_REQUIRED", "Review this tenant's ingredients.", blockers);
         AddReviewBlocker(decision.AllergensReviewed, "ALLERGEN_REVIEW_REQUIRED", "Review this tenant's allergen claims.", blockers);
         AddReviewBlocker(decision.AvailabilityReviewed, "AVAILABILITY_REVIEW_REQUIRED", "Review tenant availability.", blockers);
@@ -207,6 +220,19 @@ internal static class CatalogueImportReviewRules
         List<CatalogueImportIssueDto> blockers)
     {
         if (reviewed != true)
+        {
+            blockers.Add(Issue(code, message));
+        }
+    }
+
+    private static void AddReviewedListPresenceBlocker(
+        bool? reviewed,
+        List<string>? values,
+        string code,
+        string message,
+        List<CatalogueImportIssueDto> blockers)
+    {
+        if (reviewed == true && values is null)
         {
             blockers.Add(Issue(code, message));
         }
