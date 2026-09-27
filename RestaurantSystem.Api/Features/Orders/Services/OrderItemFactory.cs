@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
@@ -15,15 +16,18 @@ public partial class OrderItemFactory : IOrderItemFactory
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
+    private readonly ITenantFeatures _tenantFeatures;
 
     public OrderItemFactory(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
-        ILineCustomizationBuilder lineCustomizationBuilder)
+        ILineCustomizationBuilder lineCustomizationBuilder,
+        ITenantFeatures tenantFeatures)
     {
         _context = context;
         _currentUserService = currentUserService;
         _lineCustomizationBuilder = lineCustomizationBuilder;
+        _tenantFeatures = tenantFeatures;
     }
 
     public async Task<string?> AddItemAsync(
@@ -83,8 +87,10 @@ public partial class OrderItemFactory : IOrderItemFactory
         // projected against — the same resolution the read path uses for a menu-backed line
         // (OrderIngredientCustomizations). Split, because MenuItems and the products' ingredient
         // collections cartesian-multiply in EF's default single-query mode.
-        var menu = _context.Menus.Local.FirstOrDefault(
-            candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted);
+        var menu = _tenantFeatures.EnforceSauceMinimum
+            ? null
+            : _context.Menus.Local.FirstOrDefault(
+                candidate => candidate.Id == itemDto.MenuId && !candidate.IsDeleted);
         menu ??= await _context.Menus
             .Include(candidate => candidate.MenuItems)
                 .ThenInclude(item => item.Product.DetailedIngredients)
@@ -97,12 +103,27 @@ public partial class OrderItemFactory : IOrderItemFactory
             return $"Menu {itemDto.MenuId} not found";
         }
 
-        // SelectedIngredientIds is deliberately NOT read here. This branch already prices its unit
-        // from Menus.BasePrice rather than the DTO, and no producer reaches it: BasketService's
-        // MenuId branch is an empty block, so BasketItem.MenuId is never set (see
-        // BasketToOrderTranslator's remarks) and the take-order screen posts ProductId. Teaching a
-        // branch scheduled for removal (#160) to price a selection would be new untested surface on
-        // the anonymous endpoint for no caller.
+        // The menu's first product is also the recipe used for its ingredient snapshot below. When
+        // sauce-minimum enforcement is enabled, resolve the explicit selection against that recipe
+        // just as the ProductId path does. Menu lines keep Menus.BasePrice; product customization
+        // pricing cannot replace the menu's price. Skipping selection resolution while the flag is
+        // off preserves the legacy MenuId payload exactly.
+        var menuProduct = menu.MenuItems.FirstOrDefault()?.Product;
+        if (_tenantFeatures.EnforceSauceMinimum && menu.MenuItems.Count > 0 && menuProduct is null)
+        {
+            return "This menu's ingredient details are unavailable. Refresh the menu and try again.";
+        }
+
+        var ingredientQuantities = itemDto.IngredientQuantities;
+        if (_tenantFeatures.EnforceSauceMinimum && menuProduct is not null)
+        {
+            ingredientQuantities = OrderLineIngredientChoice.Resolve(
+                _lineCustomizationBuilder,
+                itemDto,
+                menuProduct,
+                isRootLine: false).Quantities;
+        }
+
         var unitPrice = menu.BasePrice;
         var customization = ResolveCustomizationPrice(itemDto, pricesAreTrusted);
         order.Items.Add(new OrderItem
@@ -116,10 +137,10 @@ public partial class OrderItemFactory : IOrderItemFactory
             UnitPrice = unitPrice,
             ItemTotal = (unitPrice * itemDto.Quantity) + customization,
             SpecialInstructions = itemDto.SpecialInstructions,
-            IngredientQuantitiesJson = SerializeIngredients(itemDto.IngredientQuantities),
+            IngredientQuantitiesJson = SerializeIngredients(ingredientQuantities),
             IngredientSnapshots = OrderIngredientSnapshot.Build(
-                menu.MenuItems?.FirstOrDefault()?.Product?.DetailedIngredients,
-                itemDto.IngredientQuantities,
+                menuProduct?.DetailedIngredients,
+                ingredientQuantities,
                 _currentUserService.GetAuditIdentifier()),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _currentUserService.GetAuditIdentifier(),
