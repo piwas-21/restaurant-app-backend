@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.OptionSets.Search;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.OptionSets;
 
@@ -12,8 +14,15 @@ namespace RestaurantSystem.Api.Features.OptionSets;
 public sealed class MenuAuthoringSearchController : ControllerBase
 {
     private readonly IMenuAuthoringSearchService _search;
+    private readonly MenuAuthoringPaginationSettings _pagination;
 
-    public MenuAuthoringSearchController(IMenuAuthoringSearchService search) => _search = search;
+    public MenuAuthoringSearchController(
+        IMenuAuthoringSearchService search,
+        IOptions<MenuAuthoringPaginationSettings> pagination)
+    {
+        _search = search;
+        _pagination = pagination.Value;
+    }
 
     [HttpGet("search")]
     [ApiScope(ApiTokenScopes.MenuRead)]
@@ -22,10 +31,10 @@ public sealed class MenuAuthoringSearchController : ControllerBase
         [FromQuery] string? q,
         [FromQuery] OptionSetKind? forKind,
         [FromQuery] string? cursor,
-        [FromQuery] int limit = 24,
+        [FromQuery] int? limit,
         CancellationToken cancellationToken = default)
     {
-        var result = await _search.SearchAsync(q, forKind, cursor, limit, cancellationToken);
+        var result = await _search.SearchAsync(q, forKind, cursor, _pagination.Normalize(limit), cancellationToken);
         return Ok(ApiResponse<MenuAuthoringSearchPageDto>.SuccessWithData(result));
     }
 

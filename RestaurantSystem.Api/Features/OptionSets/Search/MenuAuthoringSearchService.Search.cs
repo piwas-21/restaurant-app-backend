@@ -17,7 +17,7 @@ public sealed partial class MenuAuthoringSearchService
     {
         var normalizedQuery = ValidateQuery(query);
         var searchCursor = string.IsNullOrWhiteSpace(cursor) ? null : MenuAuthoringSearchCursor.Decode(cursor);
-        var pageSize = Math.Clamp(limit, 1, 100);
+        var pageSize = PageSize(limit);
         var decisions = await _context.OptionSetMatchDecisions.AsNoTracking()
             .Where(decision => decision.NormalizedName == normalizedQuery)
             .Select(decision => new { decision.CandidateType, decision.CandidateId, decision.IsAccepted })

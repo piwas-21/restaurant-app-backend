@@ -306,6 +306,14 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services.AddOptions<MenuAuthoringPaginationSettings>()
+    .Bind(builder.Configuration.GetSection(MenuAuthoringPaginationSettings.SectionName))
+    .Validate(settings => settings.MinimumPageSize >= 1
+        && settings.MaximumPageSize >= settings.MinimumPageSize
+        && settings.DefaultPageSize >= settings.MinimumPageSize
+        && settings.DefaultPageSize <= settings.MaximumPageSize,
+        "Menu-authoring pagination settings are inconsistent")
+    .ValidateOnStart();
 builder.Services.AddOptions<OrderRoutingSettings>()
     .Bind(builder.Configuration.GetSection(OrderRoutingSettings.SectionName))
     .ValidateDataAnnotations()

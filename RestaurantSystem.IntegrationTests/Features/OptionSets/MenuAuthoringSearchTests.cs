@@ -4,10 +4,12 @@ using System.Net;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.OptionSets.Search;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Infrastructure;
@@ -99,7 +101,8 @@ public sealed class MenuAuthoringSearchTests : IntegrationTestBase
         var counter = new SearchCommandCounter();
         await using var context = DatabaseFixture.CreateContext(counter);
         var caller = new Mock<ICurrentUserService>();
-        var service = new MenuAuthoringSearchService(context, caller.Object);
+        var service = new MenuAuthoringSearchService(
+            context, caller.Object, Options.Create(new MenuAuthoringPaginationSettings()));
         var stopwatch = Stopwatch.StartNew();
 
         var page = await service.SearchAsync("searchperf", null, null, 24, CancellationToken.None);

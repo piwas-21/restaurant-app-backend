@@ -1,8 +1,5 @@
-using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Menus;
-using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -113,7 +110,7 @@ internal static class OptionSetMaterializerTargetWriter
 
             if (changed)
             {
-                Stamp(row.Entity, audit, now);
+                OptionSetMaterializerTargetAudit.Stamp(row.Entity, audit, now);
             }
 
             result.AppliedRows.Add(new OptionSetMaterializationAppliedRowDto
@@ -127,8 +124,8 @@ internal static class OptionSetMaterializerTargetWriter
 
         await RemoveOmittedRowsAsync(
             context, attachment, desiredIds, rowLookups, result, cancellationToken);
-        ApplyAttachmentSettings(set.Kind, state, attachment, target, audit, now);
-        await ValidateTargetRuntimeRulesAsync(context, set.Kind, state, cancellationToken);
+        OptionSetMaterializerTargetSettings.ApplyAttachmentSettings(set.Kind, state, attachment, target, audit, now);
+        await OptionSetMaterializerRuntimeRules.ValidateAsync(context, set.Kind, state, cancellationToken);
         if (target.Role == OptionSetAttachmentRole.BundleChoice && state.MenuDefinition is not null)
         {
             state.MenuDefinition.VersionedSectionEditingStarted = true;
@@ -140,7 +137,7 @@ internal static class OptionSetMaterializerTargetWriter
 
         if (target.Role == OptionSetAttachmentRole.ProductChoice && state.CustomizationGroup is not null)
         {
-            ApplyProductChoiceSettings(state.CustomizationGroup, state.Settings);
+            OptionSetMaterializerTargetSettings.ApplyProductChoiceSettings(state.CustomizationGroup, state.Settings);
             state.CustomizationGroup.AuthoringVersion++;
             state.CustomizationGroup.UpdatedAt = now;
             state.CustomizationGroup.UpdatedBy = audit;
@@ -228,74 +225,6 @@ internal static class OptionSetMaterializerTargetWriter
         target.ConflictPolicy == OptionSetConflictPolicy.UseOverrides
             && target.Overrides?.TryGetValue(entryId, out var value) == true ? value : null;
 
-    private static void Stamp(object row, string audit, DateTime now)
-    {
-        switch (row)
-        {
-            case ProductIngredient ingredient:
-                ingredient.UpdatedAt = now;
-                ingredient.UpdatedBy = audit;
-                break;
-            case ProductSideItem side:
-                side.UpdatedAt = now;
-                side.UpdatedBy = audit;
-                break;
-            case MenuSectionItem item:
-                item.UpdatedAt = now;
-                item.UpdatedBy = audit;
-                break;
-            case ProductCustomizationProductOption option:
-                option.UpdatedAt = now;
-                option.UpdatedBy = audit;
-                break;
-        }
-    }
-
-    private static void ApplyAttachmentSettings(
-        OptionSetKind kind,
-        OptionSetTargetState state,
-        OptionSetAttachment attachment,
-        OptionSetMaterializationTargetRequest target,
-        string audit,
-        DateTime now)
-    {
-        attachment.MinSelection = state.Settings.MinSelection;
-        attachment.MaxSelection = state.Settings.MaxSelection;
-        attachment.IncludedFree = state.Settings.IncludedFree;
-        attachment.DisplayOrder = state.Settings.DisplayOrder ?? 0;
-        attachment.IntentionalDifferenceReason = string.IsNullOrWhiteSpace(target.IntentionalDifferenceReason)
-            ? attachment.IntentionalDifferenceReason : target.IntentionalDifferenceReason.Trim();
-
-        if (kind == OptionSetKind.Sauce)
-        {
-            state.Product.SauceMin = state.Settings.MinSelection ?? 0;
-            state.Product.SauceMax = state.Settings.MaxSelection;
-            state.Product.SauceIncludedFree = state.Settings.IncludedFree ?? 0;
-            state.Product.UpdatedAt = now;
-            state.Product.UpdatedBy = audit;
-        }
-
-        if (kind == OptionSetKind.BundleChoice && state.Section is not null)
-        {
-            state.Section.MinSelection = state.Settings.MinSelection ?? 0;
-            state.Section.MaxSelection = state.Settings.MaxSelection ?? 1;
-            state.Section.IsRequired = state.Section.MinSelection > 0;
-            state.Section.DisplayOrder = state.Settings.DisplayOrder ?? state.Section.DisplayOrder;
-        }
-
-    }
-
-    private static void ApplyProductChoiceSettings(
-        ProductCustomizationGroup group,
-        OptionSetAttachmentSettings settings)
-    {
-        group.MinSelection = settings.MinSelection ?? 0;
-        group.MaxSelection = settings.MaxSelection ?? 1;
-        group.IsRequired = group.MinSelection > 0;
-        group.IncludedFreeUnits = settings.IncludedFree ?? 0;
-        group.DisplayOrder = settings.DisplayOrder ?? group.DisplayOrder;
-    }
-
     private static async Task RemoveOmittedRowsAsync(
         ApplicationDbContext context,
         OptionSetAttachment attachment,
@@ -333,44 +262,4 @@ internal static class OptionSetMaterializerTargetWriter
         }
     }
 
-    private static async Task ValidateTargetRuntimeRulesAsync(
-        ApplicationDbContext context,
-        OptionSetKind kind,
-        OptionSetTargetState state,
-        CancellationToken cancellationToken)
-    {
-        if (kind is OptionSetKind.Ingredient or OptionSetKind.Sauce)
-        {
-            await ValidateIncludedDeductionAsync(context, state.Product, cancellationToken);
-        }
-
-        if (kind == OptionSetKind.BundleChoice && state.Section is not null)
-        {
-            await MenuSectionVariationValidator.ValidateEntitiesAsync(context, [state.Section], cancellationToken);
-        }
-    }
-
-    private static async Task ValidateIncludedDeductionAsync(
-        ApplicationDbContext context,
-        Product product,
-        CancellationToken cancellationToken)
-    {
-        await context.ProductIngredients.Where(ingredient => ingredient.ProductId == product.Id).LoadAsync(cancellationToken);
-        var activeVariations = await context.ProductVariations.Where(variation => variation.ProductId == product.Id && variation.IsActive)
-            .Select(variation => variation.PriceModifier).ToListAsync(cancellationToken);
-        var dto = context.ProductIngredients.Local.Where(ingredient => ingredient.ProductId == product.Id)
-            .Select(ingredient => new ProductIngredientDto
-            {
-                IsOptional = ingredient.IsOptional,
-                IsIncludedInBasePrice = ingredient.IsIncludedInBasePrice,
-                IsActive = ingredient.IsActive,
-                Price = ingredient.Price
-            }).ToList();
-        var deduction = IncludedInBaseDeductionRule.MaxDeduction(dto);
-        var minPrice = IncludedInBaseDeductionRule.MinEffectiveUnitPrice(product.BasePrice, product.HideBaseProduct, activeVariations);
-        if (!IncludedInBaseDeductionRule.Fits(deduction, minPrice))
-        {
-            throw new BadRequestException(IncludedInBaseDeductionRule.BuildMessage(deduction, minPrice));
-        }
-    }
 }

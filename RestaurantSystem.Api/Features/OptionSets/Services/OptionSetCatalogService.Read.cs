@@ -15,7 +15,7 @@ public sealed partial class OptionSetCatalogService
         int limit,
         CancellationToken cancellationToken)
     {
-        var pageSize = Math.Clamp(limit, 1, 100);
+        var pageSize = PageSize(limit);
         var sets = _context.OptionSets.AsNoTracking().AsQueryable();
         if (kind.HasValue)
         {

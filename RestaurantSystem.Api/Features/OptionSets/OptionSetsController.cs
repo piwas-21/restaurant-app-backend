@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Menus;
@@ -7,6 +8,7 @@ using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Features.OptionSets.Services;
 using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.OptionSets;
 
@@ -16,11 +18,16 @@ public sealed class OptionSetsController : ControllerBase
 {
     private readonly IOptionSetCatalogService _catalog;
     private readonly IOptionSetMaterializer _materializer;
+    private readonly MenuAuthoringPaginationSettings _pagination;
 
-    public OptionSetsController(IOptionSetCatalogService catalog, IOptionSetMaterializer materializer)
+    public OptionSetsController(
+        IOptionSetCatalogService catalog,
+        IOptionSetMaterializer materializer,
+        IOptions<MenuAuthoringPaginationSettings> pagination)
     {
         _catalog = catalog;
         _materializer = materializer;
+        _pagination = pagination.Value;
     }
 
     [HttpGet]
@@ -30,10 +37,10 @@ public sealed class OptionSetsController : ControllerBase
         [FromQuery] OptionSetKind? kind,
         [FromQuery] string? q,
         [FromQuery] string? cursor,
-        [FromQuery] int limit = 24,
+        [FromQuery] int? limit,
         CancellationToken cancellationToken = default)
     {
-        var result = await _catalog.SearchAsync(kind, q, cursor, limit, cancellationToken);
+        var result = await _catalog.SearchAsync(kind, q, cursor, _pagination.Normalize(limit), cancellationToken);
         return Ok(ApiResponse<OptionSetPageDto>.SuccessWithData(result));
     }
 
