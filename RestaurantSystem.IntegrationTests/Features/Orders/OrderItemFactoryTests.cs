@@ -81,18 +81,27 @@ public class OrderItemFactoryTests : IAsyncLifetime
     [Fact]
     public async Task AddItemAsync_MenuWithRequiredSauce_PreservesLegacyPayloadWhenEnforcementDisabled()
     {
-        var (menu, _) = await SeedMenuAsync(sauceMin: 1);
+        var (menu, sauceId) = await SeedMenuAsync(sauceMin: 1);
+        var legacyQuantities = new Dictionary<Guid, int> { [sauceId] = 2 };
         var order = new Order { OrderNumber = "T-MENU-SAUCE-OFF", CreatedBy = "test" };
 
         var error = await CreateFactory(enforceSauceMinimum: false).AddItemAsync(
             order,
-            new CreateOrderItemDto { MenuId = menu.Id, Quantity = 1 },
+            new CreateOrderItemDto
+            {
+                MenuId = menu.Id,
+                Quantity = 1,
+                SelectedIngredientIds = [],
+                IngredientQuantities = legacyQuantities
+            },
             itemsAreServerPriced: false,
             CancellationToken.None);
 
         error.Should().BeNull();
         order.Items.Should().ContainSingle();
-        order.Items.Single().IngredientQuantitiesJson.Should().BeNull();
+        var savedQuantities = System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, int>>(
+            order.Items.Single().IngredientQuantitiesJson!);
+        savedQuantities.Should().BeEquivalentTo(legacyQuantities);
     }
 
     [Fact]
@@ -117,6 +126,9 @@ public class OrderItemFactoryTests : IAsyncLifetime
         var quantities = System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, int>>(
             item.IngredientQuantitiesJson!);
         quantities.Should().ContainKey(sauceId).WhoseValue.Should().Be(1);
+        item.IngredientSnapshots.Should().ContainSingle();
+        item.IngredientSnapshots.Single().IngredientId.Should().Be(sauceId);
+        item.IngredientSnapshots.Single().Quantity.Should().Be(1);
     }
 
     [Fact]
