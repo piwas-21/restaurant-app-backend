@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -385,6 +386,126 @@ public sealed class CatalogueRevisionChangeServiceTests(DatabaseFixture database
     }
 
     [Fact]
+    public async Task Apply_rejects_a_stale_session_version_without_mutating_the_tenant_record()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var currentUser = scope.ServiceProvider.GetRequiredService<ICurrentUserService>();
+        var scenario = await SeedItemRevisionScenarioAsync(context);
+        var catalogue = new Mock<ICentralCatalogueClient>();
+        catalogue.Setup(value => value.GetCurrentRevisionBatchAsync(
+                It.IsAny<IReadOnlyList<CatalogueCurrentRevisionRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CurrentRevisionResponse(scenario.RevisionTwo));
+        var service = new CatalogueRevisionChangeService(context, catalogue.Object, currentUser);
+        var preview = await service.GetAsync(scenario.SessionId, CancellationToken.None);
+        var request = ApplyRequest(preview, scenario.RevisionOne, scenario.RevisionTwo, ["name"]) with
+        {
+            ExpectedSessionVersion = preview.SessionVersion + 1
+        };
+
+        var act = () => service.ApplyFieldsAsync(scenario.SessionId, request, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ConflictException>()
+            .WithMessage("Import session changed. Reload it before applying revision fields.");
+        (await context.Products.AsNoTracking().SingleAsync(value => value.Id == scenario.ProductId))
+            .Name.Should().Be("Tenant edited name");
+        (await context.CatalogueImportSessions.AsNoTracking().SingleAsync(value => value.Id == scenario.SessionId))
+            .Version.Should().Be(preview.SessionVersion);
+        (await context.CatalogueTemplateAdoptions.AsNoTracking().Where(value =>
+            value.AdoptionId == scenario.AdoptionId && value.SourceTemplateId == scenario.RevisionOne.TemplateId &&
+            value.SourceEntryId == null).ToListAsync()).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Apply_rejects_catalogue_revision_or_hash_changes_since_preview()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var currentUser = scope.ServiceProvider.GetRequiredService<ICurrentUserService>();
+        var scenario = await SeedItemRevisionScenarioAsync(context);
+        var changedRevision = Revision(3, "Central name 3", "Central description 3", "Central TR name 3");
+        var changedHash = scenario.RevisionTwo with { ContentHash = new string('d', 64) };
+        var catalogue = new Mock<ICentralCatalogueClient>();
+        catalogue.SetupSequence(value => value.GetCurrentRevisionBatchAsync(
+                It.IsAny<IReadOnlyList<CatalogueCurrentRevisionRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CurrentRevisionResponse(scenario.RevisionTwo))
+            .ReturnsAsync(CurrentRevisionResponse(changedRevision))
+            .ReturnsAsync(CurrentRevisionResponse(changedHash));
+        var service = new CatalogueRevisionChangeService(context, catalogue.Object, currentUser);
+        var preview = await service.GetAsync(scenario.SessionId, CancellationToken.None);
+        var request = ApplyRequest(preview, scenario.RevisionOne, scenario.RevisionTwo, ["name"]);
+
+        var changedRevisionAct = () => service.ApplyFieldsAsync(scenario.SessionId, request, CancellationToken.None);
+
+        await changedRevisionAct.Should().ThrowAsync<ConflictException>()
+            .WithMessage("Catalogue revision changed. Reload revision changes.");
+        var changedHashAct = () => service.ApplyFieldsAsync(scenario.SessionId, request, CancellationToken.None);
+        await changedHashAct.Should().ThrowAsync<ConflictException>()
+            .WithMessage("Catalogue revision changed. Reload revision changes.");
+
+        (await context.Products.AsNoTracking().SingleAsync(value => value.Id == scenario.ProductId))
+            .Name.Should().Be("Tenant edited name");
+        (await context.CatalogueImportSessions.AsNoTracking().SingleAsync(value => value.Id == scenario.SessionId))
+            .Version.Should().Be(preview.SessionVersion);
+    }
+
+    [Fact]
+    public async Task Apply_rejects_unchanged_and_invalid_selected_field_paths()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var currentUser = scope.ServiceProvider.GetRequiredService<ICurrentUserService>();
+        var scenario = await SeedItemRevisionScenarioAsync(context);
+        var onlyNameChanged = scenario.RevisionTwo with
+        {
+            Description = scenario.RevisionOne.Description,
+            Translations = scenario.RevisionOne.Translations
+        };
+        var catalogue = new Mock<ICentralCatalogueClient>();
+        catalogue.Setup(value => value.GetCurrentRevisionBatchAsync(
+                It.IsAny<IReadOnlyList<CatalogueCurrentRevisionRequest>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CurrentRevisionResponse(onlyNameChanged));
+        var service = new CatalogueRevisionChangeService(context, catalogue.Object, currentUser);
+        var preview = await service.GetAsync(scenario.SessionId, CancellationToken.None);
+        var unchangedPath = ApplyRequest(preview, scenario.RevisionOne, onlyNameChanged, ["description"]);
+        var invalidPath = unchangedPath with { FieldPaths = ["price"] };
+
+        var unchangedAct = () => service.ApplyFieldsAsync(scenario.SessionId, unchangedPath, CancellationToken.None);
+        await unchangedAct.Should().ThrowAsync<ConflictException>()
+            .WithMessage("A selected field is no longer changed in the current revision.");
+        var invalidAct = () => service.ApplyFieldsAsync(scenario.SessionId, invalidPath, CancellationToken.None);
+        await invalidAct.Should().ThrowAsync<ConflictException>()
+            .WithMessage("A selected field is no longer changed in the current revision.");
+
+        (await context.Products.AsNoTracking().SingleAsync(value => value.Id == scenario.ProductId))
+            .Name.Should().Be("Tenant edited name");
+        (await context.CatalogueImportSessions.AsNoTracking().SingleAsync(value => value.Id == scenario.SessionId))
+            .Version.Should().Be(preview.SessionVersion);
+    }
+
+    [Fact]
+    public async Task Revision_change_endpoints_require_admin()
+    {
+        AuthenticateAsUser();
+        var endpoint = $"/api/catalogue/import-sessions/{Guid.NewGuid()}/revision-changes";
+
+        var getResponse = await Client.GetAsync(endpoint);
+        var postResponse = await PostAsJsonAsync($"{endpoint}/apply", new ApplyCatalogueRevisionFieldsRequest
+        {
+            ExpectedSessionVersion = 1,
+            TemplateId = "revision-item",
+            AdoptedRevision = 1,
+            CurrentRevision = 2,
+            CurrentContentHash = new string('b', 64),
+            ExpectedLocalHash = new string('a', 64),
+            FieldPaths = ["name"]
+        });
+
+        getResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        postResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Applying_option_set_text_advances_its_version_once_and_normalizes_its_name()
     {
         using var scope = Factory.Services.CreateScope();
@@ -604,6 +725,90 @@ public sealed class CatalogueRevisionChangeServiceTests(DatabaseFixture database
         updatedSection.Translations.Single().Name.Should().Be("İçecekler 2");
         updatedSection.UpdatedAt.Should().NotBeNull();
     }
+
+    private static async Task<ItemRevisionScenario> SeedItemRevisionScenarioAsync(ApplicationDbContext context)
+    {
+        var sessionId = Guid.NewGuid();
+        var adoptionId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var revisionOne = Revision(1, "Central name 1", "Central description 1", "Central TR name 1");
+        var revisionTwo = Revision(2, "Central name 2", "Central description 2", "Central TR name 2");
+        var product = new Product
+        {
+            Id = productId,
+            Name = "Tenant edited name",
+            Description = "Tenant edited description",
+            BasePrice = 8.75m,
+            Type = ProductType.MainItem,
+            KitchenType = KitchenType.BackKitchen,
+            Ingredients = ["Tenant ingredient"],
+            Allergens = ["Tenant allergen"],
+            IsActive = false,
+            IsAvailable = false,
+            CreatedBy = "test"
+        };
+        product.Descriptions.Add(new ProductDescription
+        {
+            Id = Guid.NewGuid(),
+            ProductId = productId,
+            Lang = "tr",
+            Name = "Lokalde düzenlenen ad",
+            Description = "Lokalde düzenlenen açıklama",
+            CreatedBy = "test"
+        });
+        var session = new CatalogueImportSession
+        {
+            Id = sessionId,
+            RootTemplateId = revisionOne.TemplateId,
+            RootRevision = revisionOne.Revision,
+            Locale = "tr",
+            IdempotencyKey = $"revision-guard-test-{sessionId:N}",
+            AdoptionId = adoptionId,
+            Version = 1,
+            CreatedBy = "test"
+        };
+        var adoption = new CatalogueTemplateAdoption
+        {
+            Id = Guid.NewGuid(),
+            AdoptionId = adoptionId,
+            SessionId = sessionId,
+            SourceTemplateId = revisionOne.TemplateId,
+            SourceRevision = revisionOne.Revision,
+            LocalEntityType = "Product",
+            LocalEntityId = productId,
+            ContentHash = revisionOne.ContentHash,
+            BaselineFieldsJson = CatalogueRevisionBaseline.Create(revisionOne, "item"),
+            CreatedBy = "test"
+        };
+
+        context.Products.Add(product);
+        context.CatalogueImportSessions.Add(session);
+        context.CatalogueTemplateAdoptions.Add(adoption);
+        await context.SaveChangesAsync();
+        return new ItemRevisionScenario(sessionId, adoptionId, productId, revisionOne, revisionTwo);
+    }
+
+    private static CatalogueProxyResponse CurrentRevisionResponse(CentralCatalogueTemplateRevision revision) =>
+        Response(StatusCodes.Status200OK, new
+        {
+            items = new[]
+            {
+                new
+                {
+                    templateId = revision.TemplateId,
+                    status = "available",
+                    revision,
+                    adoptedRevisionWithdrawn = false
+                }
+            }
+        });
+
+    private sealed record ItemRevisionScenario(
+        Guid SessionId,
+        Guid AdoptionId,
+        Guid ProductId,
+        CentralCatalogueTemplateRevision RevisionOne,
+        CentralCatalogueTemplateRevision RevisionTwo);
 
     private static CatalogueProxyResponse Response(int statusCode, object body)
     {
