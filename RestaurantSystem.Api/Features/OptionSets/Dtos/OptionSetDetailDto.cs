@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Dtos;
 
@@ -15,4 +16,5 @@ public sealed class OptionSetDetailDto
     public List<OptionSetAttachmentDto> Attachments { get; set; } = [];
     public string? SourceTemplateId { get; set; }
     public int? SourceRevision { get; set; }
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
 }

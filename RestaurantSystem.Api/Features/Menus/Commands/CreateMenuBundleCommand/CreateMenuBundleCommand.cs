@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -30,7 +32,8 @@ public record CreateMenuBundleCommand(
     // semantics its sibling on the update command has: on create there is nothing stored to
     // leave alone, so this is assigned as given and null simply yields an unlabelled bundle.
     // See IMenuBundleCommandFields for the contract the two paths do and do not share.
-    List<string>? Allergens = null
+    List<string>? Allergens = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCommand, ApiResponse<ProductDto>>
@@ -38,12 +41,17 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateMenuBundleCommandHandler> _logger;
+    private readonly ITranslationProvenanceWriter _translationProvenanceWriter;
 
-    public CreateMenuBundleCommandHandler(ApplicationDbContext context, ICurrentUserService currentUserService, ILogger<CreateMenuBundleCommandHandler> logger)
+    public CreateMenuBundleCommandHandler(ApplicationDbContext context, ICurrentUserService currentUserService,
+        ILogger<CreateMenuBundleCommandHandler> logger,
+        ITranslationProvenanceWriter? translationProvenanceWriter = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
+        _translationProvenanceWriter = translationProvenanceWriter ??
+            new TranslationProvenanceWriter(context, currentUserService);
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateMenuBundleCommand command, CancellationToken cancellationToken)
@@ -103,30 +111,8 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 }
             }
 
-            var languageCodes = command.Content.Select(x => x.Key).ToList();
-            var duplicateLanguageCodes = languageCodes.GroupBy(x => x)
-                .Where(g => g.Count() > 1)
-                .Select(g => g.Key)
-                .ToList();
-
-            if (duplicateLanguageCodes.Any())
-            {
-                return ApiResponse<ProductDto>.Failure($"Duplicate language codes found: {string.Join(", ", duplicateLanguageCodes)}");
-            }
-
-            foreach (var (languageCode, description) in command.Content)
-            {
-                var productDescription = new ProductDescription
-                {
-                    Lang = languageCode,
-                    Name = description.Name,
-                    Description = description.Description,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier()
-                };
-                _context.ProductDescriptions.Add(productDescription);
-                product.Descriptions.Add(productDescription);
-            }
+            MenuBundleContentWriter.Add(_context, product, command.Content,
+                _currentUserService.GetAuditIdentifier());
 
             // Add Menu Definition
             var menuDef = new MenuDefinition
@@ -160,7 +146,19 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
             await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 
-            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
+            var written = MenuSectionWriter.ReplaceSections(_context, menuDef, sections,
+                _currentUserService.GetAuditIdentifier());
+            foreach (var (input, section) in written)
+            {
+                await _translationProvenanceWriter.RecordAsync("menuSection", section.Id,
+                    input.TranslationMetadata, TranslationTextMap.FromSection(input), cancellationToken);
+            }
+            await _translationProvenanceWriter.RecordAsync("product", product.Id,
+                command.TranslationMetadata,
+                TranslationTextMap.Create(command.Name, command.Description,
+                    command.Content.Select(pair =>
+                        (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
+                cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

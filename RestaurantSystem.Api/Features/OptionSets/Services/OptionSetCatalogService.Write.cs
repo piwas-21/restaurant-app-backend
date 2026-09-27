@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -25,6 +27,7 @@ public sealed partial class OptionSetCatalogService
         var translations = OptionSetLocales.NormalizeTranslations(request.Translations, _settings);
         var set = new OptionSet
         {
+            Id = Guid.NewGuid(),
             Kind = request.Kind,
             Name = name,
             SourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale, _settings.MaximumLocaleTagLength),
@@ -37,6 +40,7 @@ public sealed partial class OptionSetCatalogService
         };
         set.Translations = OptionSetLocales.CreateEntities(set, translations, audit, now);
         await _context.OptionSets.AddAsync(set, cancellationToken);
+        await RecordTranslationAsync(set, request, cancellationToken);
         await SaveWithConflictTranslationAsync(cancellationToken);
         return ToDetail(set);
     }
@@ -76,6 +80,7 @@ public sealed partial class OptionSetCatalogService
         ApplyPlannedEntries(set, plan, materializedEntryIds, now, audit);
         DisableRemovedEntries(set, plan.RetainedIds, now, audit);
         UpdateSetMetadata(set, request, audit, now);
+        await RecordTranslationAsync(set, request, cancellationToken);
         await SaveWithConflictTranslationAsync(cancellationToken);
         return ToDetail(set);
     }
@@ -177,6 +182,27 @@ public sealed partial class OptionSetCatalogService
         set.Version++;
         set.UpdatedAt = now;
         set.UpdatedBy = audit;
+    }
+
+    private Task RecordTranslationAsync(OptionSet set, OptionSetWriteRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        if (request.TranslationMetadata is { } supplied &&
+            (supplied.SourceLocales is null || supplied.SourceLocales.Count != 1 ||
+             !supplied.SourceLocales.TryGetValue("name", out var locale) || locale != set.SourceLocale))
+        {
+            throw new BadRequestException("Option-set name source locale must match its translation metadata");
+        }
+        var sourceName = set.Translations.FirstOrDefault(row => row.LanguageCode == set.SourceLocale)?.Name
+            ?? set.Name;
+        return _translationProvenance.RecordAsync("optionSet", set.Id,
+        request.TranslationMetadata ?? new TranslationOwnerMetadataDto
+        {
+            SourceLocales = new Dictionary<string, string> { ["name"] = set.SourceLocale }
+        },
+        TranslationTextMap.Create(sourceName, null,
+            set.Translations.Select(row => (row.LanguageCode, (string?)row.Name, (string?)null))),
+        cancellationToken);
     }
 
     private static OptionSetEntry? ResolveExistingEntry(

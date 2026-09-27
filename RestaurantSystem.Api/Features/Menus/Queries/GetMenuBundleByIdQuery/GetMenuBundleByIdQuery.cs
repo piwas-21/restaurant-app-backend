@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Menus.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -99,6 +100,10 @@ public class GetMenuBundleByIdQueryHandler(
         }
 
         var dto = MenuBundleMapper.MapToMenuBundleDto(product, _baseUrl, query.RequestedOrderType, query.Locale);
+        if (_currentUser.IsStaff)
+        {
+            await TranslationReadMetadata.ApplyAsync(_context, dto, cancellationToken);
+        }
         return ApiResponse<MenuBundleDto>.SuccessWithData(dto);
     }
 }

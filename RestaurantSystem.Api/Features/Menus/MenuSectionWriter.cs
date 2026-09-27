@@ -28,14 +28,16 @@ public static class MenuSectionWriter
     /// they belong to this definition; absent collection keys are handled by the caller as no-op,
     /// and explicit empty lists remove the corresponding rows.
     /// </summary>
-    public static void ApplyPatch(
+    public static IReadOnlyList<(MenuSectionDto Input, MenuSection Entity)> ApplyPatch(
         ApplicationDbContext context,
         MenuDefinition menuDefinition,
         IReadOnlyCollection<MenuSectionDto> sections,
-        string auditIdentifier)
+        string auditIdentifier,
+        bool translationsOnly = false)
     {
         var existingSections = menuDefinition.Sections.ToDictionary(section => section.Id);
         var retainedSections = new HashSet<Guid>();
+        var written = new List<(MenuSectionDto Input, MenuSection Entity)>();
         var now = DateTime.UtcNow;
 
         foreach (var sectionDto in sections)
@@ -77,15 +79,8 @@ public static class MenuSectionWriter
             section.UpdatedAt = now;
             section.UpdatedBy = auditIdentifier;
 
-            if (sectionDto.TranslationsSpecified)
-            {
-                ReplaceTranslations(context, section, sectionDto.Translations ?? [], auditIdentifier, now);
-            }
-
-            if (sectionDto.ItemsSpecified)
-            {
-                ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
-            }
+            ApplySectionContent(context, section, sectionDto, auditIdentifier, now, translationsOnly);
+            written.Add((sectionDto, section));
         }
 
         foreach (var removed in existingSections.Values.Where(section => !retainedSections.Contains(section.Id)))
@@ -98,6 +93,26 @@ public static class MenuSectionWriter
         menuDefinition.VersionedSectionEditingStarted = true;
         menuDefinition.UpdatedAt = now;
         menuDefinition.UpdatedBy = auditIdentifier;
+        return written;
+    }
+
+    private static void ApplySectionContent(
+        ApplicationDbContext context,
+        MenuSection section,
+        MenuSectionDto sectionDto,
+        string auditIdentifier,
+        DateTime now,
+        bool translationsOnly)
+    {
+        if (sectionDto.TranslationsSpecified)
+        {
+            ReplaceTranslations(context, section, sectionDto.Translations ?? [], auditIdentifier, now);
+        }
+
+        if (sectionDto.ItemsSpecified && !translationsOnly)
+        {
+            ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
+        }
     }
 
     /// <summary>
@@ -124,7 +139,7 @@ public static class MenuSectionWriter
     /// The removal is unconditional: the <c>Sections != null</c> check one caller used to carry
     /// could never be false, and the other caller already ran without it.
     /// </summary>
-    public static void ReplaceSections(
+    public static IReadOnlyList<(MenuSectionDto Input, MenuSection Entity)> ReplaceSections(
         ApplicationDbContext context,
         MenuDefinition menuDefinition,
         IEnumerable<MenuSectionDto> sections,
@@ -133,26 +148,29 @@ public static class MenuSectionWriter
         // A no-op on the create path, where the definition was constructed moments ago and holds no
         // sections. Cheaper than a second public overload that could be called where one was needed.
         context.MenuSections.RemoveRange(menuDefinition.Sections);
-        AddSections(context, menuDefinition, sections, auditIdentifier);
+        var written = AddSections(context, menuDefinition, sections, auditIdentifier);
 
         if (context.Entry(menuDefinition).State != EntityState.Added)
         {
             menuDefinition.AuthoringVersion++;
         }
+        return written;
     }
 
-    private static void AddSections(
+    private static List<(MenuSectionDto Input, MenuSection Entity)> AddSections(
         ApplicationDbContext context,
         MenuDefinition menuDefinition,
         IEnumerable<MenuSectionDto> sections,
         string auditIdentifier)
     {
         var now = DateTime.UtcNow;
+        var written = new List<(MenuSectionDto Input, MenuSection Entity)>();
 
         foreach (var sectionDto in sections)
         {
             var section = new MenuSection
             {
+                Id = Guid.NewGuid(),
                 MenuDefinition = menuDefinition, // EF Core will handle the ID link
                 Name = sectionDto.Name,
                 Description = sectionDto.Description,
@@ -166,6 +184,7 @@ public static class MenuSectionWriter
             };
 
             context.MenuSections.Add(section);
+            written.Add((sectionDto, section));
 
             // NOT a dead guard, despite reading like the `Sections` one #191 removed:
             // The DTO's backing list has an empty default, and STJ writes a literal `"items": null`
@@ -193,6 +212,7 @@ public static class MenuSectionWriter
                 });
             }
         }
+        return written;
     }
 
     private static void ReplaceTranslations(

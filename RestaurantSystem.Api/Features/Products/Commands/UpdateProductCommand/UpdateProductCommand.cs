@@ -8,6 +8,8 @@ using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 using RestaurantSystem.Api.Features.Products.Services;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -51,7 +53,8 @@ public record UpdateProductCommand(
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
     bool IsComponent = false,
-    List<ProductCustomizationGroupDto>? CustomizationGroups = null
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand, ApiResponse<ProductDto>>
@@ -62,6 +65,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
     private readonly IConfiguration _configuration;
     private readonly ILogger<GetProductByIdQueryHandler> _getProductlogger;
     private readonly IProductCustomizationGroupSynchronizer _customizationGroupSynchronizer;
+    private readonly ITranslationProvenanceWriter _translationProvenanceWriter;
 
 
     public UpdateProductCommandHandler(
@@ -70,7 +74,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         ILogger<UpdateProductCommandHandler> logger,
         ILogger<GetProductByIdQueryHandler> getProductlogger,
         IConfiguration configuration,
-        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer
+        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer,
+        ITranslationProvenanceWriter? translationProvenanceWriter = null
         )
     {
         _context = context;
@@ -79,6 +84,8 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         _getProductlogger = getProductlogger;
         _configuration = configuration;
         _customizationGroupSynchronizer = customizationGroupSynchronizer;
+        _translationProvenanceWriter = translationProvenanceWriter ??
+            new TranslationProvenanceWriter(context, currentUserService);
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -137,6 +144,10 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             return ApiResponse<ProductDto>.Failure("Product not found");
         }
 
+        TranslationContentVersion.EnsureCurrent(product,
+            command.TranslationMetadata?.ExpectedContentVersion,
+            command.TranslationMetadata?.AcceptedSuggestionIds?.Count ?? 0);
+
         await MenuOfferLinkRules.EnsureCanChangeTypeAsync(
             _context, product, command.Type, cancellationToken);
         await MenuOfferLinkRules.EnsureCanDeactivateAsync(
@@ -181,6 +192,12 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         AddProductCategories(product, command);
 
         await UpdateProductContentAsync(product, command.Content, cancellationToken);
+        await _translationProvenanceWriter.RecordAsync("product", product.Id,
+            command.TranslationMetadata,
+            TranslationTextMap.Create(command.Name, command.Description,
+                (command.Content ?? []).Select(pair =>
+                    (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
+            cancellationToken);
 
         // Update variations
         await UpdateVariationsAsync(product, command.Variations, cancellationToken);
@@ -378,6 +395,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         {
             variation = new ProductVariation
             {
+                Id = Guid.NewGuid(),
                 ProductId = product.Id,
                 Name = variationDto.Name,
                 Description = variationDto.Description,
@@ -394,6 +412,7 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
 
         if (variationDto.Content is null)
         {
+            await RecordVariationMetadataAsync(variationDto, variation, cancellationToken);
             return;
         }
 
@@ -410,7 +429,18 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             };
             await _context.ProductVariationDescriptions.AddAsync(description, cancellationToken);
         }
+        await RecordVariationMetadataAsync(variationDto, variation, cancellationToken);
     }
+
+    private Task RecordVariationMetadataAsync(
+        UpdateProductVariationDto dto,
+        ProductVariation variation,
+        CancellationToken cancellationToken) => _translationProvenanceWriter.RecordAsync(
+            "productVariation", variation.Id, dto.TranslationMetadata,
+            TranslationTextMap.Create(dto.Name, dto.Description,
+                (dto.Content ?? []).Select(pair =>
+                    (pair.Key, (string?)pair.Value.Name, pair.Value.Description))),
+            cancellationToken);
 
     private async Task UpdateSuggestedSideItemsAsync(
         Product product,
@@ -452,7 +482,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             detailedIngredients,
             _currentUserService.GetAuditIdentifier(),
             _logger,
-            cancellationToken);
+            cancellationToken,
+            (dto, ingredient) => _translationProvenanceWriter.RecordAsync(
+                "productIngredient", ingredient.Id, dto.TranslationMetadata,
+                TranslationTextMap.Create(dto.Name, null,
+                    (dto.Content ?? []).Select(pair =>
+                        (pair.Key, (string?)pair.Value.Name, pair.Value.Description))),
+                cancellationToken));
     }
 
     private async Task UpdateCustomizationGroupsAsync(
@@ -537,9 +573,22 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
         var menuDef = MenuDefinitionWriter.Upsert(
             _context, existing, product.Id, menuDefinition, auditIdentifier);
+        IReadOnlyList<(MenuSectionDto Input, MenuSection Entity)> written;
         if (replaceSections)
         {
-            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
+            written = MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
+        }
+        else
+        {
+            var byId = menuDef.Sections.ToDictionary(section => section.Id);
+            written = sections.Where(section => section.Id.HasValue && byId.ContainsKey(section.Id.Value))
+                .Select(section => (section, byId[section.Id.GetValueOrDefault()])).ToArray();
+        }
+
+        foreach (var (input, section) in written)
+        {
+            await _translationProvenanceWriter.RecordAsync("menuSection", section.Id,
+                input.TranslationMetadata, TranslationTextMap.FromSection(input), cancellationToken);
         }
     }
 }
@@ -554,5 +603,6 @@ public record UpdateProductVariationDto(
     int DisplayOrder,
     Dictionary<string, ProductVariationContentDto>? Content,
     // S4 provenance. Last and defaulted, so every existing caller keeps compiling.
-    Guid? GlobalVariationId = null
+    Guid? GlobalVariationId = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 );

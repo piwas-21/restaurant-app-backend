@@ -86,6 +86,15 @@ All MRs require the pipeline to pass before merge.
 | `CorsSettings:AllowedOrigins` | `appsettings.<Env>.json` | App throws on startup in non-Dev if empty |
 | `SENTRY_DSN` (+ optional `SENTRY_ENVIRONMENT`) | env var (box `.env` → compose passthrough, deploy repo) | Empty/unset = Sentry never initializes (inert). Errors only — no PII, no request bodies, tracing off. Enable runbook: deploy repo `DEPLOYMENT.md` §Error tracking |
 | `ReservationQuickActions` | `appsettings.json` + env override | Signs the approve/reject links in the restaurant's alert mail. See below |
+| `TranslationAssistance` | env (`TranslationAssistance__*`) | Optional tenant menu translation provider; disabled until provider terms, processing region and tenant data use are approved. See below |
+
+### Menu translation assistance
+
+The admin translation workbench previews missing and stale guest-locale text without a provider. To enable suggestions for a tenant database, configure `TranslationAssistance__Enabled=true`, `TranslationAssistance__TenantDataApproved=true`, an HTTPS `TranslationAssistance__ApiUrl`, and a secret `TranslationAssistance__ApiKey`. Both booleans default to false; leave them false until provider billing, processing region and tenant data terms are confirmed. The API sends `store:false` and does not log prompts or the key. Keep the key in the box secret environment, not source control.
+
+`TranslationAssistance__MaxDailyBatches`, `MaxDailyTokens`, `MaxDailySpendUsd`, `MaxBatchTargets` and `TimeoutSeconds` bound each tenant database's usage. The workbench remains usable for manual edits and Save when the provider is disabled, over budget or unavailable. Suggestions require admin review and only reach guest text through the ordinary product or bundle Save.
+
+Set `TranslationAssistance__InputCostPerMillionUsd` and `OutputCostPerMillionUsd` for the chosen model and processing tier before enabling a provider. Defaults match standard GPT-6 Luna text pricing; regional processing can cost more. A provider attempt reserves the maximum configured output and a conservative input estimate before the call. Unknown outcomes keep that reservation charged for the day; successful calls settle to reported token usage.
 
 ### Reservation quick-action links
 

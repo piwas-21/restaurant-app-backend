@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Dtos;
 
@@ -10,4 +11,5 @@ public sealed class OptionSetWriteRequestDto
     public Dictionary<string, string> Translations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public OptionSetStatus Status { get; set; } = OptionSetStatus.Active;
     public List<OptionSetEntryDto> Entries { get; set; } = [];
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
 }

@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 using RestaurantSystem.Domain.Common.Enums;
 
@@ -18,6 +19,7 @@ namespace RestaurantSystem.Api.Features.Menus.Dtos;
 /// </summary>
 public class MenuBundleDto
 {
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public string? Description { get; set; }
@@ -123,6 +125,7 @@ public class MenuBundleDefinitionDto
 /// </summary>
 public class MenuBundleSectionDto
 {
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public string? Description { get; set; }
