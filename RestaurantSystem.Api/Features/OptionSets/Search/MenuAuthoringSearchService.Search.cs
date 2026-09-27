@@ -15,6 +15,7 @@ public sealed partial class MenuAuthoringSearchService
         CancellationToken cancellationToken)
     {
         var normalizedQuery = ValidateQuery(query);
+        var searchText = query!.Trim();
         var searchCursor = string.IsNullOrWhiteSpace(cursor)
             ? null
             : MenuAuthoringSearchCursor.Decode(cursor, _pagination.MaximumSearchCursorLength);
@@ -24,17 +25,17 @@ public sealed partial class MenuAuthoringSearchService
         if (forKind is null or OptionSetKind.BundleChoice or OptionSetKind.SuggestedSide)
         {
             candidates.AddRange(await SearchProductsAsync(
-                normalizedQuery, forKind, searchCursor, pageSize, cancellationToken));
+                normalizedQuery, searchText, forKind, searchCursor, pageSize, cancellationToken));
         }
 
         if (forKind is null or OptionSetKind.Ingredient or OptionSetKind.Sauce)
         {
             candidates.AddRange(await SearchIngredientsAsync(
-                normalizedQuery, forKind, searchCursor, pageSize, cancellationToken));
+                normalizedQuery, searchText, forKind, searchCursor, pageSize, cancellationToken));
         }
 
         candidates.AddRange(await SearchOptionSetsAsync(
-            normalizedQuery, forKind, searchCursor, pageSize, cancellationToken));
+            normalizedQuery, searchText, forKind, searchCursor, pageSize, cancellationToken));
         var accepted = await LoadAcceptedDecisionsAsync(normalizedQuery, candidates, cancellationToken);
 
         foreach (var candidate in candidates)
@@ -44,8 +45,9 @@ public sealed partial class MenuAuthoringSearchService
         }
 
         var ordered = candidates
-            .OrderBy(candidate => candidate.Name, StringComparer.Ordinal)
+            .OrderBy(candidate => candidate.RelevanceRank)
             .ThenBy(candidate => MenuAuthoringCandidateTypes.Rank(candidate.Type))
+            .ThenBy(candidate => candidate.Name, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Id)
             .Take(pageSize + 1)
             .ToList();

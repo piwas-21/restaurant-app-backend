@@ -2,6 +2,10 @@ namespace RestaurantSystem.Api.Features.OptionSets.Search;
 
 internal static class MenuAuthoringCandidateTypes
 {
+    public const int ExactMatchRank = 0;
+    public const int PrefixMatchRank = 1;
+    public const int NameMatchRank = 2;
+    public const int AliasMatchRank = 3;
     public const int ProductRank = 0;
     public const int ComponentRank = 1;
     public const int BundleRank = 2;

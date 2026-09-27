@@ -23,7 +23,4 @@ public sealed partial class MenuAuthoringSearchService : IMenuAuthoringSearchSer
 
     private int PageSize(int requestedPageSize) => _pagination.Normalize(requestedPageSize);
 
-    private static string LikePattern(string normalizedQuery) =>
-        $"%{normalizedQuery.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";
-
 }

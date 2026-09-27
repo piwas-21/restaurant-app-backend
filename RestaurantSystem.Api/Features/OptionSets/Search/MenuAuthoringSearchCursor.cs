@@ -4,12 +4,13 @@ using RestaurantSystem.Api.Common.Exceptions;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Search;
 
-internal sealed record MenuAuthoringSearchCursor(string Name, int TypeRank, Guid Id)
+internal sealed record MenuAuthoringSearchCursor(int RelevanceRank, string Name, int TypeRank, Guid Id)
 {
     private const string InvalidCursorMessage = "The authoring search cursor is invalid";
 
     public static string Encode(MenuAuthoringSearchCandidateDto candidate) =>
         WebEncoders.Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new MenuAuthoringSearchCursor(
+            candidate.RelevanceRank,
             candidate.Name,
             MenuAuthoringCandidateTypes.Rank(candidate.Type),
             candidate.Id)));
@@ -24,7 +25,11 @@ internal sealed record MenuAuthoringSearchCursor(string Name, int TypeRank, Guid
         try
         {
             return JsonSerializer.Deserialize<MenuAuthoringSearchCursor>(WebEncoders.Base64UrlDecode(value))
-                is { Id: var id, TypeRank: >= 0 and <= 4 } cursor
+                is
+            {
+                Id: var id, RelevanceRank: >= 0 and <= MenuAuthoringCandidateTypes.AliasMatchRank,
+                TypeRank: >= 0 and <= 4
+            } cursor
                 && id != Guid.Empty
                 ? cursor
                 : throw new BadRequestException(InvalidCursorMessage);

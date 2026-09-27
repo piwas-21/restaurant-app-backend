@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Enums;
+using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Search;
 
@@ -7,6 +8,8 @@ public sealed class MenuAuthoringSearchCandidateDto
     public Guid Id { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    [JsonIgnore]
+    public int RelevanceRank { get; set; }
     public string MatchSource { get; set; } = "name";
     public string? CategoryName { get; set; }
     public string? ImageUrl { get; set; }
