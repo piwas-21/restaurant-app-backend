@@ -34,12 +34,17 @@ public sealed class OptionSetMaterializationJobRunnerTests : IntegrationTestBase
         var validatedTargetCounts = new List<int>();
         var applyCount = 0;
 
-        await using var context = DatabaseFixture.CreateContext();
-        var materializer = CreateMaterializer(context, validatedTargetCounts, _ => applyCount++);
-        var runner = CreateRunner(context, materializer.Object);
         var batchCount = 0;
-        while (await runner.RunNextBatchAsync(CancellationToken.None))
+        while (true)
         {
+            await using var context = DatabaseFixture.CreateContext();
+            var materializer = CreateMaterializer(context, validatedTargetCounts, _ => applyCount++);
+            var runner = CreateRunner(context, materializer.Object);
+            if (!await runner.RunNextBatchAsync(CancellationToken.None))
+            {
+                break;
+            }
+
             batchCount++;
         }
 
