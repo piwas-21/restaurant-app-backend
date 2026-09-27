@@ -66,13 +66,21 @@ public sealed partial class OptionSetMaterializer
         IDictionary<Guid, int> menuVersionBases,
         IDictionary<Guid, int> menuVersionAdvances,
         OptionSetMaterializerValidationContext validationContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        OptionSetMaterializationJobTarget? durableTarget = null,
+        Guid? leaseId = null,
+        string? auditIdentifier = null)
     {
         await using var transaction = ambientTransaction
             ? null
             : await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         try
         {
+            if (durableTarget is not null)
+            {
+                await RenewJobLeaseAsync(durableTarget.JobId, leaseId, cancellationToken);
+            }
+
             var set = await LoadExpectedSetAsync(request, cancellationToken);
             var effectiveTarget = WithEffectiveMenuVersion(target, menuVersionBases, menuVersionAdvances);
             var targetResult = await OptionSetMaterializerTargetWriter.ApplyAsync(
@@ -80,11 +88,12 @@ public sealed partial class OptionSetMaterializer
                 set,
                 effectiveTarget,
                 request.IdempotencyKey.Trim(),
-                _currentUser.GetAuditIdentifier(),
+                auditIdentifier ?? _currentUser.GetAuditIdentifier(),
                 validationContext,
                 cancellationToken);
 
             await EnsureSetVersionUnchangedAsync(request, cancellationToken);
+            RecordSuccessfulJobOutcome(durableTarget, targetResult);
             await _context.SaveChangesAsync(cancellationToken);
             if (transaction is not null)
             {
@@ -114,6 +123,43 @@ public sealed partial class OptionSetMaterializer
             await RollbackAndClearAsync(transaction, cancellationToken);
             return ConflictResult(target, "concurrent-update", "The target changed during apply. Reload it and review the diff.");
         }
+    }
+
+    private async Task RenewJobLeaseAsync(Guid jobId, Guid? leaseId, CancellationToken cancellationToken)
+    {
+        if (leaseId is not Guid owner)
+        {
+            throw new ConflictException("The option-set job lease is missing.");
+        }
+
+        var now = DateTime.UtcNow;
+        var updated = await _context.OptionSetMaterializationJobs
+            .Where(job => job.Id == jobId && job.LeaseId == owner)
+            .ExecuteUpdateAsync(updates => updates
+                .SetProperty(job => job.LeaseExpiresAt, now.AddSeconds(_settings.JobLeaseSeconds))
+                .SetProperty(job => job.UpdatedAt, now), cancellationToken);
+        if (updated != 1)
+        {
+            throw new ConflictException("The option-set job lease was reclaimed before this target started.");
+        }
+    }
+
+    private static void RecordSuccessfulJobOutcome(
+        OptionSetMaterializationJobTarget? durableTarget,
+        OptionSetMaterializationTargetResultDto result)
+    {
+        if (durableTarget is null)
+        {
+            return;
+        }
+
+        durableTarget.Status = result.Status;
+        durableTarget.Attempts++;
+        durableTarget.ResultJson = OptionSetMaterializationJobJson.Serialize(result);
+        durableTarget.ErrorCode = null;
+        durableTarget.ErrorMessage = null;
+        durableTarget.CompletedAt = DateTime.UtcNow;
+        durableTarget.UpdatedAt = DateTime.UtcNow;
     }
 
     private async Task EnsureSetVersionUnchangedAsync(
@@ -214,9 +260,10 @@ public sealed partial class OptionSetMaterializer
     private async Task EnsureDifferencesHaveReasonsAsync(
         OptionSetMaterializationRequest request,
         IReadOnlySet<Guid>? stagedProductIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? maximumTargets = null)
     {
-        var preview = await PreviewAsync(request, stagedProductIds, cancellationToken);
+        var preview = await PreviewAsync(request, stagedProductIds, cancellationToken, maximumTargets);
         var targetByKey = request.Targets.ToDictionary(target => target.TargetKey, StringComparer.Ordinal);
         foreach (var warning in preview.RelatedOfferWarnings.Where(warning => warning.ReasonRequired))
         {

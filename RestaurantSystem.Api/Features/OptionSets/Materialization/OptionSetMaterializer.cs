@@ -37,12 +37,43 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
         CancellationToken cancellationToken)
         => await PreviewAsync(request, null, cancellationToken);
 
+    public async Task ValidateJobRequestAsync(
+        OptionSetMaterializationRequest request,
+        CancellationToken cancellationToken)
+    {
+        EnsureMaterializationEnabled();
+        ValidateRequest(request, _settings.MaximumTargetsPerJob);
+        await EnsureDifferencesHaveReasonsAsync(
+            request, null, cancellationToken, _settings.MaximumTargetsPerJob);
+    }
+
+    public Task<OptionSetMaterializationTargetResultDto> ApplyJobTargetAsync(
+        OptionSetMaterializationRequest request,
+        OptionSetMaterializationTargetRequest target,
+        OptionSetMaterializationJobTarget jobTarget,
+        Guid leaseId,
+        int? previousMenuVersion,
+        string auditIdentifier,
+        CancellationToken cancellationToken)
+    {
+        EnsureMaterializationEnabled();
+        ValidateRequest(request, _settings.MaximumTargetsPerJob);
+        var effectiveTarget = previousMenuVersion is int version
+            ? WithExpectedMenuVersion(target, version)
+            : target;
+        return ApplyTargetAsync(
+            request, effectiveTarget, false, new Dictionary<Guid, int>(), new Dictionary<Guid, int>(),
+            new OptionSetMaterializerValidationContext(null, _settings), cancellationToken,
+            jobTarget, leaseId, auditIdentifier);
+    }
+
     private async Task<OptionSetMaterializationPreview> PreviewAsync(
         OptionSetMaterializationRequest request,
         IReadOnlySet<Guid>? stagedProductIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? maximumTargets = null)
     {
-        ValidateRequest(request);
+        ValidateRequest(request, maximumTargets);
         var set = await LoadExpectedSetAsync(request, cancellationToken);
         var preview = new OptionSetMaterializationPreview
         {
@@ -104,15 +135,16 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
         return set;
     }
 
-    private void ValidateRequest(OptionSetMaterializationRequest request)
+    private void ValidateRequest(OptionSetMaterializationRequest request, int? maximumTargets = null)
     {
+        var targetLimit = maximumTargets ?? _settings.MaximumTargetsPerRequest;
         if (request.OptionSetId == Guid.Empty || request.ExpectedSetVersion <= 0
             || string.IsNullOrWhiteSpace(request.IdempotencyKey)
             || request.IdempotencyKey.Trim().Length > _settings.MaximumIdempotencyKeyLength
-            || request.Targets.Count is < 1 || request.Targets.Count > _settings.MaximumTargetsPerRequest)
+            || request.Targets.Count is < 1 || request.Targets.Count > targetLimit)
         {
             throw new BadRequestException(
-                $"A valid option set, version, idempotency key, and 1 to {_settings.MaximumTargetsPerRequest} targets are required");
+                $"A valid option set, version, idempotency key, and 1 to {targetLimit} targets are required");
         }
 
         var keys = new HashSet<string>(StringComparer.Ordinal);
@@ -142,4 +174,23 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
             }
         }
     }
+
+    private static OptionSetMaterializationTargetRequest WithExpectedMenuVersion(
+        OptionSetMaterializationTargetRequest target,
+        int version) => new()
+        {
+            TargetKey = target.TargetKey,
+            Role = target.Role,
+            TargetProductId = target.TargetProductId,
+            TargetMenuSectionId = target.TargetMenuSectionId,
+            TargetCustomizationGroupId = target.TargetCustomizationGroupId,
+            ExpectedMenuAuthoringVersion = version,
+            ExpectedCustomizationGroupVersion = target.ExpectedCustomizationGroupVersion,
+            ExpectedAttachmentVersion = target.ExpectedAttachmentVersion,
+            EntryIds = target.EntryIds,
+            Overrides = target.Overrides,
+            ConflictPolicy = target.ConflictPolicy,
+            Settings = target.Settings,
+            IntentionalDifferenceReason = target.IntentionalDifferenceReason
+        };
 }

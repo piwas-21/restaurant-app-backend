@@ -11,8 +11,15 @@ namespace RestaurantSystem.Api.Features.OptionSets;
 public sealed class OptionSetMaterializationController : ControllerBase
 {
     private readonly IOptionSetMaterializer _materializer;
+    private readonly IOptionSetMaterializationJobService _jobs;
 
-    public OptionSetMaterializationController(IOptionSetMaterializer materializer) => _materializer = materializer;
+    public OptionSetMaterializationController(
+        IOptionSetMaterializer materializer,
+        IOptionSetMaterializationJobService jobs)
+    {
+        _materializer = materializer;
+        _jobs = jobs;
+    }
 
     [HttpPost("preview")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
@@ -38,5 +45,43 @@ public sealed class OptionSetMaterializationController : ControllerBase
         request.OptionSetId = id;
         var result = await _materializer.ApplyAsync(request, cancellationToken);
         return Ok(ApiResponse<OptionSetMaterializationResult>.SuccessWithData(result));
+    }
+
+    [HttpPost("apply-jobs")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<OptionSetMaterializationJobDto>>> CreateJob(
+        Guid id,
+        [FromBody] OptionSetMaterializationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var job = await _jobs.CreateAsync(id, request, cancellationToken);
+        return AcceptedAtAction(nameof(GetJob), new { id, jobId = job.JobId },
+            ApiResponse<OptionSetMaterializationJobDto>.SuccessWithData(job));
+    }
+
+    [HttpGet("apply-jobs/{jobId:guid}")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<OptionSetMaterializationJobDto>>> GetJob(
+        Guid id,
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        var job = await _jobs.GetAsync(id, jobId, cancellationToken);
+        return Ok(ApiResponse<OptionSetMaterializationJobDto>.SuccessWithData(job));
+    }
+
+    [HttpPost("apply-jobs/{jobId:guid}/resume")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<OptionSetMaterializationJobDto>>> ResumeJob(
+        Guid id,
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        var job = await _jobs.ResumeAsync(id, jobId, cancellationToken);
+        return AcceptedAtAction(nameof(GetJob), new { id, jobId },
+            ApiResponse<OptionSetMaterializationJobDto>.SuccessWithData(job));
     }
 }

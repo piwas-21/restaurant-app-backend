@@ -10,7 +10,10 @@ public static class OptionSetServiceCollectionExtensions
     {
         services.AddScoped<IOptionSetCatalogService, OptionSetCatalogService>();
         services.AddScoped<IOptionSetMaterializer, OptionSetMaterializer>();
+        services.AddScoped<IOptionSetMaterializationJobService, OptionSetMaterializationJobService>();
+        services.AddScoped<IOptionSetMaterializationJobRunner, OptionSetMaterializationJobRunner>();
         services.AddScoped<IMenuAuthoringSearchService, MenuAuthoringSearchService>();
+        services.AddHostedService<OptionSetMaterializationJobWorker>();
         return services;
     }
 }
