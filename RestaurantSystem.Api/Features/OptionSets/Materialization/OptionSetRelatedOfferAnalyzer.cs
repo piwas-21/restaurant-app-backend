@@ -68,7 +68,7 @@ internal static partial class OptionSetRelatedOfferAnalyzer
         var requiredRequestTargets = new Dictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>>();
         foreach (var target in choiceTargets)
         {
-            if (!TryGetRequiredSource(target, sourceTargets, out var source))
+            if (!TryGetRequiredSource(target, sourceTargets, out _))
             {
                 continue;
             }

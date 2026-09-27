@@ -31,10 +31,22 @@ internal static partial class OptionSetMaterializerTargetWriter
         var rowLookups = await OptionSetMaterializerBatchRows.FindManyAsync(
             context, target.Role, target, state.SelectedEntries, state.AppliedByEntry, cancellationToken);
         var selectedIds = state.SelectedEntries.Select(entry => entry.Id).ToHashSet();
-        await ApplySelectedRowsAsync(
-            context, set, target, state, attachment, rowLookups, audit, now, result, cancellationToken);
+        await ApplySelectedRowsAsync(new TargetRowApplyContext
+        {
+            DbContext = context,
+            Set = set,
+            Target = target,
+            State = state,
+            Attachment = attachment,
+            RowLookups = rowLookups,
+            Audit = audit,
+            Now = now,
+            Result = result,
+            CancellationToken = cancellationToken
+        });
         await RemoveOmittedRowsAsync(context, attachment, selectedIds, rowLookups, result, cancellationToken);
-        await ValidateAndApplySettingsAsync(context, set, target, state, attachment, audit, now, cancellationToken);
+        OptionSetMaterializerTargetSettings.ApplyAttachmentSettings(set.Kind, state, attachment, target, audit, now);
+        await OptionSetMaterializerRuntimeRules.ValidateAsync(context, set.Kind, state, cancellationToken);
         AdvanceTargetVersion(target, state, result, audit, now);
         AddRevision(context, set, target, result, audit, now);
         UpdateAttachment(attachment, set, idempotencyKey, audit, now);
@@ -111,20 +123,6 @@ internal static partial class OptionSetMaterializerTargetWriter
         {
             throw new BadRequestException(error);
         }
-    }
-
-    private static async Task ValidateAndApplySettingsAsync(
-        ApplicationDbContext context,
-        OptionSet set,
-        OptionSetMaterializationTargetRequest target,
-        OptionSetTargetState state,
-        OptionSetAttachment attachment,
-        string audit,
-        DateTime now,
-        CancellationToken cancellationToken)
-    {
-        OptionSetMaterializerTargetSettings.ApplyAttachmentSettings(set.Kind, state, attachment, target, audit, now);
-        await OptionSetMaterializerRuntimeRules.ValidateAsync(context, set.Kind, state, cancellationToken);
     }
 
     private static void AdvanceTargetVersion(

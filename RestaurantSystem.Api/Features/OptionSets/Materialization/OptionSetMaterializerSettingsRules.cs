@@ -158,9 +158,8 @@ internal static class OptionSetMaterializerSettingsRules
             || value.Price.HasValue || value.IsIncludedInBasePrice.HasValue;
         var hasSideOnly = value.IsRequired.HasValue;
         var hasBundleOnly = value.AdditionalPrice.HasValue || value.IsDefault.HasValue;
-        var fieldsMismatch = kind is OptionSetKind.Ingredient or OptionSetKind.Sauce
-            ? hasSideOnly || hasBundleOnly
-            : false;
+        var fieldsMismatch = (kind is OptionSetKind.Ingredient or OptionSetKind.Sauce)
+            && (hasSideOnly || hasBundleOnly);
         if (kind == OptionSetKind.SuggestedSide)
         {
             fieldsMismatch = hasIngredientOnly || hasBundleOnly;
