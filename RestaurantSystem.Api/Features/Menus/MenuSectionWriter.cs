@@ -79,15 +79,7 @@ public static class MenuSectionWriter
             section.UpdatedAt = now;
             section.UpdatedBy = auditIdentifier;
 
-            if (sectionDto.TranslationsSpecified)
-            {
-                ReplaceTranslations(context, section, sectionDto.Translations ?? [], auditIdentifier, now);
-            }
-
-            if (sectionDto.ItemsSpecified && !translationsOnly)
-            {
-                ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
-            }
+            ApplySectionContent(context, section, sectionDto, auditIdentifier, now, translationsOnly);
             written.Add((sectionDto, section));
         }
 
@@ -102,6 +94,25 @@ public static class MenuSectionWriter
         menuDefinition.UpdatedAt = now;
         menuDefinition.UpdatedBy = auditIdentifier;
         return written;
+    }
+
+    private static void ApplySectionContent(
+        ApplicationDbContext context,
+        MenuSection section,
+        MenuSectionDto sectionDto,
+        string auditIdentifier,
+        DateTime now,
+        bool translationsOnly)
+    {
+        if (sectionDto.TranslationsSpecified)
+        {
+            ReplaceTranslations(context, section, sectionDto.Translations ?? [], auditIdentifier, now);
+        }
+
+        if (sectionDto.ItemsSpecified && !translationsOnly)
+        {
+            ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
+        }
     }
 
     /// <summary>

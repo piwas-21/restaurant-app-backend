@@ -106,12 +106,8 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
             var existingDefinition = product.MenuDefinition;
-            var translationOnly = existingDefinition?.VersionedSectionEditingStarted == true &&
-                MenuSectionReplacementGuard.IsTranslationOnlyChange(existingDefinition.Sections, sections);
-            if (translationOnly && command.ExpectedAuthoringVersion != existingDefinition?.AuthoringVersion)
-            {
-                throw new ConflictException("Menu sections changed. Reload before saving translations.");
-            }
+            var translationOnly = IsTranslationOnlyChange(existingDefinition, sections,
+                command.ExpectedAuthoringVersion);
             var replaceSections = !translationOnly && (existingDefinition is null ||
                 MenuSectionReplacementGuard.ShouldReplaceSections(existingDefinition, sections));
 
@@ -278,5 +274,24 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             MenuOfferLinkConflict.ThrowIfExpected(exception);
             throw;
         }
+    }
+
+    private static bool IsTranslationOnlyChange(
+        MenuDefinition? existingDefinition,
+        IReadOnlyCollection<MenuSectionDto> sections,
+        int? expectedAuthoringVersion)
+    {
+        if (existingDefinition?.VersionedSectionEditingStarted != true ||
+            !MenuSectionReplacementGuard.IsTranslationOnlyChange(existingDefinition.Sections, sections))
+        {
+            return false;
+        }
+
+        if (expectedAuthoringVersion != existingDefinition.AuthoringVersion)
+        {
+            throw new ConflictException("Menu sections changed. Reload before saving translations.");
+        }
+
+        return true;
     }
 }

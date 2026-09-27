@@ -90,23 +90,8 @@ public sealed class OpenAiTranslationGenerationProvider(
         IReadOnlyList<TranslationGenerationTarget> targets,
         string model)
     {
-        if (!response.TryGetProperty("status", out var status) || status.GetString() != "completed" ||
-            !response.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
-        {
-            throw new HttpRequestException("Translation provider returned an incomplete response");
-        }
-
-        var text = output.EnumerateArray()
-            .Where(item => item.TryGetProperty("type", out var kind) && kind.GetString() == "message")
-            .SelectMany(item => item.GetProperty("content").EnumerateArray())
-            .FirstOrDefault(item => item.TryGetProperty("type", out var kind) && kind.GetString() == "output_text");
-        if (text.ValueKind != JsonValueKind.Object ||
-            !text.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String)
-        {
-            throw new HttpRequestException("Translation provider returned no text");
-        }
-
-        using var parsed = JsonDocument.Parse(textValue.GetString()!);
+        var text = GetOutputText(response);
+        using var parsed = JsonDocument.Parse(text);
         if (!parsed.RootElement.TryGetProperty("items", out var items) ||
             items.ValueKind != JsonValueKind.Array || items.GetArrayLength() != targets.Count)
         {
@@ -136,6 +121,26 @@ public sealed class OpenAiTranslationGenerationProvider(
         var inputTokens = ReadTokens(usage, "input_tokens");
         var outputTokens = ReadTokens(usage, "output_tokens");
         return new TranslationGenerationResult(results, "openai", model, inputTokens, outputTokens);
+    }
+
+    private static string GetOutputText(JsonElement response)
+    {
+        if (!response.TryGetProperty("status", out var status) || status.GetString() != "completed" ||
+            !response.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
+        {
+            throw new HttpRequestException("Translation provider returned an incomplete response");
+        }
+
+        var text = output.EnumerateArray()
+            .Where(item => item.TryGetProperty("type", out var kind) && kind.GetString() == "message")
+            .SelectMany(item => item.GetProperty("content").EnumerateArray())
+            .FirstOrDefault(item => item.TryGetProperty("type", out var kind) && kind.GetString() == "output_text");
+        if (text.ValueKind != JsonValueKind.Object ||
+            !text.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String)
+        {
+            throw new HttpRequestException("Translation provider returned no text");
+        }
+        return textValue.GetString()!;
     }
 
     private static int ReadTokens(JsonElement usage, string key)
