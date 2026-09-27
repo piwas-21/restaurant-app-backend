@@ -477,6 +477,13 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         UpdateProductCommand command,
         CancellationToken cancellationToken)
     {
+        if (product.MenuDefinition?.VersionedSectionEditingStarted == true
+            && command.Type != ProductType.Menu)
+        {
+            throw new ConflictException(
+                "This menu has entered versioned section editing and cannot be converted through the legacy product PUT. Use the menu authoring API to preserve its section IDs.");
+        }
+
         if (command.Type == ProductType.Menu && command.MenuDefinition is not null)
         {
             await WriteMenuDefinitionAsync(product, command.MenuDefinition, command.IsComponent, cancellationToken);
@@ -514,14 +521,26 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
         // Menu sections are loaded separately because the product query intentionally includes only
         // the definition. The tracked instance is reused by EF for the replacement operation.
         var existing = await _context.MenuDefinitions
+            .AsSplitQuery()
             .Include(menu => menu.Sections)
                 .ThenInclude(section => section.Items)
+            .Include(menu => menu.Sections)
+                .ThenInclude(section => section.Translations)
             .FirstOrDefaultAsync(menu => menu.ProductId == product.Id, cancellationToken);
+
+        // Compare the incoming full-replacement snapshot to the persisted sections before Upsert
+        // changes the schedule or offer-parent fields. Once versioned editing starts, unchanged
+        // snapshots may accompany other product edits; changed snapshots must use the PATCH API.
+        var replaceSections = existing is null
+            || MenuSectionReplacementGuard.ShouldReplaceSections(existing, sections);
 
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
         var menuDef = MenuDefinitionWriter.Upsert(
             _context, existing, product.Id, menuDefinition, auditIdentifier);
-        MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
+        if (replaceSections)
+        {
+            MenuSectionWriter.ReplaceSections(_context, menuDef, sections, auditIdentifier);
+        }
     }
 }
 

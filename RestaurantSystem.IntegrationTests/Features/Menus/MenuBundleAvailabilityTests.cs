@@ -35,6 +35,9 @@ public class MenuBundleAvailabilityTests : IntegrationTestBase
     private const int TakeawayAndDelivery = (int)(OrderChannels.Takeaway | OrderChannels.Delivery);
 
     private Guid _inheritingBundleId;
+    private Guid _channelChoicesBundleId;
+    private Guid _dineInChoiceId;
+    private Guid _deliveryChoiceId;
 
     public MenuBundleAvailabilityTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -111,6 +114,40 @@ public class MenuBundleAvailabilityTests : IntegrationTestBase
         detail!.Data!.Availability.Should().BeEquivalentTo(listed.Availability);
         detail.Data.Availability.CanOrder.Should().BeFalse(
             "both surfaces must refuse it — an equivalence check alone passes when BOTH are permissive");
+    }
+
+    [Fact]
+    public async Task Detail_ResolvesRequiredOptionsPerChannelAndReadsCurrentState()
+    {
+        var dineIn = await GetChannelChoicesBundleAsync(OrderType.DineIn);
+        var section = dineIn.MenuDefinition!.Sections.Single();
+        var dineInChoice = section.Items.Single(item => item.ProductId == _dineInChoiceId);
+        var deliveryChoice = section.Items.Single(item => item.ProductId == _deliveryChoiceId);
+
+        dineIn.Availability.CanOrder.Should().BeTrue();
+        dineIn.Availability.AllowedOrderTypes.Should().BeEquivalentTo(new[] { OrderType.DineIn, OrderType.Delivery });
+        dineInChoice.Availability.CanOrder.Should().BeTrue();
+        deliveryChoice.Availability.CanOrder.Should().BeFalse();
+        deliveryChoice.Availability.Reason.Should().Be(AvailabilityReason.WrongOrderType);
+
+        var browse = await GetChannelChoicesBundleAsync(requestedOrderType: null);
+        browse.Availability.CanOrder.Should().BeTrue("no channel is chosen while browsing");
+        browse.MenuDefinition!.Sections.Single().Items.Should().AllSatisfy(item =>
+            item.Availability.CanOrder.Should().BeTrue());
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Products
+                .Where(product => product.Id == _dineInChoiceId || product.Id == _deliveryChoiceId)
+                .ExecuteUpdateAsync(update => update.SetProperty(product => product.IsAvailable, false));
+        }
+
+        var refreshed = await GetChannelChoicesBundleAsync(OrderType.DineIn);
+        refreshed.Availability.CanOrder.Should().BeFalse();
+        refreshed.Availability.Reason.Should().Be(AvailabilityReason.Unavailable);
+        refreshed.MenuDefinition!.Sections.Single().Items.Should().AllSatisfy(item =>
+            item.Availability.Reason.Should().Be(AvailabilityReason.Unavailable));
     }
 
     /// <summary>
@@ -278,6 +315,82 @@ public class MenuBundleAvailabilityTests : IntegrationTestBase
         await SeedBundleAsync(UnrestrictedBundleName, ownMask: null);
         _inheritingBundleId = await SeedBundleAsync(
             InheritingBundleName, ownMask: null, inheritedMask: TakeawayAndDelivery);
+        (_channelChoicesBundleId, _dineInChoiceId, _deliveryChoiceId) = await SeedChannelChoicesBundleAsync();
+    }
+
+    private async Task<MenuBundleDto> GetChannelChoicesBundleAsync(OrderType? requestedOrderType)
+    {
+        var channel = requestedOrderType is null ? string.Empty : $"?RequestedOrderType={requestedOrderType}";
+        var response = await GetFromJsonAsync<ApiResponse<MenuBundleDto>>(
+            $"/api/Menus/{_channelChoicesBundleId}{channel}");
+        return response!.Data!;
+    }
+
+    private async Task<(Guid BundleId, Guid DineInChoiceId, Guid DeliveryChoiceId)> SeedChannelChoicesBundleAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var dineInCategory = new Category
+        {
+            Name = "§9.2 Dine-in Choice",
+            AvailableOrderTypes = (int)OrderChannels.DineIn,
+            CreatedBy = "test"
+        };
+        var deliveryCategory = new Category
+        {
+            Name = "§9.2 Delivery Choice",
+            AvailableOrderTypes = (int)OrderChannels.Delivery,
+            CreatedBy = "test"
+        };
+        var dineInChoice = ChannelChoiceProduct("§9.2 Dine-in Option", dineInCategory);
+        var deliveryChoice = ChannelChoiceProduct("§9.2 Delivery Option", deliveryCategory);
+        var bundle = new Product
+        {
+            Name = "§9.2 Required Channel Options",
+            BasePrice = 20m,
+            Type = ProductType.Menu,
+            IsActive = true,
+            IsAvailable = true,
+            CreatedBy = "test",
+            MenuDefinition = new MenuDefinition { IsAlwaysAvailable = true, CreatedBy = "test" }
+        };
+        bundle.MenuDefinition.Sections.Add(new MenuSection
+        {
+            Name = "Choose one meal",
+            IsRequired = true,
+            MinSelection = 1,
+            MaxSelection = 2,
+            CreatedBy = "test",
+            Items =
+            {
+                new MenuSectionItem { Product = dineInChoice, CreatedBy = "test" },
+                new MenuSectionItem { Product = deliveryChoice, CreatedBy = "test" }
+            }
+        });
+
+        context.AddRange(bundle, dineInChoice, deliveryChoice);
+        await context.SaveChangesAsync();
+        return (bundle.Id, dineInChoice.Id, deliveryChoice.Id);
+    }
+
+    private static Product ChannelChoiceProduct(string name, Category category)
+    {
+        var product = new Product
+        {
+            Name = name,
+            BasePrice = 5m,
+            IsActive = true,
+            IsAvailable = true,
+            Type = ProductType.MainItem,
+            CreatedBy = "test"
+        };
+        product.ProductCategories.Add(new ProductCategory
+        {
+            Category = category,
+            IsPrimary = true,
+            CreatedBy = "test"
+        });
+        return product;
     }
 
     private async Task<Guid> SeedBundleAsync(string name, int? ownMask, int? inheritedMask = null)

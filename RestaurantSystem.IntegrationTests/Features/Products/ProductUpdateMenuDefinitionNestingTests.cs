@@ -41,6 +41,7 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
     private Guid _bundleId;
     private Guid _categoryId;
     private Guid _componentProductId;
+    private Guid _alternateOptionProductId;
 
     public ProductUpdateMenuDefinitionNestingTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -56,6 +57,21 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
 
         _categoryId = (await context.Categories.OrderBy(c => c.Name).FirstAsync()).Id;
         _componentProductId = (await context.Products.OrderBy(p => p.Name).FirstAsync()).Id;
+
+        var alternateOption = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Menu Option Beverage",
+            BasePrice = 2m,
+            Type = ProductType.Beverage,
+            IsActive = true,
+            IsAvailable = true,
+            Ingredients = new List<string>(),
+            Allergens = new List<string>(),
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        _alternateOptionProductId = alternateOption.Id;
 
         var bundle = new Product
         {
@@ -143,7 +159,7 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
             CreatedBy = "test"
         });
 
-        context.Products.Add(bundle);
+        context.Products.AddRange(alternateOption, bundle);
         await context.SaveChangesAsync();
     }
 
@@ -297,7 +313,9 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
             "isRequired": false,
             "minSelection": 0,
             "maxSelection": 1,
-            "items": []
+            "items": [
+              { "productId": "{{_alternateOptionProductId}}", "additionalPrice": 0, "displayOrder": 0, "isDefault": false }
+            ]
           }
         ]
       }
@@ -347,7 +365,7 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
         var response = await PutRawAsync(MenuPayloadWithoutDetailedIngredients());
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 0));
+        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 1));
     }
 
     // The orphan. A Menu → non-Menu type change with no `detailedIngredients` never reached the
@@ -387,9 +405,8 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
     // non-Menu → Menu conversion, where the definition has to be created and Added by the same
     // shared helper both handlers now depend on.
     //
-    // Sections carry no items deliberately: the component product is the only other product seeded
-    // here, and a menu whose one section offers the product it was converted from is a confusing
-    // fixture. The item path is covered by the section tests above.
+    // This section points to a separate product so the new menu has a valid option without
+    // offering the product being converted back to itself.
     [Fact]
     public async Task NonMenuProductGainingMenuDefinition_CreatesIt()
     {
@@ -421,7 +438,8 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
             "availableSaturday": false,
             "availableSunday": true,
             "sections": [
-              { "name": "Only Section", "displayOrder": 0, "isRequired": true, "minSelection": 1, "maxSelection": 1, "items": [] }
+              { "name": "Only Section", "displayOrder": 0, "isRequired": true, "minSelection": 1, "maxSelection": 1,
+                "items": [{ "productId": "{{_alternateOptionProductId}}", "additionalPrice": 0, "displayOrder": 0, "isDefault": true }] }
             ]
           }
         }
@@ -451,6 +469,41 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
         created.Sections.Select(s => s.Name).Should().Equal("Only Section");
     }
 
+    [Fact]
+    public async Task RequiredEmptySection_IsRejectedWithoutChangingExistingDefinition()
+    {
+        AuthenticateAsAdmin();
+
+        var json = $$"""
+        {
+          "id": "{{_bundleId}}",
+          "name": "Combo Renamed",
+          "basePrice": 22,
+          "isActive": true,
+          "isAvailable": true,
+          "isSpecial": false,
+          "preparationTimeMinutes": 15,
+          "type": "menu",
+          "kitchenType": "none",
+          "displayOrder": 0,
+          "categoryIds": ["{{_categoryId}}"],
+          "primaryCategoryId": "{{_categoryId}}",
+          "detailedIngredients": [],
+          "menuDefinition": {
+            "isAlwaysAvailable": true,
+            "sections": [
+              { "name": "Required", "displayOrder": 0, "isRequired": true, "minSelection": 1, "maxSelection": 1, "items": [] }
+            ]
+          }
+        }
+        """;
+
+        var response = await PutRawAsync(json);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadSectionsAsync()).Should().Equal(("Main", 1), ("Drink", 0));
+    }
+
     // ---- Regressions: the paths that already worked must keep working -------------------------
 
     // Both keys present — the shape the nesting made work by accident, which lifting the block out
@@ -473,7 +526,7 @@ public class ProductUpdateMenuDefinitionNestingTests : IntegrationTestBase
         var definition = await ReadDefinitionAsync();
         definition.Should().NotBeNull();
         definition!.IsAlwaysAvailable.Should().BeFalse();
-        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 0));
+        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 1));
     }
 
     // The other half of the un-nesting: the ingredient rewrite is now the branch's only tenant, so

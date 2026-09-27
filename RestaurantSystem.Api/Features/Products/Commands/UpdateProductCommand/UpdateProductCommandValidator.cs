@@ -11,7 +11,9 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
     {
         RuleFor(x => x.Id).NotEmpty().WithMessage("Product ID is required");
         RuleFor(x => x.Name).NotEmpty().WithMessage("Name is required").MaximumLength(200);
-        RuleFor(x => x.BasePrice).GreaterThanOrEqualTo(0).WithMessage("Price must be non-negative");
+        RuleFor(x => x.BasePrice)
+            .Must((command, price) => price > 0 || (command.IsComponent && price == 0))
+            .WithMessage("Base price must be positive unless this is an internal bundle component");
         RuleFor(x => x.PreparationTimeMinutes).GreaterThanOrEqualTo(0).WithMessage("Preparation time must be non-negative");
         RuleFor(x => x.CategoryIds).NotEmpty().WithMessage("At least one category is required");
 

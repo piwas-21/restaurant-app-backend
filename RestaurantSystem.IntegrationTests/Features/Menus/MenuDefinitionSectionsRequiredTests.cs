@@ -32,6 +32,7 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
     private Guid _bundleId;
     private Guid _categoryId;
     private Guid _componentProductId;
+    private Guid _secondOptionProductId;
 
     public MenuDefinitionSectionsRequiredTests(DatabaseFixture databaseFixture)
         : base(databaseFixture)
@@ -47,6 +48,23 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
 
         _categoryId = (await context.Categories.OrderBy(c => c.Name).FirstAsync()).Id;
         _componentProductId = (await context.Products.OrderBy(p => p.Name).FirstAsync()).Id;
+
+        var secondOption = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Second test option",
+            BasePrice = 2m,
+            Type = ProductType.MainItem,
+            IsComponent = true,
+            IsActive = true,
+            IsAvailable = true,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        _secondOptionProductId = secondOption.Id;
+        context.Products.Add(secondOption);
 
         var bundle = new Product
         {
@@ -188,11 +206,25 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
     private object[] TwoReplacementSections() =>
     [
         new { name = "Starter", displayOrder = 0, isRequired = true, minSelection = 1, maxSelection = 1, items = new[] { new { productId = _componentProductId, additionalPrice = 0m, displayOrder = 0, isDefault = true } } },
-        new { name = "Dessert", displayOrder = 1, isRequired = false, minSelection = 0, maxSelection = 1, items = Array.Empty<object>() }
+        new { name = "Dessert", displayOrder = 1, isRequired = false, minSelection = 0, maxSelection = 1, items = new[] { new { productId = _componentProductId, additionalPrice = 0m, displayOrder = 0, isDefault = false } } }
     ];
 
     private Task<HttpResponseMessage> PutRawAsync(string url, string json) =>
         Client.PutAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+
+    private Task<HttpResponseMessage> PatchRawAsync(string json, string? etag)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/Menus/{_bundleId}/sections")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        if (etag is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", etag);
+        }
+
+        return Client.SendAsync(request);
+    }
 
     // ---- PUT /api/Menus — the handler the issue was filed against ----------------------------
 
@@ -262,17 +294,13 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
             $"/api/Menus/{_bundleId}", BundlePayload(TwoReplacementSections()), JsonOptions);
 
         response.EnsureSuccessStatusCode();
-        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 0));
+        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 1));
     }
 
-    // `MenuSectionDto.Items` keeps its initializer, so this guard is the OPPOSITE of dead: STJ
-    // writes a literal `"items": null` straight over the initializer (RespectNullableAnnotations
-    // is off, which is the same mechanism that made `sections: null` the one preserving payload
-    // before this fix), nothing validates Items, and the guard is all that stands between such a
-    // body and an NRE. Accepted as "this section has no items" — pinned so a later "the guard is
-    // unreachable, delete it" reading turns a 200 into a 500 loudly instead of in production.
+    // Null still deserializes safely, but the strict cardinality contract refuses a section whose
+    // positive maximum cannot be satisfied by any available choice.
     [Fact]
-    public async Task SectionWithNullItems_IsAcceptedAsNoItems()
+    public async Task SectionWithNullItems_IsRejectedAsInvalidCardinality()
     {
         AuthenticateAsAdmin();
 
@@ -296,8 +324,8 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
 
         var response = await PutRawAsync($"/api/Menus/{_bundleId}", json);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await ReadSectionsAsync()).Should().Equal(("Solo", 0));
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadSectionNamesAsync()).Should().Equal("Main", "Drink");
     }
 
     // The new rule reads MenuDefinition.Sections, and MenuDefinition itself is still absent-able
@@ -382,7 +410,7 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var created = await context.Products.AsNoTracking().SingleAsync(p => p.Name == "New Combo");
 
-        (await ReadSectionsAsync(created.Id)).Should().Equal(("Starter", 1), ("Dessert", 0));
+        (await ReadSectionsAsync(created.Id)).Should().Equal(("Starter", 1), ("Dessert", 1));
     }
 
     // ---- PUT /api/Products — the twin guard the issue body does not mention ------------------
@@ -422,7 +450,105 @@ public class MenuDefinitionSectionsRequiredTests : IntegrationTestBase
             $"/api/Products/{_bundleId}", ProductPayload(TwoReplacementSections()), JsonOptions);
 
         response.EnsureSuccessStatusCode();
-        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 0));
+        (await ReadSectionsAsync()).Should().Equal(("Starter", 1), ("Dessert", 1));
+    }
+
+    [Fact]
+    public async Task SectionsPatch_PreservesStableIdsHonorsOmissionAndRejectsStaleWrites()
+    {
+        AuthenticateAsAdmin();
+
+        var get = await Client.GetAsync($"/api/Menus/{_bundleId}");
+        get.EnsureSuccessStatusCode();
+        var initialEtag = get.Headers.ETag?.ToString();
+        initialEtag.Should().NotBeNull();
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var main = await context.MenuDefinitions
+            .Where(definition => definition.ProductId == _bundleId)
+            .SelectMany(definition => definition.Sections)
+            .Include(section => section.Items)
+            .SingleAsync(section => section.Name == "Main");
+        var mainId = main.Id;
+        var originalItemId = main.Items.Single().Id;
+
+        var missingPrecondition = await PatchRawAsync("{\"sections\":[]}", null);
+        missingPrecondition.StatusCode.Should().Be((HttpStatusCode)428);
+
+        // The top-level collection is present, so the omitted old Drink row is removed. The nested
+        // Items key is absent for Main, so its persisted option remains in place.
+        var firstPatch = await PatchRawAsync($$"""
+        { "sections": [ {
+          "id": "{{mainId}}", "name": "Main", "displayOrder": 0,
+          "isRequired": true, "minSelection": 1, "maxSelection": 1
+        } ] }
+        """, initialEtag);
+        firstPatch.StatusCode.Should().Be(HttpStatusCode.OK);
+        var firstPatchEtag = firstPatch.Headers.ETag?.ToString();
+        firstPatchEtag.Should().NotBe(initialEtag);
+
+        var afterFirst = await ReadSectionsWithIdsAsync();
+        afterFirst.Should().ContainSingle();
+        afterFirst[0].SectionId.Should().Be(mainId);
+        afterFirst[0].ItemIds.Should().Equal(originalItemId);
+
+        var stalePatch = await PatchRawAsync("{\"sections\":[]}", initialEtag);
+        stalePatch.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadSectionsWithIdsAsync()).Should().HaveCount(1);
+
+        // Existing section/item IDs survive a mixed update; the added choice and section receive
+        // server IDs. The top-level and nested omitted/empty meanings stay distinct.
+        var secondPatch = await PatchRawAsync($$"""
+        { "sections": [
+          { "id": "{{mainId}}", "name": "Main", "displayOrder": 0,
+            "isRequired": true, "minSelection": 1, "maxSelection": 2,
+            "items": [
+              { "id": "{{originalItemId}}", "productId": "{{_componentProductId}}", "additionalPrice": 0, "displayOrder": 0, "isDefault": true },
+              { "productId": "{{_secondOptionProductId}}", "additionalPrice": 2, "displayOrder": 1, "isDefault": false }
+            ]
+          },
+          { "name": "Dessert", "displayOrder": 1, "isRequired": false,
+            "minSelection": 0, "maxSelection": 1,
+            "items": [ { "productId": "{{_secondOptionProductId}}", "additionalPrice": 0, "displayOrder": 0, "isDefault": false } ]
+          }
+        ] }
+        """, firstPatchEtag);
+        secondPatch.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var afterSecond = await ReadSectionsWithIdsAsync();
+        afterSecond.Should().HaveCount(2);
+        afterSecond[0].SectionId.Should().Be(mainId);
+        afterSecond[0].ItemIds.Should().Contain(originalItemId);
+        afterSecond[0].ItemIds.Should().HaveCount(2);
+        afterSecond[0].ItemIds.Should().OnlyHaveUniqueItems();
+        afterSecond[1].SectionId.Should().NotBe(Guid.Empty);
+        afterSecond[1].ItemIds.Should().ContainSingle().And.NotContain(Guid.Empty);
+
+        var currentEtag = secondPatch.Headers.ETag?.ToString();
+        var omittedPatch = await PatchRawAsync("{}", currentEtag);
+        omittedPatch.StatusCode.Should().Be(HttpStatusCode.OK);
+        omittedPatch.Headers.ETag?.ToString().Should().Be(currentEtag);
+
+        var clearPatch = await PatchRawAsync("{\"sections\":[]}", currentEtag);
+        clearPatch.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadSectionsWithIdsAsync()).Should().BeEmpty();
+    }
+
+    private async Task<List<(Guid SectionId, List<Guid> ItemIds)>> ReadSectionsWithIdsAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var definition = await context.MenuDefinitions
+            .Where(menu => menu.ProductId == _bundleId)
+            .Include(menu => menu.Sections)
+                .ThenInclude(section => section.Items)
+            .AsNoTracking()
+            .SingleAsync();
+        return definition.Sections
+            .OrderBy(section => section.DisplayOrder)
+            .Select(section => (section.Id, section.Items.OrderBy(item => item.DisplayOrder).Select(item => item.Id).ToList()))
+            .ToList();
     }
 
     // Pins the product rule's handling of a NULL menu definition on a Menu-type product. That is

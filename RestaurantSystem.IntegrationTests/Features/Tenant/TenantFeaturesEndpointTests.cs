@@ -29,7 +29,11 @@ public sealed class TenantFeaturesEndpointTests : IAsyncLifetime
     {
         _factory = new TestWebApplicationFactory(
             _databaseFixture.ConnectionString,
-            new Dictionary<string, string> { ["TenantFeatures:ServerWorkspaceV2"] = "true" });
+            new Dictionary<string, string>
+            {
+                ["TenantFeatures:ServerWorkspaceV2"] = "true",
+                ["TenantFeatures:EnforceSauceMinimum"] = "true"
+            });
         _client = _factory.CreateClient();
         _client.DefaultRequestHeaders.Add(TestAuthHandler.AnonymousHeader, "true");
         return Task.CompletedTask;
@@ -55,6 +59,7 @@ public sealed class TenantFeaturesEndpointTests : IAsyncLifetime
         root.GetProperty("success").GetBoolean().Should().BeTrue();
         var data = root.GetProperty("data");
         data.GetProperty("serverWorkspaceV2").GetBoolean().Should().BeTrue();
+        data.GetProperty("enforceSauceMinimum").GetBoolean().Should().BeTrue();
         data.TryGetProperty("ServerWorkspaceV2", out _).Should().BeFalse();
     }
 }

@@ -14,7 +14,7 @@ namespace RestaurantSystem.Api.Features.Products.Queries.GetProductByIdQuery;
 
 // RequestedOrderType resolves the item's `Availability` for the guest's channel; null (no type
 // chosen yet) reports it as orderable and still fills AllowedOrderTypes for the chip.
-public record GetProductByIdQuery(Guid Id, OrderType? RequestedOrderType = null) : IQuery<ApiResponse<ProductDto>>;
+public record GetProductByIdQuery(Guid Id, OrderType? RequestedOrderType = null, string? Locale = null) : IQuery<ApiResponse<ProductDto>>;
 
 public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, ApiResponse<ProductDto>>
 {
@@ -71,12 +71,18 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             // out serves a dish whose recipe reads as "no ingredients" rather than failing.
             // `AsSplitQuery()` above keeps it off the Cartesian product of the sibling includes.
             .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.Product.ProductCategories)
+                        .ThenInclude(category => category.Category)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Translations)
+            .Include(p => p.MenuDefinition!.Sections)
+                .ThenInclude(section => section.Items)
+                    .ThenInclude(item => item.ProductVariation)
+            .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.DetailedIngredients)
                         .ThenInclude(di => di.Descriptions)
-            .Include(p => p.MenuDefinition!.Sections)
-                .ThenInclude(s => s.Items)
-                    .ThenInclude(i => i.ProductVariation)
             .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.CustomizationGroups)
@@ -99,7 +105,9 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
 
         var productDto = new ProductDto
         {
-            Availability = OrderTypeAvailability.Resolve(product, query.RequestedOrderType),
+            Availability = product.Type == ProductType.Menu && product.MenuDefinition is not null
+                ? MenuBundleAvailabilityResolver.Resolve(product, query.RequestedOrderType)
+                : OrderTypeAvailability.Resolve(product, query.RequestedOrderType),
             AvailableOrderTypes = product.AvailableOrderTypes,
             Id = product.Id,
             Name = product.Name,
@@ -227,7 +235,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             // customize, and the mobile client reading this contract got the same. The two reads now
             // cannot drift, because there is only one of them.
             MenuDefinition = product.MenuDefinition != null
-                ? MenuBundleMapper.MapDefinition(product.MenuDefinition)
+                ? MenuBundleMapper.MapDefinition(product.MenuDefinition, query.RequestedOrderType, query.Locale)
                 : null,
             Content = new()
         };

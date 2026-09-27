@@ -1,8 +1,12 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
+using RestaurantSystem.Api.Features.Products.Commands.UpdateProductPriceCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -185,6 +189,28 @@ public class ProductsControllerTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UpdateProductPriceHandler_RejectsNegativePriceWithoutValidationPipeline()
+    {
+        var productId = await SeedPricedProductAsync("Handler Guard Cola", 10.00m);
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var handler = new UpdateProductPriceCommandHandler(
+            context,
+            scope.ServiceProvider.GetRequiredService<ICurrentUserService>(),
+            scope.ServiceProvider.GetRequiredService<ILogger<UpdateProductPriceCommandHandler>>());
+
+        var action = () => handler.Handle(
+            new UpdateProductPriceCommand(productId, -1m), CancellationToken.None);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Price must be non-negative");
+        (await context.Products.AsNoTracking()
+            .Where(product => product.Id == productId)
+            .Select(product => product.BasePrice)
+            .SingleAsync()).Should().Be(10m);
+    }
+
+    [Fact]
     public async Task UpdateProductPrice_OverColumnBound_IsRejected()
     {
         var productId = await SeedPricedProductAsync("Priceless Cola", 10.00m);
@@ -210,9 +236,21 @@ public class ProductsControllerTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateProductPrice_ZeroIsAccepted()
+    public async Task UpdateProductPrice_ZeroIsRejectedForSellableProducts()
     {
         var productId = await SeedPricedProductAsync("Free Cola", 10.00m);
+        AuthenticateAsAdmin();
+
+        var response = await PatchPriceAsync(productId, 0m);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetPersistedBasePriceAsync(productId)).Should().Be(10.00m);
+    }
+
+    [Fact]
+    public async Task UpdateProductPrice_ZeroIsAcceptedForInternalComponents()
+    {
+        var productId = await SeedPricedProductAsync("Internal Cola", 10.00m, isComponent: true);
         AuthenticateAsAdmin();
 
         var response = await PatchPriceAsync(productId, 0m);
@@ -288,7 +326,8 @@ public class ProductsControllerTests : IntegrationTestBase
         variation.Content!["en"].Name.Should().BeOneOf("Large", "Large (duplicate language)");
     }
 
-    private async Task<Guid> SeedPricedProductAsync(string name, decimal price, bool isDeleted = false)
+    private async Task<Guid> SeedPricedProductAsync(
+        string name, decimal price, bool isDeleted = false, bool isComponent = false)
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -307,6 +346,7 @@ public class ProductsControllerTests : IntegrationTestBase
             Allergens = new List<string>(),
             DisplayOrder = 50,
             IsDeleted = isDeleted,
+            IsComponent = isComponent,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "test"
         };

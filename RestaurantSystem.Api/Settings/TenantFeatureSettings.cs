@@ -13,4 +13,10 @@ public sealed class TenantFeatureSettings
     /// authorization or module entitlement; it only selects the UI implementation.
     /// </summary>
     public bool ServerWorkspaceV2 { get; set; }
+
+    /// <summary>
+    /// Requires configured minimum sauce choices at write time. Defaults off for existing guest,
+    /// staff and mobile clients until each tenant's payload compatibility is verified.
+    /// </summary>
+    public bool EnforceSauceMinimum { get; set; }
 }

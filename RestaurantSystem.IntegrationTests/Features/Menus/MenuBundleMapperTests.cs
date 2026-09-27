@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -12,6 +13,12 @@ namespace RestaurantSystem.IntegrationTests.Features.Menus;
 // projected. Pure static mapper — no DB.
 public class MenuBundleMapperTests
 {
+    private static readonly string ImageBaseUrl = new ConfigurationBuilder()
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.Test.json", optional: false)
+        .Build()["AWS:S3:BaseUrl"]
+        ?? throw new InvalidOperationException("Test image base URL is missing");
+
     [Fact]
     public void MapsPerOptionDetailedIngredients_AndDropsDeadSuggestedSideItems()
     {
@@ -83,7 +90,7 @@ public class MenuBundleMapperTests
             CreatedBy = "test"
         };
 
-        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", requestedOrderType: null);
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, ImageBaseUrl, requestedOrderType: null);
 
         var item = dto.MenuDefinition!.Sections.Single().Items.Single();
         item.DetailedIngredients.Should().ContainSingle().Which.Name.Should().Be("Ice");
@@ -102,7 +109,7 @@ public class MenuBundleMapperTests
     {
         var bundle = BundleWith(availableOrderTypes: (int)(OrderChannels.Takeaway | OrderChannels.Delivery));
 
-        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", requested);
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, ImageBaseUrl, requested);
 
         dto.Availability.CanOrder.Should().Be(expectedCanOrder);
         dto.Availability.InheritsOrderTypes.Should().BeFalse();
@@ -130,7 +137,7 @@ public class MenuBundleMapperTests
             CreatedBy = "test"
         });
 
-        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", OrderType.DineIn);
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, ImageBaseUrl, OrderType.DineIn);
 
         dto.Availability.CanOrder.Should().BeFalse();
         dto.Availability.InheritsOrderTypes.Should().BeTrue();
@@ -142,10 +149,22 @@ public class MenuBundleMapperTests
     public void ResolvesUnrestrictedWhenNothingRestrictsTheBundle()
     {
         var dto = MenuBundleMapper.MapToMenuBundleDto(
-            BundleWith(availableOrderTypes: null), "https://cdn.example", OrderType.DineIn);
+            BundleWith(availableOrderTypes: null), ImageBaseUrl, OrderType.DineIn);
 
         dto.Availability.CanOrder.Should().BeTrue();
         dto.Availability.AllowedOrderTypes.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void A_bundle_without_a_definition_is_not_orderable()
+    {
+        var bundle = BundleWith(availableOrderTypes: null);
+        bundle.MenuDefinition = null;
+
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, ImageBaseUrl, OrderType.DineIn);
+
+        dto.Availability.CanOrder.Should().BeFalse();
+        dto.Availability.AllowedOrderTypes.Should().BeEmpty();
     }
 
     /// <summary>
@@ -177,7 +196,7 @@ public class MenuBundleMapperTests
             CreatedBy = "test"
         });
 
-        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", requestedOrderType: null);
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, ImageBaseUrl, requestedOrderType: null);
 
         dto.CategoryIds.Should().BeEquivalentTo(new[] { primaryId, secondaryId });
         dto.PrimaryCategoryId.Should().Be(primaryId,
@@ -188,23 +207,69 @@ public class MenuBundleMapperTests
     public void AnOrphanBundleProjectsNoCategories()
     {
         var dto = MenuBundleMapper.MapToMenuBundleDto(
-            BundleWith(availableOrderTypes: null), "https://cdn.example", requestedOrderType: null);
+            BundleWith(availableOrderTypes: null), ImageBaseUrl, requestedOrderType: null);
 
         dto.CategoryIds.Should().BeEmpty();
         dto.PrimaryCategoryId.Should().BeNull();
     }
 
-    private static Product BundleWith(int? availableOrderTypes) => new()
+    private static Product BundleWith(int? availableOrderTypes)
     {
-        Id = Guid.NewGuid(),
-        Name = "Combo",
-        BasePrice = 12m,
-        Type = ProductType.Menu,
-        IsAvailable = true,
-        AvailableOrderTypes = availableOrderTypes,
-        Ingredients = new List<string>(),
-        Allergens = new List<string>(),
-        CreatedAt = DateTime.UtcNow,
-        CreatedBy = "test"
-    };
+        var option = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Choice",
+            BasePrice = 1m,
+            Type = ProductType.MainItem,
+            IsActive = true,
+            IsAvailable = true,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        var section = new MenuSection
+        {
+            Id = Guid.NewGuid(),
+            Name = "Choice",
+            IsRequired = true,
+            MinSelection = 1,
+            MaxSelection = 1,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        section.Items.Add(new MenuSectionItem
+        {
+            Id = Guid.NewGuid(),
+            ProductId = option.Id,
+            Product = option,
+            DisplayOrder = 1,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+        var definition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            IsAlwaysAvailable = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        definition.Sections.Add(section);
+
+        return new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Combo",
+            BasePrice = 12m,
+            Type = ProductType.Menu,
+            IsActive = true,
+            IsAvailable = true,
+            AvailableOrderTypes = availableOrderTypes,
+            Ingredients = [],
+            Allergens = [],
+            MenuDefinition = definition,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+    }
 }

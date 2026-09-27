@@ -69,7 +69,8 @@ public class IncludedInBaseDeductionRuleTests
         decimal basePrice,
         List<ProductIngredientDto>? ingredients,
         List<CreateProductVariationDto>? variations = null,
-        bool hideBaseProduct = false)
+        bool hideBaseProduct = false,
+        bool isComponent = false)
     {
         var categoryId = Guid.NewGuid();
         return new CreateProductCommandValidator().Validate(new CreateProductCommand(
@@ -80,14 +81,16 @@ public class IncludedInBaseDeductionRuleTests
             PrimaryCategoryId: categoryId, Variations: variations, SuggestedSideItemIds: null,
             DetailedIngredients: ingredients,
             Content: new ProductDescriptionsDto { ["en"] = new() { Name = "n", Description = "d" } },
-            HideBaseProduct: hideBaseProduct));
+            HideBaseProduct: hideBaseProduct,
+            IsComponent: isComponent));
     }
 
     private static ValidationResult ValidateUpdate(
         decimal basePrice,
         List<ProductIngredientDto>? ingredients,
         List<UpdateProductVariationDto>? variations = null,
-        bool hideBaseProduct = false)
+        bool hideBaseProduct = false,
+        bool isComponent = false)
     {
         var categoryId = Guid.NewGuid();
         return new UpdateProductCommandValidator().Validate(new UpdateProductCommand(
@@ -97,7 +100,8 @@ public class IncludedInBaseDeductionRuleTests
             Allergens: null, DisplayOrder: 0, CategoryIds: [categoryId],
             PrimaryCategoryId: categoryId, Variations: variations, SuggestedSideItemIds: null,
             DetailedIngredients: ingredients, MenuDefinition: null, Content: null,
-            HideBaseProduct: hideBaseProduct));
+            HideBaseProduct: hideBaseProduct,
+            IsComponent: isComponent));
     }
 
     private static bool Refused(ValidationResult result) =>
@@ -118,6 +122,47 @@ public class IncludedInBaseDeductionRuleTests
         Refused(ValidateCreate(PlatePrice, Mezze())).Should().BeFalse(
             "equality prices the line at 0.00, not below — and it is what the configuration means: "
             + "the plate IS its seven mezze");
+    }
+
+    [Fact]
+    public void ZeroPrice_IsAcceptedOnlyForInternalComponents_OnCreateAndUpdate()
+    {
+        var createComponent = new CreateProductCommandValidator().Validate(BuildCreateCommand(0m, isComponent: true));
+        createComponent.IsValid.Should().BeTrue(string.Join(" | ", createComponent.Errors.Select(error => error.ErrorMessage)));
+        var updateComponent = new UpdateProductCommandValidator().Validate(BuildUpdateCommand(0m, isComponent: true));
+        updateComponent.IsValid.Should().BeTrue(string.Join(" | ", updateComponent.Errors.Select(error => error.ErrorMessage)));
+
+        new CreateProductCommandValidator().Validate(BuildCreateCommand(0m)).IsValid.Should().BeFalse();
+        new UpdateProductCommandValidator().Validate(BuildUpdateCommand(0m)).IsValid.Should().BeFalse();
+        new CreateProductCommandValidator().Validate(BuildCreateCommand(-0.01m, isComponent: true))
+            .IsValid.Should().BeFalse();
+        new UpdateProductCommandValidator().Validate(BuildUpdateCommand(-0.01m, isComponent: true))
+            .IsValid.Should().BeFalse();
+    }
+
+    private static CreateProductCommand BuildCreateCommand(decimal basePrice, bool isComponent = false)
+    {
+        var categoryId = Guid.NewGuid();
+        return new CreateProductCommand(
+            Name: "Internal Component", Description: null, BasePrice: basePrice, IsActive: true,
+            IsAvailable: true, IsSpecial: false, PreparationTimeMinutes: 0,
+            Type: ProductType.MainItem, KitchenType: KitchenType.None, Ingredients: null,
+            Allergens: null, DisplayOrder: 0, CategoryIds: [categoryId], PrimaryCategoryId: categoryId,
+            Variations: null, SuggestedSideItemIds: null, DetailedIngredients: null,
+            Content: new ProductDescriptionsDto { ["en"] = new() { Name = "Internal Component", Description = "Internal component" } },
+            IsComponent: isComponent);
+    }
+
+    private static UpdateProductCommand BuildUpdateCommand(decimal basePrice, bool isComponent = false)
+    {
+        var categoryId = Guid.NewGuid();
+        return new UpdateProductCommand(
+            Id: Guid.NewGuid(), Name: "Internal Component", Description: null, BasePrice: basePrice,
+            IsActive: true, IsAvailable: true, IsSpecial: false, PreparationTimeMinutes: 0,
+            Type: ProductType.MainItem, KitchenType: KitchenType.None, Ingredients: null,
+            Allergens: null, DisplayOrder: 0, CategoryIds: [categoryId], PrimaryCategoryId: categoryId,
+            Variations: null, SuggestedSideItemIds: null, DetailedIngredients: null,
+            MenuDefinition: null, Content: null, IsComponent: isComponent);
     }
 
     /// <summary>One CHF 0.01 rise in one mezze is the whole distance between safe and negative.</summary>

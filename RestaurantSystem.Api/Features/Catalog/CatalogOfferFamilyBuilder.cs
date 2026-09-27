@@ -63,7 +63,7 @@ internal static class CatalogOfferFamilyBuilder
                 ProductId = menu.Id,
                 ParentVariationId = menu.MenuDefinition!.ParentOfferVariationId,
                 Price = menu.BasePrice,
-                Availability = OrderTypeAvailability.Resolve(menu, requestedOrderType),
+                Availability = MenuBundleAvailabilityResolver.Resolve(menu, requestedOrderType),
                 ScheduleAvailable = schedule(menu),
                 Allergens = menu.Allergens
             })

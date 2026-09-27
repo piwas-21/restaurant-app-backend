@@ -47,6 +47,7 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         }
         var product = products.GetValueOrDefault(source.ProductId.Value)
             ?? throw new NotFoundException($"Product {source.ProductId.Value} not found");
+        BasketComponentGuard.EnsureNotOrderedAlone(product);
         var variation = ResolveVariation(product, source.ProductVariationId);
         return PriceLine(source, product, variation, products);
     }
@@ -68,8 +69,8 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         var customization = _customizations.Build(
             product.DetailedIngredients, explicitCustomization.SelectedIngredientIds,
             explicitCustomization.IngredientQuantities,
-            preferProvidedQuantities: false, product.SauceIncludedFree, product.SauceMax,
-            product.CustomizationGroups);
+            preferProvidedQuantities: false,
+            options: LineCustomizationOptions.FromProduct(product));
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m)
             + explicitCustomization.ProductOptionPrice;
         var children = source.ChildItems;

@@ -65,6 +65,11 @@ internal sealed record OrderLineIngredientChoice(Dictionary<Guid, int>? Quantiti
         // legacy branch that would leave the declared price standing.
         if (itemDto.SelectedIngredientIds is null)
         {
+            builder.EnsureAtLeastMinimum(
+                product.DetailedIngredients,
+                selectedIngredientIds: null,
+                itemDto.IngredientQuantities,
+                product.SauceMin);
             return new OrderLineIngredientChoice(itemDto.IngredientQuantities, Price: null);
         }
 
@@ -74,19 +79,14 @@ internal sealed record OrderLineIngredientChoice(Dictionary<Guid, int>? Quantiti
         // OrderIngredientCustomizations turns into a "NO xxx" ticket line. The regular-item
         // precedence would persist the client's map verbatim, i.e. trust the caller to have zeroed
         // its own removals — the exact trust this change exists to withdraw.
-        // sauceIncludedFree is passed EXPLICITLY, exactly as BasketItemFactory does
-        // (BasketItemFactory.cs:51, :269). It defaults to 0, so omitting it compiles, prices a
-        // sauce-allowance product as though it had none, and OVERCHARGES the guest for sauces the
-        // dish includes (S6/#429, plan D10). A default that is silently wrong for this caller is
-        // why it is named here rather than left off.
+        // LineCustomizationOptions.FromProduct supplies the sauce allowance and limits; omitting
+        // them would overcharge a product with included sauces (S6/#429, plan D10).
         var line = builder.Build(
             product.DetailedIngredients,
             itemDto.SelectedIngredientIds,
             itemDto.IngredientQuantities,
             preferProvidedQuantities: false,
-            sauceIncludedFree: product.SauceIncludedFree,
-            sauceMax: product.SauceMax,
-            explicitGroups: product.CustomizationGroups);
+            options: LineCustomizationOptions.FromProduct(product));
 
         var serverCanPrice =
             isRootLine
