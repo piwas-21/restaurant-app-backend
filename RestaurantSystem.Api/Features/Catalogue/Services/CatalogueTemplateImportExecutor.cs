@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
@@ -9,16 +10,36 @@ using RestaurantSystem.Api.Features.Categories.Commands.CreateCategoryCommand;
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.CreateGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Api.Features.Menus.Commands.CreateMenuBundleCommand;
+using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Features.Products.Commands.CreateProductCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Catalogue.Services;
 
-public sealed class CatalogueTemplateImportExecutor(
-    CustomMediator mediator) : ICatalogueTemplateImportExecutor
+public sealed partial class CatalogueTemplateImportExecutor : ICatalogueTemplateImportExecutor
 {
+    private readonly ApplicationDbContext context;
+    private readonly CustomMediator mediator;
+    private readonly IOptionSetMaterializer optionSetMaterializer;
+    private readonly ITranslationProvenanceWriter translationProvenance;
+
+    public CatalogueTemplateImportExecutor(
+        ApplicationDbContext context,
+        CustomMediator mediator,
+        IOptionSetMaterializer optionSetMaterializer,
+        ITranslationProvenanceWriter translationProvenance)
+    {
+        this.context = context;
+        this.mediator = mediator;
+        this.optionSetMaterializer = optionSetMaterializer;
+        this.translationProvenance = translationProvenance;
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
@@ -70,7 +91,8 @@ public sealed class CatalogueTemplateImportExecutor(
             "category" => await CreateCategoryAsync(session, revision, decision, cancellationToken),
             "ingredient" => await CreateIngredientAsync(session, revision, decision, cancellationToken),
             "item" => await CreateItemAsync(session, revision, decision, resolver, cancellationToken),
-            "option-set" or "bundle" => throw UnsupportedUntilMaterialization(item.Type),
+            "option-set" => await CreateOptionSetAsync(session, revision, decision, resolver, cancellationToken),
+            "bundle" => await CreateBundleAsync(session, revision, decision, resolver, cancellationToken),
             _ => throw CatalogueImportPayloadReader.Unsupported("This template type is not supported by the tenant importer.")
         };
     }
@@ -99,36 +121,6 @@ public sealed class CatalogueTemplateImportExecutor(
         return Imported("GlobalIngredient", ingredient.Id);
     }
 
-    private async Task<CatalogueTemplateImportOutcome> CreateItemAsync(
-        CatalogueImportSession session,
-        CentralCatalogueTemplateRevision revision,
-        CatalogueImportItemDecision decision,
-        CatalogueImportEntityResolver resolver,
-        CancellationToken cancellationToken)
-    {
-        var choiceSets = CatalogueImportPayloadReader.ReadReferences(revision.Payload, "optionSets");
-        var sideSets = CatalogueImportPayloadReader.ReadReferences(revision.Payload, "sideSets");
-        if (choiceSets.Any(reference => IsSelected(session, reference)) ||
-            sideSets.Any(reference => IsSelected(session, reference)))
-        {
-            throw UnsupportedUntilMaterialization("item choice sets");
-        }
-
-        var category = CatalogueImportPayloadReader.ReadOptionalReference(revision.Payload, "category")
-            ?? throw new BadRequestException(
-                "This item has no reviewed category reference. Assign a category before importing it.",
-                "ITEM_CATEGORY_REQUIRED");
-        var categoryId = resolver.ResolveDependency(session, category, "Category");
-        var command = CatalogueImportCommandMapper.Item(revision, session.Locale, decision, categoryId);
-        var response = await mediator.SendCommand<ApiResponse<ProductDto>>(command, cancellationToken);
-        var product = RequireData(response, "Item creation was rejected by tenant validation.");
-        return Imported("Product", product.Id);
-    }
-
-    private static bool IsSelected(CatalogueImportSession session, CatalogueSourceReference reference) =>
-        session.Templates.Any(item => item.TemplateId == reference.TemplateId &&
-            item.Revision == reference.Revision && item.IsSelected);
-
     private static CatalogueImportItemDecision? ReadDecision(string? json) => string.IsNullOrWhiteSpace(json)
         ? null
         : JsonSerializer.Deserialize<CatalogueImportItemDecision>(json, JsonOptions);
@@ -147,7 +139,7 @@ public sealed class CatalogueTemplateImportExecutor(
     private static CatalogueTemplateImportOutcome Imported(string? entityType, Guid? entityId) =>
         new(CatalogueImportItemStatus.Imported, entityType, entityId, []);
 
-    private static BadRequestException UnsupportedUntilMaterialization(string type) => new(
-        $"Importing {type} requires the shared option-set materialization path, which is not available for this tenant yet.",
-        "OPTION_SET_MATERIALIZATION_UNAVAILABLE");
+    private sealed record ImportedOptionSet(Guid Id, int Version, OptionSetKind Kind);
+
+    private sealed record ImportedProductChoiceGroup(Guid Id, int AuthoringVersion, int DisplayOrder);
 }

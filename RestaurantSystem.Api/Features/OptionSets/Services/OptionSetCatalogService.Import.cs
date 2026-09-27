@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -70,6 +71,11 @@ public sealed partial class OptionSetCatalogService
         };
         set.Translations = OptionSetLocales.CreateEntities(set, translations, actor, now);
         await _context.OptionSets.AddAsync(set, cancellationToken);
+        await _translationProvenance.RecordAsync(
+            "optionSet", set.Id, request.TranslationMetadata,
+            new TranslationTextMap(set.Name, null,
+                translations.ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, string?>()), cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
         return ImportedResult(set, created: true, request.Entries);
     }

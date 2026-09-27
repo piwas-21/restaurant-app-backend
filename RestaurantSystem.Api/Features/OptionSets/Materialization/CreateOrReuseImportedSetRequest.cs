@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
@@ -11,6 +12,7 @@ public sealed class CreateOrReuseImportedSetRequest
     public string Name { get; set; } = string.Empty;
     public string SourceLocale { get; set; } = "en";
     public IReadOnlyDictionary<string, string> Translations { get; set; } = new Dictionary<string, string>();
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
     public IReadOnlyList<ImportedOptionSetEntryRequest> Entries { get; set; } = [];
     public IReadOnlySet<Guid> StagedProductIds { get; set; } = new HashSet<Guid>();
 }

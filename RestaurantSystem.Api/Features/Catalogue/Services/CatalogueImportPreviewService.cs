@@ -63,6 +63,11 @@ public sealed partial class CatalogueImportPreviewService(
             .ToListAsync(cancellationToken);
         var entityReferences = mappings.Select(mapping =>
                 new CatalogueLocalEntityKey(mapping.LocalEntityType, mapping.LocalEntityId))
+            .Concat(sourceItems.Where(source => source.Item.IsSelected &&
+                    source.Item.Status == CatalogueImportItemStatus.Imported &&
+                    source.Item.LocalEntityId.HasValue && !string.IsNullOrWhiteSpace(source.Item.LocalEntityType))
+                .Select(source => new CatalogueLocalEntityKey(
+                    source.Item.LocalEntityType!, source.Item.LocalEntityId!.Value)))
             .Concat(sourceItems.Where(source =>
                     source.Decision?.Resolution.Equals("Reuse", StringComparison.OrdinalIgnoreCase) == true &&
                     source.Decision.LocalEntityId.HasValue)

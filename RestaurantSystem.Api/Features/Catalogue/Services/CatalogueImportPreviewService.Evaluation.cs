@@ -34,7 +34,7 @@ public sealed partial class CatalogueImportPreviewService
             candidatesBySource.GetValueOrDefault(CatalogueImportCandidateLookup.Key(item.Type, source.Localized.Name)) ?? []);
         var warnings = new List<CatalogueImportIssueDto>();
         var blockers = new List<CatalogueImportIssueDto>();
-        AddPendingBlockers(session, source, mapping, candidates, existingEntities, warnings, blockers);
+        AddPendingBlockers(session, source, mapping, mappedBySource, candidates, existingEntities, warnings, blockers);
         AddSelectedWarnings(source, warnings, blockers);
         return new CatalogueImportPreviewItemDto(item.TemplateId, item.Revision, item.Type, source.Localized.Name,
             item.IsSelected, source.Decision?.Resolution ?? (mappingIsUsable ? ReuseResolution : null),
@@ -45,6 +45,7 @@ public sealed partial class CatalogueImportPreviewService
         CatalogueImportSession session,
         CataloguePreviewSource source,
         CataloguePreviewAdoption? mapping,
+        Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
         List<CatalogueLocalCandidateDto> candidates,
         HashSet<CatalogueLocalEntityKey> existingEntities,
         List<CatalogueImportIssueDto> warnings,
@@ -62,8 +63,17 @@ public sealed partial class CatalogueImportPreviewService
 
         AddResolutionBlockers(source, mapping, mappingIsUsable, candidates, existingEntities, warnings, blockers);
         AddChoiceReviewBlockers(source, mappingIsUsable, blockers);
-        if (NeedsOptionSetMaterialization(item.Type, source.Revision, source.Decision, mappingIsUsable))
-            AddMaterializationBlocker(blockers);
+        if (NeedsOptionSetMaterialization(item.Type, source.Revision, source.Decision, mappingIsUsable)
+            && !tenantFeatures.OptionSetMaterializationEnabled)
+        {
+            blockers.Add(Issue("OPTION_SET_MATERIALIZATION_DISABLED",
+                "Option-set imports are not enabled for this tenant. No local menu rows were changed."));
+        }
+
+        if (NeedsCreateReview(source.Decision, mappingIsUsable))
+        {
+            AddDependencyBlockers(session, source, mappedBySource, existingEntities, blockers);
+        }
     }
 
     private static void AddResolutionBlockers(
@@ -130,17 +140,6 @@ public sealed partial class CatalogueImportPreviewService
         }
     }
 
-    private void AddMaterializationBlocker(List<CatalogueImportIssueDto> blockers)
-    {
-        var code = tenantFeatures.OptionSetMaterializationEnabled
-            ? "OPTION_SET_MATERIALIZATION_UNAVAILABLE"
-            : "OPTION_SET_MATERIALIZATION_DISABLED";
-        var message = tenantFeatures.OptionSetMaterializationEnabled
-            ? "This template needs the shared option-set importer, which is not available yet. No local menu rows were changed."
-            : "Option-set import is not enabled for this tenant. No local menu rows were changed.";
-        blockers.Add(Issue(code, message));
-    }
-
     private static void AddSelectedWarnings(
         CataloguePreviewSource source,
         List<CatalogueImportIssueDto> warnings,
@@ -182,9 +181,16 @@ public sealed partial class CatalogueImportPreviewService
         CatalogueImportItemDecision? decision,
         bool hasUsableMapping)
     {
+        if (hasUsableMapping ||
+            decision?.Resolution.Equals(ReuseResolution, StringComparison.OrdinalIgnoreCase) == true ||
+            decision?.Resolution.Equals(CreateResolution, StringComparison.OrdinalIgnoreCase) != true)
+        {
+            return false;
+        }
+
         if (templateType == OptionSetType)
         {
-            return NeedsCreateReview(decision, hasUsableMapping);
+            return true;
         }
 
         if (templateType == "item" && revision.Payload.ValueKind == JsonValueKind.Object)
@@ -192,7 +198,7 @@ public sealed partial class CatalogueImportPreviewService
             return HasReferences(revision.Payload, "optionSets") || HasReferences(revision.Payload, "sideSets");
         }
 
-        if (templateType == "bundle") return NeedsCreateReview(decision, hasUsableMapping);
+        if (templateType == "bundle") return true;
 
         return false;
     }

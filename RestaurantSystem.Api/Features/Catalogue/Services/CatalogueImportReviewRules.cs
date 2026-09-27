@@ -90,9 +90,16 @@ internal static class CatalogueImportReviewRules
         }
 
         AddReviewBlocker(decision.OptionPricesReviewed, "OPTION_PRICES_REVIEW_REQUIRED", "Review local prices for every imported choice.", blockers);
-        foreach (var sourceRef in priceRefs.Where(sourceRef => decision.LocalOptionPrices?.ContainsKey(sourceRef) != true))
+        foreach (var sourceRef in priceRefs)
         {
-            blockers.Add(Issue("OPTION_PRICE_REQUIRED", $"Set a tenant-local price for {sourceRef}."));
+            if (decision.LocalOptionPrices?.TryGetValue(sourceRef, out var price) != true)
+            {
+                blockers.Add(Issue("OPTION_PRICE_REQUIRED", $"Set a tenant-local price for {sourceRef}."));
+            }
+            else if (price < 0)
+            {
+                blockers.Add(Issue("OPTION_PRICE_INVALID", $"The tenant-local price for {sourceRef} cannot be negative."));
+            }
         }
     }
 

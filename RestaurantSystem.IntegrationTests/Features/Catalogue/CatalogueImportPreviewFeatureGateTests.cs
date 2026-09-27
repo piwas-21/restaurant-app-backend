@@ -87,7 +87,7 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
     }
 
     [Fact]
-    public async Task Set_bearing_item_preview_blocks_until_the_executor_supports_materialization()
+    public async Task Set_bearing_item_preview_is_gated_by_the_feature_and_dependency_review()
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -123,6 +123,7 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
             IsRoot = true,
             IsSelectable = true,
             IsSelected = true,
+            DecisionJson = JsonSerializer.Serialize(new CatalogueImportItemDecision { Resolution = "Create" }),
             Status = CatalogueImportItemStatus.Pending,
             CreatedBy = "test"
         };
@@ -155,11 +156,14 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
             .PreviewAsync(session.Id, CancellationToken.None);
 
         enabledPreview.Items.Single().BlockingIssues.Should().Contain(issue =>
+            issue.Code == "DEPENDENCY_NOT_IN_SESSION");
+        enabledPreview.Items.Single().BlockingIssues.Should().NotContain(issue =>
+            issue.Code == "OPTION_SET_MATERIALIZATION_DISABLED" ||
             issue.Code == "OPTION_SET_MATERIALIZATION_UNAVAILABLE");
     }
 
     [Fact]
-    public async Task Option_set_and_bundle_create_preview_remain_blocked_when_the_feature_is_enabled()
+    public async Task Option_set_and_bundle_create_preview_reports_dependencies_not_missing_executor_support()
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -167,6 +171,9 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
         var enabled = new Mock<ITenantFeatures>();
         enabled.SetupGet(value => value.OptionSetMaterializationEnabled).Returns(true);
         var preview = new CatalogueImportPreviewService(context, enabled.Object, logger);
+        var disabled = new Mock<ITenantFeatures>();
+        disabled.SetupGet(value => value.OptionSetMaterializationEnabled).Returns(false);
+        var disabledPreview = new CatalogueImportPreviewService(context, disabled.Object, logger);
 
         foreach (var type in new[] { "option-set", "bundle" })
         {
@@ -198,7 +205,13 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
                 IsRoot = true,
                 IsSelectable = true,
                 IsSelected = true,
-                DecisionJson = JsonSerializer.Serialize(new CatalogueImportItemDecision { Resolution = "Create" }),
+                DecisionJson = JsonSerializer.Serialize(new CatalogueImportItemDecision
+                {
+                    Resolution = "Create",
+                    ChoiceRulesReviewed = true,
+                    OptionPricesReviewed = true,
+                    LocalOptionPrices = new Dictionary<string, decimal> { ["choice@1"] = -1m }
+                }),
                 Status = CatalogueImportItemStatus.Pending,
                 CreatedBy = "test"
             };
@@ -219,8 +232,15 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
 
             var result = await preview.PreviewAsync(session.Id, CancellationToken.None);
 
-            result.Items.Single().BlockingIssues.Should().Contain(issue =>
+            result.Items.Single().BlockingIssues.Should().Contain(issue => issue.Code == "DEPENDENCY_NOT_IN_SESSION");
+            result.Items.Single().BlockingIssues.Should().Contain(issue => issue.Code == "OPTION_PRICE_INVALID");
+            result.Items.Single().BlockingIssues.Should().NotContain(issue =>
+                issue.Code == "OPTION_SET_MATERIALIZATION_DISABLED" ||
                 issue.Code == "OPTION_SET_MATERIALIZATION_UNAVAILABLE");
+
+            var blocked = await disabledPreview.PreviewAsync(session.Id, CancellationToken.None);
+            blocked.Items.Single().BlockingIssues.Should().Contain(issue =>
+                issue.Code == "OPTION_SET_MATERIALIZATION_DISABLED");
         }
     }
 }
