@@ -89,8 +89,15 @@ internal static partial class OptionSetMaterializerTargetWriter
             CreatedBy = audit
         };
 
-    private static string ResolveAction(bool isNewRow, bool changed) =>
-        isNewRow ? "add" : changed ? "update" : "preserve";
+    private static string ResolveAction(bool isNewRow, bool changed)
+    {
+        if (isNewRow)
+        {
+            return "add";
+        }
+
+        return changed ? "update" : "preserve";
+    }
 
     private sealed class TargetRowApplyContext
     {
