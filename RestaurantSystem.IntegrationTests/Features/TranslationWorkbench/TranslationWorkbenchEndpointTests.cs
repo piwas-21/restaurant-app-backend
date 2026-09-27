@@ -60,6 +60,22 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
     }
 
     [Fact]
+    public async Task OptionSetRejectsConflictingSourceTranslation()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/OptionSets", new
+        {
+            kind = 1,
+            name = $"Acı sos {Guid.NewGuid():N}",
+            sourceLocale = "tr",
+            translations = new Dictionary<string, string> { ["tr"] = "Different name" },
+            status = 0,
+            entries = Array.Empty<object>()
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task CompleteOrLegacyTextDoesNotGenerateAndOnlyMissingTargetsAreReported()
     {
         AuthenticateAsAdmin();

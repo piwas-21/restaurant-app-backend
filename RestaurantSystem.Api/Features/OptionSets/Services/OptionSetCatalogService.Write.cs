@@ -185,8 +185,20 @@ public sealed partial class OptionSetCatalogService
     }
 
     private Task RecordTranslationAsync(OptionSet set, OptionSetWriteRequestDto request,
-        CancellationToken cancellationToken) => _translationProvenance.RecordAsync(
-        "optionSet", set.Id,
+        CancellationToken cancellationToken)
+    {
+        if (request.TranslationMetadata is { } supplied &&
+            (supplied.SourceLocales is null || supplied.SourceLocales.Count != 1 ||
+             !supplied.SourceLocales.TryGetValue("name", out var locale) || locale != set.SourceLocale))
+        {
+            throw new BadRequestException("Option-set name source locale must match its translation metadata");
+        }
+        if (set.Translations.Any(row => row.LanguageCode == set.SourceLocale && row.Name != set.Name))
+        {
+            throw new BadRequestException("The source-locale translation must match the option-set name");
+        }
+
+        return _translationProvenance.RecordAsync("optionSet", set.Id,
         request.TranslationMetadata ?? new TranslationOwnerMetadataDto
         {
             SourceLocales = new Dictionary<string, string> { ["name"] = set.SourceLocale }
@@ -194,6 +206,7 @@ public sealed partial class OptionSetCatalogService
         TranslationTextMap.Create(set.Name, null,
             set.Translations.Select(row => (row.LanguageCode, (string?)row.Name, (string?)null))),
         cancellationToken);
+    }
 
     private static OptionSetEntry? ResolveExistingEntry(
         OptionSetEntryDto dto,
