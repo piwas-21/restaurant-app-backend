@@ -7,16 +7,24 @@ namespace RestaurantSystem.Api.Features.OptionSets.Search;
 public sealed partial class MenuAuthoringSearchService
 {
     private async Task<List<MenuAuthoringSearchCandidateDto>> SearchProductsAsync(
-        string pattern,
+        string normalizedQuery,
         OptionSetKind? forKind,
         MenuAuthoringSearchCursor? cursor,
-        HashSet<(string CandidateType, Guid CandidateId)> accepted,
-        HashSet<(string CandidateType, Guid CandidateId)> rejected,
         int pageSize,
         CancellationToken cancellationToken)
     {
-        var acceptedIds = ProductDecisionIds(accepted);
-        var rejectedIds = ProductDecisionIds(rejected);
+        var pattern = LikePattern(normalizedQuery);
+        var decisionTypes = new[]
+        {
+            MenuAuthoringCandidateTypes.Product,
+            MenuAuthoringCandidateTypes.Component,
+            MenuAuthoringCandidateTypes.Bundle
+        };
+        var decisions = _context.OptionSetMatchDecisions.AsNoTracking()
+            .Where(decision => decision.NormalizedName == normalizedQuery
+                && decisionTypes.Contains(decision.CandidateType));
+        var acceptedIds = decisions.Where(decision => decision.IsAccepted).Select(decision => decision.CandidateId);
+        var rejectedIds = decisions.Where(decision => !decision.IsAccepted).Select(decision => decision.CandidateId);
         var products = _context.Products.AsNoTracking().Where(product => product.IsActive && product.IsAvailable);
         if (forKind == OptionSetKind.SuggestedSide)
         {
@@ -25,10 +33,7 @@ public sealed partial class MenuAuthoringSearchService
 
         products = products.Where(product =>
             EF.Functions.ILike(product.Name, pattern, "\\") || acceptedIds.Contains(product.Id));
-        if (rejectedIds.Count > 0)
-        {
-            products = products.Where(product => !rejectedIds.Contains(product.Id));
-        }
+        products = products.Where(product => !rejectedIds.Contains(product.Id));
 
         var ranked = products.Select(product => new RankedProduct
         {
@@ -41,12 +46,6 @@ public sealed partial class MenuAuthoringSearchService
             .ThenBy(row => row.Rank).ThenBy(row => row.Product.Id).Take(pageSize + 1))
             .ToListAsync(cancellationToken);
     }
-
-    private static List<Guid> ProductDecisionIds(
-        HashSet<(string CandidateType, Guid CandidateId)> decisions) => decisions
-        .Where(item => item.CandidateType is MenuAuthoringCandidateTypes.Product
-            or MenuAuthoringCandidateTypes.Component or MenuAuthoringCandidateTypes.Bundle)
-        .Select(item => item.CandidateId).ToList();
 
     private static IQueryable<RankedProduct> AfterCursor(
         IQueryable<RankedProduct> products, MenuAuthoringSearchCursor cursor) =>

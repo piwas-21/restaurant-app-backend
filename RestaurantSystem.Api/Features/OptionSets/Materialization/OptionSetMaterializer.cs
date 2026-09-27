@@ -75,7 +75,7 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
     {
         if (_context.Database.CurrentTransaction is null)
         {
-            throw new InvalidOperationException("Catalogue option-set imports must participate in an item transaction");
+            throw new ConflictException("Catalogue option-set imports must participate in an item transaction");
         }
     }
 

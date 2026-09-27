@@ -110,7 +110,7 @@ public sealed class MenuAuthoringSearchTests : IntegrationTestBase
         stopwatch.Stop();
         page.Items.Should().HaveCount(24);
         counter.ReadCount.Should().Be(4,
-            "the search reads saved decisions and queries products, ingredients, and sets once each");
+            "the search queries the three candidate sources once each and loads decisions only for the bounded page");
         _output.WriteLine(
             $"Representative menu-authoring search: {stopwatch.ElapsedMilliseconds} ms, {counter.ReadCount} SQL reads, 45 bundles, 44 products, 26 components, 654 ingredients, 40 option sets.");
     }

@@ -6,18 +6,18 @@ namespace RestaurantSystem.Api.Features.OptionSets.Search;
 public sealed partial class MenuAuthoringSearchService
 {
     private async Task<List<MenuAuthoringSearchCandidateDto>> SearchOptionSetsAsync(
-        string pattern,
+        string normalizedQuery,
         OptionSetKind? forKind,
         MenuAuthoringSearchCursor? cursor,
-        HashSet<(string CandidateType, Guid CandidateId)> accepted,
-        HashSet<(string CandidateType, Guid CandidateId)> rejected,
         int pageSize,
         CancellationToken cancellationToken)
     {
-        var acceptedIds = accepted.Where(item => item.CandidateType == MenuAuthoringCandidateTypes.OptionSet)
-            .Select(item => item.CandidateId).ToList();
-        var rejectedIds = rejected.Where(item => item.CandidateType == MenuAuthoringCandidateTypes.OptionSet)
-            .Select(item => item.CandidateId).ToList();
+        var pattern = LikePattern(normalizedQuery);
+        var decisions = _context.OptionSetMatchDecisions.AsNoTracking()
+            .Where(decision => decision.NormalizedName == normalizedQuery
+                && decision.CandidateType == MenuAuthoringCandidateTypes.OptionSet);
+        var acceptedIds = decisions.Where(decision => decision.IsAccepted).Select(decision => decision.CandidateId);
+        var rejectedIds = decisions.Where(decision => !decision.IsAccepted).Select(decision => decision.CandidateId);
         var sets = _context.OptionSets.AsNoTracking().Where(item => item.Status == OptionSetStatus.Active);
         if (forKind.HasValue)
         {
@@ -27,10 +27,7 @@ public sealed partial class MenuAuthoringSearchService
         sets = sets.Where(item => EF.Functions.ILike(item.NormalizedName, pattern, "\\")
             || item.Translations.Any(translation => EF.Functions.ILike(translation.Name, pattern, "\\"))
             || acceptedIds.Contains(item.Id));
-        if (rejectedIds.Count > 0)
-        {
-            sets = sets.Where(item => !rejectedIds.Contains(item.Id));
-        }
+        sets = sets.Where(item => !rejectedIds.Contains(item.Id));
 
         if (cursor is not null)
         {

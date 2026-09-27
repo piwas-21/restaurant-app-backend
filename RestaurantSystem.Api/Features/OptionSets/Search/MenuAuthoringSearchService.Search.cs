@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Services;
 using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Search;
 
@@ -18,28 +17,23 @@ public sealed partial class MenuAuthoringSearchService
         var normalizedQuery = ValidateQuery(query);
         var searchCursor = string.IsNullOrWhiteSpace(cursor) ? null : MenuAuthoringSearchCursor.Decode(cursor);
         var pageSize = PageSize(limit);
-        var decisions = await _context.OptionSetMatchDecisions.AsNoTracking()
-            .Where(decision => decision.NormalizedName == normalizedQuery)
-            .Select(decision => new { decision.CandidateType, decision.CandidateId, decision.IsAccepted })
-            .ToListAsync(cancellationToken);
-        var accepted = decisions.Where(decision => decision.IsAccepted)
-            .Select(decision => (decision.CandidateType, decision.CandidateId)).ToHashSet();
-        var rejected = decisions.Where(decision => !decision.IsAccepted)
-            .Select(decision => (decision.CandidateType, decision.CandidateId)).ToHashSet();
-        var pattern = LikePattern(normalizedQuery);
         var candidates = new List<MenuAuthoringSearchCandidateDto>();
 
         if (forKind is null or OptionSetKind.BundleChoice or OptionSetKind.SuggestedSide)
         {
-            candidates.AddRange(await SearchProductsAsync(pattern, forKind, searchCursor, accepted, rejected, pageSize, cancellationToken));
+            candidates.AddRange(await SearchProductsAsync(
+                normalizedQuery, forKind, searchCursor, pageSize, cancellationToken));
         }
 
         if (forKind is null or OptionSetKind.Ingredient or OptionSetKind.Sauce)
         {
-            candidates.AddRange(await SearchIngredientsAsync(pattern, forKind, searchCursor, accepted, rejected, pageSize, cancellationToken));
+            candidates.AddRange(await SearchIngredientsAsync(
+                normalizedQuery, forKind, searchCursor, pageSize, cancellationToken));
         }
 
-        candidates.AddRange(await SearchOptionSetsAsync(pattern, forKind, searchCursor, accepted, rejected, pageSize, cancellationToken));
+        candidates.AddRange(await SearchOptionSetsAsync(
+            normalizedQuery, forKind, searchCursor, pageSize, cancellationToken));
+        var accepted = await LoadAcceptedDecisionsAsync(normalizedQuery, candidates, cancellationToken);
 
         foreach (var candidate in candidates)
         {
@@ -64,6 +58,30 @@ public sealed partial class MenuAuthoringSearchService
             Items = ordered,
             NextCursor = hasMore && ordered.Count > 0 ? MenuAuthoringSearchCursor.Encode(ordered[^1]) : null
         };
+    }
+
+    private async Task<HashSet<(string CandidateType, Guid CandidateId)>> LoadAcceptedDecisionsAsync(
+        string normalizedQuery,
+        List<MenuAuthoringSearchCandidateDto> candidates,
+        CancellationToken cancellationToken)
+    {
+        if (candidates.Count == 0)
+        {
+            return [];
+        }
+
+        var candidateIds = candidates.Select(candidate => candidate.Id).Distinct().ToList();
+        var candidateTypes = candidates.Select(candidate => candidate.Type).Distinct().ToList();
+        // Search sources page-bound candidates; the unique decision key bounds this result to their ID/type pairs.
+        var maximumDecisions = candidateIds.Count * candidateTypes.Count;
+        var decisions = await _context.OptionSetMatchDecisions.AsNoTracking()
+            .Where(decision => decision.NormalizedName == normalizedQuery && decision.IsAccepted
+                && candidateIds.Contains(decision.CandidateId) && candidateTypes.Contains(decision.CandidateType))
+            .Take(maximumDecisions)
+            .Select(decision => new { decision.CandidateType, decision.CandidateId })
+            .ToListAsync(cancellationToken);
+
+        return decisions.Select(decision => (decision.CandidateType, decision.CandidateId)).ToHashSet();
     }
 
     private static string ValidateQuery(string? query)
