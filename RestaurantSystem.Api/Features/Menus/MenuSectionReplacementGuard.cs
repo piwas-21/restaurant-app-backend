@@ -23,7 +23,7 @@ internal static class MenuSectionReplacementGuard
             : throw new ConflictException(VersionedEditConflictMessage);
     }
 
-    private static bool IsUnchangedSnapshot(
+    internal static bool IsUnchangedSnapshot(
         ICollection<MenuSection> currentSections,
         IReadOnlyCollection<MenuSectionDto> proposedSections)
     {
@@ -58,6 +58,38 @@ internal static class MenuSectionReplacementGuard
         }
 
         return true;
+    }
+
+    internal static bool IsTranslationOnlyChange(
+        ICollection<MenuSection> currentSections,
+        IReadOnlyCollection<MenuSectionDto> proposedSections)
+    {
+        if (currentSections.Count != proposedSections.Count)
+        {
+            return false;
+        }
+
+        var byId = currentSections.ToDictionary(section => section.Id);
+        var seen = new HashSet<Guid>();
+        var changed = false;
+        foreach (var proposed in proposedSections)
+        {
+            if (proposed.Id is not Guid id || !seen.Add(id) ||
+                !byId.TryGetValue(id, out var current) ||
+                current.Name != proposed.Name || current.Description != proposed.Description ||
+                current.DisplayOrder != proposed.DisplayOrder ||
+                current.IsRequired != proposed.IsRequired ||
+                current.MinSelection != proposed.MinSelection ||
+                current.MaxSelection != proposed.MaxSelection ||
+                !ItemsMatchWhenSpecified(current.Items, proposed))
+            {
+                return false;
+            }
+
+            changed |= !TranslationsMatchWhenSpecified(current.Translations, proposed);
+        }
+
+        return changed;
     }
 
     private static bool ItemsMatchWhenSpecified(

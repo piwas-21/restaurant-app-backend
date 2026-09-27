@@ -683,6 +683,440 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("BasketItems", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueCuisinePreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<List<string>>("Cuisines")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("cuisines");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_catalogue_cuisine_preferences");
+
+                    b.ToTable("catalogue_cuisine_preferences", t =>
+                        {
+                            t.HasCheckConstraint("ck_catalogue_cuisine_preferences_singleton", "id = '4a44b885-29e2-4000-8000-000000000006'");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueImportSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AdoptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("adoption_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<bool>("CreateNewCopy")
+                        .HasColumnType("boolean")
+                        .HasColumnName("create_new_copy");
+
+                    b.Property<string>("CreateSelectionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("create_selection_json");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<int?>("LastImportExpectedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_import_expected_version");
+
+                    b.Property<string>("LastImportIdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("last_import_idempotency_key");
+
+                    b.Property<string>("LastImportResultJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("last_import_result_json");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("locale");
+
+                    b.Property<int>("RootRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("root_revision");
+
+                    b.Property<string>("RootTemplateId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("root_template_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_catalogue_import_sessions");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("RootTemplateId", "RootRevision");
+
+                    b.ToTable("catalogue_import_sessions", t =>
+                        {
+                            t.HasCheckConstraint("ck_catalogue_import_sessions_root_revision", "root_revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueImportSessionTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DecisionJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("decision_json");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<bool>("IsRoot")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_root");
+
+                    b.Property<bool>("IsSelectable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_selectable");
+
+                    b.Property<bool>("IsSelected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_selected");
+
+                    b.Property<Guid?>("LocalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("local_entity_id");
+
+                    b.Property<string>("LocalEntityType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("local_entity_type");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("RevisionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("revision_json");
+
+                    b.Property<string>("SelectionRole")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("selection_role");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TemplateId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("template_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_catalogue_import_session_templates");
+
+                    b.HasIndex("SessionId", "IsSelected");
+
+                    b.HasIndex("SessionId", "TemplateId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("catalogue_import_session_templates", t =>
+                        {
+                            t.HasCheckConstraint("ck_catalogue_import_session_templates_revision", "revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueMatchDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<string>("CandidateType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("candidate_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("decision");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<int>("SourceRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_revision");
+
+                    b.Property<string>("SourceTemplateId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_template_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_catalogue_match_decisions");
+
+                    b.HasIndex("NormalizedName", "CandidateType");
+
+                    b.HasIndex("SourceTemplateId", "SourceRevision", "CandidateType", "CandidateId")
+                        .IsUnique();
+
+                    b.ToTable("catalogue_match_decisions", t =>
+                        {
+                            t.HasCheckConstraint("ck_catalogue_match_decisions_source_revision", "source_revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueTemplateAdoption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AdoptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("adoption_id");
+
+                    b.Property<string>("BaselineFieldsJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("baseline_fields_json");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<Guid>("LocalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("local_entity_id");
+
+                    b.Property<string>("LocalEntityType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("local_entity_type");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("SourceEntryId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("source_entry_id");
+
+                    b.Property<int>("SourceRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_revision");
+
+                    b.Property<string>("SourceTemplateId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_template_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_catalogue_template_adoptions");
+
+                    b.HasIndex("SessionId", "AdoptionId");
+
+                    b.HasIndex("SourceTemplateId", "SourceRevision", "LocalEntityType")
+                        .IsUnique()
+                        .HasFilter("\"is_default\" = true AND \"source_entry_id\" IS NULL");
+
+                    b.HasIndex("AdoptionId", "SourceTemplateId", "SourceRevision", "LocalEntityType")
+                        .IsUnique()
+                        .HasFilter("\"source_entry_id\" IS NULL");
+
+                    b.HasIndex("SourceTemplateId", "SourceRevision", "LocalEntityType", "SourceEntryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_catalogue_template_adoptions_source_template_id_source_rev~1")
+                        .HasFilter("\"is_default\" = true AND \"source_entry_id\" IS NOT NULL");
+
+                    b.HasIndex("AdoptionId", "SourceTemplateId", "SourceRevision", "LocalEntityType", "SourceEntryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_catalogue_template_adoptions_adoption_id_source_template_i~1")
+                        .HasFilter("\"source_entry_id\" IS NOT NULL");
+
+                    b.ToTable("catalogue_template_adoptions", t =>
+                        {
+                            t.HasCheckConstraint("ck_catalogue_template_adoptions_source_revision", "source_revision > 0");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -745,6 +1179,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("SourceLocale")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_locale");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -757,6 +1196,63 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasName("pk_categories");
 
                     b.ToTable("categories");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CategoryTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_category_translations");
+
+                    b.HasIndex("CategoryId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("CategoryTranslations", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerDiscountRule", b =>
@@ -2356,6 +2852,759 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("MenuSectionTranslations", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<string>("SourceLocale")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("en")
+                        .HasColumnName("source_locale");
+
+                    b.Property<string>("SourceOptionSetId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_option_set_id");
+
+                    b.Property<int?>("SourceRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_revision");
+
+                    b.Property<string>("SourceTemplateId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_template_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_sets");
+
+                    b.HasIndex("Kind", "NormalizedName")
+                        .IsUnique();
+
+                    b.HasIndex("SourceTemplateId", "SourceRevision", "SourceOptionSetId")
+                        .IsUnique()
+                        .HasFilter("\"source_template_id\" IS NOT NULL AND \"source_revision\" IS NOT NULL AND \"source_option_set_id\" IS NOT NULL");
+
+                    b.ToTable("OptionSets", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAppliedRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LastAppliedValuesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("last_applied_values_json");
+
+                    b.Property<Guid>("MaterializedRowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("materialized_row_id");
+
+                    b.Property<Guid>("OptionSetAttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_attachment_id");
+
+                    b.Property<Guid>("OptionSetEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_entry_id");
+
+                    b.Property<bool>("OwnsMaterializedRow")
+                        .HasColumnType("boolean")
+                        .HasColumnName("owns_materialized_row");
+
+                    b.Property<string>("RowType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("row_type");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_applied_rows");
+
+                    b.HasIndex("OptionSetEntryId")
+                        .HasDatabaseName("ix_option_set_applied_rows_option_set_entry_id");
+
+                    b.HasIndex("OptionSetAttachmentId", "OptionSetEntryId")
+                        .IsUnique();
+
+                    b.HasIndex("RowType", "MaterializedRowId");
+
+                    b.ToTable("OptionSetAppliedRows", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AppliedSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("applied_set_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<int?>("IncludedFree")
+                        .HasColumnType("integer")
+                        .HasColumnName("included_free");
+
+                    b.Property<string>("IntentionalDifferenceReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("intentional_difference_reason");
+
+                    b.Property<string>("LastIdempotencyKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_idempotency_key");
+
+                    b.Property<int?>("MaxSelection")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_selection");
+
+                    b.Property<int?>("MinSelection")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_selection");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer")
+                        .HasColumnName("role");
+
+                    b.Property<Guid?>("TargetCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_customization_group_id");
+
+                    b.Property<Guid?>("TargetMenuSectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_menu_section_id");
+
+                    b.Property<Guid>("TargetProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_attachments");
+
+                    b.HasIndex("OptionSetId")
+                        .HasDatabaseName("ix_option_set_attachments_option_set_id");
+
+                    b.HasIndex("TargetCustomizationGroupId", "Role")
+                        .IsUnique()
+                        .HasFilter("\"target_customization_group_id\" IS NOT NULL");
+
+                    b.HasIndex("TargetMenuSectionId", "Role")
+                        .IsUnique()
+                        .HasFilter("\"target_menu_section_id\" IS NOT NULL");
+
+                    b.HasIndex("TargetProductId", "Role")
+                        .IsUnique()
+                        .HasFilter("\"target_menu_section_id\" IS NULL AND \"target_customization_group_id\" IS NULL");
+
+                    b.ToTable("OptionSetAttachments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_set_attachments_target", "(role = 2 AND target_menu_section_id IS NOT NULL AND target_customization_group_id IS NULL) OR (role = 4 AND target_menu_section_id IS NULL AND target_customization_group_id IS NOT NULL) OR (role NOT IN (2, 4) AND target_menu_section_id IS NULL AND target_customization_group_id IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAuthoringRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int?>("AppliedSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("applied_set_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<int?>("SourceSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_set_version");
+
+                    b.Property<string>("SummaryJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("summary_json");
+
+                    b.Property<Guid?>("TargetCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_customization_group_id");
+
+                    b.Property<Guid?>("TargetMenuSectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_menu_section_id");
+
+                    b.Property<Guid>("TargetProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_authoring_revisions");
+
+                    b.HasIndex("TargetCustomizationGroupId");
+
+                    b.HasIndex("OptionSetId", "CreatedAt");
+
+                    b.HasIndex("TargetProductId", "CreatedAt");
+
+                    b.ToTable("OptionSetAuthoringRevisions", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("AdditionalPrice")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("additional_price");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<Guid?>("GlobalIngredientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_ingredient_id");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<bool>("IsIncludedInBasePrice")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_included_in_base_price");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_optional");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<int>("MaxQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_quantity");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("price");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variation_id");
+
+                    b.Property<string>("SourceEntryId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_entry_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_entries");
+
+                    b.HasIndex("GlobalIngredientId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductVariationId");
+
+                    b.HasIndex("OptionSetId", "GlobalIngredientId")
+                        .IsUnique()
+                        .HasFilter("\"global_ingredient_id\" IS NOT NULL");
+
+                    b.HasIndex("OptionSetId", "ProductId")
+                        .IsUnique()
+                        .HasFilter("\"product_id\" IS NOT NULL AND \"product_variation_id\" IS NULL");
+
+                    b.HasIndex("OptionSetId", "ProductVariationId")
+                        .IsUnique()
+                        .HasFilter("\"product_variation_id\" IS NOT NULL");
+
+                    b.ToTable("OptionSetEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_set_entries_one_reference", "(global_ingredient_id IS NULL) <> (product_id IS NULL) AND (product_variation_id IS NULL OR product_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_option_set_entries_positive_quantity", "max_quantity >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMatchDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Alias")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("alias");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<string>("CandidateType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("candidate_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsAccepted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_accepted");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_match_decisions");
+
+                    b.HasIndex("NormalizedName", "CandidateType", "CandidateId")
+                        .IsUnique();
+
+                    b.ToTable("OptionSetMatchDecisions", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMaterializationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("request_json");
+
+                    b.Property<int>("SetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("set_version");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_materialization_jobs");
+
+                    b.HasIndex("OptionSetId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "LeaseExpiresAt", "CreatedAt");
+
+                    b.ToTable("OptionSetMaterializationJobs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_set_materialization_jobs_status", "status IN ('queued', 'processing', 'completed', 'partial', 'blocked')");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMaterializationJobTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("error_code");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("error_message");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("request_json");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result_json");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("target_key");
+
+                    b.Property<Guid>("TargetProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_materialization_job_targets");
+
+                    b.HasIndex("JobId", "Sequence")
+                        .IsUnique();
+
+                    b.HasIndex("JobId", "TargetKey")
+                        .IsUnique();
+
+                    b.HasIndex("JobId", "Status", "Sequence");
+
+                    b.ToTable("OptionSetMaterializationJobTargets", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_set_materialization_job_targets_status", "status IN ('pending', 'applied', 'unchanged', 'conflict', 'failed')");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_translations");
+
+                    b.HasIndex("OptionSetId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("OptionSetTranslations", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3950,6 +5199,13 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AuthoringVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("authoring_version");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -5789,6 +7045,329 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_configurations");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TranslationFieldProvenance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ContextHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("context_hash");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("field_key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("locale");
+
+                    b.Property<string>("ReviewStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("review_status");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<string>("ReviewerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reviewer_id");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_hash");
+
+                    b.Property<string>("SourceLocale")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_locale");
+
+                    b.Property<string>("TemplateId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("template_id");
+
+                    b.Property<int?>("TemplateRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("template_revision");
+
+                    b.Property<string>("TextHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("text_hash");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_translation_field_provenances");
+
+                    b.HasIndex("EntityType", "EntityId", "FieldKey", "Locale")
+                        .IsUnique();
+
+                    b.ToTable("translation_field_provenances", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TranslationGenerationBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<decimal>("EstimatedCostUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("estimated_cost_usd");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("input_tokens");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("output_tokens");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_translation_generation_batches");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Fingerprint");
+
+                    b.ToTable("translation_generation_batches", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TranslationSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<string>("ClientKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("client_key");
+
+                    b.Property<string>("ContextHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("context_hash");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("field_key");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("locale");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<string>("ReviewedText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reviewed_text");
+
+                    b.Property<string>("ReviewerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("reviewer_id");
+
+                    b.Property<string>("SourceHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_hash");
+
+                    b.Property<string>("SourceLocale")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_locale");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SuggestedText")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("suggested_text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_translation_suggestions");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("CreatedAt", "RequestedBy");
+
+                    b.HasIndex("Fingerprint", "EntityType", "EntityId", "ClientKey", "FieldKey", "Locale", "RequestedBy");
+
+                    b.ToTable("translation_suggestions", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.UserAddress", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6182,6 +7761,30 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductVariation");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueImportSessionTemplate", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.CatalogueImportSession", "Session")
+                        .WithMany("Templates")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_catalogue_import_session_templates_catalogue_import_session~");
+
+                    b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CategoryTranslation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Category", "Category")
+                        .WithMany("Translations")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_category_translations_categories_category_id");
+
+                    b.Navigation("Category");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.CustomerDiscountRule", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", "User")
@@ -6426,6 +8029,123 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_menu_section_translations_menu_sections_menu_section_id");
 
                     b.Navigation("MenuSection");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAppliedRow", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSetAttachment", "Attachment")
+                        .WithMany("AppliedRows")
+                        .HasForeignKey("OptionSetAttachmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_applied_rows_optionsetattachments_option_set_att~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSetEntry", "Entry")
+                        .WithMany()
+                        .HasForeignKey("OptionSetEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_applied_rows_optionsetentries_option_set_entry_id");
+
+                    b.Navigation("Attachment");
+
+                    b.Navigation("Entry");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAttachment", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", "OptionSet")
+                        .WithMany("Attachments")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_attachments_option_sets_option_set_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", null)
+                        .WithMany()
+                        .HasForeignKey("TargetCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.MenuSection", null)
+                        .WithMany()
+                        .HasForeignKey("TargetMenuSectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("TargetProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAuthoringRevision", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", null)
+                        .WithMany()
+                        .HasForeignKey("TargetCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetEntry", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.GlobalIngredient", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalIngredientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", "OptionSet")
+                        .WithMany("Entries")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_entries_option_sets_option_set_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductVariation", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMaterializationJob", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", null)
+                        .WithMany()
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMaterializationJobTarget", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSetMaterializationJob", "Job")
+                        .WithMany("Targets")
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_materialization_job_targets_option_set_materiali~");
+
+                    b.Navigation("Job");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetTranslation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", "OptionSet")
+                        .WithMany("Translations")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_translations_option_sets_option_set_id");
+
+                    b.Navigation("OptionSet");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
@@ -7041,9 +8761,16 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("ChildBasketItems");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.CatalogueImportSession", b =>
+                {
+                    b.Navigation("Templates");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Category", b =>
                 {
                     b.Navigation("ProductCategories");
+
+                    b.Navigation("Translations");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.FloorPlan", b =>
@@ -7085,6 +8812,25 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Translations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSet", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Entries");
+
+                    b.Navigation("Translations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAttachment", b =>
+                {
+                    b.Navigation("AppliedRows");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMaterializationJob", b =>
+                {
+                    b.Navigation("Targets");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>

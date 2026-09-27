@@ -137,6 +137,58 @@ public class SetupChecklistTests : IntegrationTestBase
         Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task MenuStep_RequiresActiveAvailableOrderableProductInActiveCategory()
+    {
+        AuthenticateAsAdmin();
+        var join = await LinkFirstProductToFirstCategoryAsync();
+        Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeTrue();
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Products.Where(p => p.Id == join.ProductId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false));
+        }
+        Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeFalse();
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Products.Where(p => p.Id == join.ProductId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, true)
+                    .SetProperty(p => p.IsAvailable, false));
+        }
+        Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeFalse();
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Products.Where(p => p.Id == join.ProductId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsAvailable, true)
+                    .SetProperty(p => p.IsComponent, true));
+        }
+        Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeFalse();
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Products.Where(p => p.Id == join.ProductId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsComponent, false));
+            await context.Categories.Where(c => c.Id == join.CategoryId)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.IsActive, false));
+        }
+        Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeFalse();
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.Categories.Where(c => c.Id == join.CategoryId)
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.IsActive, true));
+        }
+        Step(await GetChecklistAsync(), SetupSteps.Menu).IsDone.Should().BeTrue();
+    }
+
     private async Task<ProductCategory> LinkFirstProductToFirstCategoryAsync()
     {
         using var scope = Factory.Services.CreateScope();

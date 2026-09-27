@@ -4,7 +4,9 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.Utilities;
+using RestaurantSystem.Api.Features.Categories;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -51,8 +53,10 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
         // See UpdateCategoryCommand: ProductCount dereferences `pc.Product` in memory after
         // materialisation, so without ThenInclude this 500s for any category that has products.
         var category = await _context.Categories
+            .AsSplitQuery()
             .Include(c => c.ProductCategories)
                 .ThenInclude(pc => pc.Product)
+            .Include(c => c.Translations)
             .FirstOrDefaultAsync(c => c.Id == command.CategoryId && !c.IsDeleted, cancellationToken);
 
         if (category == null)
@@ -85,6 +89,8 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
                 Id = category.Id,
                 Name = category.Name,
                 Description = category.Description,
+                SourceLocale = category.SourceLocale,
+                Translations = CategoryTranslationMapper.ToDto(category.Translations),
                 ImageUrl = UrlJoin.Join(_configuration["AWS:S3:BaseUrl"], category.ImageUrl),
                 IsActive = category.IsActive,
                 DisplayOrder = category.DisplayOrder,
@@ -95,6 +101,7 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
                 UpdatedAt = category.UpdatedAt
             };
 
+            categoryDto = await TranslationReadMetadata.ApplyAsync(_context, categoryDto, cancellationToken);
             _logger.LogInformation("Category {CategoryId} image updated successfully", category.Id);
             return ApiResponse<CategoryDto>.SuccessWithData(categoryDto, "Category image updated successfully");
         }

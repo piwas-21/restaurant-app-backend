@@ -89,6 +89,11 @@ public class ExceptionHandlingMiddleware
                 message = "The email could not be delivered. Please try again later.";
                 break;
 
+            case ServiceUnavailableException:
+                statusCode = HttpStatusCode.ServiceUnavailable;
+                message = exception.Message;
+                break;
+
             default:
                 statusCode = HttpStatusCode.InternalServerError;
                 message = _environment.IsDevelopment()

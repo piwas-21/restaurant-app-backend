@@ -1,5 +1,6 @@
 ﻿using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.Categories.Dtos;
 
@@ -8,6 +9,9 @@ public record CategoryDto
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    public Dictionary<string, CategoryContentDto> Translations { get; init; } = new(StringComparer.Ordinal);
+    public string? SourceLocale { get; init; }
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; init; }
     public string? ImageUrl { get; init; }
     public bool IsActive { get; init; }
     public int DisplayOrder { get; init; }

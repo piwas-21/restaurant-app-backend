@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.Products.Services;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -48,7 +50,8 @@ public record CreateProductCommand(
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
     bool IsComponent = false,
-    List<ProductCustomizationGroupDto>? CustomizationGroups = null
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -60,7 +63,8 @@ public record CreateProductVariationDto(
     Dictionary<string, ProductVariationContentDto>? Content,
     // S4 provenance. Last and defaulted, so every existing caller and every existing test payload
     // keeps compiling and keeps meaning "typed by hand".
-    Guid? GlobalVariationId = null
+    Guid? GlobalVariationId = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 );
 
 public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand, ApiResponse<ProductDto>>
@@ -69,23 +73,30 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateProductCommandHandler> _logger;
     private readonly IProductCustomizationGroupSynchronizer _customizationGroupSynchronizer;
+    private readonly ITranslationProvenanceWriter _translationProvenanceWriter;
 
     public CreateProductCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
         ILogger<CreateProductCommandHandler> logger,
-        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer)
+        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer,
+        ITranslationProvenanceWriter? translationProvenanceWriter = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
         _customizationGroupSynchronizer = customizationGroupSynchronizer;
+        _translationProvenanceWriter = translationProvenanceWriter ??
+            new TranslationProvenanceWriter(context, currentUserService);
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
     {
 
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var existingTransaction = _context.Database.CurrentTransaction;
+        var ownsTransaction = existingTransaction is null;
+        var transaction = existingTransaction ?? await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var ownedTransaction = ownsTransaction ? transaction : null;
 
         try
         {
@@ -196,6 +207,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 {
                     var variation = new ProductVariation
                     {
+                        Id = Guid.NewGuid(),
                         Name = variationDto.Name,
                         Description = variationDto.Description,
                         PriceModifier = variationDto.PriceModifier,
@@ -226,6 +238,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                             variation.Descriptions.Add(description);
                         }
                     }
+
+                    await _translationProvenanceWriter.RecordAsync("productVariation", variation.Id,
+                        variationDto.TranslationMetadata,
+                        TranslationTextMap.Create(variationDto.Name, variationDto.Description,
+                            (variationDto.Content ?? []).Select(pair =>
+                                (pair.Key, (string?)pair.Value.Name, pair.Value.Description))),
+                        cancellationToken);
                 }
             }
 
@@ -311,6 +330,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                             ingredient.Descriptions.Add(description);
                         }
                     }
+
+                    await _translationProvenanceWriter.RecordAsync("productIngredient", ingredient.Id,
+                        ingredientDto.TranslationMetadata,
+                        TranslationTextMap.Create(ingredientDto.Name, null,
+                            (ingredientDto.Content ?? []).Select(pair =>
+                                (pair.Key, (string?)pair.Value.Name, pair.Value.Description))),
+                        cancellationToken);
                 }
 
             }
@@ -322,9 +348,19 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     _currentUserService.GetAuditIdentifier(), cancellationToken);
             }
 
+            await _translationProvenanceWriter.RecordAsync("product", product.Id,
+                command.TranslationMetadata,
+                TranslationTextMap.Create(command.Name, command.Description,
+                    command.Content.Select(pair =>
+                        (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
+                cancellationToken);
+
             await _context.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
+            if (ownsTransaction)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
 
             var createdProduct = await _context.Products
                 .WithProductDtoNavigations()
@@ -340,14 +376,18 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
         }
         catch
         {
-            // Only rollback if the transaction is still active
-            try
+            // A caller such as catalogue import owns the ambient transaction and rolls back the
+            // whole item if any later step fails. Standalone command calls still own this scope.
+            if (ownsTransaction)
             {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-            catch (InvalidOperationException)
-            {
-                // Transaction already completed or disposed, ignore rollback error
+                try
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Transaction already completed or disposed, ignore rollback error
+                }
             }
             throw;
         }

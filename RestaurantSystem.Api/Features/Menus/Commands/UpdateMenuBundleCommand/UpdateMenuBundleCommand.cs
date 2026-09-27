@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -33,7 +35,9 @@ public record UpdateMenuBundleCommand(
     // usual: the client that seeds the stored value lands FIRST
     // (piwas-21/restaurant-app-frontend#704). A client that seeds nothing sends `[]`, and `[]`
     // is a real instruction — an admin who unticks every chip means it.
-    List<string>? Allergens = null
+    List<string>? Allergens = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null,
+    int? ExpectedAuthoringVersion = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
 public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
@@ -41,12 +45,17 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<UpdateMenuBundleCommandHandler> _logger;
+    private readonly ITranslationProvenanceWriter _translationProvenanceWriter;
 
-    public UpdateMenuBundleCommandHandler(ApplicationDbContext context, ICurrentUserService currentUserService, ILogger<UpdateMenuBundleCommandHandler> logger)
+    public UpdateMenuBundleCommandHandler(ApplicationDbContext context, ICurrentUserService currentUserService,
+        ILogger<UpdateMenuBundleCommandHandler> logger,
+        ITranslationProvenanceWriter? translationProvenanceWriter = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
+        _translationProvenanceWriter = translationProvenanceWriter ??
+            new TranslationProvenanceWriter(context, currentUserService);
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(UpdateMenuBundleCommand command, CancellationToken cancellationToken)
@@ -76,6 +85,10 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
                 return ApiResponse<ProductDto>.Failure("Product is not a menu bundle");
             }
 
+            TranslationContentVersion.EnsureCurrent(product,
+                command.TranslationMetadata?.ExpectedContentVersion,
+                command.TranslationMetadata?.AcceptedSuggestionIds?.Count ?? 0);
+
             await MenuOfferLinkRules.EnsureCanDeactivateAsync(
                 _context, product.Id, command.IsActive, cancellationToken);
 
@@ -92,8 +105,11 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             // unrelated bundle fields only when it echoes the current section snapshot.
             var sections = command.MenuDefinition.Sections
                 ?? throw new BadRequestException(MenuDefinitionDto.SectionsRequiredMessage);
-            var replaceSections = product.MenuDefinition is null
-                || MenuSectionReplacementGuard.ShouldReplaceSections(product.MenuDefinition, sections);
+            var existingDefinition = product.MenuDefinition;
+            var translationOnly = IsTranslationOnlyChange(existingDefinition, sections,
+                command.ExpectedAuthoringVersion);
+            var replaceSections = !translationOnly && (existingDefinition is null ||
+                MenuSectionReplacementGuard.ShouldReplaceSections(existingDefinition, sections));
 
             await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
 
@@ -200,10 +216,35 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             // makes null unreachable here — but the throw is what keeps it unreachable SAFELY. A
             // `?? []` would silently restore the exact wipe this fixes, and a `!` would trade a
             // 400 for a 500.
-            if (replaceSections)
+            IReadOnlyList<(MenuSectionDto Input, MenuSection Entity)> written;
+            if (translationOnly)
             {
-                MenuSectionWriter.ReplaceSections(_context, menuDef, sections, _currentUserService.GetAuditIdentifier());
+                written = MenuSectionWriter.ApplyPatch(_context, menuDef, sections,
+                    _currentUserService.GetAuditIdentifier(), translationsOnly: true);
             }
+            else if (replaceSections)
+            {
+                written = MenuSectionWriter.ReplaceSections(_context, menuDef, sections,
+                    _currentUserService.GetAuditIdentifier());
+            }
+            else
+            {
+                var byId = menuDef.Sections.ToDictionary(section => section.Id);
+                written = sections.Where(section => section.Id.HasValue && byId.ContainsKey(section.Id.Value))
+                    .Select(section => (section, byId[section.Id.GetValueOrDefault()])).ToArray();
+            }
+
+            foreach (var (input, section) in written)
+            {
+                await _translationProvenanceWriter.RecordAsync("menuSection", section.Id,
+                    input.TranslationMetadata, TranslationTextMap.FromSection(input), cancellationToken);
+            }
+            await _translationProvenanceWriter.RecordAsync("product", product.Id,
+                command.TranslationMetadata,
+                TranslationTextMap.Create(command.Name, command.Description,
+                    (command.Content ?? []).Select(pair =>
+                        (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
+                cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -233,5 +274,24 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             MenuOfferLinkConflict.ThrowIfExpected(exception);
             throw;
         }
+    }
+
+    private static bool IsTranslationOnlyChange(
+        MenuDefinition? existingDefinition,
+        IReadOnlyCollection<MenuSectionDto> sections,
+        int? expectedAuthoringVersion)
+    {
+        if (existingDefinition?.VersionedSectionEditingStarted != true ||
+            !MenuSectionReplacementGuard.IsTranslationOnlyChange(existingDefinition.Sections, sections))
+        {
+            return false;
+        }
+
+        if (expectedAuthoringVersion != existingDefinition.AuthoringVersion)
+        {
+            throw new ConflictException("Menu sections changed. Reload before saving translations.");
+        }
+
+        return true;
     }
 }

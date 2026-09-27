@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
@@ -12,6 +13,7 @@ public record MenuSectionDto
     public bool IsRequired { get; init; }
     public int MinSelection { get; init; }
     public int MaxSelection { get; init; }
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; init; }
 
     private Dictionary<string, MenuSectionTranslationDto>? _translations = new();
 

@@ -21,6 +21,7 @@ public class TenantFeaturesTests
 
         features.ServerWorkspaceV2.Should().BeFalse();
         features.EnforceSauceMinimum.Should().BeFalse();
+        features.OptionSetMaterializationEnabled.Should().BeFalse();
     }
 
     [Fact]
@@ -40,6 +41,14 @@ public class TenantFeaturesTests
     }
 
     [Fact]
+    public void Option_set_materialization_can_be_enabled_per_tenant()
+    {
+        var features = Create(new TenantFeatureSettings { OptionSetMaterializationEnabled = true });
+
+        features.OptionSetMaterializationEnabled.Should().BeTrue();
+    }
+
+    [Fact]
     public void Configuration_binding_rejects_an_invalid_boolean()
     {
         var services = new ServiceCollection();
@@ -49,6 +58,7 @@ public class TenantFeaturesTests
                 {
                     [$"{TenantFeatureSettings.SectionName}:ServerWorkspaceV2"] = "maybe",
                     [$"{TenantFeatureSettings.SectionName}:EnforceSauceMinimum"] = "maybe",
+                    [$"{TenantFeatureSettings.SectionName}:OptionSetMaterializationEnabled"] = "maybe",
                 })
                 .Build()
                 .GetSection(TenantFeatureSettings.SectionName))
@@ -70,6 +80,7 @@ public class TenantFeaturesTests
         {
             ServerWorkspaceV2 = enabled,
             EnforceSauceMinimum = enabled,
+            OptionSetMaterializationEnabled = enabled,
         }))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
@@ -81,6 +92,7 @@ public class TenantFeaturesTests
         body.Success.Should().BeTrue();
         body.Data!.ServerWorkspaceV2.Should().Be(enabled);
         body.Data.EnforceSauceMinimum.Should().Be(enabled);
+        body.Data.OptionSetMaterializationEnabled.Should().Be(enabled);
         controller.Response.Headers.CacheControl.ToString().Should().Be("no-store");
     }
 

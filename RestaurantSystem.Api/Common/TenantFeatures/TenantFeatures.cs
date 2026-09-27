@@ -13,9 +13,12 @@ public sealed class TenantFeatures : ITenantFeatures
         ArgumentNullException.ThrowIfNull(options);
         ServerWorkspaceV2 = options.Value.ServerWorkspaceV2;
         EnforceSauceMinimum = options.Value.EnforceSauceMinimum;
+        OptionSetMaterializationEnabled = options.Value.OptionSetMaterializationEnabled;
     }
 
     public bool ServerWorkspaceV2 { get; }
 
     public bool EnforceSauceMinimum { get; }
+
+    public bool OptionSetMaterializationEnabled { get; }
 }

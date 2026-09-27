@@ -19,6 +19,9 @@ public class Category : SoftDeleteEntity
     /// </summary>
     public bool IsHiddenFromAllTab { get; set; }
 
+    /// <summary>The locale used for the category's scalar name and description.</summary>
+    public string? SourceLocale { get; set; }
+
     /// <summary>
     /// The <see cref="Common.Enums.OrderChannels"/> bitmask this category may be ordered through.
     /// <c>null</c> = every channel. Products in this category inherit it unless they override.
@@ -27,4 +30,5 @@ public class Category : SoftDeleteEntity
     public int? AvailableOrderTypes { get; set; }
 
     public virtual ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();
+    public virtual ICollection<CategoryTranslation> Translations { get; set; } = new List<CategoryTranslation>();
 }

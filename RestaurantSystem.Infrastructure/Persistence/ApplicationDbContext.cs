@@ -43,6 +43,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
         // Product-related DbSets
         public DbSet<Category> Categories { get; set; }
+        public DbSet<CategoryTranslation> CategoryTranslations { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductImage> ProductImages { get; set; }
         public DbSet<ProductCategory> ProductCategories { get; set; }
@@ -65,7 +66,24 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<MenuDefinition> MenuDefinitions { get; set; }
         public DbSet<MenuSection> MenuSections { get; set; }
         public DbSet<MenuSectionItem> MenuSectionItems { get; set; }
+        public DbSet<CatalogueImportSession> CatalogueImportSessions { get; set; }
+        public DbSet<CatalogueImportSessionTemplate> CatalogueImportSessionTemplates { get; set; }
+        public DbSet<CatalogueTemplateAdoption> CatalogueTemplateAdoptions { get; set; }
+        public DbSet<CatalogueMatchDecision> CatalogueMatchDecisions { get; set; }
+        public DbSet<CatalogueCuisinePreference> CatalogueCuisinePreferences { get; set; }
         public DbSet<MenuSectionTranslation> MenuSectionTranslations { get; set; }
+        public DbSet<OptionSet> OptionSets { get; set; }
+        public DbSet<OptionSetEntry> OptionSetEntries { get; set; }
+        public DbSet<OptionSetAttachment> OptionSetAttachments { get; set; }
+        public DbSet<OptionSetAppliedRow> OptionSetAppliedRows { get; set; }
+        public DbSet<OptionSetMatchDecision> OptionSetMatchDecisions { get; set; }
+        public DbSet<OptionSetAuthoringRevision> OptionSetAuthoringRevisions { get; set; }
+        public DbSet<OptionSetTranslation> OptionSetTranslations { get; set; }
+        public DbSet<OptionSetMaterializationJob> OptionSetMaterializationJobs { get; set; }
+        public DbSet<OptionSetMaterializationJobTarget> OptionSetMaterializationJobTargets { get; set; }
+        public DbSet<TranslationFieldProvenance> TranslationFieldProvenances { get; set; }
+        public DbSet<TranslationSuggestion> TranslationSuggestions { get; set; }
+        public DbSet<TranslationGenerationBatch> TranslationGenerationBatches { get; set; }
 
         // Basket-related
 
@@ -160,6 +178,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
             base.OnModelCreating(builder);
 
             ConfigurePostgreSQL(builder);
+            ConfigureMenuAuthoringSearchFunctions(builder);
 
             builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
@@ -167,6 +186,25 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
             ConfigureDefaultValues(builder);
 
+        }
+
+        private static void ConfigureMenuAuthoringSearchFunctions(ModelBuilder builder)
+        {
+            builder.HasDbFunction(
+                    typeof(MenuAuthoringSearchDatabaseFunctions).GetMethod(
+                        nameof(MenuAuthoringSearchDatabaseFunctions.Normalize), [typeof(string)])!)
+                .HasName("menu_authoring_search_normalize")
+                .HasSchema("public");
+            builder.HasDbFunction(
+                    typeof(MenuAuthoringSearchDatabaseFunctions).GetMethod(
+                        nameof(MenuAuthoringSearchDatabaseFunctions.Pattern), [typeof(string)])!)
+                .HasName("menu_authoring_search_pattern")
+                .HasSchema("public");
+            builder.HasDbFunction(
+                    typeof(MenuAuthoringSearchDatabaseFunctions).GetMethod(
+                        nameof(MenuAuthoringSearchDatabaseFunctions.PrefixPattern), [typeof(string)])!)
+                .HasName("menu_authoring_search_prefix_pattern")
+                .HasSchema("public");
         }
 
         private void ConfigurePostgreSQL(ModelBuilder builder)

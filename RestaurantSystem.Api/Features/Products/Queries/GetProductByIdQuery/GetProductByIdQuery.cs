@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Utilities;
@@ -6,6 +7,7 @@ using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -21,12 +23,15 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
     private readonly ApplicationDbContext _context;
     private readonly ILogger<GetProductByIdQueryHandler> _logger;
     private readonly string _baseUrl;
+    private readonly ICurrentUserService? _currentUser;
 
-    public GetProductByIdQueryHandler(ApplicationDbContext context, ILogger<GetProductByIdQueryHandler> logger, IConfiguration configuration)
+    public GetProductByIdQueryHandler(ApplicationDbContext context, ILogger<GetProductByIdQueryHandler> logger,
+        IConfiguration configuration, ICurrentUserService? currentUser = null)
     {
         _context = context;
         _logger = logger;
         _baseUrl = configuration["AWS:S3:BaseUrl"]!;
+        _currentUser = currentUser;
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(GetProductByIdQuery query, CancellationToken cancellationToken)
@@ -247,6 +252,11 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 Name = description.Name,
                 Description = description.Description
             };
+        }
+
+        if (_currentUser?.IsStaff == true)
+        {
+            await TranslationReadMetadata.ApplyAsync(_context, productDto, cancellationToken);
         }
 
         _logger.LogInformation("Retrieved product {ProductId} successfully", query.Id);

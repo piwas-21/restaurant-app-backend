@@ -86,6 +86,24 @@ All MRs require the pipeline to pass before merge.
 | `CorsSettings:AllowedOrigins` | `appsettings.<Env>.json` | App throws on startup in non-Dev if empty |
 | `SENTRY_DSN` (+ optional `SENTRY_ENVIRONMENT`) | env var (box `.env` → compose passthrough, deploy repo) | Empty/unset = Sentry never initializes (inert). Errors only — no PII, no request bodies, tracing off. Enable runbook: deploy repo `DEPLOYMENT.md` §Error tracking |
 | `ReservationQuickActions` | `appsettings.json` + env override | Signs the approve/reject links in the restaurant's alert mail. See below |
+| `TranslationAssistance` | env (`TranslationAssistance__*`) | Optional tenant menu translation provider; disabled until provider terms, processing region and tenant data use are approved. See below |
+
+### Menu translation assistance
+
+The admin translation workbench previews missing and stale guest-locale text without a provider. Both enablement switches default to false; leave them false until provider billing, processing region and tenant data terms are confirmed. Provider credentials belong in the box secret environment, not source control. The API does not log prompts or keys.
+
+Choose one provider with `TranslationAssistance__Provider` (`openai` by default, or `gemini`). Configure its settings before setting both `TranslationAssistance__Enabled=true` and `TranslationAssistance__TenantDataApproved=true`:
+
+| Provider | Required settings | Request behavior |
+|---|---|---|
+| OpenAI | HTTPS `TranslationAssistance__ApiUrl`, `TranslationAssistance__ApiKey`, model `TranslationAssistance__Model`, `TranslationAssistance__InputCostPerMillionUsd`, `TranslationAssistance__OutputCostPerMillionUsd` | Sends `store:false`; root cost defaults apply only to this provider. |
+| Gemini | HTTPS base `TranslationAssistance__Gemini__ApiBaseUrl`, `TranslationAssistance__Gemini__ApiKey`, `TranslationAssistance__Gemini__Model`, `TranslationAssistance__Gemini__InputCostPerMillionUsd`, `TranslationAssistance__Gemini__OutputCostPerMillionUsd` | Uses GenerateContent with structured JSON output and low thinking; both nested cost rates must be positive before it is ready. Gemini thought tokens count toward output usage. |
+
+The Gemini model defaults to `gemini-3.8-flash`, but its base URL, key and rates have no enabled defaults. The provider is selected at process startup; changing it requires a backend restart. Do not set either provider live until its current pricing and data-processing terms are verified.
+
+`TranslationAssistance__MaxDailyBatches`, `MaxDailyTokens`, `MaxDailySpendUsd`, `MaxBatchTargets` and `TimeoutSeconds` bound each tenant database's usage. The workbench remains usable for manual edits and Save when the provider is disabled, over budget or unavailable. Suggestions require admin review and only reach guest text through the ordinary product or bundle Save.
+
+Set the selected provider's cost fields for its model and processing tier before enabling it. The root defaults match standard GPT-6 Luna text pricing for OpenAI; regional processing can cost more. A provider attempt reserves the maximum configured output and a conservative input estimate before the call. Unknown outcomes keep that reservation charged for the day; successful calls settle to reported token usage.
 
 ### Reservation quick-action links
 
