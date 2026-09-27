@@ -45,7 +45,7 @@ internal sealed partial class CatalogueRevisionLocalTextStore
         string field)
     {
         if (!revision.Translations.TryGetValue(locale, out var text)) return null;
-        return field == "name" ? text!.Name : text!.Description;
+        return field == "name" ? text.Name : text.Description;
     }
 
     private async Task<bool> SetIngredientTranslationAsync(
