@@ -73,6 +73,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OptionSetMatchDecision> OptionSetMatchDecisions { get; set; }
         public DbSet<OptionSetAuthoringRevision> OptionSetAuthoringRevisions { get; set; }
         public DbSet<OptionSetTranslation> OptionSetTranslations { get; set; }
+        public DbSet<TranslationFieldProvenance> TranslationFieldProvenances { get; set; }
+        public DbSet<TranslationSuggestion> TranslationSuggestions { get; set; }
+        public DbSet<TranslationGenerationBatch> TranslationGenerationBatches { get; set; }
 
         // Basket-related
 

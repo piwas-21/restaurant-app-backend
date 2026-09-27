@@ -6,6 +6,8 @@ using RestaurantSystem.Api.Features.Catalog;
 using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.Products.Services;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -48,7 +50,8 @@ public record CreateProductCommand(
     // Product.IsComponent). Optional and last so every existing caller and test payload keeps
     // compiling and keeps meaning "an ordinary catalogue item".
     bool IsComponent = false,
-    List<ProductCustomizationGroupDto>? CustomizationGroups = null
+    List<ProductCustomizationGroupDto>? CustomizationGroups = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 ) : ICommand<ApiResponse<ProductDto>>;
 
 public record CreateProductVariationDto(
@@ -60,7 +63,8 @@ public record CreateProductVariationDto(
     Dictionary<string, ProductVariationContentDto>? Content,
     // S4 provenance. Last and defaulted, so every existing caller and every existing test payload
     // keeps compiling and keeps meaning "typed by hand".
-    Guid? GlobalVariationId = null
+    Guid? GlobalVariationId = null,
+    TranslationOwnerMetadataDto? TranslationMetadata = null
 );
 
 public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand, ApiResponse<ProductDto>>
@@ -69,17 +73,21 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
     private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<CreateProductCommandHandler> _logger;
     private readonly IProductCustomizationGroupSynchronizer _customizationGroupSynchronizer;
+    private readonly ITranslationProvenanceWriter _translationProvenanceWriter;
 
     public CreateProductCommandHandler(
         ApplicationDbContext context,
         ICurrentUserService currentUserService,
         ILogger<CreateProductCommandHandler> logger,
-        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer)
+        IProductCustomizationGroupSynchronizer customizationGroupSynchronizer,
+        ITranslationProvenanceWriter? translationProvenanceWriter = null)
     {
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
         _customizationGroupSynchronizer = customizationGroupSynchronizer;
+        _translationProvenanceWriter = translationProvenanceWriter ??
+            new TranslationProvenanceWriter(context, currentUserService);
     }
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -196,6 +204,7 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                 {
                     var variation = new ProductVariation
                     {
+                        Id = Guid.NewGuid(),
                         Name = variationDto.Name,
                         Description = variationDto.Description,
                         PriceModifier = variationDto.PriceModifier,
@@ -226,6 +235,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                             variation.Descriptions.Add(description);
                         }
                     }
+
+                    await _translationProvenanceWriter.RecordAsync("productVariation", variation.Id,
+                        variationDto.TranslationMetadata,
+                        TranslationTextMap.Create(variationDto.Name, variationDto.Description,
+                            (variationDto.Content ?? []).Select(pair =>
+                                (pair.Key, (string?)pair.Value.Name, pair.Value.Description))),
+                        cancellationToken);
                 }
             }
 
@@ -311,6 +327,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                             ingredient.Descriptions.Add(description);
                         }
                     }
+
+                    await _translationProvenanceWriter.RecordAsync("productIngredient", ingredient.Id,
+                        ingredientDto.TranslationMetadata,
+                        TranslationTextMap.Create(ingredientDto.Name, null,
+                            (ingredientDto.Content ?? []).Select(pair =>
+                                (pair.Key, (string?)pair.Value.Name, pair.Value.Description))),
+                        cancellationToken);
                 }
 
             }
@@ -321,6 +344,13 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
                     product, command.CustomizationGroups,
                     _currentUserService.GetAuditIdentifier(), cancellationToken);
             }
+
+            await _translationProvenanceWriter.RecordAsync("product", product.Id,
+                command.TranslationMetadata,
+                TranslationTextMap.Create(command.Name, command.Description,
+                    command.Content.Select(pair =>
+                        (pair.Key, (string?)pair.Value.Name, (string?)pair.Value.Description))),
+                cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
 

@@ -1,12 +1,14 @@
 ﻿using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Menus.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 public record ProductDto
 {
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }

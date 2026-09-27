@@ -1,7 +1,10 @@
-﻿namespace RestaurantSystem.Api.Features.Products.Dtos;
+﻿using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
+
+namespace RestaurantSystem.Api.Features.Products.Dtos;
 
 public record ProductVariationDto
 {
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }

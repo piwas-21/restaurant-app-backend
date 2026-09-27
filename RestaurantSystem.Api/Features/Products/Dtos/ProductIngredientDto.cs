@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.Products.Dtos;
 
@@ -37,6 +38,7 @@ public record ProductIngredientDto
     public string? ExclusionGroup { get; set; }
 
     public Dictionary<string, ProductIngredientContentDto>? Content { get; set; }
+    public TranslationOwnerMetadataDto? TranslationMetadata { get; set; }
 }
 
 public record ProductIngredientContentDto

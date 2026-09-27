@@ -37,7 +37,8 @@ internal static class ProductIngredientSynchronizer
         IReadOnlyCollection<ProductIngredientDto> incoming,
         string auditIdentifier,
         ILogger logger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<ProductIngredientDto, ProductIngredient, Task>? onUpsert = null)
     {
         // `OfType<Guid>()` rather than the `Where(HasValue).Select(x => x.Id!.Value)` the variation
         // block uses: flow analysis does not carry `HasValue` across the lambda boundary, so that
@@ -122,6 +123,7 @@ internal static class ProductIngredientSynchronizer
             {
                 ingredient = new ProductIngredient
                 {
+                    Id = Guid.NewGuid(),
                     ProductId = product.Id,
                     Name = ingredientDto.Name,
                     IsOptional = ingredientDto.IsOptional,
@@ -138,6 +140,11 @@ internal static class ProductIngredientSynchronizer
                 };
 
                 await context.ProductIngredients.AddAsync(ingredient, cancellationToken);
+            }
+
+            if (onUpsert is not null)
+            {
+                await onUpsert(ingredientDto, ingredient);
             }
 
             if (ingredientDto.Content == null)

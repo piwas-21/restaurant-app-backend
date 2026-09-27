@@ -39,6 +39,7 @@ using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields.Services;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
 using RestaurantSystem.Api.Features.Settings.Services;
+using RestaurantSystem.Api.Features.TranslationWorkbench;
 using RestaurantSystem.Api.Features.Groups.Interfaces;
 using RestaurantSystem.Api.Features.Groups.Services;
 using RestaurantSystem.Api.Settings;
@@ -801,6 +802,7 @@ builder.Services.AddScoped<RestaurantSystem.Api.Features.FloorPlan.Services.IFlo
 builder.Services.AddScoped<IGroupMembershipService, GroupMembershipService>();
 builder.Services.AddScoped<IMembershipQrService, MembershipQrService>();
 builder.Services.AddScoped<IUserGroupService, UserGroupService>();
+builder.Services.AddTranslationWorkbench(builder.Configuration);
 // HTML page builder for email-link landing endpoints (Sprint 2 task 2.1).
 // Pure string composition — singleton lifetime is appropriate.
 builder.Services.AddSingleton<IHtmlResponseBuilder, HtmlResponseBuilder>();
