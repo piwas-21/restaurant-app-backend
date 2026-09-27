@@ -34,6 +34,7 @@ using RestaurantSystem.Api.Features.FidelityPoints.Services;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Products.Services;
+using RestaurantSystem.Api.Features.OptionSets;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields.Services;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
@@ -666,12 +667,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
-builder.Services.AddScoped<RestaurantSystem.Api.Features.OptionSets.Services.IOptionSetCatalogService,
-    RestaurantSystem.Api.Features.OptionSets.Services.OptionSetCatalogService>();
-builder.Services.AddScoped<RestaurantSystem.Api.Features.OptionSets.Materialization.IOptionSetMaterializer,
-    RestaurantSystem.Api.Features.OptionSets.Materialization.OptionSetMaterializer>();
-builder.Services.AddScoped<RestaurantSystem.Api.Features.OptionSets.Search.IMenuAuthoringSearchService,
-    RestaurantSystem.Api.Features.OptionSets.Search.MenuAuthoringSearchService>();
+builder.Services.AddOptionSetFeatures();
 // Lets ApplicationDbContext (Infrastructure, which cannot see ICurrentUserService) backfill audit
 // columns with the acting user. NOT forwarded to ICurrentUserService: that is a dependency CYCLE —
 // CurrentUserService needs UserManager, which needs IUserStore, which AddEntityFrameworkStores

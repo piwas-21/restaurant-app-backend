@@ -61,35 +61,47 @@ internal static class OptionSetMaterializerPlanBuilder
         IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
+        var entriesToValidate = state.SelectedEntries
+            .Where(entry => !state.AppliedByEntry.ContainsKey(entry.Id)).ToList();
+        if (set.Status == RestaurantSystem.Domain.Common.Enums.OptionSetStatus.Active)
+        {
+            var validationErrors = await OptionSetMaterializerEntryValidation.ValidateManyAsync(
+                context, set.Kind, entriesToValidate, stagedProductIds, cancellationToken);
+            if (validationErrors.FirstOrDefault(error => error is not null) is string error)
+            {
+                throw new BadRequestException(error);
+            }
+        }
+
+        var rows = await OptionSetMaterializerBatchRows.FindManyAsync(
+            context, target.Role, target, state.SelectedEntries, state.AppliedByEntry, cancellationToken);
         foreach (var entry in state.SelectedEntries)
         {
-            try
-            {
-                state.AppliedByEntry.TryGetValue(entry.Id, out var mapping);
-                if (set.Status != RestaurantSystem.Domain.Common.Enums.OptionSetStatus.Active && mapping is null)
-                {
-                    throw new ConflictException("An archived option set cannot add entries to an existing target");
-                }
-
-                if (mapping is null)
-                {
-                    await OptionSetMaterializerEntryValidation.ValidateAsync(
-                        context, set.Kind, entry, stagedProductIds, cancellationToken);
-                }
-
-                var row = await OptionSetMaterializerRows.FindAsync(
-                    context, target.Role, target, entry, mapping, cancellationToken);
-                preview.Changes.Add(PlanEntry(target, entry, mapping, row));
-            }
-            catch (ConflictException exception)
+            state.AppliedByEntry.TryGetValue(entry.Id, out var mapping);
+            if (set.Status != RestaurantSystem.Domain.Common.Enums.OptionSetStatus.Active && mapping is null)
             {
                 preview.Conflicts.Add(new OptionSetMaterializationConflictDto
                 {
                     Code = "row-conflict",
-                    Message = exception.Message,
+                    Message = "An archived option set cannot add entries to an existing target",
                     EntryId = entry.Id
                 });
+                continue;
             }
+
+            var resolution = rows[entry.Id];
+            if (resolution.ConflictMessage is string conflict)
+            {
+                preview.Conflicts.Add(new OptionSetMaterializationConflictDto
+                {
+                    Code = "row-conflict",
+                    Message = conflict,
+                    EntryId = entry.Id
+                });
+                continue;
+            }
+
+            preview.Changes.Add(PlanEntry(target, entry, mapping, resolution.Row));
         }
     }
 

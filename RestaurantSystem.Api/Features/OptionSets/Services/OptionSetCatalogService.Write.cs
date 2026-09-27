@@ -11,7 +11,8 @@ public sealed partial class OptionSetCatalogService
     public async Task<OptionSetDetailDto> CreateAsync(OptionSetWriteRequestDto request, CancellationToken cancellationToken)
     {
         ValidateHeader(request, creating: true);
-        await ValidateEntriesAsync(request, cancellationToken);
+        ValidateEntryCount(request);
+        await ValidateEntriesAsync(request.Kind, request.Entries, cancellationToken);
         var name = request.Name.Trim();
         var normalizedName = OptionSetNameNormalizer.Normalize(name);
         if (await _context.OptionSets.AnyAsync(set => set.Kind == request.Kind && set.NormalizedName == normalizedName, cancellationToken))
@@ -70,6 +71,8 @@ public sealed partial class OptionSetCatalogService
         var byId = set.Entries.ToDictionary(entry => entry.Id);
         var retained = new HashSet<Guid>();
         var references = new HashSet<string>(StringComparer.Ordinal);
+        var plannedEntries = new List<(OptionSetEntryDto Dto, OptionSetEntry? Existing)>();
+        var entriesToValidate = new List<OptionSetEntryDto>();
         var now = DateTime.UtcNow;
         var audit = _currentUser.GetAuditIdentifier();
 
@@ -84,10 +87,22 @@ public sealed partial class OptionSetCatalogService
             var entry = ResolveExistingEntry(dto, set.Entries, byId, retained);
             if (entry is null || !SameReference(entry, dto))
             {
-                await OptionSetEntryValidator.ValidateAsync(
-                    _context, request.Kind, dto, cancellationToken: cancellationToken);
+                entriesToValidate.Add(dto);
             }
 
+            plannedEntries.Add((dto, entry));
+        }
+
+        await ValidateEntriesAsync(request.Kind, entriesToValidate, cancellationToken);
+        var entryIds = set.Entries.Select(entry => entry.Id).ToArray();
+        HashSet<Guid> materializedEntryIds = entryIds.Length == 0
+            ? []
+            : (await _context.OptionSetAppliedRows.Where(row => entryIds.Contains(row.OptionSetEntryId))
+                .Select(row => row.OptionSetEntryId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+
+        foreach (var (dto, existingEntry) in plannedEntries)
+        {
+            var entry = existingEntry;
             if (entry is null)
             {
                 entry = NewEntry(dto, audit, now);
@@ -99,7 +114,7 @@ public sealed partial class OptionSetCatalogService
             }
             else
             {
-                if (HasMaterializedRows(entry.Id) && !SameReference(entry, dto))
+                if (materializedEntryIds.Contains(entry.Id) && !SameReference(entry, dto))
                 {
                     throw new ConflictException("Detach this entry from its targets before changing its canonical item");
                 }
@@ -134,17 +149,19 @@ public sealed partial class OptionSetCatalogService
     }
 
     private async Task ValidateEntriesAsync(
-        OptionSetWriteRequestDto request,
+        OptionSetKind kind,
+        IReadOnlyList<OptionSetEntryDto> entries,
         CancellationToken cancellationToken,
         IReadOnlySet<Guid>? stagedProductIds = null)
     {
-        ValidateEntryCount(request);
-
-        foreach (var entry in request.Entries)
+        var errors = await OptionSetEntryValidator.ValidateManyAsync(
+            _context, kind, entries, stagedProductIds: stagedProductIds, cancellationToken: cancellationToken);
+        foreach (var error in errors)
         {
-            await OptionSetEntryValidator.ValidateAsync(
-                _context, request.Kind, entry, stagedProductIds: stagedProductIds,
-                cancellationToken: cancellationToken);
+            if (error is not null)
+            {
+                throw new BadRequestException(error);
+            }
         }
     }
 
@@ -184,8 +201,6 @@ public sealed partial class OptionSetCatalogService
             throw new ConflictException("An option set with the same name or canonical entry already exists", exception);
         }
     }
-
-    private bool HasMaterializedRows(Guid entryId) => _context.OptionSetAppliedRows.Any(row => row.OptionSetEntryId == entryId);
 
     private static OptionSetEntry? ResolveExistingEntry(
         OptionSetEntryDto dto,

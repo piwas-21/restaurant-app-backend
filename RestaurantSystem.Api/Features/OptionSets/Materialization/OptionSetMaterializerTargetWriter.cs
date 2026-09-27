@@ -51,6 +51,22 @@ internal static class OptionSetMaterializerTargetWriter
             await context.OptionSetAttachments.AddAsync(attachment, cancellationToken);
         }
 
+        var entriesToValidate = state.SelectedEntries
+            .Where(entry => !state.AppliedByEntry.ContainsKey(entry.Id)).ToList();
+        if (set.Status != OptionSetStatus.Active && entriesToValidate.Count > 0)
+        {
+            throw new ConflictException("An archived option set cannot add entries to an existing target");
+        }
+
+        var validationErrors = await OptionSetMaterializerEntryValidation.ValidateManyAsync(
+            context, set.Kind, entriesToValidate, stagedProductIds, cancellationToken);
+        if (validationErrors.FirstOrDefault(error => error is not null) is string validationError)
+        {
+            throw new BadRequestException(validationError);
+        }
+
+        var rowLookups = await OptionSetMaterializerBatchRows.FindManyAsync(
+            context, target.Role, target, state.SelectedEntries, state.AppliedByEntry, cancellationToken);
         var desiredIds = state.SelectedEntries.Select(entry => entry.Id).ToHashSet();
         foreach (var entry in state.SelectedEntries)
         {
@@ -60,14 +76,13 @@ internal static class OptionSetMaterializerTargetWriter
                 throw new ConflictException("An archived option set cannot add entries to an existing target");
             }
 
-            if (mapping is null)
+            var resolution = rowLookups[entry.Id];
+            if (resolution.ConflictMessage is string conflict)
             {
-                await OptionSetMaterializerEntryValidation.ValidateAsync(
-                    context, set.Kind, entry, stagedProductIds, cancellationToken);
+                throw new ConflictException(conflict);
             }
 
-            var row = await OptionSetMaterializerRows.FindAsync(
-                context, target.Role, target, entry, mapping, cancellationToken);
+            var row = resolution.Row;
             var isNewRow = row is null;
             row ??= await OptionSetMaterializerRows.CreateAsync(
                 context, set.Kind, target, entry, GetOverride(target, entry.Id), audit, cancellationToken);
@@ -110,7 +125,8 @@ internal static class OptionSetMaterializerTargetWriter
             });
         }
 
-        await RemoveOmittedRowsAsync(context, attachment, state, desiredIds, audit, result, cancellationToken);
+        await RemoveOmittedRowsAsync(
+            context, attachment, desiredIds, rowLookups, result, cancellationToken);
         ApplyAttachmentSettings(set.Kind, state, attachment, target, audit, now);
         await ValidateTargetRuntimeRulesAsync(context, set.Kind, state, cancellationToken);
         if (target.Role == OptionSetAttachmentRole.BundleChoice && state.MenuDefinition is not null)
@@ -283,28 +299,26 @@ internal static class OptionSetMaterializerTargetWriter
     private static async Task RemoveOmittedRowsAsync(
         ApplicationDbContext context,
         OptionSetAttachment attachment,
-        OptionSetTargetState state,
         HashSet<Guid> selectedIds,
-        string audit,
+        IReadOnlyDictionary<Guid, MaterializedOptionSetRowLookup> rowLookups,
         OptionSetMaterializationTargetResultDto result,
         CancellationToken cancellationToken)
     {
-        foreach (var mapping in attachment.AppliedRows.Where(row => !selectedIds.Contains(row.OptionSetEntryId)).ToList())
+        var omittedMappings = attachment.AppliedRows.Where(row => !selectedIds.Contains(row.OptionSetEntryId)).ToList();
+        var sharedOwnedRows = await OptionSetMaterializerBatchRows.LoadSharedOwnedRowIdsAsync(
+            context, omittedMappings, cancellationToken);
+        foreach (var mapping in omittedMappings)
         {
-            var row = await OptionSetMaterializerRows.FindAsync(
-                context, attachment.Role, new OptionSetMaterializationTargetRequest
-                {
-                    TargetProductId = attachment.TargetProductId,
-                    TargetMenuSectionId = attachment.TargetMenuSectionId,
-                    TargetCustomizationGroupId = attachment.TargetCustomizationGroupId,
-                    Role = attachment.Role
-                },
-                state.SelectedEntries.FirstOrDefault() ?? new OptionSetEntry { CreatedBy = audit }, mapping, cancellationToken);
-            if (row is not null && mapping.OwnsMaterializedRow
-                && !await context.OptionSetAppliedRows.AnyAsync(other => other.Id != mapping.Id
-                    && other.RowType == mapping.RowType && other.MaterializedRowId == mapping.MaterializedRowId, cancellationToken))
+            var resolution = rowLookups[mapping.OptionSetEntryId];
+            if (resolution.ConflictMessage is string conflict)
             {
-                OptionSetMaterializerRows.Delete(context, row);
+                throw new ConflictException(conflict);
+            }
+
+            if (resolution.Row is not null && mapping.OwnsMaterializedRow
+                && !sharedOwnedRows.Contains(mapping.MaterializedRowId))
+            {
+                OptionSetMaterializerRows.Delete(context, resolution.Row);
             }
 
             context.OptionSetAppliedRows.Remove(mapping);

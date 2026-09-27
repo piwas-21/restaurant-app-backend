@@ -15,19 +15,45 @@ internal static class OptionSetEntryValidator
         IReadOnlySet<Guid>? stagedProductIds = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(entry.Name) || entry.Name.Trim().Length > 200 || entry.DisplayOrder < 0)
+        var errors = await ValidateManyAsync(
+            context, kind, [entry], requireActiveReference, stagedProductIds, cancellationToken);
+        if (errors[0] is string error)
         {
-            throw new BadRequestException("Each option needs a name up to 200 characters and a non-negative order");
+            throw new BadRequestException(error);
         }
+    }
 
+    public static async Task<IReadOnlyList<string?>> ValidateManyAsync(
+        ApplicationDbContext context,
+        OptionSetKind kind,
+        IReadOnlyList<OptionSetEntryDto> entries,
+        bool requireActiveReference = true,
+        IReadOnlySet<Guid>? stagedProductIds = null,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = entries.Select(entry =>
+            string.IsNullOrWhiteSpace(entry.Name) || entry.Name.Trim().Length > 200 || entry.DisplayOrder < 0
+                ? "Each option needs a name up to 200 characters and a non-negative order"
+                : null).ToArray();
         if (kind is OptionSetKind.Ingredient or OptionSetKind.Sauce)
         {
-            await OptionSetIngredientEntryValidator.ValidateAsync(
-                context, kind, entry, requireActiveReference, cancellationToken);
-            return;
+            var referenceErrors = await OptionSetIngredientEntryValidator.ValidateManyAsync(
+                context, kind, entries, requireActiveReference, cancellationToken);
+            CopyFirstErrors(errors, referenceErrors);
+            return errors;
         }
 
-        await OptionSetProductEntryValidator.ValidateAsync(
-            context, entry, kind, requireActiveReference, stagedProductIds, cancellationToken);
+        var productErrors = await OptionSetProductEntryValidator.ValidateManyAsync(
+            context, entries, kind, requireActiveReference, stagedProductIds, cancellationToken);
+        CopyFirstErrors(errors, productErrors);
+        return errors;
+    }
+
+    private static void CopyFirstErrors(string?[] target, IReadOnlyList<string?> source)
+    {
+        for (var index = 0; index < target.Length; index++)
+        {
+            target[index] ??= source[index];
+        }
     }
 }

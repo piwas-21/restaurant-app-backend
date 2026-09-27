@@ -45,7 +45,9 @@ public sealed partial class OptionSetCatalogService
             Entries = request.Entries.Select(ImportedEntry).ToList()
         };
         ValidateHeader(write, creating: true);
-        await ValidateEntriesAsync(write, cancellationToken, request.StagedProductIds);
+        ValidateEntryCount(write);
+        await ValidateEntriesAsync(
+            write.Kind, write.Entries, cancellationToken, request.StagedProductIds);
         EnsureDistinctSourceEntries(request.Entries);
         var name = await ResolveImportedNameAsync(request, cancellationToken);
         var now = DateTime.UtcNow;
