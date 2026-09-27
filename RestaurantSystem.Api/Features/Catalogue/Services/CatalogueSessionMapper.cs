@@ -91,6 +91,11 @@ internal static class CatalogueSessionMapper
     public static string SerializeDecision(CatalogueImportItemDecision decision) =>
         JsonSerializer.Serialize(decision, JsonOptions);
 
+    public static CatalogueImportItemDecision? ParseDecision(string? decisionJson) =>
+        string.IsNullOrWhiteSpace(decisionJson)
+            ? null
+            : JsonSerializer.Deserialize<CatalogueImportItemDecision>(decisionJson, JsonOptions);
+
     private static IEnumerable<string> LocaleCandidates(CentralCatalogueTemplateRevision revision, string locale)
     {
         yield return locale;

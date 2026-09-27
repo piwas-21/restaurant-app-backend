@@ -49,6 +49,13 @@ internal static partial class CatalogueImportPayloadReader
         var minimum = ReadInt(payload, "min");
         var maximum = ReadInt(payload, "max");
         ValidateCardinality(minimum, maximum, options, "option set");
+        if (kind == "suggested-side" && (minimum > 0 || maximum < options.Length))
+        {
+            throw Unsupported(
+                "Suggested-side selection bounds cannot be represented by the tenant side-item contract.",
+                "UNSUPPORTED_SUGGESTED_SIDE_CARDINALITY");
+        }
+
         return new CatalogueOptionSetPayload(kind, minimum, maximum, options);
     }
 

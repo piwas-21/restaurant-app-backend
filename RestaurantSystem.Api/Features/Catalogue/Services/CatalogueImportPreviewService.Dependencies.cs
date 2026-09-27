@@ -31,6 +31,8 @@ public sealed partial class CatalogueImportPreviewService
             return;
         }
 
+        AddDuplicateResolvedOptionBlocker(session, source, dependencies, mappedBySource, existingEntities, blockers);
+
         foreach (var dependency in dependencies)
         {
             var template = session.Templates.FirstOrDefault(candidate =>
@@ -89,6 +91,60 @@ public sealed partial class CatalogueImportPreviewService
             {
                 blockers.Add(Issue("DEPENDENCY_NOT_SELECTED",
                     $"Select the required catalogue dependency {dependency.Reference.Key} or adopt an existing mapped record."));
+            }
+        }
+    }
+
+    private static void AddDuplicateResolvedOptionBlocker(
+        CatalogueImportSession session,
+        CataloguePreviewSource source,
+        IReadOnlyList<CataloguePayloadDependency> dependencies,
+        Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
+        HashSet<CatalogueLocalEntityKey> existingEntities,
+        List<CatalogueImportIssueDto> blockers)
+    {
+        if (source.Item.Type != "option-set") return;
+
+        var resolvedIds = new HashSet<Guid>();
+        foreach (var dependency in dependencies)
+        {
+            var template = session.Templates.FirstOrDefault(candidate =>
+                candidate.TemplateId == dependency.Reference.TemplateId &&
+                candidate.Revision == dependency.Reference.Revision);
+            if (template is null) continue;
+
+            var entityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
+            Guid? resolvedId = null;
+            if (template.IsSelected && template.Status == CatalogueImportItemStatus.Imported &&
+                template.LocalEntityType == entityType)
+            {
+                resolvedId = template.LocalEntityId;
+            }
+            else if (template.IsSelected && !string.IsNullOrWhiteSpace(template.DecisionJson))
+            {
+                var decision = CatalogueSessionMapper.ParseDecision(template.DecisionJson);
+                if (decision?.Resolution.Equals(ReuseResolution, StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    resolvedId = decision.LocalEntityId;
+                }
+            }
+            else if (mappedBySource.TryGetValue((template.TemplateId, template.Revision), out var mapping) &&
+                mapping.LocalEntityType == entityType)
+            {
+                resolvedId = mapping.LocalEntityId;
+            }
+
+            if (resolvedId is not Guid localId ||
+                !existingEntities.Contains(new CatalogueLocalEntityKey(entityType, localId)))
+            {
+                continue;
+            }
+
+            if (!resolvedIds.Add(localId))
+            {
+                blockers.Add(Issue("DUPLICATE_RESOLVED_OPTION",
+                    "Distinct catalogue choices resolve to the same tenant record. Choose distinct tenant records before importing."));
+                return;
             }
         }
     }

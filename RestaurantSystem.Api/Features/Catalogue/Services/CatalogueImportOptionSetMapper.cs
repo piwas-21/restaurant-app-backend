@@ -185,8 +185,17 @@ internal static class CatalogueImportOptionSetMapper
         var expectedEntityType = kind is OptionSetKind.Ingredient or OptionSetKind.Sauce
             ? "GlobalIngredient"
             : "Product";
-        return options.Select(option => BuildEntry(option, kind, session, resolver, decision, expectedEntityType))
+        var entries = options.Select(option => BuildEntry(option, kind, session, resolver, decision, expectedEntityType))
             .ToList();
+        var resolvedIds = entries.Select(entry => entry.GlobalIngredientId ?? entry.ProductId).ToArray();
+        if (resolvedIds.Distinct().Count() != resolvedIds.Length)
+        {
+            throw new BadRequestException(
+                "Distinct catalogue choices resolve to the same tenant record. Choose distinct tenant records before importing.",
+                "DUPLICATE_RESOLVED_OPTION");
+        }
+
+        return entries;
     }
 
     private static ImportedOptionSetEntryRequest BuildEntry(
@@ -200,9 +209,11 @@ internal static class CatalogueImportOptionSetMapper
         var localId = resolver.ResolveDependency(session, option.Reference, expectedEntityType);
         var dependency = session.Templates.FirstOrDefault(item =>
             item.TemplateId == option.Reference.TemplateId && item.Revision == option.Reference.Revision);
+        var dependencyDecision = CatalogueSessionMapper.ParseDecision(dependency?.DecisionJson);
         var name = dependency is null
             ? option.Reference.TemplateId
-            : CatalogueSessionMapper.Localized(CatalogueSessionMapper.ParseRevision(dependency.RevisionJson), session.Locale).Name;
+            : CreatedDependencyName(dependencyDecision) ?? CatalogueSessionMapper.Localized(
+                CatalogueSessionMapper.ParseRevision(dependency.RevisionJson), session.Locale).Name;
         var entry = new ImportedOptionSetEntryRequest
         {
             SourceEntryId = SourceEntryId(option.Reference),
@@ -226,6 +237,12 @@ internal static class CatalogueImportOptionSetMapper
 
         return entry;
     }
+
+    private static string? CreatedDependencyName(CatalogueImportItemDecision? decision) =>
+        decision?.Resolution.Equals("Create", StringComparison.OrdinalIgnoreCase) == true &&
+        !string.IsNullOrWhiteSpace(decision.LocalName)
+            ? decision.LocalName.Trim()
+            : null;
 
     private static decimal RequiredLocalPrice(
         CatalogueImportItemDecision decision,

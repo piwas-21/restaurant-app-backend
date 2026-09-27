@@ -57,6 +57,31 @@ public sealed class CatalogueImportPayloadReaderTests
         Assert.Contains(blockers, blocker => blocker.Code == "UNSUPPORTED_INGREDIENT_CARDINALITY");
     }
 
+    [Theory]
+    [InlineData(1, 2)]
+    [InlineData(0, 1)]
+    public void EnsureSupportedPayload_RejectsSuggestedSideBoundsNotRepresentedByTenantContract(
+        int minimum,
+        int maximum)
+    {
+        var revision = Revision("option-set", $$"""
+            {
+              "kind": "suggested-side",
+              "min": {{minimum}},
+              "max": {{maximum}},
+              "options": [
+                { "templateId": "fries", "revision": 1, "sortOrder": 0 },
+                { "templateId": "salad", "revision": 1, "sortOrder": 1 }
+              ]
+            }
+            """);
+
+        var exception = Assert.Throws<BadRequestException>(() =>
+            CatalogueImportPayloadReader.EnsureSupportedPayload(revision));
+
+        Assert.Equal("UNSUPPORTED_SUGGESTED_SIDE_CARDINALITY", exception.ErrorCode);
+    }
+
     [Fact]
     public void EnsureSupportedPayload_RejectsVariationReferencesWithStableCode()
     {

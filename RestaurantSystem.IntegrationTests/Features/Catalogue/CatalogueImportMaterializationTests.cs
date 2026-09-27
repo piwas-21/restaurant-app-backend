@@ -334,6 +334,114 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     }
 
     [Fact]
+    public async Task Preview_and_mapper_block_distinct_choice_sources_that_resolve_to_the_same_product()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var choices = await MakeInactiveChoicesAsync(context);
+        var localProductId = choices[0].Id;
+        var sourceChoices = new[]
+        {
+            ImportedTemplate(Revision("same-local-option-one", "item", EmptyItemPayload()), "Product", localProductId),
+            ImportedTemplate(Revision("same-local-option-two", "item", EmptyItemPayload()), "Product", localProductId)
+        };
+        var setRevision = OptionSetRevision("duplicate-local-choice-set", "bundle-option", 1, 2,
+            ["same-local-option-one", "same-local-option-two"]);
+        var set = PendingTemplate(setRevision, SetDecision(
+            ("same-local-option-one@1", 0m), ("same-local-option-two@1", 0m)), isRoot: true);
+        var session = NewSession(setRevision.TemplateId, [.. sourceChoices, set]);
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var preview = await scope.ServiceProvider.GetRequiredService<ICatalogueImportPreviewService>()
+            .PreviewAsync(session.Id, CancellationToken.None);
+        preview.Items.Single(item => item.TemplateId == setRevision.TemplateId).BlockingIssues
+            .Should().Contain(issue => issue.Code == "DUPLICATE_RESOLVED_OPTION");
+
+        var batch = await scope.ServiceProvider.GetRequiredService<ICatalogueImportStateStore>()
+            .LoadBatchContextAsync(session, CancellationToken.None);
+        var act = () => CatalogueImportOptionSetMapper.ForTemplate(
+            setRevision,
+            session,
+            CatalogueImportPayloadReader.ReadOptionSet(setRevision),
+            SetDecision(("same-local-option-one@1", 0m), ("same-local-option-two@1", 0m)),
+            new CatalogueImportEntityResolver(batch));
+
+        var exception = act.Should().Throw<BadRequestException>().Which;
+        exception.ErrorCode.Should().Be("DUPLICATE_RESOLVED_OPTION");
+    }
+
+    [Fact]
+    public async Task Preview_blocks_suggested_side_bounds_the_tenant_contract_cannot_represent()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var choices = await MakeInactiveChoicesAsync(context);
+        var sourceChoices = choices.Select((product, index) => ImportedTemplate(
+            Revision($"bounded-side-option-{index + 1}", "item", EmptyItemPayload()), "Product", product.Id)).ToArray();
+        var sideSetRevision = OptionSetRevision("bounded-side-set", "suggested-side", 1, 2,
+            ["bounded-side-option-1", "bounded-side-option-2"]);
+        var sideSet = PendingTemplate(sideSetRevision, SetDecision(), isRoot: true);
+        var session = NewSession(sideSetRevision.TemplateId, [.. sourceChoices, sideSet]);
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var preview = await scope.ServiceProvider.GetRequiredService<ICatalogueImportPreviewService>()
+            .PreviewAsync(session.Id, CancellationToken.None);
+
+        preview.Items.Single(item => item.TemplateId == sideSetRevision.TemplateId).BlockingIssues
+            .Should().Contain(issue => issue.Code == "UNSUPPORTED_SUGGESTED_SIDE_CARDINALITY");
+    }
+
+    [Fact]
+    public async Task Item_import_uses_applied_source_locale_ingredient_name_for_materialized_option()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var category = await context.Categories.AsNoTracking().FirstAsync();
+        const string localIngredientName = "Restaurant onion";
+        var ingredientRevision = Revision("source-locale-onion", "ingredient",
+            new { suggestedOnly = true, role = "ingredient" });
+        var ingredient = PendingTemplate(ingredientRevision, new CatalogueImportItemDecision
+        {
+            Resolution = "Create",
+            LocalName = localIngredientName
+        });
+        var setRevision = OptionSetRevision("source-locale-onion-set", "ingredient", 0, 1,
+            [ingredientRevision.TemplateId]);
+        var set = PendingTemplate(setRevision, SetDecision(("source-locale-onion@1", 0m)));
+        var categoryRevision = Revision("source-locale-category", "category", new { sortOrder = 0 });
+        var categoryTemplate = ImportedTemplate(categoryRevision, "Category", category.Id);
+        var itemRevision = Revision("source-locale-item", "item", new
+        {
+            category = Reference(categoryRevision.TemplateId),
+            suggestedIngredients = Array.Empty<object>(),
+            optionSets = new[] { Reference(setRevision.TemplateId) },
+            sideSets = Array.Empty<object>()
+        }, dependencies:
+        [
+            Dependency(categoryRevision.TemplateId, "category", 0),
+            Dependency(setRevision.TemplateId, "option-set", 1)
+        ]);
+        var item = PendingTemplate(itemRevision, ReviewedSellableDecision(), isRoot: true);
+        var session = NewSession(itemRevision.TemplateId, [categoryTemplate, ingredient, set, item]);
+        session.Locale = "en";
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var result = await ImportAsync(scope.ServiceProvider, context, session,
+            [categoryRevision, ingredientRevision, setRevision, itemRevision]);
+
+        result.Status.Should().Be(nameof(CatalogueImportStatus.Imported));
+        var productId = result.Items.Single(value => value.TemplateId == itemRevision.TemplateId).LocalEntityId;
+        var ingredientId = result.Items.Single(value => value.TemplateId == ingredientRevision.TemplateId).LocalEntityId;
+        productId.Should().NotBeNull();
+        ingredientId.Should().NotBeNull();
+        (await context.ProductIngredients.AsNoTracking().SingleAsync(row =>
+            row.ProductId == productId && row.GlobalIngredientId == ingredientId)).Name.Should().Be(localIngredientName);
+    }
+
+    [Fact]
     public async Task Item_import_rolls_back_its_new_product_when_a_reused_option_set_has_the_wrong_kind()
     {
         using var scope = Factory.Services.CreateScope();
