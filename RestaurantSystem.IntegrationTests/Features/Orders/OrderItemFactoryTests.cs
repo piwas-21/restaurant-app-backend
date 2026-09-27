@@ -64,7 +64,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
     [Fact]
     public async Task AddItemAsync_MenuWithRequiredSauce_RejectsMissingSelectionWhenEnforcementEnabled()
     {
-        var (menu, _) = await SeedMenuAsync(sauceMin: 1);
+        var (menu, _, _) = await SeedMenuAsync(sauceMin: 1);
         var order = new Order { OrderNumber = "T-MENU-SAUCE-ON", CreatedBy = "test" };
 
         var act = () => CreateFactory(enforceSauceMinimum: true).AddItemAsync(
@@ -81,7 +81,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
     [Fact]
     public async Task AddItemAsync_MenuWithRequiredSauce_PreservesLegacyPayloadWhenEnforcementDisabled()
     {
-        var (menu, sauceId) = await SeedMenuAsync(sauceMin: 1);
+        var (menu, sauceId, optionalIngredientId) = await SeedMenuAsync(sauceMin: 1);
         var legacyQuantities = new Dictionary<Guid, int> { [sauceId] = 2 };
         var order = new Order { OrderNumber = "T-MENU-SAUCE-OFF", CreatedBy = "test" };
 
@@ -91,7 +91,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
             {
                 MenuId = menu.Id,
                 Quantity = 1,
-                SelectedIngredientIds = [],
+                SelectedIngredientIds = [optionalIngredientId],
                 IngredientQuantities = legacyQuantities
             },
             itemsAreServerPriced: false,
@@ -102,12 +102,14 @@ public class OrderItemFactoryTests : IAsyncLifetime
         var savedQuantities = System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, int>>(
             order.Items.Single().IngredientQuantitiesJson!);
         savedQuantities.Should().BeEquivalentTo(legacyQuantities);
+        savedQuantities.Should().NotContainKey(optionalIngredientId,
+            "the disabled legacy MenuId path persists the existing quantity map and discards SelectedIngredientIds");
     }
 
     [Fact]
     public async Task AddItemAsync_MenuWithRequiredSauce_UsesSelectedIdsForKitchenSnapshotWhenEnforced()
     {
-        var (menu, sauceId) = await SeedMenuAsync(sauceMin: 1);
+        var (menu, sauceId, _) = await SeedMenuAsync(sauceMin: 1);
         var order = new Order { OrderNumber = "T-MENU-SAUCE-SELECTED", CreatedBy = "test" };
 
         var error = await CreateFactory(enforceSauceMinimum: true).AddItemAsync(
@@ -134,7 +136,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
     [Fact]
     public async Task AddItemAsync_MenuWithOptionalSauce_DoesNotRequireSelectionWhenEnforced()
     {
-        var (menu, _) = await SeedMenuAsync(sauceMin: 0);
+        var (menu, _, _) = await SeedMenuAsync(sauceMin: 0);
         var order = new Order { OrderNumber = "T-MENU-SAUCE-OPTIONAL", CreatedBy = "test" };
 
         var error = await CreateFactory(enforceSauceMinimum: true).AddItemAsync(
@@ -491,7 +493,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
             tenantFeatures);
     }
 
-    private async Task<(Menu Menu, Guid SauceId)> SeedMenuAsync(int sauceMin)
+    private async Task<(Menu Menu, Guid SauceId, Guid OptionalIngredientId)> SeedMenuAsync(int sauceMin)
     {
         var product = new Product
         {
@@ -523,6 +525,21 @@ public class OrderItemFactoryTests : IAsyncLifetime
             CreatedBy = "test"
         };
         product.DetailedIngredients.Add(sauce);
+        var optionalIngredientId = Guid.NewGuid();
+        product.DetailedIngredients.Add(new ProductIngredient
+        {
+            Id = optionalIngredientId,
+            ProductId = product.Id,
+            Product = product,
+            Name = "Optional topping",
+            Kind = IngredientKind.Ingredient,
+            IsOptional = true,
+            MaxQuantity = 1,
+            IsActive = true,
+            IsIncludedInBasePrice = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
 
         var menu = new Menu
         {
@@ -547,6 +564,6 @@ public class OrderItemFactoryTests : IAsyncLifetime
 
         _context.AddRange(product, menu);
         await _context.SaveChangesAsync();
-        return (menu, sauce.Id);
+        return (menu, sauce.Id, optionalIngredientId);
     }
 }
