@@ -65,6 +65,11 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<MenuDefinition> MenuDefinitions { get; set; }
         public DbSet<MenuSection> MenuSections { get; set; }
         public DbSet<MenuSectionItem> MenuSectionItems { get; set; }
+        public DbSet<CatalogueImportSession> CatalogueImportSessions { get; set; }
+        public DbSet<CatalogueImportSessionTemplate> CatalogueImportSessionTemplates { get; set; }
+        public DbSet<CatalogueTemplateAdoption> CatalogueTemplateAdoptions { get; set; }
+        public DbSet<CatalogueMatchDecision> CatalogueMatchDecisions { get; set; }
+        public DbSet<CatalogueCuisinePreference> CatalogueCuisinePreferences { get; set; }
         public DbSet<MenuSectionTranslation> MenuSectionTranslations { get; set; }
         public DbSet<OptionSet> OptionSets { get; set; }
         public DbSet<OptionSetEntry> OptionSetEntries { get; set; }
