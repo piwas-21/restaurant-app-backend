@@ -33,7 +33,11 @@ public static class MenuBundleMapper
     /// The channel the guest is ordering through, or <c>null</c> when they have not chosen one (the
     /// dominant browse state) — nothing is reported as blocked in that case.
     /// </param>
-    public static MenuBundleDto MapToMenuBundleDto(Product product, string baseUrl, OrderType? requestedOrderType)
+    public static MenuBundleDto MapToMenuBundleDto(
+        Product product,
+        string baseUrl,
+        OrderType? requestedOrderType,
+        string? locale = null)
     {
         var dto = new MenuBundleDto
         {
@@ -47,7 +51,7 @@ public static class MenuBundleMapper
             PreparationTimeMinutes = product.PreparationTimeMinutes,
             Type = "menu",
             DisplayOrder = product.DisplayOrder,
-            Availability = OrderTypeAvailability.Resolve(product, requestedOrderType),
+            Availability = MenuBundleAvailabilityResolver.Resolve(product, requestedOrderType),
             AvailableOrderTypes = product.AvailableOrderTypes,
             // The links the caller must have loaded for the channel verdict anyway (see the class
             // doc) — so grouping comes free, no extra round-trip.
@@ -59,7 +63,7 @@ public static class MenuBundleMapper
             // everything" (#477).
             Allergens = product.Allergens,
             MenuDefinition = product.MenuDefinition != null
-                ? MapDefinition(product.MenuDefinition)
+                ? MapDefinition(product.MenuDefinition, requestedOrderType, locale)
                 : null,
             Content = new(),
             Images = product.Images.Select(i => new ProductImageDto
@@ -101,13 +105,17 @@ public static class MenuBundleMapper
     /// not throw: it serves an option product whose recipe reads as "this dish has no ingredients".
     /// </para>
     /// </remarks>
-    public static MenuBundleDefinitionDto MapDefinition(MenuDefinition definition)
+    public static MenuBundleDefinitionDto MapDefinition(
+        MenuDefinition definition,
+        OrderType? requestedOrderType = null,
+        string? locale = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
         return new MenuBundleDefinitionDto
         {
             Id = definition.Id,
+            AuthoringVersion = definition.AuthoringVersion,
             ParentOfferProductId = definition.ParentOfferProductId,
             ParentOfferVariationId = definition.ParentOfferVariationId,
             IsAlwaysAvailable = definition.IsAlwaysAvailable,
@@ -122,82 +130,95 @@ public static class MenuBundleMapper
             AvailableSunday = definition.AvailableSunday,
             Sections = definition.Sections
                 .OrderBy(s => s.DisplayOrder)
-                .Select(MapSection)
+                .Select(section => MapSection(section, requestedOrderType, locale))
                 .ToList()
         };
     }
 
-    private static MenuBundleSectionDto MapSection(MenuSection section) => new()
+    private static MenuBundleSectionDto MapSection(
+        MenuSection section,
+        OrderType? requestedOrderType,
+        string? locale)
     {
-        Id = section.Id,
-        Name = section.Name,
-        Description = section.Description,
-        DisplayOrder = section.DisplayOrder,
-        IsRequired = section.IsRequired,
-        MinSelection = section.MinSelection,
-        MaxSelection = section.MaxSelection,
-        // A section that lists a DELETED product went on offering it to guests, and the basket then
-        // refuses the line. The filter lives HERE and not in the callers' includes because one of
-        // those callers (`GetProductByIdQuery`) runs `IgnoreQueryFilters()`, which un-filters every
-        // include — so the soft-delete rule cannot be left to the global filter on that read.
-        Items = section.Items
+        var display = MenuSectionLocale.Resolve(section, locale);
+        return new MenuBundleSectionDto
+        {
+            Id = section.Id,
+            Name = section.Name,
+            Description = section.Description,
+            DisplayName = display.Name,
+            DisplayDescription = display.Description,
+            Translations = MenuSectionLocale.ToDto(section.Translations),
+            DisplayOrder = section.DisplayOrder,
+            IsRequired = section.IsRequired,
+            MinSelection = section.MinSelection,
+            MaxSelection = section.MaxSelection,
+            // A section that lists a DELETED product went on offering it to guests, and the basket then
+            // refuses the line. The filter lives HERE and not in the callers' includes because one of
+            // those callers (`GetProductByIdQuery`) runs `IgnoreQueryFilters()`, which un-filters every
+            // include — so the soft-delete rule cannot be left to the global filter on that read.
+            Items = section.Items
             .Where(i => i.Product != null && !i.Product.IsDeleted)
             .OrderBy(i => i.DisplayOrder)
-            .Select(MapSectionItem)
+            .Select(item => MapSectionItem(item, requestedOrderType))
             .ToList()
-    };
+        };
+    }
 
-    private static MenuBundleSectionItemDto MapSectionItem(MenuSectionItem item) => new()
-    {
-        Id = item.Id,
-        ProductId = item.ProductId,
-        ProductVariationId = item.ProductVariationId,
-        ProductVariationName = item.ProductVariation?.Name,
-        ProductVariationPriceModifier = item.ProductVariation?.PriceModifier,
-        ProductName = item.Product?.Name,
-        AdditionalPrice = item.AdditionalPrice,
-        DisplayOrder = item.DisplayOrder,
-        IsDefault = item.IsDefault,
-        Ingredients = SectionItemIngredients(item.Product),
-        Allergens = item.Product?.Allergens,
-        // The option product's OWN sauce rule (S6) — the same row BasketItemFactory prices the
-        // child line with. A missing product means no rule to state, so the defaults (0 / null / 0)
-        // say "no sauce group", which is what a product that never mentions sauces carries anyway.
-        SauceMin = item.Product?.SauceMin ?? 0,
-        SauceMax = item.Product?.SauceMax,
-        SauceIncludedFree = item.Product?.SauceIncludedFree ?? 0,
-        CustomizationGroups = item.Product?.CustomizationGroups
-            .OrderBy(group => group.DisplayOrder)
-            .Select(ProductDtoMapper.MapCustomizationGroup)
-            .ToList() ?? [],
-        DetailedIngredients = item.Product?.DetailedIngredients
-            .Where(di => di.IsActive)
-            .OrderBy(di => di.DisplayOrder)
-            .Select(di => new MenuBundleIngredientDto
-            {
-                Id = di.Id,
-                Name = di.Name,
-                IsOptional = di.IsOptional,
-                Price = di.Price,
-                IsIncludedInBasePrice = di.IsIncludedInBasePrice,
-                IsActive = di.IsActive,
-                DisplayOrder = di.DisplayOrder,
-                MaxQuantity = di.MaxQuantity,
-                Kind = di.Kind,
-                ExclusionGroup = di.ExclusionGroup,
-                Content = di.Descriptions?
-                    .GroupBy(desc => desc.LanguageCode)
-                    .Select(g => g.First()) // first wins on duplicate language codes
-                    .ToDictionary(
-                        desc => desc.LanguageCode,
-                        desc => new MenuBundleIngredientContentDto
-                        {
-                            Name = desc.Name,
-                            Description = desc.Description
-                        }
-                    )
-            }).ToList()
-    };
+    private static MenuBundleSectionItemDto MapSectionItem(
+        MenuSectionItem item,
+        OrderType? requestedOrderType) => new()
+        {
+            Id = item.Id,
+            ProductId = item.ProductId,
+            ProductVariationId = item.ProductVariationId,
+            ProductVariationName = item.ProductVariation?.Name,
+            ProductVariationPriceModifier = item.ProductVariation?.PriceModifier,
+            ProductName = item.Product?.Name,
+            AdditionalPrice = item.AdditionalPrice,
+            DisplayOrder = item.DisplayOrder,
+            IsDefault = item.IsDefault,
+            Ingredients = SectionItemIngredients(item.Product),
+            Allergens = item.Product?.Allergens,
+            Availability = MenuBundleAvailabilityResolver.ResolveOption(item, requestedOrderType),
+            // The option product's OWN sauce rule (S6) — the same row BasketItemFactory prices the
+            // child line with. A missing product means no rule to state, so the defaults (0 / null / 0)
+            // say "no sauce group", which is what a product that never mentions sauces carries anyway.
+            SauceMin = item.Product?.SauceMin ?? 0,
+            SauceMax = item.Product?.SauceMax,
+            SauceIncludedFree = item.Product?.SauceIncludedFree ?? 0,
+            CustomizationGroups = item.Product?.CustomizationGroups
+                .OrderBy(group => group.DisplayOrder)
+                .Select(ProductDtoMapper.MapCustomizationGroup)
+                .ToList() ?? [],
+            DetailedIngredients = item.Product?.DetailedIngredients
+                .Where(di => di.IsActive)
+                .OrderBy(di => di.DisplayOrder)
+                .Select(di => new MenuBundleIngredientDto
+                {
+                    Id = di.Id,
+                    Name = di.Name,
+                    IsOptional = di.IsOptional,
+                    Price = di.Price,
+                    IsIncludedInBasePrice = di.IsIncludedInBasePrice,
+                    IsActive = di.IsActive,
+                    DisplayOrder = di.DisplayOrder,
+                    MaxQuantity = di.MaxQuantity,
+                    Kind = di.Kind,
+                    ExclusionGroup = di.ExclusionGroup,
+                    Content = di.Descriptions?
+                        .GroupBy(desc => desc.LanguageCode)
+                        .Select(g => g.First()) // first wins on duplicate language codes
+                        .ToDictionary(
+                            desc => desc.LanguageCode,
+                            desc => new MenuBundleIngredientContentDto
+                            {
+                                Name = desc.Name,
+                                Description = desc.Description
+                            }
+                        )
+                }).ToList()
+        };
 
     /// <summary>
     /// A section-item's display ingredient names: the active detailed-ingredient names when the

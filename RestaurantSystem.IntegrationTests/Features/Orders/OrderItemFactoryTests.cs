@@ -1,4 +1,6 @@
 using FluentAssertions;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -88,6 +90,24 @@ public class OrderItemFactoryTests : IAsyncLifetime
         item.Quantity.Should().Be(2);
         item.ItemTotal.Should().Be(25.00m); // unitPrice * qty
         item.ParentOrderItem.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AddItemAsync_ComponentAsRootLine_IsRefused()
+    {
+        var component = await SeedProductAsync("Internal component", basePrice: 0m, isComponent: true);
+        var order = new Order { OrderNumber = "T-COMPONENT", CreatedBy = "test" };
+
+        var act = () => _factory.AddItemAsync(order, new CreateOrderItemDto
+        {
+            ProductId = component.Id,
+            Quantity = 1,
+            UnitPrice = 10m
+        }, itemsAreServerPriced: false, CancellationToken.None);
+
+        var error = await act.Should().ThrowAsync<BadRequestException>();
+        error.Which.ErrorCode.Should().Be(ErrorCodes.ComponentNotOrderable);
+        order.Items.Should().BeEmpty();
     }
 
     [Fact]
@@ -352,7 +372,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
         order.Items.Sum(i => i.ItemTotal).Should().Be(rootRolledUpPrice + grandchildCustomization);
     }
 
-    private async Task<Product> SeedProductAsync(string name, decimal basePrice)
+    private async Task<Product> SeedProductAsync(string name, decimal basePrice, bool isComponent = false)
     {
         var product = new Product
         {
@@ -363,6 +383,7 @@ public class OrderItemFactoryTests : IAsyncLifetime
             Type = ProductType.MainItem,
             IsActive = true,
             IsAvailable = true,
+            IsComponent = isComponent,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "test"
         };

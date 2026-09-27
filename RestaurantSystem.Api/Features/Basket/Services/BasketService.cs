@@ -91,28 +91,7 @@ public class BasketService : IBasketService
         if (item.ProductId != Guid.Empty)
         {
             // Validate product exists and is available
-            var product = await _context.Products
-                .AsSplitQuery()
-                .Include(p => p.Variations)
-                .Include(p => p.DetailedIngredients)
-                .Include(p => p.CustomizationGroups)
-                    .ThenInclude(group => group.IngredientOptions)
-                        .ThenInclude(option => option.ProductIngredient)
-                .Include(p => p.CustomizationGroups)
-                    .ThenInclude(group => group.ProductOptions)
-                        .ThenInclude(option => option.OptionProduct.ProductCategories)
-                            .ThenInclude(pc => pc.Category)
-                // Needed so BasketChannelGuard can resolve availability inherited from the
-                // PRIMARY category (ORDER-TYPE-AVAILABILITY-PLAN §4.1).
-                .Include(p => p.ProductCategories)
-                    .ThenInclude(pc => pc.Category)
-                .Include(p => p.MenuDefinition)
-                    .ThenInclude(md => md!.Sections)
-                        .ThenInclude(s => s.Items)
-                            .ThenInclude(i => i.Product)
-                .Include(p => p.MenuDefinition!.Sections)
-                    .ThenInclude(s => s.Items)
-                        .ThenInclude(i => i.ProductVariation)
+            var product = await BasketProductQuery.WithFactoryDependencies(_context.Products)
                 .FirstOrDefaultAsync(p => p.Id == item.ProductId && p.IsActive && p.IsAvailable);
 
             if (product == null)
@@ -281,6 +260,7 @@ public class BasketService : IBasketService
         // before SauceMax was server-enforced. Validate the root and each bundle child rather than
         // letting a legacy/crafted row become newly active through a later basket mutation.
         SauceSelectionRule.EnsureWithinMaximum(basketItem);
+        _basketItemFactory.EnsureAtLeastMinimum(basketItem);
         if (basketItem.Product != null)
         {
             ExplicitCustomizationSelection.EnsurePersisted(
@@ -289,6 +269,7 @@ public class BasketService : IBasketService
         foreach (var child in basketItem.ChildBasketItems)
         {
             SauceSelectionRule.EnsureWithinMaximum(child);
+            _basketItemFactory.EnsureAtLeastMinimum(child);
             if (child.Product != null)
             {
                 ExplicitCustomizationSelection.EnsurePersisted(child.Product, child, []);

@@ -12,7 +12,10 @@ public sealed class TenantFeatures : ITenantFeatures
     {
         ArgumentNullException.ThrowIfNull(options);
         ServerWorkspaceV2 = options.Value.ServerWorkspaceV2;
+        EnforceSauceMinimum = options.Value.EnforceSauceMinimum;
     }
 
     public bool ServerWorkspaceV2 { get; }
+
+    public bool EnforceSauceMinimum { get; }
 }

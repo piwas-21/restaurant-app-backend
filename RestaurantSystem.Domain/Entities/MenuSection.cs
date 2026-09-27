@@ -5,7 +5,7 @@ namespace RestaurantSystem.Domain.Entities;
 public class MenuSection : Entity
 {
     public Guid MenuDefinitionId { get; set; }
-    public string Name { get; set; } = null!; // e.g. "Choose Drink", "Main Course"
+    public string Name { get; set; } = string.Empty; // e.g. "Choose Drink", "Main Course"
     public string? Description { get; set; }
     public int DisplayOrder { get; set; }
 
@@ -16,4 +16,5 @@ public class MenuSection : Entity
     // Navigation
     public virtual MenuDefinition MenuDefinition { get; set; } = null!;
     public virtual ICollection<MenuSectionItem> Items { get; set; } = new List<MenuSectionItem>();
+    public virtual ICollection<MenuSectionTranslation> Translations { get; set; } = new List<MenuSectionTranslation>();
 }

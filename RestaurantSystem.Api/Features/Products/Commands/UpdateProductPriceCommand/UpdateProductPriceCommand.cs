@@ -40,6 +40,17 @@ public class UpdateProductPriceCommandHandler
             .FirstOrDefaultAsync(p => p.Id == command.Id, cancellationToken)
             ?? throw new NotFoundException("Product", command.Id);
 
+        if (command.Price < 0m)
+        {
+            throw new BadRequestException("Price must be non-negative");
+        }
+
+        if (command.Price == 0m && !product.IsComponent)
+        {
+            throw new BadRequestException(
+                "Only internal bundle components may have a zero base price.");
+        }
+
         product.BasePrice = command.Price;
         // The async SaveChanges override does not run ApplyAuditInformation in this codebase, so
         // set the audit fields explicitly (mirrors UpdateProductCommand). A price change is a

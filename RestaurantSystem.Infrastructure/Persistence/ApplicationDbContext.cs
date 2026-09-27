@@ -65,6 +65,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<MenuDefinition> MenuDefinitions { get; set; }
         public DbSet<MenuSection> MenuSections { get; set; }
         public DbSet<MenuSectionItem> MenuSectionItems { get; set; }
+        public DbSet<MenuSectionTranslation> MenuSectionTranslations { get; set; }
 
         // Basket-related
 

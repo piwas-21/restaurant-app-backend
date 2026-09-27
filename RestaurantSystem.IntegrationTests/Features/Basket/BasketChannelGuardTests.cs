@@ -16,11 +16,16 @@ public class BasketChannelGuardTests
     private const int TakeawayAndDelivery = (int)(OrderChannels.Takeaway | OrderChannels.Delivery);
     private const string Actor = "channel-guard-tests";
 
-    private static Product Product(int? productMask = null, int? categoryMask = null) =>
+    private static Product Product(
+        int? productMask = null,
+        int? categoryMask = null,
+        bool isActive = true,
+        bool isAvailable = true) =>
         new()
         {
             Name = "Dürüm",
-            IsAvailable = true,
+            IsActive = isActive,
+            IsAvailable = isAvailable,
             AvailableOrderTypes = productMask,
             CreatedBy = Actor,
             ProductCategories =
@@ -46,6 +51,19 @@ public class BasketChannelGuardTests
         var act = () => BasketChannelGuard.EnsureOrderable(Product(categoryMask: TakeawayAndDelivery), null);
 
         act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void Refuses_inactive_or_unavailable_products_even_without_a_channel(
+        bool isActive,
+        bool isAvailable)
+    {
+        var act = () => BasketChannelGuard.EnsureOrderable(
+            Product(isActive: isActive, isAvailable: isAvailable), null);
+
+        act.Should().Throw<BadRequestException>();
     }
 
     [Theory]

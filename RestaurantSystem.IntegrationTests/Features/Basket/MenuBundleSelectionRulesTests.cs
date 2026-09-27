@@ -10,6 +10,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Basket;
 public sealed class MenuBundleSelectionRulesTests
 {
     private static readonly Guid MainProduct = Guid.NewGuid();
+    private static readonly Guid AlternateMainProduct = Guid.NewGuid();
     private static readonly Guid DrinkProduct = Guid.NewGuid();
 
     private static (MenuSection Main, MenuSection Drinks) Sections()
@@ -27,6 +28,13 @@ public sealed class MenuBundleSelectionRulesTests
         {
             ProductId = MainProduct,
             AdditionalPrice = 3.00m,
+            MenuSectionId = main.Id,
+            CreatedBy = nameof(MenuBundleSelectionRulesTests)
+        });
+        main.Items.Add(new MenuSectionItem
+        {
+            ProductId = AlternateMainProduct,
+            AdditionalPrice = 0m,
             MenuSectionId = main.Id,
             CreatedBy = nameof(MenuBundleSelectionRulesTests)
         });
@@ -91,11 +99,27 @@ public sealed class MenuBundleSelectionRulesTests
             new List<SelectedMenuOptionDto>
             {
                 new() { SectionId = sections.Main.Id, ItemId = MainProduct },
-                new() { SectionId = sections.Main.Id, ItemId = MainProduct }
+                new() { SectionId = sections.Main.Id, ItemId = AlternateMainProduct }
             });
 
         act.Should().Throw<BadRequestException>()
             .WithMessage("Section 'Main' allows at most 1 selection(s)");
+    }
+
+    [Fact]
+    public void Rejects_duplicate_option_membership_within_a_section()
+    {
+        var sections = Sections();
+        var act = () => MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            new[] { sections.Main, sections.Drinks },
+            new List<SelectedMenuOptionDto>
+            {
+                new() { SectionId = sections.Main.Id, ItemId = MainProduct },
+                new() { SectionId = sections.Main.Id, ItemId = MainProduct }
+            });
+
+        act.Should().Throw<BadRequestException>()
+            .WithMessage("A menu option can only be selected once per section");
     }
 
     [Fact]

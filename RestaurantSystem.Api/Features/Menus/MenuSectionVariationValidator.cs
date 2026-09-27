@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Menus;
@@ -12,45 +12,17 @@ namespace RestaurantSystem.Api.Features.Menus;
 /// </summary>
 public static class MenuSectionVariationValidator
 {
-    public static async Task ValidateAsync(
+    public static Task ValidateAsync(
         ApplicationDbContext context,
         IEnumerable<MenuSectionDto> sections,
+        CancellationToken cancellationToken) =>
+        MenuSectionIntegrityRule.ValidateAsync(context, sections, cancellationToken);
+
+    public static Task ValidateEntitiesAsync(
+        ApplicationDbContext context,
+        IEnumerable<MenuSection> sections,
         CancellationToken cancellationToken)
     {
-        var references = sections
-            .SelectMany(section => section.Items ?? [])
-            .Where(item => item.ProductVariationId.HasValue)
-            .Select(item => (item.ProductId, VariationId: item.ProductVariationId!.Value))
-            .ToList();
-
-        if (references.Count == 0)
-        {
-            return;
-        }
-
-        var variationIds = references.Select(reference => reference.VariationId).Distinct().ToList();
-        var variations = await context.ProductVariations
-            .Where(variation => variationIds.Contains(variation.Id) && !variation.IsDeleted)
-            .Select(variation => new { variation.Id, variation.ProductId, variation.IsActive })
-            .ToDictionaryAsync(variation => variation.Id, cancellationToken);
-
-        foreach (var (productId, variationId) in references)
-        {
-            if (!variations.TryGetValue(variationId, out var variation))
-            {
-                throw new BadRequestException($"Menu section variation '{variationId}' was not found");
-            }
-
-            if (variation.ProductId != productId)
-            {
-                throw new BadRequestException(
-                    $"Menu section variation '{variationId}' does not belong to product '{productId}'");
-            }
-
-            if (!variation.IsActive)
-            {
-                throw new BadRequestException($"Menu section variation '{variationId}' is not active");
-            }
-        }
+        return ValidateAsync(context, MenuSectionIntegrityRule.Project(sections), cancellationToken);
     }
 }

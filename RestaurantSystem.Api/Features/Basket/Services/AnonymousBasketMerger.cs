@@ -40,6 +40,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
     private readonly IBasketRepository _basketRepository;
     private readonly IBasketMappingService _basketMappingService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILineCustomizationBuilder _lineCustomizationBuilder;
     private readonly ILogger<AnonymousBasketMerger> _logger;
 
     public AnonymousBasketMerger(
@@ -47,12 +48,14 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
         IBasketRepository basketRepository,
         IBasketMappingService basketMappingService,
         ICurrentUserService currentUserService,
+        ILineCustomizationBuilder lineCustomizationBuilder,
         ILogger<AnonymousBasketMerger> logger)
     {
         _context = context;
         _basketRepository = basketRepository;
         _basketMappingService = basketMappingService;
         _currentUserService = currentUserService;
+        _lineCustomizationBuilder = lineCustomizationBuilder;
         _logger = logger;
     }
 
@@ -251,6 +254,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
             {
                 line.Product = product;
                 SauceSelectionRule.EnsureWithinMaximum(line);
+                _lineCustomizationBuilder.EnsureAtLeastMinimum(line);
                 ExplicitCustomizationSelection.EnsurePersisted(
                     product, line,
                     childrenByParent.TryGetValue(line.Id, out var children) ? children : []);

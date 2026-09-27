@@ -1,6 +1,8 @@
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace RestaurantSystem.Api.Features.Menus;
 
@@ -21,6 +23,83 @@ namespace RestaurantSystem.Api.Features.Menus;
 /// </summary>
 public static class MenuSectionWriter
 {
+    /// <summary>
+    /// Applies the editor's ID-preserving collection patch. Existing IDs are accepted only when
+    /// they belong to this definition; absent collection keys are handled by the caller as no-op,
+    /// and explicit empty lists remove the corresponding rows.
+    /// </summary>
+    public static void ApplyPatch(
+        ApplicationDbContext context,
+        MenuDefinition menuDefinition,
+        IReadOnlyCollection<MenuSectionDto> sections,
+        string auditIdentifier)
+    {
+        var existingSections = menuDefinition.Sections.ToDictionary(section => section.Id);
+        var retainedSections = new HashSet<Guid>();
+        var now = DateTime.UtcNow;
+
+        foreach (var sectionDto in sections)
+        {
+            MenuSection section;
+            if (sectionDto.Id is Guid sectionId)
+            {
+                if (!existingSections.TryGetValue(sectionId, out var existingSection))
+                {
+                    throw new BadRequestException($"Section '{sectionId}' does not belong to this menu");
+                }
+
+                section = existingSection;
+
+                if (!retainedSections.Add(sectionId))
+                {
+                    throw new BadRequestException($"Section '{sectionId}' appears more than once");
+                }
+            }
+            else
+            {
+                section = new MenuSection
+                {
+                    Id = Guid.NewGuid(),
+                    MenuDefinition = menuDefinition,
+                    CreatedAt = now,
+                    CreatedBy = auditIdentifier
+                };
+                menuDefinition.Sections.Add(section);
+                context.MenuSections.Add(section);
+            }
+
+            section.Name = sectionDto.Name;
+            section.Description = sectionDto.Description;
+            section.DisplayOrder = sectionDto.DisplayOrder;
+            section.IsRequired = sectionDto.IsRequired;
+            section.MinSelection = sectionDto.MinSelection;
+            section.MaxSelection = sectionDto.MaxSelection;
+            section.UpdatedAt = now;
+            section.UpdatedBy = auditIdentifier;
+
+            if (sectionDto.TranslationsSpecified)
+            {
+                ReplaceTranslations(context, section, sectionDto.Translations ?? [], auditIdentifier, now);
+            }
+
+            if (sectionDto.ItemsSpecified)
+            {
+                ApplyItems(context, section, sectionDto.Items ?? [], auditIdentifier, now);
+            }
+        }
+
+        foreach (var removed in existingSections.Values.Where(section => !retainedSections.Contains(section.Id)))
+        {
+            context.MenuSections.Remove(removed);
+            menuDefinition.Sections.Remove(removed);
+        }
+
+        menuDefinition.AuthoringVersion++;
+        menuDefinition.VersionedSectionEditingStarted = true;
+        menuDefinition.UpdatedAt = now;
+        menuDefinition.UpdatedBy = auditIdentifier;
+    }
+
     /// <summary>
     /// Replaces every section of <paramref name="menuDefinition"/> with <paramref name="sections"/>.
     /// A full replace, matching the PUT contract: an empty list clears them all, which is exactly
@@ -55,6 +134,11 @@ public static class MenuSectionWriter
         // sections. Cheaper than a second public overload that could be called where one was needed.
         context.MenuSections.RemoveRange(menuDefinition.Sections);
         AddSections(context, menuDefinition, sections, auditIdentifier);
+
+        if (context.Entry(menuDefinition).State != EntityState.Added)
+        {
+            menuDefinition.AuthoringVersion++;
+        }
     }
 
     private static void AddSections(
@@ -76,6 +160,7 @@ public static class MenuSectionWriter
                 IsRequired = sectionDto.IsRequired,
                 MinSelection = sectionDto.MinSelection,
                 MaxSelection = sectionDto.MaxSelection,
+                Translations = BuildTranslations(sectionDto.Translations ?? [], auditIdentifier, now),
                 CreatedAt = now,
                 CreatedBy = auditIdentifier
             };
@@ -83,7 +168,7 @@ public static class MenuSectionWriter
             context.MenuSections.Add(section);
 
             // NOT a dead guard, despite reading like the `Sections` one #191 removed:
-            // MenuSectionDto.Items keeps its initializer, and STJ writes a literal `"items": null`
+            // The DTO's backing list has an empty default, and STJ writes a literal `"items": null`
             // straight over it (RespectNullableAnnotations is off — the very mechanism that made
             // `sections: null` the one preserving payload before #191). Nothing validates Items, so
             // this is all that stands between such a body and an NRE; removing it is a measured 500,
@@ -107,6 +192,136 @@ public static class MenuSectionWriter
                     CreatedBy = auditIdentifier
                 });
             }
+        }
+    }
+
+    private static void ReplaceTranslations(
+        ApplicationDbContext context,
+        MenuSection section,
+        IReadOnlyDictionary<string, MenuSectionTranslationDto> translations,
+        string auditIdentifier,
+        DateTime now)
+    {
+        var normalized = NormalizeTranslations(translations);
+        context.MenuSectionTranslations.RemoveRange(section.Translations);
+        section.Translations.Clear();
+
+        foreach (var (languageCode, translation) in normalized)
+        {
+            var entity = new MenuSectionTranslation
+            {
+                MenuSection = section,
+                LanguageCode = languageCode,
+                Name = translation.Name.Trim(),
+                Description = string.IsNullOrWhiteSpace(translation.Description)
+                    ? null
+                    : translation.Description.Trim(),
+                CreatedAt = now,
+                CreatedBy = auditIdentifier
+            };
+            section.Translations.Add(entity);
+            context.MenuSectionTranslations.Add(entity);
+        }
+    }
+
+    private static List<MenuSectionTranslation> BuildTranslations(
+        IReadOnlyDictionary<string, MenuSectionTranslationDto> translations,
+        string auditIdentifier,
+        DateTime now) => NormalizeTranslations(translations)
+        .Select(pair => new MenuSectionTranslation
+        {
+            LanguageCode = pair.Key,
+            Name = pair.Value.Name.Trim(),
+            Description = string.IsNullOrWhiteSpace(pair.Value.Description) ? null : pair.Value.Description.Trim(),
+            CreatedAt = now,
+            CreatedBy = auditIdentifier
+        })
+        .ToList();
+
+    private static Dictionary<string, MenuSectionTranslationDto> NormalizeTranslations(
+        IReadOnlyDictionary<string, MenuSectionTranslationDto> translations)
+    {
+        var result = new Dictionary<string, MenuSectionTranslationDto>(StringComparer.Ordinal);
+        foreach (var (rawLanguageCode, translation) in translations)
+        {
+            var languageCode = rawLanguageCode.Trim().ToLowerInvariant();
+            if (!MenuSectionLocale.IsValidTag(languageCode))
+            {
+                throw new BadRequestException($"Invalid menu section language tag '{rawLanguageCode}'");
+            }
+
+            if (translation is null || string.IsNullOrWhiteSpace(translation.Name) || translation.Name.Length > 100)
+            {
+                throw new BadRequestException($"A translated section name of at most 100 characters is required for '{rawLanguageCode}'");
+            }
+
+            if (translation.Description?.Length > 500)
+            {
+                throw new BadRequestException($"The translated section description for '{rawLanguageCode}' cannot exceed 500 characters");
+            }
+
+            if (!result.TryAdd(languageCode, translation))
+            {
+                throw new BadRequestException($"Duplicate menu section language tag '{rawLanguageCode}'");
+            }
+        }
+
+        return result;
+    }
+
+    private static void ApplyItems(
+        ApplicationDbContext context,
+        MenuSection section,
+        IReadOnlyCollection<MenuSectionItemDto> items,
+        string auditIdentifier,
+        DateTime now)
+    {
+        var existingItems = section.Items.ToDictionary(item => item.Id);
+        var retainedItems = new HashSet<Guid>();
+
+        foreach (var itemDto in items)
+        {
+            MenuSectionItem item;
+            if (itemDto.Id is Guid itemId)
+            {
+                if (!existingItems.TryGetValue(itemId, out var existingItem))
+                {
+                    throw new BadRequestException($"Option '{itemId}' does not belong to section '{section.Id}'");
+                }
+
+                item = existingItem;
+
+                if (!retainedItems.Add(itemId))
+                {
+                    throw new BadRequestException($"Option '{itemId}' appears more than once");
+                }
+            }
+            else
+            {
+                item = new MenuSectionItem
+                {
+                    Id = Guid.NewGuid(),
+                    MenuSection = section,
+                    CreatedAt = now,
+                    CreatedBy = auditIdentifier
+                };
+                section.Items.Add(item);
+                context.MenuSectionItems.Add(item);
+            }
+
+            item.ProductId = itemDto.ProductId;
+            item.ProductVariationId = itemDto.ProductVariationId;
+            item.AdditionalPrice = itemDto.AdditionalPrice;
+            item.DisplayOrder = itemDto.DisplayOrder;
+            item.IsDefault = itemDto.IsDefault;
+            item.UpdatedAt = now;
+            item.UpdatedBy = auditIdentifier;
+        }
+
+        foreach (var removed in existingItems.Values.Where(item => !retainedItems.Contains(item.Id)))
+        {
+            context.MenuSectionItems.Remove(removed);
+            section.Items.Remove(removed);
         }
     }
 }

@@ -25,7 +25,9 @@ public static class ProductDtoMapper
     {
         var dto = new ProductDto
         {
-            Availability = OrderTypeAvailability.Resolve(product, requestedOrderType),
+            Availability = product.Type == ProductType.Menu && product.MenuDefinition is not null
+                ? MenuBundleAvailabilityResolver.Resolve(product, requestedOrderType)
+                : OrderTypeAvailability.Resolve(product, requestedOrderType),
             AvailableOrderTypes = product.AvailableOrderTypes,
             Id = product.Id,
             Name = product.Name,
@@ -118,7 +120,7 @@ public static class ProductDtoMapper
             // sections → items → product → detailed-ingredients or the echo states a recipe the
             // saved bundle does not have; all three callers do.
             MenuDefinition = product.MenuDefinition != null
-                ? MenuBundleMapper.MapDefinition(product.MenuDefinition)
+                ? MenuBundleMapper.MapDefinition(product.MenuDefinition, requestedOrderType)
                 : null,
             Content = new()
         };

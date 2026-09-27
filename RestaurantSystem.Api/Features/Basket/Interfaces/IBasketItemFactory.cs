@@ -12,6 +12,9 @@ namespace RestaurantSystem.Api.Features.Basket.Interfaces;
 /// </summary>
 public interface IBasketItemFactory
 {
+    /// <summary>Applies the tenant's configured minimum-sauce rule to a basket line.</summary>
+    void EnsureAtLeastMinimum(BasketItem line);
+
     /// <summary>
     /// Builds a new non-menu basket item for the given product (and optional variation):
     /// unit price + ingredient customisation + side-item surcharges, with the selected

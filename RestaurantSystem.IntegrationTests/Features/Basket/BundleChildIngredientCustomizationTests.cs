@@ -4,8 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
+using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -257,6 +259,96 @@ public class BundleChildIngredientCustomizationTests : IntegrationTestBase
         var colaChild = GetChildItem(basket.Data!, _menuProduct.Id, _testCola.Id);
         colaChild.IngredientQuantities.Should().BeNull();
         colaChild.SelectedIngredients.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ZeroPricedComponentWithVariationAndCustomization_PreservesBundleTotals()
+    {
+        var variationId = Guid.NewGuid();
+        await using (var seed = DatabaseFixture.CreateContext())
+        {
+            var component = await seed.Products.SingleAsync(product => product.Id == _testPizza.Id);
+            component.IsComponent = true;
+            component.BasePrice = 0.01m;
+            seed.ProductVariations.Add(new ProductVariation
+            {
+                Id = variationId,
+                ProductId = component.Id,
+                Name = "Internal option",
+                PriceModifier = 0m,
+                IsActive = true,
+                CreatedBy = "test"
+            });
+            var sectionItem = await seed.MenuSectionItems
+                .SingleAsync(item => item.MenuSectionId == _mainSection.Id);
+            sectionItem.AdditionalPrice = 0m;
+            sectionItem.ProductVariationId = variationId;
+            await seed.SaveChangesAsync();
+        }
+
+        var basketBeforeZero = await AddCustomizedBundleAsync(variationId);
+        await using (var update = DatabaseFixture.CreateContext())
+        {
+            var component = await update.Products.SingleAsync(product => product.Id == _testPizza.Id);
+            component.BasePrice = 0m;
+            await update.SaveChangesAsync();
+        }
+
+        var basketAfterZero = await AddCustomizedBundleAsync(variationId);
+
+        basketAfterZero.SubTotal.Should().Be(basketBeforeZero.SubTotal,
+            "the bundle price comes from its own base, section surcharge, variation and customization");
+
+        await using var orderScope = Factory.Services.CreateAsyncScope();
+        var factory = orderScope.ServiceProvider.GetRequiredService<IOrderItemFactory>();
+        var translator = new BasketToOrderTranslator();
+        var order = new Order { OrderNumber = "ZERO-COMPONENT", CreatedBy = "test" };
+        foreach (var item in translator.Translate(basketAfterZero.Items))
+        {
+            var error = await factory.AddItemAsync(
+                order, item, itemsAreServerPriced: true, CancellationToken.None);
+            error.Should().BeNull();
+        }
+
+        var orderedComponent = order.Items.Single(item => item.ProductId == _testPizza.Id);
+        orderedComponent.ProductVariationId.Should().Be(variationId);
+        orderedComponent.VariationName.Should().Be("Internal option");
+        orderedComponent.UnitPrice.Should().Be(0m,
+            "trusted basket prices must preserve a genuinely free selected component");
+        order.Items.Sum(item => item.ItemTotal).Should().Be(basketAfterZero.SubTotal);
+    }
+
+    private async Task<BasketDto> AddCustomizedBundleAsync(Guid variationId)
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var basketService = scope.ServiceProvider.GetRequiredService<IBasketService>();
+        return await basketService.AddItemToBasketAsync(Guid.NewGuid().ToString(), null, new AddToBasketDto
+        {
+            ProductId = _menuProduct.Id,
+            Quantity = 1,
+            SelectedMenuOptions =
+            [
+                new SelectedMenuOptionDto
+                {
+                    SectionId = _mainSection.Id,
+                    ItemId = _testPizza.Id,
+                    ProductVariationId = variationId,
+                    Quantity = 1,
+                    SelectedIngredients = [_mushrooms.Id, _tomatoSauce.Id],
+                    IngredientQuantities = new Dictionary<Guid, int>
+                    {
+                        [_mushrooms.Id] = 2,
+                        [_tomatoSauce.Id] = 1
+                    }
+                },
+                new SelectedMenuOptionDto
+                {
+                    SectionId = _drinkSection.Id,
+                    ItemId = _testCola.Id,
+                    Quantity = 1
+                }
+            ]
+        });
     }
 
     [Fact]

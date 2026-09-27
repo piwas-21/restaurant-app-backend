@@ -19,12 +19,12 @@ namespace RestaurantSystem.Api.Features.Basket.Services;
 public static class BasketChannelGuard
 {
     /// <summary>
-    /// Throws <see cref="BadRequestException"/> when <paramref name="product"/> cannot be ordered on
-    /// the basket's channel.
+    /// Throws <see cref="BadRequestException"/> when <paramref name="product"/> is inactive,
+    /// unavailable, or cannot be ordered on the basket's channel.
     /// </summary>
     /// <param name="basketOrderType">
-    /// The basket's channel, or <c>null</c> when the guest has not chosen one — the dominant browse
-    /// state, which is deliberately permissive so pre-pick adds keep working.
+    /// The basket's channel, or <c>null</c> when the guest has not chosen one — channel masks remain
+    /// permissive before selection, while inactive and unavailable products are always refused.
     /// </param>
     /// <remarks>
     /// The message names the channels the item IS available on, because the client re-displays it
@@ -39,6 +39,16 @@ public static class BasketChannelGuard
     /// </remarks>
     public static void EnsureOrderable(Product product, OrderType? basketOrderType)
     {
+        if (!product.IsActive)
+        {
+            throw new BadRequestException($"{product.Name} is no longer active.");
+        }
+
+        if (!product.IsAvailable)
+        {
+            throw new BadRequestException($"{product.Name} is not currently available.");
+        }
+
         if (basketOrderType is null)
         {
             return;

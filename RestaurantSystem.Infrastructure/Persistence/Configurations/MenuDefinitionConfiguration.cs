@@ -8,6 +8,13 @@ public class MenuDefinitionConfiguration : IEntityTypeConfiguration<MenuDefiniti
 {
     public void Configure(EntityTypeBuilder<MenuDefinition> builder)
     {
+        builder.Property(m => m.AuthoringVersion)
+            .HasDefaultValue(1)
+            .IsConcurrencyToken();
+
+        builder.Property(m => m.VersionedSectionEditingStarted)
+            .HasDefaultValue(false);
+
         builder.HasOne(m => m.Product)
             .WithOne(p => p.MenuDefinition)
             .HasForeignKey<MenuDefinition>(m => m.ProductId)

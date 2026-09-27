@@ -9,6 +9,7 @@ using RestaurantSystem.Api.Features.Products.Commands.DeleteProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductPriceCommand;
+using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Commands.UploadMultipleProductImagesCommand;
 using RestaurantSystem.Api.Features.Products.Commands.UploadProductImageCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -89,10 +90,16 @@ public class ProductsController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<ProductDto>>> GetProduct(
         Guid id,
-        [FromQuery] OrderType? requestedOrderType = null)
+        [FromQuery] OrderType? requestedOrderType = null,
+        [FromQuery] string? locale = null)
     {
-        var query = new GetProductByIdQuery(id, requestedOrderType);
+        var query = new GetProductByIdQuery(id, requestedOrderType, locale);
         var result = await _mediator.SendQuery(query);
+        if (result.Data?.MenuDefinition is { } definition)
+        {
+            Response.Headers.ETag = MenuAuthoringVersionTag.Format(definition.AuthoringVersion);
+        }
+
         return Ok(result);
     }
 

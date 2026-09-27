@@ -1986,6 +1986,13 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<int>("AuthoringVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("authoring_version");
+
                     b.Property<bool>("AvailableFriday")
                         .HasColumnType("boolean")
                         .HasColumnName("available_friday");
@@ -2056,6 +2063,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text")
                         .HasColumnName("updated_by");
+
+                    b.Property<bool>("VersionedSectionEditingStarted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("versioned_section_editing_started");
 
                     b.HasKey("Id")
                         .HasName("pk_menu_definitions");
@@ -2284,6 +2297,63 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_menu_section_items_product_variation_id");
 
                     b.ToTable("menu_section_items");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.MenuSectionTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<Guid>("MenuSectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("menu_section_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_menu_section_translations");
+
+                    b.HasIndex("MenuSectionId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("MenuSectionTranslations", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
@@ -5575,12 +5645,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("OperationId")
                         .IsUnique();
 
-                    b.HasIndex("Status", "RequestedAt");
-
                     b.HasIndex("ServiceSessionId")
                         .IsUnique()
                         .HasDatabaseName("ix_table_service_payment_handoffs_service_session_id")
                         .HasFilter("\"status\" = 'Requested'");
+
+                    b.HasIndex("Status", "RequestedAt");
 
                     b.ToTable("table_service_payment_handoffs");
                 });
@@ -6346,6 +6416,18 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductVariation");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.MenuSectionTranslation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.MenuSection", "MenuSection")
+                        .WithMany("Translations")
+                        .HasForeignKey("MenuSectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_menu_section_translations_menu_sections_menu_section_id");
+
+                    b.Navigation("MenuSection");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.CustomerDiscountRule", "CustomerDiscountRule")
@@ -7001,6 +7083,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.MenuSection", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("Translations");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>

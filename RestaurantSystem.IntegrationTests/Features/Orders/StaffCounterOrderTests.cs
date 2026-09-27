@@ -203,6 +203,29 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Create_refuses_component_as_a_standalone_counter_line()
+    {
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var component = await context.Products.SingleAsync(product => product.Id == _productId);
+            component.IsComponent = true;
+            component.BasePrice = 0m;
+            await context.SaveChangesAsync();
+        }
+
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync(
+            "/api/staff/orders", CreateBody(Guid.NewGuid(), releaseToKitchen: false));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var result = await ReadResponseAsync<ApiResponse<OrderDto>>(response);
+        result!.ErrorCode.Should().Be(ErrorCodes.ComponentNotOrderable);
+        await using var after = DatabaseFixture.CreateContext();
+        (await after.Orders.CountAsync()).Should().Be(0);
+        (await after.StaffOrderOperations.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Notes_at_the_column_limit_persist_and_longer_notes_are_rejected_before_persistence()
     {
         AuthenticateAsAdmin();
