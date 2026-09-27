@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Catalogue.Dtos;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.CreateGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
+using RestaurantSystem.Api.Features.Menus.Commands.CreateMenuBundleCommand;
 using RestaurantSystem.Api.Features.Products.Commands.CreateProductCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
@@ -72,7 +73,8 @@ internal static class CatalogueImportCommandMapper
         CentralCatalogueTemplateRevision revision,
         string locale,
         CatalogueImportItemDecision decision,
-        Guid categoryId)
+        Guid categoryId,
+        List<ProductCustomizationGroupDto>? customizationGroups = null)
     {
         var localized = CatalogueSessionMapper.Localized(revision, locale);
         var content = ProductContent(revision, locale, decision, localized);
@@ -96,7 +98,51 @@ internal static class CatalogueImportCommandMapper
             DetailedIngredients: null,
             Content: content,
             AvailableOrderTypes: decision.AvailableOrderTypes,
-            CustomizationGroups: null);
+            CustomizationGroups: customizationGroups,
+            TranslationMetadata: CatalogueImportTranslationMapper.OwnerMetadata(revision));
+    }
+
+    public static CreateMenuBundleCommand Bundle(
+        CentralCatalogueTemplateRevision revision,
+        string locale,
+        CatalogueImportItemDecision decision,
+        IReadOnlyList<MenuSectionDto> sections,
+        Guid? parentOfferProductId)
+    {
+        var localized = CatalogueSessionMapper.Localized(revision, locale);
+        var definition = new MenuDefinitionDto
+        {
+            IsAlwaysAvailable = true,
+            AvailableMonday = true,
+            AvailableTuesday = true,
+            AvailableWednesday = true,
+            AvailableThursday = true,
+            AvailableFriday = true,
+            AvailableSaturday = true,
+            AvailableSunday = true,
+            Sections = sections.ToList()
+        };
+        if (parentOfferProductId.HasValue)
+        {
+            definition = definition with { ParentOfferProductId = parentOfferProductId };
+        }
+
+        return new CreateMenuBundleCommand(
+            Name: LocalName(decision, localized.Name),
+            Description: decision.LocalDescription ?? localized.Description,
+            BasePrice: decision.LocalPrice ?? throw new BadRequestException("A tenant-local bundle price is required"),
+            IsActive: false,
+            IsAvailable: false,
+            IsSpecial: false,
+            PreparationTimeMinutes: 0,
+            DisplayOrder: 0,
+            CategoryIds: null,
+            PrimaryCategoryId: null,
+            MenuDefinition: definition,
+            Content: ProductContent(revision, locale, decision, localized),
+            AvailableOrderTypes: decision.AvailableOrderTypes,
+            Allergens: decision.Allergens?.Select(value => value.Trim()).ToList() ?? [],
+            TranslationMetadata: CatalogueImportTranslationMapper.OwnerMetadata(revision));
     }
 
     private static ProductDescriptionsDto ProductContent(

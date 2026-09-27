@@ -29,3 +29,7 @@ internal sealed record CataloguePackReference(
     CatalogueSourceReference Reference,
     int SortOrder,
     bool IncludedByDefault);
+
+internal sealed record CataloguePayloadDependency(
+    CatalogueSourceReference Reference,
+    string ExpectedTemplateType);
