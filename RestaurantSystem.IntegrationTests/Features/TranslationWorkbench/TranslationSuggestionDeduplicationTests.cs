@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RestaurantSystem.Api.Features.TranslationWorkbench;
@@ -48,6 +49,35 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
             json.RootElement.GetProperty("data").GetProperty("suggestions")
                 .GetArrayLength().Should().Be(1);
         }
+    }
+
+    [Fact]
+    public async Task ExistingLegacyItemCanFillAMissingLocaleOnce()
+    {
+        AuthenticateAsAdmin();
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var productId = await context.Products.Select(product => product.Id).FirstAsync();
+        var provider = Factory.Services.GetRequiredService<ITranslationGenerationProvider>()
+            .Should().BeOfType<CountingProvider>().Subject;
+        var request = new
+        {
+            generationIntent = "saveReview",
+            targetLocales = new[] { "tr", "en" },
+            fields = new[] { new
+            {
+                fieldRef = new { entityType = "product", entityId = productId, fieldKey = "name" },
+                sourceLocale = "tr", sourceText = "Tavuk",
+                targetTexts = new Dictionary<string, string> { ["tr"] = "Tavuk", ["en"] = "" }
+            } }
+        };
+        var before = provider.Calls;
+        var first = await PostAsJsonAsync("/api/translation-workbench/suggestions", request);
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        provider.Calls.Should().Be(before + 1);
+        var second = await PostAsJsonAsync("/api/translation-workbench/suggestions", request);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+        provider.Calls.Should().Be(before + 1);
     }
 
     private static object Request(string english) => new

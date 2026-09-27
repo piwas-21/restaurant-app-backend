@@ -129,10 +129,6 @@ public sealed class TranslationSuggestionService(
         {
             var field = request.Fields[index];
             var row = preview.Rows[index];
-            var sourceTarget = row.Targets.FirstOrDefault(target => target.Locale == field.SourceLocale);
-            var saveEligible = field.FieldRef.ClientKey is not null ||
-                sourceTarget?.Provenance?.Kind == "template" ||
-                sourceTarget?.Provenance?.SourceHash is { } priorHash && priorHash != row.SourceHash;
             var contextHash = TranslationWorkbenchRules.Hash(JsonSerializer.Serialize(new
             {
                 field.Context,
@@ -143,7 +139,6 @@ public sealed class TranslationSuggestionService(
             foreach (var target in row.Targets)
             {
                 if (target.Locale == field.SourceLocale || target.Status is not ("missing" or "stale" or "sourceCopy") ||
-                    request.GenerationIntent == "saveReview" && !saveEligible ||
                     target.Status == "sourceCopy" && request.GenerationIntent != "explicitFill")
                 {
                     continue;
