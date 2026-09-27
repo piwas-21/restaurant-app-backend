@@ -12,4 +12,5 @@ public sealed class CreateOrReuseImportedSetRequest
     public string SourceLocale { get; set; } = "en";
     public IReadOnlyDictionary<string, string> Translations { get; set; } = new Dictionary<string, string>();
     public IReadOnlyList<ImportedOptionSetEntryRequest> Entries { get; set; } = [];
+    public IReadOnlySet<Guid> StagedProductIds { get; set; } = new HashSet<Guid>();
 }

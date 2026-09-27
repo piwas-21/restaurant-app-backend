@@ -12,6 +12,7 @@ internal static class OptionSetMaterializerEntryValidation
         ApplicationDbContext context,
         OptionSetKind kind,
         OptionSetEntry entry,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken) =>
         OptionSetEntryValidator.ValidateAsync(context, kind, new OptionSetEntryDto
         {
@@ -28,5 +29,5 @@ internal static class OptionSetMaterializerEntryValidation
             IsRequired = entry.IsRequired,
             AdditionalPrice = entry.AdditionalPrice,
             IsDefault = entry.IsDefault
-        }, cancellationToken);
+        }, stagedProductIds: stagedProductIds, cancellationToken: cancellationToken);
 }

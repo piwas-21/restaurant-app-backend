@@ -29,9 +29,12 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
     private static readonly Guid StandaloneProductId = Guid.NewGuid();
     private static readonly Guid DefinitionId = Guid.NewGuid();
     private static readonly Guid SectionId = Guid.NewGuid();
+    private static readonly Guid SecondSectionId = Guid.NewGuid();
     private static readonly Guid ChoiceGroupId = Guid.NewGuid();
     private static readonly Guid ExistingChoiceId = Guid.NewGuid();
     private static readonly Guid AddedChoiceId = Guid.NewGuid();
+    private static readonly Guid ThirdChoiceId = Guid.NewGuid();
+    private static readonly Guid SauceId = Guid.NewGuid();
     private static readonly Guid ExistingSectionItemId = Guid.NewGuid();
     private static readonly Guid ExistingProductChoiceId = Guid.NewGuid();
     private Guid _categoryId;
@@ -141,6 +144,272 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         saved!.Data!.Version.Should().Be(2);
         saved.Data.Entries.Should().HaveCount(2);
         saved.Data.Entries[0].Id.Should().Be(firstId);
+    }
+
+    [Fact]
+    public async Task Update_keeps_a_new_entry_enabled_and_materializable()
+    {
+        AuthenticateAsAdmin();
+        var detail = (await CreateBundleChoiceSetAsync())!.Data!;
+        var update = new OptionSetWriteRequestDto
+        {
+            Kind = detail.Kind,
+            Name = detail.Name,
+            SourceLocale = detail.SourceLocale,
+            Translations = detail.Translations,
+            Entries =
+            [
+                .. detail.Entries,
+                new OptionSetEntryDto { Name = "Beef", ProductId = ThirdChoiceId, DisplayOrder = 2 }
+            ]
+        };
+        Client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "\"1\"");
+
+        var updateResponse = await PutAsJsonAsync($"/api/OptionSets/{detail.Id}", update);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await updateResponse.Content.ReadAsStringAsync());
+        var updated = (await ReadResponseAsync<ApiResponse<OptionSetDetailDto>>(updateResponse))!.Data!;
+        updated.Entries.Should().ContainSingle(entry => entry.ProductId == ThirdChoiceId);
+        updated.Entries.Single(entry => entry.ProductId == ThirdChoiceId).Id.Should().NotBe(Guid.Empty);
+
+        var request = new OptionSetMaterializationRequest
+        {
+            OptionSetId = updated.Id,
+            ExpectedSetVersion = updated.Version,
+            IdempotencyKey = $"added-entry-{Guid.NewGuid():N}",
+            Targets =
+            [
+                new OptionSetMaterializationTargetRequest
+                {
+                    TargetKey = "taco-menu-choice",
+                    Role = OptionSetAttachmentRole.BundleChoice,
+                    TargetProductId = MenuId,
+                    TargetMenuSectionId = SectionId,
+                    ExpectedMenuAuthoringVersion = 1,
+                    IntentionalDifferenceReason = "The related standalone offer keeps its local choice group.",
+                    Settings = new OptionSetAttachmentSettings { MinSelection = 1, MaxSelection = 2 }
+                }
+            ]
+        };
+        var applyResponse = await PostAsJsonAsync($"/api/OptionSets/{updated.Id}/apply", request);
+        applyResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await applyResponse.Content.ReadAsStringAsync());
+        var applied = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(applyResponse))!.Data!;
+        applied.Targets.Should().ContainSingle().Which.Status.Should().Be("applied");
+
+        await using var context = DatabaseFixture.CreateContext();
+        var section = await context.MenuSections.Include(item => item.Items)
+            .SingleAsync(item => item.Id == SectionId);
+        section.Items.Should().Contain(item => item.ProductId == ThirdChoiceId);
+    }
+
+    [Fact]
+    public async Task Updating_metadata_allows_existing_inactive_reference_but_rejects_a_new_one()
+    {
+        AuthenticateAsAdmin();
+        var detail = (await CreateBundleChoiceSetAsync())!.Data!;
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var existing = await context.Products.SingleAsync(product => product.Id == ExistingChoiceId);
+            var newReference = await context.Products.SingleAsync(product => product.Id == ThirdChoiceId);
+            existing.IsActive = false;
+            existing.IsAvailable = false;
+            newReference.IsActive = false;
+            newReference.IsAvailable = false;
+            await context.SaveChangesAsync();
+        }
+
+        var rename = new OptionSetWriteRequestDto
+        {
+            Kind = detail.Kind,
+            Name = "Taco proteins translated",
+            SourceLocale = "en",
+            Translations = new Dictionary<string, string> { ["en"] = "Taco proteins translated" },
+            Entries = detail.Entries
+        };
+        Client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "\"1\"");
+        var renameResponse = await PutAsJsonAsync($"/api/OptionSets/{detail.Id}", rename);
+        renameResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await renameResponse.Content.ReadAsStringAsync());
+        var renamed = (await ReadResponseAsync<ApiResponse<OptionSetDetailDto>>(renameResponse))!.Data!;
+        renamed.Version.Should().Be(2);
+        renamed.Entries.Should().HaveCount(2);
+
+        Client.DefaultRequestHeaders.Remove("If-Match");
+        Client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", "\"2\"");
+        var addInactive = new OptionSetWriteRequestDto
+        {
+            Kind = renamed.Kind,
+            Name = renamed.Name,
+            SourceLocale = renamed.SourceLocale,
+            Translations = renamed.Translations,
+            Entries =
+            [
+                .. renamed.Entries,
+                new OptionSetEntryDto { Name = "Unavailable beef", ProductId = ThirdChoiceId, DisplayOrder = 2 }
+            ]
+        };
+        var rejected = await PutAsJsonAsync($"/api/OptionSets/{detail.Id}", addInactive);
+        rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            await rejected.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Sauce_preview_shows_rule_only_change_and_can_clear_the_existing_maximum()
+    {
+        AuthenticateAsAdmin();
+        var create = new OptionSetWriteRequestDto
+        {
+            Kind = OptionSetKind.Sauce,
+            Name = "Hot sauce choices",
+            SourceLocale = "en",
+            Translations = new Dictionary<string, string> { ["en"] = "Hot sauce choices" },
+            Entries = [new OptionSetEntryDto { Name = "Hot sauce", GlobalIngredientId = SauceId }]
+        };
+        var createResponse = await PostAsJsonAsync("/api/OptionSets", create);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await createResponse.Content.ReadAsStringAsync());
+        var set = (await ReadResponseAsync<ApiResponse<OptionSetDetailDto>>(createResponse))!.Data!;
+        var initial = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = $"sauce-initial-{Guid.NewGuid():N}",
+            Targets =
+            [
+                new OptionSetMaterializationTargetRequest
+                {
+                    TargetKey = "falafel-sauces",
+                    Role = OptionSetAttachmentRole.Sauce,
+                    TargetProductId = AddedChoiceId,
+                    Settings = new OptionSetAttachmentSettings
+                    {
+                        MinSelection = 0, MaxSelection = 1, IncludedFree = 0, DisplayOrder = 0
+                    }
+                }
+            ]
+        };
+        var initialResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/apply", initial);
+        initialResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await initialResponse.Content.ReadAsStringAsync());
+        (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(initialResponse))!
+            .Data!.Targets.Should().ContainSingle().Which.Status.Should().Be("applied");
+
+        var clearMaximum = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = $"sauce-clear-{Guid.NewGuid():N}",
+            Targets =
+            [
+                new OptionSetMaterializationTargetRequest
+                {
+                    TargetKey = "falafel-sauces",
+                    Role = OptionSetAttachmentRole.Sauce,
+                    TargetProductId = AddedChoiceId,
+                    ExpectedAttachmentVersion = 1,
+                    Settings = new OptionSetAttachmentSettings
+                    {
+                        MinSelection = 0, ClearMaxSelection = true, IncludedFree = 0, DisplayOrder = 0
+                    }
+                }
+            ]
+        };
+        var previewResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/preview", clearMaximum);
+        previewResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await previewResponse.Content.ReadAsStringAsync());
+        var preview = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationPreview>>(previewResponse))!.Data!;
+        var targetPreview = preview.Targets.Should().ContainSingle().Which;
+        targetPreview.Status.Should().Be("ready");
+        targetPreview.CurrentSettings.MaxSelection.Should().Be(1);
+        targetPreview.ProposedSettings.MaxSelection.Should().BeNull();
+        targetPreview.ChangedSettings.Should().ContainSingle().Which.Should().Be("maxSelection");
+
+        var applyResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/apply", clearMaximum);
+        applyResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await applyResponse.Content.ReadAsStringAsync());
+        var applied = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(applyResponse))!.Data!;
+        applied.Targets.Should().ContainSingle().Which.Status.Should().Be("applied");
+
+        await using var context = DatabaseFixture.CreateContext();
+        (await context.Products.Where(product => product.Id == AddedChoiceId)
+            .Select(product => product.SauceMax).SingleAsync()).Should().BeNull();
+        (await context.OptionSetAttachments.Where(attachment => attachment.OptionSetId == set.Id)
+            .Select(attachment => attachment.MaxSelection).SingleAsync()).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Long_import_ids_get_bounded_unique_names_and_staged_inactive_targets_stay_unavailable()
+    {
+        AuthenticateAsAdmin();
+        var adminSet = (await CreateBundleChoiceSetAsync())!.Data!;
+        await using (var stateContext = DatabaseFixture.CreateContext())
+        {
+            var menu = await stateContext.Products.SingleAsync(product => product.Id == MenuId);
+            var referencedChoice = await stateContext.Products.SingleAsync(product => product.Id == AddedChoiceId);
+            menu.IsActive = false;
+            menu.IsAvailable = false;
+            referencedChoice.IsActive = false;
+            referencedChoice.IsAvailable = false;
+            await stateContext.SaveChangesAsync();
+        }
+
+        var adminApply = new OptionSetMaterializationRequest
+        {
+            OptionSetId = adminSet.Id,
+            ExpectedSetVersion = adminSet.Version,
+            IdempotencyKey = $"admin-inactive-{Guid.NewGuid():N}",
+            Targets = [BundleTarget("inactive-admin-target", SectionId, 1)]
+        };
+        var adminResponse = await PostAsJsonAsync($"/api/OptionSets/{adminSet.Id}/apply", adminApply);
+        adminResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await adminResponse.Content.ReadAsStringAsync());
+        var adminResult = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(adminResponse))!.Data!;
+        adminResult.Targets.Should().ContainSingle().Which.Status.Should().Be("conflict");
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var materializer = scope.ServiceProvider.GetRequiredService<IOptionSetMaterializer>();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var longSourceIdOne = new string('s', 119) + "1";
+        var longSourceIdTwo = new string('s', 119) + "2";
+        var stagedProducts = new HashSet<Guid> { MenuId, AddedChoiceId };
+        var firstImported = await materializer.CreateOrReuseImportedSetAsync(
+            ImportedSetRequest("menu-catalogue-test-one", longSourceIdOne, adminSet.Name, stagedProducts),
+            CancellationToken.None);
+        var secondImported = await materializer.CreateOrReuseImportedSetAsync(
+            ImportedSetRequest("menu-catalogue-test-two", longSourceIdTwo, adminSet.Name, stagedProducts),
+            CancellationToken.None);
+
+        var importedSets = await context.OptionSets.AsNoTracking()
+            .Where(set => set.Id == firstImported.OptionSetId || set.Id == secondImported.OptionSetId)
+            .OrderBy(set => set.Id)
+            .ToListAsync();
+        importedSets.Should().HaveCount(2);
+        importedSets.Should().OnlyContain(set => set.Name.Length <= 120);
+        importedSets.Select(set => set.NormalizedName).Distinct().Should().HaveCount(2);
+
+        var importApply = new OptionSetMaterializationRequest
+        {
+            OptionSetId = firstImported.OptionSetId,
+            ExpectedSetVersion = firstImported.Version,
+            IdempotencyKey = $"staged-product-{Guid.NewGuid():N}",
+            Targets = [BundleTarget("imported-inactive-menu", SectionId, 1)]
+        };
+        var importResult = await materializer.ApplyImportedAsync(
+            importApply, stagedProducts, CancellationToken.None);
+        importResult.Targets.Should().ContainSingle().Which.Status.Should().Be("applied");
+        await transaction.CommitAsync();
+
+        await using var verify = DatabaseFixture.CreateContext();
+        var stagedMenu = await verify.Products.SingleAsync(product => product.Id == MenuId);
+        var stagedChoice = await verify.Products.SingleAsync(product => product.Id == AddedChoiceId);
+        stagedMenu.IsActive.Should().BeFalse();
+        stagedMenu.IsAvailable.Should().BeFalse();
+        stagedChoice.IsActive.Should().BeFalse();
+        stagedChoice.IsAvailable.Should().BeFalse();
+        (await verify.MenuSections.Where(section => section.Id == SectionId)
+            .SelectMany(section => section.Items).AnyAsync(item => item.ProductId == AddedChoiceId)).Should().BeTrue();
     }
 
     [Fact]
@@ -282,6 +551,92 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Same_menu_retry_uses_the_actual_version_delta_from_an_idempotent_target()
+    {
+        AuthenticateAsAdmin();
+        var set = (await CreateBundleChoiceSetAsync())!.Data!;
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var definition = await context.MenuDefinitions.SingleAsync(item => item.ProductId == MenuId);
+            var secondSection = new MenuSection
+            {
+                Id = SecondSectionId,
+                MenuDefinitionId = definition.Id,
+                MenuDefinition = definition,
+                Name = "Choose a second filling",
+                DisplayOrder = 1,
+                IsRequired = true,
+                MinSelection = 1,
+                MaxSelection = 2,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            };
+            secondSection.Items.Add(new MenuSectionItem
+            {
+                Id = Guid.NewGuid(),
+                MenuSectionId = SecondSectionId,
+                MenuSection = secondSection,
+                ProductId = ExistingChoiceId,
+                DisplayOrder = 0,
+                IsDefault = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            });
+            context.MenuSections.Add(secondSection);
+            await context.SaveChangesAsync();
+        }
+
+        var sharedKey = $"first-section-{Guid.NewGuid():N}";
+        var first = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = sharedKey,
+            Targets = [BundleTarget("first", SectionId, 1)]
+        };
+        var firstResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/apply", first);
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await firstResponse.Content.ReadAsStringAsync());
+
+        var second = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = $"second-section-{Guid.NewGuid():N}",
+            Targets = [BundleTarget("second", SecondSectionId, 2)]
+        };
+        var secondResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/apply", second);
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await secondResponse.Content.ReadAsStringAsync());
+        (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(secondResponse))!
+            .Data!.Targets.Should().ContainSingle().Which.MenuAuthoringVersion.Should().Be(3);
+
+        var retry = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = sharedKey,
+            Targets =
+            [
+                BundleTarget("first", SectionId, 1, expectedAttachmentVersion: 1),
+                BundleTarget("second", SecondSectionId, 1, expectedAttachmentVersion: 1)
+            ]
+        };
+        var retryResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/apply", retry);
+        retryResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await retryResponse.Content.ReadAsStringAsync());
+        var retried = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(retryResponse))!.Data!;
+        retried.Targets.Single(target => target.TargetKey == "first").Status.Should().Be("unchanged");
+        var secondRetried = retried.Targets.Single(target => target.TargetKey == "second");
+        secondRetried.Status.Should().Be("applied", string.Join("; ", secondRetried.Conflicts.Select(item => item.Message)));
+        retried.Targets.Single(target => target.TargetKey == "second").MenuAuthoringVersion.Should().Be(4);
+
+        await using var verify = DatabaseFixture.CreateContext();
+        (await verify.MenuDefinitions.Where(item => item.ProductId == MenuId)
+            .Select(item => item.AuthoringVersion).SingleAsync()).Should().Be(4);
+    }
+
+    [Fact]
     public async Task Option_set_enums_use_the_documented_wire_values()
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -301,6 +656,8 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         _categoryId = category.Id;
         var existingChoice = Product(ExistingChoiceId, "Chicken", 6m);
         var addedChoice = Product(AddedChoiceId, "Falafel", 5m);
+        addedChoice.SauceMax = 1;
+        var thirdChoice = Product(ThirdChoiceId, "Beef", 7m);
         var standaloneProduct = Product(StandaloneProductId, "Taco", 12m);
         standaloneProduct.ProductCategories.Add(new ProductCategory
         {
@@ -386,7 +743,15 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         });
         definition.Sections.Add(section);
         menuProduct.MenuDefinition = definition;
-        context.AddRange(existingChoice, addedChoice, standaloneProduct, choiceGroup, menuProduct, definition);
+        context.AddRange(existingChoice, addedChoice, thirdChoice, standaloneProduct, choiceGroup, menuProduct, definition);
+        context.GlobalIngredients.Add(new GlobalIngredient
+        {
+            Id = SauceId,
+            DefaultName = "Hot sauce",
+            Kind = IngredientKind.Sauce,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Actor
+        });
         await context.SaveChangesAsync();
     }
 
@@ -434,6 +799,55 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
             }
         ]
     };
+
+    private static OptionSetMaterializationTargetRequest BundleTarget(
+        string key,
+        Guid sectionId,
+        int expectedMenuVersion,
+        int? expectedAttachmentVersion = null) => new()
+        {
+            TargetKey = key,
+            Role = OptionSetAttachmentRole.BundleChoice,
+            TargetProductId = MenuId,
+            TargetMenuSectionId = sectionId,
+            ExpectedMenuAuthoringVersion = expectedMenuVersion,
+            ExpectedAttachmentVersion = expectedAttachmentVersion,
+            IntentionalDifferenceReason = "The linked standalone offer retains its existing choice group.",
+            Settings = new OptionSetAttachmentSettings { MinSelection = 1, MaxSelection = 2, DisplayOrder = 0 }
+        };
+
+    private static CreateOrReuseImportedSetRequest ImportedSetRequest(
+        string templateId,
+        string sourceOptionSetId,
+        string name,
+        IReadOnlySet<Guid> stagedProductIds) => new()
+        {
+            SourceTemplateId = templateId,
+            SourceRevision = 1,
+            SourceOptionSetId = sourceOptionSetId,
+            Kind = OptionSetKind.BundleChoice,
+            Name = name,
+            SourceLocale = "en",
+            Translations = new Dictionary<string, string> { ["en"] = name },
+            StagedProductIds = stagedProductIds,
+            Entries =
+        [
+            new ImportedOptionSetEntryRequest
+            {
+                SourceEntryId = "chicken",
+                Name = "Chicken",
+                ProductId = ExistingChoiceId,
+                IsDefault = true
+            },
+            new ImportedOptionSetEntryRequest
+            {
+                SourceEntryId = "falafel",
+                Name = "Falafel",
+                ProductId = AddedChoiceId,
+                DisplayOrder = 1
+            }
+        ]
+        };
 
     private object MenuPutPayload(string sectionName) => new
     {

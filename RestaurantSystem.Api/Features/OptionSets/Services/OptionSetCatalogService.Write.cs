@@ -66,7 +66,7 @@ public sealed partial class OptionSetCatalogService
             throw new BadRequestException("An option set cannot change kind after creation");
         }
 
-        await ValidateEntriesAsync(request, cancellationToken);
+        ValidateEntryCount(request);
         var byId = set.Entries.ToDictionary(entry => entry.Id);
         var retained = new HashSet<Guid>();
         var references = new HashSet<string>(StringComparer.Ordinal);
@@ -82,10 +82,20 @@ public sealed partial class OptionSetCatalogService
             }
 
             var entry = ResolveExistingEntry(dto, set.Entries, byId, retained);
+            if (entry is null || !SameReference(entry, dto))
+            {
+                await OptionSetEntryValidator.ValidateAsync(
+                    _context, request.Kind, dto, cancellationToken: cancellationToken);
+            }
+
             if (entry is null)
             {
                 entry = NewEntry(dto, audit, now);
+                entry.OptionSetId = set.Id;
+                entry.OptionSet = set;
                 set.Entries.Add(entry);
+                _context.OptionSetEntries.Add(entry);
+                retained.Add(entry.Id);
             }
             else
             {
@@ -123,16 +133,26 @@ public sealed partial class OptionSetCatalogService
         return ToDetail(set);
     }
 
-    private async Task ValidateEntriesAsync(OptionSetWriteRequestDto request, CancellationToken cancellationToken)
+    private async Task ValidateEntriesAsync(
+        OptionSetWriteRequestDto request,
+        CancellationToken cancellationToken,
+        IReadOnlySet<Guid>? stagedProductIds = null)
+    {
+        ValidateEntryCount(request);
+
+        foreach (var entry in request.Entries)
+        {
+            await OptionSetEntryValidator.ValidateAsync(
+                _context, request.Kind, entry, stagedProductIds: stagedProductIds,
+                cancellationToken: cancellationToken);
+        }
+    }
+
+    private static void ValidateEntryCount(OptionSetWriteRequestDto request)
     {
         if (request.Entries.Count > 200)
         {
             throw new BadRequestException("An option set may contain at most 200 entries");
-        }
-
-        foreach (var entry in request.Entries)
-        {
-            await OptionSetEntryValidator.ValidateAsync(_context, request.Kind, entry, cancellationToken);
         }
     }
 
@@ -194,8 +214,10 @@ public sealed partial class OptionSetCatalogService
 
     private static OptionSetEntry NewEntry(OptionSetEntryDto dto, string audit, DateTime now)
     {
-        var entry = new OptionSetEntry { CreatedAt = now, CreatedBy = audit };
+        var entry = new OptionSetEntry { Id = Guid.NewGuid(), CreatedAt = now, CreatedBy = audit };
         CopyEntry(dto, entry, audit, now);
+        entry.UpdatedAt = null;
+        entry.UpdatedBy = null;
         return entry;
     }
 

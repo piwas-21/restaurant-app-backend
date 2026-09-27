@@ -12,6 +12,7 @@ internal static class OptionSetRelatedOfferAnalyzer
         ApplicationDbContext context,
         OptionSet set,
         OptionSetMaterializationRequest request,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         if (set.Kind != OptionSetKind.BundleChoice)
@@ -22,7 +23,7 @@ internal static class OptionSetRelatedOfferAnalyzer
         var warnings = new List<OptionSetRelatedOfferWarningDto>();
         foreach (var target in request.Targets.Where(IsChoiceTarget))
         {
-            var source = await LoadSourceAsync(context, set, target, cancellationToken);
+            var source = await LoadSourceAsync(context, set, target, stagedProductIds, cancellationToken);
             if (source is null || source.State.Settings.MinSelection <= 0)
             {
                 continue;
@@ -54,7 +55,8 @@ internal static class OptionSetRelatedOfferAnalyzer
             foreach (var candidate in candidates)
             {
                 if (HasRequiredAttachment(candidate, attachments)
-                    || await IsRequiredRequestTargetAsync(context, set, request, candidate, cancellationToken))
+                    || await IsRequiredRequestTargetAsync(
+                        context, set, request, candidate, stagedProductIds, cancellationToken))
                 {
                     continue;
                 }
@@ -87,11 +89,13 @@ internal static class OptionSetRelatedOfferAnalyzer
         ApplicationDbContext context,
         OptionSet set,
         OptionSetMaterializationTargetRequest target,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         try
         {
-            var state = await OptionSetMaterializerTargetLoader.LoadAsync(context, set, target, null, cancellationToken);
+            var state = await OptionSetMaterializerTargetLoader.LoadAsync(
+                context, set, target, null, stagedProductIds, cancellationToken);
             return new SourceTarget(state);
         }
         catch (ConflictException)
@@ -183,6 +187,7 @@ internal static class OptionSetRelatedOfferAnalyzer
         OptionSet set,
         OptionSetMaterializationRequest request,
         RelatedTarget candidate,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         var targets = request.Targets.Where(target => target.TargetProductId == candidate.ProductId
@@ -192,7 +197,7 @@ internal static class OptionSetRelatedOfferAnalyzer
                 || target.TargetMenuSectionId == candidate.TargetId));
         foreach (var target in targets)
         {
-            var state = await LoadSourceAsync(context, set, target, cancellationToken);
+            var state = await LoadSourceAsync(context, set, target, stagedProductIds, cancellationToken);
             if (state?.State.Settings.MinSelection > 0)
             {
                 return true;

@@ -11,5 +11,6 @@ internal sealed class OptionSetTargetState
     public OptionSetAttachment? Attachment { get; init; }
     public required List<OptionSetEntry> SelectedEntries { get; init; }
     public required Dictionary<Guid, OptionSetAppliedRow> AppliedByEntry { get; init; }
+    public required OptionSetAttachmentSettings CurrentSettings { get; init; }
     public required OptionSetAttachmentSettings Settings { get; init; }
 }

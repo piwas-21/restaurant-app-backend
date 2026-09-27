@@ -11,6 +11,7 @@ internal static class OptionSetMaterializerPlanBuilder
         ApplicationDbContext context,
         OptionSet set,
         OptionSetMaterializationTargetRequest target,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         var preview = new OptionSetMaterializationTargetPreviewDto
@@ -22,15 +23,21 @@ internal static class OptionSetMaterializerPlanBuilder
         };
         try
         {
-            var state = await OptionSetMaterializerTargetLoader.LoadAsync(context, set, target, null, cancellationToken);
+            var state = await OptionSetMaterializerTargetLoader.LoadAsync(
+                context, set, target, null, stagedProductIds, cancellationToken);
             preview.AttachmentId = state.Attachment?.Id;
             preview.CurrentAttachmentVersion = state.Attachment?.Version;
             preview.CurrentMenuAuthoringVersion = state.MenuDefinition?.AuthoringVersion;
             preview.CurrentCustomizationGroupVersion = state.CustomizationGroup?.AuthoringVersion;
-            await PlanActiveEntries(context, set, target, state, preview, cancellationToken);
+            preview.CurrentSettings = CopySettings(state.CurrentSettings);
+            preview.ProposedSettings = CopySettings(state.Settings);
+            AddSettingsDiff(state.CurrentSettings, state.Settings, preview.ChangedSettings);
+            await PlanActiveEntries(context, set, target, state, preview, stagedProductIds, cancellationToken);
             PlanRemovedEntries(state, preview);
+            var hasRowChanges = preview.Changes.Any(change =>
+                change.Action is "add" or "update" or "remove" || change.ChangedFields.Count > 0);
             preview.Status = preview.Conflicts.Count > 0 ? "conflict"
-                : preview.Changes.Count == 0 ? "unchanged" : "ready";
+                : !hasRowChanges && preview.ChangedSettings.Count == 0 ? "unchanged" : "ready";
         }
         catch (ConflictException exception)
         {
@@ -51,6 +58,7 @@ internal static class OptionSetMaterializerPlanBuilder
         OptionSetMaterializationTargetRequest target,
         OptionSetTargetState state,
         OptionSetMaterializationTargetPreviewDto preview,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         foreach (var entry in state.SelectedEntries)
@@ -65,7 +73,8 @@ internal static class OptionSetMaterializerPlanBuilder
 
                 if (mapping is null)
                 {
-                    await OptionSetMaterializerEntryValidation.ValidateAsync(context, set.Kind, entry, cancellationToken);
+                    await OptionSetMaterializerEntryValidation.ValidateAsync(
+                        context, set.Kind, entry, stagedProductIds, cancellationToken);
                 }
 
                 var row = await OptionSetMaterializerRows.FindAsync(
@@ -81,6 +90,33 @@ internal static class OptionSetMaterializerPlanBuilder
                     EntryId = entry.Id
                 });
             }
+        }
+    }
+
+    private static OptionSetAttachmentSettings CopySettings(OptionSetAttachmentSettings settings) => new()
+    {
+        MinSelection = settings.MinSelection,
+        MaxSelection = settings.MaxSelection,
+        IncludedFree = settings.IncludedFree,
+        DisplayOrder = settings.DisplayOrder
+    };
+
+    private static void AddSettingsDiff(
+        OptionSetAttachmentSettings current,
+        OptionSetAttachmentSettings proposed,
+        ICollection<string> changes)
+    {
+        AddIfChanged(nameof(current.MinSelection), current.MinSelection, proposed.MinSelection, changes);
+        AddIfChanged(nameof(current.MaxSelection), current.MaxSelection, proposed.MaxSelection, changes);
+        AddIfChanged(nameof(current.IncludedFree), current.IncludedFree, proposed.IncludedFree, changes);
+        AddIfChanged(nameof(current.DisplayOrder), current.DisplayOrder, proposed.DisplayOrder, changes);
+    }
+
+    private static void AddIfChanged<T>(string field, T current, T proposed, ICollection<string> changes)
+    {
+        if (!EqualityComparer<T>.Default.Equals(current, proposed))
+        {
+            changes.Add(char.ToLowerInvariant(field[0]) + field[1..]);
         }
     }
 

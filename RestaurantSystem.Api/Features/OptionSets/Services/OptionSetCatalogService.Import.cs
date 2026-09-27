@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
@@ -15,7 +17,8 @@ public sealed partial class OptionSetCatalogService
     {
         if (string.IsNullOrWhiteSpace(request.SourceTemplateId)
             || string.IsNullOrWhiteSpace(request.SourceOptionSetId)
-            || request.SourceRevision <= 0 || string.IsNullOrWhiteSpace(request.Name)
+            || request.SourceOptionSetId.Length > 120 || request.SourceRevision <= 0
+            || string.IsNullOrWhiteSpace(request.Name)
             || !Enum.IsDefined(request.Kind))
         {
             throw new BadRequestException("The central option-set revision reference is incomplete");
@@ -42,7 +45,7 @@ public sealed partial class OptionSetCatalogService
             Entries = request.Entries.Select(ImportedEntry).ToList()
         };
         ValidateHeader(write, creating: true);
-        await ValidateEntriesAsync(write, cancellationToken);
+        await ValidateEntriesAsync(write, cancellationToken, request.StagedProductIds);
         EnsureDistinctSourceEntries(request.Entries);
         var name = await ResolveImportedNameAsync(request, cancellationToken);
         var now = DateTime.UtcNow;
@@ -75,8 +78,13 @@ public sealed partial class OptionSetCatalogService
             return name;
         }
 
-        var suffix = $" · {request.SourceOptionSetId}";
-        var available = $"{name[..Math.Min(name.Length, 120 - suffix.Length)]}{suffix}";
+        var sourceId = request.SourceOptionSetId;
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceId)))[..16].ToLowerInvariant();
+        var sourceLabel = sourceId[..Math.Min(sourceId.Length, 32)];
+        var suffix = $" · {sourceLabel}-{fingerprint}";
+        var prefixLength = Math.Max(0, 120 - suffix.Length);
+        var prefix = name[..Math.Min(name.Length, prefixLength)].TrimEnd();
+        var available = $"{prefix}{suffix}";
         if (await _context.OptionSets.AnyAsync(set => set.Kind == request.Kind
             && set.NormalizedName == OptionSetNameNormalizer.Normalize(available), cancellationToken))
         {

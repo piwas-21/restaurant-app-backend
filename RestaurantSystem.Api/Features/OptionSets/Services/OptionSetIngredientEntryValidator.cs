@@ -12,6 +12,7 @@ internal static class OptionSetIngredientEntryValidator
         ApplicationDbContext context,
         OptionSetKind kind,
         OptionSetEntryDto entry,
+        bool requireActiveReference,
         CancellationToken cancellationToken)
     {
         if (entry.GlobalIngredientId is not Guid id || entry.ProductId.HasValue || entry.ProductVariationId.HasValue)
@@ -21,7 +22,8 @@ internal static class OptionSetIngredientEntryValidator
 
         var expectedKind = kind == OptionSetKind.Sauce ? IngredientKind.Sauce : IngredientKind.Ingredient;
         var ingredient = await context.GlobalIngredients.FirstOrDefaultAsync(
-            item => item.Id == id && item.ArchivedAt == null, cancellationToken);
+            item => item.Id == id && (!requireActiveReference || (item.ArchivedAt == null && item.IsActive)),
+            cancellationToken);
         if (ingredient is null || ingredient.Kind != expectedKind)
         {
             throw new BadRequestException("Choose an active library ingredient of the same option-set kind");

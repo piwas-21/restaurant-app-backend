@@ -30,6 +30,12 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
     public async Task<OptionSetMaterializationPreview> PreviewAsync(
         OptionSetMaterializationRequest request,
         CancellationToken cancellationToken)
+        => await PreviewAsync(request, null, cancellationToken);
+
+    private async Task<OptionSetMaterializationPreview> PreviewAsync(
+        OptionSetMaterializationRequest request,
+        IReadOnlySet<Guid>? stagedProductIds,
+        CancellationToken cancellationToken)
     {
         ValidateRequest(request);
         var set = await LoadExpectedSetAsync(request, cancellationToken);
@@ -42,11 +48,11 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
         foreach (var target in request.Targets)
         {
             preview.Targets.Add(await OptionSetMaterializerPlanBuilder.BuildAsync(
-                _context, set, target, cancellationToken));
+                _context, set, target, stagedProductIds, cancellationToken));
         }
 
         preview.RelatedOfferWarnings.AddRange(await OptionSetRelatedOfferAnalyzer.AnalyzeAsync(
-            _context, set, request, cancellationToken));
+            _context, set, request, stagedProductIds, cancellationToken));
 
         return preview;
     }
@@ -56,7 +62,16 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
         CancellationToken cancellationToken)
     {
         EnsureMaterializationEnabled();
+        EnsureImportTransaction();
         return _catalog.CreateOrReuseImportedSetAsync(request, cancellationToken);
+    }
+
+    private void EnsureImportTransaction()
+    {
+        if (_context.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException("Catalogue option-set imports must participate in an item transaction");
+        }
     }
 
     private void EnsureMaterializationEnabled()

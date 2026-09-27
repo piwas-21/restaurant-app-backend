@@ -10,6 +10,11 @@ public interface IOptionSetMaterializer
         OptionSetMaterializationRequest request,
         CancellationToken cancellationToken);
 
+    Task<OptionSetMaterializationResult> ApplyImportedAsync(
+        OptionSetMaterializationRequest request,
+        IReadOnlySet<Guid> stagedProductIds,
+        CancellationToken cancellationToken);
+
     Task<CreateOrReuseImportedSetResult> CreateOrReuseImportedSetAsync(
         CreateOrReuseImportedSetRequest request,
         CancellationToken cancellationToken);

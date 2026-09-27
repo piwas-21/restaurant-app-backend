@@ -11,6 +11,9 @@ public sealed class OptionSetMaterializationTargetPreviewDto
     public int? CurrentAttachmentVersion { get; set; }
     public int? CurrentMenuAuthoringVersion { get; set; }
     public int? CurrentCustomizationGroupVersion { get; set; }
+    public OptionSetAttachmentSettings CurrentSettings { get; set; } = new();
+    public OptionSetAttachmentSettings ProposedSettings { get; set; } = new();
+    public List<string> ChangedSettings { get; set; } = [];
     public List<OptionSetMaterializationConflictDto> Conflicts { get; set; } = [];
     public List<OptionSetMaterializationChangeDto> Changes { get; set; } = [];
 }

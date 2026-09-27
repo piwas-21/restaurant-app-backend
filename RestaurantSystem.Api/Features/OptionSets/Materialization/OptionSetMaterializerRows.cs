@@ -155,6 +155,7 @@ internal static class OptionSetMaterializerRows
         {
             var row = new ProductIngredient
             {
+                Id = Guid.NewGuid(),
                 ProductId = target.TargetProductId,
                 GlobalIngredientId = entry.GlobalIngredientId,
                 Kind = kind == OptionSetKind.Sauce ? IngredientKind.Sauce : IngredientKind.Ingredient,
@@ -170,6 +171,7 @@ internal static class OptionSetMaterializerRows
         {
             var row = new ProductSideItem
             {
+                Id = Guid.NewGuid(),
                 MainProductId = target.TargetProductId,
                 SideItemProductId = entry.ProductId!.Value,
                 CreatedAt = now,
@@ -189,6 +191,7 @@ internal static class OptionSetMaterializerRows
 
             var option = new ProductCustomizationProductOption
             {
+                Id = Guid.NewGuid(),
                 ProductCustomizationGroupId = target.TargetCustomizationGroupId!.Value,
                 OptionProductId = entry.ProductId!.Value,
                 CreatedAt = now,
@@ -201,6 +204,7 @@ internal static class OptionSetMaterializerRows
 
         var bundleRow = new MenuSectionItem
         {
+            Id = Guid.NewGuid(),
             MenuSectionId = target.TargetMenuSectionId!.Value,
             ProductId = entry.ProductId!.Value,
             ProductVariationId = entry.ProductVariationId,

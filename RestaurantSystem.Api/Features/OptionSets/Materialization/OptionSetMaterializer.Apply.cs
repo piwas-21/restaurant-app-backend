@@ -13,8 +13,31 @@ public sealed partial class OptionSetMaterializer
         CancellationToken cancellationToken)
     {
         EnsureMaterializationEnabled();
+        return await ApplyCoreAsync(request, null, cancellationToken);
+    }
+
+    public async Task<OptionSetMaterializationResult> ApplyImportedAsync(
+        OptionSetMaterializationRequest request,
+        IReadOnlySet<Guid> stagedProductIds,
+        CancellationToken cancellationToken)
+    {
+        EnsureMaterializationEnabled();
+        EnsureImportTransaction();
+        if (stagedProductIds is null || stagedProductIds.Contains(Guid.Empty))
+        {
+            throw new BadRequestException("The import staged-product allowlist is invalid");
+        }
+
+        return await ApplyCoreAsync(request, stagedProductIds, cancellationToken);
+    }
+
+    private async Task<OptionSetMaterializationResult> ApplyCoreAsync(
+        OptionSetMaterializationRequest request,
+        IReadOnlySet<Guid>? stagedProductIds,
+        CancellationToken cancellationToken)
+    {
         ValidateRequest(request);
-        await EnsureDifferencesHaveReasonsAsync(request, cancellationToken);
+        await EnsureDifferencesHaveReasonsAsync(request, stagedProductIds, cancellationToken);
         var ambientTransaction = _context.Database.CurrentTransaction is not null;
         var result = new OptionSetMaterializationResult
         {
@@ -27,7 +50,8 @@ public sealed partial class OptionSetMaterializer
         foreach (var target in request.Targets)
         {
             result.Targets.Add(await ApplyTargetAsync(
-                request, target, ambientTransaction, menuVersionBases, menuVersionAdvances, cancellationToken));
+                request, target, ambientTransaction, menuVersionBases, menuVersionAdvances,
+                stagedProductIds, cancellationToken));
         }
 
         return result;
@@ -39,6 +63,7 @@ public sealed partial class OptionSetMaterializer
         bool ambientTransaction,
         IDictionary<Guid, int> menuVersionBases,
         IDictionary<Guid, int> menuVersionAdvances,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         await using var transaction = ambientTransaction
@@ -54,6 +79,7 @@ public sealed partial class OptionSetMaterializer
                 effectiveTarget,
                 request.IdempotencyKey.Trim(),
                 _currentUser.GetAuditIdentifier(),
+                stagedProductIds,
                 cancellationToken);
 
             await EnsureSetVersionUnchangedAsync(request, cancellationToken);
@@ -152,8 +178,10 @@ public sealed partial class OptionSetMaterializer
             return;
         }
 
-        versionBases.TryAdd(target.TargetProductId, target.ExpectedMenuAuthoringVersion ?? current);
-        versionAdvances[target.TargetProductId] = GetValue(versionAdvances, target.TargetProductId) + 1;
+        var baseVersion = target.ExpectedMenuAuthoringVersion ?? current;
+        versionBases.TryAdd(target.TargetProductId, baseVersion);
+        baseVersion = versionBases[target.TargetProductId];
+        versionAdvances[target.TargetProductId] = Math.Max(0, current - baseVersion);
     }
 
     private static int GetValue(IDictionary<Guid, int> values, Guid key) =>
@@ -183,9 +211,10 @@ public sealed partial class OptionSetMaterializer
 
     private async Task EnsureDifferencesHaveReasonsAsync(
         OptionSetMaterializationRequest request,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
-        var preview = await PreviewAsync(request, cancellationToken);
+        var preview = await PreviewAsync(request, stagedProductIds, cancellationToken);
         var targetByKey = request.Targets.ToDictionary(target => target.TargetKey, StringComparer.Ordinal);
         foreach (var warning in preview.RelatedOfferWarnings.Where(warning => warning.ReasonRequired))
         {

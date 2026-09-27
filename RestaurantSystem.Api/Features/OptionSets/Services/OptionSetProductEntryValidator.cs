@@ -12,6 +12,8 @@ internal static class OptionSetProductEntryValidator
         ApplicationDbContext context,
         OptionSetEntryDto entry,
         OptionSetKind kind,
+        bool requireActiveReference,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         if (entry.ProductId is not Guid productId || entry.GlobalIngredientId.HasValue)
@@ -20,7 +22,9 @@ internal static class OptionSetProductEntryValidator
         }
 
         var product = await context.Products.FirstOrDefaultAsync(item => item.Id == productId, cancellationToken);
-        if (product is null || product.IsDeleted || !product.IsActive || !product.IsAvailable
+        var isStagedProduct = stagedProductIds?.Contains(productId) == true;
+        if (product is null || product.IsDeleted
+            || (requireActiveReference && !isStagedProduct && (!product.IsActive || !product.IsAvailable))
             || (product.IsComponent && kind != OptionSetKind.BundleChoice))
         {
             throw new BadRequestException("Choose an active, available tenant product that is valid for this option-set kind");
@@ -29,7 +33,8 @@ internal static class OptionSetProductEntryValidator
         if (entry.ProductVariationId is Guid variationId)
         {
             var variationExists = await context.ProductVariations.AnyAsync(
-                variation => variation.Id == variationId && variation.ProductId == productId && variation.IsActive,
+                variation => variation.Id == variationId && variation.ProductId == productId
+                    && (!requireActiveReference || isStagedProduct || variation.IsActive),
                 cancellationToken);
             if (!variationExists)
             {

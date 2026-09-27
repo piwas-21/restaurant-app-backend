@@ -11,7 +11,9 @@ internal static class OptionSetEntryValidator
         ApplicationDbContext context,
         OptionSetKind kind,
         OptionSetEntryDto entry,
-        CancellationToken cancellationToken)
+        bool requireActiveReference = true,
+        IReadOnlySet<Guid>? stagedProductIds = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(entry.Name) || entry.Name.Trim().Length > 200 || entry.DisplayOrder < 0)
         {
@@ -21,10 +23,11 @@ internal static class OptionSetEntryValidator
         if (kind is OptionSetKind.Ingredient or OptionSetKind.Sauce)
         {
             await OptionSetIngredientEntryValidator.ValidateAsync(
-                context, kind, entry, cancellationToken);
+                context, kind, entry, requireActiveReference, cancellationToken);
             return;
         }
 
-        await OptionSetProductEntryValidator.ValidateAsync(context, entry, kind, cancellationToken);
+        await OptionSetProductEntryValidator.ValidateAsync(
+            context, entry, kind, requireActiveReference, stagedProductIds, cancellationToken);
     }
 }

@@ -17,10 +17,11 @@ internal static class OptionSetMaterializerTargetWriter
         OptionSetMaterializationTargetRequest target,
         string idempotencyKey,
         string audit,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         var state = await OptionSetMaterializerTargetLoader.LoadAsync(
-            context, set, target, idempotencyKey, cancellationToken);
+            context, set, target, idempotencyKey, stagedProductIds, cancellationToken);
         var result = new OptionSetMaterializationTargetResultDto
         {
             TargetKey = target.TargetKey,
@@ -61,7 +62,8 @@ internal static class OptionSetMaterializerTargetWriter
 
             if (mapping is null)
             {
-                await OptionSetMaterializerEntryValidation.ValidateAsync(context, set.Kind, entry, cancellationToken);
+                await OptionSetMaterializerEntryValidation.ValidateAsync(
+                    context, set.Kind, entry, stagedProductIds, cancellationToken);
             }
 
             var row = await OptionSetMaterializerRows.FindAsync(
@@ -146,8 +148,7 @@ internal static class OptionSetMaterializerTargetWriter
         attachment.Version++;
         attachment.UpdatedAt = now;
         attachment.UpdatedBy = audit;
-        result.Status = result.AppliedRows.Count == 0 || result.AppliedRows.All(row => row.Action == "preserve")
-            ? "unchanged" : "applied";
+        result.Status = "applied";
         result.AttachmentId = attachment.Id;
         result.AttachmentVersion = attachment.Version;
         return result;

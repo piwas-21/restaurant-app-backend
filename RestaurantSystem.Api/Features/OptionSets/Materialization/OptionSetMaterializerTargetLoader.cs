@@ -13,6 +13,7 @@ internal static class OptionSetMaterializerTargetLoader
         OptionSet set,
         OptionSetMaterializationTargetRequest target,
         string? idempotencyKey,
+        IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
         ValidateTargetShape(set, target);
@@ -45,7 +46,8 @@ internal static class OptionSetMaterializerTargetLoader
             throw new ConflictException("Archived option sets cannot be attached to new targets");
         }
 
-        if (attachment is null && (!product.IsActive || !product.IsAvailable || product.IsComponent))
+        var isStagedTarget = stagedProductIds?.Contains(product.Id) == true;
+        if (attachment is null && ((!product.IsActive || !product.IsAvailable) && !isStagedTarget || product.IsComponent))
         {
             throw new ConflictException("Inactive, unavailable, or internal products cannot receive a new option-set attachment");
         }
@@ -62,7 +64,7 @@ internal static class OptionSetMaterializerTargetLoader
         }
 
         var defaultSettings = ExistingSettings(set.Kind, attachment, section, customizationGroup, product);
-        var settings = MergeSettings(defaultSettings, target.Settings);
+        var settings = MergeSettings(set.Kind, defaultSettings, target.Settings);
         ValidateSettings(set.Kind, target.Role, settings, entries.Count);
         ValidateOverrides(set.Kind, target.Overrides);
         return new OptionSetTargetState
@@ -74,6 +76,7 @@ internal static class OptionSetMaterializerTargetLoader
             Attachment = attachment,
             SelectedEntries = entries,
             AppliedByEntry = attachment?.AppliedRows.ToDictionary(row => row.OptionSetEntryId) ?? [],
+            CurrentSettings = defaultSettings,
             Settings = settings
         };
     }
@@ -236,14 +239,25 @@ internal static class OptionSetMaterializerTargetLoader
     }
 
     private static OptionSetAttachmentSettings MergeSettings(
+        OptionSetKind kind,
         OptionSetAttachmentSettings baseline,
-        OptionSetAttachmentSettings? requested) => requested is null ? baseline : new()
+        OptionSetAttachmentSettings? requested)
+    {
+        if (requested?.ClearMaxSelection == true
+            && (kind != OptionSetKind.Sauce || requested.MaxSelection.HasValue))
+        {
+            throw new BadRequestException("Only a sauce attachment may explicitly clear its maximum selection");
+        }
+
+        return requested is null ? baseline : new()
         {
             MinSelection = requested.MinSelection ?? baseline.MinSelection,
-            MaxSelection = requested.MaxSelection ?? baseline.MaxSelection,
+            MaxSelection = requested.ClearMaxSelection ? null : requested.MaxSelection ?? baseline.MaxSelection,
             IncludedFree = requested.IncludedFree ?? baseline.IncludedFree,
-            DisplayOrder = requested.DisplayOrder ?? baseline.DisplayOrder
+            DisplayOrder = requested.DisplayOrder ?? baseline.DisplayOrder,
+            ClearMaxSelection = false
         };
+    }
 
     private static void ValidateSettings(
         OptionSetKind kind,
