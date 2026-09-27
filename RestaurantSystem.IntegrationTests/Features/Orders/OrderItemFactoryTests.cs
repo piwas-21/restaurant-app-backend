@@ -1,6 +1,7 @@
 using FluentAssertions;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -52,18 +53,86 @@ public class OrderItemFactoryTests : IAsyncLifetime
         // CalculateIngredientCustomizationPrice, which is pure arithmetic over the recipe. A mock
         // would answer 0 to every question and quietly pass a future test that asserted a price.
         // Its own collaborators are stubbed because none of them is reached by that method.
-        _factory = new OrderItemFactory(
-            _context,
-            _currentUserServiceMock.Object,
-            new LineCustomizationBuilder(new BasketPricingService(
-                Mock.Of<ICustomerDiscountService>(),
-                Options.Create(new OrderSettings()),
-                NullLogger<BasketPricingService>.Instance)));
+        _factory = CreateFactory(enforceSauceMinimum: false);
     }
 
     public async Task DisposeAsync()
     {
         await _context.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task AddItemAsync_MenuWithRequiredSauce_RejectsMissingSelectionWhenEnforcementEnabled()
+    {
+        var (menu, _) = await SeedMenuAsync(sauceMin: 1);
+        var order = new Order { OrderNumber = "T-MENU-SAUCE-ON", CreatedBy = "test" };
+
+        var act = () => CreateFactory(enforceSauceMinimum: true).AddItemAsync(
+            order,
+            new CreateOrderItemDto { MenuId = menu.Id, Quantity = 1 },
+            itemsAreServerPriced: false,
+            CancellationToken.None);
+
+        var error = await act.Should().ThrowAsync<BadRequestException>();
+        error.Which.ErrorCode.Should().Be(ErrorCodes.SauceMinimumNotMet);
+        order.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AddItemAsync_MenuWithRequiredSauce_PreservesLegacyPayloadWhenEnforcementDisabled()
+    {
+        var (menu, _) = await SeedMenuAsync(sauceMin: 1);
+        var order = new Order { OrderNumber = "T-MENU-SAUCE-OFF", CreatedBy = "test" };
+
+        var error = await CreateFactory(enforceSauceMinimum: false).AddItemAsync(
+            order,
+            new CreateOrderItemDto { MenuId = menu.Id, Quantity = 1 },
+            itemsAreServerPriced: false,
+            CancellationToken.None);
+
+        error.Should().BeNull();
+        order.Items.Should().ContainSingle();
+        order.Items.Single().IngredientQuantitiesJson.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AddItemAsync_MenuWithRequiredSauce_UsesSelectedIdsForKitchenSnapshotWhenEnforced()
+    {
+        var (menu, sauceId) = await SeedMenuAsync(sauceMin: 1);
+        var order = new Order { OrderNumber = "T-MENU-SAUCE-SELECTED", CreatedBy = "test" };
+
+        var error = await CreateFactory(enforceSauceMinimum: true).AddItemAsync(
+            order,
+            new CreateOrderItemDto
+            {
+                MenuId = menu.Id,
+                Quantity = 1,
+                SelectedIngredientIds = [sauceId]
+            },
+            itemsAreServerPriced: false,
+            CancellationToken.None);
+
+        error.Should().BeNull();
+        var item = order.Items.Should().ContainSingle().Subject;
+        var quantities = System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, int>>(
+            item.IngredientQuantitiesJson!);
+        quantities.Should().ContainKey(sauceId).WhoseValue.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AddItemAsync_MenuWithOptionalSauce_DoesNotRequireSelectionWhenEnforced()
+    {
+        var (menu, _) = await SeedMenuAsync(sauceMin: 0);
+        var order = new Order { OrderNumber = "T-MENU-SAUCE-OPTIONAL", CreatedBy = "test" };
+
+        var error = await CreateFactory(enforceSauceMinimum: true).AddItemAsync(
+            order,
+            new CreateOrderItemDto { MenuId = menu.Id, Quantity = 1 },
+            itemsAreServerPriced: false,
+            CancellationToken.None);
+
+        error.Should().BeNull();
+        order.Items.Should().ContainSingle();
     }
 
     [Fact]
@@ -390,5 +459,82 @@ public class OrderItemFactoryTests : IAsyncLifetime
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
         return product;
+    }
+
+    private OrderItemFactory CreateFactory(bool enforceSauceMinimum)
+    {
+        var tenantFeatures = new TenantFeatures(Options.Create(new TenantFeatureSettings
+        {
+            EnforceSauceMinimum = enforceSauceMinimum
+        }));
+        var lineCustomizationBuilder = new LineCustomizationBuilder(new BasketPricingService(
+            Mock.Of<ICustomerDiscountService>(),
+            Options.Create(new OrderSettings()),
+            NullLogger<BasketPricingService>.Instance), tenantFeatures);
+
+        return new OrderItemFactory(
+            _context,
+            _currentUserServiceMock.Object,
+            lineCustomizationBuilder,
+            tenantFeatures);
+    }
+
+    private async Task<(Menu Menu, Guid SauceId)> SeedMenuAsync(int sauceMin)
+    {
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Sauced menu product",
+            Description = "Sauced menu product description",
+            BasePrice = 10m,
+            Type = ProductType.MainItem,
+            IsActive = true,
+            IsAvailable = true,
+            SauceMin = sauceMin,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        var sauce = new ProductIngredient
+        {
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            Product = product,
+            Name = "House sauce",
+            Kind = IngredientKind.Sauce,
+            IsOptional = true,
+            MaxQuantity = 1,
+            IsActive = true,
+            IsIncludedInBasePrice = false,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        product.DetailedIngredients.Add(sauce);
+
+        var menu = new Menu
+        {
+            Id = Guid.NewGuid(),
+            Name = "Sauced menu",
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            BasePrice = 12m,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        menu.MenuItems.Add(new MenuItem
+        {
+            Id = Guid.NewGuid(),
+            MenuId = menu.Id,
+            DailyMenu = menu,
+            ProductId = product.Id,
+            Product = product,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+
+        _context.AddRange(product, menu);
+        await _context.SaveChangesAsync();
+        return (menu, sauce.Id);
     }
 }

@@ -26,6 +26,7 @@ public sealed class SauceMinimumEnforcementTests : IntegrationTestBase
     private static readonly Guid SauceOneId = Guid.NewGuid();
     private static readonly Guid SauceTwoId = Guid.NewGuid();
     private static readonly Guid SauceThreeId = Guid.NewGuid();
+    private static readonly Guid MenuId = Guid.NewGuid();
 
     public SauceMinimumEnforcementTests(DatabaseFixture databaseFixture) : base(databaseFixture)
     {
@@ -67,7 +68,29 @@ public sealed class SauceMinimumEnforcementTests : IntegrationTestBase
             ]
         };
 
+        var menu = new Menu
+        {
+            Id = MenuId,
+            Name = "Sauce minimum legacy menu",
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            BasePrice = 10m,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Actor
+        };
+        menu.MenuItems.Add(new MenuItem
+        {
+            Id = Guid.NewGuid(),
+            MenuId = MenuId,
+            DailyMenu = menu,
+            ProductId = ProductId,
+            Product = product,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Actor
+        });
+
         context.Products.Add(product);
+        context.Menus.Add(menu);
         await context.SaveChangesAsync();
     }
 
@@ -155,6 +178,21 @@ public sealed class SauceMinimumEnforcementTests : IntegrationTestBase
             ]
         });
         await AssertMinimumFailure(waiterOrder);
+
+        var legacyMenuOrder = await PostAsJsonAsync("/api/Orders", new CreateOrderCommand
+        {
+            Type = OrderType.Takeaway,
+            Items =
+            [
+                new CreateOrderItemDto
+                {
+                    MenuId = MenuId,
+                    Quantity = 1,
+                    SelectedIngredientIds = [SauceOneId]
+                }
+            ]
+        });
+        await AssertMinimumFailure(legacyMenuOrder);
 
         AuthenticateAsRole(UserRole.Cashier);
         var counterQuote = await PostAsJsonAsync("/api/staff/orders/quote", new
