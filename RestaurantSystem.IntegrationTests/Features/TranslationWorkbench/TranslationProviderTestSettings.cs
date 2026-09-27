@@ -9,4 +9,9 @@ internal static class TranslationProviderTestSettings
     {
         Path = "/v1/responses"
     }.Uri.AbsoluteUri;
+
+    public static string GeminiBaseUrl => new UriBuilder(Uri.UriSchemeHttps, IPAddress.Loopback.ToString())
+    {
+        Path = "/v1beta"
+    }.Uri.AbsoluteUri;
 }

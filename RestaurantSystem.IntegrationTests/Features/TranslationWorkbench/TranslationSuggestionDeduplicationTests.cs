@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -108,6 +109,35 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
         latest.InputTokens.Should().BeGreaterThan(0);
         latest.OutputTokens.Should().BeGreaterThan(0);
         latest.EstimatedCostUsd.Should().BeGreaterThan(0);
+
+        var product = await context.Products.AsNoTracking().FirstAsync();
+        var categoryId = await context.Categories.OrderBy(category => category.Name)
+            .Select(category => category.Id).FirstAsync();
+        var manualSave = await Client.PutAsJsonAsync($"/api/Products/{product.Id}", new
+        {
+            id = product.Id,
+            name = product.Name,
+            description = (string?)null,
+            basePrice = product.BasePrice,
+            isActive = product.IsActive,
+            isAvailable = product.IsAvailable,
+            isSpecial = product.IsSpecial,
+            preparationTimeMinutes = product.PreparationTimeMinutes,
+            type = (int)product.Type,
+            kitchenType = (int)product.KitchenType,
+            displayOrder = product.DisplayOrder,
+            categoryIds = new[] { categoryId },
+            primaryCategoryId = categoryId,
+            content = new Dictionary<string, object>
+            {
+                ["en"] = new { name = "Manual English fallback", description = "" }
+            }
+        });
+        manualSave.StatusCode.Should().Be(HttpStatusCode.OK,
+            "the administrator must still be able to save a manual translation after generation fails");
+        (await context.ProductDescriptions.AsNoTracking()
+            .Where(description => description.ProductId == product.Id && description.Lang == "en")
+            .Select(description => description.Name).SingleAsync()).Should().Be("Manual English fallback");
     }
 
     private static object Request(string english, string clientKey = "new-product") => new // pragma: allowlist secret -- draft identity

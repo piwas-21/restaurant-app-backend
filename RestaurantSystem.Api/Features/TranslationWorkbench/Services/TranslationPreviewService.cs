@@ -29,7 +29,7 @@ public sealed class TranslationPreviewService(
         {
             var sourceHash = TranslationWorkbenchRules.Hash($"{field.SourceLocale}\n{field.SourceText}");
             var contextHash = TranslationWorkbenchRules.ContextHash(field.Context,
-                options.Value.Glossary, options.Value.PromptVersion, options.Value.Model);
+                options.Value.Glossary, options.Value.PromptVersion, options.Value.ContextModelKey);
             var texts = await textReader.ReadAsync(field, cancellationToken);
             var targets = new List<TranslationTargetStatusDto>(request.TargetLocales.Count);
             foreach (var locale in request.TargetLocales)
