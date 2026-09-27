@@ -71,7 +71,7 @@ public sealed class TranslationGenerationContractTests
         var provider = new OpenAiTranslationGenerationProvider(client,
             Options.Create(new TranslationAssistanceSettings
             {
-                ApiUrl = "https://api.openai.com/v1/responses",
+                ApiUrl = TranslationProviderTestSettings.Endpoint,
                 ApiKey = "test-key" // pragma: allowlist secret -- inert test value
             }));
         var result = await provider.GenerateAsync(
@@ -99,7 +99,7 @@ public sealed class TranslationGenerationContractTests
         var provider = new OpenAiTranslationGenerationProvider(client,
             Options.Create(new TranslationAssistanceSettings
             {
-                ApiUrl = "https://api.openai.com/v1/responses",
+                ApiUrl = TranslationProviderTestSettings.Endpoint,
                 ApiKey = "test-key" // pragma: allowlist secret -- inert test value
             }));
 
@@ -120,7 +120,7 @@ public sealed class TranslationGenerationContractTests
         var provider = new OpenAiTranslationGenerationProvider(client,
             Options.Create(new TranslationAssistanceSettings
             {
-                ApiUrl = "https://api.openai.com/v1/responses",
+                ApiUrl = TranslationProviderTestSettings.Endpoint,
                 ApiKey = "test-key" // pragma: allowlist secret -- inert test value
             }));
 

@@ -21,7 +21,7 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
         {
             settings.Enabled = true;
             settings.TenantDataApproved = true;
-            settings.ApiUrl = "https://translation-test.invalid/v1/responses";
+            settings.ApiUrl = TranslationProviderTestSettings.Endpoint;
             settings.ApiKey = "test-only-key"; // pragma: allowlist secret -- inert test value
         });
     }
