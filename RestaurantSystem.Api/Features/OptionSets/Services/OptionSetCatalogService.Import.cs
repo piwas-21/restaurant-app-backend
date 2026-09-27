@@ -24,8 +24,8 @@ public sealed partial class OptionSetCatalogService
             throw new BadRequestException("The central option-set revision reference is incomplete");
         }
 
-        var sourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale);
-        var translations = OptionSetLocales.NormalizeTranslations(request.Translations);
+        var sourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale, _settings.MaximumLocaleTagLength);
+        var translations = OptionSetLocales.NormalizeTranslations(request.Translations, _settings);
         var existing = await _context.OptionSets.AsNoTracking().AsSplitQuery().Include(set => set.Entries)
             .Include(set => set.Translations)
             .FirstOrDefaultAsync(set => set.SourceTemplateId == request.SourceTemplateId
@@ -48,7 +48,7 @@ public sealed partial class OptionSetCatalogService
         ValidateEntryCount(write);
         await ValidateEntriesAsync(
             write.Kind, write.Entries, cancellationToken, request.StagedProductIds);
-        EnsureDistinctSourceEntries(request.Entries);
+        EnsureDistinctSourceEntries(request.Entries, _settings.MaximumEntriesPerOptionSet);
         var name = await ResolveImportedNameAsync(request, cancellationToken);
         var now = DateTime.UtcNow;
         var actor = _currentUser.GetAuditIdentifier();
@@ -96,12 +96,15 @@ public sealed partial class OptionSetCatalogService
         return available;
     }
 
-    private static void EnsureDistinctSourceEntries(IReadOnlyList<ImportedOptionSetEntryRequest> entries)
+    private static void EnsureDistinctSourceEntries(
+        IReadOnlyList<ImportedOptionSetEntryRequest> entries,
+        int maximumEntries)
     {
-        if (entries.Count > 200 || entries.Any(entry => string.IsNullOrWhiteSpace(entry.SourceEntryId))
+        if (entries.Count > maximumEntries || entries.Any(entry => string.IsNullOrWhiteSpace(entry.SourceEntryId))
             || entries.Select(entry => entry.SourceEntryId).Distinct(StringComparer.Ordinal).Count() != entries.Count)
         {
-            throw new BadRequestException("Imported option entries need unique source IDs and a maximum of 200 rows");
+            throw new BadRequestException(
+                $"Imported option entries need unique source IDs and a maximum of {maximumEntries} rows");
         }
     }
 

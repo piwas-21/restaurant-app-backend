@@ -22,12 +22,12 @@ public sealed partial class OptionSetCatalogService
 
         var now = DateTime.UtcNow;
         var audit = _currentUser.GetAuditIdentifier();
-        var translations = OptionSetLocales.NormalizeTranslations(request.Translations);
+        var translations = OptionSetLocales.NormalizeTranslations(request.Translations, _settings);
         var set = new OptionSet
         {
             Kind = request.Kind,
             Name = name,
-            SourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale),
+            SourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale, _settings.MaximumLocaleTagLength),
             NormalizedName = normalizedName,
             Status = OptionSetStatus.Active,
             Version = 1,
@@ -163,72 +163,20 @@ public sealed partial class OptionSetCatalogService
         }
     }
 
-    private static void UpdateSetMetadata(OptionSet set, OptionSetWriteRequestDto request, string audit, DateTime now)
+    private void UpdateSetMetadata(OptionSet set, OptionSetWriteRequestDto request, string audit, DateTime now)
     {
         set.Name = request.Name.Trim();
-        set.SourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale);
+        set.SourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale, _settings.MaximumLocaleTagLength);
         set.NormalizedName = OptionSetNameNormalizer.Normalize(set.Name);
         OptionSetLocales.Sync(
             set.Translations,
-            OptionSetLocales.NormalizeTranslations(request.Translations),
+            OptionSetLocales.NormalizeTranslations(request.Translations, _settings),
             audit,
             now);
         set.Status = request.Status;
         set.Version++;
         set.UpdatedAt = now;
         set.UpdatedBy = audit;
-    }
-
-    private async Task ValidateEntriesAsync(
-        OptionSetKind kind,
-        IReadOnlyList<OptionSetEntryDto> entries,
-        CancellationToken cancellationToken,
-        IReadOnlySet<Guid>? stagedProductIds = null)
-    {
-        var errors = await OptionSetEntryValidator.ValidateManyAsync(
-            _context, kind, entries, stagedProductIds: stagedProductIds, cancellationToken: cancellationToken);
-        if (errors.FirstOrDefault(error => error is not null) is string error)
-        {
-            throw new BadRequestException(error);
-        }
-    }
-
-    private static void ValidateEntryCount(OptionSetWriteRequestDto request)
-    {
-        if (request.Entries.Count > OptionSetReferenceBatchRules.MaximumEntryCount)
-        {
-            throw new BadRequestException(
-                $"An option set may contain at most {OptionSetReferenceBatchRules.MaximumEntryCount} entries");
-        }
-    }
-
-    private static void ValidateHeader(OptionSetWriteRequestDto request, bool creating)
-    {
-        if (!Enum.IsDefined(request.Kind) || string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 120)
-        {
-            throw new BadRequestException("Choose a valid option-set kind and a name up to 120 characters");
-        }
-
-        if (!Enum.IsDefined(request.Status) || (creating && request.Status != OptionSetStatus.Active))
-        {
-            throw new BadRequestException("New option sets must start active");
-        }
-    }
-
-    private async Task SaveWithConflictTranslationAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException exception)
-        {
-            throw new ConflictException("This option set changed. Reload it and review the current values.", exception);
-        }
-        catch (DbUpdateException exception)
-        {
-            throw new ConflictException("An option set with the same name or canonical entry already exists", exception);
-        }
     }
 
     private static OptionSetEntry? ResolveExistingEntry(

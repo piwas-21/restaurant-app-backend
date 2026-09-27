@@ -9,16 +9,15 @@ namespace RestaurantSystem.Api.Features.OptionSets.Services;
 
 internal static class OptionSetReferenceBatchRules
 {
-    internal const int MaximumEntryCount = 200;
-
     public static async Task<IReadOnlyList<string?>> ValidateIngredientsAsync(
         ApplicationDbContext context,
         OptionSetKind kind,
         IReadOnlyList<OptionSetEntryDto> entries,
+        int maximumEntryCount,
         bool requireActiveReference,
         CancellationToken cancellationToken)
     {
-        var safeEntries = GetBoundedEntries(entries);
+        var safeEntries = GetBoundedEntries(entries, maximumEntryCount);
         var errors = new string?[safeEntries.Length];
         var ingredientIds = CollectIngredientIds(safeEntries, errors);
         var byId = await LoadIngredientsAsync(context, ingredientIds, cancellationToken);
@@ -30,11 +29,12 @@ internal static class OptionSetReferenceBatchRules
         ApplicationDbContext context,
         IReadOnlyList<OptionSetEntryDto> entries,
         OptionSetKind kind,
+        int maximumEntryCount,
         bool requireActiveReference,
         IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
-        var safeEntries = GetBoundedEntries(entries);
+        var safeEntries = GetBoundedEntries(entries, maximumEntryCount);
         var errors = new string?[safeEntries.Length];
         var (productIds, variationIds) = CollectProductIds(safeEntries, errors);
         var products = await LoadProductsAsync(context, productIds, cancellationToken);
@@ -43,11 +43,13 @@ internal static class OptionSetReferenceBatchRules
         return errors;
     }
 
-    private static OptionSetEntryDto[] GetBoundedEntries(IReadOnlyList<OptionSetEntryDto> entries)
+    private static OptionSetEntryDto[] GetBoundedEntries(
+        IReadOnlyList<OptionSetEntryDto> entries,
+        int maximumEntryCount)
     {
-        if (entries.Count > MaximumEntryCount)
+        if (entries.Count > maximumEntryCount)
         {
-            throw new BadRequestException($"An option set may contain at most {MaximumEntryCount} entries");
+            throw new BadRequestException($"An option set may contain at most {maximumEntryCount} entries");
         }
 
         return entries.ToArray();
@@ -77,7 +79,7 @@ internal static class OptionSetReferenceBatchRules
     {
         return ids.Count == 0
             ? []
-            : await context.GlobalIngredients.Where(item => ids.Contains(item.Id))
+            : await context.GlobalIngredients.AsNoTracking().Where(item => ids.Contains(item.Id))
                 .ToDictionaryAsync(item => item.Id, cancellationToken);
     }
 
@@ -157,7 +159,7 @@ internal static class OptionSetReferenceBatchRules
     {
         return productIds.Count == 0
             ? []
-            : await context.Products.Where(item => productIds.Contains(item.Id))
+            : await context.Products.AsNoTracking().Where(item => productIds.Contains(item.Id))
                 .ToDictionaryAsync(item => item.Id, cancellationToken);
     }
 
@@ -168,7 +170,7 @@ internal static class OptionSetReferenceBatchRules
     {
         return variationIds.Count == 0
             ? []
-            : await context.ProductVariations.Where(item => variationIds.Contains(item.Id))
+            : await context.ProductVariations.AsNoTracking().Where(item => variationIds.Contains(item.Id))
                 .ToDictionaryAsync(item => item.Id, cancellationToken);
     }
 

@@ -56,12 +56,14 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
             caller.Object,
             catalog.Object,
             features,
-            Options.Create(new OptionSetMaterializationSettings
+            Options.Create(new OptionSetAuthoringSettings
             {
                 MaximumIdempotencyKeyLength = 100,
                 MaximumTargetsPerRequest = 100,
-                MaximumEntriesPerTarget = 200,
-                MaximumIntentionalDifferenceReasonLength = 500
+                MaximumEntriesPerOptionSet = 200,
+                MaximumIntentionalDifferenceReasonLength = 500,
+                MaximumTranslationLocales = 10,
+                MaximumLocaleTagLength = 10
             }));
 
         var action = () => materializer.ApplyAsync(

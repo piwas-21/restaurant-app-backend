@@ -11,7 +11,7 @@ internal static class OptionSetMaterializerPlanBuilder
         ApplicationDbContext context,
         OptionSet set,
         OptionSetMaterializationTargetRequest target,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         var preview = new OptionSetMaterializationTargetPreviewDto
@@ -24,7 +24,7 @@ internal static class OptionSetMaterializerPlanBuilder
         try
         {
             var state = await OptionSetMaterializerTargetLoader.LoadAsync(
-                context, set, target, null, stagedProductIds, cancellationToken);
+                context, set, target, null, validationContext.StagedProductIds, cancellationToken);
             preview.AttachmentId = state.Attachment?.Id;
             preview.CurrentAttachmentVersion = state.Attachment?.Version;
             preview.CurrentMenuAuthoringVersion = state.MenuDefinition?.AuthoringVersion;
@@ -32,7 +32,7 @@ internal static class OptionSetMaterializerPlanBuilder
             preview.CurrentSettings = CopySettings(state.CurrentSettings);
             preview.ProposedSettings = CopySettings(state.Settings);
             AddSettingsDiff(state.CurrentSettings, state.Settings, preview.ChangedSettings);
-            await PlanActiveEntries(context, set, target, state, preview, stagedProductIds, cancellationToken);
+            await PlanActiveEntries(context, set, target, state, preview, validationContext, cancellationToken);
             PlanRemovedEntries(state, preview);
             var hasRowChanges = preview.Changes.Any(change =>
                 change.Action is "add" or "update" or "remove" || change.ChangedFields.Count > 0);
@@ -57,7 +57,7 @@ internal static class OptionSetMaterializerPlanBuilder
         OptionSetMaterializationTargetRequest target,
         OptionSetTargetState state,
         OptionSetMaterializationTargetPreviewDto preview,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         var entriesToValidate = state.SelectedEntries
@@ -65,7 +65,7 @@ internal static class OptionSetMaterializerPlanBuilder
         if (set.Status == RestaurantSystem.Domain.Common.Enums.OptionSetStatus.Active)
         {
             var validationErrors = await OptionSetMaterializerEntryValidation.ValidateManyAsync(
-                context, set.Kind, entriesToValidate, stagedProductIds, cancellationToken);
+                context, set.Kind, entriesToValidate, validationContext, cancellationToken);
             if (validationErrors.FirstOrDefault(error => error is not null) is string error)
             {
                 throw new BadRequestException(error);

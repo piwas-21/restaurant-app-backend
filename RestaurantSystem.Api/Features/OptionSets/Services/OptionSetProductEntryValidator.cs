@@ -10,9 +10,10 @@ internal static class OptionSetProductEntryValidator
         ApplicationDbContext context,
         IReadOnlyList<OptionSetEntryDto> entries,
         OptionSetKind kind,
+        int maximumEntryCount,
         bool requireActiveReference,
         IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken) =>
         OptionSetReferenceBatchRules.ValidateProductsAsync(
-            context, entries, kind, requireActiveReference, stagedProductIds, cancellationToken);
+            context, entries, kind, maximumEntryCount, requireActiveReference, stagedProductIds, cancellationToken);
 }

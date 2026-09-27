@@ -10,8 +10,9 @@ internal static class OptionSetIngredientEntryValidator
         ApplicationDbContext context,
         OptionSetKind kind,
         IReadOnlyList<OptionSetEntryDto> entries,
+        int maximumEntryCount,
         bool requireActiveReference,
         CancellationToken cancellationToken) =>
         OptionSetReferenceBatchRules.ValidateIngredientsAsync(
-            context, kind, entries, requireActiveReference, cancellationToken);
+            context, kind, entries, maximumEntryCount, requireActiveReference, cancellationToken);
 }

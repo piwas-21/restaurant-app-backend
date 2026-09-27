@@ -1,29 +1,30 @@
 using System.Text.RegularExpressions;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Services;
 
 internal static partial class OptionSetLocales
 {
-    private const int MaximumLocales = 10;
-
     [GeneratedRegex("^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$", RegexOptions.CultureInvariant)]
     private static partial Regex LanguageTagPattern();
 
-    public static string NormalizeLocale(string? locale)
+    public static string NormalizeLocale(string? locale, int maximumLocaleTagLength)
     {
         var normalized = locale?.Trim().Replace('_', '-').ToLowerInvariant() ?? string.Empty;
-        if (normalized.Length > 10 || !LanguageTagPattern().IsMatch(normalized))
+        if (normalized.Length > maximumLocaleTagLength || !LanguageTagPattern().IsMatch(normalized))
         {
-            throw new BadRequestException("Source and translation locales must be valid language tags up to 10 characters");
+            throw new BadRequestException(
+                $"Source and translation locales must be valid language tags up to {maximumLocaleTagLength} characters");
         }
 
         return normalized;
     }
 
     public static Dictionary<string, string> NormalizeTranslations(
-        IReadOnlyDictionary<string, string>? translations)
+        IReadOnlyDictionary<string, string>? translations,
+        OptionSetAuthoringSettings settings)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (translations is null)
@@ -31,14 +32,15 @@ internal static partial class OptionSetLocales
             return result;
         }
 
-        if (translations.Count > MaximumLocales)
+        if (translations.Count > settings.MaximumTranslationLocales)
         {
-            throw new BadRequestException("An option set may contain translations for at most 10 locales");
+            throw new BadRequestException(
+                $"An option set may contain translations for at most {settings.MaximumTranslationLocales} locales");
         }
 
         foreach (var (language, value) in translations)
         {
-            var locale = NormalizeLocale(language);
+            var locale = NormalizeLocale(language, settings.MaximumLocaleTagLength);
             if (string.IsNullOrWhiteSpace(value) || value.Trim().Length > 120 || !result.TryAdd(locale, value.Trim()))
             {
                 throw new BadRequestException("Option-set translations need unique locales and names up to 120 characters");

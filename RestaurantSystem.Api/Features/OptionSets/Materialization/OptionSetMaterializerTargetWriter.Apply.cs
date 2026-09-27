@@ -13,11 +13,11 @@ internal static partial class OptionSetMaterializerTargetWriter
         OptionSetMaterializationTargetRequest target,
         string idempotencyKey,
         string audit,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         var state = await OptionSetMaterializerTargetLoader.LoadAsync(
-            context, set, target, idempotencyKey, stagedProductIds, cancellationToken);
+            context, set, target, idempotencyKey, validationContext.StagedProductIds, cancellationToken);
         var result = CreateTargetResult(target, state);
         if (IsIdempotentReplay(state, set, idempotencyKey))
         {
@@ -27,7 +27,7 @@ internal static partial class OptionSetMaterializerTargetWriter
 
         var now = DateTime.UtcNow;
         var attachment = await EnsureAttachmentAsync(context, set, target, state, audit, now, cancellationToken);
-        await ValidateEntriesToAddAsync(context, set, state, stagedProductIds, cancellationToken);
+        await ValidateEntriesToAddAsync(context, set, state, validationContext, cancellationToken);
         var rowLookups = await OptionSetMaterializerBatchRows.FindManyAsync(
             context, target.Role, target, state.SelectedEntries, state.AppliedByEntry, cancellationToken);
         var selectedIds = state.SelectedEntries.Select(entry => entry.Id).ToHashSet();
@@ -108,7 +108,7 @@ internal static partial class OptionSetMaterializerTargetWriter
         ApplicationDbContext context,
         OptionSet set,
         OptionSetTargetState state,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         var entries = state.SelectedEntries.Where(entry => !state.AppliedByEntry.ContainsKey(entry.Id)).ToList();
@@ -118,7 +118,7 @@ internal static partial class OptionSetMaterializerTargetWriter
         }
 
         var errors = await OptionSetMaterializerEntryValidation.ValidateManyAsync(
-            context, set.Kind, entries, stagedProductIds, cancellationToken);
+            context, set.Kind, entries, validationContext, cancellationToken);
         if (errors.FirstOrDefault(error => error is not null) is string error)
         {
             throw new BadRequestException(error);

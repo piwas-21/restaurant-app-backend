@@ -314,13 +314,15 @@ builder.Services.AddOptions<MenuAuthoringPaginationSettings>()
         && settings.DefaultPageSize <= settings.MaximumPageSize,
         "Menu-authoring pagination settings are inconsistent")
     .ValidateOnStart();
-builder.Services.AddOptions<OptionSetMaterializationSettings>()
-    .Bind(builder.Configuration.GetSection(OptionSetMaterializationSettings.SectionName))
+builder.Services.AddOptions<OptionSetAuthoringSettings>()
+    .Bind(builder.Configuration.GetSection(OptionSetAuthoringSettings.SectionName))
     .Validate(settings => settings.MaximumIdempotencyKeyLength > 0
         && settings.MaximumTargetsPerRequest > 0
-        && settings.MaximumEntriesPerTarget > 0
-        && settings.MaximumIntentionalDifferenceReasonLength > 0,
-        "Option-set materialization limits must be positive")
+        && settings.MaximumEntriesPerOptionSet > 0
+        && settings.MaximumIntentionalDifferenceReasonLength > 0
+        && settings.MaximumTranslationLocales > 0
+        && settings.MaximumLocaleTagLength > 0,
+        "Option-set authoring limits must be positive")
     .ValidateOnStart();
 builder.Services.AddOptions<OrderRoutingSettings>()
     .Bind(builder.Configuration.GetSection(OrderRoutingSettings.SectionName))

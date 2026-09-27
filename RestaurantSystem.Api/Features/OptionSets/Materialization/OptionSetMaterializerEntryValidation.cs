@@ -6,18 +6,27 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
+internal sealed record OptionSetMaterializerValidationContext(
+    IReadOnlySet<Guid>? StagedProductIds,
+    int MaximumEntryCount);
+
 internal static class OptionSetMaterializerEntryValidation
 {
     public static Task<IReadOnlyList<string?>> ValidateManyAsync(
         ApplicationDbContext context,
         OptionSetKind kind,
         IReadOnlyList<OptionSetEntry> entries,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         var dtos = entries.Select(ToDto).ToList();
         return OptionSetEntryValidator.ValidateManyAsync(
-            context, kind, dtos, stagedProductIds: stagedProductIds, cancellationToken: cancellationToken);
+            context,
+            kind,
+            dtos,
+            validationContext.MaximumEntryCount,
+            stagedProductIds: validationContext.StagedProductIds,
+            cancellationToken: cancellationToken);
     }
 
     private static OptionSetEntryDto ToDto(OptionSetEntry entry) => new()

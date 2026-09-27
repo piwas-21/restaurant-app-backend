@@ -16,14 +16,14 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
     private readonly ICurrentUserService _currentUser;
     private readonly IOptionSetCatalogService _catalog;
     private readonly ITenantFeatures _tenantFeatures;
-    private readonly OptionSetMaterializationSettings _settings;
+    private readonly OptionSetAuthoringSettings _settings;
 
     public OptionSetMaterializer(
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         IOptionSetCatalogService catalog,
         ITenantFeatures tenantFeatures,
-        IOptions<OptionSetMaterializationSettings> settings)
+        IOptions<OptionSetAuthoringSettings> settings)
     {
         _context = context;
         _currentUser = currentUser;
@@ -49,11 +49,13 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
             OptionSetId = set.Id,
             SetVersion = set.Version
         };
+        var validationContext = new OptionSetMaterializerValidationContext(
+            stagedProductIds, _settings.MaximumEntriesPerOptionSet);
 
         foreach (var target in request.Targets)
         {
             preview.Targets.Add(await OptionSetMaterializerPlanBuilder.BuildAsync(
-                _context, set, target, stagedProductIds, cancellationToken));
+                _context, set, target, validationContext, cancellationToken));
         }
 
         preview.RelatedOfferWarnings.AddRange(await OptionSetRelatedOfferAnalyzer.AnalyzeAsync(
@@ -132,11 +134,11 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
                 throw new BadRequestException("A materialization request cannot repeat the same target and role");
             }
 
-            if (target.EntryIds?.Count > _settings.MaximumEntriesPerTarget
-                || target.Overrides?.Count > _settings.MaximumEntriesPerTarget)
+            if (target.EntryIds?.Count > _settings.MaximumEntriesPerOptionSet
+                || target.Overrides?.Count > _settings.MaximumEntriesPerOptionSet)
             {
                 throw new BadRequestException(
-                    $"A target may select or override at most {_settings.MaximumEntriesPerTarget} entries");
+                    $"A target may select or override at most {_settings.MaximumEntriesPerOptionSet} entries");
             }
         }
     }

@@ -44,6 +44,8 @@ public sealed partial class OptionSetMaterializer
             OptionSetId = request.OptionSetId,
             SetVersion = request.ExpectedSetVersion
         };
+        var validationContext = new OptionSetMaterializerValidationContext(
+            stagedProductIds, _settings.MaximumEntriesPerOptionSet);
         var menuVersionBases = new Dictionary<Guid, int>();
         var menuVersionAdvances = new Dictionary<Guid, int>();
 
@@ -51,7 +53,7 @@ public sealed partial class OptionSetMaterializer
         {
             result.Targets.Add(await ApplyTargetAsync(
                 request, target, ambientTransaction, menuVersionBases, menuVersionAdvances,
-                stagedProductIds, cancellationToken));
+                validationContext, cancellationToken));
         }
 
         return result;
@@ -63,7 +65,7 @@ public sealed partial class OptionSetMaterializer
         bool ambientTransaction,
         IDictionary<Guid, int> menuVersionBases,
         IDictionary<Guid, int> menuVersionAdvances,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         await using var transaction = ambientTransaction
@@ -79,7 +81,7 @@ public sealed partial class OptionSetMaterializer
                 effectiveTarget,
                 request.IdempotencyKey.Trim(),
                 _currentUser.GetAuditIdentifier(),
-                stagedProductIds,
+                validationContext,
                 cancellationToken);
 
             await EnsureSetVersionUnchangedAsync(request, cancellationToken);
