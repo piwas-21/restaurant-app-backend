@@ -36,27 +36,38 @@ public static class MenuSectionIntegrityRule
         var variationIds = references.Select(reference => reference.VariationId).Distinct().ToList();
         var variations = await context.ProductVariations
             .Where(variation => variationIds.Contains(variation.Id) && !variation.IsDeleted)
-            .Select(variation => new { variation.Id, variation.ProductId, variation.IsActive })
+            .Select(variation => new VariationReference(
+                variation.Id, variation.ProductId, variation.IsActive))
             .ToDictionaryAsync(variation => variation.Id, cancellationToken);
         foreach (var (productId, variationId) in references)
         {
-            if (!variations.TryGetValue(variationId, out var variation))
-            {
-                throw new BadRequestException($"Menu section variation '{variationId}' was not found");
-            }
-
-            if (variation.ProductId != productId)
-            {
-                throw new BadRequestException(
-                    $"Menu section variation '{variationId}' does not belong to product '{productId}'");
-            }
-
-            if (!variation.IsActive)
-            {
-                throw new BadRequestException($"Menu section variation '{variationId}' is not active");
-            }
+            ValidateVariationReference(variations, productId, variationId);
         }
     }
+
+    private static void ValidateVariationReference(
+        IReadOnlyDictionary<Guid, VariationReference> variations,
+        Guid productId,
+        Guid variationId)
+    {
+        if (!variations.TryGetValue(variationId, out var variation))
+        {
+            throw new BadRequestException($"Menu section variation '{variationId}' was not found");
+        }
+
+        if (variation.ProductId != productId)
+        {
+            throw new BadRequestException(
+                $"Menu section variation '{variationId}' does not belong to product '{productId}'");
+        }
+
+        if (!variation.IsActive)
+        {
+            throw new BadRequestException($"Menu section variation '{variationId}' is not active");
+        }
+    }
+
+    private sealed record VariationReference(Guid Id, Guid ProductId, bool IsActive);
 
     public static List<MenuSectionDto> Project(IEnumerable<MenuSection> sections) => sections
         .Select(section => new MenuSectionDto
