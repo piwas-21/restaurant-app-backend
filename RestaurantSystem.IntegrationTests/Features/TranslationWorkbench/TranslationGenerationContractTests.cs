@@ -5,11 +5,36 @@ using FluentAssertions;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.TranslationWorkbench;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.IntegrationTests.Features.TranslationWorkbench;
 
 public sealed class TranslationGenerationContractTests
 {
+    [Fact]
+    public void AcceptedTranslationRequiresTheTextVersionLoadedBeforeAnotherSave()
+    {
+        var product = new Product
+        {
+            Name = "Tavuk",
+            CreatedBy = "test",
+            Descriptions =
+            [
+                new ProductDescription { Lang = "en", Name = "Chicken", Description = "", CreatedBy = "test" },
+                new ProductDescription { Lang = "fr", Name = "Poulet", Description = "", CreatedBy = "test" }
+            ]
+        };
+        var loadedVersion = TranslationContentVersion.ForProduct(product);
+        TranslationContentVersion.EnsureCurrent(product, loadedVersion, 1);
+
+        product.Descriptions.Single(row => row.Lang == "fr").Name = "Poulet grillé";
+        var staleSave = () => TranslationContentVersion.EnsureCurrent(product, loadedVersion, 1);
+        staleSave.Should().Throw<ConflictException>()
+            .WithMessage("Menu text changed. Reload before saving reviewed translations.");
+        TranslationContentVersion.EnsureCurrent(product, null, 0);
+    }
+
     [Theory]
     [InlineData("Tacos 2 {count} €5", "2 tacos {count} €5", true)]
     [InlineData("Tacos 2 {count} €5", "2 tacos {count} €6", false)]

@@ -15,6 +15,7 @@ public sealed class TranslationSuggestionService(
     ITranslationPreviewService preview,
     ITranslationGenerationProvider provider,
     ICurrentUserService currentUser,
+    IServiceScopeFactory scopeFactory,
     IOptions<TranslationAssistanceSettings> options,
     ILogger<TranslationSuggestionService> logger) : ITranslationSuggestionService
 {
@@ -72,8 +73,7 @@ public sealed class TranslationSuggestionService(
                 candidate.Context?.DishName,
                 candidate.Context?.Category,
                 candidate.Context?.Exclusions ?? [])).ToArray();
-            await EnsureBudgetAsync(settings, targets, glossary, cancellationToken);
-            var generated = await provider.GenerateAsync(targets, glossary, cancellationToken);
+            var reservation = await EnsureBudgetAsync(settings, targets, glossary, cancellationToken);
             var actor = currentUser.GetAuditIdentifier();
             var now = DateTime.UtcNow;
             var batch = new TranslationGenerationBatch
@@ -81,15 +81,24 @@ public sealed class TranslationSuggestionService(
                 Id = Guid.NewGuid(),
                 Fingerprint = TranslationWorkbenchRules.Hash(string.Join("|", uncached.Select(row => row.Fingerprint))),
                 RequestedBy = actor,
-                Provider = generated.Provider,
-                Model = generated.Model,
-                InputTokens = generated.InputTokens,
-                OutputTokens = generated.OutputTokens,
-                EstimatedCostUsd = EstimateCost(generated, settings),
+                Provider = settings.Provider,
+                Model = settings.Model,
+                InputTokens = reservation.InputTokens,
+                OutputTokens = reservation.OutputTokens,
+                EstimatedCostUsd = reservation.SpendUsd,
                 CreatedAt = now,
                 CreatedBy = actor
             };
-            context.TranslationGenerationBatches.Add(batch);
+            await TranslationGenerationReservation.SaveAsync(scopeFactory, batch, cancellationToken);
+            var generated = await provider.GenerateAsync(targets, glossary, cancellationToken);
+            context.TranslationGenerationBatches.Attach(batch);
+            batch.Provider = generated.Provider;
+            batch.Model = generated.Model;
+            batch.InputTokens = generated.InputTokens;
+            batch.OutputTokens = generated.OutputTokens;
+            batch.EstimatedCostUsd = EstimateCost(generated, settings);
+            batch.UpdatedAt = DateTime.UtcNow;
+            batch.UpdatedBy = actor;
             foreach (var (candidate, index) in uncached.Select((value, index) => (value, index)))
             {
                 var key = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -129,17 +138,17 @@ public sealed class TranslationSuggestionService(
         {
             var field = request.Fields[index];
             var row = preview.Rows[index];
-            var contextHash = TranslationWorkbenchRules.Hash(JsonSerializer.Serialize(new
-            {
-                field.Context,
-                glossary,
-                settings.PromptVersion,
-                settings.Model
-            }));
+            var contextHash = TranslationWorkbenchRules.ContextHash(field.Context, glossary,
+                settings.PromptVersion, settings.Model);
             foreach (var target in row.Targets)
             {
-                if (target.Locale == field.SourceLocale || target.Status is not ("missing" or "stale" or "sourceCopy") ||
-                    target.Status == "sourceCopy" && request.GenerationIntent != "explicitFill")
+                var alternative = request.GenerationIntent == "explicitAlternative" &&
+                    target.Status == "current" && !string.IsNullOrWhiteSpace(target.Text) &&
+                    target.Provenance?.Kind is ("manual" or "legacyUnknown");
+                var gap = target.Status is "missing" or "stale" ||
+                    target.Status == "sourceCopy" && request.GenerationIntent == "explicitFill";
+                if (target.Locale == field.SourceLocale || !(alternative ||
+                    request.GenerationIntent != "explicitAlternative" && gap))
                 {
                     continue;
                 }
@@ -191,7 +200,7 @@ public sealed class TranslationSuggestionService(
         return missing;
     }
 
-    private async Task EnsureBudgetAsync(
+    private async Task<GenerationReservationBudget> EnsureBudgetAsync(
         TranslationAssistanceSettings settings,
         IReadOnlyList<TranslationGenerationTarget> targets,
         IReadOnlyDictionary<string, string> glossary,
@@ -218,7 +227,12 @@ public sealed class TranslationSuggestionService(
         {
             throw new BadRequestException("Translation assistance daily limit reached");
         }
+
+        return new GenerationReservationBudget(reservedInputTokens,
+            settings.MaxOutputTokens, reservedSpend);
     }
+
+    private sealed record GenerationReservationBudget(int InputTokens, int OutputTokens, decimal SpendUsd);
 
     private static TranslationSuggestion NewSuggestion(
         TranslationSuggestionCandidate candidate,

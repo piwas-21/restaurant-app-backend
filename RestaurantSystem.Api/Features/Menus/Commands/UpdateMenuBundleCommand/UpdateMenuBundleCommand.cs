@@ -85,6 +85,10 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
                 return ApiResponse<ProductDto>.Failure("Product is not a menu bundle");
             }
 
+            TranslationContentVersion.EnsureCurrent(product,
+                command.TranslationMetadata?.ExpectedContentVersion,
+                command.TranslationMetadata?.AcceptedSuggestionIds?.Count ?? 0);
+
             await MenuOfferLinkRules.EnsureCanDeactivateAsync(
                 _context, product.Id, command.IsActive, cancellationToken);
 

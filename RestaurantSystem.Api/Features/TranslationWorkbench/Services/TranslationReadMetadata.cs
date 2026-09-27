@@ -19,7 +19,12 @@ public static class TranslationReadMetadata
             .Concat(product.MenuDefinition?.Sections.Select(row => row.Id) ?? [])
             .Where(id => id != Guid.Empty).Distinct().ToArray();
         var sources = await LoadAsync(context, ids, cancellationToken);
-        product.TranslationMetadata = Find(sources, "product", product.Id);
+        product.TranslationMetadata = (Find(sources, "product", product.Id) ?? new TranslationOwnerMetadataDto()) with
+        {
+            ExpectedContentVersion = TranslationContentVersion.Compute(product.Name,
+                product.Description, product.Content.Select(row =>
+                    (row.Key, row.Value.Name, (string?)row.Value.Description)))
+        };
         foreach (var variation in product.Variations)
         {
             variation.TranslationMetadata = Find(sources, "productVariation", variation.Id);
@@ -48,7 +53,12 @@ public static class TranslationReadMetadata
             .Concat(bundle.MenuDefinition?.Sections.Select(row => row.Id) ?? [])
             .ToArray();
         var sources = await LoadAsync(context, ids, cancellationToken);
-        bundle.TranslationMetadata = Find(sources, "product", bundle.Id);
+        bundle.TranslationMetadata = (Find(sources, "product", bundle.Id) ?? new TranslationOwnerMetadataDto()) with
+        {
+            ExpectedContentVersion = TranslationContentVersion.Compute(bundle.Name,
+                bundle.Description, bundle.Content.Select(row =>
+                    (row.Key, row.Value.Name, row.Value.Description)))
+        };
         foreach (var section in bundle.MenuDefinition?.Sections ?? [])
         {
             section.TranslationMetadata = Find(sources, "menuSection", section.Id);

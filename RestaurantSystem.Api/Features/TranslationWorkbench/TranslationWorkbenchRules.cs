@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
@@ -21,7 +22,7 @@ internal static partial class TranslationWorkbenchRules
 
     public static void Validate(TranslationWorkbenchRequestDto request)
     {
-        if (request.GenerationIntent is not ("saveReview" or "explicitFill") ||
+        if (request.GenerationIntent is not ("saveReview" or "explicitFill" or "explicitAlternative") ||
             request.TargetLocales is null or { Count: < 1 or > 10 } ||
             request.TargetLocales.Distinct(StringComparer.Ordinal).Count() != request.TargetLocales.Count ||
             request.TargetLocales.Any(locale => !GuestLocales.Contains(locale)) ||
@@ -64,6 +65,18 @@ internal static partial class TranslationWorkbenchRules
 
     public static string Hash(string value) => Convert.ToHexStringLower(
         SHA256.HashData(Encoding.UTF8.GetBytes(value.Normalize(NormalizationForm.FormC))));
+
+    public static string ContextHash(
+        TranslationContextDto? context,
+        IReadOnlyDictionary<string, string> glossary,
+        string promptVersion,
+        string model) => Hash(JsonSerializer.Serialize(new
+        {
+            Context = context,
+            Glossary = glossary.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray(),
+            PromptVersion = promptVersion,
+            Model = model
+        }));
 
     public static bool IsSafeSuggestion(string source, string suggestion, string fieldKey)
     {

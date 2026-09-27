@@ -22,6 +22,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     locale = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     source_locale = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     source_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    context_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     text_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     kind = table.Column<string>(type: "character varying(24)", maxLength: 24, nullable: false),
                     review_status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),

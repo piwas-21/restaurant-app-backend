@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -7,7 +8,8 @@ namespace RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 
 public sealed class TranslationPreviewService(
     ApplicationDbContext context,
-    ITranslationTextReader textReader) : ITranslationPreviewService
+    ITranslationTextReader textReader,
+    IOptions<TranslationAssistanceSettings> options) : ITranslationPreviewService
 {
     public async Task<TranslationPreviewDto> PreviewAsync(
         TranslationWorkbenchRequestDto request,
@@ -26,6 +28,8 @@ public sealed class TranslationPreviewService(
         foreach (var field in request.Fields)
         {
             var sourceHash = TranslationWorkbenchRules.Hash($"{field.SourceLocale}\n{field.SourceText}");
+            var contextHash = TranslationWorkbenchRules.ContextHash(field.Context,
+                options.Value.Glossary, options.Value.PromptVersion, options.Value.Model);
             var texts = await textReader.ReadAsync(field, cancellationToken);
             var targets = new List<TranslationTargetStatusDto>(request.TargetLocales.Count);
             foreach (var locale in request.TargetLocales)
@@ -47,7 +51,8 @@ public sealed class TranslationPreviewService(
                     !string.IsNullOrWhiteSpace(text) &&
                     evidence.TextHash == TranslationWorkbenchRules.Hash(text);
                 var knownEvidence = evidenceMatchesText ? evidence : null;
-                var status = Status(locale, field.SourceLocale, field.SourceText, text, sourceHash, knownEvidence);
+                var status = Status(locale, field.SourceLocale, field.SourceText, text,
+                    sourceHash, contextHash, knownEvidence);
                 targets.Add(new TranslationTargetStatusDto(locale, status, text,
                     EvidenceDto(knownEvidence, text)));
             }
@@ -65,6 +70,7 @@ public sealed class TranslationPreviewService(
         string sourceText,
         string? targetText,
         string sourceHash,
+        string contextHash,
         TranslationFieldProvenance? evidence)
     {
         if (locale == sourceLocale) return "current";
@@ -74,8 +80,10 @@ public sealed class TranslationPreviewService(
             return "sourceCopy";
         }
 
-        if (evidence is not null && evidence.SourceHash != sourceHash &&
-            evidence.Kind is "ai" or "template") return "stale";
+        if (evidence is not null && evidence.Kind is ("ai" or "template") &&
+            (evidence.SourceHash != sourceHash ||
+             evidence.Kind == "ai" && evidence.ContextHash is not null &&
+             evidence.ContextHash != contextHash)) return "stale";
         if (evidence?.ReviewStatus == "reviewed") return "current";
 
         return "current";

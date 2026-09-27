@@ -5,4 +5,5 @@ public sealed record TranslationOwnerMetadataDto
 {
     public Dictionary<string, string> SourceLocales { get; init; } = new(StringComparer.Ordinal);
     public Dictionary<string, string> AcceptedSuggestionIds { get; init; } = new(StringComparer.Ordinal);
+    public string? ExpectedContentVersion { get; init; }
 }

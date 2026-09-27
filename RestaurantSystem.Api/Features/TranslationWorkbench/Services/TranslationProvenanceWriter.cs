@@ -120,7 +120,8 @@ public sealed class TranslationProvenanceWriter(
                     VerifyAccepted(suggestion, entityType, entityId, fieldKey, locale,
                         sourceHash, value, actor);
                     Upsert(existing, entityType, entityId, fieldKey, locale, sourceLocale,
-                        sourceHash, textHash, "ai", "reviewed", null, null, actor);
+                        sourceHash, textHash, "ai", "reviewed", null, null, actor,
+                        suggestion.ContextHash);
                 }
                 else if (existing is not null && existing.TextHash != textHash)
                 {
@@ -211,7 +212,8 @@ public sealed class TranslationProvenanceWriter(
         string reviewStatus,
         string? templateId,
         int? templateRevision,
-        string actor)
+        string actor,
+        string? contextHash = null)
     {
         var row = existing ?? new TranslationFieldProvenance
         {
@@ -225,6 +227,7 @@ public sealed class TranslationProvenanceWriter(
         };
         row.SourceLocale = sourceLocale;
         row.SourceHash = sourceHash;
+        row.ContextHash = contextHash;
         row.TextHash = textHash;
         row.Kind = kind;
         row.ReviewStatus = reviewStatus;

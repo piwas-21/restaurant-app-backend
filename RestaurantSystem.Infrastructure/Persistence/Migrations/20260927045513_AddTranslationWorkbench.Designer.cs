@@ -6365,7 +6365,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TranslationFieldProvenance", b =>
-                {
+            {
+                    b.Property<string>("ContextHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("context_hash");
+
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")

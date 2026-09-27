@@ -144,6 +144,10 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             return ApiResponse<ProductDto>.Failure("Product not found");
         }
 
+        TranslationContentVersion.EnsureCurrent(product,
+            command.TranslationMetadata?.ExpectedContentVersion,
+            command.TranslationMetadata?.AcceptedSuggestionIds?.Count ?? 0);
+
         await MenuOfferLinkRules.EnsureCanChangeTypeAsync(
             _context, product, command.Type, cancellationToken);
         await MenuOfferLinkRules.EnsureCanDeactivateAsync(

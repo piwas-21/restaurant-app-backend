@@ -80,13 +80,36 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
         provider.Calls.Should().Be(before + 1);
     }
 
-    private static object Request(string english) => new
+    [Fact]
+    public async Task FailedProviderCallKeepsAConservativeDailyReservation()
+    {
+        AuthenticateAsAdmin();
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var provider = Factory.Services.GetRequiredService<ITranslationGenerationProvider>()
+            .Should().BeOfType<CountingProvider>().Subject;
+        var before = await context.TranslationGenerationBatches.CountAsync();
+        provider.FailNext();
+
+        var response = await PostAsJsonAsync("/api/translation-workbench/suggestions",
+            Request(string.Empty, $"failed-{Guid.NewGuid():N}"));
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+
+        var latest = await context.TranslationGenerationBatches.AsNoTracking()
+            .OrderByDescending(row => row.CreatedAt).FirstAsync();
+        (await context.TranslationGenerationBatches.CountAsync()).Should().Be(before + 1);
+        latest.InputTokens.Should().BeGreaterThan(0);
+        latest.OutputTokens.Should().BeGreaterThan(0);
+        latest.EstimatedCostUsd.Should().BeGreaterThan(0);
+    }
+
+    private static object Request(string english, string clientKey = "new-product") => new // pragma: allowlist secret -- draft identity
     {
         generationIntent = "saveReview",
         targetLocales = new[] { "tr", "en" },
         fields = new[] { new
         {
-            fieldRef = new { entityType = "product", clientKey = "new-product", fieldKey = "name" }, // pragma: allowlist secret -- draft identity
+            fieldRef = new { entityType = "product", clientKey, fieldKey = "name" }, // pragma: allowlist secret -- draft identity
             sourceLocale = "tr", sourceText = "Tavuk",
             targetTexts = new Dictionary<string, string> { ["tr"] = "Tavuk", ["en"] = english }
         } }
@@ -95,7 +118,9 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
     private sealed class CountingProvider : ITranslationGenerationProvider
     {
         private int _calls;
+        private int _failNext;
         public int Calls => Volatile.Read(ref _calls);
+        public void FailNext() => Interlocked.Exchange(ref _failNext, 1);
 
         public Task<TranslationGenerationResult> GenerateAsync(
             IReadOnlyList<TranslationGenerationTarget> targets,
@@ -103,6 +128,10 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
             CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _calls);
+            if (Interlocked.Exchange(ref _failNext, 0) == 1)
+            {
+                throw new HttpRequestException("Provider outcome is unknown");
+            }
             return Task.FromResult(new TranslationGenerationResult(
                 targets.ToDictionary(target => target.Key, _ => "Chicken"),
                 "test", "fake", 100, 10));

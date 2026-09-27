@@ -11,6 +11,7 @@ public sealed class TranslationFieldProvenance : Entity
     public string Locale { get; set; } = string.Empty;
     public string SourceLocale { get; set; } = string.Empty;
     public string SourceHash { get; set; } = string.Empty;
+    public string? ContextHash { get; set; }
     public string TextHash { get; set; } = string.Empty;
     public string Kind { get; set; } = string.Empty;
     public string ReviewStatus { get; set; } = string.Empty;

@@ -15,6 +15,7 @@ public sealed class TranslationFieldProvenanceConfiguration : IEntityTypeConfigu
         builder.Property(row => row.Locale).HasMaxLength(10).IsRequired();
         builder.Property(row => row.SourceLocale).HasMaxLength(10).IsRequired();
         builder.Property(row => row.SourceHash).HasMaxLength(64).IsRequired();
+        builder.Property(row => row.ContextHash).HasMaxLength(64);
         builder.Property(row => row.TextHash).HasMaxLength(64).IsRequired();
         builder.Property(row => row.Kind).HasMaxLength(24).IsRequired();
         builder.Property(row => row.ReviewStatus).HasMaxLength(16).IsRequired();

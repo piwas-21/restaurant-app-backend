@@ -126,6 +126,30 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
     }
 
     [Fact]
+    public async Task ExplicitAlternativeCanTargetExistingManualTextWithoutReplacingIt()
+    {
+        AuthenticateAsAdmin();
+        var response = await PostAsJsonAsync("/api/translation-workbench/suggestions", new
+        {
+            generationIntent = "explicitAlternative",
+            targetLocales = new[] { "en" },
+            fields = new[] { new
+            {
+                fieldRef = new { entityType = "product", clientKey = "draft-alternative", fieldKey = "name" }, // pragma: allowlist secret -- draft identity
+                sourceLocale = "tr", sourceText = "Tavuk",
+                targetTexts = new Dictionary<string, string> { ["en"] = "Chicken" }
+            } }
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var data = json.RootElement.GetProperty("data");
+        data.GetProperty("suggestions").GetArrayLength().Should().Be(0);
+        data.GetProperty("skipped").GetArrayLength().Should().Be(1);
+        data.GetProperty("skipped")[0].GetProperty("locale").GetString().Should().Be("en");
+        data.GetProperty("skipped")[0].GetProperty("reason").GetString().Should().Be("providerDisabled");
+    }
+
+    [Fact]
     public async Task PersistedSourceLocaleAppearsOnAdminProductRead()
     {
         AuthenticateAsAdmin();
@@ -249,6 +273,69 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
     }
 
     [Fact]
+    public async Task ChangedGlossaryContextMakesTrackedAiTextStaleButNotManualText()
+    {
+        AuthenticateAsAdmin();
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var productId = await context.Products.Select(product => product.Id).FirstAsync();
+        var sourceHash = TranslationWorkbenchRules.Hash("tr\nTavuk");
+        context.TranslationFieldProvenances.AddRange(
+            new TranslationFieldProvenance
+            {
+                Id = Guid.NewGuid(),
+                EntityType = "product",
+                EntityId = productId,
+                FieldKey = "name",
+                Locale = "en",
+                SourceLocale = "tr",
+                SourceHash = sourceHash,
+                ContextHash = new string('0', 64),
+                TextHash = TranslationWorkbenchRules.Hash("Chicken"),
+                Kind = "ai",
+                ReviewStatus = "reviewed",
+                CreatedBy = "test"
+            },
+            new TranslationFieldProvenance
+            {
+                Id = Guid.NewGuid(),
+                EntityType = "product",
+                EntityId = productId,
+                FieldKey = "name",
+                Locale = "fr",
+                SourceLocale = "tr",
+                SourceHash = sourceHash,
+                ContextHash = new string('0', 64),
+                TextHash = TranslationWorkbenchRules.Hash("Poulet"),
+                Kind = "manual",
+                ReviewStatus = "reviewed",
+                CreatedBy = "test"
+            });
+        await context.SaveChangesAsync();
+
+        var response = await PostAsJsonAsync("/api/translation-workbench/preview", new
+        {
+            generationIntent = "saveReview",
+            targetLocales = new[] { "en", "fr" },
+            fields = new[] { new
+            {
+                fieldRef = new { entityType = "product", entityId = productId, fieldKey = "name" },
+                sourceLocale = "tr", sourceText = "Tavuk",
+                targetTexts = new Dictionary<string, string>
+                {
+                    ["en"] = "Chicken", ["fr"] = "Poulet"
+                }
+            } }
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var targets = json.RootElement.GetProperty("data").GetProperty("rows")[0]
+            .GetProperty("targets");
+        targets[0].GetProperty("status").GetString().Should().Be("stale");
+        targets[1].GetProperty("status").GetString().Should().Be("current");
+    }
+
+    [Fact]
     public async Task TemplateProvenanceRecordsOnlyReviewedTextThatMatchesSavedValues()
     {
         using var scope = Factory.Services.CreateScope();
@@ -313,8 +400,10 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
             TranslationTextMap.Create("Tavuk", null, [("en", "Chicken", null)]),
             CancellationToken.None);
         await context.SaveChangesAsync();
-        (await context.TranslationFieldProvenances.SingleAsync(row =>
-            row.EntityId == productId && row.Locale == "en")).Kind.Should().Be("ai");
+        var acceptedEvidence = await context.TranslationFieldProvenances.SingleAsync(row =>
+            row.EntityId == productId && row.Locale == "en");
+        acceptedEvidence.Kind.Should().Be("ai");
+        acceptedEvidence.ContextHash.Should().Be(suggestion.ContextHash);
 
         var staleSave = () => writer.RecordAsync("product", productId, metadata,
             TranslationTextMap.Create("Yeni tavuk", null, [("en", "Chicken", null)]),
