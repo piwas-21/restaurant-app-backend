@@ -23,29 +23,20 @@ public record UpdateCategoryCommand : ICommand<ApiResponse<CategoryDto>>
         string Name,
         string? Description,
         bool IsActive,
-        int? DisplayOrder = null,
-        int? AvailableOrderTypes = null,
-        bool IsHiddenFromAllTab = false,
-        Dictionary<string, CategoryContentDto>? Translations = null,
-        string? SourceLocale = null,
-        TranslationOwnerMetadataDto? TranslationMetadata = null)
+        int? DisplayOrder = null)
     {
         this.Id = Id;
         this.Name = Name;
         this.Description = Description;
         this.IsActive = IsActive;
         this.DisplayOrder = DisplayOrder;
-        this.AvailableOrderTypes = AvailableOrderTypes;
-        this.IsHiddenFromAllTab = IsHiddenFromAllTab;
-        this.Translations = Translations;
-        _sourceLocale = SourceLocale;
-        SourceLocaleWasSpecified = SourceLocale is not null;
-        this.TranslationMetadata = TranslationMetadata;
     }
 
+    [JsonRequired]
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    [JsonRequired]
     public bool IsActive { get; init; }
 
     // NOTE: DisplayOrder is accepted but deliberately NOT assigned by this handler —
@@ -59,6 +50,7 @@ public record UpdateCategoryCommand : ICommand<ApiResponse<CategoryDto>>
 
     // Partner request 2026-09-06: keep the category orderable on its own tab but out of the
     // guest "All" list. The admin edit form always posts it (the PUT is a full replace).
+    [JsonRequired]
     public bool IsHiddenFromAllTab { get; init; }
     public Dictionary<string, CategoryContentDto>? Translations { get; init; }
 
@@ -107,6 +99,7 @@ public class UpdateCategoryCommandHandler : ICommandHandler<UpdateCategoryComman
         // channel matrix, i.e. on every real category. A category with NO products succeeded,
         // because the Count lambda then never ran, which is why this survived so long.
         var category = await _context.Categories
+            .AsSplitQuery()
             .Include(c => c.ProductCategories)
                 .ThenInclude(pc => pc.Product)
             .Include(c => c.Translations)

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Categories;
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Menus.Dtos;
@@ -31,43 +31,6 @@ public static class TranslationReadMetadata
             TranslationMetadata = dto.TranslationMetadata,
             Content = dto.Translations
         };
-    }
-
-    public static async Task<IReadOnlyList<CategoryDto>> ApplyCategoriesAsync(
-        ApplicationDbContext context,
-        IReadOnlyList<CategoryDto> categories,
-        CancellationToken cancellationToken)
-    {
-        if (categories.Count == 0) return [];
-
-        var ids = categories.Select(category => category.Id).Distinct().ToArray();
-        var translations = await context.CategoryTranslations.AsNoTracking()
-            .Where(row => ids.Contains(row.CategoryId))
-            .ToListAsync(cancellationToken);
-        var translationsById = translations.GroupBy(row => row.CategoryId)
-            .ToDictionary(group => group.Key, group => CategoryTranslationMapper.ToDto(group));
-        return categories.Select(category =>
-        {
-            var content = translationsById.GetValueOrDefault(category.Id) ?? [];
-            var sourceLocales = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (category.SourceLocale is not null)
-            {
-                sourceLocales["name"] = category.SourceLocale;
-                if (!string.IsNullOrWhiteSpace(category.Description))
-                {
-                    sourceLocales["description"] = category.SourceLocale;
-                }
-            }
-
-            var metadata = new TranslationOwnerMetadataDto
-            {
-                SourceLocales = sourceLocales,
-                ExpectedContentVersion = TranslationContentVersion.ForCategory(category.SourceLocale,
-                    category.Name, category.Description, content.Select(row =>
-                        (row.Key, row.Value.Name, row.Value.Description)))
-            };
-            return category with { Translations = content, TranslationMetadata = metadata };
-        }).ToArray();
     }
 
     public static async Task ApplyAsync(
@@ -125,6 +88,43 @@ public static class TranslationReadMetadata
         {
             section.TranslationMetadata = Find(sources, "menuSection", section.Id);
         }
+    }
+
+    public static async Task<IReadOnlyList<CategoryDto>> ApplyCategoriesAsync(
+        ApplicationDbContext context,
+        IReadOnlyList<CategoryDto> categories,
+        CancellationToken cancellationToken)
+    {
+        if (categories.Count == 0) return [];
+
+        var ids = categories.Select(category => category.Id).Distinct().ToArray();
+        var translations = await context.CategoryTranslations.AsNoTracking()
+            .Where(row => ids.Contains(row.CategoryId))
+            .ToListAsync(cancellationToken);
+        var translationsById = translations.GroupBy(row => row.CategoryId)
+            .ToDictionary(group => group.Key, group => CategoryTranslationMapper.ToDto(group));
+        return categories.Select(category =>
+        {
+            var content = translationsById.GetValueOrDefault(category.Id) ?? [];
+            var sourceLocales = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (category.SourceLocale is not null)
+            {
+                sourceLocales["name"] = category.SourceLocale;
+                if (!string.IsNullOrWhiteSpace(category.Description))
+                {
+                    sourceLocales["description"] = category.SourceLocale;
+                }
+            }
+
+            var metadata = new TranslationOwnerMetadataDto
+            {
+                SourceLocales = sourceLocales,
+                ExpectedContentVersion = TranslationContentVersion.ForCategory(category.SourceLocale,
+                    category.Name, category.Description, content.Select(row =>
+                        (row.Key, row.Value.Name, row.Value.Description)))
+            };
+            return category with { Translations = content, TranslationMetadata = metadata };
+        }).ToArray();
     }
 
     private static async Task<Dictionary<(string EntityType, Guid EntityId), TranslationOwnerMetadataDto>> LoadAsync(

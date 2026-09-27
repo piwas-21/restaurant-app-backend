@@ -53,6 +53,7 @@ public class UpdateCategoryImageCommandHandler : ICommandHandler<UpdateCategoryI
         // See UpdateCategoryCommand: ProductCount dereferences `pc.Product` in memory after
         // materialisation, so without ThenInclude this 500s for any category that has products.
         var category = await _context.Categories
+            .AsSplitQuery()
             .Include(c => c.ProductCategories)
                 .ThenInclude(pc => pc.Product)
             .Include(c => c.Translations)

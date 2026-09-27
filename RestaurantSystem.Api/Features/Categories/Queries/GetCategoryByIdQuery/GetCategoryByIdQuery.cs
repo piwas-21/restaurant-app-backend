@@ -29,6 +29,7 @@ public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, A
     public async Task<ApiResponse<CategoryDetailDto>> Handle(GetCategoryByIdQuery query, CancellationToken cancellationToken)
     {
         var category = await _context.Categories
+            .AsSplitQuery()
             .Include(c => c.ProductCategories)
                 .ThenInclude(pc => pc.Product)
                     .ThenInclude(p => p.Images)

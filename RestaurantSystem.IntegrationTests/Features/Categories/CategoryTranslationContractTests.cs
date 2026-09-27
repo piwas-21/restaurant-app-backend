@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -60,7 +60,7 @@ public sealed class CategoryTranslationContractTests(DatabaseFixture fixture) : 
         detail!.Data!.Translations.Should().BeEquivalentTo(translations);
         detail.Data.Content.Should().BeEquivalentTo(translations);
 
-        var clearSourceLocale = $$"""{"id":"{{created.Data.Id}}","name":"{{name}}","description":"English description","isActive":false,"sourceLocale":null}""";
+        var clearSourceLocale = $$"""{"id":"{{created.Data.Id}}","name":"{{name}}","description":"English description","isActive":false,"isHiddenFromAllTab":false,"sourceLocale":null}""";
         var clearedResponse = await Client.PutAsync($"/api/categories/{created.Data.Id}",
             new StringContent(clearSourceLocale, Encoding.UTF8, "application/json"));
         clearedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -78,18 +78,43 @@ public sealed class CategoryTranslationContractTests(DatabaseFixture fixture) : 
     }
 
     [Fact]
+    public async Task CategoryUpdateRejectsOmittedRequiredValueFields()
+    {
+        AuthenticateAsAdmin();
+        var name = $"Required category {Guid.NewGuid():N}";
+        var created = await ReadResponseAsync<ApiResponse<CategoryDto>>(
+            await PostAsJsonAsync("/api/categories", new CreateCategoryCommand(name, null, true, 1)));
+        var id = created!.Data!.Id;
+        var bodies = new[]
+        {
+            $$"""{"name":"{{name}}","isActive":true,"isHiddenFromAllTab":false}""",
+            $$"""{"id":"{{id}}","name":"{{name}}","isHiddenFromAllTab":false}""",
+            $$"""{"id":"{{id}}","name":"{{name}}","isActive":true}"""
+        };
+
+        foreach (var body in bodies)
+        {
+            var response = await Client.PutAsync($"/api/categories/{id}",
+                new StringContent(body, Encoding.UTF8, "application/json"));
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+    }
+
+    [Fact]
     public async Task CategoryUpdateRejectsAcceptedTextFromAStaleContentVersion()
     {
         AuthenticateAsAdmin();
         var name = $"Stale category {Guid.NewGuid():N}";
         var created = await ReadResponseAsync<ApiResponse<CategoryDto>>(
             await PostAsJsonAsync("/api/categories", new CreateCategoryCommand(name, null, true, 1)));
-        var command = new UpdateCategoryCommand(created!.Data!.Id, name, null, true,
-            TranslationMetadata: new TranslationOwnerMetadataDto
+        var command = new UpdateCategoryCommand(created!.Data!.Id, name, null, true)
+        {
+            TranslationMetadata = new TranslationOwnerMetadataDto
             {
                 ExpectedContentVersion = new string('0', 64),
                 AcceptedSuggestionIds = new Dictionary<string, string> { ["name.fr"] = "stale" }
-            });
+            }
+        };
 
         var response = await PutAsJsonAsync($"/api/categories/{created.Data.Id}", command);
 
