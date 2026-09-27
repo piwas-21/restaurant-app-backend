@@ -37,6 +37,19 @@ public sealed record LineCustomization(
     public Dictionary<Guid, int>? IngredientQuantities { get; init; }
 }
 
+public sealed record LineCustomizationOptions(
+    int SauceIncludedFree = 0,
+    int? SauceMax = null,
+    ICollection<ProductCustomizationGroup>? ExplicitGroups = null,
+    int SauceMin = 0)
+{
+    public static LineCustomizationOptions FromProduct(Product product) => new(
+        product.SauceIncludedFree,
+        product.SauceMax,
+        product.CustomizationGroups,
+        product.SauceMin);
+}
+
 public interface ILineCustomizationBuilder
 {
     /// <param name="preferProvidedQuantities">
@@ -46,20 +59,16 @@ public interface ILineCustomizationBuilder
     /// selection when present, else persist a provided map as-is). Since #303 the two agree on the
     /// one thing that is not precedence: neither backfills without a selection to backfill FROM.
     /// </param>
-    /// <param name="sauceIncludedFree">
-    /// The sauce allowance of the product THIS LINE IS (plan D10). The caller supplies it because
-    /// only the caller holds the product row; the default of 0 keeps every other call site — and
-    /// every product that never mentions sauces — priced exactly as before.
+    /// <param name="options">
+    /// The product-specific sauce and explicit-group rules. The caller supplies these because it
+    /// holds the product row; omitted options retain the historical zero/default behavior.
     /// </param>
     LineCustomization Build(
         ICollection<ProductIngredient>? detailedIngredients,
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities,
-        int sauceIncludedFree = 0,
-        int? sauceMax = null,
-        ICollection<ProductCustomizationGroup>? explicitGroups = null,
-        int sauceMin = 0);
+        LineCustomizationOptions? options = null);
 
     /// <summary>Checks minimum sauces for a line after deserializing its legacy quantity map.</summary>
     void EnsureAtLeastMinimum(BasketItem line);
@@ -90,13 +99,11 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
         List<Guid>? selectedIngredients,
         Dictionary<Guid, int>? ingredientQuantities,
         bool preferProvidedQuantities,
-        int sauceIncludedFree = 0,
-        int? sauceMax = null,
-        ICollection<ProductCustomizationGroup>? explicitGroups = null,
-        int sauceMin = 0)
+        LineCustomizationOptions? options = null)
     {
-        SauceSelectionRule.EnsureWithinMaximum(detailedIngredients, selectedIngredients, sauceMax);
-        EnsureAtLeastMinimum(detailedIngredients, selectedIngredients, ingredientQuantities, sauceMin);
+        SauceSelectionRule.EnsureWithinMaximum(detailedIngredients, selectedIngredients, options?.SauceMax);
+        EnsureAtLeastMinimum(
+            detailedIngredients, selectedIngredients, ingredientQuantities, options?.SauceMin ?? 0);
 
         // A payload carrying neither a selection nor a quantity map expressed no ingredient choice
         // at all, so there is nothing to record and nothing to price (#303). `useReorder` posts
@@ -113,7 +120,11 @@ public class LineCustomizationBuilder : ILineCustomizationBuilder
 
         var customizationPrice = expressedAnIngredientChoice
             ? _basketPricingService.CalculateIngredientCustomizationPrice(
-                detailedIngredients, selectedIngredients, ingredientQuantities, sauceIncludedFree, explicitGroups)
+                detailedIngredients,
+                selectedIngredients,
+                ingredientQuantities,
+                options?.SauceIncludedFree ?? 0,
+                options?.ExplicitGroups)
             : 0m;
 
         var resolvedQuantities = ResolveIngredientQuantities(

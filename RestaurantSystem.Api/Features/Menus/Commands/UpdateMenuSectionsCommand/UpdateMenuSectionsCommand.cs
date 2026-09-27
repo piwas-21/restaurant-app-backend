@@ -37,6 +37,7 @@ public sealed class UpdateMenuSectionsCommandHandler(
         }
 
         var definition = await _context.MenuDefinitions
+            .AsSplitQuery()
             .Include(menu => menu.Product)
             .Include(menu => menu.Sections)
                 .ThenInclude(section => section.Translations)

@@ -45,13 +45,10 @@ public class UpdateProductPriceCommandHandler
             throw new BadRequestException("Price must be non-negative");
         }
 
-        if (command.Price == 0m)
+        if (command.Price == 0m && !product.IsComponent)
         {
-            if (!product.IsComponent)
-            {
-                throw new BadRequestException(
-                    "Only internal bundle components may have a zero base price.");
-            }
+            throw new BadRequestException(
+                "Only internal bundle components may have a zero base price.");
         }
 
         product.BasePrice = command.Price;

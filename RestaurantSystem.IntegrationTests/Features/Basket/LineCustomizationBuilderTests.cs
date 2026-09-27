@@ -163,7 +163,9 @@ public class LineCustomizationBuilderTests
     {
         var builder = Build(price: 0m, out var pricing);
 
-        builder.Build(Ingredients(), [Bacon], null, preferProvidedQuantities, sauceIncludedFree: 2);
+        builder.Build(
+            Ingredients(), [Bacon], null, preferProvidedQuantities,
+            new LineCustomizationOptions(SauceIncludedFree: 2));
 
         pricing.Verify(
             p => p.CalculateIngredientCustomizationPrice(

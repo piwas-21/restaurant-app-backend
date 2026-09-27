@@ -19,10 +19,9 @@ public static class BasketProductQuery
                     .ThenInclude(category => category.Category)
         .Include(product => product.ProductCategories)
             .ThenInclude(category => category.Category)
-        .Include(product => product.MenuDefinition)
-            .ThenInclude(definition => definition!.Sections)
-                .ThenInclude(section => section.Items)
-                    .ThenInclude(item => item.Product)
+        .Include(product => product.MenuDefinition!.Sections)
+            .ThenInclude(section => section.Items)
+                .ThenInclude(item => item.Product)
         .Include(product => product.MenuDefinition!.Sections)
             .ThenInclude(section => section.Items)
                 .ThenInclude(item => item.ProductVariation);

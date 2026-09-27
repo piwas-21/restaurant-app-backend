@@ -36,7 +36,7 @@ public record UpdateMenuBundleCommand(
     List<string>? Allergens = null
 ) : ICommand<ApiResponse<ProductDto>>, IMenuBundleCommandFields;
 
-public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
+public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCommand, ApiResponse<ProductDto>>
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
@@ -60,12 +60,10 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
                 .AsSplitQuery()
                 .Include(p => p.ProductCategories)
                 .Include(p => p.Descriptions)
-                .Include(p => p.MenuDefinition)
-                    .ThenInclude(md => md!.Sections)
-                        .ThenInclude(section => section.Items)
-                .Include(p => p.MenuDefinition)
-                    .ThenInclude(md => md!.Sections)
-                        .ThenInclude(section => section.Translations)
+                .Include(p => p.MenuDefinition!.Sections)
+                    .ThenInclude(section => section.Items)
+                .Include(p => p.MenuDefinition!.Sections)
+                    .ThenInclude(section => section.Translations)
                 .FirstOrDefaultAsync(p => p.Id == command.Id, cancellationToken);
 
             if (product == null)
@@ -81,26 +79,12 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             await MenuOfferLinkRules.EnsureCanDeactivateAsync(
                 _context, product.Id, command.IsActive, cancellationToken);
 
-            if (command.MenuDefinition.OfferParentSpecified)
-            {
-                await MenuOfferLinkRules.EnsureValidAsync(
-                    _context,
-                    product.Id,
-                    command.MenuDefinition.ParentOfferProductId,
-                    command.MenuDefinition.ParentOfferVariationId,
-                    cancellationToken);
-            }
+            await ValidateOfferParentAsync(product.Id, command.MenuDefinition, cancellationToken);
 
             // Validate categories
-            if (command.CategoryIds?.Any() == true)
+            if (!await CategoriesExistAsync(command.CategoryIds, cancellationToken))
             {
-                var categoriesCount = await _context.Categories
-                   .CountAsync(c => command.CategoryIds.Contains(c.Id), cancellationToken);
-
-                if (categoriesCount != command.CategoryIds.Count)
-                {
-                    return ApiResponse<ProductDto>.Failure("One or more categories not found");
-                }
+                return ApiResponse<ProductDto>.Failure("One or more categories not found");
             }
 
             // Check a versioned menu's full-replacement snapshot against the persisted sections
@@ -170,25 +154,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             // when we skip, PrimaryCategoryId is necessarily null and there is nothing to apply.
             // Relaxing that rule to allow re-pointing the primary without resending categories
             // would need this block to handle it, or the change would be silently ignored.
-            if (command.CategoryIds?.Any() == true)
-            {
-                _context.ProductCategories.RemoveRange(product.ProductCategories);
-
-                var displayOrder = 0;
-                foreach (var categoryId in command.CategoryIds)
-                {
-                    var productCategory = new ProductCategory
-                    {
-                        ProductId = product.Id,
-                        CategoryId = categoryId,
-                        IsPrimary = categoryId == command.PrimaryCategoryId,
-                        DisplayOrder = displayOrder++,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedBy = _currentUserService.GetAuditIdentifier()
-                    };
-                    _context.ProductCategories.Add(productCategory);
-                }
-            }
+            UpdateCategories(product, command.CategoryIds, command.PrimaryCategoryId);
 
             // Update Content (Descriptions).
             //
@@ -197,8 +163,6 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             // every description. Mirrors UpdateProductCommandHandler, which already had both
             // guards — this handler had neither, so the same UI action meant "no-op" on a
             // product and "delete every translation" on a bundle (#190).
-            var contentMap = command.Content ?? new ProductDescriptionsDto();
-
             // The duplicate-language-code check both handlers carried here was DEAD and has been
             // dropped: ProductDescriptionsDto derives from Dictionary<string, …>, so duplicate
             // keys cannot survive deserialization — System.Text.Json applies last-wins via the
@@ -206,26 +170,7 @@ public class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenuBundleCo
             // check reported zero duplicates and its failure branch was unreachable. The copy in
             // UpdateProductCommandHandler is equally dead; removing it there belongs with that
             // handler's own tests (#193).
-            if (contentMap.Any())
-            {
-                _context.ProductDescriptions.RemoveRange(product.Descriptions);
-            }
-
-            foreach (var (languageCode, description) in contentMap)
-            {
-                var productDescription = new ProductDescription
-                {
-                    ProductId = product.Id,
-                    Lang = languageCode,
-                    Name = description.Name,
-                    Description = description.Description,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = _currentUserService.GetAuditIdentifier(),
-                    UpdatedAt = DateTime.UtcNow,
-                    UpdatedBy = _currentUserService.GetAuditIdentifier()
-                };
-                _context.ProductDescriptions.Add(productDescription);
-            }
+            UpdateContent(product, command.Content);
 
             // Update Menu Definition.
             //

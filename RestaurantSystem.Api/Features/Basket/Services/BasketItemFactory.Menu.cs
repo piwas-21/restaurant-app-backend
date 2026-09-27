@@ -113,8 +113,7 @@ public partial class BasketItemFactory
             var childCustomization = _lineCustomizationBuilder.Build(
                 childProduct.DetailedIngredients, selectedIngredients,
                 ingredientQuantities, preferProvidedQuantities: false,
-                sauceIncludedFree: childProduct.SauceIncludedFree, sauceMax: childProduct.SauceMax,
-                explicitGroups: childProduct.CustomizationGroups, sauceMin: childProduct.SauceMin);
+                options: LineCustomizationOptions.FromProduct(childProduct));
 
             totalCustomizationPrice += childCustomization.CustomizationPrice * option.Quantity;
             totalCustomizationPrice += explicitSelection.ProductOptions.Sum(

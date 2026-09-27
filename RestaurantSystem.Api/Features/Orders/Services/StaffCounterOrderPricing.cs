@@ -69,8 +69,8 @@ public sealed class StaffCounterOrderPricing : IStaffCounterOrderPricing
         var customization = _customizations.Build(
             product.DetailedIngredients, explicitCustomization.SelectedIngredientIds,
             explicitCustomization.IngredientQuantities,
-            preferProvidedQuantities: false, product.SauceIncludedFree, product.SauceMax,
-            product.CustomizationGroups, product.SauceMin);
+            preferProvidedQuantities: false,
+            options: LineCustomizationOptions.FromProduct(product));
         var unitPrice = product.BasePrice + (variation?.PriceModifier ?? 0m)
             + explicitCustomization.ProductOptionPrice;
         var children = source.ChildItems;

@@ -42,7 +42,6 @@ public sealed class GetCatalogQueryHandler(
                 .ThenInclude(pc => pc.Category)
             .Include(p => p.Variations.Where(v => !v.IsDeleted && v.IsActive).OrderBy(v => v.DisplayOrder))
                 .ThenInclude(v => v.Descriptions)
-            .Include(p => p.MenuDefinition)
             .Include(p => p.MenuDefinition!.Sections)
                 .ThenInclude(section => section.Items)
                     .ThenInclude(item => item.Product.ProductCategories)

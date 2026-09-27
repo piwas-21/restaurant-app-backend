@@ -33,6 +33,9 @@ public partial class BasketItemFactory : IBasketItemFactory
         _lineCustomizationBuilder = lineCustomizationBuilder;
     }
 
+    public void EnsureAtLeastMinimum(BasketItem line) =>
+        _lineCustomizationBuilder.EnsureAtLeastMinimum(line);
+
     public async Task<BasketItem> BuildRegularItemAsync(
         Product product, ProductVariation? variation, AddToBasketDto item, Guid basketId, OrderType? basketOrderType)
     {
@@ -54,8 +57,7 @@ public partial class BasketItemFactory : IBasketItemFactory
         var customization = _lineCustomizationBuilder.Build(
             product.DetailedIngredients, selectedIngredients,
             ingredientQuantities, preferProvidedQuantities: true,
-            sauceIncludedFree: product.SauceIncludedFree, sauceMax: product.SauceMax,
-            explicitGroups: product.CustomizationGroups, sauceMin: product.SauceMin);
+            options: LineCustomizationOptions.FromProduct(product));
         decimal customizationPrice = customization.CustomizationPrice;
         customizationPrice += explicitSelection.ProductOptions.Sum(option => option.AdditionalPrice);
 

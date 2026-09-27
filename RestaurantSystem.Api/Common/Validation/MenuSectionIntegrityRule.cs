@@ -17,8 +17,15 @@ public static class MenuSectionIntegrityRule
         var sectionList = sections.ToList();
         ValidateStructure(sectionList);
         await ValidateProductReferencesAsync(context, sectionList, cancellationToken);
+        await ValidateVariationReferencesAsync(context, sectionList, cancellationToken);
+    }
 
-        var references = sectionList.SelectMany(section => section.Items ?? [])
+    private static async Task ValidateVariationReferencesAsync(
+        ApplicationDbContext context,
+        IEnumerable<MenuSectionDto> sections,
+        CancellationToken cancellationToken)
+    {
+        var references = sections.SelectMany(section => section.Items ?? [])
             .Where(item => item.ProductVariationId.HasValue)
             .Select(item => (item.ProductId, VariationId: item.ProductVariationId!.Value)).ToList();
         if (references.Count == 0)
