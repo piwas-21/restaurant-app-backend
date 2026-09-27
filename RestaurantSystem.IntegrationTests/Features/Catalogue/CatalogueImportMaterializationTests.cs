@@ -3,20 +3,24 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.Catalogue.Dtos;
 using RestaurantSystem.Api.Features.Catalogue.Services;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.IntegrationTests.Infrastructure;
+using RestaurantSystem.IntegrationTests.Features.TranslationWorkbench;
 
 namespace RestaurantSystem.IntegrationTests.Features.Catalogue;
 
@@ -27,8 +31,98 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     private const string Actor = "catalogue-import-materialization-test";
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
-    protected override void ConfigureTestServices(IServiceCollection services) =>
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
         services.PostConfigure<TenantFeatureSettings>(settings => settings.OptionSetMaterializationEnabled = true);
+        services.RemoveAll<ITranslationGenerationProvider>();
+        services.AddSingleton<ITranslationGenerationProvider, CountingTranslationProvider>();
+        services.Configure<TranslationAssistanceSettings>(settings =>
+        {
+            settings.Enabled = true;
+            settings.TenantDataApproved = true;
+            settings.ApiUrl = TranslationProviderTestSettings.Endpoint;
+            settings.ApiKey = "test-only-key"; // pragma: allowlist secret -- inert test value
+        });
+    }
+
+    [Fact]
+    public async Task Reviewed_ingredient_import_records_template_text_and_unchanged_save_needs_no_suggestions()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var revision = Revision("mint-ingredient", "ingredient", new { suggestedOnly = true, role = "ingredient" });
+        var item = PendingTemplate(revision, new CatalogueImportItemDecision { Resolution = "Create" }, isRoot: true);
+        var session = NewSession(revision.TemplateId, [item]);
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var result = await ImportAsync(scope.ServiceProvider, context, session, [revision]);
+
+        result.Status.Should().Be(nameof(CatalogueImportStatus.Imported));
+        var ingredientId = result.Items.Single().LocalEntityId;
+        ingredientId.Should().NotBeNull();
+        var ingredient = await context.GlobalIngredients.AsNoTracking().Include(row => row.Translations)
+            .SingleAsync(row => row.Id == ingredientId);
+        var evidence = await context.TranslationFieldProvenances.AsNoTracking()
+            .Where(row => row.EntityType == "globalIngredient" && row.EntityId == ingredient.Id)
+            .ToListAsync();
+        evidence.Should().Contain(row => row.FieldKey == "name" && row.Locale == "en" &&
+            row.Kind == "template" && row.TemplateId == revision.TemplateId && row.TemplateRevision == revision.Revision);
+        evidence.Should().Contain(row => row.FieldKey == "name" && row.Locale == "fr" &&
+            row.Kind == "template" && row.TemplateId == revision.TemplateId && row.TemplateRevision == revision.Revision);
+
+        AuthenticateAsAdmin();
+        var provider = Factory.Services.GetRequiredService<ITranslationGenerationProvider>()
+            .Should().BeOfType<CountingTranslationProvider>().Subject;
+        var response = await PostAsJsonAsync("/api/translation-workbench/suggestions", new
+        {
+            generationIntent = "saveReview",
+            targetLocales = new[] { "en", "fr" },
+            fields = new[]
+            {
+                new
+                {
+                    fieldRef = new { entityType = "globalIngredient", entityId = ingredient.Id, fieldKey = "name" },
+                    sourceLocale = "en",
+                    sourceText = ingredient.DefaultName
+                }
+            }
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("data").GetProperty("suggestions").GetArrayLength().Should().Be(0);
+        provider.Calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Unreviewed_template_text_is_blocked_before_ingredient_creation()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var revision = Revision("draft-ingredient", "ingredient",
+            new { suggestedOnly = true, role = "ingredient" }) with
+        { QualityStatus = "draft" };
+        var item = PendingTemplate(revision, new CatalogueImportItemDecision { Resolution = "Create" }, isRoot: true);
+        var session = NewSession(revision.TemplateId, [item]);
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var preview = await scope.ServiceProvider.GetRequiredService<ICatalogueImportPreviewService>()
+            .PreviewAsync(session.Id, CancellationToken.None);
+        preview.Items.Single().BlockingIssues.Should().Contain(issue =>
+            issue.Code == "TEMPLATE_QUALITY_NOT_REVIEWED");
+        var batchContext = await scope.ServiceProvider.GetRequiredService<ICatalogueImportStateStore>()
+            .LoadBatchContextAsync(session, CancellationToken.None);
+        var executor = scope.ServiceProvider.GetRequiredService<ICatalogueTemplateImportExecutor>();
+        var execute = () => executor.ExecuteAsync(session, item, batchContext, CancellationToken.None);
+        var exception = await execute.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("Only reviewed catalogue template revisions can be imported.");
+        exception.Which.ErrorCode.Should().Be("TEMPLATE_QUALITY_NOT_REVIEWED");
+        (await context.GlobalIngredients.AnyAsync(value => value.DefaultName == revision.Name)).Should().BeFalse();
+        (await context.TranslationFieldProvenances.AnyAsync(value => value.TemplateId == revision.TemplateId))
+            .Should().BeFalse();
+    }
 
     [Fact]
     public async Task Item_import_creates_option_sets_and_materializes_all_roles_using_inactive_staged_rows()
@@ -526,5 +620,21 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     private sealed class NoopLease : IAsyncDisposable
     {
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class CountingTranslationProvider : ITranslationGenerationProvider
+    {
+        public int Calls { get; private set; }
+
+        public Task<TranslationGenerationResult> GenerateAsync(
+            IReadOnlyList<TranslationGenerationTarget> targets,
+            IReadOnlyDictionary<string, string> glossary,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(new TranslationGenerationResult(
+                targets.ToDictionary(target => target.Key, target => target.SourceText),
+                "test", "test", 1, 1));
+        }
     }
 }

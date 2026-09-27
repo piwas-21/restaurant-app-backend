@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Features.Catalogue.Dtos;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Features.Products.Dtos;
@@ -34,6 +35,14 @@ internal static class CatalogueImportTranslationMapper
         ProductDto product) => new(
         "product", product.Id, revision.TemplateId, revision.Revision, revision.SourceLocale,
         ProductText(product, revision.SourceLocale), ReviewedValues(revision));
+
+    public static RecordTemplateTranslationRequest ForIngredient(
+        CentralCatalogueTemplateRevision revision,
+        GlobalIngredientDto ingredient) => new(
+        "globalIngredient", ingredient.Id, revision.TemplateId, revision.Revision, revision.SourceLocale,
+        TranslationTextMap.Create(ingredient.DefaultName, null,
+            ingredient.Translations.Select(value => (value.LanguageCode, (string?)value.Name, (string?)null))),
+        ReviewedNames(revision.SourceLocale, revision.Name, revision.Translations));
 
     public static RecordTemplateTranslationRequest ForOptionSet(
         CentralCatalogueTemplateRevision revision,
@@ -108,6 +117,6 @@ internal static class CatalogueImportTranslationMapper
          .. translations.Where(pair => !pair.Key.Equals(sourceLocale, StringComparison.OrdinalIgnoreCase))
              .Select(pair => new TemplateTranslationEvidence("name", pair.Key, pair.Value))];
 
-    private static bool IsReviewed(CentralCatalogueTemplateRevision revision) =>
+    public static bool IsReviewed(CentralCatalogueTemplateRevision revision) =>
         string.Equals(revision.QualityStatus, "reviewed", StringComparison.OrdinalIgnoreCase);
 }

@@ -55,6 +55,12 @@ public sealed partial class CatalogueTemplateImportExecutor : ICatalogueTemplate
         batchContext.EnsureFresh();
         var revision = CatalogueSessionMapper.ParseRevision(item.RevisionJson);
         CatalogueImportPayloadReader.EnsureSupportedPayload(revision);
+        if (!CatalogueImportTranslationMapper.IsReviewed(revision))
+        {
+            throw new BadRequestException(
+                "Only reviewed catalogue template revisions can be imported.", "TEMPLATE_QUALITY_NOT_REVIEWED");
+        }
+
         if (revision.Type == "cuisine-pack")
         {
             return Imported(null, null);
@@ -118,6 +124,8 @@ public sealed partial class CatalogueTemplateImportExecutor : ICatalogueTemplate
         var command = CatalogueImportCommandMapper.Ingredient(revision, session.Locale, decision);
         var response = await mediator.SendCommand<ApiResponse<GlobalIngredientDto>>(command, cancellationToken);
         var ingredient = RequireData(response, "Ingredient creation was rejected by tenant validation.");
+        await RecordTemplateTranslationAsync(
+            revision, CatalogueImportTranslationMapper.ForIngredient(revision, ingredient), cancellationToken);
         return Imported("GlobalIngredient", ingredient.Id);
     }
 

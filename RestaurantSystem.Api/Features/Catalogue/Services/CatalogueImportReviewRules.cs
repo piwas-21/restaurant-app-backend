@@ -8,6 +8,17 @@ internal static class CatalogueImportReviewRules
 {
     private const string OptionSetType = "option-set";
 
+    public static void AddTemplateQualityBlocker(
+        CentralCatalogueTemplateRevision revision,
+        List<CatalogueImportIssueDto> blockers)
+    {
+        if (!CatalogueImportTranslationMapper.IsReviewed(revision))
+        {
+            blockers.Add(Issue("TEMPLATE_QUALITY_NOT_REVIEWED",
+                "Only reviewed catalogue template revisions can be imported."));
+        }
+    }
+
     public static string ExpectedEntityType(string templateType) => templateType switch
     {
         "category" => "Category",

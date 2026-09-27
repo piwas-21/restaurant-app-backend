@@ -147,6 +147,7 @@ public sealed partial class CatalogueImportPreviewService
     {
         if (source.Item.IsSelected)
         {
+            CatalogueImportReviewRules.AddTemplateQualityBlocker(source.Revision, blockers);
             CatalogueImportReviewRules.AddUnsupportedPayloadBlockers(source.Revision, blockers);
             if (source.Item.Type == OptionSetType)
                 warnings.Add(Issue("OPTION_SET_REVIEW_REQUIRED", "Confirm local choice prices and every tenant-specific operational detail before activating offers."));
