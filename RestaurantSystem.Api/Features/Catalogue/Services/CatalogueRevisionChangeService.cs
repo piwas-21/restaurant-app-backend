@@ -231,11 +231,12 @@ public sealed class CatalogueRevisionChangeService(
 
     private static bool IsRevisionWriteConflict(Exception exception)
     {
-        var sqlState = exception is PostgresException postgres
-            ? postgres.SqlState
-            : exception is DbUpdateException { InnerException: PostgresException inner }
-                ? inner.SqlState
-                : null;
+        var sqlState = exception switch
+        {
+            PostgresException postgres => postgres.SqlState,
+            DbUpdateException { InnerException: PostgresException inner } => inner.SqlState,
+            _ => null
+        };
         return sqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected or
             PostgresErrorCodes.UniqueViolation;
     }

@@ -17,7 +17,11 @@ internal sealed partial class CatalogueRevisionLocalTextStore
         CancellationToken cancellationToken)
     {
         var hasValue = revision.Translations.TryGetValue(locale, out var text);
-        var value = hasValue ? field == "name" ? text!.Name : text!.Description : null;
+        string? value = null;
+        if (hasValue)
+        {
+            value = field == "name" ? text!.Name : text!.Description;
+        }
         if (templateType == "option-set" && field == "name") ValidateText(value, "option-set translation name", 120, required: false);
         if (templateType == "ingredient" && field == "name")
         {

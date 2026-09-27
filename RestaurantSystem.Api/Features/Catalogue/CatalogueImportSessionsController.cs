@@ -9,8 +9,7 @@ namespace RestaurantSystem.Api.Features.Catalogue;
 [Route("api/catalogue/import-sessions")]
 [RequireAdmin]
 public sealed class CatalogueImportSessionsController(
-    ICatalogueImportSessionService sessions,
-    ICatalogueRevisionChangeService revisionChanges) : ControllerBase
+    ICatalogueImportSessionService sessions) : ControllerBase
 {
     [HttpPost]
     [ProducesResponseType(typeof(CatalogueImportSessionDto), StatusCodes.Status200OK)]
@@ -50,26 +49,5 @@ public sealed class CatalogueImportSessionsController(
         [FromBody] ImportCatalogueSessionRequest request,
         CancellationToken cancellationToken) =>
         Ok(await sessions.ImportAsync(sessionId, request, cancellationToken));
-
-    [HttpGet("{sessionId:guid}/revision-changes")]
-    [ProducesResponseType(typeof(CatalogueRevisionChangesDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<CatalogueRevisionChangesDto>> GetRevisionChanges(
-        Guid sessionId,
-        CancellationToken cancellationToken) =>
-        Ok(await revisionChanges.GetAsync(sessionId, cancellationToken));
-
-    [HttpPost("{sessionId:guid}/revision-changes/apply")]
-    [ProducesResponseType(typeof(CatalogueRevisionFieldApplyResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<CatalogueRevisionFieldApplyResultDto>> ApplyRevisionFields(
-        Guid sessionId,
-        [FromBody] ApplyCatalogueRevisionFieldsRequest request,
-        CancellationToken cancellationToken) =>
-        Ok(await revisionChanges.ApplyFieldsAsync(sessionId, request, cancellationToken));
 
 }

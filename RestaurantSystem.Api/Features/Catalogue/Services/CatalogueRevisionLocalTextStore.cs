@@ -12,11 +12,13 @@ namespace RestaurantSystem.Api.Features.Catalogue.Services;
 
 internal sealed partial class CatalogueRevisionLocalTextStore(ApplicationDbContext context, ICurrentUserService currentUser)
 {
+    private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromSeconds(1);
     private static readonly Regex TranslationPath = new(
-        "^translations\\[([a-zA-Z0-9-]+)\\]\\.(name|description)$", RegexOptions.CultureInvariant);
+        "^translations\\[([a-zA-Z0-9-]+)\\]\\.(name|description)$", RegexOptions.CultureInvariant,
+        RegexMatchTimeout);
     private static readonly Regex SectionPath = new(
         "^sections\\[([a-zA-Z0-9_-]+)\\]\\.(name|translations\\[([a-zA-Z0-9-]+)\\]\\.name)$",
-        RegexOptions.CultureInvariant);
+        RegexOptions.CultureInvariant, RegexMatchTimeout);
 
     public async Task ApplyAsync(
         CatalogueTemplateAdoption adoption,

@@ -141,9 +141,9 @@ internal sealed class CatalogueRevisionChangesReader(
         var hasTextChanges = fields.Any(field => !string.Equals(field.Baseline, field.Current, StringComparison.Ordinal));
         var hasRevisionChanges = adoption.SourceRevision != published.Revision.Revision ||
             !string.Equals(adoption.ContentHash, published.Revision.ContentHash, StringComparison.Ordinal);
-        var status = published.Metadata.AdoptedRevisionWithdrawn == true
-            ? "AdoptedRevisionWithdrawn"
-            : hasTextChanges || hasRevisionChanges ? "UpdateAvailable" : "Current";
+        var status = "Current";
+        if (hasTextChanges || hasRevisionChanges) status = "UpdateAvailable";
+        if (published.Metadata.AdoptedRevisionWithdrawn == true) status = "AdoptedRevisionWithdrawn";
         var notice = status switch
         {
             "AdoptedRevisionWithdrawn" => "The adopted revision is withdrawn. The newer revision is only a suggestion; local data is unchanged.",
