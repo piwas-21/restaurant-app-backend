@@ -5,6 +5,9 @@ using RestaurantSystem.Api.Features.Catalogue.Services;
 namespace RestaurantSystem.Api.Features.Catalogue;
 
 [ApiController]
+// Public-by-design discovery exposes only centrally published, reviewed fields through a
+// bounded response allowlist. Tenant preferences, import sessions and local writes are
+// separate admin-authorized routes; this controller never reads tenant menu records.
 [AllowAnonymous]
 [Route("api/catalogue/templates")]
 public sealed class CatalogueTemplatesController(ICatalogueTemplateQueryService templates) : ControllerBase
