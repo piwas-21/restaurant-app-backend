@@ -173,7 +173,7 @@ public sealed class GeminiTranslationGenerationProviderTests
         TimeoutSeconds = 3,
         Gemini = new GeminiTranslationProviderSettings
         {
-            ApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta",
+            ApiBaseUrl = TranslationProviderTestSettings.GeminiBaseUrl,
             ApiKey = "inert-gemini-test-key", // pragma: allowlist secret -- inert test value
             Model = "gemini-3.8-flash",
             InputCostPerMillionUsd = 1m,
