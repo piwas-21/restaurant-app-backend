@@ -10,4 +10,7 @@ public interface ITenantFeatures
 
     /// <summary>Whether server writes enforce each product's minimum selected sauces.</summary>
     bool EnforceSauceMinimum { get; }
+
+    /// <summary>Whether admins may materialize or import option sets into tenant menu rows.</summary>
+    bool OptionSetMaterializationEnabled { get; }
 }

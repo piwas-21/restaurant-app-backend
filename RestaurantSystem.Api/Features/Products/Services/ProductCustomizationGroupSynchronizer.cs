@@ -16,6 +16,8 @@ internal sealed class ProductCustomizationGroupSynchronizer(
         CancellationToken cancellationToken)
     {
         ValidateShape(incoming);
+        var protectedIds = await ProductCustomizationGroupOptionSetGuard.ValidateAndGetProtectedIdsAsync(
+            context, product, incoming, cancellationToken);
         await ValidateReferencesAsync(context, product, incoming, cancellationToken);
 
         var incomingIds = incoming.Select(group => group.Id).OfType<Guid>().ToHashSet();
@@ -24,9 +26,18 @@ internal sealed class ProductCustomizationGroupSynchronizer(
 
         foreach (var dto in incoming)
         {
+            if (dto.Id is Guid protectedId && protectedIds.Contains(protectedId))
+            {
+                continue;
+            }
+
             var group = ResolveGroup(context, product, dto, auditIdentifier);
             ApplyFields(group, dto, auditIdentifier);
             ReplaceChildren(context, group, dto, auditIdentifier);
+            if (dto.Id.HasValue)
+            {
+                group.AuthoringVersion++;
+            }
         }
     }
 

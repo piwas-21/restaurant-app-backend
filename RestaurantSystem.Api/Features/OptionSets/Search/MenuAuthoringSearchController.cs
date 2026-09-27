@@ -1,0 +1,42 @@
+using Microsoft.AspNetCore.Mvc;
+using RestaurantSystem.Api.Common.Authorization;
+using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.OptionSets.Search;
+using RestaurantSystem.Domain.Common.Constants;
+using RestaurantSystem.Domain.Common.Enums;
+
+namespace RestaurantSystem.Api.Features.OptionSets;
+
+[ApiController]
+[Route("api/MenuAuthoring")]
+public sealed class MenuAuthoringSearchController : ControllerBase
+{
+    private readonly IMenuAuthoringSearchService _search;
+
+    public MenuAuthoringSearchController(IMenuAuthoringSearchService search) => _search = search;
+
+    [HttpGet("search")]
+    [ApiScope(ApiTokenScopes.MenuRead)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<MenuAuthoringSearchPageDto>>> Search(
+        [FromQuery] string? q,
+        [FromQuery] OptionSetKind? forKind,
+        [FromQuery] string? cursor,
+        [FromQuery] int limit = 24,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _search.SearchAsync(q, forKind, cursor, limit, cancellationToken);
+        return Ok(ApiResponse<MenuAuthoringSearchPageDto>.SuccessWithData(result));
+    }
+
+    [HttpPost("match-decisions")]
+    [ApiScope(ApiTokenScopes.MenuWrite)]
+    [RequireAdmin]
+    public async Task<ActionResult<ApiResponse<MenuAuthoringMatchDecisionDto>>> RecordDecision(
+        [FromBody] MenuAuthoringMatchDecisionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _search.RecordDecisionAsync(request, cancellationToken);
+        return Ok(ApiResponse<MenuAuthoringMatchDecisionDto>.SuccessWithData(result));
+    }
+}

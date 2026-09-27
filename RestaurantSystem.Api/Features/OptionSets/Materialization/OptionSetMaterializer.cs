@@ -1,0 +1,119 @@
+using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.OptionSets.Services;
+using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
+
+namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
+
+public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
+{
+    private readonly ApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IOptionSetCatalogService _catalog;
+    private readonly ITenantFeatures _tenantFeatures;
+
+    public OptionSetMaterializer(
+        ApplicationDbContext context,
+        ICurrentUserService currentUser,
+        IOptionSetCatalogService catalog,
+        ITenantFeatures tenantFeatures)
+    {
+        _context = context;
+        _currentUser = currentUser;
+        _catalog = catalog;
+        _tenantFeatures = tenantFeatures;
+    }
+
+    public async Task<OptionSetMaterializationPreview> PreviewAsync(
+        OptionSetMaterializationRequest request,
+        CancellationToken cancellationToken)
+    {
+        ValidateRequest(request);
+        var set = await LoadExpectedSetAsync(request, cancellationToken);
+        var preview = new OptionSetMaterializationPreview
+        {
+            OptionSetId = set.Id,
+            SetVersion = set.Version
+        };
+
+        foreach (var target in request.Targets)
+        {
+            preview.Targets.Add(await OptionSetMaterializerPlanBuilder.BuildAsync(
+                _context, set, target, cancellationToken));
+        }
+
+        preview.RelatedOfferWarnings.AddRange(await OptionSetRelatedOfferAnalyzer.AnalyzeAsync(
+            _context, set, request, cancellationToken));
+
+        return preview;
+    }
+
+    public Task<CreateOrReuseImportedSetResult> CreateOrReuseImportedSetAsync(
+        CreateOrReuseImportedSetRequest request,
+        CancellationToken cancellationToken)
+    {
+        EnsureMaterializationEnabled();
+        return _catalog.CreateOrReuseImportedSetAsync(request, cancellationToken);
+    }
+
+    private void EnsureMaterializationEnabled()
+    {
+        if (!_tenantFeatures.OptionSetMaterializationEnabled)
+        {
+            throw new OptionSetMaterializationDisabledException();
+        }
+    }
+
+    private async Task<OptionSet> LoadExpectedSetAsync(
+        OptionSetMaterializationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var set = await _context.OptionSets.AsNoTracking().Include(item => item.Entries)
+            .FirstOrDefaultAsync(item => item.Id == request.OptionSetId, cancellationToken)
+            ?? throw new NotFoundException("Option set", request.OptionSetId);
+        if (set.Version != request.ExpectedSetVersion)
+        {
+            throw new ConflictException("This option set changed. Reload it and preview the current version before applying.");
+        }
+
+        return set;
+    }
+
+    private static void ValidateRequest(OptionSetMaterializationRequest request)
+    {
+        if (request.OptionSetId == Guid.Empty || request.ExpectedSetVersion <= 0
+            || string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Trim().Length > 100
+            || request.Targets.Count is < 1 or > 100)
+        {
+            throw new BadRequestException("A valid option set, version, idempotency key, and 1 to 100 targets are required");
+        }
+
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var targetIds = new HashSet<(int Role, Guid ProductId, Guid? SectionId, Guid? CustomizationGroupId)>();
+        foreach (var target in request.Targets)
+        {
+            if (target is null || string.IsNullOrWhiteSpace(target.TargetKey)
+                || !keys.Add(target.TargetKey.Trim()) || !Enum.IsDefined(target.Role)
+                || !Enum.IsDefined(target.ConflictPolicy)
+                || target.ExpectedAttachmentVersion is < 0
+                || target.IntentionalDifferenceReason?.Trim().Length > 500)
+            {
+                throw new BadRequestException("Targets need unique keys, valid roles and policies, and valid concurrency data");
+            }
+
+            if (!targetIds.Add(((int)target.Role, target.TargetProductId,
+                target.TargetMenuSectionId, target.TargetCustomizationGroupId)))
+            {
+                throw new BadRequestException("A materialization request cannot repeat the same target and role");
+            }
+
+            if (target.EntryIds?.Count > 200 || target.Overrides?.Count > 200)
+            {
+                throw new BadRequestException("A target may select or override at most 200 entries");
+            }
+        }
+    }
+}

@@ -1,0 +1,137 @@
+using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.OptionSets.Dtos;
+using RestaurantSystem.Api.Features.OptionSets.Materialization;
+using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
+
+namespace RestaurantSystem.Api.Features.OptionSets.Services;
+
+public sealed partial class OptionSetCatalogService
+{
+    public async Task<CreateOrReuseImportedSetResult> CreateOrReuseImportedSetAsync(
+        CreateOrReuseImportedSetRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.SourceTemplateId)
+            || string.IsNullOrWhiteSpace(request.SourceOptionSetId)
+            || request.SourceRevision <= 0 || string.IsNullOrWhiteSpace(request.Name)
+            || !Enum.IsDefined(request.Kind))
+        {
+            throw new BadRequestException("The central option-set revision reference is incomplete");
+        }
+
+        var sourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale);
+        var translations = OptionSetLocales.NormalizeTranslations(request.Translations);
+        var existing = await _context.OptionSets.AsNoTracking().Include(set => set.Entries)
+            .Include(set => set.Translations)
+            .FirstOrDefaultAsync(set => set.SourceTemplateId == request.SourceTemplateId
+                && set.SourceRevision == request.SourceRevision
+                && set.SourceOptionSetId == request.SourceOptionSetId, cancellationToken);
+        if (existing is not null)
+        {
+            return ImportedResult(existing, created: false, request.Entries);
+        }
+
+        var write = new OptionSetWriteRequestDto
+        {
+            Kind = request.Kind,
+            Name = request.Name,
+            SourceLocale = sourceLocale,
+            Translations = translations,
+            Entries = request.Entries.Select(ImportedEntry).ToList()
+        };
+        ValidateHeader(write, creating: true);
+        await ValidateEntriesAsync(write, cancellationToken);
+        EnsureDistinctSourceEntries(request.Entries);
+        var name = await ResolveImportedNameAsync(request, cancellationToken);
+        var now = DateTime.UtcNow;
+        var actor = _currentUser.GetAuditIdentifier();
+        var set = new OptionSet
+        {
+            Kind = request.Kind,
+            Name = name,
+            SourceLocale = sourceLocale,
+            NormalizedName = OptionSetNameNormalizer.Normalize(name),
+            SourceTemplateId = request.SourceTemplateId,
+            SourceRevision = request.SourceRevision,
+            SourceOptionSetId = request.SourceOptionSetId,
+            CreatedAt = now,
+            CreatedBy = actor,
+            Entries = request.Entries.Select(entry => ImportedEntity(entry, actor, now)).ToList()
+        };
+        set.Translations = OptionSetLocales.CreateEntities(set, translations, actor, now);
+        await _context.OptionSets.AddAsync(set, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        return ImportedResult(set, created: true, request.Entries);
+    }
+
+    private async Task<string> ResolveImportedNameAsync(CreateOrReuseImportedSetRequest request, CancellationToken cancellationToken)
+    {
+        var name = request.Name.Trim();
+        var normalized = OptionSetNameNormalizer.Normalize(name);
+        if (!await _context.OptionSets.AnyAsync(set => set.Kind == request.Kind && set.NormalizedName == normalized, cancellationToken))
+        {
+            return name;
+        }
+
+        var suffix = $" · {request.SourceOptionSetId}";
+        var available = $"{name[..Math.Min(name.Length, 120 - suffix.Length)]}{suffix}";
+        if (await _context.OptionSets.AnyAsync(set => set.Kind == request.Kind
+            && set.NormalizedName == OptionSetNameNormalizer.Normalize(available), cancellationToken))
+        {
+            throw new ConflictException("A matching imported option set name already exists for a different source revision");
+        }
+
+        return available;
+    }
+
+    private static void EnsureDistinctSourceEntries(IReadOnlyList<ImportedOptionSetEntryRequest> entries)
+    {
+        if (entries.Count > 200 || entries.Any(entry => string.IsNullOrWhiteSpace(entry.SourceEntryId))
+            || entries.Select(entry => entry.SourceEntryId).Distinct(StringComparer.Ordinal).Count() != entries.Count)
+        {
+            throw new BadRequestException("Imported option entries need unique source IDs and a maximum of 200 rows");
+        }
+    }
+
+    private static OptionSetEntryDto ImportedEntry(ImportedOptionSetEntryRequest entry) => new()
+    {
+        Name = entry.Name ?? string.Empty,
+        DisplayOrder = entry.DisplayOrder,
+        GlobalIngredientId = entry.GlobalIngredientId,
+        ProductId = entry.ProductId,
+        ProductVariationId = entry.ProductVariationId,
+        IsOptional = entry.IsOptional,
+        MaxQuantity = entry.MaxQuantity,
+        Price = entry.Price,
+        IsIncludedInBasePrice = entry.IsIncludedInBasePrice,
+        IsRequired = entry.IsRequired,
+        AdditionalPrice = entry.AdditionalPrice,
+        IsDefault = entry.IsDefault
+    };
+
+    private static OptionSetEntry ImportedEntity(ImportedOptionSetEntryRequest dto, string actor, DateTime now)
+    {
+        var entry = NewEntry(ImportedEntry(dto), actor, now);
+        entry.SourceEntryId = dto.SourceEntryId;
+        return entry;
+    }
+
+    private static CreateOrReuseImportedSetResult ImportedResult(
+        OptionSet set,
+        bool created,
+        IReadOnlyList<ImportedOptionSetEntryRequest> requested) => new()
+        {
+            OptionSetId = set.Id,
+            Version = set.Version,
+            Created = created,
+            SourceLocale = set.SourceLocale,
+            Translations = OptionSetLocales.ToDto(set.Translations),
+            Entries = requested.Select(source => new ImportedOptionSetEntryResult
+            {
+                SourceEntryId = source.SourceEntryId,
+                OptionSetEntryId = set.Entries.Single(entry => entry.SourceEntryId == source.SourceEntryId).Id
+            }).ToList()
+        };
+}

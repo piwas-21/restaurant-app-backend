@@ -19,4 +19,7 @@ public sealed class TenantFeatureSettings
     /// staff and mobile clients until each tenant's payload compatibility is verified.
     /// </summary>
     public bool EnforceSauceMinimum { get; set; }
+
+    /// <summary>Enables explicit option-set materialization and catalogue import commits for this tenant.</summary>
+    public bool OptionSetMaterializationEnabled { get; set; }
 }

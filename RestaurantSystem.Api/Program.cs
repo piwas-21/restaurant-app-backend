@@ -666,6 +666,12 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.OptionSets.Services.IOptionSetCatalogService,
+    RestaurantSystem.Api.Features.OptionSets.Services.OptionSetCatalogService>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.OptionSets.Materialization.IOptionSetMaterializer,
+    RestaurantSystem.Api.Features.OptionSets.Materialization.OptionSetMaterializer>();
+builder.Services.AddScoped<RestaurantSystem.Api.Features.OptionSets.Search.IMenuAuthoringSearchService,
+    RestaurantSystem.Api.Features.OptionSets.Search.MenuAuthoringSearchService>();
 // Lets ApplicationDbContext (Infrastructure, which cannot see ICurrentUserService) backfill audit
 // columns with the acting user. NOT forwarded to ICurrentUserService: that is a dependency CYCLE —
 // CurrentUserService needs UserManager, which needs IUserStore, which AddEntityFrameworkStores

@@ -6,6 +6,8 @@ namespace RestaurantSystem.Domain.Entities;
 public class ProductCustomizationGroup : Entity
 {
     public Guid ProductId { get; set; }
+    /// <summary>Monotonic revision used to reject stale option-set and product writes.</summary>
+    public int AuthoringVersion { get; set; } = 1;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int DisplayOrder { get; set; }

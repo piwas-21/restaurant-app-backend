@@ -235,6 +235,11 @@ public static class MenuOfferLinkRules
         ProductType targetType,
         CancellationToken cancellationToken)
     {
+        if (targetType == product.Type)
+        {
+            return;
+        }
+
         if (targetType == ProductType.Menu)
         {
             return;

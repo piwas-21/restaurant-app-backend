@@ -10,6 +10,7 @@ public class ProductCustomizationGroupConfiguration : IEntityTypeConfiguration<P
     {
         builder.Property(group => group.Name).IsRequired().HasMaxLength(100);
         builder.Property(group => group.Description).HasMaxLength(500);
+        builder.Property(group => group.AuthoringVersion).HasDefaultValue(1).IsConcurrencyToken();
 
         builder.HasOne(group => group.Product)
             .WithMany(product => product.CustomizationGroups)

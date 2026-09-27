@@ -3,6 +3,7 @@ namespace RestaurantSystem.Api.Features.Products.Dtos;
 public record ProductCustomizationGroupDto
 {
     public Guid? Id { get; init; }
+    public int AuthoringVersion { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public int DisplayOrder { get; init; }
