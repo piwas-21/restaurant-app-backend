@@ -19,13 +19,18 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
     public async Task OptionSetSavePersistsSourceAndMakesExistingNamesReadableForReview()
     {
         AuthenticateAsAdmin();
-        var name = $"Acı sos {Guid.NewGuid():N}";
+        var suffix = Guid.NewGuid().ToString("N");
+        var sourceName = $"Acı sos {suffix}";
         var response = await PostAsJsonAsync("/api/OptionSets", new
         {
             kind = 1,
-            name,
+            name = $"Hot sauce {suffix}",
             sourceLocale = "tr",
-            translations = new Dictionary<string, string> { ["en"] = "Hot sauce" },
+            translations = new Dictionary<string, string>
+            {
+                ["tr"] = sourceName,
+                ["en"] = $"Hot sauce {suffix}"
+            },
             status = 0,
             entries = Array.Empty<object>(),
             translationMetadata = new
@@ -42,6 +47,7 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
         var source = await context.TranslationFieldProvenances.SingleAsync(row =>
             row.EntityType == "optionSet" && row.EntityId == id && row.Locale == "tr");
         source.Kind.Should().Be("tenantSource");
+        source.SourceHash.Should().Be(TranslationWorkbenchRules.Hash($"tr\n{sourceName}"));
 
         var preview = await PostAsJsonAsync("/api/translation-workbench/preview", new
         {
@@ -50,7 +56,7 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
             fields = new[] { new
             {
                 fieldRef = new { entityType = "optionSet", entityId = id, fieldKey = "name" },
-                sourceLocale = "tr", sourceText = name
+                sourceLocale = "tr", sourceText = sourceName
             } }
         });
         preview.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -60,7 +66,7 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
     }
 
     [Fact]
-    public async Task OptionSetRejectsConflictingSourceTranslation()
+    public async Task OptionSetRejectsConflictingSourceMetadata()
     {
         AuthenticateAsAdmin();
         var response = await PostAsJsonAsync("/api/OptionSets", new
@@ -68,9 +74,13 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
             kind = 1,
             name = $"Acı sos {Guid.NewGuid():N}",
             sourceLocale = "tr",
-            translations = new Dictionary<string, string> { ["tr"] = "Different name" },
+            translations = new Dictionary<string, string> { ["tr"] = "Acı sos" },
             status = 0,
-            entries = Array.Empty<object>()
+            entries = Array.Empty<object>(),
+            translationMetadata = new
+            {
+                sourceLocales = new Dictionary<string, string> { ["name"] = "en" }
+            }
         });
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }

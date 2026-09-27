@@ -91,7 +91,7 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
             ?? throw new NotFoundException("Option set was not found");
         var texts = set.Translations.ToDictionary(row => row.LanguageCode, row => row.Name,
             StringComparer.Ordinal);
-        texts[set.SourceLocale] = set.Name;
+        texts.TryAdd(set.SourceLocale, set.Name);
         return texts;
     }
 }

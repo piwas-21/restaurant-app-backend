@@ -193,17 +193,14 @@ public sealed partial class OptionSetCatalogService
         {
             throw new BadRequestException("Option-set name source locale must match its translation metadata");
         }
-        if (set.Translations.Any(row => row.LanguageCode == set.SourceLocale && row.Name != set.Name))
-        {
-            throw new BadRequestException("The source-locale translation must match the option-set name");
-        }
-
+        var sourceName = set.Translations.FirstOrDefault(row => row.LanguageCode == set.SourceLocale)?.Name
+            ?? set.Name;
         return _translationProvenance.RecordAsync("optionSet", set.Id,
         request.TranslationMetadata ?? new TranslationOwnerMetadataDto
         {
             SourceLocales = new Dictionary<string, string> { ["name"] = set.SourceLocale }
         },
-        TranslationTextMap.Create(set.Name, null,
+        TranslationTextMap.Create(sourceName, null,
             set.Translations.Select(row => (row.LanguageCode, (string?)row.Name, (string?)null))),
         cancellationToken);
     }
