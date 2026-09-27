@@ -165,6 +165,14 @@ public sealed class OptionSetMaterializationJobService : IOptionSetMaterializati
             throw new ConflictException("This job has no pending or retryable targets; review conflicts and create a new job.");
         }
 
+        var request = OptionSetMaterializationJobJson.Deserialize<OptionSetMaterializationRequest>(job.RequestJson);
+        request.OptionSetId = job.OptionSetId;
+        var targetsToValidate = job.Targets
+            .Where(target => target.Status is "pending" or "failed")
+            .Select(target => target.Sequence);
+        await _materializer.ValidateJobRequestAsync(
+            OptionSetMaterializationJobJson.WithTargets(request, targetsToValidate), cancellationToken);
+
         foreach (var target in retryable)
         {
             target.Status = "pending";

@@ -40,7 +40,26 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         try
         {
             input = await LoadRequestAsync(claim.JobId, cancellationToken);
-            await _materializer.ValidateJobRequestAsync(input.Request, cancellationToken);
+            if (claim.IsFirstRun || claim.RecoveredExpiredLease)
+            {
+                if (claim.RecoveredExpiredLease)
+                {
+                    var pendingSequences = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
+                        .Where(target => target.JobId == claim.JobId && target.Status == "pending")
+                        .OrderBy(target => target.Sequence)
+                        .Select(target => target.Sequence)
+                        .ToListAsync(cancellationToken);
+                    if (pendingSequences.Count > 0)
+                    {
+                        await _materializer.ValidateJobRequestAsync(
+                            OptionSetMaterializationJobJson.WithTargets(input.Request, pendingSequences), cancellationToken);
+                    }
+                }
+                else
+                {
+                    await _materializer.ValidateJobRequestAsync(input.Request, cancellationToken);
+                }
+            }
         }
         catch (Exception exception) when (exception is ConflictException or BadRequestException or NotFoundException or JsonException)
         {
@@ -132,7 +151,7 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
             .Where(job => job.Status == "queued"
                 || job.Status == "processing" && (job.LeaseExpiresAt == null || job.LeaseExpiresAt <= now))
             .OrderBy(job => job.CreatedAt)
-            .Select(job => (Guid?)job.Id)
+            .Select(job => new { job.Id, job.Status, job.StartedAt })
             .FirstOrDefaultAsync(cancellationToken);
         if (candidateId is null)
         {
@@ -142,7 +161,7 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         var leaseId = Guid.NewGuid();
         var leaseExpiresAt = now.AddSeconds(_settings.JobLeaseSeconds);
         var claimed = await _context.OptionSetMaterializationJobs
-            .Where(job => job.Id == candidateId.Value
+            .Where(job => job.Id == candidateId.Id
                 && (job.Status == "queued"
                     || job.Status == "processing" && (job.LeaseExpiresAt == null || job.LeaseExpiresAt <= now)))
             .ExecuteUpdateAsync(updates => updates
@@ -151,7 +170,10 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
                 .SetProperty(job => job.LeaseExpiresAt, leaseExpiresAt)
                 .SetProperty(job => job.StartedAt, job => job.StartedAt ?? now)
                 .SetProperty(job => job.UpdatedAt, now), cancellationToken);
-        return claimed == 1 ? new JobLease(candidateId.Value, leaseId) : null;
+        return claimed == 1
+            ? new JobLease(
+                candidateId.Id, leaseId, candidateId.Status == "processing", candidateId.StartedAt is null)
+            : null;
     }
 
     private async Task<JobInput> LoadRequestAsync(
@@ -177,7 +199,9 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
 
         var previousJson = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
             .Where(row => row.JobId == target.JobId && row.TargetProductId == target.TargetProductId
-                && row.Sequence < target.Sequence && (row.Status == "applied" || row.Status == "unchanged"))
+                && row.Sequence < target.Sequence && (row.Status == "applied" || row.Status == "unchanged")
+                && row.ResultJson != null
+                && EF.Functions.JsonContains(row.RequestJson, "{\"role\":\"bundleChoice\"}"))
             .OrderByDescending(row => row.Sequence)
             .Select(row => row.ResultJson)
             .FirstOrDefaultAsync(cancellationToken);
@@ -187,6 +211,6 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
                 .MenuAuthoringVersion;
     }
 
-    private sealed record JobLease(Guid JobId, Guid LeaseId);
+    private sealed record JobLease(Guid JobId, Guid LeaseId, bool RecoveredExpiredLease, bool IsFirstRun);
     private sealed record JobInput(OptionSetMaterializationRequest Request, string CreatedBy);
 }

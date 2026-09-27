@@ -13,6 +13,33 @@ internal static class OptionSetMaterializationJobJson
     public static T Deserialize<T>(string json) => JsonSerializer.Deserialize<T>(json, JsonOptions)
         ?? throw new JsonException("The saved option-set job data is empty.");
 
+    public static OptionSetMaterializationRequest WithTargets(
+        OptionSetMaterializationRequest request,
+        IEnumerable<int> targetSequences)
+    {
+        var targets = targetSequences.Select(sequence =>
+        {
+            if (sequence < 0 || sequence >= request.Targets.Count)
+            {
+                throw new JsonException("A saved option-set job target is outside its immutable request.");
+            }
+
+            return request.Targets[sequence];
+        }).ToArray();
+        if (targets.Length == 0)
+        {
+            throw new JsonException("The saved option-set job has no pending targets to validate.");
+        }
+
+        return new OptionSetMaterializationRequest
+        {
+            OptionSetId = request.OptionSetId,
+            ExpectedSetVersion = request.ExpectedSetVersion,
+            IdempotencyKey = request.IdempotencyKey,
+            Targets = targets
+        };
+    }
+
     public static string Fingerprint(OptionSetMaterializationRequest request)
     {
         using var document = JsonDocument.Parse(Serialize(request));
