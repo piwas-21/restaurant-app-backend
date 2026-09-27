@@ -179,8 +179,9 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
         var response = await Client.GetAsync($"/api/Products/{productId}");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        json.RootElement.GetProperty("data").GetProperty("translationMetadata")
-            .GetProperty("sourceLocales").GetProperty("name").GetString().Should().Be("tr");
+        var metadata = json.RootElement.GetProperty("data").GetProperty("translationMetadata");
+        metadata.GetProperty("sourceLocales").GetProperty("name").GetString().Should().Be("tr");
+        metadata.GetProperty("expectedContentVersion").GetString().Should().HaveLength(64);
     }
 
     [Fact]
