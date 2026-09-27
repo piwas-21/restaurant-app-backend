@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -10,8 +11,9 @@ public sealed class OptionSetMaterializationJobModelTests
     [Fact]
     public void Job_model_maps_immutable_json_and_idempotency_constraints()
     {
+        using var connection = new NpgsqlConnection();
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql("Host=localhost;Database=option_set_job_model")
+            .UseNpgsql(connection)
             .Options;
         using var context = new ApplicationDbContext(options);
         var job = context.Model.FindEntityType(typeof(OptionSetMaterializationJob));

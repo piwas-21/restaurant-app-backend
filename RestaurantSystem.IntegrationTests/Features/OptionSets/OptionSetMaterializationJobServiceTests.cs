@@ -55,8 +55,12 @@ public sealed class OptionSetMaterializationJobServiceTests : IntegrationTestBas
         OptionSetMaterializationJobDto replayed;
         await using (var restartedProcessContext = DatabaseFixture.CreateContext())
         {
-            replayed = await CreateService(restartedProcessContext, materializer.Object)
+            var service = CreateService(restartedProcessContext, materializer.Object);
+            replayed = await service
                 .CreateAsync(optionSet.Id, request, CancellationToken.None);
+            (await service.GetAsync(optionSet.Id, created.JobId, CancellationToken.None))
+                .JobId.Should().Be(created.JobId);
+            restartedProcessContext.ChangeTracker.Entries().Should().BeEmpty();
         }
 
         replayed.JobId.Should().Be(created.JobId);

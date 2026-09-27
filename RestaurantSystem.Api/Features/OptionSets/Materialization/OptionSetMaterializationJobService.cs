@@ -106,7 +106,10 @@ public sealed class OptionSetMaterializationJobService : IOptionSetMaterializati
         Guid jobId,
         CancellationToken cancellationToken)
     {
-        var job = await LoadAsync(optionSetId, jobId, cancellationToken);
+        var job = await _context.OptionSetMaterializationJobs.AsNoTracking()
+            .Include(item => item.Targets.OrderBy(target => target.Sequence))
+            .FirstOrDefaultAsync(item => item.Id == jobId && item.OptionSetId == optionSetId, cancellationToken)
+            ?? throw new NotFoundException("Option-set materialization job was not found");
         return ToDto(job);
     }
 
