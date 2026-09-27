@@ -78,10 +78,16 @@ public sealed class CatalogueImportReviewedListTests(DatabaseFixture databaseFix
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var session = await SeedSessionAsync("item", context);
+        var session = await SeedBlockedItemSessionAsync(context);
         var productCount = await context.Products.CountAsync();
-        var revision = JsonSerializer.Deserialize<CentralCatalogueTemplateRevision>(
-            session.Templates.Single().RevisionJson, WebOptions)!;
+        var categoryCount = await context.Categories.CountAsync();
+        var revisions = session.Templates.ToDictionary(template => template.TemplateId,
+            template => JsonSerializer.Deserialize<CentralCatalogueTemplateRevision>(template.RevisionJson, WebOptions)!,
+            StringComparer.Ordinal);
+        var previewService = scope.ServiceProvider.GetRequiredService<ICatalogueImportPreviewService>();
+        var preview = await previewService.PreviewAsync(session.Id, CancellationToken.None);
+        preview.Items.Where(item => item.IsSelected).SelectMany(item => item.BlockingIssues)
+            .Select(issue => issue.Code).Should().Equal("TENANT_INGREDIENTS_REQUIRED");
         var central = new Mock<ICentralCatalogueClient>(MockBehavior.Strict);
         central.Setup(client => client.GetCurrentRevisionBatchAsync(
                 It.IsAny<IReadOnlyList<CatalogueCurrentRevisionRequest>>(), It.IsAny<CancellationToken>()))
@@ -92,7 +98,7 @@ public sealed class CatalogueImportReviewedListTests(DatabaseFixture databaseFix
                     {
                         templateId = request.TemplateId,
                         status = "available",
-                        revision,
+                        revision = revisions[request.TemplateId],
                         adoptedRevisionWithdrawn = false
                     })
                 }, WebOptions)));
@@ -104,7 +110,7 @@ public sealed class CatalogueImportReviewedListTests(DatabaseFixture databaseFix
             importLock.Object,
             new CatalogueImportStateStore(context, scope.ServiceProvider.GetRequiredService<ICurrentUserService>()),
             scope.ServiceProvider.GetRequiredService<ICatalogueTemplateImportExecutor>(),
-            scope.ServiceProvider.GetRequiredService<ICatalogueImportPreviewService>(),
+            previewService,
             central.Object,
             scope.ServiceProvider.GetRequiredService<ILogger<CatalogueSessionImporter>>());
 
@@ -116,8 +122,57 @@ public sealed class CatalogueImportReviewedListTests(DatabaseFixture databaseFix
             .WithMessage("Resolve the blocking import review issues before importing.");
         exception.Which.ErrorCode.Should().BeNull();
         (await context.Products.CountAsync()).Should().Be(productCount);
+        (await context.Categories.CountAsync()).Should().Be(categoryCount);
         (await context.CatalogueImportSessions.AsNoTracking().SingleAsync(value => value.Id == session.Id))
             .Status.Should().Be(CatalogueImportStatus.Draft);
+    }
+
+    private static async Task<CatalogueImportSession> SeedBlockedItemSessionAsync(ApplicationDbContext context)
+    {
+        var categoryId = $"review-category-{Guid.NewGuid():N}";
+        var itemId = $"review-item-{Guid.NewGuid():N}";
+        var categoryRevision = CreateRevision(categoryId, "category", new { sortOrder = 0 });
+        var itemRevision = CreateRevision(itemId, "item", new
+        {
+            category = new { templateId = categoryId, revision = 1 },
+            suggestedIngredients = Array.Empty<object>(),
+            optionSets = Array.Empty<object>(),
+            sideSets = Array.Empty<object>()
+        });
+        var category = CreateTemplate(categoryRevision,
+            new CatalogueImportItemDecision { Resolution = "Create" }, isRoot: false);
+        var item = CreateTemplate(itemRevision, new CatalogueImportItemDecision
+        {
+            Resolution = "Create",
+            LocalPrice = 9.5m,
+            LocalProductType = "MainItem",
+            IntendedIsAvailable = false,
+            Ingredients = null,
+            Allergens = [],
+            IngredientsReviewed = true,
+            AllergensReviewed = true,
+            AvailabilityReviewed = true,
+            ChannelsReviewed = true,
+            KitchenRoutingReviewed = true,
+            AvailableOrderTypes = 3,
+            KitchenType = KitchenType.BackKitchen
+        }, isRoot: true);
+        var session = new CatalogueImportSession
+        {
+            Id = Guid.NewGuid(),
+            RootTemplateId = itemId,
+            RootRevision = 1,
+            Locale = "en",
+            IdempotencyKey = Guid.NewGuid().ToString("N"),
+            AdoptionId = Guid.NewGuid(),
+            CreateNewCopy = true,
+            Version = 1,
+            CreatedBy = Actor,
+            Templates = [category, item]
+        };
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+        return session;
     }
 
     private async Task<JsonDocument> SaveAndPreviewAsync(
@@ -243,6 +298,40 @@ public sealed class CatalogueImportReviewedListTests(DatabaseFixture databaseFix
         AddListPayload(decision, "allergens", allergenState);
         return decision;
     }
+
+    private static CentralCatalogueTemplateRevision CreateRevision(string templateId, string type, object payload) => new()
+    {
+        SchemaVersion = 1,
+        TemplateId = templateId,
+        Revision = 1,
+        Type = type,
+        Name = $"Reviewed {type}",
+        SourceLocale = "en",
+        QualityStatus = "reviewed",
+        CompatibleTenantContractVersions = [1],
+        Provenance = JsonSerializer.SerializeToElement(new { source = "test" }),
+        Payload = JsonSerializer.SerializeToElement(payload),
+        ContentHash = new string('d', 64)
+    };
+
+    private static CatalogueImportSessionTemplate CreateTemplate(
+        CentralCatalogueTemplateRevision revision,
+        CatalogueImportItemDecision decision,
+        bool isRoot) => new()
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = revision.TemplateId,
+            Revision = revision.Revision,
+            Type = revision.Type,
+            ContentHash = revision.ContentHash,
+            RevisionJson = JsonSerializer.Serialize(revision, WebOptions),
+            DecisionJson = JsonSerializer.Serialize(decision, WebOptions),
+            IsRoot = isRoot,
+            IsSelectable = true,
+            IsSelected = true,
+            Status = CatalogueImportItemStatus.Pending,
+            CreatedBy = Actor
+        };
 
     private static void AddListPayload(Dictionary<string, object?> decision, string field, string state)
     {
