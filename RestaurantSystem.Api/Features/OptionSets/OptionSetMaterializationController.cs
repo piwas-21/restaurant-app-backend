@@ -12,7 +12,10 @@ public sealed class OptionSetMaterializationController : ControllerBase
 {
     private readonly IOptionSetMaterializer _materializer;
 
-    public OptionSetMaterializationController(IOptionSetMaterializer materializer) => _materializer = materializer;
+    public OptionSetMaterializationController(IOptionSetMaterializer materializer)
+    {
+        _materializer = materializer;
+    }
 
     [HttpPost("preview")]
     [ApiScope(ApiTokenScopes.MenuWrite)]
@@ -39,4 +42,5 @@ public sealed class OptionSetMaterializationController : ControllerBase
         var result = await _materializer.ApplyAsync(request, cancellationToken);
         return Ok(ApiResponse<OptionSetMaterializationResult>.SuccessWithData(result));
     }
+
 }

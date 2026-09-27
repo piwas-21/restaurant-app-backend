@@ -330,6 +330,15 @@ builder.Services.AddOptions<OptionSetAuthoringSettings>()
     .Validate(settings => settings.MaximumIdempotencyKeyLength > 0
         && settings.MaximumIdempotencyKeyLength <= OptionSetSchemaLimits.IdempotencyKeyLength
         && settings.MaximumTargetsPerRequest > 0
+        && settings.MaximumTargetsPerRequest <= OptionSetAuthoringSettings.MaximumSynchronousTargetsLimit
+        && settings.MaximumTargetsPerJob > settings.MaximumTargetsPerRequest
+        && settings.MaximumTargetsPerJob <= OptionSetAuthoringSettings.MaximumJobTargetsLimit
+        && settings.TargetsPerJobRun > 0
+        && settings.TargetsPerJobRun <= OptionSetAuthoringSettings.MaximumTargetsPerJobRunLimit
+        && settings.JobLeaseSeconds > 0
+        && settings.JobLeaseSeconds <= OptionSetAuthoringSettings.MaximumJobLeaseSecondsLimit
+        && settings.JobPollIntervalSeconds > 0
+        && settings.JobPollIntervalSeconds <= OptionSetAuthoringSettings.MaximumJobPollIntervalSecondsLimit
         && settings.MaximumTargetKeyLength > 0
         && settings.MaximumEntriesPerOptionSet > 0
         && settings.MaximumEntryNameLength > 0

@@ -1,3 +1,5 @@
+using RestaurantSystem.Domain.Entities;
+
 namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
 public interface IOptionSetMaterializer
@@ -8,6 +10,19 @@ public interface IOptionSetMaterializer
 
     Task<OptionSetMaterializationResult> ApplyAsync(
         OptionSetMaterializationRequest request,
+        CancellationToken cancellationToken);
+
+    Task ValidateJobRequestAsync(
+        OptionSetMaterializationRequest request,
+        CancellationToken cancellationToken);
+
+    Task<OptionSetMaterializationTargetResultDto> ApplyJobTargetAsync(
+        OptionSetMaterializationRequest request,
+        OptionSetMaterializationTargetRequest target,
+        OptionSetMaterializationJobTarget jobTarget,
+        Guid leaseId,
+        int? previousMenuVersion,
+        string auditIdentifier,
         CancellationToken cancellationToken);
 
     Task<OptionSetMaterializationResult> ApplyImportedAsync(
