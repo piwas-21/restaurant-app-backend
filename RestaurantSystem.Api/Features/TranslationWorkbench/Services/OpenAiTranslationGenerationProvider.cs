@@ -9,7 +9,6 @@ public sealed class OpenAiTranslationGenerationProvider(
     HttpClient client,
     IOptions<TranslationAssistanceSettings> options) : ITranslationGenerationProvider
 {
-    private const string Instructions = "Translate only the requested restaurant menu text. Preserve every number, currency, and placeholder exactly. Do not add ingredients, allergens, claims, or prices. Use the glossary and exclusion context as supplied. Return one text for each key.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<TranslationGenerationResult> GenerateAsync(
@@ -30,7 +29,7 @@ public sealed class OpenAiTranslationGenerationProvider(
             store = false,
             reasoning = new { effort = "none" },
             max_output_tokens = settings.MaxOutputTokens,
-            instructions = Instructions,
+            instructions = TranslationGenerationPrompt.Instructions,
             input = JsonSerializer.Serialize(new { glossary, targets }, JsonOptions),
             text = new
             {
@@ -90,37 +89,11 @@ public sealed class OpenAiTranslationGenerationProvider(
         IReadOnlyList<TranslationGenerationTarget> targets,
         string model)
     {
-        var text = GetOutputText(response);
-        using var parsed = JsonDocument.Parse(text);
-        if (!parsed.RootElement.TryGetProperty("items", out var items) ||
-            items.ValueKind != JsonValueKind.Array || items.GetArrayLength() != targets.Count)
-        {
-            throw new HttpRequestException("Translation provider returned an invalid batch");
-        }
-
-        var results = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var item in items.EnumerateArray())
-        {
-            if (!item.TryGetProperty("key", out var keyValue) || keyValue.ValueKind != JsonValueKind.String ||
-                !item.TryGetProperty("text", out var translated) || translated.ValueKind != JsonValueKind.String)
-            {
-                throw new HttpRequestException("Translation provider returned an invalid item");
-            }
-
-            var key = keyValue.GetString()!;
-            var target = targets.FirstOrDefault(candidate => candidate.Key == key);
-            var value = translated.GetString()!;
-            if (target is null || !results.TryAdd(key, value) ||
-                !TranslationWorkbenchRules.IsSafeSuggestion(target.SourceText, value, target.FieldKey))
-            {
-                throw new HttpRequestException("Translation provider returned unsafe text");
-            }
-        }
-
         var usage = response.TryGetProperty("usage", out var usageValue) ? usageValue : default;
         var inputTokens = ReadTokens(usage, "input_tokens");
         var outputTokens = ReadTokens(usage, "output_tokens");
-        return new TranslationGenerationResult(results, "openai", model, inputTokens, outputTokens);
+        return TranslationGenerationResponseParser.Parse(
+            GetOutputText(response), targets, "openai", model, inputTokens, outputTokens);
     }
 
     private static string GetOutputText(JsonElement response)

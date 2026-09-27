@@ -9,6 +9,7 @@ public sealed class TranslationAssistanceSettings
     public string ApiKey { get; set; } = string.Empty;
     public string Provider { get; set; } = "openai";
     public string Model { get; set; } = "gpt-6-luna";
+    public GeminiTranslationProviderSettings Gemini { get; set; } = new();
     public string PromptVersion { get; set; } = "1";
     public int MaxOutputTokens { get; set; } = 2048;
     public int MaxDailyBatches { get; set; } = 40;
@@ -19,4 +20,31 @@ public sealed class TranslationAssistanceSettings
     public int MaxBatchTargets { get; set; } = 30;
     public int TimeoutSeconds { get; set; } = 20;
     public Dictionary<string, string> Glossary { get; set; } = new(StringComparer.Ordinal);
+
+    public string SelectedModel => Provider == "gemini" ? Gemini.Model : Model;
+
+    public decimal SelectedInputCostPerMillionUsd => Provider == "gemini" ? Gemini.InputCostPerMillionUsd : InputCostPerMillionUsd;
+
+    public decimal SelectedOutputCostPerMillionUsd => Provider == "gemini" ? Gemini.OutputCostPerMillionUsd : OutputCostPerMillionUsd;
+    public bool CanGenerate => Enabled && TenantDataApproved && HasProviderConfiguration;
+
+    public bool HasProviderConfiguration => Provider switch
+    {
+        "openai" => !string.IsNullOrWhiteSpace(ApiKey) && IsHttpsUrl(ApiUrl),
+        "gemini" => !string.IsNullOrWhiteSpace(Gemini.ApiKey) &&
+            IsHttpsBaseUrl(Gemini.ApiBaseUrl) &&
+            !string.IsNullOrWhiteSpace(Gemini.Model) && !Gemini.Model.Contains('/') &&
+            Gemini.InputCostPerMillionUsd > 0 && Gemini.OutputCostPerMillionUsd > 0,
+        _ => false
+    };
+
+    private static bool IsHttpsUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
+
+    private static bool IsHttpsBaseUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        string.IsNullOrEmpty(uri.UserInfo) &&
+        string.IsNullOrEmpty(uri.Query) &&
+        string.IsNullOrEmpty(uri.Fragment);
 }

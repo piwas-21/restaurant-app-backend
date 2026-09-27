@@ -82,7 +82,7 @@ public sealed class TranslationSuggestionService(
                 Fingerprint = TranslationWorkbenchRules.Hash(string.Join("|", uncached.Select(row => row.Fingerprint))),
                 RequestedBy = actor,
                 Provider = settings.Provider,
-                Model = settings.Model,
+                Model = settings.SelectedModel,
                 InputTokens = reservation.InputTokens,
                 OutputTokens = reservation.OutputTokens,
                 EstimatedCostUsd = reservation.SpendUsd,
@@ -152,7 +152,9 @@ public sealed class TranslationSuggestionService(
         string actor)
     {
         var contextHash = TranslationWorkbenchRules.ContextHash(field.Context, glossary,
-            settings.PromptVersion, settings.Model);
+            settings.PromptVersion, settings.Provider == "openai"
+                ? settings.SelectedModel
+                : $"{settings.Provider}:{settings.SelectedModel}");
         var identity = TranslationWorkbenchRules.Identity(field.FieldRef);
         var actorScope = field.FieldRef.ClientKey is null ? string.Empty : actor;
         foreach (var target in row.Targets)
@@ -236,8 +238,8 @@ public sealed class TranslationSuggestionService(
         var inputBytes = Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new { glossary, targets }));
         var reservedInputTokens = inputBytes + 4096;
         var reservedTokens = reservedInputTokens + settings.MaxOutputTokens;
-        var reservedSpend = (reservedInputTokens * settings.InputCostPerMillionUsd +
-            settings.MaxOutputTokens * settings.OutputCostPerMillionUsd) / 1_000_000m;
+        var reservedSpend = (reservedInputTokens * settings.SelectedInputCostPerMillionUsd +
+            settings.MaxOutputTokens * settings.SelectedOutputCostPerMillionUsd) / 1_000_000m;
         if ((usage?.Count ?? 0) >= settings.MaxDailyBatches ||
             (usage?.Tokens ?? 0) + reservedTokens > settings.MaxDailyTokens ||
             (usage?.Spend ?? 0m) + reservedSpend > settings.MaxDailySpendUsd)
@@ -284,15 +286,11 @@ public sealed class TranslationSuggestionService(
         row.Locale, row.SourceHash, row.SuggestedText, row.Provider, row.Model, "suggested");
 
     private static string ProviderStatus(TranslationAssistanceSettings settings) =>
-        settings.Enabled && settings.TenantDataApproved &&
-        settings.Provider == "openai" &&
-        !string.IsNullOrWhiteSpace(settings.ApiKey) &&
-        Uri.TryCreate(settings.ApiUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
-            ? "ready" : "disabled";
+        settings.CanGenerate ? "ready" : "disabled";
 
     private static decimal EstimateCost(
         TranslationGenerationResult result,
         TranslationAssistanceSettings settings) =>
-        (result.InputTokens * settings.InputCostPerMillionUsd +
-         result.OutputTokens * settings.OutputCostPerMillionUsd) / 1_000_000m;
+        (result.InputTokens * settings.SelectedInputCostPerMillionUsd +
+         result.OutputTokens * settings.SelectedOutputCostPerMillionUsd) / 1_000_000m;
 }
