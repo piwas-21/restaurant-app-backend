@@ -32,42 +32,9 @@ internal sealed partial class CatalogueRevisionLocalTextStore(ApplicationDbConte
         var changedMenuDefinitions = new HashSet<Guid>();
         foreach (var path in fieldPaths.OrderBy(path => path.EndsWith(".description", StringComparison.Ordinal) ? 1 : 0))
         {
-            if (path == "name")
-            {
-                var changed = await SetCanonicalNameAsync(adoption, templateType, revision.Name, cancellationToken);
-                optionSetChanged |= templateType == "option-set" && changed;
-                continue;
-            }
-
-            if (path == "description")
-            {
-                await SetCanonicalDescriptionAsync(adoption, templateType, revision.Description, cancellationToken);
-                continue;
-            }
-
-            var translation = TranslationPath.Match(path);
-            if (translation.Success)
-            {
-                var changed = await SetTranslationAsync(adoption, templateType, translation.Groups[1].Value,
-                    translation.Groups[2].Value, revision, cancellationToken);
-                optionSetChanged |= templateType == "option-set" && changed;
-                continue;
-            }
-
-            var section = SectionPath.Match(path);
-            if (section.Success)
-            {
-                var menuDefinitionId = await SetSectionFieldAsync(adoption, entryMappings, section.Groups[1].Value,
-                    section.Groups[2].Value, section.Groups[3].Value, revision, cancellationToken);
-                if (menuDefinitionId is Guid changedMenuDefinitionId)
-                {
-                    changedMenuDefinitions.Add(changedMenuDefinitionId);
-                }
-
-                continue;
-            }
-
-            throw new BadRequestException("Revision field path is invalid.");
+            var effect = await ApplyFieldAsync(adoption, templateType, revision, entryMappings, path, cancellationToken);
+            optionSetChanged |= effect.OptionSetChanged;
+            if (effect.MenuDefinitionId is Guid menuDefinitionId) changedMenuDefinitions.Add(menuDefinitionId);
         }
 
         if (optionSetChanged)
@@ -88,6 +55,47 @@ internal sealed partial class CatalogueRevisionLocalTextStore(ApplicationDbConte
             Touch(definition);
         }
     }
+
+    private async Task<AppliedFieldEffect> ApplyFieldAsync(
+        CatalogueTemplateAdoption adoption,
+        string templateType,
+        CentralCatalogueTemplateRevision revision,
+        IReadOnlyCollection<CatalogueTemplateAdoption> entryMappings,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (path == "name")
+        {
+            var changed = await SetCanonicalNameAsync(adoption, templateType, revision.Name, cancellationToken);
+            return new(templateType == "option-set" && changed, null);
+        }
+
+        if (path == "description")
+        {
+            await SetCanonicalDescriptionAsync(adoption, templateType, revision.Description, cancellationToken);
+            return new(false, null);
+        }
+
+        var translation = TranslationPath.Match(path);
+        if (translation.Success)
+        {
+            var changed = await SetTranslationAsync(adoption, templateType, translation.Groups[1].Value,
+                translation.Groups[2].Value, revision, cancellationToken);
+            return new(templateType == "option-set" && changed, null);
+        }
+
+        var section = SectionPath.Match(path);
+        if (section.Success)
+        {
+            var menuDefinitionId = await SetSectionFieldAsync(adoption, entryMappings, section.Groups[1].Value,
+                section.Groups[2].Value, section.Groups[3].Value, revision, cancellationToken);
+            return new(false, menuDefinitionId);
+        }
+
+        throw new BadRequestException("Revision field path is invalid.");
+    }
+
+    private readonly record struct AppliedFieldEffect(bool OptionSetChanged, Guid? MenuDefinitionId);
 
     private async Task<bool> SetCanonicalNameAsync(
         CatalogueTemplateAdoption adoption,
