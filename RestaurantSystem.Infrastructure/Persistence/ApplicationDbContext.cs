@@ -175,6 +175,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
             base.OnModelCreating(builder);
 
             ConfigurePostgreSQL(builder);
+            ConfigureMenuAuthoringSearchFunctions(builder);
 
             builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
@@ -182,6 +183,25 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
             ConfigureDefaultValues(builder);
 
+        }
+
+        private static void ConfigureMenuAuthoringSearchFunctions(ModelBuilder builder)
+        {
+            builder.HasDbFunction(
+                    typeof(MenuAuthoringSearchDatabaseFunctions).GetMethod(
+                        nameof(MenuAuthoringSearchDatabaseFunctions.Normalize), [typeof(string)])!)
+                .HasName("menu_authoring_search_normalize")
+                .HasSchema("public");
+            builder.HasDbFunction(
+                    typeof(MenuAuthoringSearchDatabaseFunctions).GetMethod(
+                        nameof(MenuAuthoringSearchDatabaseFunctions.Pattern), [typeof(string)])!)
+                .HasName("menu_authoring_search_pattern")
+                .HasSchema("public");
+            builder.HasDbFunction(
+                    typeof(MenuAuthoringSearchDatabaseFunctions).GetMethod(
+                        nameof(MenuAuthoringSearchDatabaseFunctions.PrefixPattern), [typeof(string)])!)
+                .HasName("menu_authoring_search_prefix_pattern")
+                .HasSchema("public");
         }
 
         private void ConfigurePostgreSQL(ModelBuilder builder)
