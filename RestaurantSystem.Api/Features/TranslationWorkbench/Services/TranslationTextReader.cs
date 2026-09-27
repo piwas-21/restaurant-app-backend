@@ -25,6 +25,7 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
         return reference.EntityType switch
         {
             "product" => await ProductAsync(id, reference.FieldKey, cancellationToken),
+            "globalIngredient" => await GlobalIngredientAsync(id, cancellationToken),
             "productVariation" => await VariationAsync(id, reference.FieldKey, cancellationToken),
             "productIngredient" => await IngredientAsync(id, cancellationToken),
             "menuSection" => await SectionAsync(id, reference.FieldKey, cancellationToken),
@@ -67,6 +68,17 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
             .FirstOrDefaultAsync(row => row.Id == id, cancellationToken)
             ?? throw new NotFoundException("Product ingredient was not found");
         return ingredient.Descriptions.ToDictionary(
+            row => row.LanguageCode, row => row.Name, StringComparer.Ordinal);
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> GlobalIngredientAsync(
+        Guid id, CancellationToken cancellationToken)
+    {
+        var ingredient = await context.GlobalIngredients.AsNoTracking()
+            .Include(row => row.Translations)
+            .FirstOrDefaultAsync(row => row.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Global ingredient was not found");
+        return ingredient.Translations.ToDictionary(
             row => row.LanguageCode, row => row.Name, StringComparer.Ordinal);
     }
 

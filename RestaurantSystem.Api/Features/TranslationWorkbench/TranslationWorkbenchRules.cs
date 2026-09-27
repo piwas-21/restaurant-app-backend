@@ -12,7 +12,7 @@ internal static partial class TranslationWorkbenchRules
     public static readonly HashSet<string> GuestLocales =
         ["en", "tr", "es", "ar", "de", "fr", "nl", "it", "ru", "zh"];
     private static readonly HashSet<string> EntityTypes =
-        ["product", "productIngredient", "productVariation", "menuSection", "optionSet"];
+        ["product", "globalIngredient", "productIngredient", "productVariation", "menuSection", "optionSet"];
 
     [GeneratedRegex(@"\{\{[^{}]+\}\}|\{[A-Za-z_][^{}]*\}", RegexOptions.CultureInvariant)]
     private static partial Regex PlaceholderPattern();
@@ -41,7 +41,8 @@ internal static partial class TranslationWorkbenchRules
             var reference = field.FieldRef;
             if (reference is null || !EntityTypes.Contains(reference.EntityType) ||
                 reference.FieldKey is not ("name" or "description") ||
-                reference.EntityType is "productIngredient" or "optionSet" && reference.FieldKey != "name" ||
+                reference.EntityType is "globalIngredient" or "productIngredient" or "optionSet" &&
+                    reference.FieldKey != "name" ||
                 !GuestLocales.Contains(field.SourceLocale) ||
                 string.IsNullOrWhiteSpace(field.SourceText) || field.SourceText.Length > MaxLength(reference.FieldKey) ||
                 (reference.EntityId.HasValue == !string.IsNullOrWhiteSpace(reference.ClientKey)) ||

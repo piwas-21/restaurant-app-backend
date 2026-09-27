@@ -21,12 +21,13 @@ public sealed class TranslationProvenanceWriter(
         IReadOnlyList<TemplateTranslationEvidence> reviewedValues,
         CancellationToken cancellationToken)
     {
-        if (entityType is not ("product" or "productIngredient" or "productVariation" or
+        if (entityType is not ("product" or "globalIngredient" or "productIngredient" or "productVariation" or
             "menuSection" or "optionSet") || entityId == Guid.Empty ||
             string.IsNullOrWhiteSpace(templateId) || templateId.Length > 120 ||
             templateRevision < 1 || !TranslationWorkbenchRules.GuestLocales.Contains(sourceLocale) ||
             reviewedValues.Count > 20 || reviewedValues.Any(value =>
                 value.FieldKey is not ("name" or "description") ||
+                entityType == "globalIngredient" && value.FieldKey != "name" ||
                 !TranslationWorkbenchRules.GuestLocales.Contains(value.Locale) ||
                 string.IsNullOrWhiteSpace(value.Text) ||
                 value.Text.Length > TranslationWorkbenchRules.MaxLength(value.FieldKey)) ||

@@ -360,6 +360,58 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
     }
 
     [Fact]
+    public async Task GlobalIngredientTemplateTextUsesItsOwnIdentityAndSavedTranslations()
+    {
+        AuthenticateAsAdmin();
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var writer = scope.ServiceProvider.GetRequiredService<ITranslationProvenanceWriter>();
+        var ingredient = new GlobalIngredient
+        {
+            DefaultName = $"Mint {Guid.NewGuid():N}",
+            CreatedBy = "test",
+            Translations =
+            {
+                new GlobalIngredientTranslation { LanguageCode = "tr", Name = "Nane", CreatedBy = "test" },
+                new GlobalIngredientTranslation { LanguageCode = "en", Name = "Mint", CreatedBy = "test" }
+            }
+        };
+        context.GlobalIngredients.Add(ingredient);
+        await context.SaveChangesAsync();
+
+        var matched = await writer.RecordTemplateAsync("globalIngredient", ingredient.Id,
+            "turkish-mint", 1, "tr",
+            TranslationTextMap.Create("Nane", null,
+                [("tr", "Nane", null), ("en", "Mint", null)]),
+            [new("name", "tr", "Nane"), new("name", "en", "Mint"),
+                new("name", "fr", "Menthe")], CancellationToken.None);
+        await context.SaveChangesAsync();
+        matched.Should().Be(2);
+        var rows = await context.TranslationFieldProvenances
+            .Where(row => row.EntityType == "globalIngredient" && row.EntityId == ingredient.Id)
+            .ToListAsync();
+        rows.Select(row => row.Locale).Should().BeEquivalentTo("tr", "en");
+
+        var preview = await PostAsJsonAsync("/api/translation-workbench/preview", new
+        {
+            generationIntent = "saveReview",
+            targetLocales = new[] { "tr", "en", "fr" },
+            fields = new[] { new
+            {
+                fieldRef = new { entityType = "globalIngredient", entityId = ingredient.Id, fieldKey = "name" },
+                sourceLocale = "tr", sourceText = "Nane"
+            } }
+        });
+        preview.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var reviewed = JsonDocument.Parse(await preview.Content.ReadAsStringAsync());
+        var targets = reviewed.RootElement.GetProperty("data").GetProperty("rows")[0]
+            .GetProperty("targets");
+        targets[0].GetProperty("status").GetString().Should().Be("current");
+        targets[1].GetProperty("status").GetString().Should().Be("current");
+        targets[2].GetProperty("status").GetString().Should().Be("missing");
+    }
+
+    [Fact]
     public async Task AcceptedSuggestionMustMatchTheExactSavedSourceAndTarget()
     {
         using var scope = Factory.Services.CreateScope();
