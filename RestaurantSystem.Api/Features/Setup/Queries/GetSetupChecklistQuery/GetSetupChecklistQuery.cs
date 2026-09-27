@@ -79,18 +79,26 @@ public class GetSetupChecklistQueryHandler
     private async Task<SetupFacts> ReadFactsAsync(
         bool needsPaymentFact, CancellationToken cancellationToken)
     {
-        // A product that is actually IN a category, not "some category exists AND some
-        // product exists". Those are two independent facts, and an owner who made one
-        // empty category and one uncategorised product satisfies both while having a
-        // menu no guest can reach — the exact "congratulated for work nobody did"
-        // failure the derived/acknowledged split exists to prevent.
+        // A live, active, available, saleable product that is actually IN a live,
+        // active category. An import session is not guest-visible menu content, and a
+        // bundle component is not orderable by itself. We query the assignment rather
+        // than "some category exists AND some product exists"; those are two
+        // independent facts, and an owner who made one empty category and one
+        // uncategorised product would otherwise be congratulated for a menu no guest
+        // can reach.
         //
         // The two `!IsDeleted` predicates are written out rather than left to the global
         // filter: `ProductCategory` is a plain `Entity`, not a `SoftDeleteEntity`, so
         // the join row outlives a soft-deleted product or category and the query is
         // rooted on the join.
         var hasMenu = await _context.ProductCategories
-            .AnyAsync(pc => !pc.Product.IsDeleted && !pc.Category.IsDeleted, cancellationToken);
+            .AnyAsync(pc => !pc.Product.IsDeleted
+                && pc.Product.IsActive
+                && pc.Product.IsAvailable
+                && !pc.Product.IsComponent
+                && !pc.Category.IsDeleted
+                && pc.Category.IsActive,
+                cancellationToken);
 
         // STAFF, not users. Every customer who registers is an ApplicationUser too, so
         // "more than one user" would flip this step done the moment the first guest

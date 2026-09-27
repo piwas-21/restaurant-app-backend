@@ -29,6 +29,7 @@ using RestaurantSystem.Api.Common.Validation;
 using RestaurantSystem.Api.Features.Auth.Handlers;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Basket.Services;
+using RestaurantSystem.Api.Features.Catalogue;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Services;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
@@ -426,6 +427,10 @@ builder.Services.AddOptions<TenantFeatureSettings>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddSingleton<ITenantFeatures, TenantFeatures>();
+
+// Tenant-side proxy to the global reviewed-template API. Missing Catalogue__ApiBaseUrl leaves
+// existing menu operation untouched and causes only catalogue discovery/import routes to fail closed.
+builder.Services.AddCentralCatalogue(builder.Configuration);
 
 // Partner attribution shown in the tenant footer (SOFRA-PARTNER-PLAN §11 / S4a). Same rail and
 // same lifetime as the modules above: the deploy repo's tenant compose template maps
