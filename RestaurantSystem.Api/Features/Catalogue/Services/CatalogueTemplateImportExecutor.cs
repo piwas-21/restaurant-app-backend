@@ -112,6 +112,14 @@ public sealed partial class CatalogueTemplateImportExecutor : ICatalogueTemplate
         var command = CatalogueImportCommandMapper.Category(revision, session.Locale, decision);
         var response = await mediator.SendCommand<ApiResponse<CategoryDto>>(command, cancellationToken);
         var category = RequireData(response, "Category creation was rejected by tenant validation.");
+        if (CatalogueImportCategoryTranslationMapper.IsReviewed(revision))
+        {
+            await translationProvenance.RecordTemplateAsync(
+                CatalogueImportCategoryTranslationMapper.ForCategory(revision, session.Locale, category),
+                cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
         return Imported("Category", category.Id);
     }
 

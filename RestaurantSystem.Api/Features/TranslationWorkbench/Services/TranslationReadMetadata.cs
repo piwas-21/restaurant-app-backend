@@ -1,4 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Api.Features.Categories;
+using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Menus.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
@@ -8,6 +10,29 @@ namespace RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 
 public static class TranslationReadMetadata
 {
+    public static async Task<CategoryDto> ApplyAsync(
+        ApplicationDbContext context,
+        CategoryDto category,
+        CancellationToken cancellationToken)
+    {
+        var rows = await ApplyCategoriesAsync(context, [category], cancellationToken);
+        return rows[0];
+    }
+
+    public static async Task<CategoryDetailDto> ApplyAsync(
+        ApplicationDbContext context,
+        CategoryDetailDto category,
+        CancellationToken cancellationToken)
+    {
+        var dto = await ApplyAsync(context, (CategoryDto)category, cancellationToken);
+        return category with
+        {
+            Translations = dto.Translations,
+            TranslationMetadata = dto.TranslationMetadata,
+            Content = dto.Translations
+        };
+    }
+
     public static async Task ApplyAsync(
         ApplicationDbContext context,
         ProductDto product,
@@ -63,6 +88,43 @@ public static class TranslationReadMetadata
         {
             section.TranslationMetadata = Find(sources, "menuSection", section.Id);
         }
+    }
+
+    public static async Task<IReadOnlyList<CategoryDto>> ApplyCategoriesAsync(
+        ApplicationDbContext context,
+        IReadOnlyList<CategoryDto> categories,
+        CancellationToken cancellationToken)
+    {
+        if (categories.Count == 0) return [];
+
+        var ids = categories.Select(category => category.Id).Distinct().ToArray();
+        var translations = await context.CategoryTranslations.AsNoTracking()
+            .Where(row => ids.Contains(row.CategoryId))
+            .ToListAsync(cancellationToken);
+        var translationsById = translations.GroupBy(row => row.CategoryId)
+            .ToDictionary(group => group.Key, group => CategoryTranslationMapper.ToDto(group));
+        return categories.Select(category =>
+        {
+            var content = translationsById.GetValueOrDefault(category.Id) ?? [];
+            var sourceLocales = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (category.SourceLocale is not null)
+            {
+                sourceLocales["name"] = category.SourceLocale;
+                if (!string.IsNullOrWhiteSpace(category.Description))
+                {
+                    sourceLocales["description"] = category.SourceLocale;
+                }
+            }
+
+            var metadata = new TranslationOwnerMetadataDto
+            {
+                SourceLocales = sourceLocales,
+                ExpectedContentVersion = TranslationContentVersion.ForCategory(category.SourceLocale,
+                    category.Name, category.Description, content.Select(row =>
+                        (row.Key, row.Value.Name, row.Value.Description)))
+            };
+            return category with { Translations = content, TranslationMetadata = metadata };
+        }).ToArray();
     }
 
     private static async Task<Dictionary<(string EntityType, Guid EntityId), TranslationOwnerMetadataDto>> LoadAsync(

@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Categories.Commands.CreateCategoryCommand;
@@ -206,7 +206,10 @@ public class CategoriesControllerTests : IntegrationTestBase
 
         // A rename that ECHOES the mask must keep it — the §9.1 contract, now on a populated
         // category so the 500 cannot mask the assertion.
-        var update = new UpdateCategoryCommand(categoryId, "Channel QA Renamed", null, true, 31, 6);
+        var update = new UpdateCategoryCommand(categoryId, "Channel QA Renamed", null, true, 31)
+        {
+            AvailableOrderTypes = 6
+        };
         var response = await PutAsJsonAsync($"/api/categories/{categoryId}", update);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

@@ -9,6 +9,20 @@ namespace RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 
 public sealed partial class TranslationProvenanceWriter
 {
+    public async Task ClearSourceLocaleAsync(
+        string entityType,
+        Guid entityId,
+        CancellationToken cancellationToken)
+    {
+        var tenantSources = await context.TranslationFieldProvenances
+            .Where(row => row.EntityType == entityType && row.EntityId == entityId &&
+                (row.FieldKey == NameField || row.FieldKey == DescriptionField) &&
+                row.Locale == row.SourceLocale &&
+                row.Kind == "tenantSource")
+            .ToListAsync(cancellationToken);
+        context.TranslationFieldProvenances.RemoveRange(tenantSources);
+    }
+
     public async Task RecordAsync(
         string entityType,
         Guid entityId,

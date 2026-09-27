@@ -1,4 +1,6 @@
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 
@@ -23,4 +25,9 @@ public sealed record TranslationTextMap(
         section.Name, section.Description,
         (section.Translations ?? []).Select(pair =>
             (pair.Key, (string?)pair.Value.Name, pair.Value.Description)));
+
+    public static TranslationTextMap FromCategory(Category category) => Create(
+        category.Name, category.Description,
+        category.Translations.Select(row =>
+            (row.LanguageCode, (string?)row.Name, row.Description)));
 }
