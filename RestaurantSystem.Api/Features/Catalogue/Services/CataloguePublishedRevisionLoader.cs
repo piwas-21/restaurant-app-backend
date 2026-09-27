@@ -162,43 +162,7 @@ internal sealed class CataloguePublishedRevisionLoader(ICentralCatalogueClient c
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in itemArray.EnumerateArray())
         {
-            if (item.ValueKind != System.Text.Json.JsonValueKind.Object ||
-                !item.TryGetProperty("templateId", out var idValue) ||
-                idValue.ValueKind != System.Text.Json.JsonValueKind.String)
-            {
-                return false;
-            }
-
-            var id = idValue.GetString();
-            if (string.IsNullOrWhiteSpace(id) || !expectedIds.Contains(id) || !seenIds.Add(id) ||
-                !item.TryGetProperty("status", out var status) || status.ValueKind != System.Text.Json.JsonValueKind.String ||
-                !item.TryGetProperty("revision", out var revision) ||
-                !item.TryGetProperty("adoptedRevisionWithdrawn", out var adoptedWithdrawn) ||
-                adoptedWithdrawn.ValueKind is not (
-                    System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False or
-                    System.Text.Json.JsonValueKind.Null))
-            {
-                return false;
-            }
-
-            var statusText = status.GetString();
-            if (statusText == AvailableStatus)
-            {
-                if (revision.ValueKind != System.Text.Json.JsonValueKind.Object)
-                {
-                    return false;
-                }
-            }
-            else if (statusText is WithdrawnStatus or NotFoundStatus)
-            {
-                if (revision.ValueKind != System.Text.Json.JsonValueKind.Null ||
-                    statusText == NotFoundStatus &&
-                    adoptedWithdrawn.ValueKind != System.Text.Json.JsonValueKind.Null)
-                {
-                    return false;
-                }
-            }
-            else
+            if (!TryReadValidItem(item, expectedIds, seenIds))
             {
                 return false;
             }
@@ -207,6 +171,52 @@ internal sealed class CataloguePublishedRevisionLoader(ICentralCatalogueClient c
         }
 
         return seenIds.Count == expectedIds.Count;
+    }
+
+    private static bool TryReadValidItem(
+        System.Text.Json.JsonElement item,
+        HashSet<string> expectedIds,
+        HashSet<string> seenIds)
+    {
+        if (item.ValueKind != System.Text.Json.JsonValueKind.Object ||
+            !item.TryGetProperty("templateId", out var idValue) ||
+            idValue.ValueKind != System.Text.Json.JsonValueKind.String)
+        {
+            return false;
+        }
+
+        var id = idValue.GetString();
+        if (string.IsNullOrWhiteSpace(id) || !expectedIds.Contains(id) || !seenIds.Add(id) ||
+            !item.TryGetProperty("status", out var status) || status.ValueKind != System.Text.Json.JsonValueKind.String ||
+            !item.TryGetProperty("revision", out var revision) ||
+            !item.TryGetProperty("adoptedRevisionWithdrawn", out var adoptedWithdrawn) ||
+            adoptedWithdrawn.ValueKind is not (
+                System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False or
+                System.Text.Json.JsonValueKind.Null))
+        {
+            return false;
+        }
+
+        return HasValidStatusPayload(status.GetString(), revision, adoptedWithdrawn);
+    }
+
+    private static bool HasValidStatusPayload(
+        string? status,
+        System.Text.Json.JsonElement revision,
+        System.Text.Json.JsonElement adoptedWithdrawn)
+    {
+        if (status == AvailableStatus)
+        {
+            return revision.ValueKind == System.Text.Json.JsonValueKind.Object;
+        }
+
+        if (status is WithdrawnStatus or NotFoundStatus)
+        {
+            return revision.ValueKind == System.Text.Json.JsonValueKind.Null &&
+                (status != NotFoundStatus || adoptedWithdrawn.ValueKind == System.Text.Json.JsonValueKind.Null);
+        }
+
+        return false;
     }
 
     private static bool? ReadNullableBoolean(System.Text.Json.JsonElement value) => value.ValueKind switch
