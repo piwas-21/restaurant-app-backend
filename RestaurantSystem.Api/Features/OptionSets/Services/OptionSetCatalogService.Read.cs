@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -125,6 +126,10 @@ public sealed partial class OptionSetCatalogService
                 IntentionalDifferenceReason = attachment.IntentionalDifferenceReason
             }).ToList(),
         SourceTemplateId = set.SourceTemplateId,
-        SourceRevision = set.SourceRevision
+        SourceRevision = set.SourceRevision,
+        TranslationMetadata = new TranslationOwnerMetadataDto
+        {
+            SourceLocales = new Dictionary<string, string> { ["name"] = set.SourceLocale }
+        }
     };
 }

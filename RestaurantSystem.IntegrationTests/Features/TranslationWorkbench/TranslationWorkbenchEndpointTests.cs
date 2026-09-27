@@ -16,6 +16,50 @@ namespace RestaurantSystem.IntegrationTests.Features.TranslationWorkbench;
 public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
     [Fact]
+    public async Task OptionSetSavePersistsSourceAndMakesExistingNamesReadableForReview()
+    {
+        AuthenticateAsAdmin();
+        var name = $"Acı sos {Guid.NewGuid():N}";
+        var response = await PostAsJsonAsync("/api/OptionSets", new
+        {
+            kind = 1,
+            name,
+            sourceLocale = "tr",
+            translations = new Dictionary<string, string> { ["en"] = "Hot sauce" },
+            status = 0,
+            entries = Array.Empty<object>(),
+            translationMetadata = new
+            {
+                sourceLocales = new Dictionary<string, string> { ["name"] = "tr" }
+            }
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var saved = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var id = saved.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var source = await context.TranslationFieldProvenances.SingleAsync(row =>
+            row.EntityType == "optionSet" && row.EntityId == id && row.Locale == "tr");
+        source.Kind.Should().Be("tenantSource");
+
+        var preview = await PostAsJsonAsync("/api/translation-workbench/preview", new
+        {
+            generationIntent = "saveReview",
+            targetLocales = new[] { "tr", "en" },
+            fields = new[] { new
+            {
+                fieldRef = new { entityType = "optionSet", entityId = id, fieldKey = "name" },
+                sourceLocale = "tr", sourceText = name
+            } }
+        });
+        preview.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var reviewed = JsonDocument.Parse(await preview.Content.ReadAsStringAsync());
+        reviewed.RootElement.GetProperty("data").GetProperty("rows")[0]
+            .GetProperty("targets")[1].GetProperty("status").GetString().Should().Be("current");
+    }
+
+    [Fact]
     public async Task CompleteOrLegacyTextDoesNotGenerateAndOnlyMissingTargetsAreReported()
     {
         AuthenticateAsAdmin();

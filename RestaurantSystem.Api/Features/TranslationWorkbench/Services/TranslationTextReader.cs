@@ -28,7 +28,7 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
             "productVariation" => await VariationAsync(id, reference.FieldKey, cancellationToken),
             "productIngredient" => await IngredientAsync(id, cancellationToken),
             "menuSection" => await SectionAsync(id, reference.FieldKey, cancellationToken),
-            "optionSet" => new Dictionary<string, string>(),
+            "optionSet" => await OptionSetAsync(id, cancellationToken),
             _ => throw new BadRequestException("Unsupported translation entity")
         };
     }
@@ -81,5 +81,17 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
             row => row.LanguageCode,
             row => field == "name" ? row.Name : row.Description ?? string.Empty,
             StringComparer.Ordinal);
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> OptionSetAsync(
+        Guid id, CancellationToken cancellationToken)
+    {
+        var set = await context.OptionSets.AsNoTracking().Include(row => row.Translations)
+            .FirstOrDefaultAsync(row => row.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Option set was not found");
+        var texts = set.Translations.ToDictionary(row => row.LanguageCode, row => row.Name,
+            StringComparer.Ordinal);
+        texts[set.SourceLocale] = set.Name;
+        return texts;
     }
 }
