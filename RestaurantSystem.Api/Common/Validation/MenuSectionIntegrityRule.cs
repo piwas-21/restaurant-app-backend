@@ -105,27 +105,47 @@ public static class MenuSectionIntegrityRule
             var items = section.Items ?? [];
             var optionCount = items.Select(item => item.ProductId).Distinct().Count();
             var defaultCount = items.Count(item => item.IsDefault);
-            if (items.Count != optionCount)
-            {
-                throw new BadRequestException($"Section '{section.Name}' cannot contain the same product more than once");
-            }
+            ValidateUniqueOptions(section, items, optionCount);
+            ValidateSelectionBounds(section, optionCount);
+            ValidateRequiredMinimum(section);
+            ValidateDefaultCount(section, defaultCount);
+        }
+    }
 
-            if (section.MinSelection < 0 || section.MaxSelection <= 0
-                || section.MinSelection > section.MaxSelection || section.MaxSelection > optionCount)
-            {
-                throw new BadRequestException($"Section '{section.Name}' has invalid minimum or maximum selections");
-            }
+    private static void ValidateUniqueOptions(
+        MenuSectionDto section,
+        List<MenuSectionItemDto> items,
+        int optionCount)
+    {
+        if (items.Count != optionCount)
+        {
+            throw new BadRequestException($"Section '{section.Name}' cannot contain the same product more than once");
+        }
+    }
 
-            if ((section.IsRequired && section.MinSelection == 0)
-                || (!section.IsRequired && section.MinSelection != 0))
-            {
-                throw new BadRequestException($"Section '{section.Name}' has an invalid required-selection minimum");
-            }
+    private static void ValidateSelectionBounds(MenuSectionDto section, int optionCount)
+    {
+        if (section.MinSelection < 0 || section.MaxSelection <= 0
+            || section.MinSelection > section.MaxSelection || section.MaxSelection > optionCount)
+        {
+            throw new BadRequestException($"Section '{section.Name}' has invalid minimum or maximum selections");
+        }
+    }
 
-            if (defaultCount > section.MaxSelection || (defaultCount > 0 && defaultCount < section.MinSelection))
-            {
-                throw new BadRequestException($"Section '{section.Name}' has an invalid default selection count");
-            }
+    private static void ValidateRequiredMinimum(MenuSectionDto section)
+    {
+        if ((section.IsRequired && section.MinSelection == 0)
+            || (!section.IsRequired && section.MinSelection != 0))
+        {
+            throw new BadRequestException($"Section '{section.Name}' has an invalid required-selection minimum");
+        }
+    }
+
+    private static void ValidateDefaultCount(MenuSectionDto section, int defaultCount)
+    {
+        if (defaultCount > section.MaxSelection || (defaultCount > 0 && defaultCount < section.MinSelection))
+        {
+            throw new BadRequestException($"Section '{section.Name}' has an invalid default selection count");
         }
     }
 
