@@ -136,35 +136,52 @@ public sealed class TranslationSuggestionService(
         var result = new List<TranslationSuggestionCandidate>();
         for (var index = 0; index < request.Fields.Count; index++)
         {
-            var field = request.Fields[index];
-            var row = preview.Rows[index];
-            var contextHash = TranslationWorkbenchRules.ContextHash(field.Context, glossary,
-                settings.PromptVersion, settings.Model);
-            foreach (var target in row.Targets)
-            {
-                var alternative = request.GenerationIntent == "explicitAlternative" &&
-                    target.Status == "current" && !string.IsNullOrWhiteSpace(target.Text) &&
-                    target.Provenance?.Kind is ("manual" or "legacyUnknown");
-                var gap = target.Status is "missing" or "stale" ||
-                    target.Status == "sourceCopy" && request.GenerationIntent == "explicitFill";
-                if (target.Locale == field.SourceLocale || !(alternative ||
-                    request.GenerationIntent != "explicitAlternative" && gap))
-                {
-                    continue;
-                }
-
-                var identity = TranslationWorkbenchRules.Identity(field.FieldRef);
-                var actorScope = field.FieldRef.ClientKey is null ? string.Empty : actor;
-                var fingerprint = TranslationWorkbenchRules.Hash(
-                    $"{identity}|{actorScope}|{target.Locale}|{row.SourceHash}|{contextHash}");
-                result.Add(new TranslationSuggestionCandidate(field.FieldRef,
-                    field.SourceLocale, target.Locale, field.SourceText,
-                    row.SourceHash, field.Context, contextHash, fingerprint));
-            }
+            result.AddRange(SelectFieldCandidates(request.GenerationIntent,
+                request.Fields[index], preview.Rows[index], settings, glossary, actor));
         }
 
         return result;
     }
+
+    private static IEnumerable<TranslationSuggestionCandidate> SelectFieldCandidates(
+        string generationIntent,
+        TranslationFieldInputDto field,
+        TranslationFieldStatusDto row,
+        TranslationAssistanceSettings settings,
+        IReadOnlyDictionary<string, string> glossary,
+        string actor)
+    {
+        var contextHash = TranslationWorkbenchRules.ContextHash(field.Context, glossary,
+            settings.PromptVersion, settings.Model);
+        var identity = TranslationWorkbenchRules.Identity(field.FieldRef);
+        var actorScope = field.FieldRef.ClientKey is null ? string.Empty : actor;
+        foreach (var target in row.Targets)
+        {
+            if (!IsCandidateTarget(generationIntent, field.SourceLocale, target)) continue;
+            var fingerprint = TranslationWorkbenchRules.Hash(
+                $"{identity}|{actorScope}|{target.Locale}|{row.SourceHash}|{contextHash}");
+            yield return new TranslationSuggestionCandidate(field.FieldRef,
+                field.SourceLocale, target.Locale, field.SourceText,
+                row.SourceHash, field.Context, contextHash, fingerprint);
+        }
+    }
+
+    private static bool IsCandidateTarget(
+        string generationIntent,
+        string sourceLocale,
+        TranslationTargetStatusDto target) =>
+        target.Locale != sourceLocale &&
+        (IsAlternativeTarget(generationIntent, target) ||
+         generationIntent != "explicitAlternative" && IsFillTarget(generationIntent, target));
+
+    private static bool IsAlternativeTarget(string generationIntent, TranslationTargetStatusDto target) =>
+        generationIntent == "explicitAlternative" && target.Status == "current" &&
+        !string.IsNullOrWhiteSpace(target.Text) &&
+        target.Provenance?.Kind is "manual" or "legacyUnknown";
+
+    private static bool IsFillTarget(string generationIntent, TranslationTargetStatusDto target) =>
+        target.Status is "missing" or "stale" ||
+        target.Status == "sourceCopy" && generationIntent == "explicitFill";
 
     private async Task<List<TranslationSuggestionCandidate>> ReadCacheAsync(
         IReadOnlyList<TranslationSuggestionCandidate> candidates,

@@ -22,11 +22,7 @@ internal static partial class TranslationWorkbenchRules
 
     public static void Validate(TranslationWorkbenchRequestDto request)
     {
-        if (request.GenerationIntent is not ("saveReview" or "explicitFill" or "explicitAlternative") ||
-            request.TargetLocales is null or { Count: < 1 or > 10 } ||
-            request.TargetLocales.Distinct(StringComparer.Ordinal).Count() != request.TargetLocales.Count ||
-            request.TargetLocales.Any(locale => !GuestLocales.Contains(locale)) ||
-            request.Fields is null or { Count: < 1 or > 40 })
+        if (!IsValidRequestEnvelope(request))
         {
             throw new BadRequestException("Invalid translation workbench request");
         }
@@ -34,30 +30,49 @@ internal static partial class TranslationWorkbenchRules
         var identities = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in request.Fields)
         {
-            if (field is null)
-            {
-                throw new BadRequestException("Invalid translation field");
-            }
-            var reference = field.FieldRef;
-            if (reference is null || !EntityTypes.Contains(reference.EntityType) ||
-                reference.FieldKey is not ("name" or "description") ||
-                reference.EntityType is "globalIngredient" or "productIngredient" or "optionSet" &&
-                    reference.FieldKey != "name" ||
-                !GuestLocales.Contains(field.SourceLocale) ||
-                string.IsNullOrWhiteSpace(field.SourceText) || field.SourceText.Length > MaxLength(reference.FieldKey) ||
-                (reference.EntityId.HasValue == !string.IsNullOrWhiteSpace(reference.ClientKey)) ||
-                reference.ClientKey?.Length > 128 ||
-                field.TargetTexts?.Any(pair => !GuestLocales.Contains(pair.Key) ||
-                    pair.Value is null || pair.Value.Length > MaxLength(reference.FieldKey)) == true ||
-                field.Context?.DishName?.Length > 200 || field.Context?.Category?.Length > 100 ||
-                field.Context?.Exclusions is { Count: > 20 } ||
-                field.Context?.Exclusions?.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > 200) == true ||
-                !identities.Add(Identity(reference)))
+            if (field is null || !IsValidField(field) || !identities.Add(Identity(field.FieldRef)))
             {
                 throw new BadRequestException("Invalid or duplicate translation field");
             }
         }
     }
+
+    private static bool IsValidRequestEnvelope(TranslationWorkbenchRequestDto request) =>
+        (request.GenerationIntent is "saveReview" or "explicitFill" or "explicitAlternative") &&
+        request.TargetLocales is { Count: >= 1 and <= 10 } &&
+        request.TargetLocales.Distinct(StringComparer.Ordinal).Count() == request.TargetLocales.Count &&
+        request.TargetLocales.All(GuestLocales.Contains) &&
+        request.Fields is { Count: >= 1 and <= 40 };
+
+    private static bool IsValidField(TranslationFieldInputDto field)
+    {
+        var reference = field.FieldRef;
+        return reference is not null && IsValidReference(reference) &&
+            IsValidSource(field, reference) && IsValidTargets(field.TargetTexts, reference.FieldKey) &&
+            IsValidContext(field.Context);
+    }
+
+    private static bool IsValidReference(TranslationFieldRefDto reference) =>
+        EntityTypes.Contains(reference.EntityType) &&
+        (reference.FieldKey is "name" or "description") &&
+        !((reference.EntityType is "globalIngredient" or "productIngredient" or "optionSet") &&
+            reference.FieldKey != "name");
+
+    private static bool IsValidSource(TranslationFieldInputDto field, TranslationFieldRefDto reference) =>
+        GuestLocales.Contains(field.SourceLocale) &&
+        !string.IsNullOrWhiteSpace(field.SourceText) &&
+        field.SourceText.Length <= MaxLength(reference.FieldKey) &&
+        reference.EntityId.HasValue != !string.IsNullOrWhiteSpace(reference.ClientKey) &&
+        (reference.ClientKey is null || reference.ClientKey.Length <= 128);
+
+    private static bool IsValidTargets(Dictionary<string, string>? targets, string fieldKey) =>
+        targets?.All(pair => GuestLocales.Contains(pair.Key) && pair.Value is not null &&
+            pair.Value.Length <= MaxLength(fieldKey)) != false;
+
+    private static bool IsValidContext(TranslationContextDto? context) =>
+        (context?.DishName?.Length ?? 0) <= 200 && (context?.Category?.Length ?? 0) <= 100 &&
+        context?.Exclusions is not { Count: > 20 } &&
+        context?.Exclusions?.All(value => !string.IsNullOrWhiteSpace(value) && value.Length <= 200) != false;
 
     public static int MaxLength(string fieldKey) => fieldKey == "name" ? 200 : 1000;
 

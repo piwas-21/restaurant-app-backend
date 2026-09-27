@@ -2,6 +2,15 @@ using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 
 namespace RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 
+public sealed record RecordTemplateTranslationRequest(
+    string EntityType,
+    Guid EntityId,
+    string TemplateId,
+    int TemplateRevision,
+    string SourceLocale,
+    TranslationTextMap SavedText,
+    IReadOnlyList<TemplateTranslationEvidence> ReviewedValues);
+
 public interface ITranslationProvenanceWriter
 {
     Task RecordAsync(
@@ -12,12 +21,6 @@ public interface ITranslationProvenanceWriter
         CancellationToken cancellationToken);
 
     Task<int> RecordTemplateAsync(
-        string entityType,
-        Guid entityId,
-        string templateId,
-        int templateRevision,
-        string sourceLocale,
-        TranslationTextMap savedText,
-        IReadOnlyList<TemplateTranslationEvidence> reviewedValues,
+        RecordTemplateTranslationRequest request,
         CancellationToken cancellationToken);
 }

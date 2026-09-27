@@ -343,12 +343,12 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
         var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
         var writer = scope.ServiceProvider.GetRequiredService<ITranslationProvenanceWriter>();
         var productId = await context.Products.Select(product => product.Id).FirstAsync();
-        var matched = await writer.RecordTemplateAsync("product", productId,
-            "turkish-chicken", 2, "tr",
+        var matched = await writer.RecordTemplateAsync(new RecordTemplateTranslationRequest(
+            "product", productId, "turkish-chicken", 2, "tr",
             TranslationTextMap.Create("Tavuk", null,
                 [("tr", "Tavuk", null), ("en", "Chicken", null), ("fr", "Poulet maison", null)]),
             [new("name", "tr", "Tavuk"), new("name", "en", "Chicken"),
-                new("name", "fr", "Poulet")], CancellationToken.None);
+                new("name", "fr", "Poulet")]), CancellationToken.None);
         await context.SaveChangesAsync();
 
         matched.Should().Be(2);
@@ -379,12 +379,12 @@ public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) :
         context.GlobalIngredients.Add(ingredient);
         await context.SaveChangesAsync();
 
-        var matched = await writer.RecordTemplateAsync("globalIngredient", ingredient.Id,
-            "turkish-mint", 1, "tr",
+        var matched = await writer.RecordTemplateAsync(new RecordTemplateTranslationRequest(
+            "globalIngredient", ingredient.Id, "turkish-mint", 1, "tr",
             TranslationTextMap.Create("Nane", null,
                 [("tr", "Nane", null), ("en", "Mint", null)]),
             [new("name", "tr", "Nane"), new("name", "en", "Mint"),
-                new("name", "fr", "Menthe")], CancellationToken.None);
+                new("name", "fr", "Menthe")]), CancellationToken.None);
         await context.SaveChangesAsync();
         matched.Should().Be(2);
         var rows = await context.TranslationFieldProvenances
