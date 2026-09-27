@@ -93,7 +93,10 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
     public async Task<ApiResponse<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
     {
 
-        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var existingTransaction = _context.Database.CurrentTransaction;
+        var ownsTransaction = existingTransaction is null;
+        var transaction = existingTransaction ?? await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var ownedTransaction = ownsTransaction ? transaction : null;
 
         try
         {
@@ -354,7 +357,10 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
+            if (ownsTransaction)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
 
             var createdProduct = await _context.Products
                 .WithProductDtoNavigations()
@@ -370,14 +376,18 @@ public class CreateProductCommandHandler : ICommandHandler<CreateProductCommand,
         }
         catch
         {
-            // Only rollback if the transaction is still active
-            try
+            // A caller such as catalogue import owns the ambient transaction and rolls back the
+            // whole item if any later step fails. Standalone command calls still own this scope.
+            if (ownsTransaction)
             {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-            catch (InvalidOperationException)
-            {
-                // Transaction already completed or disposed, ignore rollback error
+                try
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Transaction already completed or disposed, ignore rollback error
+                }
             }
             throw;
         }

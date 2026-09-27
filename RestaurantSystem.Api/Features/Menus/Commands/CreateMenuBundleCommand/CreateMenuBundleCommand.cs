@@ -56,8 +56,10 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
 
     public async Task<ApiResponse<ProductDto>> Handle(CreateMenuBundleCommand command, CancellationToken cancellationToken)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
+        var transaction = _context.Database.CurrentTransaction;
+        var ownsTransaction = transaction is null;
+        transaction ??= await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var ownedTransaction = ownsTransaction ? transaction : null;
 
         try
         {
@@ -161,7 +163,7 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
                 cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (ownsTransaction) await transaction.CommitAsync(cancellationToken);
 
             // Re-fetch with the navigations the shared ProductDtoMapper reads, then map.
 
@@ -178,12 +180,13 @@ public class CreateMenuBundleCommandHandler : ICommandHandler<CreateMenuBundleCo
         }
         catch (Exception exception)
         {
-            try { await transaction.RollbackAsync(cancellationToken); }
-            catch (Exception rollbackEx)
+            if (ownsTransaction)
             {
-                // The original exception is the actionable one and is rethrown
-                // below; rollback failure here is logged but mustn't shadow it.
-                _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle create");
+                try { await transaction.RollbackAsync(cancellationToken); }
+                catch (Exception rollbackEx)
+                {
+                    _logger.LogWarning(rollbackEx, "Transaction rollback failed during menu bundle create");
+                }
             }
 
             MenuOfferLinkConflict.ThrowIfExpected(exception);
