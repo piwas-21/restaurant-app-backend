@@ -80,6 +80,67 @@ public sealed class CatalogueImportCommandMapperTests
     }
 
     [Fact]
+    public void Item_command_preserves_explicit_empty_tenant_review_lists()
+    {
+        var revision = Revision("item", new { });
+        var decision = new CatalogueImportItemDecision
+        {
+            LocalPrice = 10m,
+            LocalProductType = "MainItem",
+            KitchenType = KitchenType.BackKitchen,
+            Ingredients = [],
+            Allergens = []
+        };
+
+        var command = CatalogueImportCommandMapper.Item(revision, "en", decision, Guid.NewGuid());
+
+        command.Ingredients.Should().BeEmpty();
+        command.Allergens.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true, "TENANT_INGREDIENTS_REQUIRED")]
+    [InlineData(false, "TENANT_ALLERGENS_REQUIRED")]
+    public void Item_command_rejects_a_missing_tenant_review_list(bool missingIngredients, string errorCode)
+    {
+        var revision = Revision("item", new { });
+        var decision = new CatalogueImportItemDecision
+        {
+            LocalPrice = 10m,
+            LocalProductType = "MainItem",
+            KitchenType = KitchenType.BackKitchen,
+            Ingredients = missingIngredients ? null : [],
+            Allergens = missingIngredients ? [] : null
+        };
+
+        var act = () => CatalogueImportCommandMapper.Item(revision, "en", decision, Guid.NewGuid());
+
+        act.Should().Throw<BadRequestException>().Which.ErrorCode.Should().Be(errorCode);
+    }
+
+    [Fact]
+    public void Bundle_command_preserves_an_explicit_empty_tenant_allergen_list()
+    {
+        var revision = Revision("bundle", new { sections = Array.Empty<object>() });
+        var decision = new CatalogueImportItemDecision { LocalPrice = 10m, Allergens = [] };
+
+        var command = CatalogueImportCommandMapper.Bundle(revision, "en", decision, [], null);
+
+        command.Allergens.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Bundle_command_rejects_a_missing_tenant_allergen_list()
+    {
+        var revision = Revision("bundle", new { sections = Array.Empty<object>() });
+        var decision = new CatalogueImportItemDecision { LocalPrice = 10m };
+
+        var act = () => CatalogueImportCommandMapper.Bundle(revision, "en", decision, [], null);
+
+        act.Should().Throw<BadRequestException>().Which.ErrorCode.Should().Be("TENANT_ALLERGENS_REQUIRED");
+    }
+
+    [Fact]
     public void Ingredient_command_maps_only_supported_central_roles_and_keeps_reviewed_locale_text()
     {
         var revision = Revision("ingredient", new { suggestedOnly = true, role = "sauce" });
