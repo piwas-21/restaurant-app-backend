@@ -148,6 +148,18 @@ public class MenuBundleMapperTests
         dto.Availability.AllowedOrderTypes.Should().HaveCount(3);
     }
 
+    [Fact]
+    public void A_bundle_without_a_definition_is_not_orderable()
+    {
+        var bundle = BundleWith(availableOrderTypes: null);
+        bundle.MenuDefinition = null;
+
+        var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, "https://cdn.example", OrderType.DineIn);
+
+        dto.Availability.CanOrder.Should().BeFalse();
+        dto.Availability.AllowedOrderTypes.Should().BeEmpty();
+    }
+
     /// <summary>
     /// The customer menu groups a bundle into the tabs of its main dish's categories, so the read
     /// contract has to carry the links (the same ProductCategories the channel verdict already
@@ -194,17 +206,63 @@ public class MenuBundleMapperTests
         dto.PrimaryCategoryId.Should().BeNull();
     }
 
-    private static Product BundleWith(int? availableOrderTypes) => new()
+    private static Product BundleWith(int? availableOrderTypes)
     {
-        Id = Guid.NewGuid(),
-        Name = "Combo",
-        BasePrice = 12m,
-        Type = ProductType.Menu,
-        IsAvailable = true,
-        AvailableOrderTypes = availableOrderTypes,
-        Ingredients = new List<string>(),
-        Allergens = new List<string>(),
-        CreatedAt = DateTime.UtcNow,
-        CreatedBy = "test"
-    };
+        var option = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Choice",
+            BasePrice = 1m,
+            Type = ProductType.MainItem,
+            IsActive = true,
+            IsAvailable = true,
+            Ingredients = [],
+            Allergens = [],
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        var section = new MenuSection
+        {
+            Id = Guid.NewGuid(),
+            Name = "Choice",
+            IsRequired = true,
+            MinSelection = 1,
+            MaxSelection = 1,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        section.Items.Add(new MenuSectionItem
+        {
+            Id = Guid.NewGuid(),
+            ProductId = option.Id,
+            Product = option,
+            DisplayOrder = 1,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+        var definition = new MenuDefinition
+        {
+            Id = Guid.NewGuid(),
+            IsAlwaysAvailable = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+        definition.Sections.Add(section);
+
+        return new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Combo",
+            BasePrice = 12m,
+            Type = ProductType.Menu,
+            IsActive = true,
+            IsAvailable = true,
+            AvailableOrderTypes = availableOrderTypes,
+            Ingredients = [],
+            Allergens = [],
+            MenuDefinition = definition,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        };
+    }
 }

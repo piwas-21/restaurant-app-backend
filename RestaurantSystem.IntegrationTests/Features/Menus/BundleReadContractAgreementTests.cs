@@ -85,11 +85,13 @@ public class BundleReadContractAgreementTests : IntegrationTestBase
         {
             "id", "productId", "productVariationId", "productVariationName",
             "productVariationPriceModifier", "productName", "additionalPrice", "displayOrder", "isDefault",
-            "ingredients", "allergens", "detailedIngredients", "suggestedSideItems",
+            "ingredients", "allergens", "availability", "detailedIngredients", "suggestedSideItems",
             "customizationGroups",
             "sauceMin", "sauceMax", "sauceIncludedFree"
         };
 
+        Keys(fromProduct).Should().BeEquivalentTo(Keys(fromBundle),
+            "both product and menu reads use the same section-item projection");
         Keys(fromProduct).Should().BeEquivalentTo(expected);
         Keys(fromBundle).Should().BeEquivalentTo(expected);
     }
