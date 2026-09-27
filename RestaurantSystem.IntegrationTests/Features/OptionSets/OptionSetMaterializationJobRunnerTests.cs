@@ -240,6 +240,7 @@ public sealed class OptionSetMaterializationJobRunnerTests : IntegrationTestBase
         int? previousMenuVersion,
         CancellationToken cancellationToken)
     {
+        context.Attach(jobTarget);
         int? menuVersion = request.Role == OptionSetAttachmentRole.BundleChoice
             ? (previousMenuVersion ?? request.ExpectedMenuAuthoringVersion ?? 0) + 1
             : null;

@@ -23,22 +23,25 @@ public sealed partial class OptionSetMaterializationJobRunner
             return false;
         }
 
-        var target = await _context.OptionSetMaterializationJobTargets
-            .SingleAsync(row => row.Id == targetId && row.JobId == claim.JobId, cancellationToken);
-        if (target.Status != "pending")
+        var now = DateTime.UtcNow;
+        var resultJson = result is null ? null : OptionSetMaterializationJobJson.Serialize(result);
+        var safeError = Truncate(errorMessage, OptionSetMaterializationLimits.PersistedErrorMaxLength);
+        var updated = await _context.OptionSetMaterializationJobTargets
+            .Where(row => row.Id == targetId && row.JobId == claim.JobId && row.Status == "pending")
+            .ExecuteUpdateAsync(updates => updates
+                .SetProperty(row => row.Status, status)
+                .SetProperty(row => row.Attempts, row => row.Attempts + 1)
+                .SetProperty(row => row.ResultJson, resultJson)
+                .SetProperty(row => row.ErrorCode, errorCode)
+                .SetProperty(row => row.ErrorMessage, safeError)
+                .SetProperty(row => row.CompletedAt, status == "failed" ? (DateTime?)null : now)
+                .SetProperty(row => row.UpdatedAt, now), cancellationToken);
+        if (updated != 1)
         {
             await transaction.RollbackAsync(cancellationToken);
             return false;
         }
 
-        target.Status = status;
-        target.Attempts++;
-        target.ResultJson = result is null ? null : OptionSetMaterializationJobJson.Serialize(result);
-        target.ErrorCode = errorCode;
-        target.ErrorMessage = Truncate(errorMessage, OptionSetMaterializationLimits.PersistedErrorMaxLength);
-        target.CompletedAt = status == "failed" ? null : DateTime.UtcNow;
-        target.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
     }

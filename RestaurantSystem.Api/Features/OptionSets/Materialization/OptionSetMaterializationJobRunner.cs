@@ -50,16 +50,17 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
             return true;
         }
 
-        var targetIds = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
+        var targets = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
             .Where(target => target.JobId == claim.JobId && target.Status == "pending")
             .OrderBy(target => target.Sequence)
-            .Select(target => target.Id)
             .Take(_settings.TargetsPerJobRun)
             .ToListAsync(cancellationToken);
+        var previousMenuVersions = await LoadPreviousMenuVersionsAsync(claim.JobId, targets, cancellationToken);
 
-        foreach (var targetId in targetIds)
+        foreach (var target in targets)
         {
-            if (!await ProcessTargetAsync(claim, input.Request, input.CreatedBy, targetId, cancellationToken))
+            if (!await ProcessTargetAsync(
+                claim, input.Request, input.CreatedBy, target, previousMenuVersions, cancellationToken))
             {
                 break;
             }
@@ -102,14 +103,13 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         JobLease claim,
         OptionSetMaterializationRequest request,
         string auditIdentifier,
-        Guid targetId,
+        OptionSetMaterializationJobTarget target,
+        Dictionary<Guid, List<PreviousMenuVersion>> previousMenuVersions,
         CancellationToken cancellationToken)
     {
         _context.ChangeTracker.Clear();
         try
         {
-            var target = await _context.OptionSetMaterializationJobTargets
-                .SingleAsync(row => row.Id == targetId && row.JobId == claim.JobId, cancellationToken);
             var targetRequest = OptionSetMaterializationJobJson.Deserialize<OptionSetMaterializationTargetRequest>(
                 target.RequestJson);
             if (target.Sequence >= request.Targets.Count
@@ -120,15 +120,16 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
                 return false;
             }
 
-            var previousMenuVersion = await GetPreviousMenuVersionAsync(target, targetRequest, cancellationToken);
+            var previousMenuVersion = GetPreviousMenuVersion(target, targetRequest, previousMenuVersions);
             var result = await _materializer.ApplyJobTargetAsync(
                 request, targetRequest, target, claim.LeaseId, previousMenuVersion, auditIdentifier,
                 cancellationToken);
             if (result.Status == "conflict")
             {
-                return await PersistOutcomeAsync(claim, targetId, result, "conflict", null, null, cancellationToken);
+                return await PersistOutcomeAsync(claim, target.Id, result, "conflict", null, null, cancellationToken);
             }
 
+            RememberMenuVersion(target, targetRequest, result, previousMenuVersions);
             return true;
         }
         catch (OperationCanceledException)
@@ -137,20 +138,15 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         }
         catch (BadRequestException exception)
         {
-            _context.ChangeTracker.Clear();
-            var targetKey = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
-                .Where(row => row.Id == targetId)
-                .Select(row => row.TargetKey)
-                .SingleOrDefaultAsync(cancellationToken) ?? string.Empty;
-            var result = ConflictResult(targetKey, "invalid-target", exception.Message);
+            var result = ConflictResult(target.TargetKey, "invalid-target", exception.Message);
             return await PersistOutcomeAsync(
-                claim, targetId, result, "conflict", "invalid-target", exception.Message, cancellationToken);
+                claim, target.Id, result, "conflict", "invalid-target", exception.Message, cancellationToken);
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Option-set materialization target {TargetId} failed.", targetId);
+            _logger.LogError(exception, "Option-set materialization target {TargetId} failed.", target.Id);
             return await PersistOutcomeAsync(
-                claim, targetId, null, "failed", "target-processing-failed",
+                claim, target.Id, null, "failed", "target-processing-failed",
                 "Target processing failed. Resume this job to retry it if the issue is transient.",
                 cancellationToken);
         }
@@ -199,30 +195,81 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         return new JobInput(request, job.CreatedBy);
     }
 
-    private async Task<int?> GetPreviousMenuVersionAsync(
-        OptionSetMaterializationJobTarget target,
-        OptionSetMaterializationTargetRequest request,
+    private async Task<Dictionary<Guid, List<PreviousMenuVersion>>> LoadPreviousMenuVersionsAsync(
+        Guid jobId,
+        IReadOnlyCollection<OptionSetMaterializationJobTarget> targets,
         CancellationToken cancellationToken)
     {
-        if (request.Role != OptionSetAttachmentRole.BundleChoice)
+        var productIds = targets.Select(target => target.TargetProductId).Distinct().ToArray();
+        if (productIds.Length == 0)
+        {
+            return [];
+        }
+
+        var lastSequence = targets.Max(target => target.Sequence);
+        var previous = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
+            .Where(row => row.JobId == jobId && productIds.Contains(row.TargetProductId)
+                && row.Sequence < lastSequence && (row.Status == "applied" || row.Status == "unchanged")
+                && row.ResultJson != null
+                && EF.Functions.JsonContains(row.RequestJson, "{\"role\":\"bundleChoice\"}"))
+            .OrderBy(row => row.Sequence)
+            .Select(row => new PreviousMenuVersion(row.TargetProductId, row.Sequence, row.ResultJson, null))
+            .ToListAsync(cancellationToken);
+
+        return previous.GroupBy(row => row.TargetProductId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+    }
+
+    private static int? GetPreviousMenuVersion(
+        OptionSetMaterializationJobTarget target,
+        OptionSetMaterializationTargetRequest request,
+        IReadOnlyDictionary<Guid, List<PreviousMenuVersion>> previousMenuVersions)
+    {
+        if (request.Role != OptionSetAttachmentRole.BundleChoice
+            || !previousMenuVersions.TryGetValue(target.TargetProductId, out var previous))
         {
             return null;
         }
 
-        var previousJson = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
-            .Where(row => row.JobId == target.JobId && row.TargetProductId == target.TargetProductId
-                && row.Sequence < target.Sequence && (row.Status == "applied" || row.Status == "unchanged")
-                && row.ResultJson != null
-                && EF.Functions.JsonContains(row.RequestJson, "{\"role\":\"bundleChoice\"}"))
-            .OrderByDescending(row => row.Sequence)
-            .Select(row => row.ResultJson)
-            .FirstOrDefaultAsync(cancellationToken);
-        return previousJson is null
-            ? null
-            : OptionSetMaterializationJobJson.Deserialize<OptionSetMaterializationTargetResultDto>(previousJson)
+        var latest = previous.LastOrDefault(row => row.Sequence < target.Sequence);
+        if (latest is null)
+        {
+            return null;
+        }
+
+        return latest.ResultJson is null
+            ? latest.MenuAuthoringVersion
+            : OptionSetMaterializationJobJson.Deserialize<OptionSetMaterializationTargetResultDto>(latest.ResultJson)
                 .MenuAuthoringVersion;
+    }
+
+    private static void RememberMenuVersion(
+        OptionSetMaterializationJobTarget target,
+        OptionSetMaterializationTargetRequest request,
+        OptionSetMaterializationTargetResultDto result,
+        Dictionary<Guid, List<PreviousMenuVersion>> previousMenuVersions)
+    {
+        if (request.Role != OptionSetAttachmentRole.BundleChoice
+            || result.Status is not ("applied" or "unchanged"))
+        {
+            return;
+        }
+
+        if (!previousMenuVersions.TryGetValue(target.TargetProductId, out var versions))
+        {
+            versions = [];
+            previousMenuVersions[target.TargetProductId] = versions;
+        }
+
+        versions.Add(new PreviousMenuVersion(
+            target.TargetProductId, target.Sequence, null, result.MenuAuthoringVersion));
     }
 
     private sealed record JobLease(Guid JobId, Guid LeaseId, bool RecoveredExpiredLease, bool IsFirstRun);
     private sealed record JobInput(OptionSetMaterializationRequest Request, string CreatedBy);
+    private sealed record PreviousMenuVersion(
+        Guid TargetProductId,
+        int Sequence,
+        string? ResultJson,
+        int? MenuAuthoringVersion);
 }

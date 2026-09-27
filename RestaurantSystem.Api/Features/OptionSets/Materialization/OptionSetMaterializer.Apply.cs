@@ -72,6 +72,11 @@ public sealed partial class OptionSetMaterializer
         {
             if (context.DurableTarget is not null)
             {
+                if (_context.Entry(context.DurableTarget).State == EntityState.Detached)
+                {
+                    _context.Attach(context.DurableTarget);
+                }
+
                 await RenewJobLeaseAsync(context.DurableTarget.JobId, context.LeaseId, context.CancellationToken);
             }
 
