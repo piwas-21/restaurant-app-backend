@@ -51,7 +51,18 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         var caller = new Mock<ICurrentUserService>();
         var catalog = new Mock<RestaurantSystem.Api.Features.OptionSets.Services.IOptionSetCatalogService>();
         var features = new TenantFeatures(Options.Create(new TenantFeatureSettings()));
-        var materializer = new OptionSetMaterializer(context, caller.Object, catalog.Object, features);
+        var materializer = new OptionSetMaterializer(
+            context,
+            caller.Object,
+            catalog.Object,
+            features,
+            Options.Create(new OptionSetMaterializationSettings
+            {
+                MaximumIdempotencyKeyLength = 100,
+                MaximumTargetsPerRequest = 100,
+                MaximumEntriesPerTarget = 200,
+                MaximumIntentionalDifferenceReasonLength = 500
+            }));
 
         var action = () => materializer.ApplyAsync(
             new OptionSetMaterializationRequest { ExpectedSetVersion = 1 }, CancellationToken.None);

@@ -3,8 +3,10 @@ using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.OptionSets.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
@@ -14,17 +16,20 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
     private readonly ICurrentUserService _currentUser;
     private readonly IOptionSetCatalogService _catalog;
     private readonly ITenantFeatures _tenantFeatures;
+    private readonly OptionSetMaterializationSettings _settings;
 
     public OptionSetMaterializer(
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         IOptionSetCatalogService catalog,
-        ITenantFeatures tenantFeatures)
+        ITenantFeatures tenantFeatures,
+        IOptions<OptionSetMaterializationSettings> settings)
     {
         _context = context;
         _currentUser = currentUser;
         _catalog = catalog;
         _tenantFeatures = tenantFeatures;
+        _settings = settings.Value;
     }
 
     public async Task<OptionSetMaterializationPreview> PreviewAsync(
@@ -97,13 +102,15 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
         return set;
     }
 
-    private static void ValidateRequest(OptionSetMaterializationRequest request)
+    private void ValidateRequest(OptionSetMaterializationRequest request)
     {
         if (request.OptionSetId == Guid.Empty || request.ExpectedSetVersion <= 0
-            || string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Trim().Length > 100
-            || request.Targets.Count is < 1 or > 100)
+            || string.IsNullOrWhiteSpace(request.IdempotencyKey)
+            || request.IdempotencyKey.Trim().Length > _settings.MaximumIdempotencyKeyLength
+            || request.Targets.Count is < 1 || request.Targets.Count > _settings.MaximumTargetsPerRequest)
         {
-            throw new BadRequestException("A valid option set, version, idempotency key, and 1 to 100 targets are required");
+            throw new BadRequestException(
+                $"A valid option set, version, idempotency key, and 1 to {_settings.MaximumTargetsPerRequest} targets are required");
         }
 
         var keys = new HashSet<string>(StringComparer.Ordinal);
@@ -114,7 +121,7 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
                 || !keys.Add(target.TargetKey.Trim()) || !Enum.IsDefined(target.Role)
                 || !Enum.IsDefined(target.ConflictPolicy)
                 || target.ExpectedAttachmentVersion is < 0
-                || target.IntentionalDifferenceReason?.Trim().Length > 500)
+                || target.IntentionalDifferenceReason?.Trim().Length > _settings.MaximumIntentionalDifferenceReasonLength)
             {
                 throw new BadRequestException("Targets need unique keys, valid roles and policies, and valid concurrency data");
             }
@@ -125,9 +132,11 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
                 throw new BadRequestException("A materialization request cannot repeat the same target and role");
             }
 
-            if (target.EntryIds?.Count > 200 || target.Overrides?.Count > 200)
+            if (target.EntryIds?.Count > _settings.MaximumEntriesPerTarget
+                || target.Overrides?.Count > _settings.MaximumEntriesPerTarget)
             {
-                throw new BadRequestException("A target may select or override at most 200 entries");
+                throw new BadRequestException(
+                    $"A target may select or override at most {_settings.MaximumEntriesPerTarget} entries");
             }
         }
     }
