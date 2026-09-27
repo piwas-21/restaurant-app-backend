@@ -140,6 +140,7 @@ public static class ProductDtoMapper
         => new()
         {
             Id = group.Id,
+            AuthoringVersion = group.AuthoringVersion,
             Name = group.Name,
             Description = group.Description,
             DisplayOrder = group.DisplayOrder,

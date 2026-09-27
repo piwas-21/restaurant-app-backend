@@ -29,7 +29,10 @@ public sealed class TenantFeaturesController : ControllerBase
     public ActionResult<ApiResponse<TenantFeaturesDto>> Get()
     {
         Response.Headers.CacheControl = "no-store";
-        var dto = new TenantFeaturesDto(_features.ServerWorkspaceV2, _features.EnforceSauceMinimum);
+        var dto = new TenantFeaturesDto(
+            _features.ServerWorkspaceV2,
+            _features.EnforceSauceMinimum,
+            _features.OptionSetMaterializationEnabled);
         return Ok(ApiResponse<TenantFeaturesDto>.SuccessWithData(dto));
     }
 }

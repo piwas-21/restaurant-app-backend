@@ -2356,6 +2356,571 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("MenuSectionTranslations", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<string>("SourceLocale")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("en")
+                        .HasColumnName("source_locale");
+
+                    b.Property<string>("SourceOptionSetId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_option_set_id");
+
+                    b.Property<int?>("SourceRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_revision");
+
+                    b.Property<string>("SourceTemplateId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_template_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_sets");
+
+                    b.HasIndex("Kind", "NormalizedName")
+                        .IsUnique();
+
+                    b.HasIndex("SourceTemplateId", "SourceRevision", "SourceOptionSetId")
+                        .IsUnique()
+                        .HasFilter("\"source_template_id\" IS NOT NULL AND \"source_revision\" IS NOT NULL AND \"source_option_set_id\" IS NOT NULL");
+
+                    b.ToTable("OptionSets", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAppliedRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LastAppliedValuesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("last_applied_values_json");
+
+                    b.Property<Guid>("MaterializedRowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("materialized_row_id");
+
+                    b.Property<Guid>("OptionSetAttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_attachment_id");
+
+                    b.Property<Guid>("OptionSetEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_entry_id");
+
+                    b.Property<bool>("OwnsMaterializedRow")
+                        .HasColumnType("boolean")
+                        .HasColumnName("owns_materialized_row");
+
+                    b.Property<string>("RowType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("row_type");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_applied_rows");
+
+                    b.HasIndex("OptionSetEntryId")
+                        .HasDatabaseName("ix_option_set_applied_rows_option_set_entry_id");
+
+                    b.HasIndex("OptionSetAttachmentId", "OptionSetEntryId")
+                        .IsUnique();
+
+                    b.HasIndex("RowType", "MaterializedRowId");
+
+                    b.ToTable("OptionSetAppliedRows", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AppliedSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("applied_set_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<int?>("IncludedFree")
+                        .HasColumnType("integer")
+                        .HasColumnName("included_free");
+
+                    b.Property<string>("IntentionalDifferenceReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("intentional_difference_reason");
+
+                    b.Property<string>("LastIdempotencyKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_idempotency_key");
+
+                    b.Property<int?>("MaxSelection")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_selection");
+
+                    b.Property<int?>("MinSelection")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_selection");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer")
+                        .HasColumnName("role");
+
+                    b.Property<Guid?>("TargetCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_customization_group_id");
+
+                    b.Property<Guid?>("TargetMenuSectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_menu_section_id");
+
+                    b.Property<Guid>("TargetProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_attachments");
+
+                    b.HasIndex("OptionSetId")
+                        .HasDatabaseName("ix_option_set_attachments_option_set_id");
+
+                    b.HasIndex("TargetCustomizationGroupId", "Role")
+                        .IsUnique()
+                        .HasFilter("\"target_customization_group_id\" IS NOT NULL");
+
+                    b.HasIndex("TargetMenuSectionId", "Role")
+                        .IsUnique()
+                        .HasFilter("\"target_menu_section_id\" IS NOT NULL");
+
+                    b.HasIndex("TargetProductId", "Role")
+                        .IsUnique()
+                        .HasFilter("\"target_menu_section_id\" IS NULL AND \"target_customization_group_id\" IS NULL");
+
+                    b.ToTable("OptionSetAttachments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_set_attachments_target", "(role = 2 AND target_menu_section_id IS NOT NULL AND target_customization_group_id IS NULL) OR (role = 4 AND target_menu_section_id IS NULL AND target_customization_group_id IS NOT NULL) OR (role NOT IN (2, 4) AND target_menu_section_id IS NULL AND target_customization_group_id IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAuthoringRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int?>("AppliedSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("applied_set_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<int?>("SourceSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_set_version");
+
+                    b.Property<string>("SummaryJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("summary_json");
+
+                    b.Property<Guid?>("TargetCustomizationGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_customization_group_id");
+
+                    b.Property<Guid?>("TargetMenuSectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_menu_section_id");
+
+                    b.Property<Guid>("TargetProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_authoring_revisions");
+
+                    b.HasIndex("TargetCustomizationGroupId");
+
+                    b.HasIndex("OptionSetId", "CreatedAt");
+
+                    b.HasIndex("TargetProductId", "CreatedAt");
+
+                    b.ToTable("OptionSetAuthoringRevisions", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("AdditionalPrice")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("additional_price");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<Guid?>("GlobalIngredientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_ingredient_id");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<bool>("IsIncludedInBasePrice")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_included_in_base_price");
+
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_optional");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<int>("MaxQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_quantity");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("price");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid?>("ProductVariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_variation_id");
+
+                    b.Property<string>("SourceEntryId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source_entry_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_entries");
+
+                    b.HasIndex("GlobalIngredientId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductVariationId");
+
+                    b.HasIndex("OptionSetId", "GlobalIngredientId")
+                        .IsUnique()
+                        .HasFilter("\"global_ingredient_id\" IS NOT NULL");
+
+                    b.HasIndex("OptionSetId", "ProductId")
+                        .IsUnique()
+                        .HasFilter("\"product_id\" IS NOT NULL AND \"product_variation_id\" IS NULL");
+
+                    b.HasIndex("OptionSetId", "ProductVariationId")
+                        .IsUnique()
+                        .HasFilter("\"product_variation_id\" IS NOT NULL");
+
+                    b.ToTable("OptionSetEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_option_set_entries_one_reference", "(global_ingredient_id IS NULL) <> (product_id IS NULL) AND (product_variation_id IS NULL OR product_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_option_set_entries_positive_quantity", "max_quantity >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetMatchDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Alias")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("alias");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<string>("CandidateType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("candidate_type");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsAccepted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_accepted");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_match_decisions");
+
+                    b.HasIndex("NormalizedName", "CandidateType", "CandidateId")
+                        .IsUnique();
+
+                    b.ToTable("OptionSetMatchDecisions", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language_code");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OptionSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_set_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_option_set_translations");
+
+                    b.HasIndex("OptionSetId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("OptionSetTranslations", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3950,6 +4515,13 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AuthoringVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("authoring_version");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -6428,6 +7000,102 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("MenuSection");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAppliedRow", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSetAttachment", "Attachment")
+                        .WithMany("AppliedRows")
+                        .HasForeignKey("OptionSetAttachmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_applied_rows_optionsetattachments_option_set_att~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSetEntry", "Entry")
+                        .WithMany()
+                        .HasForeignKey("OptionSetEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_applied_rows_optionsetentries_option_set_entry_id");
+
+                    b.Navigation("Attachment");
+
+                    b.Navigation("Entry");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAttachment", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", "OptionSet")
+                        .WithMany("Attachments")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_attachments_option_sets_option_set_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", null)
+                        .WithMany()
+                        .HasForeignKey("TargetCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.MenuSection", null)
+                        .WithMany()
+                        .HasForeignKey("TargetMenuSectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("TargetProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAuthoringRevision", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductCustomizationGroup", null)
+                        .WithMany()
+                        .HasForeignKey("TargetCustomizationGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetEntry", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.GlobalIngredient", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalIngredientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", "OptionSet")
+                        .WithMany("Entries")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_entries_option_sets_option_set_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.ProductVariation", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("OptionSet");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetTranslation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OptionSet", "OptionSet")
+                        .WithMany("Translations")
+                        .HasForeignKey("OptionSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_option_set_translations_option_sets_option_set_id");
+
+                    b.Navigation("OptionSet");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.CustomerDiscountRule", "CustomerDiscountRule")
@@ -7085,6 +7753,20 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Translations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSet", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Entries");
+
+                    b.Navigation("Translations");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OptionSetAttachment", b =>
+                {
+                    b.Navigation("AppliedRows");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Order", b =>

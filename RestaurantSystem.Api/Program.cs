@@ -34,6 +34,7 @@ using RestaurantSystem.Api.Features.FidelityPoints.Services;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Products.Services;
+using RestaurantSystem.Api.Features.OptionSets;
 using RestaurantSystem.Api.Features.Settings.FormFields.Interfaces;
 using RestaurantSystem.Api.Features.Settings.FormFields.Services;
 using RestaurantSystem.Api.Features.Settings.Interfaces;
@@ -45,6 +46,7 @@ using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Infrastructure.Persistence.Configurations;
 using RestaurantSystem.ServiceDefaults;
 using System.Text.Json;
 
@@ -305,6 +307,52 @@ builder.Services.Configure<EmailSettings>(emailSettings);
 (emailSettings.Get<EmailSettings>() ?? new EmailSettings()).Validate();
 
 builder.Services.Configure<PrinterSettings>(builder.Configuration.GetSection("PrinterSettings"));
+builder.Services.AddOptions<MenuAuthoringPaginationSettings>()
+    .Bind(builder.Configuration.GetSection(MenuAuthoringPaginationSettings.SectionName))
+    .Validate(settings => settings.MinimumPageSize >= 1
+        && settings.MaximumPageSize >= settings.MinimumPageSize
+        && settings.DefaultPageSize >= settings.MinimumPageSize
+        && settings.DefaultPageSize <= settings.MaximumPageSize
+        && settings.MaximumSearchQueryLength > 0
+        && settings.MinimumNormalizedSearchQueryLength > 0
+        && settings.MaximumNormalizedSearchQueryLength >= settings.MinimumNormalizedSearchQueryLength
+        && settings.MaximumSearchQueryLength <= settings.MaximumNormalizedSearchQueryLength
+        && settings.MaximumNormalizedSearchQueryLength <= OptionSetSchemaLimits.NormalizedNameLength
+        && settings.MaximumSearchAliasLength > 0
+        && settings.MaximumSearchAliasLength <= OptionSetSchemaLimits.AliasLength
+        && settings.MaximumSearchCursorLength > 0,
+        "Menu-authoring pagination settings are inconsistent")
+    .ValidateOnStart();
+builder.Services.AddOptions<OptionSetAuthoringSettings>()
+    .Bind(builder.Configuration.GetSection(OptionSetAuthoringSettings.SectionName))
+    .Validate(settings => settings.MaximumIdempotencyKeyLength > 0
+        && settings.MaximumIdempotencyKeyLength <= OptionSetSchemaLimits.IdempotencyKeyLength
+        && settings.MaximumTargetsPerRequest > 0
+        && settings.MaximumTargetKeyLength > 0
+        && settings.MaximumEntriesPerOptionSet > 0
+        && settings.MaximumEntryNameLength > 0
+        && settings.MaximumEntryNameLength <= OptionSetSchemaLimits.EntryNameLength
+        && settings.MaximumOptionSetNameLength > 0
+        && settings.MaximumOptionSetNameLength <= OptionSetSchemaLimits.OptionSetNameLength
+        && settings.MaximumTranslationNameLength > 0
+        && settings.MaximumTranslationNameLength <= OptionSetSchemaLimits.TranslationNameLength
+        && settings.MaximumIntentionalDifferenceReasonLength > 0
+        && settings.MaximumIntentionalDifferenceReasonLength <= OptionSetSchemaLimits.IntentionalDifferenceReasonLength
+        && settings.MaximumTranslationLocales > 0
+        && settings.MaximumLocaleTagLength > 0
+        && settings.MaximumLocaleTagLength <= OptionSetSchemaLimits.SourceLocaleLength
+        && settings.MaximumSourceIdentifierLength > 0
+        && settings.MaximumSourceIdentifierLength <= OptionSetSchemaLimits.SourceIdentifierLength
+        && settings.MaximumImportedSourceLabelLength > 0
+        && settings.MaximumImportedSourceFingerprintLength > 0
+        && settings.MaximumImportedSourceFingerprintLength <= System.Security.Cryptography.SHA256.HashSizeInBytes * 2
+        && settings.MaximumImportedSourceLabelLength <= settings.MaximumSourceIdentifierLength
+        && (long)settings.MaximumImportedSourceLabelLength + settings.MaximumImportedSourceFingerprintLength
+            + OptionSetAuthoringSettings.ImportedSourceLabelSeparator.Length
+            + OptionSetAuthoringSettings.ImportedSourceFingerprintSeparator.Length
+            <= settings.MaximumOptionSetNameLength,
+        "Option-set authoring limits must be positive")
+    .ValidateOnStart();
 builder.Services.AddOptions<OrderRoutingSettings>()
     .Bind(builder.Configuration.GetSection(OrderRoutingSettings.SectionName))
     .ValidateDataAnnotations()
@@ -666,6 +714,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddOptionSetFeatures();
 // Lets ApplicationDbContext (Infrastructure, which cannot see ICurrentUserService) backfill audit
 // columns with the acting user. NOT forwarded to ICurrentUserService: that is a dependency CYCLE —
 // CurrentUserService needs UserManager, which needs IUserStore, which AddEntityFrameworkStores
