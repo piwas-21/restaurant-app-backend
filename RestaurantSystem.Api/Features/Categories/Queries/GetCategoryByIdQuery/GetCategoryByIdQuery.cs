@@ -2,8 +2,10 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Utilities;
+using RestaurantSystem.Api.Features.Categories;
 using RestaurantSystem.Api.Features.Categories.Dtos;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Categories.Queries.GetCategoryByIdQuery;
@@ -30,6 +32,7 @@ public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, A
             .Include(c => c.ProductCategories)
                 .ThenInclude(pc => pc.Product)
                     .ThenInclude(p => p.Images)
+            .Include(c => c.Translations)
             .FirstOrDefaultAsync(c => c.Id == query.Id && !c.IsDeleted, cancellationToken);
 
         if (category == null)
@@ -68,6 +71,7 @@ public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, A
             Id = category.Id,
             Name = category.Name,
             Description = category.Description,
+            SourceLocale = category.SourceLocale,
             ImageUrl = category.ImageUrl,
             IsActive = category.IsActive,
             DisplayOrder = category.DisplayOrder,
@@ -75,8 +79,11 @@ public class GetCategoryByIdQueryHandler : IQueryHandler<GetCategoryByIdQuery, A
             CreatedAt = category.CreatedAt,
             UpdatedAt = category.UpdatedAt,
             FeaturedProducts = featuredProducts,
-            Content = new Dictionary<string, CategoryContentDto>()
+            Translations = CategoryTranslationMapper.ToDto(category.Translations),
+            Content = CategoryTranslationMapper.ToDto(category.Translations)
         };
+
+        categoryDto = await TranslationReadMetadata.ApplyAsync(_context, categoryDto, cancellationToken);
 
         _logger.LogInformation("Retrieved category {CategoryId} successfully", query.Id);
         return ApiResponse<CategoryDetailDto>.SuccessWithData(categoryDto);

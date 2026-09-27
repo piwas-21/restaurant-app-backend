@@ -20,6 +20,11 @@ public interface ITranslationProvenanceWriter
         TranslationTextMap text,
         CancellationToken cancellationToken);
 
+    Task ClearSourceLocaleAsync(
+        string entityType,
+        Guid entityId,
+        CancellationToken cancellationToken);
+
     Task<int> RecordTemplateAsync(
         RecordTemplateTranslationRequest request,
         CancellationToken cancellationToken);

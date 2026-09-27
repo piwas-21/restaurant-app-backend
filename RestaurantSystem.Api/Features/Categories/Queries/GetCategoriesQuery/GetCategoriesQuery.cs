@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.Categories.Queries.GetCategoriesQuery;
@@ -66,6 +67,7 @@ public class GetCategoriesQueryHandler : IQueryHandler<GetCategoriesQuery, ApiRe
                 Id = c.Id,
                 Name = c.Name,
                 Description = c.Description,
+                SourceLocale = c.SourceLocale,
                 ImageUrl = c.ImageUrl,
                 IsActive = c.IsActive,
                 DisplayOrder = c.DisplayOrder,
@@ -76,6 +78,9 @@ public class GetCategoriesQueryHandler : IQueryHandler<GetCategoriesQuery, ApiRe
                 UpdatedAt = c.UpdatedAt
             })
             .ToListAsync(cancellationToken);
+
+        categories = (await TranslationReadMetadata.ApplyCategoriesAsync(
+            _context, categories, cancellationToken)).ToList();
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize);
 

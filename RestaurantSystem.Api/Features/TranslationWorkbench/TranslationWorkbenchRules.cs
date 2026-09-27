@@ -12,7 +12,7 @@ internal static partial class TranslationWorkbenchRules
     public static readonly HashSet<string> GuestLocales =
         ["en", "tr", "es", "ar", "de", "fr", "nl", "it", "ru", "zh"];
     private static readonly HashSet<string> EntityTypes =
-        ["product", "globalIngredient", "productIngredient", "productVariation", "menuSection", "optionSet"];
+        ["product", "globalIngredient", "productIngredient", "productVariation", "menuSection", "optionSet", "category"];
 
     [GeneratedRegex(@"\{\{[^{}]+\}\}|\{[A-Za-z_][^{}]*\}", RegexOptions.CultureInvariant)]
     private static partial Regex PlaceholderPattern();

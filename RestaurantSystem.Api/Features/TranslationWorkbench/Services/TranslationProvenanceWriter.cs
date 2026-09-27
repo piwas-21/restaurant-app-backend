@@ -70,7 +70,7 @@ public sealed partial class TranslationProvenanceWriter(
 
     private static bool IsSupportedEntityType(string entityType) => entityType is
         "product" or "globalIngredient" or "productIngredient" or "productVariation" or
-        "menuSection" or "optionSet";
+        "menuSection" or "optionSet" or "category";
 
     private static bool IsValidReviewedValue(string entityType, TemplateTranslationEvidence value) =>
         (value.FieldKey is NameField or DescriptionField) &&

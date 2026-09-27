@@ -1,6 +1,7 @@
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.Categories.Commands.CreateCategoryCommand;
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Api.Features.Catalogue.Dtos;
 using RestaurantSystem.Api.Features.GlobalIngredients.Commands.CreateGlobalIngredientCommand;
 using RestaurantSystem.Api.Features.GlobalIngredients.Dtos;
@@ -19,11 +20,53 @@ internal static class CatalogueImportCommandMapper
         CatalogueImportItemDecision decision)
     {
         var localized = CatalogueSessionMapper.Localized(revision, locale);
+        var translations = CategoryContent(revision, locale, decision, localized);
         return new CreateCategoryCommand(
             Name: LocalName(decision, localized.Name),
             Description: decision.LocalDescription ?? localized.Description,
             IsActive: true,
-            DisplayOrder: CatalogueImportPayloadReader.ReadInt(revision.Payload, "sortOrder"));
+            DisplayOrder: CatalogueImportPayloadReader.ReadInt(revision.Payload, "sortOrder"),
+            Translations: translations,
+            SourceLocale: locale,
+            TranslationMetadata: CatalogueImportCategoryTranslationMapper.OwnerMetadata(revision, locale));
+    }
+
+    private static Dictionary<string, CategoryContentDto> CategoryContent(
+        CentralCatalogueTemplateRevision revision,
+        string locale,
+        CatalogueImportItemDecision decision,
+        (string Name, string? Description) localized)
+    {
+        var content = new Dictionary<string, CategoryContentDto>(StringComparer.OrdinalIgnoreCase)
+        {
+            [revision.SourceLocale] = new CategoryContentDto
+            {
+                Name = revision.Name.Trim(),
+                Description = revision.Description
+            }
+        };
+        foreach (var (language, translation) in revision.Translations)
+        {
+            if (language.Equals(revision.SourceLocale, StringComparison.OrdinalIgnoreCase)) continue;
+            content[language] = new CategoryContentDto
+            {
+                Name = translation.Name,
+                Description = translation.Description
+            };
+        }
+
+        if (decision.LocalName is not null || decision.LocalDescription is not null ||
+            !content.ContainsKey(locale))
+        {
+            content.TryGetValue(locale, out var current);
+            content[locale] = new CategoryContentDto
+            {
+                Name = decision.LocalName?.Trim() ?? current?.Name ?? localized.Name,
+                Description = decision.LocalDescription ?? current?.Description ?? localized.Description
+            };
+        }
+
+        return content;
     }
 
     public static CreateGlobalIngredientCommand Ingredient(

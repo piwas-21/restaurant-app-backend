@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.Categories;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -30,6 +31,7 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
             "productIngredient" => await IngredientAsync(id, cancellationToken),
             "menuSection" => await SectionAsync(id, reference.FieldKey, cancellationToken),
             "optionSet" => await OptionSetAsync(id, cancellationToken),
+            "category" => await CategoryAsync(id, reference.FieldKey, cancellationToken),
             _ => throw new BadRequestException("Unsupported translation entity")
         };
     }
@@ -105,5 +107,17 @@ public sealed class TranslationTextReader(ApplicationDbContext context) : ITrans
             StringComparer.Ordinal);
         texts.TryAdd(set.SourceLocale, set.Name);
         return texts;
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> CategoryAsync(
+        Guid id, string field, CancellationToken cancellationToken)
+    {
+        var category = await context.Categories.AsNoTracking().Include(row => row.Translations)
+            .FirstOrDefaultAsync(row => row.Id == id, cancellationToken)
+            ?? throw new NotFoundException("Category was not found");
+        return CategoryTranslationMapper.ToDto(category.Translations).ToDictionary(
+            pair => pair.Key,
+            pair => field == "name" ? pair.Value.Name : pair.Value.Description ?? string.Empty,
+            StringComparer.Ordinal);
     }
 }
