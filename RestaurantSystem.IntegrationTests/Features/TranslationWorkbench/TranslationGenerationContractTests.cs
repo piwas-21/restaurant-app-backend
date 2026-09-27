@@ -84,6 +84,28 @@ public sealed class TranslationGenerationContractTests
         await act.Should().ThrowAsync<HttpRequestException>();
     }
 
+    [Fact]
+    public async Task ProviderRejectsMissingUsageSoDailyLimitsCannotUndercount()
+    {
+        using var client = new HttpClient(new StubHandler(_ => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"{\\\"items\\\":[{\\\"key\\\":\\\"0\\\",\\\"text\\\":\\\"Chicken\\\"}]}\"}]}]}")
+            })));
+        var provider = new OpenAiTranslationGenerationProvider(client,
+            Options.Create(new TranslationAssistanceSettings
+            {
+                ApiUrl = "https://api.openai.com/v1/responses",
+                ApiKey = "test-key" // pragma: allowlist secret -- inert test value
+            }));
+
+        var act = () => provider.GenerateAsync(
+            [new TranslationGenerationTarget("0", "tr", "en", "name", "Tavuk", null, null, [])],
+            new Dictionary<string, string>(), CancellationToken.None);
+        await act.Should().ThrowAsync<HttpRequestException>()
+            .WithMessage("Translation provider returned invalid usage");
+    }
+
     private sealed class StubHandler(
         Func<HttpRequestMessage, Task<HttpResponseMessage>> response) : HttpMessageHandler
     {

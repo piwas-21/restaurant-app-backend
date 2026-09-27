@@ -138,7 +138,15 @@ public sealed class OpenAiTranslationGenerationProvider(
         return new TranslationGenerationResult(results, "openai", model, inputTokens, outputTokens);
     }
 
-    private static int ReadTokens(JsonElement usage, string key) =>
-        usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty(key, out var value) &&
-        value.TryGetInt32(out var count) ? count : 0;
+    private static int ReadTokens(JsonElement usage, string key)
+    {
+        if (usage.ValueKind != JsonValueKind.Object ||
+            !usage.TryGetProperty(key, out var value) ||
+            !value.TryGetInt32(out var count) || count <= 0)
+        {
+            throw new HttpRequestException("Translation provider returned invalid usage");
+        }
+
+        return count;
+    }
 }
