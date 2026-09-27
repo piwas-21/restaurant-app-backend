@@ -5,6 +5,10 @@ namespace RestaurantSystem.Api.Features.Catalogue.Services;
 
 internal sealed class CataloguePublishedRevisionLoader(ICentralCatalogueClient catalogue)
 {
+    private const string AvailableStatus = "available";
+    private const string WithdrawnStatus = "withdrawn";
+    private const string NotFoundStatus = "notFound";
+
     public async Task<IReadOnlyDictionary<string, CataloguePublishedRevisionResult>> LoadBatchAsync(
         IReadOnlyList<CatalogueCurrentRevisionRequest> requests,
         CancellationToken cancellationToken)
@@ -14,67 +18,119 @@ internal sealed class CataloguePublishedRevisionLoader(ICentralCatalogueClient c
             return new Dictionary<string, CataloguePublishedRevisionResult>(StringComparer.Ordinal);
         }
 
-        if (requests.Any(request => string.IsNullOrWhiteSpace(request.TemplateId)) ||
-            requests.Select(request => request.TemplateId).Distinct(StringComparer.Ordinal).Count() != requests.Count)
+        if (HasInvalidRequests(requests))
         {
             return UnavailableBatch(requests);
         }
 
+        return await LoadChunksAsync(requests, cancellationToken);
+    }
+
+    private async Task<Dictionary<string, CataloguePublishedRevisionResult>> LoadChunksAsync(
+        IReadOnlyList<CatalogueCurrentRevisionRequest> requests,
+        CancellationToken cancellationToken)
+    {
         var results = new Dictionary<string, CataloguePublishedRevisionResult>(StringComparer.Ordinal);
         foreach (var requestBatch in requests.Chunk(CatalogueCurrentRevisionBatchLimits.MaximumTenantBatchItems))
         {
-            var batch = requestBatch.ToArray();
-            var response = await catalogue.GetCurrentRevisionBatchAsync(batch, cancellationToken);
-            if (response.StatusCode != StatusCodes.Status200OK || !TryReadBatchItems(response.Body, batch, out var items))
-            {
-                foreach (var request in batch)
-                {
-                    results.Add(request.TemplateId, Unavailable(
-                        "Catalogue status is temporarily unavailable; the tenant record was not changed."));
-                }
-
-                continue;
-            }
-
-            foreach (var item in items)
-            {
-                var status = item.GetProperty("status").GetString();
-                var templateId = item.GetProperty("templateId").GetString()!;
-                var adoptedRevisionWithdrawn = ReadNullableBoolean(item.GetProperty("adoptedRevisionWithdrawn"));
-                if (status == "notFound")
-                {
-                    results.Add(templateId, new CataloguePublishedRevisionResult("Unknown", null, null,
-                        "Catalogue no longer recognizes this template ID; the tenant record was not changed."));
-                    continue;
-                }
-
-                if (status == "withdrawn")
-                {
-                    var metadata = new CatalogueCurrentRevisionMetadata(templateId, null, null, true,
-                        adoptedRevisionWithdrawn);
-                    var resultStatus = adoptedRevisionWithdrawn == true ? "AdoptedRevisionWithdrawn" : "Withdrawn";
-                    results.Add(templateId, new CataloguePublishedRevisionResult(resultStatus, metadata, null,
-                        "This template is withdrawn from new adoption; the tenant record remains unchanged."));
-                    continue;
-                }
-
-                try
-                {
-                    var revision = CatalogueTemplateGraphLoader.Deserialize(item.GetProperty("revision"));
-                    CatalogueTemplateGraphLoader.ValidateRevisionDocument(revision, templateId, null);
-                    var metadata = new CatalogueCurrentRevisionMetadata(templateId, revision.Revision,
-                        revision.ContentHash, false, adoptedRevisionWithdrawn);
-                    results.Add(templateId, new CataloguePublishedRevisionResult("Available", metadata, revision, null));
-                }
-                catch (Exception exception) when (exception is System.Text.Json.JsonException or BadRequestException)
-                {
-                    results.Add(templateId, Unavailable(
-                        "Catalogue returned an invalid revision; the tenant record was not changed."));
-                }
-            }
+            await AddBatchResultsAsync(results, requestBatch, cancellationToken);
         }
 
         return results;
+    }
+
+    private async Task AddBatchResultsAsync(
+        Dictionary<string, CataloguePublishedRevisionResult> results,
+        IEnumerable<CatalogueCurrentRevisionRequest> requestBatch,
+        CancellationToken cancellationToken)
+    {
+        var batch = requestBatch.ToArray();
+        var response = await catalogue.GetCurrentRevisionBatchAsync(batch, cancellationToken);
+        if (response.StatusCode != StatusCodes.Status200OK ||
+            !TryReadBatchItems(response.Body, batch, out var items))
+        {
+            AddUnavailableResults(results, batch);
+            return;
+        }
+
+        AddReadResults(results, items);
+    }
+
+    private static void AddReadResults(
+        Dictionary<string, CataloguePublishedRevisionResult> results,
+        IEnumerable<System.Text.Json.JsonElement> items)
+    {
+        foreach (var item in items)
+        {
+            var templateId = item.GetProperty("templateId").GetString()!;
+            results.Add(templateId, ReadResult(item, templateId));
+        }
+    }
+
+    private static bool HasInvalidRequests(IReadOnlyList<CatalogueCurrentRevisionRequest> requests) =>
+        requests.Any(request => string.IsNullOrWhiteSpace(request.TemplateId)) ||
+        requests.Select(request => request.TemplateId).Distinct(StringComparer.Ordinal).Count() != requests.Count;
+
+    private static void AddUnavailableResults(
+        Dictionary<string, CataloguePublishedRevisionResult> results,
+        IEnumerable<CatalogueCurrentRevisionRequest> requests)
+    {
+        foreach (var request in requests)
+        {
+            results.Add(request.TemplateId, Unavailable(
+                "Catalogue status is temporarily unavailable; the tenant record was not changed."));
+        }
+    }
+
+    private static CataloguePublishedRevisionResult ReadResult(System.Text.Json.JsonElement item, string templateId)
+    {
+        var status = item.GetProperty("status").GetString();
+        var adoptedRevisionWithdrawn = ReadNullableBoolean(item.GetProperty("adoptedRevisionWithdrawn"));
+        if (status == NotFoundStatus)
+        {
+            return UnknownResult();
+        }
+
+        if (status == WithdrawnStatus)
+        {
+            return WithdrawnResult(templateId, adoptedRevisionWithdrawn);
+        }
+
+        return AvailableResult(item, templateId, adoptedRevisionWithdrawn);
+    }
+
+    private static CataloguePublishedRevisionResult UnknownResult() =>
+        new("Unknown", null, null,
+            "Catalogue no longer recognizes this template ID; the tenant record was not changed.");
+
+    private static CataloguePublishedRevisionResult WithdrawnResult(
+        string templateId,
+        bool? adoptedRevisionWithdrawn)
+    {
+        var metadata = new CatalogueCurrentRevisionMetadata(templateId, null, null, true,
+            adoptedRevisionWithdrawn);
+        var resultStatus = adoptedRevisionWithdrawn == true ? "AdoptedRevisionWithdrawn" : "Withdrawn";
+        return new CataloguePublishedRevisionResult(resultStatus, metadata, null,
+            "This template is withdrawn from new adoption; the tenant record remains unchanged.");
+    }
+
+    private static CataloguePublishedRevisionResult AvailableResult(
+        System.Text.Json.JsonElement item,
+        string templateId,
+        bool? adoptedRevisionWithdrawn)
+    {
+        try
+        {
+            var revision = CatalogueTemplateGraphLoader.Deserialize(item.GetProperty("revision"));
+            CatalogueTemplateGraphLoader.ValidateRevisionDocument(revision, templateId, null);
+            var metadata = new CatalogueCurrentRevisionMetadata(templateId, revision.Revision,
+                revision.ContentHash, false, adoptedRevisionWithdrawn);
+            return new CataloguePublishedRevisionResult("Available", metadata, revision, null);
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or BadRequestException)
+        {
+            return Unavailable("Catalogue returned an invalid revision; the tenant record was not changed.");
+        }
     }
 
     private static CataloguePublishedRevisionResult Unavailable(string notice) =>
@@ -126,17 +182,17 @@ internal sealed class CataloguePublishedRevisionLoader(ICentralCatalogueClient c
             }
 
             var statusText = status.GetString();
-            if (statusText == "available")
+            if (statusText == AvailableStatus)
             {
                 if (revision.ValueKind != System.Text.Json.JsonValueKind.Object)
                 {
                     return false;
                 }
             }
-            else if (statusText is "withdrawn" or "notFound")
+            else if (statusText is WithdrawnStatus or NotFoundStatus)
             {
                 if (revision.ValueKind != System.Text.Json.JsonValueKind.Null ||
-                    statusText == "notFound" &&
+                    statusText == NotFoundStatus &&
                     adoptedWithdrawn.ValueKind != System.Text.Json.JsonValueKind.Null)
                 {
                     return false;

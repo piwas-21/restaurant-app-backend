@@ -174,7 +174,7 @@ public sealed class CatalogueSessionImporter(
         var priorLocalEntityType = item.LocalEntityType;
         var priorLocalEntityId = item.LocalEntityId;
         var priorItemUpdatedAt = item.UpdatedAt;
-        Exception? failure = null;
+        Exception failure;
         await using (var transaction = await context.Database.BeginTransactionAsync(cancellationToken))
         {
             try
@@ -215,7 +215,7 @@ public sealed class CatalogueSessionImporter(
             }
         }
 
-        var itemFailure = failure ?? throw new InvalidOperationException("Import transaction ended without a result.");
+        var itemFailure = failure;
         context.ChangeTracker.Clear();
         session.Version = priorSessionVersion;
         session.UpdatedAt = priorSessionUpdatedAt;

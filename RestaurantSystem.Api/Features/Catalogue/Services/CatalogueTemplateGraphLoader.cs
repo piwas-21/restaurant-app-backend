@@ -26,85 +26,59 @@ public sealed class CatalogueTemplateGraphLoader(ICentralCatalogueClient client)
         int rootRevision,
         CancellationToken cancellationToken)
     {
-        var nodes = new Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode>();
-        var activePath = new HashSet<(string TemplateId, int Revision)>();
-        await VisitAsync(
-            nodes, activePath, rootTemplateId, rootRevision, "root", true, false, 0, true, cancellationToken);
-        return new CatalogueTemplateGraph(nodes.Values.ToArray());
+        var context = new GraphTraversalContext(
+            new Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode>(),
+            new HashSet<(string TemplateId, int Revision)>(),
+            cancellationToken);
+        await VisitAsync(context, new GraphVisit(rootTemplateId, rootRevision, "root", true, false, 0, true));
+        return new CatalogueTemplateGraph(context.Nodes.Values.ToArray());
     }
 
     private async Task VisitAsync(
-        Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode> nodes,
-        HashSet<(string TemplateId, int Revision)> activePath,
-        string templateId,
-        int revision,
-        string role,
-        bool isRoot,
-        bool isSelectable,
-        int depth,
-        bool root,
-        CancellationToken cancellationToken)
+        GraphTraversalContext context,
+        GraphVisit visit)
     {
-        var key = (templateId, revision);
-        EnsureDepthWithinLimit(depth);
-        if (!activePath.Add(key))
+        var key = (visit.TemplateId, visit.Revision);
+        EnsureDepthWithinLimit(visit.Depth);
+        if (!context.ActivePath.Add(key))
         {
             throw new BadRequestException("Catalogue dependency graph contains a cycle");
         }
 
-        if (PromoteExistingNode(nodes, activePath, key, isSelectable))
+        if (PromoteExistingNode(context.Nodes, context.ActivePath, key, visit.IsSelectable))
         {
             return;
         }
 
-        EnsureNodeCanBeAdded(nodes, templateId, revision);
-        var revisionDocument = await GetRevisionDocumentAsync(templateId, revision, root, cancellationToken);
-        nodes.Add(key, new CatalogueTemplateGraphNode(revisionDocument, role, isRoot, isSelectable));
-        await VisitDependenciesAsync(nodes, activePath, revisionDocument, depth, cancellationToken);
-        activePath.Remove(key);
+        EnsureNodeCanBeAdded(context.Nodes, visit.TemplateId, visit.Revision);
+        var revisionDocument = await GetRevisionDocumentAsync(
+            visit.TemplateId, visit.Revision, visit.IsRootRevision, context.CancellationToken);
+        context.Nodes.Add(key, new CatalogueTemplateGraphNode(
+            revisionDocument, visit.Role, visit.IsRoot, visit.IsSelectable));
+        await VisitDependenciesAsync(context, visit, revisionDocument);
+        context.ActivePath.Remove(key);
     }
 
-    private static void EnsureDepthWithinLimit(int depth)
+    private async Task VisitDependenciesAsync(
+        GraphTraversalContext context,
+        GraphVisit parent,
+        CentralCatalogueTemplateRevision revisionDocument)
     {
-        if (depth > MaximumGraphDepth)
+        foreach (var dependency in revisionDocument.Dependencies)
         {
-            throw new BadRequestException("Catalogue dependency graph exceeds the supported depth");
-        }
-    }
+            if (IsInvalidDependency(dependency))
+            {
+                throw new BadRequestException("A catalogue revision contains an invalid dependency");
+            }
 
-    private static bool PromoteExistingNode(
-        Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode> nodes,
-        HashSet<(string TemplateId, int Revision)> activePath,
-        (string TemplateId, int Revision) key,
-        bool isSelectable)
-    {
-        if (!nodes.TryGetValue(key, out var existing))
-        {
-            return false;
-        }
-
-        if (isSelectable && !existing.IsSelectable)
-        {
-            nodes[key] = existing with { IsSelectable = true };
-        }
-
-        activePath.Remove(key);
-        return true;
-    }
-
-    private static void EnsureNodeCanBeAdded(
-        Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode> nodes,
-        string templateId,
-        int revision)
-    {
-        if (nodes.Count >= MaximumGraphNodes)
-        {
-            throw new BadRequestException("Catalogue dependency graph exceeds the supported size");
-        }
-
-        if (nodes.Keys.Any(existingKey => existingKey.TemplateId == templateId && existingKey.Revision != revision))
-        {
-            throw new BadRequestException("Catalogue dependency graph contains multiple revisions of one template");
+            await VisitAsync(context, new GraphVisit(
+                dependency.TemplateId,
+                dependency.Revision,
+                dependency.Role,
+                false,
+                dependency.IncludedByDefault.HasValue,
+                parent.Depth + 1,
+                false));
         }
     }
 
@@ -137,31 +111,47 @@ public sealed class CatalogueTemplateGraphLoader(ICentralCatalogueClient client)
         return revisionDocument;
     }
 
-    private async Task VisitDependenciesAsync(
+    private static void EnsureNodeCanBeAdded(
+        Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode> nodes,
+        string templateId,
+        int revision)
+    {
+        if (nodes.Count >= MaximumGraphNodes)
+        {
+            throw new BadRequestException("Catalogue dependency graph exceeds the supported size");
+        }
+
+        if (nodes.Keys.Any(existingKey => existingKey.TemplateId == templateId && existingKey.Revision != revision))
+        {
+            throw new BadRequestException("Catalogue dependency graph contains multiple revisions of one template");
+        }
+    }
+
+    private static bool PromoteExistingNode(
         Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode> nodes,
         HashSet<(string TemplateId, int Revision)> activePath,
-        CentralCatalogueTemplateRevision revisionDocument,
-        int depth,
-        CancellationToken cancellationToken)
+        (string TemplateId, int Revision) key,
+        bool isSelectable)
     {
-        foreach (var dependency in revisionDocument.Dependencies)
+        if (!nodes.TryGetValue(key, out var existing))
         {
-            if (IsInvalidDependency(dependency))
-            {
-                throw new BadRequestException("A catalogue revision contains an invalid dependency");
-            }
+            return false;
+        }
 
-            await VisitAsync(
-                nodes,
-                activePath,
-                dependency.TemplateId,
-                dependency.Revision,
-                dependency.Role,
-                false,
-                dependency.IncludedByDefault.HasValue,
-                depth + 1,
-                false,
-                cancellationToken);
+        if (isSelectable && !existing.IsSelectable)
+        {
+            nodes[key] = existing with { IsSelectable = true };
+        }
+
+        activePath.Remove(key);
+        return true;
+    }
+
+    private static void EnsureDepthWithinLimit(int depth)
+    {
+        if (depth > MaximumGraphDepth)
+        {
+            throw new BadRequestException("Catalogue dependency graph exceeds the supported depth");
         }
     }
 
@@ -169,6 +159,20 @@ public sealed class CatalogueTemplateGraphLoader(ICentralCatalogueClient client)
         string.IsNullOrWhiteSpace(dependency.TemplateId) || dependency.Revision < 1 ||
         string.IsNullOrWhiteSpace(dependency.Role) || dependency.Role.Length > 32 ||
         !TemplateIdPattern.IsMatch(dependency.TemplateId);
+
+    private sealed record GraphTraversalContext(
+        Dictionary<(string TemplateId, int Revision), CatalogueTemplateGraphNode> Nodes,
+        HashSet<(string TemplateId, int Revision)> ActivePath,
+        CancellationToken CancellationToken);
+
+    private sealed record GraphVisit(
+        string TemplateId,
+        int Revision,
+        string Role,
+        bool IsRoot,
+        bool IsSelectable,
+        int Depth,
+        bool IsRootRevision);
 
     public static CentralCatalogueTemplateRevision Deserialize(JsonElement body)
     {

@@ -34,7 +34,7 @@ public sealed partial class CatalogueImportPreviewService
             candidatesBySource.GetValueOrDefault(CatalogueImportCandidateLookup.Key(item.Type, source.Localized.Name)) ?? []);
         var warnings = new List<CatalogueImportIssueDto>();
         var blockers = new List<CatalogueImportIssueDto>();
-        AddPendingBlockers(session, source, mapping, mappingIsUsable, candidates, existingEntities, warnings, blockers);
+        AddPendingBlockers(session, source, mapping, candidates, existingEntities, warnings, blockers);
         AddSelectedWarnings(source, warnings, blockers);
         return new CatalogueImportPreviewItemDto(item.TemplateId, item.Revision, item.Type, source.Localized.Name,
             item.IsSelected, source.Decision?.Resolution ?? (mappingIsUsable ? ReuseResolution : null),
@@ -45,7 +45,6 @@ public sealed partial class CatalogueImportPreviewService
         CatalogueImportSession session,
         CataloguePreviewSource source,
         CataloguePreviewAdoption? mapping,
-        bool mappingIsUsable,
         List<CatalogueLocalCandidateDto> candidates,
         HashSet<CatalogueLocalEntityKey> existingEntities,
         List<CatalogueImportIssueDto> warnings,
@@ -53,6 +52,8 @@ public sealed partial class CatalogueImportPreviewService
     {
         var item = source.Item;
         if (!item.IsSelected || item.Status is not (CatalogueImportItemStatus.Pending or CatalogueImportItemStatus.Failed)) return;
+        var mappingIsUsable = mapping is not null && existingEntities.Contains(
+            new CatalogueLocalEntityKey(mapping.LocalEntityType, mapping.LocalEntityId));
         if (item.Type == "cuisine-pack")
         {
             AddPackOfferBlocker(session, blockers);
