@@ -94,6 +94,8 @@ The admin translation workbench previews missing and stale guest-locale text wit
 
 `TranslationAssistance__MaxDailyBatches`, `MaxDailyTokens`, `MaxDailySpendUsd`, `MaxBatchTargets` and `TimeoutSeconds` bound each tenant database's usage. The workbench remains usable for manual edits and Save when the provider is disabled, over budget or unavailable. Suggestions require admin review and only reach guest text through the ordinary product or bundle Save.
 
+Set `TranslationAssistance__InputCostPerMillionUsd` and `OutputCostPerMillionUsd` for the chosen model and processing tier before enabling a provider. Defaults match standard GPT-6 Luna text pricing; regional processing can cost more. A provider attempt reserves the maximum configured output and a conservative input estimate before the call. Unknown outcomes keep that reservation charged for the day; successful calls settle to reported token usage.
+
 ### Reservation quick-action links
 
 `GET /api/reservations/{id}/quick-approve` and `.../quick-reject` are opened from the restaurant's
