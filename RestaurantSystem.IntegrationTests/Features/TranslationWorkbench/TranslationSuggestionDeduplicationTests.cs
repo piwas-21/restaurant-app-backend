@@ -49,6 +49,13 @@ public sealed class TranslationSuggestionDeduplicationTests(DatabaseFixture fixt
             json.RootElement.GetProperty("data").GetProperty("suggestions")
                 .GetArrayLength().Should().Be(1);
         }
+
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var settled = await context.TranslationGenerationBatches.AsNoTracking()
+            .OrderByDescending(row => row.CreatedAt).FirstAsync();
+        settled.InputTokens.Should().Be(100);
+        settled.OutputTokens.Should().Be(10);
     }
 
     [Fact]
