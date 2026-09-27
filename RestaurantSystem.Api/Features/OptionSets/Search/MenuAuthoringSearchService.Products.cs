@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Search;
 
@@ -14,12 +15,8 @@ public sealed partial class MenuAuthoringSearchService
         int pageSize,
         CancellationToken cancellationToken)
     {
-        var acceptedIds = accepted.Where(item => item.CandidateType is MenuAuthoringCandidateTypes.Product
-                or MenuAuthoringCandidateTypes.Component or MenuAuthoringCandidateTypes.Bundle)
-            .Select(item => item.CandidateId).ToList();
-        var rejectedIds = rejected.Where(item => item.CandidateType is MenuAuthoringCandidateTypes.Product
-                or MenuAuthoringCandidateTypes.Component or MenuAuthoringCandidateTypes.Bundle)
-            .Select(item => item.CandidateId).ToList();
+        var acceptedIds = ProductDecisionIds(accepted);
+        var rejectedIds = ProductDecisionIds(rejected);
         var products = _context.Products.AsNoTracking().Where(product => product.IsActive && product.IsAvailable);
         if (forKind == OptionSetKind.SuggestedSide)
         {
@@ -33,42 +30,54 @@ public sealed partial class MenuAuthoringSearchService
             products = products.Where(product => !rejectedIds.Contains(product.Id));
         }
 
-        if (cursor is not null)
+        var ranked = products.Select(product => new RankedProduct
         {
-            products = products.Where(product =>
-                EF.Functions.Collate(product.Name, "C").CompareTo(cursor.Name) > 0
-                || EF.Functions.Collate(product.Name, "C").CompareTo(cursor.Name) == 0
-                && ((product.Type == ProductType.Menu ? MenuAuthoringCandidateTypes.BundleRank
-                    : product.IsComponent ? MenuAuthoringCandidateTypes.ComponentRank : MenuAuthoringCandidateTypes.ProductRank) > cursor.TypeRank
-                    || (product.Type == ProductType.Menu ? MenuAuthoringCandidateTypes.BundleRank
-                        : product.IsComponent ? MenuAuthoringCandidateTypes.ComponentRank : MenuAuthoringCandidateTypes.ProductRank) == cursor.TypeRank
-                    && product.Id.CompareTo(cursor.Id) > 0));
-        }
-
-        return await products
-            .OrderBy(product => EF.Functions.Collate(product.Name, "C"))
-            .ThenBy(product => product.Type == ProductType.Menu ? MenuAuthoringCandidateTypes.BundleRank
-                : product.IsComponent ? MenuAuthoringCandidateTypes.ComponentRank : MenuAuthoringCandidateTypes.ProductRank)
-            .ThenBy(product => product.Id)
-            .Take(pageSize + 1)
-            .Select(product => new MenuAuthoringSearchCandidateDto
-            {
-                Id = product.Id,
-                Type = product.Type == ProductType.Menu ? MenuAuthoringCandidateTypes.Bundle
-                    : product.IsComponent ? MenuAuthoringCandidateTypes.Component : MenuAuthoringCandidateTypes.Product,
-                Name = product.Name,
-                CategoryName = product.ProductCategories.Where(link => link.IsPrimary && link.Category.IsActive)
-                    .Select(link => link.Category.Name).FirstOrDefault(),
-                ImageUrl = product.ImageUrl ?? product.Images.Where(image => image.IsPrimary)
-                    .OrderBy(image => image.SortOrder).Select(image => image.Url).FirstOrDefault(),
-                BasePrice = product.BasePrice,
-                ProductType = product.Type,
-                ParentOfferProductId = product.MenuDefinition == null ? null : product.MenuDefinition.ParentOfferProductId,
-                ParentOfferVariationId = product.MenuDefinition == null ? null : product.MenuDefinition.ParentOfferVariationId,
-                IsComponent = product.IsComponent,
-                IsActive = product.IsActive,
-                IsAvailable = product.IsAvailable
-            })
+            Product = product,
+            Rank = product.Type == ProductType.Menu ? MenuAuthoringCandidateTypes.BundleRank
+                : product.IsComponent ? MenuAuthoringCandidateTypes.ComponentRank : MenuAuthoringCandidateTypes.ProductRank
+        });
+        if (cursor is not null) ranked = AfterCursor(ranked, cursor);
+        return await ProjectProducts(ranked.OrderBy(row => EF.Functions.Collate(row.Product.Name, "C"))
+            .ThenBy(row => row.Rank).ThenBy(row => row.Product.Id).Take(pageSize + 1))
             .ToListAsync(cancellationToken);
+    }
+
+    private static List<Guid> ProductDecisionIds(
+        HashSet<(string CandidateType, Guid CandidateId)> decisions) => decisions
+        .Where(item => item.CandidateType is MenuAuthoringCandidateTypes.Product
+            or MenuAuthoringCandidateTypes.Component or MenuAuthoringCandidateTypes.Bundle)
+        .Select(item => item.CandidateId).ToList();
+
+    private static IQueryable<RankedProduct> AfterCursor(
+        IQueryable<RankedProduct> products, MenuAuthoringSearchCursor cursor) =>
+        products.Where(row => EF.Functions.Collate(row.Product.Name, "C").CompareTo(cursor.Name) > 0
+            || EF.Functions.Collate(row.Product.Name, "C").CompareTo(cursor.Name) == 0
+            && (row.Rank > cursor.TypeRank || row.Rank == cursor.TypeRank
+                && row.Product.Id.CompareTo(cursor.Id) > 0));
+
+    private static IQueryable<MenuAuthoringSearchCandidateDto> ProjectProducts(
+        IQueryable<RankedProduct> products) => products.Select(row => new MenuAuthoringSearchCandidateDto
+        {
+            Id = row.Product.Id,
+            Type = row.Product.Type == ProductType.Menu ? MenuAuthoringCandidateTypes.Bundle
+                    : row.Product.IsComponent ? MenuAuthoringCandidateTypes.Component : MenuAuthoringCandidateTypes.Product,
+            Name = row.Product.Name,
+            CategoryName = row.Product.ProductCategories.Where(link => link.IsPrimary && link.Category.IsActive)
+                    .Select(link => link.Category.Name).FirstOrDefault(),
+            ImageUrl = row.Product.ImageUrl ?? row.Product.Images.Where(image => image.IsPrimary)
+                    .OrderBy(image => image.SortOrder).Select(image => image.Url).FirstOrDefault(),
+            BasePrice = row.Product.BasePrice,
+            ProductType = row.Product.Type,
+            ParentOfferProductId = row.Product.MenuDefinition == null ? null : row.Product.MenuDefinition.ParentOfferProductId,
+            ParentOfferVariationId = row.Product.MenuDefinition == null ? null : row.Product.MenuDefinition.ParentOfferVariationId,
+            IsComponent = row.Product.IsComponent,
+            IsActive = row.Product.IsActive,
+            IsAvailable = row.Product.IsAvailable
+        });
+
+    private sealed class RankedProduct
+    {
+        public required Product Product { get; init; }
+        public int Rank { get; init; }
     }
 }

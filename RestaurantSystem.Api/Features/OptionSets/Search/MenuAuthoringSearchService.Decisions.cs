@@ -12,31 +12,8 @@ public sealed partial class MenuAuthoringSearchService
         MenuAuthoringMatchDecisionRequestDto request,
         CancellationToken cancellationToken)
     {
-        var normalized = ValidateQuery(request.Query);
-        var accepted = request.Decision switch
-        {
-            "accept" => true,
-            "reject" => false,
-            _ => throw new BadRequestException("Decision must be 'accept' or 'reject'")
-        };
+        var (normalized, accepted, alias) = await ValidateDecisionAsync(request, cancellationToken);
         var candidateType = request.CandidateType;
-        if (!MenuAuthoringCandidateTypes.IsKnown(candidateType) || request.CandidateId == Guid.Empty
-            || !await CandidateExistsAsync(candidateType, request.CandidateId, cancellationToken))
-        {
-            throw new BadRequestException("Choose an active candidate from this tenant's authoring search");
-        }
-
-        var alias = string.IsNullOrWhiteSpace(request.Alias) ? request.Query.Trim() : request.Alias.Trim();
-        if (accepted && (alias.Length > 160 || OptionSetNameNormalizer.Normalize(alias) != normalized))
-        {
-            throw new BadRequestException("An accepted alias must preserve the normalized search phrase and be at most 160 characters");
-        }
-
-        if (!accepted && !string.IsNullOrWhiteSpace(request.Alias))
-        {
-            throw new BadRequestException("Rejected candidates cannot carry an alias");
-        }
-
         var row = await _context.OptionSetMatchDecisions.FirstOrDefaultAsync(decision =>
             decision.NormalizedName == normalized && decision.CandidateType == candidateType
             && decision.CandidateId == request.CandidateId, cancellationToken);
@@ -81,6 +58,36 @@ public sealed partial class MenuAuthoringSearchService
             Decision = accepted ? "accept" : "reject",
             Alias = accepted ? alias : null
         };
+    }
+
+    private async Task<(string Normalized, bool Accepted, string Alias)> ValidateDecisionAsync(
+        MenuAuthoringMatchDecisionRequestDto request, CancellationToken cancellationToken)
+    {
+        var normalized = ValidateQuery(request.Query);
+        var accepted = request.Decision switch
+        {
+            "accept" => true,
+            "reject" => false,
+            _ => throw new BadRequestException("Decision must be 'accept' or 'reject'")
+        };
+        if (!MenuAuthoringCandidateTypes.IsKnown(request.CandidateType) || request.CandidateId == Guid.Empty
+            || !await CandidateExistsAsync(request.CandidateType, request.CandidateId, cancellationToken))
+        {
+            throw new BadRequestException("Choose an active candidate from this tenant's authoring search");
+        }
+
+        var alias = string.IsNullOrWhiteSpace(request.Alias) ? request.Query.Trim() : request.Alias.Trim();
+        if (accepted && (alias.Length > 160 || OptionSetNameNormalizer.Normalize(alias) != normalized))
+        {
+            throw new BadRequestException("An accepted alias must preserve the normalized search phrase and be at most 160 characters");
+        }
+
+        if (!accepted && !string.IsNullOrWhiteSpace(request.Alias))
+        {
+            throw new BadRequestException("Rejected candidates cannot carry an alias");
+        }
+
+        return (normalized, accepted, alias);
     }
 
     private async Task<bool> CandidateExistsAsync(string type, Guid id, CancellationToken cancellationToken)
