@@ -52,78 +52,85 @@ public sealed partial class OptionSetMaterializer
         foreach (var target in request.Targets)
         {
             result.Targets.Add(await ApplyTargetAsync(
-                request, target, ambientTransaction, menuVersionBases, menuVersionAdvances,
-                validationContext, cancellationToken));
+                target,
+                new ApplyTargetContext(
+                    request, ambientTransaction, menuVersionBases, menuVersionAdvances,
+                    validationContext, cancellationToken)));
         }
 
         return result;
     }
 
     private async Task<OptionSetMaterializationTargetResultDto> ApplyTargetAsync(
-        OptionSetMaterializationRequest request,
         OptionSetMaterializationTargetRequest target,
-        bool ambientTransaction,
-        IDictionary<Guid, int> menuVersionBases,
-        IDictionary<Guid, int> menuVersionAdvances,
-        OptionSetMaterializerValidationContext validationContext,
-        CancellationToken cancellationToken,
-        OptionSetMaterializationJobTarget? durableTarget = null,
-        Guid? leaseId = null,
-        string? auditIdentifier = null)
+        ApplyTargetContext context)
     {
-        await using var transaction = ambientTransaction
+        await using var transaction = context.AmbientTransaction
             ? null
-            : await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            : await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable, context.CancellationToken);
         try
         {
-            if (durableTarget is not null)
+            if (context.DurableTarget is not null)
             {
-                await RenewJobLeaseAsync(durableTarget.JobId, leaseId, cancellationToken);
+                await RenewJobLeaseAsync(context.DurableTarget.JobId, context.LeaseId, context.CancellationToken);
             }
 
-            var set = await LoadExpectedSetAsync(request, cancellationToken);
-            var effectiveTarget = WithEffectiveMenuVersion(target, menuVersionBases, menuVersionAdvances);
+            var set = await LoadExpectedSetAsync(context.Request, context.CancellationToken);
+            var effectiveTarget = WithEffectiveMenuVersion(
+                target, context.MenuVersionBases, context.MenuVersionAdvances);
             var targetResult = await OptionSetMaterializerTargetWriter.ApplyAsync(
                 _context,
                 set,
                 effectiveTarget,
-                request.IdempotencyKey.Trim(),
-                auditIdentifier ?? _currentUser.GetAuditIdentifier(),
-                validationContext,
-                cancellationToken);
+                context.Request.IdempotencyKey.Trim(),
+                context.AuditIdentifier ?? _currentUser.GetAuditIdentifier(),
+                context.ValidationContext,
+                context.CancellationToken);
 
-            await EnsureSetVersionUnchangedAsync(request, cancellationToken);
-            RecordSuccessfulJobOutcome(durableTarget, targetResult);
-            await _context.SaveChangesAsync(cancellationToken);
+            await EnsureSetVersionUnchangedAsync(context.Request, context.CancellationToken);
+            RecordSuccessfulJobOutcome(context.DurableTarget, targetResult);
+            await _context.SaveChangesAsync(context.CancellationToken);
             if (transaction is not null)
             {
-                await transaction.CommitAsync(cancellationToken);
+                await transaction.CommitAsync(context.CancellationToken);
             }
 
-            AdvanceMenuVersion(target, targetResult, menuVersionBases, menuVersionAdvances);
+            AdvanceMenuVersion(target, targetResult, context.MenuVersionBases, context.MenuVersionAdvances);
             return targetResult;
         }
-        catch (ConflictException exception) when (!ambientTransaction)
+        catch (ConflictException exception) when (!context.AmbientTransaction)
         {
-            await RollbackAndClearAsync(transaction, cancellationToken);
+            await RollbackAndClearAsync(transaction, context.CancellationToken);
             return ConflictResult(target, "stale-or-invalid-target", exception.Message);
         }
-        catch (DbUpdateConcurrencyException) when (!ambientTransaction)
+        catch (DbUpdateConcurrencyException) when (!context.AmbientTransaction)
         {
-            await RollbackAndClearAsync(transaction, cancellationToken);
+            await RollbackAndClearAsync(transaction, context.CancellationToken);
             return ConflictResult(target, "concurrent-update", "The target changed during apply. Reload it and review the diff.");
         }
-        catch (DbUpdateException) when (!ambientTransaction)
+        catch (DbUpdateException) when (!context.AmbientTransaction)
         {
-            await RollbackAndClearAsync(transaction, cancellationToken);
+            await RollbackAndClearAsync(transaction, context.CancellationToken);
             return ConflictResult(target, "stable-reference-conflict", "A canonical option or target row changed concurrently. Reload the target and review the diff.");
         }
-        catch (PostgresException exception) when (!ambientTransaction && exception.SqlState == PostgresErrorCodes.SerializationFailure)
+        catch (PostgresException exception) when (!context.AmbientTransaction
+            && exception.SqlState == PostgresErrorCodes.SerializationFailure)
         {
-            await RollbackAndClearAsync(transaction, cancellationToken);
+            await RollbackAndClearAsync(transaction, context.CancellationToken);
             return ConflictResult(target, "concurrent-update", "The target changed during apply. Reload it and review the diff.");
         }
     }
+
+    private sealed record ApplyTargetContext(
+        OptionSetMaterializationRequest Request,
+        bool AmbientTransaction,
+        IDictionary<Guid, int> MenuVersionBases,
+        IDictionary<Guid, int> MenuVersionAdvances,
+        OptionSetMaterializerValidationContext ValidationContext,
+        CancellationToken CancellationToken,
+        OptionSetMaterializationJobTarget? DurableTarget = null,
+        Guid? LeaseId = null,
+        string? AuditIdentifier = null);
 
     private async Task RenewJobLeaseAsync(Guid jobId, Guid? leaseId, CancellationToken cancellationToken)
     {

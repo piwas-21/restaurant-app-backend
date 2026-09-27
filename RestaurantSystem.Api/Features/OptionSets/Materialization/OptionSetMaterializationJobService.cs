@@ -12,6 +12,8 @@ namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
 public sealed class OptionSetMaterializationJobService : IOptionSetMaterializationJobService
 {
+    private const string PendingStatus = "pending";
+
     private readonly ApplicationDbContext _context;
     private readonly IOptionSetMaterializer _materializer;
     private readonly ITenantFeatures _features;
@@ -75,7 +77,7 @@ public sealed class OptionSetMaterializationJobService : IOptionSetMaterializati
             TargetKey = target.TargetKey.Trim(),
             TargetProductId = target.TargetProductId,
             RequestJson = OptionSetMaterializationJobJson.Serialize(target),
-            Status = "pending",
+            Status = PendingStatus,
             CreatedBy = _currentUser.GetAuditIdentifier(),
             CreatedAt = now,
             UpdatedAt = now
@@ -161,7 +163,7 @@ public sealed class OptionSetMaterializationJobService : IOptionSetMaterializati
 
         var job = await LoadAsync(optionSetId, jobId, cancellationToken);
         var retryable = job.Targets.Where(target => target.Status == "failed").ToArray();
-        var pending = job.Targets.Any(target => target.Status == "pending");
+        var pending = job.Targets.Any(target => target.Status == PendingStatus);
         if (retryable.Length == 0 && !pending)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -171,14 +173,14 @@ public sealed class OptionSetMaterializationJobService : IOptionSetMaterializati
         var request = OptionSetMaterializationJobJson.Deserialize<OptionSetMaterializationRequest>(job.RequestJson);
         request.OptionSetId = job.OptionSetId;
         var targetsToValidate = job.Targets
-            .Where(target => target.Status is "pending" or "failed")
+            .Where(target => target.Status is PendingStatus or "failed")
             .Select(target => target.Sequence);
         await _materializer.ValidateJobRequestAsync(
             OptionSetMaterializationJobJson.WithTargets(request, targetsToValidate), cancellationToken);
 
         foreach (var target in retryable)
         {
-            target.Status = "pending";
+            target.Status = PendingStatus;
             target.ErrorCode = null;
             target.ErrorMessage = null;
             target.CompletedAt = null;
@@ -211,12 +213,9 @@ public sealed class OptionSetMaterializationJobService : IOptionSetMaterializati
             return;
         }
 
-        foreach (var target in targets)
+        foreach (var target in targets.Where(target => target is not null))
         {
-            if (target is not null)
-            {
-                target.TargetKey = target.TargetKey?.Trim() ?? string.Empty;
-            }
+            target.TargetKey = target.TargetKey?.Trim() ?? string.Empty;
         }
     }
 

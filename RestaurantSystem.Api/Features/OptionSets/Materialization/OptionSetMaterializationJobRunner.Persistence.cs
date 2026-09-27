@@ -105,7 +105,19 @@ public sealed partial class OptionSetMaterializationJobRunner
             .ToListAsync(cancellationToken);
         var hasPending = statuses.Contains("pending");
         var hasErrors = statuses.Contains("failed") || statuses.Contains("conflict");
-        var status = hasPending ? "queued" : hasErrors ? "partial" : "completed";
+        string status;
+        if (hasPending)
+        {
+            status = "queued";
+        }
+        else if (hasErrors)
+        {
+            status = "partial";
+        }
+        else
+        {
+            status = "completed";
+        }
         var now = DateTime.UtcNow;
         await _context.OptionSetMaterializationJobs
             .Where(job => job.Id == claim.JobId && job.LeaseId == claim.LeaseId)

@@ -62,9 +62,11 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
             ? WithExpectedMenuVersion(target, version)
             : target;
         return ApplyTargetAsync(
-            request, effectiveTarget, false, new Dictionary<Guid, int>(), new Dictionary<Guid, int>(),
-            new OptionSetMaterializerValidationContext(null, _settings), cancellationToken,
-            jobTarget, leaseId, auditIdentifier);
+            effectiveTarget,
+            new ApplyTargetContext(
+                request, false, new Dictionary<Guid, int>(), new Dictionary<Guid, int>(),
+                new OptionSetMaterializerValidationContext(null, _settings), cancellationToken,
+                jobTarget, leaseId, auditIdentifier));
     }
 
     private async Task<OptionSetMaterializationPreview> PreviewAsync(

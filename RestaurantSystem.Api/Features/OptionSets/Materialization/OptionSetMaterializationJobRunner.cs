@@ -11,6 +11,8 @@ namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
 public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMaterializationJobRunner
 {
+    private const string ProcessingStatus = "processing";
+
     private readonly ApplicationDbContext _context;
     private readonly IOptionSetMaterializer _materializer;
     private readonly OptionSetAuthoringSettings _settings;
@@ -40,26 +42,7 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         try
         {
             input = await LoadRequestAsync(claim.JobId, cancellationToken);
-            if (claim.IsFirstRun || claim.RecoveredExpiredLease)
-            {
-                if (claim.RecoveredExpiredLease)
-                {
-                    var pendingSequences = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
-                        .Where(target => target.JobId == claim.JobId && target.Status == "pending")
-                        .OrderBy(target => target.Sequence)
-                        .Select(target => target.Sequence)
-                        .ToListAsync(cancellationToken);
-                    if (pendingSequences.Count > 0)
-                    {
-                        await _materializer.ValidateJobRequestAsync(
-                            OptionSetMaterializationJobJson.WithTargets(input.Request, pendingSequences), cancellationToken);
-                    }
-                }
-                else
-                {
-                    await _materializer.ValidateJobRequestAsync(input.Request, cancellationToken);
-                }
-            }
+            await ValidateBeforeRunAsync(claim, input, cancellationToken);
         }
         catch (Exception exception) when (exception is ConflictException or BadRequestException or NotFoundException or JsonException)
         {
@@ -84,6 +67,35 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
 
         await FinishBatchAsync(claim, cancellationToken);
         return true;
+    }
+
+    private async Task ValidateBeforeRunAsync(
+        JobLease claim,
+        JobInput input,
+        CancellationToken cancellationToken)
+    {
+        if (!claim.IsFirstRun && !claim.RecoveredExpiredLease)
+        {
+            return;
+        }
+
+        var request = input.Request;
+        if (claim.RecoveredExpiredLease)
+        {
+            var pendingSequences = await _context.OptionSetMaterializationJobTargets.AsNoTracking()
+                .Where(target => target.JobId == claim.JobId && target.Status == "pending")
+                .OrderBy(target => target.Sequence)
+                .Select(target => target.Sequence)
+                .ToListAsync(cancellationToken);
+            if (pendingSequences.Count == 0)
+            {
+                return;
+            }
+
+            request = OptionSetMaterializationJobJson.WithTargets(request, pendingSequences);
+        }
+
+        await _materializer.ValidateJobRequestAsync(request, cancellationToken);
     }
 
     private async Task<bool> ProcessTargetAsync(
@@ -149,7 +161,7 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         var now = DateTime.UtcNow;
         var candidateId = await _context.OptionSetMaterializationJobs.AsNoTracking()
             .Where(job => job.Status == "queued"
-                || job.Status == "processing" && (job.LeaseExpiresAt == null || job.LeaseExpiresAt <= now))
+                || job.Status == ProcessingStatus && (job.LeaseExpiresAt == null || job.LeaseExpiresAt <= now))
             .OrderBy(job => job.CreatedAt)
             .Select(job => new { job.Id, job.Status, job.StartedAt })
             .FirstOrDefaultAsync(cancellationToken);
@@ -163,16 +175,16 @@ public sealed partial class OptionSetMaterializationJobRunner : IOptionSetMateri
         var claimed = await _context.OptionSetMaterializationJobs
             .Where(job => job.Id == candidateId.Id
                 && (job.Status == "queued"
-                    || job.Status == "processing" && (job.LeaseExpiresAt == null || job.LeaseExpiresAt <= now)))
+                    || job.Status == ProcessingStatus && (job.LeaseExpiresAt == null || job.LeaseExpiresAt <= now)))
             .ExecuteUpdateAsync(updates => updates
-                .SetProperty(job => job.Status, "processing")
+                .SetProperty(job => job.Status, ProcessingStatus)
                 .SetProperty(job => job.LeaseId, leaseId)
                 .SetProperty(job => job.LeaseExpiresAt, leaseExpiresAt)
                 .SetProperty(job => job.StartedAt, job => job.StartedAt ?? now)
                 .SetProperty(job => job.UpdatedAt, now), cancellationToken);
         return claimed == 1
             ? new JobLease(
-                candidateId.Id, leaseId, candidateId.Status == "processing", candidateId.StartedAt is null)
+                candidateId.Id, leaseId, candidateId.Status == ProcessingStatus, candidateId.StartedAt is null)
             : null;
     }
 
