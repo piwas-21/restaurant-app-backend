@@ -105,6 +105,9 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         var applied = await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(applyResponse);
         var target = applied!.Data!.Targets.Should().ContainSingle().Which;
         target.Status.Should().Be("applied");
+        target.AttachmentId.Should().NotBeNull();
+        var attachmentId = target.AttachmentId!.Value;
+        attachmentId.Should().NotBe(Guid.Empty);
         target.MenuAuthoringVersion.Should().Be(2);
         target.AttachmentVersion.Should().Be(1);
         target.AppliedRows.Should().HaveCount(2);
@@ -114,7 +117,9 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         retry.StatusCode.Should().Be(HttpStatusCode.OK,
             await retry.Content.ReadAsStringAsync());
         var retried = await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(retry);
-        retried!.Data!.Targets.Should().ContainSingle().Which.Status.Should().Be("unchanged");
+        var retriedTarget = retried!.Data!.Targets.Should().ContainSingle().Which;
+        retriedTarget.Status.Should().Be("unchanged");
+        retriedTarget.AttachmentId.Should().Be(attachmentId);
 
         await using (var context = DatabaseFixture.CreateContext())
         {
@@ -127,6 +132,8 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
             section.Items.Should().HaveCount(2);
             section.Items.Should().Contain(item => item.Id == ExistingSectionItemId);
             (await context.OptionSetAppliedRows.CountAsync()).Should().Be(2);
+            (await context.OptionSetAttachments.SingleAsync(item => item.OptionSetId == setData.Id
+                && item.TargetMenuSectionId == SectionId)).Id.Should().Be(attachmentId);
         }
 
         var menuPut = await PutAsJsonAsync($"/api/Menus/{MenuId}", MenuPutPayload("Legacy replacement"));
@@ -136,6 +143,87 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         var productPut = await PutAsJsonAsync($"/api/Products/{MenuId}", ProductPutCommand("Legacy replacement"));
         productPut.StatusCode.Should().Be(HttpStatusCode.Conflict,
             $"the Menu-type product endpoint must enforce the same section watermark: {await productPut.Content.ReadAsStringAsync()}");
+    }
+
+    [Fact]
+    public async Task Durable_job_result_and_idempotent_replay_keep_the_persisted_attachment_id()
+    {
+        AuthenticateAsAdmin();
+        var set = (await CreateBundleChoiceSetAsync())!.Data!;
+        var request = MaterializationRequest(set.Id);
+        var target = request.Targets.Single();
+        var now = DateTime.UtcNow;
+        var jobId = Guid.NewGuid();
+        var leaseId = Guid.NewGuid();
+        var jobTarget = new OptionSetMaterializationJobTarget
+        {
+            Id = Guid.NewGuid(),
+            JobId = jobId,
+            Sequence = 0,
+            TargetKey = target.TargetKey,
+            TargetProductId = target.TargetProductId,
+            RequestJson = JsonSerializer.Serialize(target, JsonOptions),
+            Status = "pending",
+            CreatedAt = now,
+            CreatedBy = Actor
+        };
+        var job = new OptionSetMaterializationJob
+        {
+            Id = jobId,
+            OptionSetId = set.Id,
+            SetVersion = set.Version,
+            IdempotencyKey = request.IdempotencyKey,
+            RequestHash = new string('a', 64),
+            RequestJson = JsonSerializer.Serialize(request, JsonOptions),
+            Status = "processing",
+            LeaseId = leaseId,
+            LeaseExpiresAt = now.AddMinutes(5),
+            Targets = [jobTarget],
+            CreatedAt = now,
+            CreatedBy = Actor
+        };
+
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var materializer = scope.ServiceProvider.GetRequiredService<IOptionSetMaterializer>();
+        await materializer.ValidateJobRequestAsync(request, CancellationToken.None);
+        context.OptionSetMaterializationJobs.Add(job);
+        await context.SaveChangesAsync();
+
+        var firstApply = await materializer.ApplyJobTargetAsync(
+            request, target, jobTarget, leaseId, null, Actor, CancellationToken.None);
+        firstApply.Status.Should().Be("applied");
+        firstApply.AttachmentId.Should().NotBeNull();
+        var attachmentId = firstApply.AttachmentId!.Value;
+        attachmentId.Should().NotBe(Guid.Empty);
+
+        await using (var verify = DatabaseFixture.CreateContext())
+        {
+            var persistedAttachment = await verify.OptionSetAttachments.SingleAsync(item =>
+                item.OptionSetId == set.Id && item.TargetMenuSectionId == SectionId);
+            persistedAttachment.Id.Should().Be(attachmentId);
+
+            var savedTarget = await verify.OptionSetMaterializationJobTargets.AsNoTracking()
+                .SingleAsync(item => item.JobId == jobId && item.Sequence == 0);
+            savedTarget.Status.Should().Be("applied");
+            var savedResult = JsonSerializer.Deserialize<OptionSetMaterializationTargetResultDto>(
+                savedTarget.ResultJson!, JsonOptions);
+            savedResult!.AttachmentId.Should().Be(attachmentId);
+        }
+
+        var replay = await materializer.ApplyJobTargetAsync(
+            request, target, jobTarget, leaseId, null, Actor, CancellationToken.None);
+        replay.Status.Should().Be("unchanged");
+        replay.AttachmentId.Should().Be(attachmentId);
+
+        await using var verifyReplay = DatabaseFixture.CreateContext();
+        var replayedResultJson = await verifyReplay.OptionSetMaterializationJobTargets.AsNoTracking()
+            .Where(item => item.JobId == jobId && item.Sequence == 0)
+            .Select(item => item.ResultJson)
+            .SingleAsync();
+        var replayedResult = JsonSerializer.Deserialize<OptionSetMaterializationTargetResultDto>(
+            replayedResultJson!, JsonOptions);
+        replayedResult!.AttachmentId.Should().Be(attachmentId);
     }
 
     [Fact]

@@ -15,6 +15,7 @@ internal static partial class OptionSetMaterializerTargetWriter
         string audit,
         DateTime now) => new()
         {
+            Id = Guid.NewGuid(),
             OptionSetId = set.Id,
             Role = target.Role,
             TargetProductId = target.TargetProductId,
