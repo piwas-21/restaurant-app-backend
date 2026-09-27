@@ -3,6 +3,7 @@ namespace RestaurantSystem.Api.Features.TranslationWorkbench;
 public sealed class TranslationAssistanceSettings
 {
     public const string SectionName = "TranslationAssistance";
+    private const string GeminiProvider = "gemini";
     public bool Enabled { get; set; }
     public bool TenantDataApproved { get; set; }
     public string ApiUrl { get; set; } = string.Empty;
@@ -21,17 +22,16 @@ public sealed class TranslationAssistanceSettings
     public int TimeoutSeconds { get; set; } = 20;
     public Dictionary<string, string> Glossary { get; set; } = new(StringComparer.Ordinal);
 
-    public string SelectedModel => Provider == "gemini" ? Gemini.Model : Model;
+    public string SelectedModel => Provider == GeminiProvider ? Gemini.Model : Model;
     public string ContextModelKey => Provider == "openai" ? SelectedModel : $"{Provider}:{SelectedModel}";
-    public decimal SelectedInputCostPerMillionUsd => Provider == "gemini" ? Gemini.InputCostPerMillionUsd : InputCostPerMillionUsd;
-
-    public decimal SelectedOutputCostPerMillionUsd => Provider == "gemini" ? Gemini.OutputCostPerMillionUsd : OutputCostPerMillionUsd;
+    public decimal SelectedInputCostPerMillionUsd => Provider == GeminiProvider ? Gemini.InputCostPerMillionUsd : InputCostPerMillionUsd;
+    public decimal SelectedOutputCostPerMillionUsd => Provider == GeminiProvider ? Gemini.OutputCostPerMillionUsd : OutputCostPerMillionUsd;
     public bool CanGenerate => Enabled && TenantDataApproved && HasProviderConfiguration;
 
     public bool HasProviderConfiguration => Provider switch
     {
         "openai" => !string.IsNullOrWhiteSpace(ApiKey) && IsHttpsUrl(ApiUrl),
-        "gemini" => !string.IsNullOrWhiteSpace(Gemini.ApiKey) &&
+        GeminiProvider => !string.IsNullOrWhiteSpace(Gemini.ApiKey) &&
             IsHttpsBaseUrl(Gemini.ApiBaseUrl) &&
             !string.IsNullOrWhiteSpace(Gemini.Model) && !Gemini.Model.Contains('/') &&
             Gemini.InputCostPerMillionUsd > 0 && Gemini.OutputCostPerMillionUsd > 0,
