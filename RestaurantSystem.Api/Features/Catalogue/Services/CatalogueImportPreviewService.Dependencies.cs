@@ -35,63 +35,79 @@ public sealed partial class CatalogueImportPreviewService
 
         foreach (var dependency in dependencies)
         {
-            var template = session.Templates.FirstOrDefault(candidate =>
-                candidate.TemplateId == dependency.Reference.TemplateId &&
-                candidate.Revision == dependency.Reference.Revision);
-            if (template is null)
-            {
-                blockers.Add(Issue("DEPENDENCY_NOT_IN_SESSION",
-                    $"The required catalogue dependency {dependency.Reference.Key} is missing from this import session."));
-                continue;
-            }
+            AddDependencyBlocker(session, dependency, mappedBySource, existingEntities, blockers);
+        }
+    }
 
-            if (!template.Type.Equals(dependency.ExpectedTemplateType, StringComparison.Ordinal))
-            {
-                blockers.Add(Issue("DEPENDENCY_TYPE_MISMATCH",
-                    $"The catalogue dependency {dependency.Reference.Key} must be a {dependency.ExpectedTemplateType} template."));
-                continue;
-            }
+    private static void AddDependencyBlocker(
+        CatalogueImportSession session,
+        CataloguePayloadDependency dependency,
+        Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
+        HashSet<CatalogueLocalEntityKey> existingEntities,
+        List<CatalogueImportIssueDto> blockers)
+    {
+        var template = session.Templates.FirstOrDefault(candidate =>
+            candidate.TemplateId == dependency.Reference.TemplateId &&
+            candidate.Revision == dependency.Reference.Revision);
+        if (template is null)
+        {
+            blockers.Add(Issue("DEPENDENCY_NOT_IN_SESSION",
+                $"The required catalogue dependency {dependency.Reference.Key} is missing from this import session."));
+            return;
+        }
 
-            if (template.IsSelected && template.Status == CatalogueImportItemStatus.Failed)
-            {
-                blockers.Add(Issue("DEPENDENCY_IMPORT_FAILED",
-                    $"The required catalogue dependency {dependency.Reference.Key} must be fixed before importing this offer."));
-                continue;
-            }
+        if (!template.Type.Equals(dependency.ExpectedTemplateType, StringComparison.Ordinal))
+        {
+            blockers.Add(Issue("DEPENDENCY_TYPE_MISMATCH",
+                $"The catalogue dependency {dependency.Reference.Key} must be a {dependency.ExpectedTemplateType} template."));
+            return;
+        }
 
-            if (template.IsSelected)
-            {
-                if (template.Status == CatalogueImportItemStatus.Skipped)
-                {
-                    blockers.Add(Issue("DEPENDENCY_NOT_IMPORTED",
-                        $"The selected catalogue dependency {dependency.Reference.Key} was skipped and must be reselected."));
-                    continue;
-                }
+        if (template.IsSelected)
+        {
+            AddSelectedDependencyBlocker(template, dependency.Reference, existingEntities, blockers);
+            return;
+        }
 
-                if (template.Status == CatalogueImportItemStatus.Imported)
-                {
-                    var expectedEntityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
-                    if (template.LocalEntityType != expectedEntityType || template.LocalEntityId is not Guid localId ||
-                        !existingEntities.Contains(new CatalogueLocalEntityKey(expectedEntityType, localId)))
-                    {
-                        blockers.Add(Issue("DEPENDENCY_LOCAL_RECORD_MISSING",
-                            $"The imported catalogue dependency {dependency.Reference.Key} no longer maps to a compatible tenant record."));
-                    }
-                }
+        var entityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
+        var hasReusableMapping = mappedBySource.TryGetValue(
+                (template.TemplateId, template.Revision), out var mapping) &&
+            mapping.LocalEntityType == entityType &&
+            existingEntities.Contains(new CatalogueLocalEntityKey(entityType, mapping.LocalEntityId));
+        if (!hasReusableMapping)
+        {
+            blockers.Add(Issue("DEPENDENCY_NOT_SELECTED",
+                $"Select the required catalogue dependency {dependency.Reference.Key} or adopt an existing mapped record."));
+        }
+    }
 
-                continue;
-            }
+    private static void AddSelectedDependencyBlocker(
+        CatalogueImportSessionTemplate template,
+        CatalogueSourceReference reference,
+        HashSet<CatalogueLocalEntityKey> existingEntities,
+        List<CatalogueImportIssueDto> blockers)
+    {
+        if (template.Status == CatalogueImportItemStatus.Failed)
+        {
+            blockers.Add(Issue("DEPENDENCY_IMPORT_FAILED",
+                $"The required catalogue dependency {reference.Key} must be fixed before importing this offer."));
+            return;
+        }
 
-            var entityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
-            var hasReusableMapping = mappedBySource.TryGetValue(
-                    (template.TemplateId, template.Revision), out var mapping) &&
-                mapping.LocalEntityType == entityType &&
-                existingEntities.Contains(new CatalogueLocalEntityKey(entityType, mapping.LocalEntityId));
-            if (!hasReusableMapping)
-            {
-                blockers.Add(Issue("DEPENDENCY_NOT_SELECTED",
-                    $"Select the required catalogue dependency {dependency.Reference.Key} or adopt an existing mapped record."));
-            }
+        if (template.Status == CatalogueImportItemStatus.Skipped)
+        {
+            blockers.Add(Issue("DEPENDENCY_NOT_IMPORTED",
+                $"The selected catalogue dependency {reference.Key} was skipped and must be reselected."));
+            return;
+        }
+
+        if (template.Status != CatalogueImportItemStatus.Imported) return;
+        var expectedEntityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
+        if (template.LocalEntityType != expectedEntityType || template.LocalEntityId is not Guid localId ||
+            !existingEntities.Contains(new CatalogueLocalEntityKey(expectedEntityType, localId)))
+        {
+            blockers.Add(Issue("DEPENDENCY_LOCAL_RECORD_MISSING",
+                $"The imported catalogue dependency {reference.Key} no longer maps to a compatible tenant record."));
         }
     }
 
@@ -105,47 +121,48 @@ public sealed partial class CatalogueImportPreviewService
     {
         if (source.Item.Type != "option-set") return;
 
-        var resolvedIds = new HashSet<Guid>();
-        foreach (var dependency in dependencies)
+        var resolvedKeys = new HashSet<CatalogueLocalEntityKey>();
+        foreach (var reference in dependencies.Select(dependency => dependency.Reference))
         {
-            var template = session.Templates.FirstOrDefault(candidate =>
-                candidate.TemplateId == dependency.Reference.TemplateId &&
-                candidate.Revision == dependency.Reference.Revision);
-            if (template is null) continue;
-
-            var entityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
-            Guid? resolvedId = null;
-            if (template.IsSelected && template.Status == CatalogueImportItemStatus.Imported &&
-                template.LocalEntityType == entityType)
-            {
-                resolvedId = template.LocalEntityId;
-            }
-            else if (template.IsSelected && !string.IsNullOrWhiteSpace(template.DecisionJson))
-            {
-                var decision = CatalogueSessionMapper.ParseDecision(template.DecisionJson);
-                if (decision?.Resolution.Equals(ReuseResolution, StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    resolvedId = decision.LocalEntityId;
-                }
-            }
-            else if (mappedBySource.TryGetValue((template.TemplateId, template.Revision), out var mapping) &&
-                mapping.LocalEntityType == entityType)
-            {
-                resolvedId = mapping.LocalEntityId;
-            }
-
-            if (resolvedId is not Guid localId ||
-                !existingEntities.Contains(new CatalogueLocalEntityKey(entityType, localId)))
-            {
-                continue;
-            }
-
-            if (!resolvedIds.Add(localId))
+            var localKey = ResolveLocalOptionKey(session, reference, mappedBySource);
+            if (localKey is not CatalogueLocalEntityKey key || !existingEntities.Contains(key)) continue;
+            if (!resolvedKeys.Add(key))
             {
                 blockers.Add(Issue("DUPLICATE_RESOLVED_OPTION",
                     "Distinct catalogue choices resolve to the same tenant record. Choose distinct tenant records before importing."));
                 return;
             }
         }
+    }
+
+    private static CatalogueLocalEntityKey? ResolveLocalOptionKey(
+        CatalogueImportSession session,
+        CatalogueSourceReference reference,
+        Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource)
+    {
+        var template = session.Templates.FirstOrDefault(candidate =>
+            candidate.TemplateId == reference.TemplateId && candidate.Revision == reference.Revision);
+        if (template is null) return null;
+        var entityType = CatalogueImportReviewRules.ExpectedEntityType(template.Type);
+        if (template.IsSelected)
+        {
+            if (template.Status == CatalogueImportItemStatus.Imported &&
+                template.LocalEntityType == entityType && template.LocalEntityId is Guid importedId)
+            {
+                return new CatalogueLocalEntityKey(entityType, importedId);
+            }
+
+            if (string.IsNullOrWhiteSpace(template.DecisionJson)) return null;
+            var decision = CatalogueSessionMapper.ParseDecision(template.DecisionJson);
+            return decision?.Resolution.Equals(ReuseResolution, StringComparison.OrdinalIgnoreCase) == true &&
+                   decision.LocalEntityId is Guid reusedId
+                ? new CatalogueLocalEntityKey(entityType, reusedId)
+                : null;
+        }
+
+        return mappedBySource.TryGetValue((template.TemplateId, template.Revision), out var mapping) &&
+               mapping.LocalEntityType == entityType
+            ? new CatalogueLocalEntityKey(entityType, mapping.LocalEntityId)
+            : null;
     }
 }

@@ -37,8 +37,7 @@ public sealed partial class CatalogueTemplateImportExecutor
 
     private async Task<OptionSetMaterializationTargetResultDto> ApplyImportedSetAsync(
         CatalogueImportSession session,
-        string sourceTemplateId,
-        int sourceRevision,
+        CentralCatalogueTemplateRevision revision,
         string sourceTargetKey,
         ImportedOptionSet set,
         OptionSetMaterializationTargetRequest target,
@@ -50,7 +49,7 @@ public sealed partial class CatalogueTemplateImportExecutor
             OptionSetId = set.Id,
             ExpectedSetVersion = set.Version,
             IdempotencyKey = CatalogueImportOptionSetMapper.StableMaterializationKey(
-                session.AdoptionId, sourceTemplateId, sourceRevision, $"apply:{sourceTargetKey}"),
+                session.AdoptionId, revision.TemplateId, revision.Revision, $"apply:{sourceTargetKey}"),
             Targets = [target]
         }, stagedProductIds, cancellationToken);
         var applied = result.Targets.SingleOrDefault()

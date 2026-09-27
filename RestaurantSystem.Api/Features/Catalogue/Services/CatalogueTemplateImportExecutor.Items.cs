@@ -34,7 +34,7 @@ public sealed partial class CatalogueTemplateImportExecutor
         var product = RequireData(response, "Item creation was rejected by tenant validation.");
         await RecordTemplateTranslationAsync(
             revision, CatalogueImportTranslationMapper.ForProduct(revision, product), cancellationToken);
-        await AttachItemOptionSetsAsync(session, revision, decision, resolver, product, optionSetReferences,
+        await AttachItemOptionSetsAsync(session, revision, resolver, product, optionSetReferences,
             sideSetReferences, cancellationToken);
         return Imported("Product", product.Id);
     }
@@ -65,7 +65,6 @@ public sealed partial class CatalogueTemplateImportExecutor
     private async Task AttachItemOptionSetsAsync(
         CatalogueImportSession session,
         CentralCatalogueTemplateRevision revision,
-        CatalogueImportItemDecision decision,
         CatalogueImportEntityResolver resolver,
         ProductDto product,
         IReadOnlyList<CatalogueSourceReference> optionSetReferences,
@@ -113,7 +112,7 @@ public sealed partial class CatalogueTemplateImportExecutor
                 Settings = CatalogueImportOptionSetMapper.AttachmentSettings(
                     set.Kind, payload.Minimum, payload.Maximum, group?.DisplayOrder ?? index)
             };
-            await ApplyImportedSetAsync(session, revision.TemplateId, revision.Revision, reference.Key,
+            await ApplyImportedSetAsync(session, revision, reference.Key,
                 set, target, stagedProducts, cancellationToken);
         }
         for (var index = 0; index < sideSetReferences.Count; index++)
@@ -135,7 +134,7 @@ public sealed partial class CatalogueTemplateImportExecutor
                 TargetProductId = product.Id,
                 Settings = CatalogueImportOptionSetMapper.AttachmentSettings(set.Kind, 0, 0, index)
             };
-            await ApplyImportedSetAsync(session, revision.TemplateId, revision.Revision,
+            await ApplyImportedSetAsync(session, revision,
                 $"side:{reference.Key}", set, target, stagedProducts, cancellationToken);
         }
     }

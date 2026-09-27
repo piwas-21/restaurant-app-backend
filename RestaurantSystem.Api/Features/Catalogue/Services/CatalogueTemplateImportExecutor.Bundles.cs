@@ -76,7 +76,7 @@ public sealed partial class CatalogueTemplateImportExecutor
                 Settings = CatalogueImportOptionSetMapper.AttachmentSettings(
                     OptionSetKind.BundleChoice, section.Minimum, section.Maximum, section.DisplayOrder)
             };
-            var result = await ApplyImportedSetAsync(session, revision.TemplateId, revision.Revision,
+            var result = await ApplyImportedSetAsync(session, revision,
                 section.Key, new ImportedOptionSet(importedSet.OptionSetId, importedSet.Version, OptionSetKind.BundleChoice),
                 target, stagedProducts, cancellationToken);
             menuVersion = result.MenuAuthoringVersion
