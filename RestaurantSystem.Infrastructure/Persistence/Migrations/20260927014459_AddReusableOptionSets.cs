@@ -149,6 +149,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 {
                     table.PrimaryKey("pk_option_set_entries", x => x.id);
                     table.CheckConstraint("ck_option_set_entries_one_reference", "(global_ingredient_id IS NULL) <> (product_id IS NULL) AND (product_variation_id IS NULL OR product_id IS NOT NULL)");
+                    table.CheckConstraint("ck_option_set_entries_positive_quantity", "max_quantity >= 1");
                     table.ForeignKey(
                         name: "FK_OptionSetEntries_Products_product_id",
                         column: x => x.product_id,

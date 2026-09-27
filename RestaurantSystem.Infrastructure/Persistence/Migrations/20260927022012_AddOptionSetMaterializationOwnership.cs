@@ -28,11 +28,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 nullable: false,
                 defaultValue: false);
 
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_option_set_entries_positive_quantity",
-                table: "OptionSetEntries",
-                sql: "max_quantity >= 1");
-
             migrationBuilder.CreateIndex(
                 name: "IX_OptionSetAppliedRows_row_type_materialized_row_id",
                 table: "OptionSetAppliedRows",
@@ -42,10 +37,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_option_set_entries_positive_quantity",
-                table: "OptionSetEntries");
-
             migrationBuilder.DropIndex(
                 name: "IX_OptionSetAppliedRows_row_type_materialized_row_id",
                 table: "OptionSetAppliedRows");
