@@ -8,7 +8,8 @@ namespace RestaurantSystem.Api.Features.Catalogue;
 [ApiController]
 [Route("api/catalogue/import-sessions")]
 [RequireAdmin]
-public sealed class CatalogueImportSessionsController(ICatalogueImportSessionService sessions) : ControllerBase
+public sealed class CatalogueImportSessionsController(
+    ICatalogueImportSessionService sessions) : ControllerBase
 {
     [HttpPost]
     [ProducesResponseType(typeof(CatalogueImportSessionDto), StatusCodes.Status200OK)]

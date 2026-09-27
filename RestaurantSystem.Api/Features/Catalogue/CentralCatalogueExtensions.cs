@@ -32,6 +32,7 @@ public static class CentralCatalogueExtensions
         services.AddScoped<ICatalogueImportLock, CatalogueImportLock>();
         services.AddScoped<ICatalogueSessionImporter, CatalogueSessionImporter>();
         services.AddScoped<ICatalogueRejectedCandidateService, CatalogueRejectedCandidateService>();
+        services.AddScoped<ICatalogueRevisionChangeService, CatalogueRevisionChangeService>();
         services.AddScoped<ICatalogueImportSessionService, CatalogueImportSessionService>();
 
         return services;
