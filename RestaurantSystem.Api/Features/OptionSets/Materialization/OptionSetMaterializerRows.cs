@@ -13,6 +13,9 @@ internal static class OptionSetMaterializerRows
     public const string SideRow = "ProductSideItem";
     public const string BundleRow = "MenuSectionItem";
     public const string ProductChoiceRow = "ProductCustomizationProductOption";
+    private const string DisplayOrderField = "displayOrder";
+    private const string AdditionalPriceField = "additionalPrice";
+    private const string IsDefaultField = "isDefault";
 
     public static Dictionary<string, object?> Desired(
         OptionSetAttachmentRole role,
@@ -24,7 +27,7 @@ internal static class OptionSetMaterializerRows
             return new Dictionary<string, object?>
             {
                 ["name"] = entryOverride?.Name ?? entry.Name,
-                ["displayOrder"] = entryOverride?.DisplayOrder ?? entry.DisplayOrder,
+                [DisplayOrderField] = entryOverride?.DisplayOrder ?? entry.DisplayOrder,
                 ["isOptional"] = entryOverride?.IsOptional ?? entry.IsOptional,
                 ["maxQuantity"] = entryOverride?.MaxQuantity ?? entry.MaxQuantity,
                 ["price"] = entryOverride?.Price ?? entry.Price,
@@ -38,15 +41,15 @@ internal static class OptionSetMaterializerRows
             return new Dictionary<string, object?>
             {
                 ["isRequired"] = entryOverride?.IsRequired ?? entry.IsRequired,
-                ["displayOrder"] = entryOverride?.DisplayOrder ?? entry.DisplayOrder
+                [DisplayOrderField] = entryOverride?.DisplayOrder ?? entry.DisplayOrder
             };
         }
 
         return new Dictionary<string, object?>
         {
-            ["additionalPrice"] = entryOverride?.AdditionalPrice ?? entry.AdditionalPrice,
-            ["displayOrder"] = entryOverride?.DisplayOrder ?? entry.DisplayOrder,
-            ["isDefault"] = entryOverride?.IsDefault ?? entry.IsDefault
+            [AdditionalPriceField] = entryOverride?.AdditionalPrice ?? entry.AdditionalPrice,
+            [DisplayOrderField] = entryOverride?.DisplayOrder ?? entry.DisplayOrder,
+            [IsDefaultField] = entryOverride?.IsDefault ?? entry.IsDefault
         };
     }
 
@@ -55,7 +58,7 @@ internal static class OptionSetMaterializerRows
         ProductIngredient ingredient => new()
         {
             ["name"] = ingredient.Name,
-            ["displayOrder"] = ingredient.DisplayOrder,
+            [DisplayOrderField] = ingredient.DisplayOrder,
             ["isOptional"] = ingredient.IsOptional,
             ["maxQuantity"] = ingredient.MaxQuantity,
             ["price"] = ingredient.Price,
@@ -65,19 +68,19 @@ internal static class OptionSetMaterializerRows
         ProductSideItem side => new()
         {
             ["isRequired"] = side.IsRequired,
-            ["displayOrder"] = side.DisplayOrder
+            [DisplayOrderField] = side.DisplayOrder
         },
         MenuSectionItem item => new()
         {
-            ["additionalPrice"] = item.AdditionalPrice,
-            ["displayOrder"] = item.DisplayOrder,
-            ["isDefault"] = item.IsDefault
+            [AdditionalPriceField] = item.AdditionalPrice,
+            [DisplayOrderField] = item.DisplayOrder,
+            [IsDefaultField] = item.IsDefault
         },
         ProductCustomizationProductOption option => new()
         {
-            ["additionalPrice"] = option.AdditionalPrice,
-            ["displayOrder"] = option.DisplayOrder,
-            ["isDefault"] = option.IsDefault
+            [AdditionalPriceField] = option.AdditionalPrice,
+            [DisplayOrderField] = option.DisplayOrder,
+            [IsDefaultField] = option.IsDefault
         },
         _ => throw new BadRequestException("The materialized option row is unsupported")
     };
@@ -205,7 +208,7 @@ internal static class OptionSetMaterializerRows
         switch (key)
         {
             case "name": row.Name = (string?)value ?? string.Empty; break;
-            case "displayOrder": row.DisplayOrder = (int)value!; break;
+            case DisplayOrderField: row.DisplayOrder = (int)value!; break;
             case "isOptional": row.IsOptional = (bool)value!; break;
             case "maxQuantity": row.MaxQuantity = (int)value!; break;
             case "price": row.Price = (decimal)value!; break;
@@ -219,7 +222,7 @@ internal static class OptionSetMaterializerRows
         switch (key)
         {
             case "isRequired": row.IsRequired = (bool)value!; break;
-            case "displayOrder": row.DisplayOrder = (int)value!; break;
+            case DisplayOrderField: row.DisplayOrder = (int)value!; break;
         }
     }
 
@@ -227,9 +230,9 @@ internal static class OptionSetMaterializerRows
     {
         switch (key)
         {
-            case "additionalPrice": row.AdditionalPrice = (decimal)value!; break;
-            case "displayOrder": row.DisplayOrder = (int)value!; break;
-            case "isDefault": row.IsDefault = (bool)value!; break;
+            case AdditionalPriceField: row.AdditionalPrice = (decimal)value!; break;
+            case DisplayOrderField: row.DisplayOrder = (int)value!; break;
+            case IsDefaultField: row.IsDefault = (bool)value!; break;
         }
     }
 
@@ -237,9 +240,9 @@ internal static class OptionSetMaterializerRows
     {
         switch (key)
         {
-            case "additionalPrice": row.AdditionalPrice = (decimal)value!; break;
-            case "displayOrder": row.DisplayOrder = (int)value!; break;
-            case "isDefault": row.IsDefault = (bool)value!; break;
+            case AdditionalPriceField: row.AdditionalPrice = (decimal)value!; break;
+            case DisplayOrderField: row.DisplayOrder = (int)value!; break;
+            case IsDefaultField: row.IsDefault = (bool)value!; break;
         }
     }
 }

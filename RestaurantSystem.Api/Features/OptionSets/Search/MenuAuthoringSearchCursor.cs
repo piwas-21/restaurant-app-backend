@@ -6,6 +6,8 @@ namespace RestaurantSystem.Api.Features.OptionSets.Search;
 
 internal sealed record MenuAuthoringSearchCursor(string Name, int TypeRank, Guid Id)
 {
+    private const string InvalidCursorMessage = "The authoring search cursor is invalid";
+
     public static string Encode(MenuAuthoringSearchCandidateDto candidate) =>
         WebEncoders.Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new MenuAuthoringSearchCursor(
             candidate.Name,
@@ -16,7 +18,7 @@ internal sealed record MenuAuthoringSearchCursor(string Name, int TypeRank, Guid
     {
         if (value.Length > 2048)
         {
-            throw new BadRequestException("The authoring search cursor is invalid");
+            throw new BadRequestException(InvalidCursorMessage);
         }
 
         try
@@ -25,15 +27,15 @@ internal sealed record MenuAuthoringSearchCursor(string Name, int TypeRank, Guid
                 is { Id: var id, TypeRank: >= 0 and <= 4 } cursor
                 && id != Guid.Empty
                 ? cursor
-                : throw new BadRequestException("The authoring search cursor is invalid");
+                : throw new BadRequestException(InvalidCursorMessage);
         }
         catch (FormatException)
         {
-            throw new BadRequestException("The authoring search cursor is invalid");
+            throw new BadRequestException(InvalidCursorMessage);
         }
         catch (JsonException)
         {
-            throw new BadRequestException("The authoring search cursor is invalid");
+            throw new BadRequestException(InvalidCursorMessage);
         }
     }
 }

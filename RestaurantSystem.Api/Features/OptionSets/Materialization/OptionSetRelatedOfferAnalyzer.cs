@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Domain.Common.Enums;
@@ -6,7 +7,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
-internal static class OptionSetRelatedOfferAnalyzer
+internal static partial class OptionSetRelatedOfferAnalyzer
 {
     public static async Task<IReadOnlyList<OptionSetRelatedOfferWarningDto>> AnalyzeAsync(
         ApplicationDbContext context,
@@ -20,21 +21,59 @@ internal static class OptionSetRelatedOfferAnalyzer
             return [];
         }
 
-        var warnings = new List<OptionSetRelatedOfferWarningDto>();
         var choiceTargets = request.Targets.Where(IsChoiceTarget).ToList();
-        var sourceTargets = new Dictionary<string, SourceTarget?>(StringComparer.Ordinal);
-        var requiredRequestTargets = new Dictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>>();
+        var sourceTargets = await LoadSourceTargetsAsync(
+            context, set, choiceTargets, stagedProductIds, cancellationToken);
+        var requiredRequestTargets = BuildRequiredRequestTargets(choiceTargets, sourceTargets);
+        var warnings = new List<OptionSetRelatedOfferWarningDto>();
         foreach (var target in choiceTargets)
         {
-            var source = await LoadSourceAsync(context, set, target, stagedProductIds, cancellationToken);
-            sourceTargets[target.TargetKey] = source;
-            if (source is null || source.State.Settings.MinSelection <= 0)
+            if (!TryGetRequiredSource(target, sourceTargets, out var source))
             {
                 continue;
             }
 
-            var targetId = target.Role == OptionSetAttachmentRole.ProductChoice
-                ? target.TargetCustomizationGroupId : target.TargetMenuSectionId;
+            var targetWarnings = await AnalyzeRequiredTargetAsync(
+                context, set, target, source, requiredRequestTargets, cancellationToken);
+            warnings.AddRange(targetWarnings);
+        }
+
+        return warnings
+            .DistinctBy(warning => (warning.TargetKey, warning.RelatedProductId, warning.RelatedTargetId))
+            .ToList();
+    }
+
+    private static async Task<Dictionary<string, SourceTarget?>> LoadSourceTargetsAsync(
+        ApplicationDbContext context,
+        OptionSet set,
+        IReadOnlyCollection<OptionSetMaterializationTargetRequest> choiceTargets,
+        IReadOnlySet<Guid>? stagedProductIds,
+        CancellationToken cancellationToken)
+    {
+        var sourceTargets = new Dictionary<string, SourceTarget?>(StringComparer.Ordinal);
+        foreach (var target in choiceTargets)
+        {
+            var source = await LoadSourceAsync(context, set, target, stagedProductIds, cancellationToken);
+            sourceTargets[target.TargetKey] = source;
+        }
+
+        return sourceTargets;
+    }
+
+    private static Dictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>>
+        BuildRequiredRequestTargets(
+            IReadOnlyCollection<OptionSetMaterializationTargetRequest> choiceTargets,
+            IReadOnlyDictionary<string, SourceTarget?> sourceTargets)
+    {
+        var requiredRequestTargets = new Dictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>>();
+        foreach (var target in choiceTargets)
+        {
+            if (!TryGetRequiredSource(target, sourceTargets, out var source))
+            {
+                continue;
+            }
+
+            var targetId = GetTargetId(target);
             var key = (target.TargetProductId, target.Role);
             if (!requiredRequestTargets.TryGetValue(key, out var targetIds))
             {
@@ -45,65 +84,117 @@ internal static class OptionSetRelatedOfferAnalyzer
             targetIds.Add(targetId);
         }
 
-        foreach (var target in choiceTargets)
+        return requiredRequestTargets;
+    }
+
+    private static bool TryGetRequiredSource(
+        OptionSetMaterializationTargetRequest target,
+        IReadOnlyDictionary<string, SourceTarget?> sourceTargets,
+        [NotNullWhen(true)] out SourceTarget? source)
+    {
+        if (sourceTargets.TryGetValue(target.TargetKey, out var found)
+            && found is not null && found.State.Settings.MinSelection > 0)
         {
-            var source = sourceTargets[target.TargetKey];
-            if (source is null || source.State.Settings.MinSelection <= 0)
-            {
-                continue;
-            }
-
-            var offerRootId = target.Role == OptionSetAttachmentRole.ProductChoice
-                ? source.State.Product.Id
-                : source.State.MenuDefinition?.ParentOfferProductId;
-            if (offerRootId is null)
-            {
-                continue;
-            }
-
-            var candidates = await LoadRelatedTargetsAsync(
-                context,
-                offerRootId.Value,
-                source.State.MenuDefinition?.ParentOfferVariationId,
-                source.State.SelectedEntries,
-                cancellationToken);
-            var attachments = await context.OptionSetAttachments.AsNoTracking()
-                .Where(item => item.OptionSetId == set.Id && item.MinSelection > 0
-                    && (item.TargetProductId == offerRootId
-                        || item.TargetProductId == source.State.Product.Id
-                        || candidates.Select(candidate => candidate.ProductId).Contains(item.TargetProductId)))
-                .Select(item => new ExistingAttachment(
-                    item.TargetProductId, item.TargetMenuSectionId, item.TargetCustomizationGroupId, item.Role))
-                .ToListAsync(cancellationToken);
-
-            foreach (var candidate in candidates)
-            {
-                if (HasRequiredAttachment(candidate, attachments)
-                    || IsRequiredRequestTarget(candidate, requiredRequestTargets))
-                {
-                    continue;
-                }
-
-                warnings.Add(new OptionSetRelatedOfferWarningDto
-                {
-                    TargetKey = target.TargetKey,
-                    RelatedProductId = candidate.ProductId,
-                    RelatedProductName = candidate.ProductName,
-                    RelatedOfferType = candidate.Role == OptionSetAttachmentRole.ProductChoice ? "standalone" : "menu",
-                    RelatedVariationId = candidate.ParentVariationId,
-                    RelatedTargetRole = candidate.Role == OptionSetAttachmentRole.ProductChoice ? "productChoice" : "bundleChoice",
-                    RelatedTargetId = candidate.TargetId,
-                    RelatedTargetName = candidate.TargetName,
-                    ReasonRequired = string.IsNullOrWhiteSpace(target.IntentionalDifferenceReason)
-                        && string.IsNullOrWhiteSpace(source.State.Attachment?.IntentionalDifferenceReason)
-                });
-            }
+            source = found;
+            return true;
         }
 
-        return warnings
-            .DistinctBy(warning => (warning.TargetKey, warning.RelatedProductId, warning.RelatedTargetId))
-            .ToList();
+        source = null;
+        return false;
     }
+
+    private static async Task<List<OptionSetRelatedOfferWarningDto>> AnalyzeRequiredTargetAsync(
+        ApplicationDbContext context,
+        OptionSet set,
+        OptionSetMaterializationTargetRequest target,
+        SourceTarget source,
+        IReadOnlyDictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>> requiredRequestTargets,
+        CancellationToken cancellationToken)
+    {
+        var offerRootId = ResolveOfferRootId(target, source.State);
+        if (offerRootId is null)
+        {
+            return [];
+        }
+
+        var candidates = await LoadRelatedTargetsAsync(
+            context,
+            offerRootId.Value,
+            source.State.MenuDefinition?.ParentOfferVariationId,
+            source.State.SelectedEntries,
+            cancellationToken);
+        var attachments = await LoadRequiredAttachmentsAsync(context, set.Id, offerRootId.Value, source, candidates, cancellationToken);
+        return BuildWarnings(target, source, candidates, attachments, requiredRequestTargets);
+    }
+
+    private static Guid? ResolveOfferRootId(
+        OptionSetMaterializationTargetRequest target,
+        OptionSetTargetState state) => target.Role == OptionSetAttachmentRole.ProductChoice
+        ? state.Product.Id
+        : state.MenuDefinition?.ParentOfferProductId;
+
+    private static Guid? GetTargetId(OptionSetMaterializationTargetRequest target) =>
+        target.Role == OptionSetAttachmentRole.ProductChoice
+            ? target.TargetCustomizationGroupId
+            : target.TargetMenuSectionId;
+
+    private static async Task<List<ExistingAttachment>> LoadRequiredAttachmentsAsync(
+        ApplicationDbContext context,
+        Guid optionSetId,
+        Guid offerRootId,
+        SourceTarget source,
+        IReadOnlyCollection<RelatedTarget> candidates,
+        CancellationToken cancellationToken)
+    {
+        var candidateProductIds = candidates.Select(candidate => candidate.ProductId).ToArray();
+        return await context.OptionSetAttachments.AsNoTracking()
+            .Where(item => item.OptionSetId == optionSetId && item.MinSelection > 0
+                && (item.TargetProductId == offerRootId
+                    || item.TargetProductId == source.State.Product.Id
+                    || candidateProductIds.Contains(item.TargetProductId)))
+            .Select(item => new ExistingAttachment(
+                item.TargetProductId, item.TargetMenuSectionId, item.TargetCustomizationGroupId, item.Role))
+            .ToListAsync(cancellationToken);
+    }
+
+    private static List<OptionSetRelatedOfferWarningDto> BuildWarnings(
+        OptionSetMaterializationTargetRequest target,
+        SourceTarget source,
+        IReadOnlyCollection<RelatedTarget> candidates,
+        IReadOnlyCollection<ExistingAttachment> attachments,
+        IReadOnlyDictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>> requiredRequestTargets)
+    {
+        var warnings = new List<OptionSetRelatedOfferWarningDto>();
+        foreach (var candidate in candidates)
+        {
+            if (HasRequiredAttachment(candidate, attachments)
+                || IsRequiredRequestTarget(candidate, requiredRequestTargets))
+            {
+                continue;
+            }
+
+            warnings.Add(CreateWarning(target, source, candidate));
+        }
+
+        return warnings;
+    }
+
+    private static OptionSetRelatedOfferWarningDto CreateWarning(
+        OptionSetMaterializationTargetRequest target,
+        SourceTarget source,
+        RelatedTarget candidate) => new()
+        {
+            TargetKey = target.TargetKey,
+            RelatedProductId = candidate.ProductId,
+            RelatedProductName = candidate.ProductName,
+            RelatedOfferType = candidate.Role == OptionSetAttachmentRole.ProductChoice ? "standalone" : "menu",
+            RelatedVariationId = candidate.ParentVariationId,
+            RelatedTargetRole = candidate.Role == OptionSetAttachmentRole.ProductChoice ? "productChoice" : "bundleChoice",
+            RelatedTargetId = candidate.TargetId,
+            RelatedTargetName = candidate.TargetName,
+            ReasonRequired = string.IsNullOrWhiteSpace(target.IntentionalDifferenceReason)
+            && string.IsNullOrWhiteSpace(source.State.Attachment?.IntentionalDifferenceReason)
+        };
 
     private static bool IsChoiceTarget(OptionSetMaterializationTargetRequest target) =>
         target.Role is OptionSetAttachmentRole.ProductChoice or OptionSetAttachmentRole.BundleChoice;
@@ -127,75 +218,6 @@ internal static class OptionSetRelatedOfferAnalyzer
         }
     }
 
-    private static async Task<List<RelatedTarget>> LoadRelatedTargetsAsync(
-        ApplicationDbContext context,
-        Guid offerRootId,
-        Guid? parentVariationId,
-        IReadOnlyCollection<OptionSetEntry> selectedEntries,
-        CancellationToken cancellationToken)
-    {
-        var productIds = selectedEntries.Select(entry => entry.ProductId).OfType<Guid>().ToHashSet();
-        var rootProduct = await context.Products.AsNoTracking()
-            .Where(product => product.Id == offerRootId && product.Type != ProductType.Menu
-                && !product.IsDeleted && product.IsActive)
-            .Select(product => new RelatedTarget(product.Id, product.Name, OptionSetAttachmentRole.ProductChoice,
-                null, null, null))
-            .SingleOrDefaultAsync(cancellationToken);
-        var targets = new List<RelatedTarget>();
-        if (rootProduct is not null)
-        {
-            var groups = await context.ProductCustomizationGroups.AsNoTracking()
-                .Where(group => group.ProductId == offerRootId
-                    && group.IsActive
-                    && group.ProductOptions.Any(option => productIds.Contains(option.OptionProductId)))
-                .OrderBy(group => group.DisplayOrder)
-                .Select(group => new RelatedTarget(
-                    offerRootId, group.Product.Name, OptionSetAttachmentRole.ProductChoice,
-                    null, group.Id, group.Name))
-                .ToListAsync(cancellationToken);
-            targets.AddRange(groups.Count == 0 ? [rootProduct] : groups);
-        }
-
-        var menuProducts = await context.MenuDefinitions.AsNoTracking()
-            .Where(definition => definition.ParentOfferProductId == offerRootId
-                && definition.ParentOfferVariationId == parentVariationId
-                && definition.Product.IsActive && !definition.Product.IsDeleted)
-            .Select(definition => new MenuProduct(
-                definition.ProductId, definition.Product.Name, definition.ParentOfferVariationId))
-            .ToListAsync(cancellationToken);
-        if (menuProducts.Count == 0)
-        {
-            return targets;
-        }
-
-        var menuIds = menuProducts.Select(product => product.ProductId).ToHashSet();
-        var sections = await context.MenuSections.AsNoTracking()
-            .Where(section => menuIds.Contains(section.MenuDefinition.ProductId)
-                && section.Items.Any(item => productIds.Contains(item.ProductId)))
-            .OrderBy(section => section.DisplayOrder)
-            .Select(section => new RelatedSection(
-                section.Id,
-                section.MenuDefinition.ProductId,
-                section.MenuDefinition.Product.Name,
-                section.MenuDefinition.ParentOfferVariationId,
-                section.Name))
-            .ToListAsync(cancellationToken);
-        foreach (var product in menuProducts)
-        {
-            var matchingSections = sections.Where(section => section.ProductId == product.ProductId)
-                .Select(section => new RelatedTarget(
-                    product.ProductId, product.Name, OptionSetAttachmentRole.BundleChoice,
-                    product.ParentVariationId, section.Id, section.Name))
-                .ToList();
-            targets.AddRange(matchingSections.Count == 0
-                ? [new RelatedTarget(product.ProductId, product.Name, OptionSetAttachmentRole.BundleChoice,
-                    product.ParentVariationId, null, null)]
-                : matchingSections);
-        }
-
-        return targets;
-    }
-
     private static bool HasRequiredAttachment(
         RelatedTarget candidate,
         IReadOnlyCollection<ExistingAttachment> attachments) => attachments.Any(item =>
@@ -207,23 +229,9 @@ internal static class OptionSetRelatedOfferAnalyzer
 
     private static bool IsRequiredRequestTarget(
         RelatedTarget candidate,
-        Dictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>> requiredTargets) =>
+        IReadOnlyDictionary<(Guid ProductId, OptionSetAttachmentRole Role), HashSet<Guid?>> requiredTargets) =>
         requiredTargets.TryGetValue((candidate.ProductId, candidate.Role), out var targetIds)
         && (candidate.TargetId is null || targetIds.Contains(candidate.TargetId));
 
-    private sealed record SourceTarget(OptionSetTargetState State);
-    private sealed record MenuProduct(Guid ProductId, string Name, Guid? ParentVariationId);
-    private sealed record RelatedSection(Guid Id, Guid ProductId, string ProductName, Guid? ParentVariationId, string Name);
-    private sealed record RelatedTarget(
-        Guid ProductId,
-        string ProductName,
-        OptionSetAttachmentRole Role,
-        Guid? ParentVariationId,
-        Guid? TargetId,
-        string? TargetName);
-    private sealed record ExistingAttachment(
-        Guid ProductId,
-        Guid? MenuSectionId,
-        Guid? CustomizationGroupId,
-        OptionSetAttachmentRole Role);
+
 }

@@ -26,7 +26,7 @@ public sealed partial class OptionSetCatalogService
 
         var sourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale);
         var translations = OptionSetLocales.NormalizeTranslations(request.Translations);
-        var existing = await _context.OptionSets.AsNoTracking().Include(set => set.Entries)
+        var existing = await _context.OptionSets.AsNoTracking().AsSplitQuery().Include(set => set.Entries)
             .Include(set => set.Translations)
             .FirstOrDefaultAsync(set => set.SourceTemplateId == request.SourceTemplateId
                 && set.SourceRevision == request.SourceRevision

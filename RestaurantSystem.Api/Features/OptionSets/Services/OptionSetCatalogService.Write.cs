@@ -53,7 +53,7 @@ public sealed partial class OptionSetCatalogService
             throw new BadRequestException("A positive If-Match option-set version is required");
         }
 
-        var set = await _context.OptionSets.Include(item => item.Entries).Include(item => item.Attachments)
+        var set = await _context.OptionSets.AsSplitQuery().Include(item => item.Entries).Include(item => item.Attachments)
             .Include(item => item.Translations)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new NotFoundException("Option set", id);
@@ -68,13 +68,25 @@ public sealed partial class OptionSetCatalogService
         }
 
         ValidateEntryCount(request);
+        var now = DateTime.UtcNow;
+        var audit = _currentUser.GetAuditIdentifier();
+        var plan = BuildUpdatePlan(request, set);
+        await ValidateEntriesAsync(request.Kind, plan.EntriesToValidate, cancellationToken);
+        var materializedEntryIds = await LoadMaterializedEntryIdsAsync(set, cancellationToken);
+        ApplyPlannedEntries(set, plan, materializedEntryIds, now, audit);
+        DisableRemovedEntries(set, plan.RetainedIds, now, audit);
+        UpdateSetMetadata(set, request, audit, now);
+        await SaveWithConflictTranslationAsync(cancellationToken);
+        return ToDetail(set);
+    }
+
+    private static UpdatePlan BuildUpdatePlan(OptionSetWriteRequestDto request, OptionSet set)
+    {
         var byId = set.Entries.ToDictionary(entry => entry.Id);
         var retained = new HashSet<Guid>();
         var references = new HashSet<string>(StringComparer.Ordinal);
         var plannedEntries = new List<(OptionSetEntryDto Dto, OptionSetEntry? Existing)>();
         var entriesToValidate = new List<OptionSetEntryDto>();
-        var now = DateTime.UtcNow;
-        var audit = _currentUser.GetAuditIdentifier();
 
         foreach (var dto in request.Entries)
         {
@@ -93,14 +105,28 @@ public sealed partial class OptionSetCatalogService
             plannedEntries.Add((dto, entry));
         }
 
-        await ValidateEntriesAsync(request.Kind, entriesToValidate, cancellationToken);
+        return new UpdatePlan(plannedEntries, entriesToValidate, retained);
+    }
+
+    private async Task<HashSet<Guid>> LoadMaterializedEntryIdsAsync(
+        OptionSet set,
+        CancellationToken cancellationToken)
+    {
         var entryIds = set.Entries.Select(entry => entry.Id).ToArray();
-        HashSet<Guid> materializedEntryIds = entryIds.Length == 0
+        return entryIds.Length == 0
             ? []
             : (await _context.OptionSetAppliedRows.Where(row => entryIds.Contains(row.OptionSetEntryId))
                 .Select(row => row.OptionSetEntryId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+    }
 
-        foreach (var (dto, existingEntry) in plannedEntries)
+    private void ApplyPlannedEntries(
+        OptionSet set,
+        UpdatePlan plan,
+        HashSet<Guid> materializedEntryIds,
+        DateTime now,
+        string audit)
+    {
+        foreach (var (dto, existingEntry) in plan.Entries)
         {
             var entry = existingEntry;
             if (entry is null)
@@ -110,7 +136,7 @@ public sealed partial class OptionSetCatalogService
                 entry.OptionSet = set;
                 set.Entries.Add(entry);
                 _context.OptionSetEntries.Add(entry);
-                retained.Add(entry.Id);
+                plan.RetainedIds.Add(entry.Id);
             }
             else
             {
@@ -121,17 +147,24 @@ public sealed partial class OptionSetCatalogService
 
                 CopyEntry(dto, entry, audit, now);
                 entry.IsEnabled = true;
-                retained.Add(entry.Id);
+                plan.RetainedIds.Add(entry.Id);
             }
         }
+    }
 
-        foreach (var entry in set.Entries.Where(entry => entry.IsEnabled && !retained.Contains(entry.Id)))
+    private static void DisableRemovedEntries(OptionSet set, HashSet<Guid> retainedIds, DateTime now, string audit)
+    {
+        var disabledEntries = set.Entries.Where(entry => entry.IsEnabled && !retainedIds.Contains(entry.Id)).ToList();
+        foreach (var entry in disabledEntries)
         {
             entry.IsEnabled = false;
             entry.UpdatedAt = now;
             entry.UpdatedBy = audit;
         }
+    }
 
+    private static void UpdateSetMetadata(OptionSet set, OptionSetWriteRequestDto request, string audit, DateTime now)
+    {
         set.Name = request.Name.Trim();
         set.SourceLocale = OptionSetLocales.NormalizeLocale(request.SourceLocale);
         set.NormalizedName = OptionSetNameNormalizer.Normalize(set.Name);
@@ -144,8 +177,6 @@ public sealed partial class OptionSetCatalogService
         set.Version++;
         set.UpdatedAt = now;
         set.UpdatedBy = audit;
-        await SaveWithConflictTranslationAsync(cancellationToken);
-        return ToDetail(set);
     }
 
     private async Task ValidateEntriesAsync(
@@ -156,20 +187,18 @@ public sealed partial class OptionSetCatalogService
     {
         var errors = await OptionSetEntryValidator.ValidateManyAsync(
             _context, kind, entries, stagedProductIds: stagedProductIds, cancellationToken: cancellationToken);
-        foreach (var error in errors)
+        if (errors.FirstOrDefault(error => error is not null) is string error)
         {
-            if (error is not null)
-            {
-                throw new BadRequestException(error);
-            }
+            throw new BadRequestException(error);
         }
     }
 
     private static void ValidateEntryCount(OptionSetWriteRequestDto request)
     {
-        if (request.Entries.Count > 200)
+        if (request.Entries.Count > OptionSetReferenceBatchRules.MaximumEntryCount)
         {
-            throw new BadRequestException("An option set may contain at most 200 entries");
+            throw new BadRequestException(
+                $"An option set may contain at most {OptionSetReferenceBatchRules.MaximumEntryCount} entries");
         }
     }
 
@@ -263,4 +292,9 @@ public sealed partial class OptionSetCatalogService
         entry.GlobalIngredientId == dto.GlobalIngredientId
         && entry.ProductId == dto.ProductId
         && entry.ProductVariationId == dto.ProductVariationId;
+
+    private sealed record UpdatePlan(
+        List<(OptionSetEntryDto Dto, OptionSetEntry? Existing)> Entries,
+        List<OptionSetEntryDto> EntriesToValidate,
+        HashSet<Guid> RetainedIds);
 }

@@ -16,13 +16,27 @@ internal static class OptionSetMaterializerSettingsRules
             throw new BadRequestException("Only a sauce attachment may explicitly clear its maximum selection");
         }
 
-        return requested is null ? baseline : new()
+        if (requested is null)
+        {
+            return baseline;
+        }
+
+        var maximum = baseline.MaxSelection;
+        if (requested.ClearMaxSelection)
+        {
+            maximum = null;
+        }
+        else if (requested.MaxSelection.HasValue)
+        {
+            maximum = requested.MaxSelection;
+        }
+
+        return new OptionSetAttachmentSettings
         {
             MinSelection = requested.MinSelection ?? baseline.MinSelection,
-            MaxSelection = requested.ClearMaxSelection ? null : requested.MaxSelection ?? baseline.MaxSelection,
+            MaxSelection = maximum,
             IncludedFree = requested.IncludedFree ?? baseline.IncludedFree,
-            DisplayOrder = requested.DisplayOrder ?? baseline.DisplayOrder,
-            ClearMaxSelection = false
+            DisplayOrder = requested.DisplayOrder ?? baseline.DisplayOrder
         };
     }
 
@@ -32,53 +46,11 @@ internal static class OptionSetMaterializerSettingsRules
         OptionSetAttachmentSettings settings,
         int entryCount)
     {
-        if (kind == OptionSetKind.Ingredient && (settings.MinSelection > 0 || settings.MaxSelection.HasValue))
-        {
-            throw new BadRequestException("Ingredient exclusion sets cannot define required minimum or maximum selection");
-        }
-
-        if (kind is OptionSetKind.Sauce or OptionSetKind.BundleChoice)
-        {
-            var minimum = settings.MinSelection ?? 0;
-            if (minimum < 0 || settings.MaxSelection < minimum || settings.IncludedFree < 0)
-            {
-                throw new BadRequestException("Selection minimum, maximum, and included-free counts are inconsistent");
-            }
-
-            if (kind == OptionSetKind.BundleChoice && (settings.MaxSelection is null or <= 0 || settings.MaxSelection > entryCount))
-            {
-                throw new BadRequestException("A choice group needs a positive maximum no greater than its selected option count");
-            }
-
-            if (kind == OptionSetKind.Sauce && settings.MaxSelection > entryCount)
-            {
-                throw new BadRequestException("A sauce maximum cannot exceed its selected option count");
-            }
-        }
-
-        if (settings.DisplayOrder is < 0)
-        {
-            throw new BadRequestException("Attachment display order cannot be negative");
-        }
-
-        if (kind != OptionSetKind.Sauce
-            && !(kind == OptionSetKind.BundleChoice && role == OptionSetAttachmentRole.ProductChoice)
-            && settings.IncludedFree.HasValue)
-        {
-            throw new BadRequestException("Included-free counts apply only to sauce or product-choice attachments");
-        }
-
-        if (kind == OptionSetKind.BundleChoice && role == OptionSetAttachmentRole.ProductChoice
-            && settings.IncludedFree > settings.MaxSelection)
-        {
-            throw new BadRequestException("Included-free units cannot exceed the product-choice maximum");
-        }
-
-        if (kind is OptionSetKind.Ingredient or OptionSetKind.SuggestedSide
-            && (settings.MinSelection.HasValue || settings.MaxSelection.HasValue))
-        {
-            throw new BadRequestException("This option-set kind cannot define group selection limits");
-        }
+        ValidateIngredientRules(kind, settings);
+        ValidateSelectionRules(kind, settings, entryCount);
+        ValidateDisplayOrder(settings);
+        ValidateIncludedFree(kind, role, settings);
+        ValidateNoGroupLimits(kind, settings);
     }
 
     public static void ValidateOverrides(
@@ -92,23 +64,114 @@ internal static class OptionSetMaterializerSettingsRules
 
         foreach (var value in overrides.Values)
         {
-            if ((value.Name is not null && (string.IsNullOrWhiteSpace(value.Name) || value.Name.Trim().Length > 200))
-                || value.DisplayOrder is < 0 || value.MaxQuantity is < 1 || value.Price is < 0m
-                || value.AdditionalPrice is < 0m)
-            {
-                throw new BadRequestException("An option override contains an invalid name, order, quantity, or price");
-            }
+            ValidateOverrideValue(value);
+            ValidateOverrideKind(kind, value);
+        }
+    }
 
-            var hasIngredientOnly = value.IsOptional.HasValue || value.MaxQuantity.HasValue
-                || value.Price.HasValue || value.IsIncludedInBasePrice.HasValue;
-            var hasSideOnly = value.IsRequired.HasValue;
-            var hasBundleOnly = value.AdditionalPrice.HasValue || value.IsDefault.HasValue;
-            if ((kind is OptionSetKind.Ingredient or OptionSetKind.Sauce && (hasSideOnly || hasBundleOnly))
-                || (kind == OptionSetKind.SuggestedSide && (hasIngredientOnly || hasBundleOnly))
-                || (kind == OptionSetKind.BundleChoice && (hasIngredientOnly || hasSideOnly)))
+    private static void ValidateIngredientRules(OptionSetKind kind, OptionSetAttachmentSettings settings)
+    {
+        if (kind == OptionSetKind.Ingredient && (settings.MinSelection > 0 || settings.MaxSelection.HasValue))
+        {
+            throw new BadRequestException("Ingredient exclusion sets cannot define required minimum or maximum selection");
+        }
+    }
+
+    private static void ValidateSelectionRules(
+        OptionSetKind kind,
+        OptionSetAttachmentSettings settings,
+        int entryCount)
+    {
+        if (kind is not (OptionSetKind.Sauce or OptionSetKind.BundleChoice))
+        {
+            return;
+        }
+
+        var minimum = settings.MinSelection ?? 0;
+        if (minimum < 0 || settings.MaxSelection < minimum || settings.IncludedFree < 0)
+        {
+            throw new BadRequestException("Selection minimum, maximum, and included-free counts are inconsistent");
+        }
+
+        if (kind == OptionSetKind.BundleChoice)
+        {
+            if (settings.MaxSelection is null or <= 0 || settings.MaxSelection > entryCount)
             {
-                throw new BadRequestException("Option override fields do not match the option-set kind");
+                throw new BadRequestException("A choice group needs a positive maximum no greater than its selected option count");
             }
+        }
+        else if (settings.MaxSelection > entryCount)
+        {
+            throw new BadRequestException("A sauce maximum cannot exceed its selected option count");
+        }
+    }
+
+    private static void ValidateDisplayOrder(OptionSetAttachmentSettings settings)
+    {
+        if (settings.DisplayOrder is < 0)
+        {
+            throw new BadRequestException("Attachment display order cannot be negative");
+        }
+    }
+
+    private static void ValidateIncludedFree(
+        OptionSetKind kind,
+        OptionSetAttachmentRole role,
+        OptionSetAttachmentSettings settings)
+    {
+        var allowsIncludedFree = kind == OptionSetKind.Sauce
+            || (kind == OptionSetKind.BundleChoice && role == OptionSetAttachmentRole.ProductChoice);
+        if (!allowsIncludedFree && settings.IncludedFree.HasValue)
+        {
+            throw new BadRequestException("Included-free counts apply only to sauce or product-choice attachments");
+        }
+
+        if (kind == OptionSetKind.BundleChoice && role == OptionSetAttachmentRole.ProductChoice
+            && settings.IncludedFree > settings.MaxSelection)
+        {
+            throw new BadRequestException("Included-free units cannot exceed the product-choice maximum");
+        }
+    }
+
+    private static void ValidateNoGroupLimits(OptionSetKind kind, OptionSetAttachmentSettings settings)
+    {
+        if (kind is OptionSetKind.Ingredient or OptionSetKind.SuggestedSide
+            && (settings.MinSelection.HasValue || settings.MaxSelection.HasValue))
+        {
+            throw new BadRequestException("This option-set kind cannot define group selection limits");
+        }
+    }
+
+    private static void ValidateOverrideValue(OptionSetEntryOverride value)
+    {
+        if ((value.Name is not null && (string.IsNullOrWhiteSpace(value.Name) || value.Name.Trim().Length > 200))
+            || value.DisplayOrder is < 0 || value.MaxQuantity is < 1 || value.Price is < 0m
+            || value.AdditionalPrice is < 0m)
+        {
+            throw new BadRequestException("An option override contains an invalid name, order, quantity, or price");
+        }
+    }
+
+    private static void ValidateOverrideKind(OptionSetKind kind, OptionSetEntryOverride value)
+    {
+        var hasIngredientOnly = value.IsOptional.HasValue || value.MaxQuantity.HasValue
+            || value.Price.HasValue || value.IsIncludedInBasePrice.HasValue;
+        var hasSideOnly = value.IsRequired.HasValue;
+        var hasBundleOnly = value.AdditionalPrice.HasValue || value.IsDefault.HasValue;
+        var fieldsMismatch = kind is OptionSetKind.Ingredient or OptionSetKind.Sauce
+            ? hasSideOnly || hasBundleOnly
+            : false;
+        if (kind == OptionSetKind.SuggestedSide)
+        {
+            fieldsMismatch = hasIngredientOnly || hasBundleOnly;
+        }
+        else if (kind == OptionSetKind.BundleChoice)
+        {
+            fieldsMismatch = hasIngredientOnly || hasSideOnly;
+        }
+        if (fieldsMismatch)
+        {
+            throw new BadRequestException("Option override fields do not match the option-set kind");
         }
     }
 }

@@ -143,8 +143,7 @@ internal static class OptionSetMaterializerTargetLoader
         }
 
         var section = await context.MenuSections.Include(item => item.Items)
-                .Include(item => item.MenuDefinition)
-                .ThenInclude(definition => definition.Product)
+                .Include(item => item.MenuDefinition.Product)
             .FirstOrDefaultAsync(item => item.Id == sectionId, cancellationToken)
             ?? throw new NotFoundException("Menu section", sectionId);
         if (section.MenuDefinition.ProductId != target.TargetProductId
@@ -229,13 +228,34 @@ internal static class OptionSetMaterializerTargetLoader
         var usesCardinality = kind is OptionSetKind.Sauce or OptionSetKind.BundleChoice;
         return new OptionSetAttachmentSettings
         {
-            MinSelection = usesCardinality ? attachment?.MinSelection ?? (section?.MinSelection ?? customizationGroup?.MinSelection ?? product.SauceMin) : null,
-            MaxSelection = usesCardinality ? attachment?.MaxSelection ?? (section?.MaxSelection ?? customizationGroup?.MaxSelection ?? product.SauceMax) : null,
-            IncludedFree = kind == OptionSetKind.Sauce ? attachment?.IncludedFree ?? product.SauceIncludedFree
-                : kind == OptionSetKind.BundleChoice && customizationGroup is not null
-                    ? attachment?.IncludedFree ?? customizationGroup.IncludedFreeUnits : null,
+            MinSelection = usesCardinality
+                ? attachment?.MinSelection ?? section?.MinSelection ?? customizationGroup?.MinSelection ?? product.SauceMin
+                : null,
+            MaxSelection = usesCardinality
+                ? attachment?.MaxSelection ?? section?.MaxSelection ?? customizationGroup?.MaxSelection ?? product.SauceMax
+                : null,
+            IncludedFree = ExistingIncludedFree(kind, attachment, customizationGroup, product),
             DisplayOrder = attachment?.DisplayOrder ?? (section?.DisplayOrder ?? customizationGroup?.DisplayOrder ?? 0)
         };
+    }
+
+    private static int? ExistingIncludedFree(
+        OptionSetKind kind,
+        OptionSetAttachment? attachment,
+        ProductCustomizationGroup? customizationGroup,
+        Product product)
+    {
+        if (kind == OptionSetKind.Sauce)
+        {
+            return attachment?.IncludedFree ?? product.SauceIncludedFree;
+        }
+
+        if (kind == OptionSetKind.BundleChoice && customizationGroup is not null)
+        {
+            return attachment?.IncludedFree ?? customizationGroup.IncludedFreeUnits;
+        }
+
+        return null;
     }
 
 }

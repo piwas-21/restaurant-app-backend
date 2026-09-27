@@ -53,7 +53,8 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         var features = new TenantFeatures(Options.Create(new TenantFeatureSettings()));
         var materializer = new OptionSetMaterializer(context, caller.Object, catalog.Object, features);
 
-        var action = () => materializer.ApplyAsync(new OptionSetMaterializationRequest(), CancellationToken.None);
+        var action = () => materializer.ApplyAsync(
+            new OptionSetMaterializationRequest { ExpectedSetVersion = 1 }, CancellationToken.None);
 
         await action.Should().ThrowAsync<OptionSetMaterializationDisabledException>();
     }

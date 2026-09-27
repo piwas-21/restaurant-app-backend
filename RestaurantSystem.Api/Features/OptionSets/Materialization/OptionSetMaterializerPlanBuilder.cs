@@ -36,8 +36,7 @@ internal static class OptionSetMaterializerPlanBuilder
             PlanRemovedEntries(state, preview);
             var hasRowChanges = preview.Changes.Any(change =>
                 change.Action is "add" or "update" or "remove" || change.ChangedFields.Count > 0);
-            preview.Status = preview.Conflicts.Count > 0 ? "conflict"
-                : !hasRowChanges && preview.ChangedSettings.Count == 0 ? "unchanged" : "ready";
+            SetPreviewStatus(preview, hasRowChanges);
         }
         catch (ConflictException exception)
         {
@@ -138,8 +137,7 @@ internal static class OptionSetMaterializerPlanBuilder
         OptionSetAppliedRow? mapping,
         MaterializedOptionSetRow? row)
     {
-        var entryOverride = target.ConflictPolicy == RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy.UseOverrides
-            && target.Overrides?.TryGetValue(entry.Id, out var supplied) == true ? supplied : null;
+        var entryOverride = ResolveOverride(target, entry.Id);
         var desired = OptionSetMaterializerRows.Desired(target.Role, entry, entryOverride);
         var change = new OptionSetMaterializationChangeDto
         {
@@ -158,30 +156,68 @@ internal static class OptionSetMaterializerPlanBuilder
         var baseline = mapping is null
             ? desired.ToDictionary(pair => pair.Key, pair => JsonSerializer.SerializeToElement(pair.Value))
             : OptionSetMaterializerRows.DeserializeSnapshot(mapping.LastAppliedValuesJson);
-        var explicitOverrides = OptionSetOverrideFields.From(entryOverride);
         foreach (var (field, value) in desired)
         {
-            var equalsBaseline = baseline.TryGetValue(field, out var previous)
-                && OptionSetMaterializerRows.SnapshotEquals(previous, current[field]);
-            var overwrite = target.ConflictPolicy == RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy.UseSetValues
-                || (target.ConflictPolicy == RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy.UseOverrides
-                    && explicitOverrides.Contains(field));
-            if (overwrite || (mapping is not null && equalsBaseline))
-            {
-                if (!Equals(value, current[field]))
-                {
-                    change.ChangedFields.Add(field);
-                }
-            }
-            else if (!Equals(value, current[field]))
-            {
-                change.PreservedFields.Add(field);
-            }
+            PlanFieldChange(target.ConflictPolicy, mapping is not null, entryOverride,
+                field, value, current[field], baseline, change);
         }
 
-        change.Action = change.ChangedFields.Count > 0 ? "update"
-            : change.PreservedFields.Count > 0 ? "preserve" : "preserve";
+        change.Action = change.ChangedFields.Count > 0 ? "update" : "preserve";
         return change;
+    }
+
+    private static OptionSetEntryOverride? ResolveOverride(
+        OptionSetMaterializationTargetRequest target,
+        Guid entryId)
+    {
+        if (target.ConflictPolicy == RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy.UseOverrides
+            && target.Overrides?.TryGetValue(entryId, out var supplied) == true)
+        {
+            return supplied;
+        }
+
+        return null;
+    }
+
+    private static void PlanFieldChange(
+        RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy conflictPolicy,
+        bool hasMapping,
+        OptionSetEntryOverride? entryOverride,
+        string field,
+        object? desired,
+        object? current,
+        Dictionary<string, JsonElement> baseline,
+        OptionSetMaterializationChangeDto change)
+    {
+        if (Equals(desired, current))
+        {
+            return;
+        }
+
+        var explicitOverrides = OptionSetOverrideFields.From(entryOverride);
+        var equalsBaseline = baseline.TryGetValue(field, out var previous)
+            && OptionSetMaterializerRows.SnapshotEquals(previous, current);
+        var shouldApply = conflictPolicy == RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy.UseSetValues
+            || (conflictPolicy == RestaurantSystem.Domain.Common.Enums.OptionSetConflictPolicy.UseOverrides
+                && explicitOverrides.Contains(field))
+            || (hasMapping && equalsBaseline);
+        (shouldApply ? change.ChangedFields : change.PreservedFields).Add(field);
+    }
+
+    private static void SetPreviewStatus(OptionSetMaterializationTargetPreviewDto preview, bool hasRowChanges)
+    {
+        if (preview.Conflicts.Count > 0)
+        {
+            preview.Status = "conflict";
+        }
+        else if (!hasRowChanges && preview.ChangedSettings.Count == 0)
+        {
+            preview.Status = "unchanged";
+        }
+        else
+        {
+            preview.Status = "ready";
+        }
     }
 
     private static void PlanRemovedEntries(
