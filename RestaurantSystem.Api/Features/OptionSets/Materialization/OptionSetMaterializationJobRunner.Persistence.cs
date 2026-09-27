@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
@@ -34,7 +35,7 @@ public sealed partial class OptionSetMaterializationJobRunner
         target.Attempts++;
         target.ResultJson = result is null ? null : OptionSetMaterializationJobJson.Serialize(result);
         target.ErrorCode = errorCode;
-        target.ErrorMessage = Truncate(errorMessage, 2000);
+        target.ErrorMessage = Truncate(errorMessage, OptionSetMaterializationLimits.PersistedErrorMaxLength);
         target.CompletedAt = status == "failed" ? null : DateTime.UtcNow;
         target.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
@@ -66,7 +67,7 @@ public sealed partial class OptionSetMaterializationJobRunner
             .Include(row => row.Targets)
             .SingleAsync(row => row.Id == claim.JobId, cancellationToken);
         var now = DateTime.UtcNow;
-        var safeError = Truncate(error, 2000)!;
+        var safeError = Truncate(error, OptionSetMaterializationLimits.PersistedErrorMaxLength)!;
         job.Status = "blocked";
         job.LastError = safeError;
         job.CompletedAt = now;

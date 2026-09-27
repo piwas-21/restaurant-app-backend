@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -18,7 +19,7 @@ public sealed class OptionSetMaterializationJobTargetConfiguration
         builder.Property(target => target.ResultJson).HasColumnType("jsonb");
         builder.Property(target => target.Status).HasMaxLength(24).IsRequired();
         builder.Property(target => target.ErrorCode).HasMaxLength(120);
-        builder.Property(target => target.ErrorMessage).HasMaxLength(2000);
+        builder.Property(target => target.ErrorMessage).HasMaxLength(OptionSetMaterializationLimits.PersistedErrorMaxLength);
         builder.HasIndex(target => new { target.JobId, target.Sequence }).IsUnique();
         builder.HasIndex(target => new { target.JobId, target.Status, target.Sequence });
         builder.HasIndex(target => new { target.JobId, target.TargetKey }).IsUnique();

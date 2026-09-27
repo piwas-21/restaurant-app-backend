@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using RestaurantSystem.Domain.Common.Constants;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -24,8 +25,12 @@ public sealed class OptionSetMaterializationJobModelTests
         job!.GetTableName().Should().Be("OptionSetMaterializationJobs");
         target!.GetTableName().Should().Be("OptionSetMaterializationJobTargets");
         job.FindProperty(nameof(OptionSetMaterializationJob.RequestJson))!.GetColumnType().Should().Be("jsonb");
+        job.FindProperty(nameof(OptionSetMaterializationJob.LastError))!.GetMaxLength()
+            .Should().Be(OptionSetMaterializationLimits.PersistedErrorMaxLength);
         target.FindProperty(nameof(OptionSetMaterializationJobTarget.RequestJson))!.GetColumnType().Should().Be("jsonb");
         target.FindProperty(nameof(OptionSetMaterializationJobTarget.ResultJson))!.GetColumnType().Should().Be("jsonb");
+        target.FindProperty(nameof(OptionSetMaterializationJobTarget.ErrorMessage))!.GetMaxLength()
+            .Should().Be(OptionSetMaterializationLimits.PersistedErrorMaxLength);
         job.GetIndexes().Should().Contain(index => index.IsUnique
             && index.Properties.Select(property => property.Name)
                 .SequenceEqual(new[] { nameof(OptionSetMaterializationJob.OptionSetId), nameof(OptionSetMaterializationJob.IdempotencyKey) }));
