@@ -3,6 +3,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.TranslationWorkbench;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
@@ -15,6 +16,51 @@ namespace RestaurantSystem.IntegrationTests.Features.TranslationWorkbench;
 [Collection("Database Lane 2")]
 public sealed class TranslationWorkbenchEndpointTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
+    [Fact]
+    public async Task ReviewedGeminiTextStaysCurrentUnderGeminiAndIsStaleUnderAnotherProvider()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext>();
+        var productId = await context.Products.Select(product => product.Id).FirstAsync();
+        var geminiSettings = new TranslationAssistanceSettings { Provider = "gemini" };
+        var sourceHash = TranslationWorkbenchRules.Hash("tr\nTavuk");
+        context.TranslationFieldProvenances.Add(new TranslationFieldProvenance
+        {
+            Id = Guid.NewGuid(),
+            EntityType = "product",
+            EntityId = productId,
+            FieldKey = "name",
+            Locale = "en",
+            SourceLocale = "tr",
+            SourceHash = sourceHash,
+            ContextHash = TranslationWorkbenchRules.ContextHash(null, geminiSettings.Glossary,
+                geminiSettings.PromptVersion, geminiSettings.ContextModelKey),
+            TextHash = TranslationWorkbenchRules.Hash("Chicken"),
+            Kind = "ai",
+            ReviewStatus = "reviewed",
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = "test"
+        });
+        await context.SaveChangesAsync();
+        var request = new TranslationWorkbenchRequestDto("saveReview", ["tr", "en"],
+            [new TranslationFieldInputDto(
+                new TranslationFieldRefDto("product", productId, null, "name"),
+                "tr", "Tavuk", new Dictionary<string, string>
+                {
+                    ["tr"] = "Tavuk", ["en"] = "Chicken"
+                })]);
+        var reader = new TranslationTextReader(context);
+        var geminiPreview = new TranslationPreviewService(context, reader, Options.Create(geminiSettings));
+        var openAiPreview = new TranslationPreviewService(context, reader,
+            Options.Create(new TranslationAssistanceSettings()));
+
+        var current = await geminiPreview.PreviewAsync(request, CancellationToken.None);
+        var stale = await openAiPreview.PreviewAsync(request, CancellationToken.None);
+
+        current.Rows[0].Targets[1].Status.Should().Be("current");
+        stale.Rows[0].Targets[1].Status.Should().Be("stale");
+    }
+
     [Fact]
     public async Task OptionSetSavePersistsSourceAndMakesExistingNamesReadableForReview()
     {

@@ -152,9 +152,7 @@ public sealed class TranslationSuggestionService(
         string actor)
     {
         var contextHash = TranslationWorkbenchRules.ContextHash(field.Context, glossary,
-            settings.PromptVersion, settings.Provider == "openai"
-                ? settings.SelectedModel
-                : $"{settings.Provider}:{settings.SelectedModel}");
+            settings.PromptVersion, settings.ContextModelKey);
         var identity = TranslationWorkbenchRules.Identity(field.FieldRef);
         var actorScope = field.FieldRef.ClientKey is null ? string.Empty : actor;
         foreach (var target in row.Targets)

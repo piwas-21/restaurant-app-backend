@@ -22,7 +22,7 @@ public sealed class TranslationAssistanceSettings
     public Dictionary<string, string> Glossary { get; set; } = new(StringComparer.Ordinal);
 
     public string SelectedModel => Provider == "gemini" ? Gemini.Model : Model;
-
+    public string ContextModelKey => Provider == "openai" ? SelectedModel : $"{Provider}:{SelectedModel}";
     public decimal SelectedInputCostPerMillionUsd => Provider == "gemini" ? Gemini.InputCostPerMillionUsd : InputCostPerMillionUsd;
 
     public decimal SelectedOutputCostPerMillionUsd => Provider == "gemini" ? Gemini.OutputCostPerMillionUsd : OutputCostPerMillionUsd;

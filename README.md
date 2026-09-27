@@ -90,11 +90,20 @@ All MRs require the pipeline to pass before merge.
 
 ### Menu translation assistance
 
-The admin translation workbench previews missing and stale guest-locale text without a provider. To enable suggestions for a tenant database, configure `TranslationAssistance__Enabled=true`, `TranslationAssistance__TenantDataApproved=true`, an HTTPS `TranslationAssistance__ApiUrl`, and a secret `TranslationAssistance__ApiKey`. Both booleans default to false; leave them false until provider billing, processing region and tenant data terms are confirmed. The API sends `store:false` and does not log prompts or the key. Keep the key in the box secret environment, not source control.
+The admin translation workbench previews missing and stale guest-locale text without a provider. Both enablement switches default to false; leave them false until provider billing, processing region and tenant data terms are confirmed. Provider credentials belong in the box secret environment, not source control. The API does not log prompts or keys.
+
+Choose one provider with `TranslationAssistance__Provider` (`openai` by default, or `gemini`). Configure its settings before setting both `TranslationAssistance__Enabled=true` and `TranslationAssistance__TenantDataApproved=true`:
+
+| Provider | Required settings | Request behavior |
+|---|---|---|
+| OpenAI | HTTPS `TranslationAssistance__ApiUrl`, `TranslationAssistance__ApiKey`, model `TranslationAssistance__Model`, `TranslationAssistance__InputCostPerMillionUsd`, `TranslationAssistance__OutputCostPerMillionUsd` | Sends `store:false`; root cost defaults apply only to this provider. |
+| Gemini | HTTPS base `TranslationAssistance__Gemini__ApiBaseUrl`, `TranslationAssistance__Gemini__ApiKey`, `TranslationAssistance__Gemini__Model`, `TranslationAssistance__Gemini__InputCostPerMillionUsd`, `TranslationAssistance__Gemini__OutputCostPerMillionUsd` | Uses GenerateContent with structured JSON output and low thinking; both nested cost rates must be positive before it is ready. Gemini thought tokens count toward output usage. |
+
+The Gemini model defaults to `gemini-3.8-flash`, but its base URL, key and rates have no enabled defaults. The provider is selected at process startup; changing it requires a backend restart. Do not set either provider live until its current pricing and data-processing terms are verified.
 
 `TranslationAssistance__MaxDailyBatches`, `MaxDailyTokens`, `MaxDailySpendUsd`, `MaxBatchTargets` and `TimeoutSeconds` bound each tenant database's usage. The workbench remains usable for manual edits and Save when the provider is disabled, over budget or unavailable. Suggestions require admin review and only reach guest text through the ordinary product or bundle Save.
 
-Set `TranslationAssistance__InputCostPerMillionUsd` and `OutputCostPerMillionUsd` for the chosen model and processing tier before enabling a provider. Defaults match standard GPT-6 Luna text pricing; regional processing can cost more. A provider attempt reserves the maximum configured output and a conservative input estimate before the call. Unknown outcomes keep that reservation charged for the day; successful calls settle to reported token usage.
+Set the selected provider's cost fields for its model and processing tier before enabling it. The root defaults match standard GPT-6 Luna text pricing for OpenAI; regional processing can cost more. A provider attempt reserves the maximum configured output and a conservative input estimate before the call. Unknown outcomes keep that reservation charged for the day; successful calls settle to reported token usage.
 
 ### Reservation quick-action links
 
