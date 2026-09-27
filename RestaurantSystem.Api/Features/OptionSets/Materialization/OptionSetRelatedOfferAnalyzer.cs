@@ -13,7 +13,7 @@ internal static partial class OptionSetRelatedOfferAnalyzer
         ApplicationDbContext context,
         OptionSet set,
         OptionSetMaterializationRequest request,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         if (set.Kind != OptionSetKind.BundleChoice)
@@ -23,7 +23,7 @@ internal static partial class OptionSetRelatedOfferAnalyzer
 
         var choiceTargets = request.Targets.Where(IsChoiceTarget).ToList();
         var sourceTargets = await LoadSourceTargetsAsync(
-            context, set, choiceTargets, stagedProductIds, cancellationToken);
+            context, set, choiceTargets, validationContext, cancellationToken);
         var requiredRequestTargets = BuildRequiredRequestTargets(choiceTargets, sourceTargets);
         var warnings = new List<OptionSetRelatedOfferWarningDto>();
         foreach (var target in choiceTargets)
@@ -47,13 +47,13 @@ internal static partial class OptionSetRelatedOfferAnalyzer
         ApplicationDbContext context,
         OptionSet set,
         IReadOnlyCollection<OptionSetMaterializationTargetRequest> choiceTargets,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         var sourceTargets = new Dictionary<string, SourceTarget?>(StringComparer.Ordinal);
         foreach (var target in choiceTargets)
         {
-            var source = await LoadSourceAsync(context, set, target, stagedProductIds, cancellationToken);
+            var source = await LoadSourceAsync(context, set, target, validationContext, cancellationToken);
             sourceTargets[target.TargetKey] = source;
         }
 
@@ -203,13 +203,13 @@ internal static partial class OptionSetRelatedOfferAnalyzer
         ApplicationDbContext context,
         OptionSet set,
         OptionSetMaterializationTargetRequest target,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
         try
         {
             var state = await OptionSetMaterializerTargetLoader.LoadAsync(
-                context, set, target, null, stagedProductIds, cancellationToken);
+                context, set, target, null, validationContext, cancellationToken);
             return new SourceTarget(state);
         }
         catch (ConflictException)

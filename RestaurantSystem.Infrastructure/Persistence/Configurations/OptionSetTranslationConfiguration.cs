@@ -10,8 +10,10 @@ public sealed class OptionSetTranslationConfiguration : IEntityTypeConfiguration
     {
         builder.ToTable("OptionSetTranslations");
         builder.HasKey(translation => translation.Id);
-        builder.Property(translation => translation.LanguageCode).HasMaxLength(10).IsRequired();
-        builder.Property(translation => translation.Name).HasMaxLength(120).IsRequired();
+        builder.Property(translation => translation.LanguageCode).HasMaxLength(OptionSetSchemaLimits.SourceLocaleLength)
+            .IsRequired();
+        builder.Property(translation => translation.Name).HasMaxLength(OptionSetSchemaLimits.TranslationNameLength)
+            .IsRequired();
         builder.HasIndex(translation => new { translation.OptionSetId, translation.LanguageCode }).IsUnique();
     }
 }

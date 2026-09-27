@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -17,7 +18,9 @@ public sealed partial class OptionSetCatalogService
     {
         if (string.IsNullOrWhiteSpace(request.SourceTemplateId)
             || string.IsNullOrWhiteSpace(request.SourceOptionSetId)
-            || request.SourceOptionSetId.Length > 120 || request.SourceRevision <= 0
+            || request.SourceTemplateId.Length > _settings.MaximumSourceIdentifierLength
+            || request.SourceOptionSetId.Length > _settings.MaximumSourceIdentifierLength
+            || request.SourceRevision <= 0
             || string.IsNullOrWhiteSpace(request.Name)
             || !Enum.IsDefined(request.Kind))
         {
@@ -48,7 +51,7 @@ public sealed partial class OptionSetCatalogService
         ValidateEntryCount(write);
         await ValidateEntriesAsync(
             write.Kind, write.Entries, cancellationToken, request.StagedProductIds);
-        EnsureDistinctSourceEntries(request.Entries, _settings.MaximumEntriesPerOptionSet);
+        EnsureDistinctSourceEntries(request.Entries, _settings);
         var name = await ResolveImportedNameAsync(request, cancellationToken);
         var now = DateTime.UtcNow;
         var actor = _currentUser.GetAuditIdentifier();
@@ -81,10 +84,18 @@ public sealed partial class OptionSetCatalogService
         }
 
         var sourceId = request.SourceOptionSetId;
-        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceId)))[..16].ToLowerInvariant();
-        var sourceLabel = sourceId[..Math.Min(sourceId.Length, 32)];
-        var suffix = $" · {sourceLabel}-{fingerprint}";
-        var prefixLength = Math.Max(0, 120 - suffix.Length);
+        var fingerprintSource = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceId))).ToLowerInvariant();
+        var fingerprint = fingerprintSource[..Math.Min(
+            fingerprintSource.Length, _settings.MaximumImportedSourceFingerprintLength)];
+        var sourceLabel = sourceId[..Math.Min(sourceId.Length, _settings.MaximumImportedSourceLabelLength)];
+        var suffix = $"{OptionSetAuthoringSettings.ImportedSourceLabelSeparator}{sourceLabel}"
+            + $"{OptionSetAuthoringSettings.ImportedSourceFingerprintSeparator}{fingerprint}";
+        if (suffix.Length > _settings.MaximumOptionSetNameLength)
+        {
+            throw new BadRequestException("Configured imported-name suffix exceeds the option-set name limit");
+        }
+
+        var prefixLength = Math.Max(0, _settings.MaximumOptionSetNameLength - suffix.Length);
         var prefix = name[..Math.Min(name.Length, prefixLength)].TrimEnd();
         var available = $"{prefix}{suffix}";
         if (await _context.OptionSets.AnyAsync(set => set.Kind == request.Kind
@@ -98,13 +109,15 @@ public sealed partial class OptionSetCatalogService
 
     private static void EnsureDistinctSourceEntries(
         IReadOnlyList<ImportedOptionSetEntryRequest> entries,
-        int maximumEntries)
+        OptionSetAuthoringSettings settings)
     {
-        if (entries.Count > maximumEntries || entries.Any(entry => string.IsNullOrWhiteSpace(entry.SourceEntryId))
+        if (entries.Count > settings.MaximumEntriesPerOptionSet
+            || entries.Any(entry => string.IsNullOrWhiteSpace(entry.SourceEntryId)
+                || entry.SourceEntryId.Length > settings.MaximumSourceIdentifierLength)
             || entries.Select(entry => entry.SourceEntryId).Distinct(StringComparer.Ordinal).Count() != entries.Count)
         {
             throw new BadRequestException(
-                $"Imported option entries need unique source IDs and a maximum of {maximumEntries} rows");
+                $"Imported option entries need unique source IDs up to {settings.MaximumSourceIdentifierLength} characters and a maximum of {settings.MaximumEntriesPerOptionSet} rows");
         }
     }
 

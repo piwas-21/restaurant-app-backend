@@ -17,7 +17,7 @@ internal static partial class OptionSetMaterializerTargetWriter
         CancellationToken cancellationToken)
     {
         var state = await OptionSetMaterializerTargetLoader.LoadAsync(
-            context, set, target, idempotencyKey, validationContext.StagedProductIds, cancellationToken);
+            context, set, target, idempotencyKey, validationContext, cancellationToken);
         var result = CreateTargetResult(target, state);
         if (IsIdempotentReplay(state, set, idempotencyKey))
         {

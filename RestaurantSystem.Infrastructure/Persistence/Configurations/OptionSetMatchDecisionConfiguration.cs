@@ -10,9 +10,10 @@ public class OptionSetMatchDecisionConfiguration : IEntityTypeConfiguration<Opti
     {
         builder.ToTable("OptionSetMatchDecisions");
         builder.HasKey(decision => decision.Id);
-        builder.Property(decision => decision.NormalizedName).HasMaxLength(160).IsRequired();
+        builder.Property(decision => decision.NormalizedName)
+            .HasMaxLength(OptionSetSchemaLimits.NormalizedNameLength).IsRequired();
         builder.Property(decision => decision.CandidateType).HasMaxLength(40).IsRequired();
-        builder.Property(decision => decision.Alias).HasMaxLength(160);
+        builder.Property(decision => decision.Alias).HasMaxLength(OptionSetSchemaLimits.AliasLength);
         builder.HasIndex(decision => new { decision.NormalizedName, decision.CandidateType, decision.CandidateId }).IsUnique();
     }
 }

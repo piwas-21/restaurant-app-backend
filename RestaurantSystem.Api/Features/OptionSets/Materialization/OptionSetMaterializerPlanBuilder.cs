@@ -24,7 +24,7 @@ internal static class OptionSetMaterializerPlanBuilder
         try
         {
             var state = await OptionSetMaterializerTargetLoader.LoadAsync(
-                context, set, target, null, validationContext.StagedProductIds, cancellationToken);
+                context, set, target, null, validationContext, cancellationToken);
             preview.AttachmentId = state.Attachment?.Id;
             preview.CurrentAttachmentVersion = state.Attachment?.Version;
             preview.CurrentMenuAuthoringVersion = state.MenuDefinition?.AuthoringVersion;

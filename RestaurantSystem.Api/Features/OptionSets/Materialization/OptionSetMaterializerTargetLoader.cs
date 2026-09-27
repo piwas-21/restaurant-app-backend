@@ -13,10 +13,10 @@ internal static class OptionSetMaterializerTargetLoader
         OptionSet set,
         OptionSetMaterializationTargetRequest target,
         string? idempotencyKey,
-        IReadOnlySet<Guid>? stagedProductIds,
+        OptionSetMaterializerValidationContext validationContext,
         CancellationToken cancellationToken)
     {
-        ValidateTargetShape(set, target);
+        ValidateTargetShape(set, target, validationContext.Settings.MaximumTargetKeyLength);
         var product = await context.Products.Include(item => item.MenuDefinition)
             .FirstOrDefaultAsync(item => item.Id == target.TargetProductId, cancellationToken)
             ?? throw new NotFoundException("Option-set target product", target.TargetProductId);
@@ -46,7 +46,7 @@ internal static class OptionSetMaterializerTargetLoader
             throw new ConflictException("Archived option sets cannot be attached to new targets");
         }
 
-        var isStagedTarget = stagedProductIds?.Contains(product.Id) == true;
+        var isStagedTarget = validationContext.StagedProductIds?.Contains(product.Id) == true;
         if (attachment is null && ((!product.IsActive || !product.IsAvailable) && !isStagedTarget || product.IsComponent))
         {
             throw new ConflictException("Inactive, unavailable, or internal products cannot receive a new option-set attachment");
@@ -66,7 +66,8 @@ internal static class OptionSetMaterializerTargetLoader
         var defaultSettings = ExistingSettings(set.Kind, attachment, section, customizationGroup, product);
         var settings = OptionSetMaterializerSettingsRules.Merge(set.Kind, defaultSettings, target.Settings);
         OptionSetMaterializerSettingsRules.Validate(set.Kind, target.Role, settings, entries.Count);
-        OptionSetMaterializerSettingsRules.ValidateOverrides(set.Kind, target.Overrides);
+        OptionSetMaterializerSettingsRules.ValidateOverrides(
+            set.Kind, target.Overrides, validationContext.Settings.MaximumEntryNameLength);
         return new OptionSetTargetState
         {
             Product = product,
@@ -81,7 +82,10 @@ internal static class OptionSetMaterializerTargetLoader
         };
     }
 
-    private static void ValidateTargetShape(OptionSet set, OptionSetMaterializationTargetRequest target)
+    private static void ValidateTargetShape(
+        OptionSet set,
+        OptionSetMaterializationTargetRequest target,
+        int maximumTargetKeyLength)
     {
         var expectedRole = set.Kind switch
         {
@@ -100,7 +104,7 @@ internal static class OptionSetMaterializerTargetLoader
         var isBundleChoice = target.Role == OptionSetAttachmentRole.BundleChoice;
         var isProductChoice = target.Role == OptionSetAttachmentRole.ProductChoice;
         if (target.TargetProductId == Guid.Empty || string.IsNullOrWhiteSpace(target.TargetKey)
-            || target.TargetKey.Length > 120
+            || target.TargetKey.Length > maximumTargetKeyLength
             || isBundleChoice != target.TargetMenuSectionId.HasValue
             || isProductChoice != target.TargetCustomizationGroupId.HasValue
             || (isBundleChoice && target.TargetCustomizationGroupId.HasValue)

@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
 using RestaurantSystem.Api.Features.OptionSets.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -8,7 +9,7 @@ namespace RestaurantSystem.Api.Features.OptionSets.Materialization;
 
 internal sealed record OptionSetMaterializerValidationContext(
     IReadOnlySet<Guid>? StagedProductIds,
-    int MaximumEntryCount);
+    OptionSetAuthoringSettings Settings);
 
 internal static class OptionSetMaterializerEntryValidation
 {
@@ -24,7 +25,7 @@ internal static class OptionSetMaterializerEntryValidation
             context,
             kind,
             dtos,
-            validationContext.MaximumEntryCount,
+            validationContext.Settings,
             stagedProductIds: validationContext.StagedProductIds,
             cancellationToken: cancellationToken);
     }

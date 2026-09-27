@@ -15,7 +15,9 @@ public sealed partial class MenuAuthoringSearchService
         CancellationToken cancellationToken)
     {
         var normalizedQuery = ValidateQuery(query);
-        var searchCursor = string.IsNullOrWhiteSpace(cursor) ? null : MenuAuthoringSearchCursor.Decode(cursor);
+        var searchCursor = string.IsNullOrWhiteSpace(cursor)
+            ? null
+            : MenuAuthoringSearchCursor.Decode(cursor, _pagination.MaximumSearchCursorLength);
         var pageSize = PageSize(limit);
         var candidates = new List<MenuAuthoringSearchCandidateDto>();
 
@@ -84,17 +86,20 @@ public sealed partial class MenuAuthoringSearchService
         return decisions.Select(decision => (decision.CandidateType, decision.CandidateId)).ToHashSet();
     }
 
-    private static string ValidateQuery(string? query)
+    private string ValidateQuery(string? query)
     {
-        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length > 120)
+        if (string.IsNullOrWhiteSpace(query) || query.Trim().Length > _pagination.MaximumSearchQueryLength)
         {
-            throw new BadRequestException("Enter an authoring search term between 2 and 120 characters");
+            throw new BadRequestException(
+                $"Enter an authoring search term with at most {_pagination.MaximumSearchQueryLength} characters");
         }
 
         var normalized = OptionSetNameNormalizer.Normalize(query);
-        if (normalized.Length is < 2 or > 160)
+        if (normalized.Length < _pagination.MinimumNormalizedSearchQueryLength
+            || normalized.Length > _pagination.MaximumNormalizedSearchQueryLength)
         {
-            throw new BadRequestException("Enter an authoring search term between 2 and 120 characters");
+            throw new BadRequestException(
+                $"Enter a normalized authoring search term between {_pagination.MinimumNormalizedSearchQueryLength} and {_pagination.MaximumNormalizedSearchQueryLength} characters");
         }
 
         return normalized;

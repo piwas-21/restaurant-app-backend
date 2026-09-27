@@ -18,8 +18,10 @@ public class OptionSetAttachmentConfiguration : IEntityTypeConfiguration<OptionS
         builder.HasKey(attachment => attachment.Id);
         builder.Property(attachment => attachment.Role).HasConversion<int>().IsRequired();
         builder.Property(attachment => attachment.Version).HasDefaultValue(1).IsConcurrencyToken();
-        builder.Property(attachment => attachment.IntentionalDifferenceReason).HasMaxLength(500);
-        builder.Property(attachment => attachment.LastIdempotencyKey).HasMaxLength(100);
+        builder.Property(attachment => attachment.IntentionalDifferenceReason)
+            .HasMaxLength(OptionSetSchemaLimits.IntentionalDifferenceReasonLength);
+        builder.Property(attachment => attachment.LastIdempotencyKey)
+            .HasMaxLength(OptionSetSchemaLimits.IdempotencyKeyLength);
         builder.HasOne<Product>().WithMany().HasForeignKey(attachment => attachment.TargetProductId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<MenuSection>().WithMany().HasForeignKey(attachment => attachment.TargetMenuSectionId)

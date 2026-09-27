@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -10,25 +11,25 @@ internal static class OptionSetEntryValidator
         ApplicationDbContext context,
         OptionSetKind kind,
         IReadOnlyList<OptionSetEntryDto> entries,
-        int maximumEntryCount,
+        OptionSetAuthoringSettings settings,
         bool requireActiveReference = true,
         IReadOnlySet<Guid>? stagedProductIds = null,
         CancellationToken cancellationToken = default)
     {
         var errors = entries.Select(entry => string.IsNullOrWhiteSpace(entry.Name)
-                || entry.Name.Trim().Length > 200 || entry.DisplayOrder < 0
-                ? "Each option needs a name up to 200 characters and a non-negative order"
+                || entry.Name.Trim().Length > settings.MaximumEntryNameLength || entry.DisplayOrder < 0
+                ? $"Each option needs a name up to {settings.MaximumEntryNameLength} characters and a non-negative order"
                 : null).ToArray();
         if (kind is OptionSetKind.Ingredient or OptionSetKind.Sauce)
         {
             var referenceErrors = await OptionSetIngredientEntryValidator.ValidateManyAsync(
-                context, kind, entries, maximumEntryCount, requireActiveReference, cancellationToken);
+                context, kind, entries, settings, requireActiveReference, cancellationToken);
             CopyFirstErrors(errors, referenceErrors);
             return errors;
         }
 
         var productErrors = await OptionSetProductEntryValidator.ValidateManyAsync(
-            context, entries, kind, maximumEntryCount, requireActiveReference, stagedProductIds, cancellationToken);
+            context, entries, kind, settings, requireActiveReference, stagedProductIds, cancellationToken);
         CopyFirstErrors(errors, productErrors);
         return errors;
     }

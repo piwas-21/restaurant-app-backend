@@ -41,9 +41,11 @@ internal static partial class OptionSetLocales
         foreach (var (language, value) in translations)
         {
             var locale = NormalizeLocale(language, settings.MaximumLocaleTagLength);
-            if (string.IsNullOrWhiteSpace(value) || value.Trim().Length > 120 || !result.TryAdd(locale, value.Trim()))
+            if (string.IsNullOrWhiteSpace(value)
+                || value.Trim().Length > settings.MaximumTranslationNameLength || !result.TryAdd(locale, value.Trim()))
             {
-                throw new BadRequestException("Option-set translations need unique locales and names up to 120 characters");
+                throw new BadRequestException(
+                    $"Option-set translations need unique locales and names up to {settings.MaximumTranslationNameLength} characters");
             }
         }
 

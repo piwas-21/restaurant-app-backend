@@ -50,7 +50,7 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
             SetVersion = set.Version
         };
         var validationContext = new OptionSetMaterializerValidationContext(
-            stagedProductIds, _settings.MaximumEntriesPerOptionSet);
+            stagedProductIds, _settings);
 
         foreach (var target in request.Targets)
         {
@@ -59,7 +59,7 @@ public sealed partial class OptionSetMaterializer : IOptionSetMaterializer
         }
 
         preview.RelatedOfferWarnings.AddRange(await OptionSetRelatedOfferAnalyzer.AnalyzeAsync(
-            _context, set, request, stagedProductIds, cancellationToken));
+            _context, set, request, validationContext, cancellationToken));
 
         return preview;
     }

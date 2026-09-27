@@ -55,7 +55,8 @@ internal static class OptionSetMaterializerSettingsRules
 
     public static void ValidateOverrides(
         OptionSetKind kind,
-        IReadOnlyDictionary<Guid, OptionSetEntryOverride>? overrides)
+        IReadOnlyDictionary<Guid, OptionSetEntryOverride>? overrides,
+        int maximumEntryNameLength)
     {
         if (overrides is null)
         {
@@ -64,7 +65,7 @@ internal static class OptionSetMaterializerSettingsRules
 
         foreach (var value in overrides.Values)
         {
-            ValidateOverrideValue(value);
+            ValidateOverrideValue(value, maximumEntryNameLength);
             ValidateOverrideKind(kind, value);
         }
     }
@@ -142,9 +143,10 @@ internal static class OptionSetMaterializerSettingsRules
         }
     }
 
-    private static void ValidateOverrideValue(OptionSetEntryOverride value)
+    private static void ValidateOverrideValue(OptionSetEntryOverride value, int maximumEntryNameLength)
     {
-        if ((value.Name is not null && (string.IsNullOrWhiteSpace(value.Name) || value.Name.Trim().Length > 200))
+        if ((value.Name is not null
+                && (string.IsNullOrWhiteSpace(value.Name) || value.Name.Trim().Length > maximumEntryNameLength))
             || value.DisplayOrder is < 0 || value.MaxQuantity is < 1 || value.Price is < 0m
             || value.AdditionalPrice is < 0m)
         {

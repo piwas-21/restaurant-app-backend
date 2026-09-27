@@ -18,7 +18,7 @@ public sealed partial class OptionSetCatalogService
             _context,
             kind,
             entries,
-            _settings.MaximumEntriesPerOptionSet,
+            _settings,
             stagedProductIds: stagedProductIds,
             cancellationToken: cancellationToken);
         if (errors.FirstOrDefault(error => error is not null) is string error)
@@ -36,11 +36,13 @@ public sealed partial class OptionSetCatalogService
         }
     }
 
-    private static void ValidateHeader(OptionSetWriteRequestDto request, bool creating)
+    private void ValidateHeader(OptionSetWriteRequestDto request, bool creating)
     {
-        if (!Enum.IsDefined(request.Kind) || string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 120)
+        if (!Enum.IsDefined(request.Kind) || string.IsNullOrWhiteSpace(request.Name)
+            || request.Name.Trim().Length > _settings.MaximumOptionSetNameLength)
         {
-            throw new BadRequestException("Choose a valid option-set kind and a name up to 120 characters");
+            throw new BadRequestException(
+                $"Choose a valid option-set kind and a name up to {_settings.MaximumOptionSetNameLength} characters");
         }
 
         if (!Enum.IsDefined(request.Status) || (creating && request.Status != OptionSetStatus.Active))

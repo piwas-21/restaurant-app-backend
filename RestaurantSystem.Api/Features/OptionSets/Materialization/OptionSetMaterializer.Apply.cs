@@ -45,7 +45,7 @@ public sealed partial class OptionSetMaterializer
             SetVersion = request.ExpectedSetVersion
         };
         var validationContext = new OptionSetMaterializerValidationContext(
-            stagedProductIds, _settings.MaximumEntriesPerOptionSet);
+            stagedProductIds, _settings);
         var menuVersionBases = new Dictionary<Guid, int>();
         var menuVersionAdvances = new Dictionary<Guid, int>();
 

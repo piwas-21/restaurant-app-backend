@@ -46,6 +46,7 @@ using RestaurantSystem.Domain.Common.Interfaces;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Extensions;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Infrastructure.Persistence.Configurations;
 using RestaurantSystem.ServiceDefaults;
 using System.Text.Json;
 
@@ -311,17 +312,45 @@ builder.Services.AddOptions<MenuAuthoringPaginationSettings>()
     .Validate(settings => settings.MinimumPageSize >= 1
         && settings.MaximumPageSize >= settings.MinimumPageSize
         && settings.DefaultPageSize >= settings.MinimumPageSize
-        && settings.DefaultPageSize <= settings.MaximumPageSize,
+        && settings.DefaultPageSize <= settings.MaximumPageSize
+        && settings.MaximumSearchQueryLength > 0
+        && settings.MinimumNormalizedSearchQueryLength > 0
+        && settings.MaximumNormalizedSearchQueryLength >= settings.MinimumNormalizedSearchQueryLength
+        && settings.MaximumSearchQueryLength <= settings.MaximumNormalizedSearchQueryLength
+        && settings.MaximumNormalizedSearchQueryLength <= OptionSetSchemaLimits.NormalizedNameLength
+        && settings.MaximumSearchAliasLength > 0
+        && settings.MaximumSearchAliasLength <= OptionSetSchemaLimits.AliasLength
+        && settings.MaximumSearchCursorLength > 0,
         "Menu-authoring pagination settings are inconsistent")
     .ValidateOnStart();
 builder.Services.AddOptions<OptionSetAuthoringSettings>()
     .Bind(builder.Configuration.GetSection(OptionSetAuthoringSettings.SectionName))
     .Validate(settings => settings.MaximumIdempotencyKeyLength > 0
+        && settings.MaximumIdempotencyKeyLength <= OptionSetSchemaLimits.IdempotencyKeyLength
         && settings.MaximumTargetsPerRequest > 0
+        && settings.MaximumTargetKeyLength > 0
         && settings.MaximumEntriesPerOptionSet > 0
+        && settings.MaximumEntryNameLength > 0
+        && settings.MaximumEntryNameLength <= OptionSetSchemaLimits.EntryNameLength
+        && settings.MaximumOptionSetNameLength > 0
+        && settings.MaximumOptionSetNameLength <= OptionSetSchemaLimits.OptionSetNameLength
+        && settings.MaximumTranslationNameLength > 0
+        && settings.MaximumTranslationNameLength <= OptionSetSchemaLimits.TranslationNameLength
         && settings.MaximumIntentionalDifferenceReasonLength > 0
+        && settings.MaximumIntentionalDifferenceReasonLength <= OptionSetSchemaLimits.IntentionalDifferenceReasonLength
         && settings.MaximumTranslationLocales > 0
-        && settings.MaximumLocaleTagLength > 0,
+        && settings.MaximumLocaleTagLength > 0
+        && settings.MaximumLocaleTagLength <= OptionSetSchemaLimits.SourceLocaleLength
+        && settings.MaximumSourceIdentifierLength > 0
+        && settings.MaximumSourceIdentifierLength <= OptionSetSchemaLimits.SourceIdentifierLength
+        && settings.MaximumImportedSourceLabelLength > 0
+        && settings.MaximumImportedSourceFingerprintLength > 0
+        && settings.MaximumImportedSourceFingerprintLength <= System.Security.Cryptography.SHA256.HashSizeInBytes * 2
+        && settings.MaximumImportedSourceLabelLength <= settings.MaximumSourceIdentifierLength
+        && (long)settings.MaximumImportedSourceLabelLength + settings.MaximumImportedSourceFingerprintLength
+            + OptionSetAuthoringSettings.ImportedSourceLabelSeparator.Length
+            + OptionSetAuthoringSettings.ImportedSourceFingerprintSeparator.Length
+            <= settings.MaximumOptionSetNameLength,
         "Option-set authoring limits must be positive")
     .ValidateOnStart();
 builder.Services.AddOptions<OrderRoutingSettings>()

@@ -14,9 +14,9 @@ internal sealed record MenuAuthoringSearchCursor(string Name, int TypeRank, Guid
             MenuAuthoringCandidateTypes.Rank(candidate.Type),
             candidate.Id)));
 
-    public static MenuAuthoringSearchCursor Decode(string value)
+    public static MenuAuthoringSearchCursor Decode(string value, int maximumLength)
     {
-        if (value.Length > 2048)
+        if (value.Length > maximumLength)
         {
             throw new BadRequestException(InvalidCursorMessage);
         }

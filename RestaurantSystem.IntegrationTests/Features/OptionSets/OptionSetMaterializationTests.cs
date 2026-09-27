@@ -60,10 +60,17 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
             {
                 MaximumIdempotencyKeyLength = 100,
                 MaximumTargetsPerRequest = 100,
+                MaximumTargetKeyLength = 120,
                 MaximumEntriesPerOptionSet = 200,
+                MaximumEntryNameLength = 200,
+                MaximumOptionSetNameLength = 120,
+                MaximumTranslationNameLength = 120,
                 MaximumIntentionalDifferenceReasonLength = 500,
                 MaximumTranslationLocales = 10,
-                MaximumLocaleTagLength = 10
+                MaximumLocaleTagLength = 10,
+                MaximumSourceIdentifierLength = 120,
+                MaximumImportedSourceLabelLength = 32,
+                MaximumImportedSourceFingerprintLength = 16
             }));
 
         var action = () => materializer.ApplyAsync(

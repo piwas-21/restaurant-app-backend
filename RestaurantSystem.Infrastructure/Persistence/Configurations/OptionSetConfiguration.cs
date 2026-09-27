@@ -10,14 +10,15 @@ public class OptionSetConfiguration : IEntityTypeConfiguration<OptionSet>
     {
         builder.ToTable("OptionSets");
         builder.HasKey(set => set.Id);
-        builder.Property(set => set.Name).HasMaxLength(120).IsRequired();
-        builder.Property(set => set.SourceLocale).HasMaxLength(10).HasDefaultValue("en").IsRequired();
-        builder.Property(set => set.NormalizedName).HasMaxLength(160).IsRequired();
+        builder.Property(set => set.Name).HasMaxLength(OptionSetSchemaLimits.OptionSetNameLength).IsRequired();
+        builder.Property(set => set.SourceLocale).HasMaxLength(OptionSetSchemaLimits.SourceLocaleLength)
+            .HasDefaultValue("en").IsRequired();
+        builder.Property(set => set.NormalizedName).HasMaxLength(OptionSetSchemaLimits.NormalizedNameLength).IsRequired();
         builder.Property(set => set.Kind).HasConversion<int>().IsRequired();
         builder.Property(set => set.Status).HasConversion<int>().IsRequired();
         builder.Property(set => set.Version).HasDefaultValue(1).IsConcurrencyToken();
-        builder.Property(set => set.SourceTemplateId).HasMaxLength(120);
-        builder.Property(set => set.SourceOptionSetId).HasMaxLength(120);
+        builder.Property(set => set.SourceTemplateId).HasMaxLength(OptionSetSchemaLimits.SourceIdentifierLength);
+        builder.Property(set => set.SourceOptionSetId).HasMaxLength(OptionSetSchemaLimits.SourceIdentifierLength);
         builder.HasIndex(set => new { set.Kind, set.NormalizedName }).IsUnique();
         builder.HasIndex(set => new { set.SourceTemplateId, set.SourceRevision, set.SourceOptionSetId })
             .IsUnique()

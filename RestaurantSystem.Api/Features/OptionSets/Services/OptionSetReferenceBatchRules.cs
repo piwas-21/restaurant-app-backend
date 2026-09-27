@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -13,11 +14,11 @@ internal static class OptionSetReferenceBatchRules
         ApplicationDbContext context,
         OptionSetKind kind,
         IReadOnlyList<OptionSetEntryDto> entries,
-        int maximumEntryCount,
+        OptionSetAuthoringSettings settings,
         bool requireActiveReference,
         CancellationToken cancellationToken)
     {
-        var safeEntries = GetBoundedEntries(entries, maximumEntryCount);
+        var safeEntries = GetBoundedEntries(entries, settings.MaximumEntriesPerOptionSet);
         var errors = new string?[safeEntries.Length];
         var ingredientIds = CollectIngredientIds(safeEntries, errors);
         var byId = await LoadIngredientsAsync(context, ingredientIds, cancellationToken);
@@ -29,12 +30,12 @@ internal static class OptionSetReferenceBatchRules
         ApplicationDbContext context,
         IReadOnlyList<OptionSetEntryDto> entries,
         OptionSetKind kind,
-        int maximumEntryCount,
+        OptionSetAuthoringSettings settings,
         bool requireActiveReference,
         IReadOnlySet<Guid>? stagedProductIds,
         CancellationToken cancellationToken)
     {
-        var safeEntries = GetBoundedEntries(entries, maximumEntryCount);
+        var safeEntries = GetBoundedEntries(entries, settings.MaximumEntriesPerOptionSet);
         var errors = new string?[safeEntries.Length];
         var (productIds, variationIds) = CollectProductIds(safeEntries, errors);
         var products = await LoadProductsAsync(context, productIds, cancellationToken);

@@ -16,8 +16,8 @@ public class OptionSetEntryConfiguration : IEntityTypeConfiguration<OptionSetEnt
             table.HasCheckConstraint("ck_option_set_entries_positive_quantity", "max_quantity >= 1");
         });
         builder.HasKey(entry => entry.Id);
-        builder.Property(entry => entry.Name).HasMaxLength(200).IsRequired();
-        builder.Property(entry => entry.SourceEntryId).HasMaxLength(120);
+        builder.Property(entry => entry.Name).HasMaxLength(OptionSetSchemaLimits.EntryNameLength).IsRequired();
+        builder.Property(entry => entry.SourceEntryId).HasMaxLength(OptionSetSchemaLimits.SourceIdentifierLength);
         builder.Property(entry => entry.Price).HasColumnType("decimal(18,2)");
         builder.Property(entry => entry.AdditionalPrice).HasColumnType("decimal(18,2)");
         builder.HasOne<GlobalIngredient>().WithMany().HasForeignKey(entry => entry.GlobalIngredientId)

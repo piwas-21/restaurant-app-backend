@@ -77,9 +77,11 @@ public sealed partial class MenuAuthoringSearchService
         }
 
         var alias = string.IsNullOrWhiteSpace(request.Alias) ? request.Query.Trim() : request.Alias.Trim();
-        if (accepted && (alias.Length > 160 || OptionSetNameNormalizer.Normalize(alias) != normalized))
+        if (accepted && (alias.Length > _pagination.MaximumSearchAliasLength
+            || OptionSetNameNormalizer.Normalize(alias) != normalized))
         {
-            throw new BadRequestException("An accepted alias must preserve the normalized search phrase and be at most 160 characters");
+            throw new BadRequestException(
+                $"An accepted alias must preserve the normalized search phrase and be at most {_pagination.MaximumSearchAliasLength} characters");
         }
 
         if (!accepted && !string.IsNullOrWhiteSpace(request.Alias))

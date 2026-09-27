@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -10,9 +11,9 @@ internal static class OptionSetIngredientEntryValidator
         ApplicationDbContext context,
         OptionSetKind kind,
         IReadOnlyList<OptionSetEntryDto> entries,
-        int maximumEntryCount,
+        OptionSetAuthoringSettings settings,
         bool requireActiveReference,
         CancellationToken cancellationToken) =>
         OptionSetReferenceBatchRules.ValidateIngredientsAsync(
-            context, kind, entries, maximumEntryCount, requireActiveReference, cancellationToken);
+            context, kind, entries, settings, requireActiveReference, cancellationToken);
 }
