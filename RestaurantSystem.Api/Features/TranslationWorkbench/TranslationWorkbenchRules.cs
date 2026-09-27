@@ -28,12 +28,10 @@ internal static partial class TranslationWorkbenchRules
         }
 
         var identities = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var field in request.Fields)
+        if (request.Fields.Any(field =>
+            field is null || !IsValidField(field) || !identities.Add(Identity(field.FieldRef))))
         {
-            if (field is null || !IsValidField(field) || !identities.Add(Identity(field.FieldRef)))
-            {
-                throw new BadRequestException("Invalid or duplicate translation field");
-            }
+            throw new BadRequestException("Invalid or duplicate translation field");
         }
     }
 
