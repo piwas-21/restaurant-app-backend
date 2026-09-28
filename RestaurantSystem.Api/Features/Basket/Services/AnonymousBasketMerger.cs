@@ -159,7 +159,7 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
                     .ToList();
 
                 BundleChildQuantityScaler.Rescale(
-                    existingChildren,
+                    BasketItemTree.Descendants(existingItem, userBasket.Items),
                     existingItem.Quantity,
                     existingItem.Quantity + item.Quantity,
                     _currentUserService.GetAuditIdentifier());
@@ -193,10 +193,9 @@ public class AnonymousBasketMerger : IAnonymousBasketMerger
                 item.UpdatedBy = _currentUserService.GetAuditIdentifier();
                 rehomed.Add(item);
 
-                // Also move any child items belonging to this bundle — without this they
-                // would be left orphaned under the soft-deleted anonymous basket.
-                var children = anonymousItems.Where(c => c.ParentBasketItemId == item.Id);
-                foreach (var child in children)
+                // Move the entire nested line, including ProductChoice grandchildren, before
+                // soft-deleting the anonymous basket.
+                foreach (var child in BasketItemTree.Descendants(item, anonymousItems))
                 {
                     child.BasketId = userBasket.Id;
                     child.UpdatedAt = DateTime.UtcNow;
