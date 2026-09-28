@@ -111,7 +111,8 @@ public partial class UpdateMenuBundleCommandHandler : ICommandHandler<UpdateMenu
             var replaceSections = !translationOnly && (existingDefinition is null ||
                 MenuSectionReplacementGuard.ShouldReplaceSections(existingDefinition, sections));
 
-            await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
+            await MenuSectionVariationValidator.ValidateWithExistingAsync(
+                _context, sections, existingDefinition?.Sections ?? [], cancellationToken);
 
             // Update product properties
             product.Name = command.Name;

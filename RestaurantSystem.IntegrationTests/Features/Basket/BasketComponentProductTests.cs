@@ -195,14 +195,7 @@ public class BasketComponentProductTests : IntegrationTestBase
         (await LineCountAsync()).Should().Be(0, "nothing is persisted when a section rule refuses");
     }
 
-    /// <summary>
-    /// <b>The stated residual, measured rather than assumed: "2 x the SAME meat" is not expressible
-    /// through the shipped picker.</b> A section counts SELECTION ENTRIES, so one entry carrying
-    /// <c>quantity: 2</c> is ONE selection and is refused by <c>MinSelection = 2</c> — and the
-    /// picker emits exactly one entry per chosen option, so it has no way to send two. This test
-    /// pins the behaviour so the limit is a recorded fact, not a surprise; it is NOT a fix, and
-    /// G8/G9 (a general min/max engine) remains out of scope pending an owner decision.
-    /// </summary>
+    /// <summary>Sections without repeat permission still count distinct choices.</summary>
     [Fact]
     public async Task Double_of_one_meat_is_not_expressible_as_a_single_selection()
     {
@@ -218,6 +211,35 @@ public class BasketComponentProductTests : IntegrationTestBase
 
         thrown.Should().BeOfType<BadRequestException>(
             "quantity 2 on one entry is still ONE selection, and the section needs two");
+    }
+
+    [Fact]
+    public async Task Repeatable_section_accepts_two_portions_of_one_meat_and_persists_child_quantity()
+    {
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var section = await context.MenuSections.SingleAsync(candidate => candidate.Id == SectionId);
+            section.AllowRepeatedItems = true;
+            await context.SaveChangesAsync();
+        }
+
+        await AddAsync(new AddToBasketDto
+        {
+            ProductId = TacosId,
+            Quantity = 1,
+            SelectedMenuOptions =
+            [
+                new SelectedMenuOptionDto { SectionId = SectionId, ItemId = MeatIds[0], Quantity = 2 },
+            ],
+        });
+
+        using var readScope = Factory.Services.CreateScope();
+        var readContext = readScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var parent = await readContext.BasketItems.Include(item => item.ChildBasketItems)
+            .SingleAsync(item => item.ProductId == TacosId);
+        parent.ChildBasketItems.Should().ContainSingle()
+            .Which.Quantity.Should().Be(2);
     }
 
     // ---- helpers -------------------------------------------------------------------------------

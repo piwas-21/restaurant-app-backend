@@ -12,6 +12,7 @@ public class MenuSection : Entity
     public bool IsRequired { get; set; } = true;
     public int MinSelection { get; set; } = 1;
     public int MaxSelection { get; set; } = 1; // 1 for single choice
+    public bool AllowRepeatedItems { get; set; }
 
     // Navigation
     public virtual MenuDefinition MenuDefinition { get; set; } = null!;

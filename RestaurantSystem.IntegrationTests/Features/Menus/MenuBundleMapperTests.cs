@@ -53,6 +53,7 @@ public class MenuBundleMapperTests
             IsRequired = true,
             MinSelection = 1,
             MaxSelection = 1,
+            AllowRepeatedItems = true,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = "test"
         };
@@ -93,6 +94,7 @@ public class MenuBundleMapperTests
         var dto = MenuBundleMapper.MapToMenuBundleDto(bundle, ImageBaseUrl, requestedOrderType: null);
 
         var item = dto.MenuDefinition!.Sections.Single().Items.Single();
+        dto.MenuDefinition.Sections.Single().AllowRepeatedItems.Should().BeTrue();
         item.DetailedIngredients.Should().ContainSingle().Which.Name.Should().Be("Ice");
         item.SuggestedSideItems.Should().BeNull("the dead per-option suggested sides are no longer projected");
     }

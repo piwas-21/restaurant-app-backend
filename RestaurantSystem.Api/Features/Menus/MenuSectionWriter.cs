@@ -68,6 +68,7 @@ public static class MenuSectionWriter
             section.IsRequired = sectionDto.IsRequired;
             section.MinSelection = sectionDto.MinSelection;
             section.MaxSelection = sectionDto.MaxSelection;
+            section.AllowRepeatedItems = sectionDto.AllowRepeatedItems ?? section.AllowRepeatedItems;
             section.UpdatedAt = now;
             section.UpdatedBy = auditIdentifier;
 
@@ -254,6 +255,7 @@ public static class MenuSectionWriter
                 IsRequired = sectionDto.IsRequired,
                 MinSelection = sectionDto.MinSelection,
                 MaxSelection = sectionDto.MaxSelection,
+                AllowRepeatedItems = sectionDto.AllowRepeatedItems ?? false,
                 Translations = BuildTranslations(sectionDto.Translations ?? [], auditIdentifier, now),
                 CreatedAt = now,
                 CreatedBy = auditIdentifier

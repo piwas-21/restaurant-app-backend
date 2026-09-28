@@ -103,7 +103,7 @@ public static class MenuBundleAvailabilityResolver
                 .Where(item => IsOptionOrderable(item, orderType))
                 .Select(item => item.ProductId)
                 .Distinct()
-                .Count() >= Math.Max(1, section.MinSelection));
+                .Count() >= (section.AllowRepeatedItems ? 1 : Math.Max(1, section.MinSelection)));
     }
 
     private static bool IsOptionOrderable(MenuSectionItem item, OrderType orderType) =>
