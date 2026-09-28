@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Categories.Dtos;
+using RestaurantSystem.Api.Features.Catalog.Dtos;
 using RestaurantSystem.Api.Features.Menus;
 using RestaurantSystem.Api.Features.Products.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
@@ -113,7 +114,7 @@ public static class ProductDtoMapper
             }).ToList(),
             CustomizationGroups = product.CustomizationGroups
                 .OrderBy(group => group.DisplayOrder)
-                .Select(MapCustomizationGroup)
+                .Select(group => MapCustomizationGroup(group, requestedOrderType))
                 .ToList(),
             // #468: one projection for a bundle's sections, shared with the two Menus reads and
             // with `GetProductByIdQuery`. This is a WRITE-path echo, so the caller must load
@@ -137,6 +138,11 @@ public static class ProductDtoMapper
     }
 
     public static ProductCustomizationGroupDto MapCustomizationGroup(ProductCustomizationGroup group)
+        => MapCustomizationGroup(group, requestedOrderType: null);
+
+    public static ProductCustomizationGroupDto MapCustomizationGroup(
+        ProductCustomizationGroup group,
+        OrderType? requestedOrderType)
         => new()
         {
             Id = group.Id,
@@ -165,11 +171,22 @@ public static class ProductDtoMapper
                     Id = option.Id,
                     OptionProductId = option.OptionProductId,
                     OptionProductName = option.OptionProduct.Name,
+                    OptionProductIsActive = option.OptionProduct.IsActive && !option.OptionProduct.IsDeleted,
+                    OptionProductIsAvailable = option.OptionProduct.IsAvailable && !option.OptionProduct.IsDeleted,
+                    Availability = ResolveOptionProductAvailability(option.OptionProduct, requestedOrderType),
                     AdditionalPrice = option.AdditionalPrice,
                     DisplayOrder = option.DisplayOrder,
                     IsDefault = option.IsDefault
                 }).ToList()
         };
+
+    private static ItemAvailabilityDto ResolveOptionProductAvailability(Product product, OrderType? requestedOrderType)
+    {
+        var availability = OrderTypeAvailability.Resolve(product, requestedOrderType);
+        return product.IsActive && !product.IsDeleted
+            ? availability
+            : availability with { CanOrder = false, Reason = AvailabilityReason.Unavailable };
+    }
 
     /// <summary>
     /// Projects a set of localized descriptions into a language-code → content map, taking the

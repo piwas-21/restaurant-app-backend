@@ -256,6 +256,13 @@ public class BasketService : IBasketService
         if (basketItem == null)
             throw new NotFoundException(BasketItemNotFoundMessage, ErrorCodes.BasketItemNotFound);
 
+        // The root query loads direct children and their product graphs. Load the basket's flat
+        // tracked rows too: nested ProductChoices are grandchildren, needed for validation and
+        // proportional quantity changes.
+        var allItems = await _context.BasketItems
+            .Where(item => item.BasketId == basket.Id)
+            .ToListAsync();
+
         // PUT changes only quantity/instructions, but it is also a write boundary for rows created
         // before SauceMax was server-enforced. Validate the root and each bundle child rather than
         // letting a legacy/crafted row become newly active through a later basket mutation.
@@ -272,7 +279,9 @@ public class BasketService : IBasketService
             _basketItemFactory.EnsureAtLeastMinimum(child);
             if (child.Product != null)
             {
-                ExplicitCustomizationSelection.EnsurePersisted(child.Product, child, []);
+                ExplicitCustomizationSelection.EnsurePersisted(
+                    child.Product, child,
+                    allItems.Where(item => item.ParentBasketItemId == child.Id).ToList());
             }
         }
 
@@ -289,7 +298,7 @@ public class BasketService : IBasketService
         basketItem.ItemTotal = BasketLineTotal.ForRoot(basketItem, basketItem.ChildBasketItems.Count);
 
         BundleChildQuantityScaler.Rescale(
-            basketItem.ChildBasketItems,
+            BasketItemTree.Descendants(basketItem, allItems),
             previousQuantity,
             update.Quantity,
             _currentUserService.GetAuditIdentifier());
@@ -314,20 +323,8 @@ public class BasketService : IBasketService
 
         var basketItem = await _context.BasketItems
             .Include(bi => bi.Basket)
-            .Include(bi => bi.ChildBasketItems) // Include child items for cascade deletion
-                                                // ROOT ROWS ONLY — the fourth member of the family in #308's header, and the same filter
-                                                // #310 put on the update path. A child carries its parent's BasketId and its component's
-                                                // ProductId, so an id-only lookup accepted it: DELETE on a child removed that component
-                                                // while the parent's UnitPrice and CustomizationPrice still included it, so the guest
-                                                // kept paying for something that had left the kitchen ticket.
-                                                //
-                                                // It is also load-bearing for BasketLineTotal: individually deleting a bundle's children
-                                                // was the ONLY way to manufacture a parent with CustomizationPrice > 0 and no children,
-                                                // which is the single state the child-count rule prices wrongly. Removing this filter
-                                                // reopens that.
-                                                //
-                                                // Answers BasketItemNotFound rather than a new code, matching the update path: to a
-                                                // client, a child id is not an addressable basket item.
+            // Child rows are derived from their root and cannot be removed on their own.
+            // The full descendant set is loaded below after this root-only address check.
             .FirstOrDefaultAsync(bi =>
                 bi.Id == basketItemId && bi.BasketId == basket.Id && bi.ParentBasketItemId == null);
 
@@ -336,11 +333,14 @@ public class BasketService : IBasketService
 
         var basketId = basketItem.BasketId;
 
-        // Remove all child items first (for menu bundles)
-        if (basketItem.ChildBasketItems != null && basketItem.ChildBasketItems.Any())
-        {
-            _context.BasketItems.RemoveRange(basketItem.ChildBasketItems);
-        }
+        // The nullable self-FK has no cascade. Include every descendant before deleting the
+        // root, or a nested ProductChoice survives as a standalone basket line.
+        var allItems = await _context.BasketItems
+            .Where(item => item.BasketId == basketId)
+            .ToListAsync();
+        var descendants = BasketItemTree.Descendants(basketItem, allItems);
+        descendants.Reverse();
+        _context.BasketItems.RemoveRange(descendants);
 
         // Remove the parent item
         _context.BasketItems.Remove(basketItem);

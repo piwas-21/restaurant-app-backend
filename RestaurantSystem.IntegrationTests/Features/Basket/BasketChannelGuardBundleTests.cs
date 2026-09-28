@@ -46,6 +46,12 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
     private static readonly Guid BlockedSideItemId = Guid.NewGuid();
     private static readonly Guid PlainProductId = Guid.NewGuid();
     private static readonly Guid SectionId = Guid.NewGuid();
+    private static readonly Guid NestedChoiceChildId = Guid.NewGuid();
+    private static readonly Guid NestedAllowedOptionId = Guid.NewGuid();
+    private static readonly Guid NestedBlockedOptionId = Guid.NewGuid();
+    private static readonly Guid NestedGroupId = Guid.NewGuid();
+    private static readonly Guid NestedAllowedMembershipId = Guid.NewGuid();
+    private static readonly Guid NestedBlockedMembershipId = Guid.NewGuid();
 
     [Fact]
     public async Task BundleOption_BlockedOnTheBasketsChannel_IsRefused()
@@ -72,6 +78,26 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
         // The dominant browse state, and deliberately permissive: a null basket channel means the
         // guest has not picked yet, not that everything is refused.
         var act = () => BuildMenuAsync(null, BlockedOptionId);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task NestedProductChoice_BlockedOnTheBasketsChannel_IsRefusedAtAddTime()
+    {
+        var act = () => BuildNestedMenuAsync(OrderType.DineIn, NestedBlockedMembershipId);
+
+        var thrown = await act.Should().ThrowAsync<BadRequestException>();
+        thrown.Which.ErrorCode.Should().Be(ErrorCodes.OrderTypeNotAvailable);
+    }
+
+    [Theory]
+    [InlineData(OrderType.DineIn)]
+    [InlineData(null)]
+    public async Task NestedProductChoice_AllowedOrChannelNotChosen_IsAccepted(OrderType? channel)
+    {
+        var membershipId = channel is null ? NestedBlockedMembershipId : NestedAllowedMembershipId;
+        var act = () => BuildNestedMenuAsync(channel, membershipId);
 
         await act.Should().NotThrowAsync();
     }
@@ -226,6 +252,46 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
         await factory.BuildRegularItemAsync(product!, null, request, Guid.NewGuid(), basketOrderType);
     }
 
+    private async Task BuildNestedMenuAsync(OrderType? basketOrderType, Guid membershipId)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var factory = scope.ServiceProvider.GetRequiredService<IBasketItemFactory>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var combo = await LoadComboAsync(context);
+
+        await factory.BuildMenuItemAsync(combo,
+            new AddToBasketDto
+            {
+                ProductId = ComboId,
+                Quantity = 1,
+                SelectedMenuOptions =
+                [
+                    new SelectedMenuOptionDto
+                    {
+                        SectionId = SectionId,
+                        ItemId = NestedChoiceChildId,
+                        Quantity = 1,
+                        CustomizationSelections =
+                        [
+                            new CustomizationGroupSelectionDto
+                            {
+                                GroupId = NestedGroupId,
+                                Options =
+                                [
+                                    new CustomizationOptionSelectionDto
+                                    {
+                                        Kind = CustomizationOptionKind.Product,
+                                        OptionId = membershipId,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            Guid.NewGuid(), basketOrderType);
+    }
+
     private static Task<Product> LoadComboAsync(ApplicationDbContext context) =>
         context.Products
             .Include(p => p.MenuDefinition!)
@@ -254,6 +320,35 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
         var blockedOption = NewProduct(BlockedOptionId, "§9.3 Blocked Option", ProductType.MainItem, noDineInCategory);
         var blockedSide = NewProduct(BlockedSideItemId, "§9.3 Blocked Side", ProductType.AddOn, noDineInCategory);
         var plain = NewProduct(PlainProductId, "§9.3 Plain Product", ProductType.MainItem, openCategory);
+        var nestedChild = NewProduct(NestedChoiceChildId, "§9.3 Nested Child", ProductType.MainItem, openCategory);
+        var nestedAllowed = NewProduct(NestedAllowedOptionId, "§9.3 Nested Allowed", ProductType.AddOn, openCategory);
+        var nestedBlocked = NewProduct(NestedBlockedOptionId, "§9.3 Nested Blocked", ProductType.AddOn, noDineInCategory);
+        var group = new ProductCustomizationGroup
+        {
+            Id = NestedGroupId,
+            ProductId = nestedChild.Id,
+            Name = "Nested choice",
+            IsRequired = true,
+            MinSelection = 1,
+            MaxSelection = 1,
+            IsActive = true,
+            CreatedBy = "test",
+        };
+        group.ProductOptions.Add(new ProductCustomizationProductOption
+        {
+            Id = NestedAllowedMembershipId,
+            OptionProductId = nestedAllowed.Id,
+            AdditionalPrice = 0m,
+            CreatedBy = "test",
+        });
+        group.ProductOptions.Add(new ProductCustomizationProductOption
+        {
+            Id = NestedBlockedMembershipId,
+            OptionProductId = nestedBlocked.Id,
+            AdditionalPrice = 0m,
+            CreatedBy = "test",
+        });
+        nestedChild.CustomizationGroups.Add(group);
 
         var definition = new MenuDefinition
         {
@@ -275,9 +370,11 @@ public class BasketChannelGuardBundleTests : IntegrationTestBase
         };
         section.Items.Add(NewSectionItem(allowedOption.Id));
         section.Items.Add(NewSectionItem(blockedOption.Id));
+        section.Items.Add(NewSectionItem(nestedChild.Id));
         definition.Sections.Add(section);
 
-        context.AddRange(combo, allowedOption, blockedOption, blockedSide, plain);
+        context.AddRange(combo, allowedOption, blockedOption, blockedSide, plain,
+            nestedChild, nestedAllowed, nestedBlocked);
         context.Add(definition);
         await context.SaveChangesAsync();
     }

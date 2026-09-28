@@ -63,7 +63,8 @@ public class GetMenuBundleByIdQueryHandler(
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.CustomizationGroups)
                         .ThenInclude(group => group.ProductOptions)
-                            .ThenInclude(option => option.OptionProduct)
+                            .ThenInclude(option => option.OptionProduct.ProductCategories)
+                                .ThenInclude(productCategory => productCategory.Category)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
             .Where(p => p.Id == query.Id && !p.IsDeleted);

@@ -96,18 +96,16 @@ public class BasketChannelService : IBasketChannelService
         {
             var doomedIds = conflicts.Select(c => c.BasketItemId).ToHashSet();
 
-            // Children MUST be removed explicitly, before their parents. The self-referencing
-            // Items→ParentBasketItem FK has NO cascade rule (ParentBasketItemId is nullable, so EF
-            // uses ClientSetNull and the DB rule is NO ACTION). Removing only the parents would set
-            // each tracked child's ParentBasketItemId to null instead of deleting it — promoting
-            // bundle children to top-level basket lines, inflating the item count, and putting them
-            // on the kitchen ticket. Mirrors BasketService.RemoveItemFromBasketAsync.
-            var doomedChildren = basket.Items
-                .Where(i => i.ParentBasketItemId.HasValue && doomedIds.Contains(i.ParentBasketItemId.Value))
-                .ToList();
+            // The nullable self-FK has no cascade. Remove every descendant, deepest first, or a
+            // nested ProductChoice is promoted into a standalone line when its parent is removed.
             var doomedParents = basket.Items.Where(i => doomedIds.Contains(i.Id)).ToList();
+            var doomedDescendants = doomedParents
+                .SelectMany(root => BasketItemTree.Descendants(root, basket.Items))
+                .DistinctBy(item => item.Id)
+                .Reverse()
+                .ToList();
 
-            _context.BasketItems.RemoveRange(doomedChildren);
+            _context.BasketItems.RemoveRange(doomedDescendants);
             _context.BasketItems.RemoveRange(doomedParents);
         }
 

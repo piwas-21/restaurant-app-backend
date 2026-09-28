@@ -41,7 +41,7 @@ internal static class BasketLineChannelScan
 
         foreach (var root in roots)
         {
-            foreach (var line in WithDescendants(root, allItems))
+            foreach (var line in BasketItemTree.WithDescendants(root, allItems))
             {
                 if (line.ProductId is { } productId)
                 {
@@ -100,7 +100,7 @@ internal static class BasketLineChannelScan
     {
         int? combined = null;
 
-        foreach (var line in WithDescendants(root, allItems))
+        foreach (var line in BasketItemTree.WithDescendants(root, allItems))
         {
             foreach (var productId in ProductIdsOf(line))
             {
@@ -126,38 +126,6 @@ internal static class BasketLineChannelScan
         }
 
         return combined;
-    }
-
-    /// <summary>A root line and every bundle child beneath it, at any depth.</summary>
-    /// <remarks>
-    /// Walks <c>ParentBasketItemId</c> over the flat loaded set rather than the
-    /// <c>ChildBasketItems</c> navigation, because the callers load baskets through
-    /// <c>FindTrackedBasketWithItemsAsync</c> (<c>.Items</c> only) — the navigation is not populated
-    /// and would silently enumerate empty.
-    /// <para>
-    /// ⚠️ <b>This recurses further than its consumers can act.</b> Baskets are only ever built one
-    /// level deep (<c>BasketItemFactory.BuildMenuItemAsync</c> is the sole writer of child rows), and
-    /// both downstream paths assume that: <c>BasketChannelService</c>'s removal collects children
-    /// whose parent is doomed but not GRANDchildren (which the missing cascade would then PROMOTE to
-    /// top-level lines, onto the kitchen ticket), and <c>AnonymousBasketMerger</c> re-homes one level
-    /// (grandchildren would be orphaned under the soft-deleted basket). Detecting a conflict at depth
-    /// &gt; 1 is therefore safe, but ACTING on one is not — if nesting ever becomes real, those two
-    /// paths must recurse before this remark is deleted.
-    /// </para>
-    /// </remarks>
-    private static IEnumerable<BasketItem> WithDescendants(
-        BasketItem root,
-        IReadOnlyCollection<BasketItem> allItems)
-    {
-        yield return root;
-
-        foreach (var child in allItems.Where(i => i.ParentBasketItemId == root.Id))
-        {
-            foreach (var descendant in WithDescendants(child, allItems))
-            {
-                yield return descendant;
-            }
-        }
     }
 
     private static IEnumerable<Guid> ProductIdsOf(BasketItem line)
