@@ -102,33 +102,49 @@ public static class MenuSectionWriter
         var retainedSections = new HashSet<Guid>();
         foreach (var sectionDto in sections)
         {
-            if (sectionDto.Id is Guid sectionId)
+            ValidateSectionPatchIds(sectionDto, existingSections, retainedSections, translationsOnly);
+        }
+    }
+
+    private static void ValidateSectionPatchIds(
+        MenuSectionDto sectionDto,
+        Dictionary<Guid, MenuSection> existingSections,
+        HashSet<Guid> retainedSections,
+        bool translationsOnly)
+    {
+        if (sectionDto.Id is not Guid sectionId)
+        {
+            if (!translationsOnly && sectionDto.ItemsSpecified)
             {
-                if (!existingSections.TryGetValue(sectionId, out var existingSection))
-                {
-                    throw new BadRequestException($"Section '{sectionId}' does not belong to this menu");
-                }
-
-                if (!retainedSections.Add(sectionId))
-                {
-                    throw new BadRequestException($"Section '{sectionId}' appears more than once");
-                }
-
-                if (!translationsOnly && sectionDto.ItemsSpecified)
-                {
-                    ValidateItemIds(existingSection, sectionDto.Items ?? []);
-                }
+                ValidateNewSectionItemIds(sectionDto.Items ?? []);
             }
-            else if (!translationsOnly && sectionDto.ItemsSpecified)
+            return;
+        }
+
+        if (!existingSections.TryGetValue(sectionId, out var existingSection))
+        {
+            throw new BadRequestException($"Section '{sectionId}' does not belong to this menu");
+        }
+
+        if (!retainedSections.Add(sectionId))
+        {
+            throw new BadRequestException($"Section '{sectionId}' appears more than once");
+        }
+
+        if (!translationsOnly && sectionDto.ItemsSpecified)
+        {
+            ValidateItemIds(existingSection, sectionDto.Items ?? []);
+        }
+    }
+
+    private static void ValidateNewSectionItemIds(IReadOnlyCollection<MenuSectionItemDto> items)
+    {
+        foreach (var item in items)
+        {
+            if (item.Id is Guid itemId)
             {
-                foreach (var item in sectionDto.Items ?? [])
-                {
-                    if (item.Id is Guid itemId)
-                    {
-                        throw new BadRequestException(
-                            $"Option '{itemId}' does not belong to a section being created");
-                    }
-                }
+                throw new BadRequestException(
+                    $"Option '{itemId}' does not belong to a section being created");
             }
         }
     }

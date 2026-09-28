@@ -42,79 +42,79 @@ internal static class AttachedBundleChoiceOptionSetGuard
             IncludeCurrentItemsForValidation(definition, proposedSections),
             cancellationToken);
 
-        var proposedById = new Dictionary<Guid, MenuSectionDto>();
-        foreach (var proposed in proposedSections)
-        {
-            if (proposed.Id is Guid sectionId && !proposedById.TryAdd(sectionId, proposed))
-            {
-                // Leave duplicate-ID reporting to MenuSectionWriter so invalid legacy payloads
-                // retain their established BadRequest response.
-                return;
-            }
-        }
-
+        var proposedById = proposedSections
+            .Where(section => section.Id.HasValue)
+            .ToDictionary(section => section.Id.GetValueOrDefault());
         foreach (var attachment in attachments)
         {
-            var sectionId = attachment.TargetMenuSectionId!.Value;
-            var currentSection = definition.Sections.FirstOrDefault(section => section.Id == sectionId);
-            if (currentSection is null || !proposedById.TryGetValue(sectionId, out var proposedSection))
+            ValidateAttachment(definition, attachment, proposedById);
+        }
+    }
+
+    private static void ValidateAttachment(
+        MenuDefinition definition,
+        OptionSetAttachment attachment,
+        Dictionary<Guid, MenuSectionDto> proposedById)
+    {
+        var sectionId = attachment.TargetMenuSectionId.GetValueOrDefault();
+        var currentSection = definition.Sections.FirstOrDefault(section => section.Id == sectionId);
+        if (currentSection is null || !proposedById.TryGetValue(sectionId, out var proposedSection))
+        {
+            throw new ConflictException(ConflictMessage);
+        }
+
+        if (currentSection.IsRequired != proposedSection.IsRequired
+            || currentSection.MinSelection != proposedSection.MinSelection
+            || currentSection.MaxSelection != proposedSection.MaxSelection)
+        {
+            throw new ConflictException(ConflictMessage);
+        }
+
+        if (proposedSection.ItemsSpecified)
+        {
+            ValidateManagedRows(currentSection, proposedSection, attachment.AppliedRows);
+        }
+    }
+
+    private static void ValidateManagedRows(
+        MenuSection section,
+        MenuSectionDto proposedSection,
+        ICollection<OptionSetAppliedRow> appliedRows)
+    {
+        if (appliedRows.Any(row => row.RowType != nameof(MenuSectionItem)))
+        {
+            throw new ConflictException(ConflictMessage);
+        }
+
+        var managedRowIds = appliedRows.Select(row => row.MaterializedRowId).ToHashSet();
+        if (managedRowIds.Count == 0)
+        {
+            return;
+        }
+
+        var currentRows = section.Items
+            .Where(item => managedRowIds.Contains(item.Id))
+            .ToDictionary(item => item.Id);
+        var proposedRows = (proposedSection.Items ?? [])
+            .Where(item => item.Id.HasValue)
+            .ToDictionary(item => item.Id.GetValueOrDefault());
+        foreach (var rowId in managedRowIds)
+        {
+            if (!currentRows.TryGetValue(rowId, out var currentRow)
+                || !proposedRows.TryGetValue(rowId, out var proposedRow)
+                || HasManagedRowChanges(currentRow, proposedRow))
             {
                 throw new ConflictException(ConflictMessage);
-            }
-
-            if (currentSection.IsRequired != proposedSection.IsRequired
-                || currentSection.MinSelection != proposedSection.MinSelection
-                || currentSection.MaxSelection != proposedSection.MaxSelection)
-            {
-                throw new ConflictException(ConflictMessage);
-            }
-
-            if (!proposedSection.ItemsSpecified)
-            {
-                continue;
-            }
-
-            if (attachment.AppliedRows.Any(row => row.RowType != nameof(MenuSectionItem)))
-            {
-                throw new ConflictException(ConflictMessage);
-            }
-
-            var managedRowIds = attachment.AppliedRows
-                .Select(row => row.MaterializedRowId)
-                .ToHashSet();
-            if (managedRowIds.Count == 0)
-            {
-                continue;
-            }
-
-            var currentRows = currentSection.Items
-                .Where(item => managedRowIds.Contains(item.Id))
-                .ToDictionary(item => item.Id);
-            var proposedRows = new Dictionary<Guid, MenuSectionItemDto>();
-            foreach (var proposedRow in proposedSection.Items ?? [])
-            {
-                if (proposedRow.Id is Guid rowId && !proposedRows.TryAdd(rowId, proposedRow))
-                {
-                    // MenuSectionWriter owns the existing duplicate-option BadRequest contract.
-                    return;
-                }
-            }
-
-            foreach (var rowId in managedRowIds)
-            {
-                if (!currentRows.TryGetValue(rowId, out var currentRow)
-                    || !proposedRows.TryGetValue(rowId, out var proposedRow)
-                    || currentRow.ProductId != proposedRow.ProductId
-                    || currentRow.ProductVariationId != proposedRow.ProductVariationId
-                    || currentRow.AdditionalPrice != proposedRow.AdditionalPrice
-                    || currentRow.DisplayOrder != proposedRow.DisplayOrder
-                    || currentRow.IsDefault != proposedRow.IsDefault)
-                {
-                    throw new ConflictException(ConflictMessage);
-                }
             }
         }
     }
+
+    private static bool HasManagedRowChanges(MenuSectionItem current, MenuSectionItemDto proposed) =>
+        current.ProductId != proposed.ProductId
+        || current.ProductVariationId != proposed.ProductVariationId
+        || current.AdditionalPrice != proposed.AdditionalPrice
+        || current.DisplayOrder != proposed.DisplayOrder
+        || current.IsDefault != proposed.IsDefault;
 
     private static List<MenuSectionDto> IncludeCurrentItemsForValidation(
         MenuDefinition definition,
