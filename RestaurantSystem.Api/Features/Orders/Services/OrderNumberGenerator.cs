@@ -28,10 +28,10 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// Two bounds are inherited rather than introduced, both far outside this tenant's volume and
 /// neither made worse here. The lexical <c>OrderByDescending</c> below agrees with numeric order
 /// only while the sequence is fixed-width, so at 10 000 orders in one day <c>D4</c> emits five
-/// digits, <c>"…10000"</c> sorts below <c>"…9999"</c>, and allocation collides permanently. And the
-/// read runs through the soft-delete filter while the unique index does not, so a soft-deleted
-/// order's number would be invisible here yet still occupy the index — unreachable today, because
-/// <c>DeleteOrderCommand</c> hard-deletes and nothing sets <c>IsDeleted</c> on an order.
+/// digits, <c>"…10000"</c> sorts below <c>"…9999"</c>, and allocation collides permanently. The read
+/// below bypasses the soft-delete filter so deleted orders continue reserving their unique numbers.
+/// Otherwise, deleting the latest order of the day could make the next allocation reuse its number
+/// and fail on the unique index.
 /// </para>
 /// </remarks>
 public class OrderNumberGenerator : IOrderNumberGenerator
@@ -71,6 +71,7 @@ public class OrderNumberGenerator : IOrderNumberGenerator
         await LockDayAsync(date, cancellationToken);
 
         var lastOrder = await _context.Orders
+            .IgnoreQueryFilters()
             .Where(o => o.OrderNumber.StartsWith(date))  // EF translates to SQL LIKE; no StringComparison overload is translatable
             .OrderByDescending(o => o.OrderNumber)
             .FirstOrDefaultAsync(cancellationToken);
