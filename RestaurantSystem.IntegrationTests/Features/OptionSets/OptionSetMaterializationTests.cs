@@ -9,10 +9,12 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Conventers;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Features.Products.Commands.UpdateProductCommand;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Dtos.Requests;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -37,6 +39,13 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
     private static readonly Guid SauceId = Guid.NewGuid();
     private static readonly Guid ExistingSectionItemId = Guid.NewGuid();
     private static readonly Guid ExistingProductChoiceId = Guid.NewGuid();
+    private static readonly Guid ComponentBundleProductId = Guid.NewGuid();
+    private static readonly Guid ComponentBundleDefinitionId = Guid.NewGuid();
+    private static readonly Guid[] ComponentProductIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+    private static readonly Guid[] ComponentSectionIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+    private static readonly Guid[] ComponentSectionItemIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+    private static readonly Guid[] ComponentChoiceGroupIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+    private static readonly Guid[] ComponentExistingChoiceIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
     private Guid _categoryId;
 
     public OptionSetMaterializationTests(DatabaseFixture databaseFixture) : base(databaseFixture) { }
@@ -660,6 +669,200 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Bundle_choice_set_can_materialize_to_an_internal_component_group_and_preserve_nested_quote()
+    {
+        AuthenticateAsAdmin();
+        await AddComponentChoiceTargetsAsync();
+        var set = (await CreateBundleChoiceSetAsync())!.Data!;
+        var request = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = $"component-choice-{Guid.NewGuid():N}",
+            Targets = Enumerable.Range(0, ComponentProductIds.Length).Select(index =>
+                new OptionSetMaterializationTargetRequest
+                {
+                    TargetKey = $"taco-internal-component-choice-{index}",
+                    Role = OptionSetAttachmentRole.ProductChoice,
+                    TargetProductId = ComponentProductIds[index],
+                    TargetCustomizationGroupId = ComponentChoiceGroupIds[index],
+                    ExpectedCustomizationGroupVersion = 1,
+                    Settings = new OptionSetAttachmentSettings
+                    {
+                        MinSelection = 1,
+                        MaxSelection = 2,
+                        IncludedFree = 0,
+                        DisplayOrder = 0
+                    }
+                }).ToList()
+        };
+
+        var previewResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/preview", request);
+        previewResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await previewResponse.Content.ReadAsStringAsync());
+        var preview = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationPreview>>(previewResponse))!.Data!;
+        preview.Targets.Should().HaveCount(3);
+        preview.Targets.Should().OnlyContain(item => item.Status == "ready");
+
+        var applyResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/apply", request);
+        applyResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await applyResponse.Content.ReadAsStringAsync());
+        var applied = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationResult>>(applyResponse))!.Data!;
+        applied.Targets.Should().HaveCount(3);
+        for (var index = 0; index < ComponentProductIds.Length; index++)
+        {
+            var target = applied.Targets.Single(item => item.TargetKey == $"taco-internal-component-choice-{index}");
+            target.Status.Should().Be("applied");
+            target.CustomizationGroupVersion.Should().Be(2);
+            target.AppliedRows.Should().ContainSingle(row => row.RowId == ComponentExistingChoiceIds[index]
+                && row.RowType == "ProductCustomizationProductOption" && row.Action == "preserve");
+        }
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var groups = await context.ProductCustomizationGroups.Include(item => item.ProductOptions)
+                .Include(item => item.Product)
+                .Where(item => ComponentChoiceGroupIds.Contains(item.Id)).ToListAsync();
+            groups.Should().HaveCount(3);
+            for (var index = 0; index < ComponentChoiceGroupIds.Length; index++)
+            {
+                var group = groups.Single(item => item.Id == ComponentChoiceGroupIds[index]);
+                group.Product.IsComponent.Should().BeTrue();
+                group.AuthoringVersion.Should().Be(2);
+                group.MinSelection.Should().Be(1);
+                group.MaxSelection.Should().Be(2);
+                group.IncludedFreeUnits.Should().Be(0);
+                group.DisplayOrder.Should().Be(0);
+                group.ProductOptions.Should().HaveCount(2);
+                var preserved = group.ProductOptions.Single(option => option.Id == ComponentExistingChoiceIds[index]);
+                preserved.OptionProductId.Should().Be(ExistingChoiceId);
+                preserved.AdditionalPrice.Should().Be(2.25m);
+                preserved.DisplayOrder.Should().Be(0);
+                preserved.IsDefault.Should().BeTrue();
+                group.ProductOptions.Should().Contain(option => option.OptionProductId == AddedChoiceId);
+            }
+            (await context.OptionSetAttachments.CountAsync(item =>
+                item.OptionSetId == set.Id && ComponentProductIds.Contains(item.TargetProductId)
+                && item.TargetCustomizationGroupId.HasValue)).Should().Be(3);
+        }
+
+        var quoteResponse = await PostAsJsonAsync($"/api/Products/{ComponentBundleProductId}/quote", new ProductQuoteRequestDto
+        {
+            Quantity = 1,
+            SelectedMenuOptions = Enumerable.Range(0, ComponentProductIds.Length).Select(index =>
+                new SelectedMenuOptionDto
+                {
+                    SectionId = ComponentSectionIds[index],
+                    ItemId = ComponentProductIds[index],
+                    CustomizationSelections =
+                    [
+                        new CustomizationGroupSelectionDto
+                        {
+                            GroupId = ComponentChoiceGroupIds[index],
+                            Options =
+                            [
+                                new CustomizationOptionSelectionDto
+                                {
+                                    Kind = CustomizationOptionKind.Product,
+                                    OptionId = ComponentExistingChoiceIds[index]
+                                }
+                            ]
+                        }
+                    ]
+                }).ToList()
+        });
+        quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await quoteResponse.Content.ReadAsStringAsync());
+        var quote = (await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse))!.Data!;
+        quote.UnitPrice.Should().Be(20.75m);
+        quote.TotalPrice.Should().Be(20.75m);
+    }
+
+    [Fact]
+    public async Task Component_materialization_rejects_wrong_roles_and_groups_owned_by_another_product()
+    {
+        AuthenticateAsAdmin();
+        await AddComponentChoiceTargetsAsync();
+        var set = (await CreateBundleChoiceSetAsync())!.Data!;
+
+        var wrongRole = new OptionSetMaterializationTargetRequest
+        {
+            TargetKey = "component-wrong-role",
+            Role = OptionSetAttachmentRole.Sauce,
+            TargetProductId = ComponentProductIds[0],
+            TargetCustomizationGroupId = ComponentChoiceGroupIds[0],
+            ExpectedCustomizationGroupVersion = 1
+        };
+        var wrongRoleResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/preview",
+            new OptionSetMaterializationRequest
+            {
+                OptionSetId = set.Id,
+                ExpectedSetVersion = set.Version,
+                IdempotencyKey = $"component-wrong-role-{Guid.NewGuid():N}",
+                Targets = [wrongRole]
+            });
+        wrongRoleResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var foreignGroup = ProductChoiceTarget("component-foreign-group", ComponentProductIds[0],
+            ChoiceGroupId);
+        var foreignGroupResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/preview",
+            new OptionSetMaterializationRequest
+            {
+                OptionSetId = set.Id,
+                ExpectedSetVersion = set.Version,
+                IdempotencyKey = $"component-foreign-group-{Guid.NewGuid():N}",
+                Targets = [foreignGroup]
+            });
+        foreignGroupResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "a valid group from a different product must not be attached to this component");
+
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var group = await context.ProductCustomizationGroups
+                .SingleAsync(item => item.Id == ComponentChoiceGroupIds[0]);
+            group.IsActive = false;
+            await context.SaveChangesAsync();
+        }
+        var inactiveGroupResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/preview",
+            new OptionSetMaterializationRequest
+            {
+                OptionSetId = set.Id,
+                ExpectedSetVersion = set.Version,
+                IdempotencyKey = $"component-inactive-group-{Guid.NewGuid():N}",
+                Targets =
+                [
+                    ProductChoiceTarget("component-inactive-group", ComponentProductIds[0],
+                        ComponentChoiceGroupIds[0])
+                ]
+            });
+        inactiveGroupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var inactivePreview = (await ReadResponseAsync<ApiResponse<OptionSetMaterializationPreview>>(
+            inactiveGroupResponse))!.Data!;
+        inactivePreview.Targets.Should().ContainSingle().Which.Status.Should().Be("conflict");
+
+        var bundleSectionOnComponent = new OptionSetMaterializationRequest
+        {
+            OptionSetId = set.Id,
+            ExpectedSetVersion = set.Version,
+            IdempotencyKey = $"component-bundle-section-{Guid.NewGuid():N}",
+            Targets =
+            [
+                new OptionSetMaterializationTargetRequest
+                {
+                    TargetKey = "component-bundle-section",
+                    Role = OptionSetAttachmentRole.BundleChoice,
+                    TargetProductId = ComponentProductIds[0],
+                    TargetMenuSectionId = ComponentSectionIds[0],
+                    ExpectedMenuAuthoringVersion = 1
+                }
+            ]
+        };
+        var bundleSectionResponse = await PostAsJsonAsync($"/api/OptionSets/{set.Id}/preview", bundleSectionOnComponent);
+        bundleSectionResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "the component reference is a child of the parent bundle, not a bundle section target");
+    }
+
+    [Fact]
     public async Task Same_menu_retry_uses_the_actual_version_delta_from_an_idempotent_target()
     {
         AuthenticateAsAdmin();
@@ -863,6 +1066,117 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
         });
         await context.SaveChangesAsync();
     }
+
+    private async Task AddComponentChoiceTargetsAsync()
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var choiceProduct = await context.Products.SingleAsync(item => item.Id == ExistingChoiceId);
+        var components = ComponentProductIds.Select((productId, index) =>
+        {
+            var component = Product(productId, $"Internal taco carrier {index + 1}", 0m);
+            component.IsComponent = true;
+            component.ProductCategories.Add(new ProductCategory
+            {
+                ProductId = productId,
+                CategoryId = _categoryId,
+                IsPrimary = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            });
+            var group = new ProductCustomizationGroup
+            {
+                Id = ComponentChoiceGroupIds[index],
+                ProductId = productId,
+                Product = component,
+                Name = "Choose a component filling",
+                IsRequired = true,
+                MinSelection = 1,
+                MaxSelection = 2,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            };
+            group.ProductOptions.Add(new ProductCustomizationProductOption
+            {
+                Id = ComponentExistingChoiceIds[index],
+                ProductCustomizationGroupId = group.Id,
+                ProductCustomizationGroup = group,
+                OptionProductId = ExistingChoiceId,
+                OptionProduct = choiceProduct,
+                AdditionalPrice = 2.25m,
+                DisplayOrder = 0,
+                IsDefault = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            });
+            component.CustomizationGroups.Add(group);
+            return component;
+        }).ToArray();
+        var bundle = Product(ComponentBundleProductId, "Component choice bundle", 14m);
+        bundle.Type = ProductType.Menu;
+        bundle.ProductCategories.Add(new ProductCategory
+        {
+            ProductId = ComponentBundleProductId,
+            CategoryId = _categoryId,
+            IsPrimary = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Actor
+        });
+        var definition = new MenuDefinition
+        {
+            Id = ComponentBundleDefinitionId,
+            ProductId = ComponentBundleProductId,
+            Product = bundle,
+            IsAlwaysAvailable = true,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = Actor
+        };
+        for (var index = 0; index < components.Length; index++)
+        {
+            var section = new MenuSection
+            {
+                Id = ComponentSectionIds[index],
+                MenuDefinitionId = definition.Id,
+                MenuDefinition = definition,
+                Name = $"Choose taco carrier {index + 1}",
+                DisplayOrder = index,
+                IsRequired = true,
+                MinSelection = 1,
+                MaxSelection = 1,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            };
+            section.Items.Add(new MenuSectionItem
+            {
+                Id = ComponentSectionItemIds[index],
+                MenuSectionId = section.Id,
+                MenuSection = section,
+                ProductId = components[index].Id,
+                Product = components[index],
+                DisplayOrder = 0,
+                IsDefault = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = Actor
+            });
+            definition.Sections.Add(section);
+        }
+        bundle.MenuDefinition = definition;
+        context.AddRange(components);
+        context.Add(bundle);
+        await context.SaveChangesAsync();
+    }
+
+    private static OptionSetMaterializationTargetRequest ProductChoiceTarget(
+        string targetKey,
+        Guid targetProductId,
+        Guid targetGroupId) => new()
+        {
+            TargetKey = targetKey,
+            Role = OptionSetAttachmentRole.ProductChoice,
+            TargetProductId = targetProductId,
+            TargetCustomizationGroupId = targetGroupId,
+            ExpectedCustomizationGroupVersion = 1,
+            Settings = new OptionSetAttachmentSettings { MinSelection = 1, MaxSelection = 2 }
+        };
 
     private async Task<ApiResponse<OptionSetDetailDto>?> CreateBundleChoiceSetAsync()
     {

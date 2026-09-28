@@ -46,11 +46,7 @@ internal static class OptionSetMaterializerTargetLoader
             throw new ConflictException("Archived option sets cannot be attached to new targets");
         }
 
-        var isStagedTarget = validationContext.StagedProductIds?.Contains(product.Id) == true;
-        if (attachment is null && ((!product.IsActive || !product.IsAvailable) && !isStagedTarget || product.IsComponent))
-        {
-            throw new ConflictException("Inactive, unavailable, or internal products cannot receive a new option-set attachment");
-        }
+        ValidateNewAttachmentTarget(product, customizationGroup, target, attachment, validationContext);
 
         var entries = SelectEntries(set, target);
         if (target.Role == OptionSetAttachmentRole.ProductChoice
@@ -80,6 +76,31 @@ internal static class OptionSetMaterializerTargetLoader
             CurrentSettings = defaultSettings,
             Settings = settings
         };
+    }
+
+    private static void ValidateNewAttachmentTarget(
+        Product product,
+        ProductCustomizationGroup? customizationGroup,
+        OptionSetMaterializationTargetRequest target,
+        OptionSetAttachment? attachment,
+        OptionSetMaterializerValidationContext validationContext)
+    {
+        if (attachment is not null)
+        {
+            return;
+        }
+
+        var isStagedTarget = validationContext.StagedProductIds?.Contains(product.Id) == true;
+        var isInactiveOrUnavailable = (!product.IsActive || !product.IsAvailable) && !isStagedTarget;
+        var isSupportedComponentGroup = target.Role == OptionSetAttachmentRole.ProductChoice
+            && customizationGroup is { IsActive: true }
+            && customizationGroup.ProductId == product.Id;
+        var hasUnsupportedInternalTarget = product.IsComponent && !isSupportedComponentGroup;
+        if (isInactiveOrUnavailable || hasUnsupportedInternalTarget)
+        {
+            throw new ConflictException(
+                "Inactive, unavailable, or unsupported internal-product targets cannot receive a new option-set attachment");
+        }
     }
 
     private static void ValidateTargetShape(
