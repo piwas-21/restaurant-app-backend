@@ -68,6 +68,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.ProductOptions)
                     .ThenInclude(option => option.OptionProduct)
+                        .ThenInclude(optionProduct => optionProduct.ProductCategories)
+                            .ThenInclude(productCategory => productCategory.Category)
             .Include(p => p.SuggestedSideItems) // Add soft delete filter here
                 .ThenInclude(si => si.SideItemProduct)
                     .ThenInclude(product => product.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
@@ -231,7 +233,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ToList(),
             CustomizationGroups = product.CustomizationGroups
                 .OrderBy(group => group.DisplayOrder)
-                .Select(ProductDtoMapper.MapCustomizationGroup)
+                .Select(group => ProductDtoMapper.MapCustomizationGroup(group, query.RequestedOrderType))
                 .ToList(),
             // #468: the SAME projection `GET /api/Menus/{id}` uses. This read had one of its own
             // that carried an option row's id, name, price and display order and stopped there — no
