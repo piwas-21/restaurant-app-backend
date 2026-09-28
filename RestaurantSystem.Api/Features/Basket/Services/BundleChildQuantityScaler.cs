@@ -3,9 +3,9 @@ using RestaurantSystem.Domain.Entities;
 namespace RestaurantSystem.Api.Features.Basket.Services;
 
 /// <summary>
-/// Keeps a menu bundle's child rows in step when the parent line's quantity changes (#305).
+/// Keeps a menu bundle's descendant rows in step when the parent line's quantity changes (#305).
 ///
-/// A bundle child stores a LINE-ABSOLUTE count. <c>BasketItemFactory</c> builds it as
+/// A bundle descendant stores a LINE-ABSOLUTE count. <c>BasketItemFactory</c> builds it as
 /// <c>Quantity = item.Quantity * option.Quantity</c> — the per-unit choice multiplied by the line
 /// quantity — while its <c>UnitPrice</c> stays per-unit (the section's AdditionalPrice). That pairing
 /// is what makes <c>child.Quantity * child.UnitPrice</c> the component's share of the line at add
@@ -20,7 +20,7 @@ public static class BundleChildQuantityScaler
 {
     /// <summary>
     /// Rescales <paramref name="children"/> from <paramref name="previousQuantity"/> to
-    /// <paramref name="newQuantity"/>, preserving each child's per-unit count.
+    /// <paramref name="newQuantity"/>, preserving each descendant's per-unit count.
     /// </summary>
     /// <remarks>
     /// Callers must pass the children they have actually LOADED. This helper deliberately does no
