@@ -16,6 +16,15 @@ public static class MenuSectionIntegrityRule
     {
         var sectionList = sections.ToList();
         ValidateStructure(sectionList);
+        await ValidateReferencesAsync(context, sectionList, cancellationToken);
+    }
+
+    public static async Task ValidateReferencesAsync(
+        ApplicationDbContext context,
+        IEnumerable<MenuSectionDto> sections,
+        CancellationToken cancellationToken)
+    {
+        var sectionList = sections.ToList();
         await ValidateProductReferencesAsync(context, sectionList, cancellationToken);
         await ValidateVariationReferencesAsync(context, sectionList, cancellationToken);
     }
