@@ -22,6 +22,8 @@ public sealed partial class CatalogueImportPreviewService
         CataloguePreviewSource source,
         Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
         HashSet<CatalogueLocalEntityKey> existingEntities,
+        IReadOnlyDictionary<CatalogueLocalEntityKey, string> localNames,
+        CatalogueImportReuseKinds reuseKinds,
         IReadOnlyCollection<CatalogueRejectedMatch> rejectedMatches,
         IReadOnlyDictionary<(string Type, string Name), List<CatalogueLocalCandidateDto>> candidatesBySource)
     {
@@ -34,11 +36,13 @@ public sealed partial class CatalogueImportPreviewService
             candidatesBySource.GetValueOrDefault(CatalogueImportCandidateLookup.Key(item.Type, source.Localized.Name)) ?? []);
         var warnings = new List<CatalogueImportIssueDto>();
         var blockers = new List<CatalogueImportIssueDto>();
-        AddPendingBlockers(session, source, mappedBySource, candidates, existingEntities, warnings, blockers);
+        AddPendingBlockers(session, source, mappedBySource, candidates, existingEntities, reuseKinds, warnings, blockers);
         AddSelectedWarnings(source, warnings, blockers);
         return new CatalogueImportPreviewItemDto(item.TemplateId, item.Revision, item.Type, source.Localized.Name,
             item.IsSelected, source.Decision?.Resolution ?? (mappingIsUsable ? ReuseResolution : null),
-            source.Decision?.LocalEntityId ?? mappedId, candidates, warnings, blockers);
+            source.Decision?.LocalEntityId ?? mappedId, candidates, warnings, blockers,
+            localNames.GetValueOrDefault(new CatalogueLocalEntityKey(
+                CatalogueImportReviewRules.ExpectedEntityType(item.Type), source.Decision?.LocalEntityId ?? mappedId ?? Guid.Empty)));
     }
 
     private void AddPendingBlockers(
@@ -47,6 +51,7 @@ public sealed partial class CatalogueImportPreviewService
         Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
         List<CatalogueLocalCandidateDto> candidates,
         HashSet<CatalogueLocalEntityKey> existingEntities,
+        CatalogueImportReuseKinds reuseKinds,
         List<CatalogueImportIssueDto> warnings,
         List<CatalogueImportIssueDto> blockers)
     {
@@ -61,7 +66,7 @@ public sealed partial class CatalogueImportPreviewService
             return;
         }
 
-        AddResolutionBlockers(source, mapping, mappingIsUsable, candidates, existingEntities, warnings, blockers);
+        AddResolutionBlockers(source, mapping, mappingIsUsable, candidates, existingEntities, reuseKinds, warnings, blockers);
         AddChoiceReviewBlockers(source, mappingIsUsable, blockers);
         if (NeedsOptionSetMaterialization(item.Type, source.Revision, source.Decision, mappingIsUsable)
             && !tenantFeatures.OptionSetMaterializationEnabled)
@@ -72,7 +77,7 @@ public sealed partial class CatalogueImportPreviewService
 
         if (NeedsCreateReview(source.Decision, mappingIsUsable))
         {
-            AddDependencyBlockers(session, source, mappedBySource, existingEntities, blockers);
+            AddDependencyBlockers(session, source, mappedBySource, existingEntities, reuseKinds, blockers);
         }
     }
 
@@ -82,6 +87,7 @@ public sealed partial class CatalogueImportPreviewService
         bool mappingIsUsable,
         List<CatalogueLocalCandidateDto> candidates,
         HashSet<CatalogueLocalEntityKey> existingEntities,
+        CatalogueImportReuseKinds reuseKinds,
         List<CatalogueImportIssueDto> warnings,
         List<CatalogueImportIssueDto> blockers)
     {
@@ -97,6 +103,12 @@ public sealed partial class CatalogueImportPreviewService
         {
             blockers.Add(Issue("SOURCE_MAPPING_ALREADY_EXISTS",
                 "This source revision is already mapped to a tenant record. Start a new-copy session to create a separate record."));
+            return;
+        }
+
+        if (mappingIsUsable && !reuseKinds.IsCompatible(source.Revision, mapping!.LocalEntityId))
+        {
+            blockers.Add(Issue("REUSE_KIND_MISMATCH", "The mapped tenant record has a different choice or ingredient kind than this template."));
             return;
         }
 
@@ -118,6 +130,11 @@ public sealed partial class CatalogueImportPreviewService
                      CatalogueImportReviewRules.ExpectedEntityType(item.Type), decision.LocalEntityId ?? Guid.Empty)))
         {
             blockers.Add(Issue("REUSE_TARGET_MISSING", "The selected tenant record no longer exists."));
+        }
+        else if (decision.Resolution.Equals(ReuseResolution, StringComparison.OrdinalIgnoreCase) &&
+                 !reuseKinds.IsCompatible(source.Revision, decision.LocalEntityId ?? Guid.Empty))
+        {
+            blockers.Add(Issue("REUSE_KIND_MISMATCH", "The selected tenant record has a different choice or ingredient kind than this template."));
         }
     }
 

@@ -442,7 +442,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     }
 
     [Fact]
-    public async Task Item_import_rolls_back_its_new_product_when_a_reused_option_set_has_the_wrong_kind()
+    public async Task Item_import_blocks_a_reused_option_set_with_the_wrong_kind_before_writing()
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -486,26 +486,27 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         await context.SaveChangesAsync();
         var productCountBefore = await context.Products.CountAsync();
 
-        var result = await ImportAsync(scope.ServiceProvider, context, session,
-            [.. sourceChoices.Select(ReadRevision), ReadRevision(categoryTemplate), optionSetRevision, itemRevision]);
-
-        result.Status.Should().Be(nameof(CatalogueImportStatus.PartiallyImported));
-        result.Items.Single(resultItem => resultItem.TemplateId == "rollback-item").Status
-            .Should().Be(nameof(CatalogueImportItemStatus.Failed));
-        result.Items.Single(resultItem => resultItem.TemplateId == "rollback-item").FailureCode
-            .Should().Be("IMPORT_VALIDATION_FAILED");
+        var preview = await scope.ServiceProvider.GetRequiredService<ICatalogueImportPreviewService>()
+            .PreviewAsync(session.Id, CancellationToken.None);
+        preview.Items.Single(resultItem => resultItem.TemplateId == "rollback-item").BlockingIssues
+            .Should().Contain(issue => issue.Code == "REUSE_KIND_MISMATCH");
+        var attempt = async () => await ImportAsync(scope.ServiceProvider, context, session,
+            [.. sourceChoices.Select(ReadRevision), ReadRevision(categoryTemplate), optionSetRevision, itemRevision],
+            expectReadyPreview: false);
+        await attempt.Should().ThrowAsync<BadRequestException>();
         (await context.Products.CountAsync()).Should().Be(productCountBefore);
         (await context.Products.AnyAsync(product => product.Name == "rollback-item français")).Should().BeFalse();
         (await context.CatalogueImportSessionTemplates.AsNoTracking()
-            .SingleAsync(template => template.TemplateId == "rollback-item")).FailureCode
-            .Should().Be("IMPORT_VALIDATION_FAILED");
+            .SingleAsync(template => template.TemplateId == "rollback-item")).Status
+            .Should().Be(CatalogueImportItemStatus.Pending);
     }
 
     private static async Task<CatalogueImportResultDto> ImportAsync(
         IServiceProvider services,
         ApplicationDbContext context,
         CatalogueImportSession session,
-        IReadOnlyList<CentralCatalogueTemplateRevision> revisions)
+        IReadOnlyList<CentralCatalogueTemplateRevision> revisions,
+        bool expectReadyPreview = true)
     {
         var byId = revisions.ToDictionary(revision => revision.TemplateId, StringComparer.Ordinal);
         var catalogue = new Mock<ICentralCatalogueClient>(MockBehavior.Strict);
@@ -537,8 +538,8 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
 
         var preview = await services.GetRequiredService<ICatalogueImportPreviewService>()
             .PreviewAsync(session.Id, CancellationToken.None);
-        preview.Items.Where(item => item.IsSelected).SelectMany(item => item.BlockingIssues)
-            .Should().BeEmpty();
+        if (expectReadyPreview)
+            preview.Items.Where(item => item.IsSelected).SelectMany(item => item.BlockingIssues).Should().BeEmpty();
 
         return await importer.ImportAsync(session.Id,
             new ImportCatalogueSessionRequest { ExpectedVersion = 1, IdempotencyKey = Guid.NewGuid().ToString("N") },

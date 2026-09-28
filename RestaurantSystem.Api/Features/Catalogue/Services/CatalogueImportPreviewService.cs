@@ -74,8 +74,10 @@ public sealed partial class CatalogueImportPreviewService(
                 .Select(source => new CatalogueLocalEntityKey(
                     CatalogueImportReviewRules.ExpectedEntityType(source.Item.Type),
                     source.Decision!.LocalEntityId!.Value)));
-        var existingEntities = await CatalogueImportEntityLookup.LoadExistingAsync(
+        var localNames = await CatalogueImportEntityLookup.LoadNamesAsync(
             context, entityReferences, cancellationToken);
+        var existingEntities = localNames.Keys.ToHashSet();
+        var reuseKinds = await CatalogueImportReuseKinds.LoadAsync(context, entityReferences, cancellationToken);
         var candidatesBySource = await CatalogueImportCandidateLookup.LoadAsync(
             context,
             sourceItems.Select(source => new CatalogueCandidateSearch(source.Item.Type, source.Localized.Name)),
@@ -86,7 +88,7 @@ public sealed partial class CatalogueImportPreviewService(
             .GroupBy(adoption => (adoption.SourceTemplateId, adoption.SourceRevision))
             .ToDictionary(group => group.Key, group => group.First());
         var results = sourceItems.Select(source => BuildPreviewItem(
-            session, source, mappedBySource, existingEntities, rejectedMatches, candidatesBySource)).ToArray();
+            session, source, mappedBySource, existingEntities, localNames, reuseKinds, rejectedMatches, candidatesBySource)).ToArray();
 
         logger.LogDebug("Built catalogue preview for {SessionId} with {ItemCount} template items", sessionId, results.Length);
         return new CatalogueImportPreviewDto(session.Id, session.Version, results);
