@@ -67,7 +67,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ThenInclude(group => group.IngredientOptions)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.ProductOptions)
-                    .ThenInclude(option => option.OptionProduct)
+                    .ThenInclude(option => option.OptionProduct.ProductCategories)
+                        .ThenInclude(productCategory => productCategory.Category)
             .Include(p => p.SuggestedSideItems) // Add soft delete filter here
                 .ThenInclude(si => si.SideItemProduct)
                     .ThenInclude(product => product.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
@@ -100,7 +101,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.CustomizationGroups)
                         .ThenInclude(group => group.ProductOptions)
-                            .ThenInclude(option => option.OptionProduct)
+                            .ThenInclude(option => option.OptionProduct.ProductCategories)
+                                .ThenInclude(productCategory => productCategory.Category)
             .FirstOrDefaultAsync(p => p.Id == query.Id && !p.IsDeleted, cancellationToken); // Also filter the main product
         if (product == null)
         {
@@ -231,7 +233,7 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ToList(),
             CustomizationGroups = product.CustomizationGroups
                 .OrderBy(group => group.DisplayOrder)
-                .Select(ProductDtoMapper.MapCustomizationGroup)
+                .Select(group => ProductDtoMapper.MapCustomizationGroup(group, query.RequestedOrderType))
                 .ToList(),
             // #468: the SAME projection `GET /api/Menus/{id}` uses. This read had one of its own
             // that carried an option row's id, name, price and display order and stopped there — no

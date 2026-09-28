@@ -189,7 +189,7 @@ public static class MenuBundleMapper
             SauceIncludedFree = item.Product?.SauceIncludedFree ?? 0,
             CustomizationGroups = item.Product?.CustomizationGroups
                 .OrderBy(group => group.DisplayOrder)
-                .Select(ProductDtoMapper.MapCustomizationGroup)
+                .Select(group => ProductDtoMapper.MapCustomizationGroup(group, requestedOrderType))
                 .ToList() ?? [],
             DetailedIngredients = item.Product?.DetailedIngredients
                 .Where(di => di.IsActive)
