@@ -25,4 +25,5 @@ public sealed record CatalogueImportSessionTemplateDto(
     string? LocalEntityType,
     Guid? LocalEntityId,
     string? FailureCode,
-    CatalogueImportItemDecision? Decision);
+    CatalogueImportItemDecision? Decision,
+    string? LocalEntityName = null);

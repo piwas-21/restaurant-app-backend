@@ -284,6 +284,7 @@ public sealed class CatalogueSessionImporter(
     {
         ConflictException => "IMPORT_CONFLICT",
         NotFoundException => "LOCAL_RECORD_MISSING",
+        BadRequestException { ErrorCode: "REUSE_KIND_MISMATCH" } => "REUSE_KIND_MISMATCH",
         BadRequestException => "IMPORT_VALIDATION_FAILED",
         DbUpdateException => "IMPORT_PERSISTENCE_FAILED",
         _ => "IMPORT_FAILED"

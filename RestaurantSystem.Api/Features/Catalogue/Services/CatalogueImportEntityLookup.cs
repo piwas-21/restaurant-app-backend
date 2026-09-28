@@ -8,6 +8,43 @@ internal readonly record struct CatalogueLocalEntityKey(string EntityType, Guid 
 
 internal static class CatalogueImportEntityLookup
 {
+    public static async Task<Dictionary<CatalogueLocalEntityKey, string>> LoadNamesAsync(
+        ApplicationDbContext context,
+        IEnumerable<CatalogueLocalEntityKey> requested,
+        CancellationToken cancellationToken)
+    {
+        var names = new Dictionary<CatalogueLocalEntityKey, string>();
+        var keys = requested.Where(key => key.Id != Guid.Empty).Distinct().ToArray();
+        var categoryIds = Ids("Category");
+        if (categoryIds.Length > 0) Add("Category", await context.Categories
+            .Where(row => categoryIds.Contains(row.Id))
+            .Select(row => new CatalogueLocalNameRow(row.Id, row.Name)).ToListAsync(cancellationToken));
+        var ingredientIds = Ids("GlobalIngredient");
+        if (ingredientIds.Length > 0) Add("GlobalIngredient", await context.GlobalIngredients
+            .Where(row => ingredientIds.Contains(row.Id))
+            .Select(row => new CatalogueLocalNameRow(row.Id, row.DefaultName)).ToListAsync(cancellationToken));
+        var productIds = Ids("Product");
+        if (productIds.Length > 0) Add("Product", await context.Products
+            .Where(row => productIds.Contains(row.Id) && row.Type != ProductType.Menu)
+            .Select(row => new CatalogueLocalNameRow(row.Id, row.Name)).ToListAsync(cancellationToken));
+        var bundleIds = Ids("MenuBundle");
+        if (bundleIds.Length > 0) Add("MenuBundle", await context.Products
+            .Where(row => bundleIds.Contains(row.Id) && row.Type == ProductType.Menu)
+            .Select(row => new CatalogueLocalNameRow(row.Id, row.Name)).ToListAsync(cancellationToken));
+        var optionSetIds = Ids("OptionSet");
+        if (optionSetIds.Length > 0) Add("OptionSet", await context.OptionSets
+            .Where(row => optionSetIds.Contains(row.Id))
+            .Select(row => new CatalogueLocalNameRow(row.Id, row.Name)).ToListAsync(cancellationToken));
+        return names;
+
+        Guid[] Ids(string entityType) => keys.Where(key => key.EntityType == entityType).Select(key => key.Id).ToArray();
+
+        void Add(string entityType, IEnumerable<CatalogueLocalNameRow> found)
+        {
+            foreach (var row in found) names[new CatalogueLocalEntityKey(entityType, row.Id)] = row.Name;
+        }
+    }
+
     public static async Task<HashSet<CatalogueLocalEntityKey>> LoadExistingAsync(
         ApplicationDbContext context,
         IEnumerable<CatalogueLocalEntityKey> requested,
@@ -43,3 +80,5 @@ internal static class CatalogueImportEntityLookup
         }
     }
 }
+
+internal sealed record CatalogueLocalNameRow(Guid Id, string Name);
