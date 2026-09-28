@@ -103,6 +103,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                     .ThenInclude(i => i.Product.CustomizationGroups)
                         .ThenInclude(group => group.ProductOptions)
                             .ThenInclude(option => option.OptionProduct)
+                                .ThenInclude(optionProduct => optionProduct.ProductCategories)
+                                    .ThenInclude(productCategory => productCategory.Category)
             .FirstOrDefaultAsync(p => p.Id == query.Id && !p.IsDeleted, cancellationToken); // Also filter the main product
         if (product == null)
         {
