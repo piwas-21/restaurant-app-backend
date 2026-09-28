@@ -52,7 +52,9 @@ public partial class BasketItemFactory
                     .ThenInclude(membership => membership.ProductIngredient)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.ProductOptions)
-                    .ThenInclude(membership => membership.OptionProduct)
+                    // Nested product choices can inherit channel masks from their primary category.
+                    .ThenInclude(membership => membership.OptionProduct.ProductCategories)
+                        .ThenInclude(category => category.Category)
             // See the side-item load: without the inheritance chain the guard below resolves every
             // inheriting option as unrestricted, which is worse than no guard — it looks like one.
             .Include(p => p.ProductCategories)
@@ -94,6 +96,10 @@ public partial class BasketItemFactory
 
             var explicitSelection = ExplicitCustomizationSelection.Resolve(
                 childProduct, option.CustomizationSelections);
+            foreach (var selected in explicitSelection.ProductOptions)
+            {
+                BasketChannelGuard.EnsureOrderable(selected.Product, basketOrderType);
+            }
             var hasExplicitGroups = childProduct.CustomizationGroups.Any(group => group.IsActive);
             var selectedIngredients = hasExplicitGroups
                 ? explicitSelection.SelectedIngredientIds
