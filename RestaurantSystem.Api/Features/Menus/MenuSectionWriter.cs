@@ -35,6 +35,7 @@ public static class MenuSectionWriter
         string auditIdentifier,
         bool translationsOnly = false)
     {
+        ValidatePatchIds(menuDefinition, sections, translationsOnly);
         var existingSections = menuDefinition.Sections.ToDictionary(section => section.Id);
         var retainedSections = new HashSet<Guid>();
         var written = new List<(MenuSectionDto Input, MenuSection Entity)>();
@@ -45,17 +46,8 @@ public static class MenuSectionWriter
             MenuSection section;
             if (sectionDto.Id is Guid sectionId)
             {
-                if (!existingSections.TryGetValue(sectionId, out var existingSection))
-                {
-                    throw new BadRequestException($"Section '{sectionId}' does not belong to this menu");
-                }
-
-                section = existingSection;
-
-                if (!retainedSections.Add(sectionId))
-                {
-                    throw new BadRequestException($"Section '{sectionId}' appears more than once");
-                }
+                section = existingSections[sectionId];
+                retainedSections.Add(sectionId);
             }
             else
             {
@@ -94,6 +86,74 @@ public static class MenuSectionWriter
         menuDefinition.UpdatedAt = now;
         menuDefinition.UpdatedBy = auditIdentifier;
         return written;
+    }
+
+    /// <summary>
+    /// Validates supplied section and item IDs without changing tracked entities. PATCH routes that
+    /// add additional protection around section writes call this before their protection checks so
+    /// malformed IDs keep the editor's established BadRequest response.
+    /// </summary>
+    public static void ValidatePatchIds(
+        MenuDefinition menuDefinition,
+        IReadOnlyCollection<MenuSectionDto> sections,
+        bool translationsOnly = false)
+    {
+        var existingSections = menuDefinition.Sections.ToDictionary(section => section.Id);
+        var retainedSections = new HashSet<Guid>();
+        foreach (var sectionDto in sections)
+        {
+            if (sectionDto.Id is Guid sectionId)
+            {
+                if (!existingSections.TryGetValue(sectionId, out var existingSection))
+                {
+                    throw new BadRequestException($"Section '{sectionId}' does not belong to this menu");
+                }
+
+                if (!retainedSections.Add(sectionId))
+                {
+                    throw new BadRequestException($"Section '{sectionId}' appears more than once");
+                }
+
+                if (!translationsOnly && sectionDto.ItemsSpecified)
+                {
+                    ValidateItemIds(existingSection, sectionDto.Items ?? []);
+                }
+            }
+            else if (!translationsOnly && sectionDto.ItemsSpecified)
+            {
+                foreach (var item in sectionDto.Items ?? [])
+                {
+                    if (item.Id is Guid itemId)
+                    {
+                        throw new BadRequestException(
+                            $"Option '{itemId}' does not belong to a section being created");
+                    }
+                }
+            }
+        }
+    }
+
+    private static void ValidateItemIds(MenuSection section, IReadOnlyCollection<MenuSectionItemDto> items)
+    {
+        var existingItems = section.Items.ToDictionary(item => item.Id);
+        var retainedItems = new HashSet<Guid>();
+        foreach (var item in items)
+        {
+            if (item.Id is not Guid itemId)
+            {
+                continue;
+            }
+
+            if (!existingItems.ContainsKey(itemId))
+            {
+                throw new BadRequestException($"Option '{itemId}' does not belong to section '{section.Id}'");
+            }
+
+            if (!retainedItems.Add(itemId))
+            {
+                throw new BadRequestException($"Option '{itemId}' appears more than once");
+            }
+        }
     }
 
     private static void ApplySectionContent(
@@ -304,17 +364,8 @@ public static class MenuSectionWriter
             MenuSectionItem item;
             if (itemDto.Id is Guid itemId)
             {
-                if (!existingItems.TryGetValue(itemId, out var existingItem))
-                {
-                    throw new BadRequestException($"Option '{itemId}' does not belong to section '{section.Id}'");
-                }
-
-                item = existingItem;
-
-                if (!retainedItems.Add(itemId))
-                {
-                    throw new BadRequestException($"Option '{itemId}' appears more than once");
-                }
+                item = existingItems[itemId];
+                retainedItems.Add(itemId);
             }
             else
             {

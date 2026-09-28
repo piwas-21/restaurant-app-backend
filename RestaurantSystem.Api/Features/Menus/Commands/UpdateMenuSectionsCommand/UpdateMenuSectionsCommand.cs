@@ -57,6 +57,9 @@ public sealed class UpdateMenuSectionsCommandHandler(
 
         if (command.Sections is not null)
         {
+            MenuSectionWriter.ValidatePatchIds(definition, command.Sections);
+            await AttachedBundleChoiceOptionSetGuard.ValidatePatchAsync(
+                _context, definition, command.Sections, cancellationToken);
             MenuSectionWriter.ApplyPatch(
                 _context,
                 definition,
