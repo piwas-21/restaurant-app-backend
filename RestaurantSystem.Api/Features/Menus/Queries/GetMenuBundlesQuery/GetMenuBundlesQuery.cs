@@ -68,9 +68,8 @@ public class GetMenuBundlesQueryHandler(
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.CustomizationGroups)
                         .ThenInclude(group => group.ProductOptions)
-                            .ThenInclude(option => option.OptionProduct)
-                                .ThenInclude(optionProduct => optionProduct.ProductCategories)
-                                    .ThenInclude(productCategory => productCategory.Category)
+                            .ThenInclude(option => option.OptionProduct.ProductCategories)
+                                .ThenInclude(productCategory => productCategory.Category)
             .Include(p => p.Descriptions)
             .Include(p => p.Images)
             // Split: 2+ collection Includes over MANY roots multiply rows (S8733). Placed in

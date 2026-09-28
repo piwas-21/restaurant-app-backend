@@ -67,9 +67,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ThenInclude(group => group.IngredientOptions)
             .Include(p => p.CustomizationGroups)
                 .ThenInclude(group => group.ProductOptions)
-                    .ThenInclude(option => option.OptionProduct)
-                        .ThenInclude(optionProduct => optionProduct.ProductCategories)
-                            .ThenInclude(productCategory => productCategory.Category)
+                    .ThenInclude(option => option.OptionProduct.ProductCategories)
+                        .ThenInclude(productCategory => productCategory.Category)
             .Include(p => p.SuggestedSideItems) // Add soft delete filter here
                 .ThenInclude(si => si.SideItemProduct)
                     .ThenInclude(product => product.Images.Where(i => !i.IsDeleted).OrderBy(i => i.SortOrder))
@@ -102,9 +101,8 @@ public class GetProductByIdQueryHandler : IQueryHandler<GetProductByIdQuery, Api
                 .ThenInclude(s => s.Items)
                     .ThenInclude(i => i.Product.CustomizationGroups)
                         .ThenInclude(group => group.ProductOptions)
-                            .ThenInclude(option => option.OptionProduct)
-                                .ThenInclude(optionProduct => optionProduct.ProductCategories)
-                                    .ThenInclude(productCategory => productCategory.Category)
+                            .ThenInclude(option => option.OptionProduct.ProductCategories)
+                                .ThenInclude(productCategory => productCategory.Category)
             .FirstOrDefaultAsync(p => p.Id == query.Id && !p.IsDeleted, cancellationToken); // Also filter the main product
         if (product == null)
         {
