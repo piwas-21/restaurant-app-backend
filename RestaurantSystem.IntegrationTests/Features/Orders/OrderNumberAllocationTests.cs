@@ -137,6 +137,38 @@ public class OrderNumberAllocationTests : IntegrationTestBase
         allocated.Should().Equal($"{Today}0001", $"{Today}0002", $"{Today}0003");
     }
 
+    [Fact]
+    public async Task Allocation_includes_soft_deleted_orders_when_reserving_daily_numbers()
+    {
+        var today = Today;
+        await using var context = DatabaseFixture.CreateContext();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
+        AddOrder(context, $"{today}0001");
+        AddOrder(context, $"{today}0002");
+        AddOrder(context, $"{today}0003");
+        await context.SaveChangesAsync();
+
+        var latest = await context.Orders.SingleAsync(order => order.OrderNumber == $"{today}0003");
+        context.Orders.Remove(latest);
+        await context.SaveChangesAsync();
+
+        var nextNumber = await new OrderNumberGenerator(context, UtcClock).GenerateAsync();
+        nextNumber.Should().Be($"{today}0004",
+            "a soft-deleted order still occupies the unique order-number index");
+
+        AddOrder(context, nextNumber);
+        await context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        var stored = await context.Orders.IgnoreQueryFilters()
+            .Where(order => order.OrderNumber.StartsWith(today))
+            .Select(order => order.OrderNumber)
+            .ToListAsync();
+        stored.Should().Contain($"{today}0003").And.Contain(nextNumber);
+        stored.Should().OnlyHaveUniqueItems();
+    }
+
     private static string Today => DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
 
     /// <summary>

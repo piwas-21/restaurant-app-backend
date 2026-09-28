@@ -33,9 +33,7 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         var order = await _context.Orders
-            .Where(order => order.Id == command.OrderId)
-            .Select(order => new { order.Version })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(current => current.Id == command.OrderId, cancellationToken);
 
         if (order is null)
         {
@@ -46,47 +44,48 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return ApiResponse<bool>.FailureWithCode(
-                "The order changed. Refresh it before deleting.",
-                ErrorCodes.OrderVersionConflict);
+            return VersionConflict();
         }
 
-        // Delete associated TableReservations first to avoid the restrict FK. Keep this in the
-        // same transaction as the conditional order delete so a stale version cannot remove a
-        // reservation before discovering that the order changed.
-        await _context.TableReservations
-            // soft-delete-bypass: permanent order purge must also remove linked reservations,
-            // including already soft-deleted rows hidden by the global filter, before the restrict FK.
-            .IgnoreQueryFilters()
-            .Where(reservation => reservation.OrderId == command.OrderId)
-            .ExecuteDeleteAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        var activeReservations = await _context.TableReservations
+            .Where(reservation => reservation.OrderId == command.OrderId && reservation.IsActive)
+            .ToListAsync(cancellationToken);
 
-        var orderQuery = _context.Orders.Where(current => current.Id == command.OrderId);
-        if (command.ExpectedVersion.HasValue)
+        foreach (var reservation in activeReservations)
         {
-            orderQuery = orderQuery.Where(current => current.Version == command.ExpectedVersion.Value);
+            reservation.IsActive = false;
+            reservation.ReleasedAt = now;
+            reservation.ReleasedBy = auditIdentifier;
+            reservation.ReleaseReason = "OrderDeleted";
         }
 
-        var rowsDeleted = await orderQuery.ExecuteDeleteAsync(cancellationToken);
-        if (rowsDeleted == 0)
+        // ApplicationDbContext converts this into an audited soft delete and increments Version.
+        // The order-change trigger records the update while retaining its durable journal rows.
+        _context.Orders.Remove(order);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
         {
             await transaction.RollbackAsync(cancellationToken);
-            var stillExists = await _context.Orders
-                .AnyAsync(current => current.Id == command.OrderId, cancellationToken);
-            return stillExists && command.ExpectedVersion.HasValue
-                ? ApiResponse<bool>.FailureWithCode(
-                    "The order changed. Refresh it before deleting.",
-                    ErrorCodes.OrderVersionConflict)
-                : ApiResponse<bool>.Failure("Order not found");
+            return VersionConflict();
         }
 
-        await transaction.CommitAsync(cancellationToken);
-
         _logger.LogInformation(
-            "Order with ID {OrderId} permanently deleted by user {UserId}",
+            "Order with ID {OrderId} soft-deleted by user {UserId}",
             command.OrderId,
             _currentUserService.UserId);
 
-        return ApiResponse<bool>.SuccessWithData(true, "Order permanently deleted");
+        return ApiResponse<bool>.SuccessWithData(true, "Order deleted successfully");
     }
+
+    private static ApiResponse<bool> VersionConflict()
+        => ApiResponse<bool>.FailureWithCode(
+            "The order changed. Refresh it before deleting.",
+            ErrorCodes.OrderVersionConflict);
 }
