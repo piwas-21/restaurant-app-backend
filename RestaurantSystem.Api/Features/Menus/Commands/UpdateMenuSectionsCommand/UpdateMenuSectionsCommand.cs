@@ -103,6 +103,7 @@ public sealed class UpdateMenuSectionsCommandHandler(
         IsRequired = section.IsRequired,
         MinSelection = section.MinSelection,
         MaxSelection = section.MaxSelection,
+        AllowRepeatedItems = section.AllowRepeatedItems,
         Translations = MenuSectionLocale.ToDto(section.Translations),
         Items = section.Items
             .OrderBy(item => item.DisplayOrder)

@@ -107,6 +107,41 @@ public sealed class MenuBundleSelectionRulesTests
     }
 
     [Fact]
+    public void Repeated_meat_section_counts_portions_and_prices_each_portion()
+    {
+        var sections = Sections();
+        sections.Main.Name = "Meats";
+        sections.Main.MinSelection = 3;
+        sections.Main.MaxSelection = 3;
+        sections.Main.AllowRepeatedItems = true;
+
+        var threeKebab = MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            [sections.Main],
+            [new SelectedMenuOptionDto { SectionId = sections.Main.Id, ItemId = MainProduct, Quantity = 3 }]);
+        var mixed = MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            [sections.Main],
+            [
+                new SelectedMenuOptionDto { SectionId = sections.Main.Id, ItemId = MainProduct, Quantity = 1 },
+                new SelectedMenuOptionDto { SectionId = sections.Main.Id, ItemId = AlternateMainProduct, Quantity = 2 }
+            ]);
+
+        threeKebab.Should().Be(9m);
+        mixed.Should().Be(3m);
+
+        var tooFew = () => MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            [sections.Main],
+            [new SelectedMenuOptionDto { SectionId = sections.Main.Id, ItemId = MainProduct, Quantity = 2 }]);
+        tooFew.Should().Throw<BadRequestException>()
+            .WithMessage("Section 'Meats' requires at least 3 selection(s)");
+
+        var tooMany = () => MenuBundleSelectionRules.ValidateAndSumOptionPrices(
+            [sections.Main],
+            [new SelectedMenuOptionDto { SectionId = sections.Main.Id, ItemId = MainProduct, Quantity = 4 }]);
+        tooMany.Should().Throw<BadRequestException>()
+            .WithMessage("Section 'Meats' allows at most 3 selection(s)");
+    }
+
+    [Fact]
     public void Rejects_duplicate_option_membership_within_a_section()
     {
         var sections = Sections();
