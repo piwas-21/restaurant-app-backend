@@ -74,8 +74,10 @@ public sealed partial class CatalogueImportPreviewService(
                 .Select(source => new CatalogueLocalEntityKey(
                     CatalogueImportReviewRules.ExpectedEntityType(source.Item.Type),
                     source.Decision!.LocalEntityId!.Value)));
-        var existingEntities = await CatalogueImportEntityLookup.LoadExistingAsync(
+        var localNames = await CatalogueImportEntityLookup.LoadNamesAsync(
             context, entityReferences, cancellationToken);
+        var existingEntities = localNames.Keys.ToHashSet();
+        var reuseKinds = await CatalogueImportReuseKinds.LoadAsync(context, entityReferences, cancellationToken);
         var candidatesBySource = await CatalogueImportCandidateLookup.LoadAsync(
             context,
             sourceItems.Select(source => new CatalogueCandidateSearch(source.Item.Type, source.Localized.Name)),
@@ -85,8 +87,9 @@ public sealed partial class CatalogueImportPreviewService(
             .ThenByDescending(adoption => adoption.IsDefault)
             .GroupBy(adoption => (adoption.SourceTemplateId, adoption.SourceRevision))
             .ToDictionary(group => group.Key, group => group.First());
-        var results = sourceItems.Select(source => BuildPreviewItem(
-            session, source, mappedBySource, existingEntities, rejectedMatches, candidatesBySource)).ToArray();
+        var lookups = new CataloguePreviewLookups(
+            mappedBySource, existingEntities, localNames, reuseKinds, rejectedMatches, candidatesBySource);
+        var results = sourceItems.Select(source => BuildPreviewItem(session, source, lookups)).ToArray();
 
         logger.LogDebug("Built catalogue preview for {SessionId} with {ItemCount} template items", sessionId, results.Length);
         return new CatalogueImportPreviewDto(session.Id, session.Version, results);
@@ -114,3 +117,11 @@ internal sealed record CataloguePreviewSource(
     CentralCatalogueTemplateRevision Revision,
     (string Name, string? Description) Localized,
     CatalogueImportItemDecision? Decision);
+
+internal sealed record CataloguePreviewLookups(
+    Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> MappedBySource,
+    HashSet<CatalogueLocalEntityKey> ExistingEntities,
+    IReadOnlyDictionary<CatalogueLocalEntityKey, string> LocalNames,
+    CatalogueImportReuseKinds ReuseKinds,
+    IReadOnlyCollection<CatalogueRejectedMatch> RejectedMatches,
+    IReadOnlyDictionary<(string Type, string Name), List<CatalogueLocalCandidateDto>> CandidatesBySource);

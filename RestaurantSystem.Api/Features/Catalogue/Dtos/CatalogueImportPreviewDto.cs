@@ -15,7 +15,8 @@ public sealed record CatalogueImportPreviewItemDto(
     Guid? LocalEntityId,
     IReadOnlyList<CatalogueLocalCandidateDto> Candidates,
     IReadOnlyList<CatalogueImportIssueDto> Warnings,
-    IReadOnlyList<CatalogueImportIssueDto> BlockingIssues);
+    IReadOnlyList<CatalogueImportIssueDto> BlockingIssues,
+    string? LocalEntityName = null);
 
 public sealed record CatalogueImportIssueDto(string Code, string Message);
 

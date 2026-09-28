@@ -12,6 +12,7 @@ public sealed partial class CatalogueImportPreviewService
         CataloguePreviewSource source,
         Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
         HashSet<CatalogueLocalEntityKey> existingEntities,
+        CatalogueImportReuseKinds reuseKinds,
         List<CatalogueImportIssueDto> blockers)
     {
         IReadOnlyList<CataloguePayloadDependency> dependencies;
@@ -35,7 +36,7 @@ public sealed partial class CatalogueImportPreviewService
 
         foreach (var dependency in dependencies)
         {
-            AddDependencyBlocker(session, dependency, mappedBySource, existingEntities, blockers);
+            AddDependencyBlocker(session, dependency, mappedBySource, existingEntities, reuseKinds, blockers);
         }
     }
 
@@ -44,6 +45,7 @@ public sealed partial class CatalogueImportPreviewService
         CataloguePayloadDependency dependency,
         Dictionary<(string SourceTemplateId, int SourceRevision), CataloguePreviewAdoption> mappedBySource,
         HashSet<CatalogueLocalEntityKey> existingEntities,
+        CatalogueImportReuseKinds reuseKinds,
         List<CatalogueImportIssueDto> blockers)
     {
         var template = session.Templates.FirstOrDefault(candidate =>
@@ -65,7 +67,7 @@ public sealed partial class CatalogueImportPreviewService
 
         if (template.IsSelected)
         {
-            AddSelectedDependencyBlocker(template, dependency.Reference, existingEntities, blockers);
+            AddSelectedDependencyBlocker(template, dependency.Reference, existingEntities, reuseKinds, blockers);
             return;
         }
 
@@ -74,6 +76,13 @@ public sealed partial class CatalogueImportPreviewService
                 (template.TemplateId, template.Revision), out var mapping) &&
             mapping.LocalEntityType == entityType &&
             existingEntities.Contains(new CatalogueLocalEntityKey(entityType, mapping.LocalEntityId));
+        if (hasReusableMapping && !reuseKinds.IsCompatible(
+                CatalogueSessionMapper.ParseRevision(template.RevisionJson), mapping!.LocalEntityId))
+        {
+            blockers.Add(Issue("REUSE_KIND_MISMATCH",
+                $"The mapped catalogue dependency {dependency.Reference.Key} has a different choice or ingredient kind."));
+            return;
+        }
         if (!hasReusableMapping)
         {
             blockers.Add(Issue("DEPENDENCY_NOT_SELECTED",
@@ -85,6 +94,7 @@ public sealed partial class CatalogueImportPreviewService
         CatalogueImportSessionTemplate template,
         CatalogueSourceReference reference,
         HashSet<CatalogueLocalEntityKey> existingEntities,
+        CatalogueImportReuseKinds reuseKinds,
         List<CatalogueImportIssueDto> blockers)
     {
         if (template.Status == CatalogueImportItemStatus.Failed)
@@ -108,6 +118,12 @@ public sealed partial class CatalogueImportPreviewService
         {
             blockers.Add(Issue("DEPENDENCY_LOCAL_RECORD_MISSING",
                 $"The imported catalogue dependency {reference.Key} no longer maps to a compatible tenant record."));
+            return;
+        }
+        if (!reuseKinds.IsCompatible(CatalogueSessionMapper.ParseRevision(template.RevisionJson), localId))
+        {
+            blockers.Add(Issue("REUSE_KIND_MISMATCH",
+                $"The imported catalogue dependency {reference.Key} has a different choice or ingredient kind."));
         }
     }
 

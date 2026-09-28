@@ -76,6 +76,8 @@ public sealed partial class CatalogueTemplateImportExecutor : ICatalogueTemplate
         var mapping = resolver.FindReusableMapping(item.TemplateId, item.Revision, entityType);
         if (mapping is not null)
         {
+            if (!batchContext.IsCompatible(revision, mapping.LocalEntityId))
+                throw new BadRequestException("The mapped tenant record has a different kind than this template.", "REUSE_KIND_MISMATCH");
             return Imported(mapping.LocalEntityType, mapping.LocalEntityId);
         }
 
@@ -88,6 +90,8 @@ public sealed partial class CatalogueTemplateImportExecutor : ICatalogueTemplate
             {
                 throw new BadRequestException("The selected tenant record no longer exists.", "REUSE_TARGET_MISSING");
             }
+            if (!batchContext.IsCompatible(revision, id))
+                throw new BadRequestException("The selected tenant record has a different kind than this template.", "REUSE_KIND_MISMATCH");
 
             return Imported(entityType, id);
         }

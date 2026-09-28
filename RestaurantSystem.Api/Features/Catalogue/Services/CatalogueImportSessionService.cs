@@ -34,7 +34,7 @@ public sealed class CatalogueImportSessionService(
         if (existing is not null)
         {
             CatalogueImportSessionRules.EnsureSameCreateIntent(existing, request);
-            return CatalogueSessionMapper.ToDto(existing);
+            return await ToDtoWithNamesAsync(existing, cancellationToken);
         }
 
         var graph = await graphLoader.LoadAsync(request.TemplateId, request.Revision, cancellationToken);
@@ -87,14 +87,14 @@ public sealed class CatalogueImportSessionService(
 
             logger.LogInformation(exception, "Reused catalogue import session after an idempotency race");
             CatalogueImportSessionRules.EnsureSameCreateIntent(winner, request);
-            return CatalogueSessionMapper.ToDto(winner);
+            return await ToDtoWithNamesAsync(winner, cancellationToken);
         }
 
-        return CatalogueSessionMapper.ToDto(session);
+        return await ToDtoWithNamesAsync(session, cancellationToken);
     }
 
     public async Task<CatalogueImportSessionDto> GetAsync(Guid sessionId, CancellationToken cancellationToken) =>
-        CatalogueSessionMapper.ToDto(await GetTrackedOrReadOnlyAsync(sessionId, false, cancellationToken));
+        await ToDtoWithNamesAsync(await GetTrackedOrReadOnlyAsync(sessionId, false, cancellationToken), cancellationToken);
 
     public async Task<CatalogueImportSessionDto> UpdateItemsAsync(
         Guid sessionId,
@@ -125,7 +125,35 @@ public sealed class CatalogueImportSessionService(
             throw new ConflictException("Import session changed. Reload it before updating selections.");
         }
 
-        return CatalogueSessionMapper.ToDto(session);
+        return await ToDtoWithNamesAsync(session, cancellationToken);
+    }
+
+    private async Task<CatalogueImportSessionDto> ToDtoWithNamesAsync(
+        CatalogueImportSession session,
+        CancellationToken cancellationToken)
+    {
+        var dto = CatalogueSessionMapper.ToDto(session);
+        var keys = dto.Items.Select(LocalKey).OfType<CatalogueLocalEntityKey>().ToArray();
+        if (keys.Length == 0) return dto;
+        var names = await CatalogueImportEntityLookup.LoadNamesAsync(context, keys, cancellationToken);
+        return dto with
+        {
+            Items = dto.Items.Select(item => item with
+            {
+                LocalEntityName = LocalKey(item) is CatalogueLocalEntityKey key
+                    ? names.GetValueOrDefault(key)
+                    : null
+            }).ToArray()
+        };
+
+        static CatalogueLocalEntityKey? LocalKey(CatalogueImportSessionTemplateDto item)
+        {
+            var reused = item.Decision?.Resolution.Equals("Reuse", StringComparison.OrdinalIgnoreCase) == true;
+            var id = reused ? item.Decision!.LocalEntityId : item.LocalEntityId;
+            if (id is not Guid localId) return null;
+            var type = reused ? CatalogueImportReviewRules.ExpectedEntityType(item.Type) : item.LocalEntityType;
+            return string.IsNullOrWhiteSpace(type) ? null : new CatalogueLocalEntityKey(type, localId);
+        }
     }
 
     private static void EnsureEditable(CatalogueImportSession session, int expectedVersion, bool isRetry)

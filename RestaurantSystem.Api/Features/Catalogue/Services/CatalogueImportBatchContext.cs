@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.Catalogue.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -13,19 +14,23 @@ public sealed class CatalogueImportBatchContext
     private readonly bool createNewCopy;
     private readonly Dictionary<CatalogueAdoptionSourceKey, List<CatalogueAdoptionLookupRow>> mappings;
     private readonly HashSet<CatalogueLocalEntityKey> existingEntities;
+    private readonly HashSet<CatalogueLocalEntityKey> newlyRegisteredEntities = [];
+    private CatalogueImportReuseKinds reuseKinds;
     private bool isFresh = true;
 
     internal CatalogueImportBatchContext(
         Guid adoptionId,
         bool createNewCopy,
         IEnumerable<CatalogueAdoptionLookupRow> mappings,
-        HashSet<CatalogueLocalEntityKey> existingEntities)
+        HashSet<CatalogueLocalEntityKey> existingEntities,
+        CatalogueImportReuseKinds reuseKinds)
     {
         this.adoptionId = adoptionId;
         this.createNewCopy = createNewCopy;
         this.mappings = mappings.GroupBy(SourceKey)
             .ToDictionary(group => group.Key, group => group.ToList());
         this.existingEntities = existingEntities;
+        this.reuseKinds = reuseKinds;
     }
 
     internal CatalogueTemplateAdoption? FindReusableMapping(
@@ -81,6 +86,10 @@ public sealed class CatalogueImportBatchContext
     internal bool LocalEntityExists(string? entityType, Guid id) =>
         id != Guid.Empty && existingEntities.Contains(new CatalogueLocalEntityKey(entityType ?? string.Empty, id));
 
+    internal bool IsCompatible(CentralCatalogueTemplateRevision revision, Guid id) =>
+        newlyRegisteredEntities.Contains(new CatalogueLocalEntityKey(
+            CatalogueImportReviewRules.ExpectedEntityType(revision.Type), id)) || reuseKinds.IsCompatible(revision, id);
+
     internal bool TryGetOwnMapping(CatalogueTemplateAdoption candidate, out CatalogueAdoptionLookupRow? mapping) =>
         TryGet(candidate, row => row.AdoptionId == adoptionId, out mapping);
 
@@ -103,7 +112,9 @@ public sealed class CatalogueImportBatchContext
 
     internal void RegisterLocalEntity(string entityType, Guid id)
     {
-        if (id != Guid.Empty) existingEntities.Add(new CatalogueLocalEntityKey(entityType, id));
+        if (id == Guid.Empty) return;
+        var key = new CatalogueLocalEntityKey(entityType, id);
+        if (existingEntities.Add(key)) newlyRegisteredEntities.Add(key);
     }
 
     internal void EnsureFresh()
@@ -156,7 +167,8 @@ public sealed class CatalogueImportBatchContext
                 .Select(item => new CatalogueLocalEntityKey(item.LocalEntityType ?? string.Empty, item.LocalEntityId!.Value)))
             .Concat(ReuseReferences(session.Templates));
         var existing = await CatalogueImportEntityLookup.LoadExistingAsync(context, references, cancellationToken);
-        return new CatalogueImportBatchContext(session.AdoptionId, session.CreateNewCopy, mappingRows, existing);
+        var kinds = await CatalogueImportReuseKinds.LoadAsync(context, references, cancellationToken);
+        return new CatalogueImportBatchContext(session.AdoptionId, session.CreateNewCopy, mappingRows, existing, kinds);
     }
 
     internal async Task RefreshAsync(
@@ -169,6 +181,7 @@ public sealed class CatalogueImportBatchContext
         foreach (var (key, rows) in refreshed.mappings) mappings[key] = rows;
         existingEntities.Clear();
         existingEntities.UnionWith(refreshed.existingEntities);
+        reuseKinds = refreshed.reuseKinds;
     }
 
     private static IEnumerable<CatalogueLocalEntityKey> ReuseReferences(

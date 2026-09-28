@@ -18,6 +18,203 @@ public sealed class CatalogueImportPreviewFeatureGateTests(DatabaseFixture datab
     : IntegrationTestBase(databaseFixture)
 {
     [Fact]
+    public async Task Preview_blocks_reusing_a_different_option_set_kind()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var suffix = Guid.NewGuid().ToString("N");
+        var set = new OptionSet
+        {
+            Id = Guid.NewGuid(),
+            Kind = OptionSetKind.Sauce,
+            Name = $"Wrong kind {suffix}",
+            NormalizedName = $"wrong kind {suffix}",
+            SourceLocale = "en",
+            Status = OptionSetStatus.Active,
+            Version = 1,
+            CreatedBy = "test"
+        };
+        var revision = new CentralCatalogueTemplateRevision
+        {
+            SchemaVersion = 1,
+            TemplateId = $"bundle-choice-{suffix}",
+            Revision = 1,
+            Type = "option-set",
+            Name = "Bundle choice",
+            SourceLocale = "en",
+            QualityStatus = "reviewed",
+            CompatibleTenantContractVersions = [1],
+            Provenance = JsonSerializer.SerializeToElement(new { source = "test" }),
+            Payload = JsonSerializer.SerializeToElement(new { kind = "bundle-option", min = 0, max = 1, options = Array.Empty<object>() }),
+            ContentHash = new string('a', 64)
+        };
+        var template = new CatalogueImportSessionTemplate
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = revision.TemplateId,
+            Revision = revision.Revision,
+            Type = revision.Type,
+            ContentHash = revision.ContentHash,
+            RevisionJson = JsonSerializer.Serialize(revision, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            IsRoot = true,
+            IsSelectable = true,
+            IsSelected = true,
+            DecisionJson = JsonSerializer.Serialize(new CatalogueImportItemDecision
+            {
+                Resolution = "Reuse",
+                LocalEntityId = set.Id
+            }),
+            Status = CatalogueImportItemStatus.Pending,
+            CreatedBy = "test"
+        };
+        var session = new CatalogueImportSession
+        {
+            Id = Guid.NewGuid(),
+            RootTemplateId = revision.TemplateId,
+            RootRevision = revision.Revision,
+            Locale = "en",
+            IdempotencyKey = $"preview-kind-{suffix}",
+            AdoptionId = Guid.NewGuid(),
+            Version = 1,
+            CreatedBy = "test",
+            Templates = [template]
+        };
+        context.OptionSets.Add(set);
+        context.CatalogueImportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var enabled = new Mock<ITenantFeatures>();
+        enabled.SetupGet(value => value.OptionSetMaterializationEnabled).Returns(true);
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<CatalogueImportPreviewService>>();
+        var preview = await new CatalogueImportPreviewService(context, enabled.Object, logger)
+            .PreviewAsync(session.Id, CancellationToken.None);
+
+        preview.Items.Single().BlockingIssues.Should().Contain(issue => issue.Code == "REUSE_KIND_MISMATCH");
+        preview.Items.Single().LocalEntityName.Should().Be(set.Name);
+        var loaded = await scope.ServiceProvider.GetRequiredService<ICatalogueImportSessionService>()
+            .GetAsync(session.Id, CancellationToken.None);
+        loaded.Items.Single().LocalEntityName.Should().Be(set.Name);
+    }
+
+    [Fact]
+    public async Task Preview_blocks_an_unselected_dependency_mapped_to_a_different_kind()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var suffix = Guid.NewGuid().ToString("N");
+        var set = new OptionSet
+        {
+            Id = Guid.NewGuid(),
+            Kind = OptionSetKind.BundleChoice,
+            Name = $"Bundle choices {suffix}",
+            NormalizedName = $"bundle choices {suffix}",
+            SourceLocale = "en",
+            Status = OptionSetStatus.Active,
+            Version = 1,
+            CreatedBy = "test"
+        };
+        var setRevision = new CentralCatalogueTemplateRevision
+        {
+            SchemaVersion = 1,
+            TemplateId = $"sauce-set-{suffix}",
+            Revision = 1,
+            Type = "option-set",
+            Name = "Sauces",
+            SourceLocale = "en",
+            QualityStatus = "reviewed",
+            CompatibleTenantContractVersions = [1],
+            Provenance = JsonSerializer.SerializeToElement(new { source = "test" }),
+            Payload = JsonSerializer.SerializeToElement(new { kind = "sauce", min = 0, max = 1, options = Array.Empty<object>() }),
+            ContentHash = new string('b', 64)
+        };
+        var itemRevision = new CentralCatalogueTemplateRevision
+        {
+            SchemaVersion = 1,
+            TemplateId = $"item-{suffix}",
+            Revision = 1,
+            Type = "item",
+            Name = "Sauced item",
+            SourceLocale = "en",
+            QualityStatus = "reviewed",
+            CompatibleTenantContractVersions = [1],
+            Provenance = JsonSerializer.SerializeToElement(new { source = "test" }),
+            Payload = JsonSerializer.SerializeToElement(new
+            {
+                category = (object?)null,
+                suggestedIngredients = Array.Empty<object>(),
+                optionSets = new[] { new { templateId = setRevision.TemplateId, revision = 1 } },
+                sideSets = Array.Empty<object>()
+            }),
+            ContentHash = new string('c', 64)
+        };
+        var item = new CatalogueImportSessionTemplate
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = itemRevision.TemplateId,
+            Revision = 1,
+            Type = "item",
+            ContentHash = itemRevision.ContentHash,
+            RevisionJson = JsonSerializer.Serialize(itemRevision, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            IsRoot = true,
+            IsSelectable = true,
+            IsSelected = true,
+            DecisionJson = JsonSerializer.Serialize(new CatalogueImportItemDecision { Resolution = "Create" }),
+            Status = CatalogueImportItemStatus.Pending,
+            CreatedBy = "test"
+        };
+        var dependency = new CatalogueImportSessionTemplate
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = setRevision.TemplateId,
+            Revision = 1,
+            Type = "option-set",
+            ContentHash = setRevision.ContentHash,
+            RevisionJson = JsonSerializer.Serialize(setRevision, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            IsSelectable = true,
+            IsSelected = false,
+            Status = CatalogueImportItemStatus.Pending,
+            CreatedBy = "test"
+        };
+        var session = new CatalogueImportSession
+        {
+            Id = Guid.NewGuid(),
+            RootTemplateId = itemRevision.TemplateId,
+            RootRevision = 1,
+            Locale = "en",
+            IdempotencyKey = $"preview-dependency-kind-{suffix}",
+            AdoptionId = Guid.NewGuid(),
+            Version = 1,
+            CreatedBy = "test",
+            Templates = [item, dependency]
+        };
+        context.OptionSets.Add(set);
+        context.CatalogueImportSessions.Add(session);
+        context.CatalogueTemplateAdoptions.Add(new CatalogueTemplateAdoption
+        {
+            Id = Guid.NewGuid(),
+            SessionId = session.Id,
+            AdoptionId = Guid.NewGuid(),
+            SourceTemplateId = setRevision.TemplateId,
+            SourceRevision = 1,
+            LocalEntityType = "OptionSet",
+            LocalEntityId = set.Id,
+            ContentHash = setRevision.ContentHash,
+            IsDefault = true,
+            CreatedBy = "test"
+        });
+        await context.SaveChangesAsync();
+
+        var enabled = new Mock<ITenantFeatures>();
+        enabled.SetupGet(value => value.OptionSetMaterializationEnabled).Returns(true);
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<CatalogueImportPreviewService>>();
+        var preview = await new CatalogueImportPreviewService(context, enabled.Object, logger)
+            .PreviewAsync(session.Id, CancellationToken.None);
+
+        preview.Items.Single(result => result.TemplateId == itemRevision.TemplateId).BlockingIssues
+            .Should().Contain(issue => issue.Code == "REUSE_KIND_MISMATCH");
+    }
+
+    [Fact]
     public async Task Preview_finds_existing_case_insensitive_candidates_in_a_batched_lookup()
     {
         using var scope = Factory.Services.CreateScope();

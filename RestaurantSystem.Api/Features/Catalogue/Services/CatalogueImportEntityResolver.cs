@@ -38,15 +38,28 @@ internal sealed class CatalogueImportEntityResolver(CatalogueImportBatchContext 
                     "LOCAL_DEPENDENCY_MISSING");
             }
 
+            EnsureCompatible(template, importedId);
+
             return importedId;
         }
 
         var mapping = batch.FindDependencyMapping(reference.TemplateId, reference.Revision, expectedEntityType);
         if (mapping is null) throw DependencyNotReady(reference);
+        if (template is null) throw DependencyNotReady(reference);
+        EnsureCompatible(template, mapping.LocalEntityId);
         return mapping.LocalEntityId;
     }
 
     public bool LocalEntityExists(string? entityType, Guid id) => batch.LocalEntityExists(entityType, id);
+
+    private void EnsureCompatible(CatalogueImportSessionTemplate template, Guid localId)
+    {
+        var revision = CatalogueSessionMapper.ParseRevision(template.RevisionJson);
+        if (!batch.IsCompatible(revision, localId))
+            throw new BadRequestException(
+                "A catalogue dependency has a different choice or ingredient kind than its source template.",
+                "REUSE_KIND_MISMATCH");
+    }
 
     private static BadRequestException DependencyNotReady(CatalogueSourceReference reference) => new(
         $"The selected dependency {reference.Key} has no imported tenant mapping.",
