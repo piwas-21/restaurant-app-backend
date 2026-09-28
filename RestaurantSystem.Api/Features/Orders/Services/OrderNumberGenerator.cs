@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -20,18 +22,13 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// Playwright drives specs in parallel.
 /// </para>
 /// <para>
-/// The allocation is therefore serialised per day by a Postgres advisory lock. The number stays
-/// derived from the orders table rather than from a counter, which keeps it consistent with every
-/// row the day already has — including any inserted by hand — and needs no schema of its own.
+/// The allocation is serialised per day by a Postgres advisory lock and advances a durable database
+/// watermark in the caller's order transaction. An insert trigger keeps that watermark current for
+/// older application versions and direct order inserts.
 /// </para>
 /// <para>
-/// Two bounds are inherited rather than introduced, both far outside this tenant's volume and
-/// neither made worse here. The lexical <c>OrderByDescending</c> below agrees with numeric order
-/// only while the sequence is fixed-width, so at 10 000 orders in one day <c>D4</c> emits five
-/// digits, <c>"…10000"</c> sorts below <c>"…9999"</c>, and allocation collides permanently. And the
-/// read runs through the soft-delete filter while the unique index does not, so a soft-deleted
-/// order's number would be invisible here yet still occupy the index — unreachable today, because
-/// <c>DeleteOrderCommand</c> hard-deletes and nothing sets <c>IsDeleted</c> on an order.
+/// The numeric suffix is padded to at least four digits. The watermark is independent of order
+/// soft-delete visibility, so deleting an order never makes its number available again.
 /// </para>
 /// </remarks>
 public class OrderNumberGenerator : IOrderNumberGenerator
@@ -70,22 +67,36 @@ public class OrderNumberGenerator : IOrderNumberGenerator
 
         await LockDayAsync(date, cancellationToken);
 
-        var lastOrder = await _context.Orders
-            .Where(o => o.OrderNumber.StartsWith(date))  // EF translates to SQL LIKE; no StringComparison overload is translatable
-            .OrderByDescending(o => o.OrderNumber)
-            .FirstOrDefaultAsync(cancellationToken);
+        var nextSequence = await ReserveNextSequenceAsync(date, cancellationToken);
 
-        int sequence = 1;
-        if (lastOrder is not null)
+        return string.Create(CultureInfo.InvariantCulture, $"{date}{nextSequence:D4}");
+    }
+
+    private async Task<long> ReserveNextSequenceAsync(string date, CancellationToken cancellationToken)
+    {
+        var transaction = _context.Database.CurrentTransaction
+            ?? throw new InvalidOperationException("Order-number allocation requires an active transaction.");
+        await using var command = _context.Database.GetDbConnection().CreateCommand();
+        command.Transaction = transaction.GetDbTransaction();
+        command.CommandText = """
+            INSERT INTO order_number_sequences (day, last_sequence)
+            VALUES (to_date(@day, 'YYYYMMDD'), 1)
+            ON CONFLICT (day) DO UPDATE
+            SET last_sequence = order_number_sequences.last_sequence + 1
+            RETURNING last_sequence
+            """;
+        var dayParameter = command.CreateParameter();
+        dayParameter.ParameterName = "day";
+        dayParameter.Value = date;
+        command.Parameters.Add(dayParameter);
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        if (result is null or DBNull)
         {
-            var lastSequence = lastOrder.OrderNumber[8..];
-            if (int.TryParse(lastSequence, out var seq))
-            {
-                sequence = seq + 1;
-            }
+            throw new DataException("Order-number sequence allocation returned no watermark.");
         }
 
-        return string.Create(CultureInfo.InvariantCulture, $"{date}{sequence:D4}");
+        return Convert.ToInt64(result, CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -95,10 +106,11 @@ public class OrderNumberGenerator : IOrderNumberGenerator
     /// <remarks>
     /// <para>
     /// The lock is <b>transaction-scoped</b>, and that is load-bearing rather than convenient. The
-    /// read below only ever sees committed rows, so a lock released before commit would let the next
-    /// caller read a table that does not yet contain the number just handed out — exactly the race
-    /// this closes. Holding to commit also means a rolled-back checkout returns its number instead of
-    /// leaving a gap, and that a crashed connection releases the lock without any cleanup path.
+    /// watermark update below is committed with the order. A lock released before commit would let
+    /// the next caller reserve from a watermark that does not yet include the number just handed out
+    /// — exactly the race this closes. Holding to commit also means a rolled-back checkout returns
+    /// its number instead of leaving a gap, and that a crashed connection releases the lock without
+    /// any cleanup path.
     /// </para>
     /// <para>
     /// It follows that there must be a transaction to scope it to. Without one the statement below
@@ -115,9 +127,8 @@ public class OrderNumberGenerator : IOrderNumberGenerator
     /// </remarks>
     /// <param name="date">
     /// The <c>yyyyMMdd</c> prefix the number will carry. The lock key is parsed from this rather
-    /// than recomputed from the clock so the two cannot drift apart: were "today" ever to become
-    /// restaurant-local rather than UTC, a key derived independently could end up guarding a
-    /// different day than the number it protects, and the guard would silently stop guarding.
+    /// than recomputed from the clock so the same tenant-calendar day labels the sequence row and
+    /// keys the advisory lock.
     /// </param>
     private async Task LockDayAsync(string date, CancellationToken cancellationToken)
     {
