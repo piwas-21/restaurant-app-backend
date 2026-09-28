@@ -47,9 +47,15 @@ internal static class OptionSetMaterializerTargetLoader
         }
 
         var isStagedTarget = validationContext.StagedProductIds?.Contains(product.Id) == true;
-        if (attachment is null && ((!product.IsActive || !product.IsAvailable) && !isStagedTarget || product.IsComponent))
+        var isInactiveOrUnavailable = (!product.IsActive || !product.IsAvailable) && !isStagedTarget;
+        var isSupportedComponentGroup = target.Role == OptionSetAttachmentRole.ProductChoice
+            && customizationGroup is { IsActive: true }
+            && customizationGroup.ProductId == product.Id;
+        var hasUnsupportedInternalTarget = product.IsComponent && !isSupportedComponentGroup;
+        if (attachment is null && (isInactiveOrUnavailable || hasUnsupportedInternalTarget))
         {
-            throw new ConflictException("Inactive, unavailable, or internal products cannot receive a new option-set attachment");
+            throw new ConflictException(
+                "Inactive, unavailable, or unsupported internal-product targets cannot receive a new option-set attachment");
         }
 
         var entries = SelectEntries(set, target);
