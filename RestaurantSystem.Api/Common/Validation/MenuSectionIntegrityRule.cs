@@ -88,6 +88,7 @@ public static class MenuSectionIntegrityRule
             IsRequired = section.IsRequired,
             MinSelection = section.MinSelection,
             MaxSelection = section.MaxSelection,
+            AllowRepeatedItems = section.AllowRepeatedItems,
             Items = section.Items.Select(item => new MenuSectionItemDto
             {
                 Id = item.Id,
@@ -135,7 +136,9 @@ public static class MenuSectionIntegrityRule
     private static void ValidateSelectionBounds(MenuSectionDto section, int optionCount)
     {
         if (section.MinSelection < 0 || section.MaxSelection <= 0
-            || section.MinSelection > section.MaxSelection || section.MaxSelection > optionCount)
+            || section.MinSelection > section.MaxSelection
+            || (section.AllowRepeatedItems != true && section.MaxSelection > optionCount)
+            || (section.AllowRepeatedItems == true && optionCount == 0))
         {
             throw new BadRequestException($"Section '{section.Name}' has invalid minimum or maximum selections");
         }

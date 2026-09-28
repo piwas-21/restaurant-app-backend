@@ -136,6 +136,7 @@ public class MenuBundleSectionDto
     public bool IsRequired { get; set; }
     public int MinSelection { get; set; }
     public int MaxSelection { get; set; }
+    public bool AllowRepeatedItems { get; set; }
     public List<MenuBundleSectionItemDto> Items { get; set; } = new();
 }
 

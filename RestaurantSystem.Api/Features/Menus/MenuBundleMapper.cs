@@ -153,6 +153,7 @@ public static class MenuBundleMapper
             IsRequired = section.IsRequired,
             MinSelection = section.MinSelection,
             MaxSelection = section.MaxSelection,
+            AllowRepeatedItems = section.AllowRepeatedItems,
             // A section that lists a DELETED product went on offering it to guests, and the basket then
             // refuses the line. The filter lives HERE and not in the callers' includes because one of
             // those callers (`GetProductByIdQuery`) runs `IgnoreQueryFilters()`, which un-filters every

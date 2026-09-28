@@ -552,8 +552,6 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
                 isComponent);
         }
 
-        await MenuSectionVariationValidator.ValidateAsync(_context, sections, cancellationToken);
-
         // Menu sections are loaded separately because the product query intentionally includes only
         // the definition. The tracked instance is reused by EF for the replacement operation.
         var existing = await _context.MenuDefinitions
@@ -563,6 +561,9 @@ public class UpdateProductCommandHandler : ICommandHandler<UpdateProductCommand,
             .Include(menu => menu.Sections)
                 .ThenInclude(section => section.Translations)
             .FirstOrDefaultAsync(menu => menu.ProductId == product.Id, cancellationToken);
+
+        await MenuSectionVariationValidator.ValidateWithExistingAsync(
+            _context, sections, existing?.Sections ?? [], cancellationToken);
 
         // Compare the incoming full-replacement snapshot to the persisted sections before Upsert
         // changes the schedule or offer-parent fields. Once versioned editing starts, unchanged

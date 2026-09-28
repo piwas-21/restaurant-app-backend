@@ -13,6 +13,8 @@ public record MenuSectionDto
     public bool IsRequired { get; init; }
     public int MinSelection { get; init; }
     public int MaxSelection { get; init; }
+    // Null preserves an existing section for older PATCH clients. New sections default to false.
+    public bool? AllowRepeatedItems { get; init; }
     public TranslationOwnerMetadataDto? TranslationMetadata { get; init; }
 
     private Dictionary<string, MenuSectionTranslationDto>? _translations = new();
@@ -34,11 +36,7 @@ public record MenuSectionDto
 
     private List<MenuSectionItemDto>? _items = new();
 
-    /// <summary>
-    /// Whether the nested option list appeared in the JSON body. The authoring PATCH treats an
-    /// omitted list as unchanged and an explicit [] as removal; legacy full-replacement writes
-    /// continue to treat a missing list as empty.
-    /// </summary>
+    /// <summary>PATCH preserves an omitted option list; an explicit [] removes it.</summary>
     [JsonIgnore]
     public bool ItemsSpecified { get; private set; }
 

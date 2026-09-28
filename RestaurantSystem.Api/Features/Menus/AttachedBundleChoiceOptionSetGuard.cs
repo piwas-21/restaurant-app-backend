@@ -65,7 +65,8 @@ internal static class AttachedBundleChoiceOptionSetGuard
 
         if (currentSection.IsRequired != proposedSection.IsRequired
             || currentSection.MinSelection != proposedSection.MinSelection
-            || currentSection.MaxSelection != proposedSection.MaxSelection)
+            || currentSection.MaxSelection != proposedSection.MaxSelection
+            || currentSection.AllowRepeatedItems != (proposedSection.AllowRepeatedItems ?? currentSection.AllowRepeatedItems))
         {
             throw new ConflictException(ConflictMessage);
         }
@@ -138,6 +139,7 @@ internal static class AttachedBundleChoiceOptionSetGuard
                 IsRequired = proposed.IsRequired,
                 MinSelection = proposed.MinSelection,
                 MaxSelection = proposed.MaxSelection,
+                AllowRepeatedItems = proposed.AllowRepeatedItems ?? current.AllowRepeatedItems,
                 Items = current.Items.Select(item => new MenuSectionItemDto
                 {
                     Id = item.Id,

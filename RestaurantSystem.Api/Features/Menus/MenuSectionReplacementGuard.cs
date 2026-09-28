@@ -50,6 +50,7 @@ internal static class MenuSectionReplacementGuard
                 || current.IsRequired != proposed.IsRequired
                 || current.MinSelection != proposed.MinSelection
                 || current.MaxSelection != proposed.MaxSelection
+                || current.AllowRepeatedItems != (proposed.AllowRepeatedItems ?? current.AllowRepeatedItems)
                 || !ItemsMatchWhenSpecified(current.Items, proposed)
                 || !TranslationsMatchWhenSpecified(current.Translations, proposed))
             {
@@ -81,6 +82,7 @@ internal static class MenuSectionReplacementGuard
                 current.IsRequired != proposed.IsRequired ||
                 current.MinSelection != proposed.MinSelection ||
                 current.MaxSelection != proposed.MaxSelection ||
+                current.AllowRepeatedItems != (proposed.AllowRepeatedItems ?? current.AllowRepeatedItems) ||
                 !ItemsMatchWhenSpecified(current.Items, proposed))
             {
                 return false;

@@ -18,6 +18,28 @@ public static class MenuSectionVariationValidator
         CancellationToken cancellationToken) =>
         MenuSectionIntegrityRule.ValidateAsync(context, sections, cancellationToken);
 
+    /// <summary>Preserve an omitted repeat setting on an unchanged legacy PUT snapshot.</summary>
+    public static Task ValidateWithExistingAsync(
+        ApplicationDbContext context,
+        IEnumerable<MenuSectionDto> sections,
+        IEnumerable<MenuSection> existingSections,
+        CancellationToken cancellationToken)
+    {
+        return ValidateAsync(context, ResolveExistingRepeatSettings(sections, existingSections), cancellationToken);
+    }
+
+    internal static IEnumerable<MenuSectionDto> ResolveExistingRepeatSettings(
+        IEnumerable<MenuSectionDto> sections,
+        IEnumerable<MenuSection> existingSections)
+    {
+        var existingById = existingSections.ToDictionary(section => section.Id);
+        return sections.Select(section =>
+            section.AllowRepeatedItems is null && section.Id is Guid id
+                && existingById.TryGetValue(id, out var existing)
+                ? section with { AllowRepeatedItems = existing.AllowRepeatedItems }
+                : section);
+    }
+
     public static Task ValidateReferencesAsync(
         ApplicationDbContext context,
         IEnumerable<MenuSectionDto> sections,

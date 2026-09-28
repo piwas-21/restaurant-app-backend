@@ -31,7 +31,9 @@ public static class MenuBundleSelectionRules
             var sectionSelections = selectedOptions
                 .Where(option => option.SectionId == section.Id)
                 .ToList();
-            var selectionCount = sectionSelections.Count;
+            var selectionCount = section.AllowRepeatedItems
+                ? sectionSelections.Sum(selection => (long)selection.Quantity)
+                : sectionSelections.Count;
 
             if (section.IsRequired && selectionCount < section.MinSelection)
             {
