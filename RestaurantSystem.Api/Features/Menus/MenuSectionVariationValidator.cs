@@ -18,6 +18,12 @@ public static class MenuSectionVariationValidator
         CancellationToken cancellationToken) =>
         MenuSectionIntegrityRule.ValidateAsync(context, sections, cancellationToken);
 
+    public static Task ValidateReferencesAsync(
+        ApplicationDbContext context,
+        IEnumerable<MenuSectionDto> sections,
+        CancellationToken cancellationToken) =>
+        MenuSectionIntegrityRule.ValidateReferencesAsync(context, sections, cancellationToken);
+
     public static Task ValidateEntitiesAsync(
         ApplicationDbContext context,
         IEnumerable<MenuSection> sections,
