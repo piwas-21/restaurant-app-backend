@@ -9,6 +9,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Conventers;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.OptionSets.Dtos;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
@@ -669,7 +670,7 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Bundle_choice_set_can_materialize_to_an_internal_component_group_and_preserve_nested_quote()
+    public async Task Bundle_choice_set_can_materialize_to_an_internal_component_group_and_preserve_guest_basket_price()
     {
         AuthenticateAsAdmin();
         await AddComponentChoiceTargetsAsync();
@@ -746,7 +747,7 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
                 && item.TargetCustomizationGroupId.HasValue)).Should().Be(3);
         }
 
-        var quoteResponse = await PostAsJsonAsync($"/api/Products/{ComponentBundleProductId}/quote", new ProductQuoteRequestDto
+        var quoteRequest = new ProductQuoteRequestDto
         {
             Quantity = 1,
             SelectedMenuOptions = Enumerable.Range(0, ComponentProductIds.Length).Select(index =>
@@ -770,12 +771,27 @@ public sealed class OptionSetMaterializationTests : IntegrationTestBase
                         }
                     ]
                 }).ToList()
-        });
+        };
+        var quoteResponse = await PostAsJsonAsync($"/api/Products/{ComponentBundleProductId}/quote", quoteRequest);
         quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK,
             await quoteResponse.Content.ReadAsStringAsync());
         var quote = (await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse))!.Data!;
         quote.UnitPrice.Should().Be(20.75m);
         quote.TotalPrice.Should().Be(20.75m);
+
+        AuthenticateAsAnonymous();
+        Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString("N"));
+        var addResponse = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = ComponentBundleProductId,
+            Quantity = quoteRequest.Quantity,
+            SelectedMenuOptions = quoteRequest.SelectedMenuOptions
+        });
+        addResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            await addResponse.Content.ReadAsStringAsync());
+        var basket = (await ReadResponseAsync<ApiResponse<BasketDto>>(addResponse))!.Data!;
+        basket.Items.Should().ContainSingle(item => item.ProductId == ComponentBundleProductId)
+            .Which.ItemTotal.Should().Be(quote.TotalPrice);
     }
 
     [Fact]
