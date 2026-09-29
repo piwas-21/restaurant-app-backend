@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Dtos;
@@ -11,11 +12,11 @@ namespace RestaurantSystem.Api.Features.TranslationWorkbench;
 [Route("api/translation-workbench")]
 [ApiScope(ApiTokenScopes.MenuWrite)]
 [RequireAdmin]
-public sealed class TranslationPreviewController(ITranslationPreviewService preview) : ControllerBase
+public sealed class TranslationAvailabilityController(IOptions<TranslationAssistanceSettings> options)
+    : ControllerBase
 {
-    [HttpPost("preview")]
-    public async Task<ActionResult<ApiResponse<TranslationPreviewDto>>> Preview(
-        [FromBody] TranslationWorkbenchRequestDto request,
-        CancellationToken cancellationToken) => Ok(ApiResponse<TranslationPreviewDto>.SuccessWithData(
-        await preview.PreviewAsync(request, cancellationToken)));
+    [HttpGet("availability")]
+    public ActionResult<ApiResponse<TranslationAvailabilityDto>> Availability() =>
+        Ok(ApiResponse<TranslationAvailabilityDto>.SuccessWithData(
+            new TranslationAvailabilityDto(options.Value.CanGenerate ? "ready" : "disabled")));
 }
