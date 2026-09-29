@@ -133,6 +133,10 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     [Fact]
     public async Task Item_import_creates_option_sets_and_materializes_all_roles_using_inactive_staged_rows()
     {
+        const int requiredChoiceMinimum = 1;
+        const int choiceMaximum = 2;
+        const int quotedQuantity = 1;
+        const decimal paidChoicePrice = 1.25m;
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var category = await context.Categories.AsNoTracking().FirstAsync();
@@ -150,7 +154,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         var categoryTemplate = ImportedTemplate(
             Revision("source-category", "category", new { sortOrder = 0 }), "Category", category.Id);
 
-        var choiceSet = OptionSetRevision("product-choice-set", "bundle-option", 1, 2,
+        var choiceSet = OptionSetRevision("product-choice-set", "bundle-option", requiredChoiceMinimum, choiceMaximum,
             ["choice-product-1", "choice-product-2"]);
         var ingredientSet = OptionSetRevision("ingredient-set", "ingredient", 0, 2,
             ["ingredient-1", "ingredient-2"]);
@@ -160,7 +164,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         { Translations = [] };
         var sets = new[]
         {
-            PendingTemplate(choiceSet, SetDecision(("choice-product-1@1", 0m), ("choice-product-2@1", 1.25m))),
+            PendingTemplate(choiceSet, SetDecision(("choice-product-1@1", 0m), ("choice-product-2@1", paidChoicePrice))),
             PendingTemplate(ingredientSet, SetDecision(("ingredient-1@1", 0.75m), ("ingredient-2@1", 0m))),
             PendingTemplate(sauceSet, SetDecision(("sauce-1@1", 0.5m), ("sauce-2@1", 1m))),
             PendingTemplate(sideSet, SetDecision())
@@ -182,7 +186,8 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             Dependency("sauce-set", "option-set", 3),
             Dependency("side-set", "option-set", 4)
         ]);
-        var item = PendingTemplate(itemRevision, ReviewedSellableDecision(), isRoot: true);
+        var itemDecision = ReviewedSellableDecision();
+        var item = PendingTemplate(itemRevision, itemDecision, isRoot: true);
         var session = NewSession(itemRevision.TemplateId,
             [.. choiceTemplates, .. ingredientTemplates, categoryTemplate, .. sets, item]);
         context.CatalogueImportSessions.Add(session);
@@ -206,8 +211,8 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         product.IsAvailable.Should().BeFalse();
         product.CustomizationGroups.Should().ContainSingle();
         product.CustomizationGroups.Single().AuthoringVersion.Should().Be(2);
-        product.CustomizationGroups.Single().MinSelection.Should().Be(1);
-        product.CustomizationGroups.Single().MaxSelection.Should().Be(2);
+        product.CustomizationGroups.Single().MinSelection.Should().Be(requiredChoiceMinimum);
+        product.CustomizationGroups.Single().MaxSelection.Should().Be(choiceMaximum);
         product.CustomizationGroups.Single().ProductOptions.Should().HaveCount(2)
             .And.OnlyContain(option => choices.Select(choice => choice.Id).Contains(option.OptionProductId));
         product.DetailedIngredients.Should().HaveCount(4);
@@ -227,7 +232,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         optionSets.Should().OnlyContain(set => set.SourceTemplateId != null && set.SourceRevision == 1);
         optionSets.Single(set => set.SourceTemplateId == "side-set").Translations.Should().BeEmpty();
         optionSets.Single(set => set.SourceTemplateId == "product-choice-set").Entries
-            .Should().ContainSingle(entry => entry.ProductId == choices[1].Id && entry.AdditionalPrice == 1.25m);
+            .Should().ContainSingle(entry => entry.ProductId == choices[1].Id && entry.AdditionalPrice == paidChoicePrice);
         var setProvenance = await context.TranslationFieldProvenances.AsNoTracking()
             .Where(row => row.EntityType == "optionSet" && optionSets.Select(set => set.Id).Contains(row.EntityId))
             .ToListAsync();
@@ -256,9 +261,9 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         var guestResponse = await Client.GetAsync($"/api/Products/{product.Id}?locale=fr&requestedOrderType=Takeaway");
         guestResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var guest = await ReadResponseAsync<ApiResponse<ProductDto>>(guestResponse);
-        guest!.Data!.CustomizationGroups.Should().ContainSingle(group => group.MinSelection == 1 &&
-            group.MaxSelection == 2 && group.ProductOptions.Count == 2);
-        guest.Data.SuggestedSideItems.Should().HaveCount(2);
+        guest!.Data!.CustomizationGroups.Should().ContainSingle(group => group.MinSelection == requiredChoiceMinimum &&
+            group.MaxSelection == choiceMaximum && group.ProductOptions.Count == choices.Count);
+        guest.Data.SuggestedSideItems.Should().HaveCount(choices.Count);
         guest.Data.Availability.CanOrder.Should().BeTrue();
         var deliveryResponse = await Client.GetAsync($"/api/Products/{product.Id}?requestedOrderType=Delivery");
         var delivery = await ReadResponseAsync<ApiResponse<ProductDto>>(deliveryResponse);
@@ -273,13 +278,13 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             {
                 Kind = CustomizationOptionKind.Product,
                 OptionId = selectedOption.Id,
-                Quantity = 1
+                Quantity = quotedQuantity
             }]
         };
-        var selectedSide = new SelectedSideItemDto { Id = choices[0].Id, Quantity = 1 };
+        var selectedSide = new SelectedSideItemDto { Id = choices[0].Id, Quantity = quotedQuantity };
         var quoteRequest = new ProductQuoteRequestDto
         {
-            Quantity = 1,
+            Quantity = quotedQuantity,
             CustomizationSelections = [selection],
             SelectedSideItems = [selectedSide]
         };
@@ -287,7 +292,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             $"/api/Products/{product.Id}/quote?requestedOrderType=Takeaway", quoteRequest);
         quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK, await quoteResponse.Content.ReadAsStringAsync());
         var quote = await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse);
-        quote!.Data!.TotalPrice.Should().Be(8.75m + 1.25m + choices[0].BasePrice);
+        quote!.Data!.TotalPrice.Should().Be(itemDecision.LocalPrice!.Value + paidChoicePrice + choices[0].BasePrice);
         (await context.Baskets.CountAsync()).Should().Be(0);
 
         Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString("N"));
@@ -314,6 +319,12 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     [Fact]
     public async Task Bundle_import_persists_guest_choices_and_quotes_the_saved_price_path()
     {
+        const int requiredChoiceMinimum = 1;
+        const int choiceMaximum = 2;
+        const int quotedQuantity = 1;
+        const decimal bundleBasePrice = 14.25m;
+        const decimal paidChoicePrice = 2m;
+        const decimal childExtraPrice = 1.5m;
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var choices = await MakeInactiveChoicesAsync(context);
@@ -335,7 +346,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             ProductCustomizationGroupId = childGroup.Id,
             OptionProduct = choices[0],
             OptionProductId = choices[0].Id,
-            AdditionalPrice = 1.5m,
+            AdditionalPrice = childExtraPrice,
             CreatedBy = Actor
         };
         childGroup.ProductOptions.Add(childExtra);
@@ -348,8 +359,8 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             sectionKey = "main-choice",
             name = "Choose a main",
             sortOrder = 0,
-            min = 1,
-            max = 2,
+            min = requiredChoiceMinimum,
+            max = choiceMaximum,
             translations = new { fr = new { name = "Choisissez un plat" } },
             options = new[]
             {
@@ -362,13 +373,13 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             [Dependency("bundle-option-1", "item", 0), Dependency("bundle-option-2", "item", 1)]);
         var decision = ReviewedSellableDecision() with
         {
-            LocalPrice = 14.25m,
+            LocalPrice = bundleBasePrice,
             ChoiceRulesReviewed = true,
             OptionPricesReviewed = true,
             LocalOptionPrices = new Dictionary<string, decimal>
             {
                 ["bundle-option-1@1"] = 0m,
-                ["bundle-option-2@1"] = 2m
+                ["bundle-option-2@1"] = paidChoicePrice
             }
         };
         var bundle = PendingTemplate(bundleRevision, decision, isRoot: true);
@@ -398,7 +409,8 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         savedSection.Name.Should().Be("Choose a main");
         savedSection.Items.Should().HaveCount(2);
         savedSection.Items.Should().ContainSingle(row => row.ProductId == choices[0].Id && row.IsDefault);
-        savedSection.Items.Should().ContainSingle(row => row.ProductId == choices[1].Id && row.AdditionalPrice == 2m);
+        savedSection.Items.Should().ContainSingle(row => row.ProductId == choices[1].Id &&
+            row.AdditionalPrice == paidChoicePrice);
 
         var set = await context.OptionSets.AsNoTracking().Include(value => value.Entries)
             .SingleAsync(value => value.SourceTemplateId == "imported-bundle" && value.SourceOptionSetId == "main-choice");
@@ -409,8 +421,8 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         attachment.Role.Should().Be(OptionSetAttachmentRole.BundleChoice);
         attachment.TargetProductId.Should().Be(product.Id);
         attachment.TargetMenuSectionId.Should().Be(savedSection.Id);
-        attachment.MinSelection.Should().Be(1);
-        attachment.MaxSelection.Should().Be(2);
+        attachment.MinSelection.Should().Be(requiredChoiceMinimum);
+        attachment.MaxSelection.Should().Be(choiceMaximum);
 
         var textRows = await context.TranslationFieldProvenances.AsNoTracking()
             .Where(row => (row.EntityType == "product" && row.EntityId == product.Id) ||
@@ -431,22 +443,23 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         var guestSection = guest!.Data!.MenuDefinition!.Sections.Should().ContainSingle().Subject;
         guestSection.Id.Should().Be(savedSection.Id);
         guestSection.DisplayName.Should().Be("Choisissez un plat");
-        guestSection.MinSelection.Should().Be(1);
-        guestSection.MaxSelection.Should().Be(2);
+        guestSection.MinSelection.Should().Be(requiredChoiceMinimum);
+        guestSection.MaxSelection.Should().Be(choiceMaximum);
         guestSection.Items.Should().ContainSingle(row => row.ProductId == choices[0].Id && row.IsDefault);
-        guestSection.Items.Should().ContainSingle(row => row.ProductId == choices[1].Id && row.AdditionalPrice == 2m);
+        guestSection.Items.Should().ContainSingle(row => row.ProductId == choices[1].Id &&
+            row.AdditionalPrice == paidChoicePrice);
         var guestChild = guestSection.Items.Single(row => row.ProductId == choices[1].Id);
         guestChild.CustomizationGroups.Should().ContainSingle(group => group.Id == childGroup.Id &&
             group.ProductOptions.Any(option => option.Id == childExtra.Id));
 
         var paidChoice = new ProductQuoteRequestDto
         {
-            Quantity = 1,
+            Quantity = quotedQuantity,
             SelectedMenuOptions = [new SelectedMenuOptionDto
             {
                 SectionId = guestSection.Id,
                 ItemId = choices[1].Id,
-                Quantity = 1,
+                Quantity = quotedQuantity,
                 CustomizationSelections = [new CustomizationGroupSelectionDto
                 {
                     GroupId = childGroup.Id,
@@ -454,7 +467,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
                     {
                         Kind = CustomizationOptionKind.Product,
                         OptionId = childExtra.Id,
-                        Quantity = 1
+                        Quantity = quotedQuantity
                     }]
                 }]
             }]
@@ -474,7 +487,7 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         var quoteResponse = await PostAsJsonAsync($"/api/Products/{bundleId}/quote", paidChoice);
         quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK, await quoteResponse.Content.ReadAsStringAsync());
         var quote = await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse);
-        quote!.Data!.TotalPrice.Should().Be(17.75m);
+        quote!.Data!.TotalPrice.Should().Be(bundleBasePrice + paidChoicePrice + childExtraPrice);
         (await context.Baskets.CountAsync()).Should().Be(0);
 
         Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString("N"));
