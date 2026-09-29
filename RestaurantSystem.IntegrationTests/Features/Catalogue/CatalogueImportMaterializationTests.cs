@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -9,13 +10,18 @@ using Moq;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Features.Basket.Dtos;
+using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Catalogue.Dtos;
 using RestaurantSystem.Api.Features.Catalogue.Services;
 using RestaurantSystem.Api.Features.OptionSets.Materialization;
 using RestaurantSystem.Api.Features.Products.Dtos;
+using RestaurantSystem.Api.Features.Products.Dtos.Requests;
 using RestaurantSystem.Api.Features.TranslationWorkbench;
 using RestaurantSystem.Api.Features.TranslationWorkbench.Services;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Domain.Common;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -235,6 +241,68 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
         itemProvenance.Should().Contain(row => row.Locale == "fr" && row.Kind == "template" &&
             row.TemplateId == "imported-item");
 
+        var orderableIds = choices.Select(choice => choice.Id).Append(product.Id).ToArray();
+        var orderableRows = await context.Products.Where(row => orderableIds.Contains(row.Id)).ToListAsync();
+        foreach (var row in orderableRows)
+        {
+            row.IsActive = true;
+            row.IsAvailable = true;
+        }
+        orderableRows.Single(row => row.Id == product.Id).AvailableOrderTypes =
+            OrderChannelMap.ToStoredMask(OrderChannels.Takeaway);
+        await context.SaveChangesAsync();
+
+        AuthenticateAsAdmin();
+        var guestResponse = await Client.GetAsync($"/api/Products/{product.Id}?locale=fr&requestedOrderType=Takeaway");
+        guestResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var guest = await ReadResponseAsync<ApiResponse<ProductDto>>(guestResponse);
+        guest!.Data!.CustomizationGroups.Should().ContainSingle(group => group.MinSelection == 1 &&
+            group.MaxSelection == 2 && group.ProductOptions.Count == 2);
+        guest.Data.SuggestedSideItems.Should().HaveCount(2);
+        guest.Data.Availability.CanOrder.Should().BeTrue();
+        var deliveryResponse = await Client.GetAsync($"/api/Products/{product.Id}?requestedOrderType=Delivery");
+        var delivery = await ReadResponseAsync<ApiResponse<ProductDto>>(deliveryResponse);
+        delivery!.Data!.Availability.CanOrder.Should().BeFalse();
+
+        var group = product.CustomizationGroups.Single();
+        var selectedOption = group.ProductOptions.Single(option => option.OptionProductId == choices[1].Id);
+        var selection = new CustomizationGroupSelectionDto
+        {
+            GroupId = group.Id,
+            Options = [new CustomizationOptionSelectionDto
+            {
+                Kind = CustomizationOptionKind.Product,
+                OptionId = selectedOption.Id,
+                Quantity = 1
+            }]
+        };
+        var selectedSide = new SelectedSideItemDto { Id = choices[0].Id, Quantity = 1 };
+        var quoteRequest = new ProductQuoteRequestDto
+        {
+            Quantity = 1,
+            CustomizationSelections = [selection],
+            SelectedSideItems = [selectedSide]
+        };
+        var quoteResponse = await PostAsJsonAsync(
+            $"/api/Products/{product.Id}/quote?requestedOrderType=Takeaway", quoteRequest);
+        quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK, await quoteResponse.Content.ReadAsStringAsync());
+        var quote = await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse);
+        quote!.Data!.TotalPrice.Should().Be(8.75m + 1.25m + choices[0].BasePrice);
+        (await context.Baskets.CountAsync()).Should().Be(0);
+
+        Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString("N"));
+        var addResponse = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = product.Id,
+            Quantity = quoteRequest.Quantity,
+            CustomizationSelections = quoteRequest.CustomizationSelections,
+            SelectedSideItems = quoteRequest.SelectedSideItems
+        });
+        addResponse.StatusCode.Should().Be(HttpStatusCode.OK, await addResponse.Content.ReadAsStringAsync());
+        var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(addResponse);
+        basket!.Data!.Items.Should().ContainSingle(row => row.ProductId == product.Id)
+            .Which.ItemTotal.Should().Be(quote.Data.TotalPrice);
+
         var replay = await ImportAsync(scope.ServiceProvider, context, session, [
             .. choiceTemplates.Select(ReadRevision), .. ingredientTemplates.Select(ReadRevision),
             ReadRevision(categoryTemplate), choiceSet, ingredientSet, sauceSet, sideSet, itemRevision
@@ -244,11 +312,35 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
     }
 
     [Fact]
-    public async Task Bundle_import_persists_stable_sections_and_applies_choice_rows_with_template_provenance()
+    public async Task Bundle_import_persists_guest_choices_and_quotes_the_saved_price_path()
     {
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var choices = await MakeInactiveChoicesAsync(context);
+        var childGroup = new ProductCustomizationGroup
+        {
+            Id = Guid.NewGuid(),
+            Product = choices[1],
+            ProductId = choices[1].Id,
+            Name = "Add an extra",
+            MinSelection = 0,
+            MaxSelection = 1,
+            IsActive = true,
+            CreatedBy = Actor
+        };
+        var childExtra = new ProductCustomizationProductOption
+        {
+            Id = Guid.NewGuid(),
+            ProductCustomizationGroup = childGroup,
+            ProductCustomizationGroupId = childGroup.Id,
+            OptionProduct = choices[0],
+            OptionProductId = choices[0].Id,
+            AdditionalPrice = 1.5m,
+            CreatedBy = Actor
+        };
+        childGroup.ProductOptions.Add(childExtra);
+        context.ProductCustomizationGroups.Add(childGroup);
+        await context.SaveChangesAsync();
         var choiceTemplates = choices.Select((product, index) => ImportedTemplate(
             Revision($"bundle-option-{index + 1}", "item", EmptyItemPayload()), "Product", product.Id)).ToArray();
         var section = new
@@ -331,6 +423,71 @@ public sealed class CatalogueImportMaterializationTests(DatabaseFixture database
             row.Kind == "template" && row.TemplateId == "imported-bundle");
         textRows.Should().Contain(row => row.EntityType == "optionSet" && row.Locale == "en" &&
             row.Kind == "template" && row.TemplateId == "imported-bundle");
+
+        AuthenticateAsAdmin();
+        var guestResponse = await Client.GetAsync($"/api/Products/{bundleId}?locale=fr");
+        guestResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var guest = await ReadResponseAsync<ApiResponse<ProductDto>>(guestResponse);
+        var guestSection = guest!.Data!.MenuDefinition!.Sections.Should().ContainSingle().Subject;
+        guestSection.Id.Should().Be(savedSection.Id);
+        guestSection.DisplayName.Should().Be("Choisissez un plat");
+        guestSection.MinSelection.Should().Be(1);
+        guestSection.MaxSelection.Should().Be(2);
+        guestSection.Items.Should().ContainSingle(row => row.ProductId == choices[0].Id && row.IsDefault);
+        guestSection.Items.Should().ContainSingle(row => row.ProductId == choices[1].Id && row.AdditionalPrice == 2m);
+        var guestChild = guestSection.Items.Single(row => row.ProductId == choices[1].Id);
+        guestChild.CustomizationGroups.Should().ContainSingle(group => group.Id == childGroup.Id &&
+            group.ProductOptions.Any(option => option.Id == childExtra.Id));
+
+        var paidChoice = new ProductQuoteRequestDto
+        {
+            Quantity = 1,
+            SelectedMenuOptions = [new SelectedMenuOptionDto
+            {
+                SectionId = guestSection.Id,
+                ItemId = choices[1].Id,
+                Quantity = 1,
+                CustomizationSelections = [new CustomizationGroupSelectionDto
+                {
+                    GroupId = childGroup.Id,
+                    Options = [new CustomizationOptionSelectionDto
+                    {
+                        Kind = CustomizationOptionKind.Product,
+                        OptionId = childExtra.Id,
+                        Quantity = 1
+                    }]
+                }]
+            }]
+        };
+        var inactiveQuote = await PostAsJsonAsync($"/api/Products/{bundleId}/quote", paidChoice);
+        inactiveQuote.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var orderableIds = choices.Select(choice => choice.Id).Append(bundleId.Value).ToArray();
+        var orderableRows = await context.Products.Where(row => orderableIds.Contains(row.Id)).ToListAsync();
+        foreach (var row in orderableRows)
+        {
+            row.IsActive = true;
+            row.IsAvailable = true;
+        }
+        await context.SaveChangesAsync();
+
+        var quoteResponse = await PostAsJsonAsync($"/api/Products/{bundleId}/quote", paidChoice);
+        quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK, await quoteResponse.Content.ReadAsStringAsync());
+        var quote = await ReadResponseAsync<ApiResponse<ProductQuoteDto>>(quoteResponse);
+        quote!.Data!.TotalPrice.Should().Be(17.75m);
+        (await context.Baskets.CountAsync()).Should().Be(0);
+
+        Client.DefaultRequestHeaders.Add("X-Session-Id", Guid.NewGuid().ToString("N"));
+        var addResponse = await PostAsJsonAsync("/api/basket/items", new AddToBasketDto
+        {
+            ProductId = bundleId.Value,
+            Quantity = paidChoice.Quantity,
+            SelectedMenuOptions = paidChoice.SelectedMenuOptions
+        });
+        addResponse.StatusCode.Should().Be(HttpStatusCode.OK, await addResponse.Content.ReadAsStringAsync());
+        var basket = await ReadResponseAsync<ApiResponse<BasketDto>>(addResponse);
+        basket!.Data!.Items.Should().ContainSingle(row => row.ProductId == bundleId)
+            .Which.ItemTotal.Should().Be(quote.Data.TotalPrice);
     }
 
     [Fact]
