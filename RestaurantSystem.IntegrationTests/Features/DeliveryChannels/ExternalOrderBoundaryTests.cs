@@ -76,6 +76,7 @@ public sealed class ExternalOrderBoundaryTests(DatabaseFixture fixture) : Extern
     [InlineData("null-items")]
     [InlineData("null-item")]
     [InlineData("missing-merchant-total")]
+    [InlineData("missing-timestamp")]
     [InlineData("missing-unit-price")]
     [InlineData("missing-item-total")]
     [InlineData("missing-all-money")]
@@ -97,6 +98,7 @@ public sealed class ExternalOrderBoundaryTests(DatabaseFixture fixture) : Extern
             case "null-items": json["items"] = null; break;
             case "null-item": json["items"] = new JsonArray((JsonNode?)null); break;
             case "missing-merchant-total": json.Remove("merchantTotal"); break;
+            case "missing-timestamp": json.Remove("placedAt"); break;
             case "missing-unit-price": item.Remove("unitPrice"); break;
             case "missing-item-total": item.Remove("total"); break;
             case "missing-all-money": json.Remove("merchantTotal"); item.Remove("unitPrice"); item.Remove("total"); break;

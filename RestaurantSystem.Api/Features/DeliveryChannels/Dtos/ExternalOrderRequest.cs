@@ -15,6 +15,7 @@ public sealed record ExternalOrderRequest
     [JsonRequired]
     public decimal MerchantTotal { get; init; }
     public decimal? ReportedTax { get; init; }
+    [JsonRequired]
     public DateTimeOffset PlacedAt { get; init; }
     public string FulfillmentType { get; init; } = string.Empty;
     public string? CustomerName { get; init; }
