@@ -1,6 +1,6 @@
 # ADR-005: central channel gateway, starting with Uber sandbox ingress
 
-Status: accepted for sandbox ingress; production order routing remains gated.
+Status: accepted for sandbox ingress and private operator testing; production order routing remains gated.
 
 ## Context
 
@@ -32,7 +32,7 @@ without assuming a unit (the provider documentation contains both seconds and na
 Only after the row commits does the API return an empty 200. Database failure/throttling returns 503 to
 request provider retries. Missing secrets return 503; invalid signatures 401; wrong environment/store 403;
 malformed metadata 400; oversized requests 413. Neither a 200 nor `Received` claims that an order was
-accepted, fetched or injected. There is no order processor in this slice.
+accepted, fetched or injected. The private console retrieves referenced orders separately.
 
 The receiver stores **no raw payloads, resource URLs or customer/order details**. Later processing must
 re-fetch canonical provider data with an allowlisted base URL and mapped resource IDs, and introduce the
@@ -47,13 +47,55 @@ explicitly before the API; no startup migrations. No existing EF migration or te
 ## Consequences and scope
 
 - The test store can be linked to an actual signed, durable webhook while the full connector is built.
-- Production scope/key support, tenant routing, workers/reconciliation, menu publishing, order accept/deny,
+- Production scope/key support, tenant routing, automatic workers/reconciliation, tenant catalogue publishing,
   customer-data retention and staff/printer contracts require subsequent slices. No live merchant onboarding
   or production verification is requested by this receiver.
 - Sandbox receipts remain diagnostic metadata in the isolated DB. Establish the supported retention,
   encrypted payload storage, backup/restore and alerting policy before advancing to order processing.
-- Do not place a test order until order accept/deny is implemented; acknowledging notification alone does
-  not prevent Uber's order-acceptance timeout.
+- Place test orders only with the private console open and an operator ready to accept/deny within Uber's
+  acceptance window. A notification acknowledgment does not accept the order.
+
+## Private sandbox connection and testing
+
+An opt-in console at `/console/` serves the one configured sandbox store. It has no tenant authentication,
+entitlement or order ingestion contract. The owner access key is represented in configuration only by its
+SHA256 hash. Successful login issues a random opaque, HttpOnly/Secure/SameSite=Lax `__Host-` cookie; only
+its hash and a bounded expiry are stored. Origin validation protects every mutation including login/logout.
+All console responses are no-store, no-referrer and noindex, with a CSP excluding inline scripts and framing.
+Login/console traffic is separately rate limited. Disabled is the default; production Uber hosts are rejected.
+
+OAuth requests use `eats.pos_provisioning`, PKCE S256 and an expiring random state bound to that session and
+store UUID. An atomic state claim prevents callback replay/concurrent exchange. Discover the merchant's
+stores, require the exact allowlisted UUID, then nominate order-manager access while retaining tablet acceptance, using a JSON request body.
+The merchant token exists only during discovery/activation. Callback redirects contain no code or token.
+Provider HTTP redirects are disabled; response sizes and whole-request deadlines are bounded.
+
+App tokens request only `eats.store eats.order` (the latter also authorizes v2 order reads). Cache until
+five minutes before expiry, coalesce concurrent refreshes, and encrypt with AES-256-GCM using a separate
+configuration key and app/store/token-kind associated data. Never return a token to browser code or log
+provider payloads. Schema source is additive `002_sandbox_console.sql`: session/state hashes, encrypted
+PKCE verifiers and app tokens, and per-order action metadata. Migration 001 and all tenant schemas remain
+unchanged. Apply 002 explicitly and grant CRUD on only its four tables to the API role; receipt permissions
+remain INSERT/SELECT. Back up the isolated DB and key separately before deployment/rotation.
+
+Menu upload is an explicit replacement of a versioned two-item sandbox fixture, previewed with its test
+hours and EUR prices. Readback must preserve every published field and stable ID before a publish is
+reported verified or order-manager testing enabled. Enabling/resuming testing uses another session-bound OAuth intent; its callback first reactivates with tablet acceptance, verifies the menu, then uses the merchant token to turn off tablet acceptance. App-token PATCH is restricted to pausing/relinquishing management. Provider-added defaults are permitted. Configuration
+readback distinguishes linked, enabled, pending promotion and actual order-manager identity. Pause testing
+is a separate action. No tenant working hours, menu, tax settings or publishing revision is inferred.
+
+Order reads require an authenticated stored notification for the configured app/store and a canonical
+GUID. Build the fixed v2 API path; never follow resource_href. Require the returned order/store IDs to
+match. Display the complete order including customer/item instructions without persisting customer data.
+Accept/deny requires explicit instruction review, a reason, a fresh CREATED state and confirmed order-manager
+configuration. An atomic unique app/store/order action claim commits before the provider POST. Record
+acknowledged, definitively rejected or uncertain outcomes; uncertain calls cannot be retried automatically.
+Only a matching ACCEPTED/DENIED readback reconciles an uncertain decision. Known 4xx rejection permits
+manual retry after another fresh order read. Restart preserves these guards. Order JSON remains ephemeral.
+
+This console proves provider behavior; it does not create tenant POS orders or print kitchen tickets.
+Sandbox-only operator testing is the next acceptance gate before tenant routing is designed and released.
+The deploy runbook defines backup, rollback and key rotation for this environment.
 
 Sources: [Uber webhooks](https://developer.uber.com/docs/eats/guides/webhooks),
 [order notification](https://developer.uber.com/docs/eats/references/api/webhooks.orders-notification),

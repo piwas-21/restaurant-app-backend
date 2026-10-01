@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Sofra · Uber Eats sandbox</title>
+  <link rel="stylesheet" href="/console/styles.css">
+  <script src="/console/console.js" defer></script>
+</head>
+<body>
+  <header><a class="wordmark" href="/console/">sofra<span>by Piwas</span></a><span class="tag">Uber Eats · sandbox</span></header>
+  <main>
+    <div class="intro"><p class="eyebrow">Delivery channels / first connection</p><h1>A test service,<br>ready to connect.</h1><p>Authorize your Uber test store, publish a small test menu, then follow each order from notification to decision.</p></div>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <section id="login-panel" class="card" hidden>
+      <h2>Open your sandbox</h2><p>Use the private console access key supplied with this environment.</p>
+      <form id="login-form"><label for="access-key">Console access key</label><input id="access-key" type="password" autocomplete="off" required minlength="32" maxlength="128"><button type="submit">Sign in</button></form>
+    </section>
+    <div id="workspace" hidden>
+      <div class="toolbar"><span>Only your approved Uber test store</span><button id="refresh" class="secondary">Refresh status</button><button id="logout" class="text-button">Sign out</button></div>
+      <section class="card"><div class="section-title"><span class="number">01</span><h2>Connect the store</h2><span id="connection-badge" class="badge">Check connection</span></div>
+        <p>Sign in with the test merchant account Uber supplied and approve store access.</p>
+        <dl id="configuration"></dl><button id="connect">Connect with Uber</button>
+      </section>
+      <section class="card"><div class="section-title"><span class="number">02</span><h2>Prepare the menu</h2></div>
+        <p>This replaces the approved sandbox store’s entire menu with two test items: a €5 meal and a €2 drink. Test availability is every day, 00:00–23:59. Nothing is prepared or charged.</p>
+        <details><summary>Preview the exact test menu</summary><pre id="menu-preview"></pre></details>
+        <div class="actions"><button id="publish">Publish test menu &amp; verify</button><button id="read-menu" class="secondary">Read current Uber menu</button></div>
+        <details id="menu-readback" hidden><summary>Menu returned by Uber</summary><pre id="menu-result"></pre></details>
+      </section>
+      <section class="card"><div class="section-title"><span class="number">03</span><h2>Receive test orders</h2></div>
+        <p>Enable order testing after menu verification. Keep this screen open while placing a test order in Uber Eats; each order needs your explicit decision.</p>
+        <div class="actions"><button id="enable">Enable order testing</button><button id="pause" class="secondary">Pause order testing</button></div>
+        <p class="hint">Use the test store’s Hoofddorp address in Uber Eats and set the restaurant to Open in Uber Eats Orders. These orders remain in this sandbox console.</p>
+        <h3>Recent notifications</h3><p id="empty-receipts">No notifications loaded.</p><ul id="receipts"></ul>
+      </section>
+      <section id="order-panel" class="card" hidden><div class="section-title"><h2>Order review</h2><span id="order-state" class="badge"></span></div>
+        <p id="order-id" class="mono"></p><pre id="order-json" tabindex="0" aria-label="Complete Uber order including item and customer instructions"></pre>
+        <label class="check"><input id="reviewed" type="checkbox"> I reviewed all items, customer instructions and special requests.</label>
+        <label for="reason">Decision reason</label><input id="reason" type="text" maxlength="250" placeholder="For example: Sandbox acceptance test">
+        <div class="actions"><button id="accept">Accept order</button><button id="deny" class="secondary">Deny order</button><button id="refresh-order" class="text-button">Refresh order</button></div>
+      </section>
+    </div>
+  </main>
+  <footer>Sofra channels sandbox <span>Private testing · Piwas</span></footer>
+</body>
+</html>

@@ -18,5 +18,7 @@
     <Using Include="Xunit" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/001_webhook_inbox.sql"
              Link="001_webhook_inbox.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/002_sandbox_console.sql"
+             Link="002_sandbox_console.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

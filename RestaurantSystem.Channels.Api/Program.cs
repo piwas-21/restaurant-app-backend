@@ -3,8 +3,12 @@ using RestaurantSystem.Channels.Api;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddChannelGateway(builder.Configuration);
+builder.Services.AddSandboxConsole(builder.Configuration);
 var app = builder.Build();
+app.UseMiddleware<SandboxConsoleMiddleware>();
 app.UseRateLimiter();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new
 {

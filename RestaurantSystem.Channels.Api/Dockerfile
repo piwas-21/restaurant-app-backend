@@ -10,6 +10,9 @@ COPY RestaurantSystem.Channels.Domain/*.cs RestaurantSystem.Channels.Domain/
 COPY RestaurantSystem.Channels.Infrastructure/*.cs RestaurantSystem.Channels.Infrastructure/
 COPY RestaurantSystem.Channels.Infrastructure/Migrations/ RestaurantSystem.Channels.Infrastructure/Migrations/
 COPY RestaurantSystem.Channels.Api/*.cs RestaurantSystem.Channels.Api/
+COPY RestaurantSystem.Channels.Api/appsettings.json RestaurantSystem.Channels.Api/
+COPY RestaurantSystem.Channels.Api/wwwroot/ RestaurantSystem.Channels.Api/wwwroot/
+COPY RestaurantSystem.Channels.Api/Fixtures/ RestaurantSystem.Channels.Api/Fixtures/
 RUN dotnet publish RestaurantSystem.Channels.Api/RestaurantSystem.Channels.Api.csproj \
     -c Release -o /app/publish --no-restore /p:UseAppHost=false
 

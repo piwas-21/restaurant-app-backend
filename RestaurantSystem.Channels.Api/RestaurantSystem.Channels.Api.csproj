@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Content Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../RestaurantSystem.Channels.Domain/RestaurantSystem.Channels.Domain.csproj" />
     <ProjectReference Include="../RestaurantSystem.Channels.Infrastructure/RestaurantSystem.Channels.Infrastructure.csproj" />
   </ItemGroup>

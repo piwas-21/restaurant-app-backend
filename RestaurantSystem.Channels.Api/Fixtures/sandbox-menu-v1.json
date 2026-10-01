@@ -1,0 +1,141 @@
+{
+  "menus": [
+    {
+      "id": "sofra-test-menu-v1",
+      "title": {
+        "translations": {
+          "en_us": "Sofra sandbox test menu"
+        }
+      },
+      "service_availability": [
+        {
+          "day_of_week": "monday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        },
+        {
+          "day_of_week": "tuesday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        },
+        {
+          "day_of_week": "wednesday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        },
+        {
+          "day_of_week": "thursday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        },
+        {
+          "day_of_week": "friday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        },
+        {
+          "day_of_week": "saturday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        },
+        {
+          "day_of_week": "sunday",
+          "time_periods": [
+            {
+              "start_time": "00:00",
+              "end_time": "23:59"
+            }
+          ]
+        }
+      ],
+      "category_ids": [
+        "sofra-test-category-v1"
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "id": "sofra-test-category-v1",
+      "title": {
+        "translations": {
+          "en_us": "Test items"
+        }
+      },
+      "entities": [
+        {
+          "id": "sofra-test-meal-v1",
+          "type": "ITEM"
+        },
+        {
+          "id": "sofra-test-drink-v1",
+          "type": "ITEM"
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "sofra-test-meal-v1",
+      "title": {
+        "translations": {
+          "en_us": "Sofra test meal"
+        }
+      },
+      "description": {
+        "translations": {
+          "en_us": "Sandbox fixture only; no food is prepared."
+        }
+      },
+      "price_info": {
+        "price": 500
+      },
+      "tax_info": {
+        "vat_rate_percentage": 9
+      }
+    },
+    {
+      "id": "sofra-test-drink-v1",
+      "title": {
+        "translations": {
+          "en_us": "Sofra test drink"
+        }
+      },
+      "description": {
+        "translations": {
+          "en_us": "Sandbox fixture only; no drink is prepared."
+        }
+      },
+      "price_info": {
+        "price": 200
+      },
+      "tax_info": {
+        "vat_rate_percentage": 9
+      }
+    }
+  ],
+  "modifier_groups": []
+}
