@@ -98,6 +98,7 @@ bind('logout', async () => { await api('auth/logout', {}); showLogin(); notice('
 bind('refresh', refresh);
 bind('connect', async () => { authorize(await api('uber/connect', {})); });
 bind('publish', async () => { await api('uber/publish', {}); notice('Test menu published and verified against Uber’s readback.'); });
+bind('verify-menu', async () => { await api('uber/verification'); notice('Current test menu verified against Uber’s readback.'); });
 bind('read-menu', async () => {
   el('menu-result').textContent = JSON.stringify(await api('uber/menu'), null, 2);
   el('menu-readback').hidden = false; el('menu-readback').open = true; notice('Current menu retrieved from Uber.');

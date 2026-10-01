@@ -27,7 +27,7 @@ public sealed class SandboxConsoleController(ISandboxSessions sessions, ISandbox
         }
     }
 
-    [HttpGet("{operation:regex(^(configuration|preview|menu|receipts)$)}")]
+    [HttpGet("{operation:regex(^(configuration|preview|menu|verification|receipts)$)}")]
     public async Task<IActionResult> Query(string operation, CancellationToken cancellationToken)
     {
         await sessions.Require(HttpContext, false, cancellationToken);

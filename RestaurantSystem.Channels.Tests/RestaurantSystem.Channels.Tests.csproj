@@ -16,6 +16,7 @@
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
     <ProjectReference Include="../RestaurantSystem.Channels.Api/RestaurantSystem.Channels.Api.csproj" />
     <Using Include="Xunit" />
+    <Content Include="Fixtures/uber-sandbox-menu-readback.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/001_webhook_inbox.sql"
              Link="001_webhook_inbox.sql" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/002_sandbox_console.sql"
