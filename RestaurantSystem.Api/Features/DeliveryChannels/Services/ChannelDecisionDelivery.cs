@@ -29,7 +29,7 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
         await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"channel-decision-claims"}, 0))", cancellationToken);
         var now = DateTime.UtcNow;
         var job = await ChannelDecisionBinding.Eligible(context.ChannelOrderDecisions.IgnoreAutoIncludes(), options)
-            .Include(job => job.Order).ThenInclude(order => order.ExternalReference)
+            .Include(job => job.Order.ExternalReference)
             .Where(job => job.AvailableAt <= now && (job.State == "Pending" || job.State == "Unknown"
                 || job.State == "Leased" && job.LeaseUntil <= now))
             .OrderBy(job => job.CreatedAt).FirstOrDefaultAsync(cancellationToken);
@@ -51,7 +51,7 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         // Shares the claim lock so an expired lease cannot be replaced while its result is applied.
         await context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"channel-decision-claims"}, 0))", cancellationToken);
-        var job = await context.ChannelOrderDecisions.IgnoreAutoIncludes().Include(job => job.Order).ThenInclude(order => order.ExternalReference)
+        var job = await context.ChannelOrderDecisions.IgnoreAutoIncludes().Include(job => job.Order.ExternalReference)
             .FirstOrDefaultAsync(job => job.Id == decisionId, cancellationToken)
             ?? throw new NotFoundException("Decision not found.");
         var source = job.Order.ExternalReference ?? throw new ConflictException("The decision lost its marketplace identity.");
@@ -102,18 +102,7 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
 
     private void ApplyCanonicalResult(ChannelOrderDecision job, ExternalOrderReference source, ChannelDecisionReport report)
     {
-        var accepted = job.Action == "accept" && report.CanonicalState is "ACCEPTED" or "FINISHED";
-        var denied = job.Action == "deny" && report.CanonicalState == "DENIED";
-        if (report.State == "Succeeded" && !accepted && !denied)
-            throw new BadRequestException("A successful decision requires matching canonical provider evidence.");
-        if (report.State != "Succeeded" && (accepted || denied))
-            throw new BadRequestException("Canonical decision confirmation must be reported as succeeded.");
-        if (report.CanonicalState == "CANCELED" && report.State != "Failed")
-            throw new BadRequestException("A canceled provider order is a failed decision.");
-        if (report.CanonicalState == "UNKNOWN") return;
-        if (report.CanonicalState == "CREATED") return;
-        if (!accepted && !denied && report.CanonicalState != "CANCELED")
-            throw new BadRequestException("The canonical state conflicts with this decision.");
+        if (!ValidateCanonicalResult(job.Action, report)) return;
         var previous = job.Order.Status;
         job.Order.Status = report.CanonicalState switch
         {
@@ -143,4 +132,21 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
                 Notes = "Verified marketplace decision result.",
             });
     }
+    private static bool ValidateCanonicalResult(string action, ChannelDecisionReport report)
+    {
+        var accepted = action == "accept" && report.CanonicalState is "ACCEPTED" or "FINISHED";
+        var denied = action == "deny" && report.CanonicalState == "DENIED";
+        if (report.State == "Succeeded" && !accepted && !denied)
+            throw new BadRequestException("A successful decision requires matching canonical provider evidence.");
+        if (report.State != "Succeeded" && (accepted || denied))
+            throw new BadRequestException("Canonical decision confirmation must be reported as succeeded.");
+        if (report.CanonicalState == "CANCELED" && report.State != "Failed")
+            throw new BadRequestException("A canceled provider order is a failed decision.");
+        if (report.CanonicalState == "UNKNOWN") return false;
+        if (report.CanonicalState == "CREATED") return false;
+        if (!accepted && !denied && report.CanonicalState != "CANCELED")
+            throw new BadRequestException("The canonical state conflicts with this decision.");
+        return true;
+    }
+
 }

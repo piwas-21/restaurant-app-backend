@@ -13,6 +13,13 @@ internal static class ExternalOrderPrintPolicy
     internal static bool Kitchen(Order order) => order.ExternalReference?.ExternalState == "ACCEPTED"
         && order.IsKitchenReleased && order.Status is not (OrderStatus.Cancelled or OrderStatus.Refunded or OrderStatus.Completed);
 
+    internal static bool Blocks(Order order, OrderAction action) => action switch
+    {
+        OrderAction.PrintKitchen => !Kitchen(order),
+        OrderAction.PrintReceipt => !Receipt(order),
+        _ => false,
+    };
+
     internal static IReadOnlyList<OrderPermittedActionDto> DeviceActions(Order order) =>
     [
         new() { Action = "PrintKitchen", Allowed = Kitchen(order) },

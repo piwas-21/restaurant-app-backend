@@ -59,8 +59,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             };
         }
 
-        if (order.ExternalReference is not null && (action == OrderAction.PrintKitchen && !ExternalOrderPrintPolicy.Kitchen(order)
-            || action == OrderAction.PrintReceipt && !ExternalOrderPrintPolicy.Receipt(order)))
+        if (order.ExternalReference is not null && ExternalOrderPrintPolicy.Blocks(order, action))
             return new OrderPermittedActionDto
             {
                 Action = action.ToString(),
