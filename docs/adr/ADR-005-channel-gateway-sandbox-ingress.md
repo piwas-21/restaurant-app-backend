@@ -79,8 +79,15 @@ unchanged. Apply 002 explicitly and grant CRUD on only its four tables to the AP
 remain INSERT/SELECT. Back up the isolated DB and key separately before deployment/rotation.
 
 Menu upload is an explicit replacement of a versioned two-item sandbox fixture, previewed with its test
-hours and EUR prices. Readback must preserve every published field and stable ID before a publish is
-reported verified or order-manager testing enabled. Enabling/resuming testing uses another session-bound OAuth intent; its callback first reactivates with tablet acceptance, verifies the menu, then uses the merchant token to turn off tablet acceptance. App-token PATCH is restricted to pausing/relinquishing management. Provider-added defaults are permitted. Configuration
+hours and EUR prices. Readback must preserve published content and stable IDs before a publish is
+reported verified or order-manager testing enabled. Uber's actual sandbox GET normalizes an empty
+modifier-group array to null and omits `type: ITEM` on category entities. Only those two equivalences are
+allowed: an explicit different type, changed prices/tax/hours/content/IDs, missing fields and nonempty
+modifier groups still fail. An independently captured provider readback and hostile mutations cover this
+boundary. `GET /api/sandbox/uber/verification` verifies the current menu without issuing another upload.
+Enabling/resuming testing uses another session-bound OAuth intent; its callback first reactivates with
+tablet acceptance, verifies the menu, then uses the merchant token to turn off tablet acceptance.
+App-token PATCH is restricted to pausing/relinquishing management. Provider-added defaults are permitted. Configuration
 readback distinguishes linked, enabled, pending promotion and actual order-manager identity. Pause testing
 is a separate action. No tenant working hours, menu, tax settings or publishing revision is inferred.
 
