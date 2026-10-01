@@ -199,3 +199,8 @@ handler/dispatcher constraints at compile time, matching the existing tenant med
 Sources: [Uber webhooks](https://developer.uber.com/docs/eats/guides/webhooks),
 [order notification](https://developer.uber.com/docs/eats/references/api/webhooks.orders-notification),
 [store provisioning](https://developer.uber.com/docs/eats/references/api/webhooks/store-provisioned).
+
+Tenant decision timing is deployment configuration: `DeliveryChannels:DecisionLeaseSeconds` defaults to 120
+(60–300 allowed), `DecisionRetrySeconds` defaults to 30 (10–300), and `DecisionClockToleranceSeconds` defaults
+to 30 (0–60). Bounds are validated even while the channel is disabled. Clock tolerance never replaces the
+monotonic canonical observation check or lease ownership. Gateway transport deadlines must fit the selected lease.

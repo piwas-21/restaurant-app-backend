@@ -21,6 +21,10 @@ public static class DeliveryChannelServiceExtensions
                 && settings.Stores.All(store => !string.IsNullOrWhiteSpace(store.Provider)
                     && !string.IsNullOrWhiteSpace(store.StoreId) && store.Currency.Length == 3
                     && (!settings.SandboxOnly || store.IsSandbox)), "Enabled channels require explicit store/currency bindings.")
+            .Validate(settings => settings.DecisionLeaseSeconds is >= 60 and <= 300
+                && settings.DecisionRetrySeconds is >= 10 and <= 300
+                && settings.DecisionClockToleranceSeconds is >= 0 and <= 60,
+                "Channel decision lease, retry and clock durations must remain within operational bounds.")
             .ValidateOnStart();
         services.AddScoped<IExternalOrderImporter, ExternalOrderImporter>();
         services.AddScoped<IChannelDecisionQueue, ChannelDecisionQueue>();

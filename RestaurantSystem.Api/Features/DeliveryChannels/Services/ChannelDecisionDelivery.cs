@@ -17,9 +17,9 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
     IOrderRoutingService routing, IOrderResponseProjector responses, IOrderNotificationService notifications)
     : IChannelDecisionDelivery
 {
-    private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan ClockTolerance = TimeSpan.FromSeconds(30);
+    private TimeSpan LeaseDuration => TimeSpan.FromSeconds(options.Value.DecisionLeaseSeconds);
+    private TimeSpan RetryDelay => TimeSpan.FromSeconds(options.Value.DecisionRetrySeconds);
+    private TimeSpan ClockTolerance => TimeSpan.FromSeconds(options.Value.DecisionClockToleranceSeconds);
 
     public async Task<ChannelDecisionLeaseDto?> ClaimAsync(CancellationToken cancellationToken)
     {
