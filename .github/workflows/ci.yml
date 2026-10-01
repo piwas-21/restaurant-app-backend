@@ -28,6 +28,30 @@ permissions:
   contents: read
 
 jobs:
+  channels_test:
+    name: channel gateway (sandbox webhook + PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    services:
+      channels-postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: channels_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CHANNEL_TESTS_DB_CONNECTION: "Host=channels-postgres;Database=channels_test;Username=test;Password=test"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - run: dotnet test RestaurantSystem.Channels.Tests/RestaurantSystem.Channels.Tests.csproj --nologo --verbosity minimal
+
   dotnet_format:
     name: dotnet format --verify-no-changes
     runs-on: ubuntu-latest
