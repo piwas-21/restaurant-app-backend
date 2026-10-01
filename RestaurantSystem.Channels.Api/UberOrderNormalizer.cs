@@ -11,11 +11,7 @@ public sealed class UberOrderNormalizer : IUberOrderNormalizer
     public TenantOrderRequest Normalize(JsonElement order, Guid expectedOrderId, TenantStoreBinding binding)
     {
         if (order.ValueKind != JsonValueKind.Object || expectedOrderId == Guid.Empty) throw UberOrderValue.Unsupported();
-        if (binding.Currency is not ("EUR" or "CHF") || binding.StoreId == Guid.Empty
-            || string.IsNullOrWhiteSpace(binding.CatalogueRevision) || binding.PublishedMenuHash.Length != 64 || !binding.PublishedMenuHash.All(Uri.IsHexDigit)
-            || binding.Items.Count == 0 || binding.Items.Any(item => item.ProductId == Guid.Empty)
-            || binding.Items.GroupBy(item => item.ProviderItemId, StringComparer.Ordinal).Any(group => group.Count() != 1))
-            throw UberOrderValue.Unsupported();
+        ValidateBinding(binding);
         if (!Guid.TryParse(UberOrderValue.Text(order, "id", 36), out var orderId) || orderId != expectedOrderId
             || !Guid.TryParse(UberOrderValue.Text(UberOrderValue.Object(order, "store"), "id", 36), out var storeId)
             || storeId != binding.StoreId || UberOrderValue.Text(order, "current_state", 24) != "CREATED")
@@ -29,18 +25,7 @@ public sealed class UberOrderNormalizer : IUberOrderNormalizer
             || !cart.TryGetProperty("items", out var sourceItems) || sourceItems.ValueKind != JsonValueKind.Array
             || sourceItems.GetArrayLength() is < 1 or > 200) throw UberOrderValue.Unsupported();
         var items = sourceItems.EnumerateArray().Select(item => Item(item, binding)).ToArray();
-        var payment = UberOrderValue.Object(order, "payment");
-        if (UberOrderValue.HasContent(payment, "promotions")) throw UberOrderValue.Unsupported();
-        var charges = UberOrderValue.Object(payment, "charges");
-        var total = UberOrderValue.Money(charges, "total", binding.Currency);
-        var subtotal = UberOrderValue.Money(charges, "sub_total", binding.Currency);
-        if (total != subtotal || subtotal != items.Sum(item => item.Total)) throw UberOrderValue.Unsupported();
-        decimal? tax = charges.TryGetProperty("tax", out var taxValue) && taxValue.ValueKind != JsonValueKind.Null
-            ? UberOrderValue.Money(charges, "tax", binding.Currency) : null;
-        if (tax > total) throw UberOrderValue.Unsupported();
-        foreach (var charge in charges.EnumerateObject().Where(property => property.Name is not ("total" or "sub_total" or "tax")))
-            if (charge.Value.ValueKind != JsonValueKind.Null && UberOrderValue.Money(charges, charge.Name, binding.Currency) != 0)
-                throw UberOrderValue.Unsupported();
+        var (total, tax) = ReadTotals(order, binding.Currency, items);
         var eater = UberOrderValue.Object(order, "eater");
         if (UberOrderValue.HasContent(order, "packaging") || !string.IsNullOrEmpty(Optional(eater, "phone_code", 30)))
             throw UberOrderValue.Unsupported();
@@ -51,6 +36,32 @@ public sealed class UberOrderNormalizer : IUberOrderNormalizer
             binding.Currency, total, tax, placedAt, type,
             Optional(eater, "first_name", 100), Optional(eater, "phone", 20),
             Optional(cart, "special_instructions", 1000, notes: true), items);
+    }
+
+    private static void ValidateBinding(TenantStoreBinding binding)
+    {
+        if (binding.Currency is not ("EUR" or "CHF") || binding.StoreId == Guid.Empty
+            || string.IsNullOrWhiteSpace(binding.CatalogueRevision) || binding.PublishedMenuHash.Length != 64 || !binding.PublishedMenuHash.All(Uri.IsHexDigit)
+            || binding.Items.Count == 0 || binding.Items.Any(item => item.ProductId == Guid.Empty)
+            || binding.Items.GroupBy(item => item.ProviderItemId, StringComparer.Ordinal).Any(group => group.Count() != 1))
+            throw UberOrderValue.Unsupported();
+    }
+
+    private static (decimal Total, decimal? Tax) ReadTotals(JsonElement order, string currency, TenantOrderItem[] items)
+    {
+        var payment = UberOrderValue.Object(order, "payment");
+        if (UberOrderValue.HasContent(payment, "promotions")) throw UberOrderValue.Unsupported();
+        var charges = UberOrderValue.Object(payment, "charges");
+        var total = UberOrderValue.Money(charges, "total", currency);
+        var subtotal = UberOrderValue.Money(charges, "sub_total", currency);
+        if (total != subtotal || subtotal != items.Sum(item => item.Total)) throw UberOrderValue.Unsupported();
+        decimal? tax = charges.TryGetProperty("tax", out var taxValue) && taxValue.ValueKind != JsonValueKind.Null
+            ? UberOrderValue.Money(charges, "tax", currency) : null;
+        if (tax > total) throw UberOrderValue.Unsupported();
+        foreach (var charge in charges.EnumerateObject().Where(property => property.Name is not ("total" or "sub_total" or "tax")))
+            if (charge.Value.ValueKind != JsonValueKind.Null && UberOrderValue.Money(charges, charge.Name, currency) != 0)
+                throw UberOrderValue.Unsupported();
+        return (total, tax);
     }
 
     private static TenantOrderItem Item(JsonElement item, TenantStoreBinding binding)

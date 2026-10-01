@@ -51,9 +51,11 @@ public sealed class PostgresChannelImportJobs(NpgsqlDataSource dataSource) : ICh
             """);
         var lease = Guid.NewGuid(); Add(command, clientId, storeId, tenantId, lease);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? new(clientId, storeId, reader.GetGuid(0), tenantId, reader.GetString(1), lease,
-                reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3)) : null;
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        var encryptedRequest = reader.IsDBNull(2) ? null : reader.GetString(2);
+        DateTimeOffset? expiresAt = reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3);
+        return new(clientId, storeId, reader.GetGuid(0), tenantId, reader.GetString(1), lease,
+            encryptedRequest, expiresAt);
     }
 
     public Task<bool> Prepare(ChannelImportJob job, string ciphertext, string requestHash, DateTimeOffset expiresAt, CancellationToken cancellationToken)
