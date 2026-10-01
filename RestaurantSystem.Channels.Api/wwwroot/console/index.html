@@ -6,13 +6,13 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Sofra · Uber Eats sandbox</title>
   <link rel="stylesheet" href="/console/styles.css">
-  <script src="/console/console.js" defer></script>
+  <script src="/console/console.js" type="module"></script>
 </head>
 <body>
   <header><a class="wordmark" href="/console/">sofra<span>by Piwas</span></a><span class="tag">Uber Eats · sandbox</span></header>
   <main>
     <div class="intro"><p class="eyebrow">Delivery channels / first connection</p><h1>A test service,<br>ready to connect.</h1><p>Authorize your Uber test store, publish a small test menu, then follow each order from notification to decision.</p></div>
-    <p id="notice" role="status" aria-live="polite"></p>
+    <output id="notice" aria-live="polite"></output>
     <section id="login-panel" class="card" hidden>
       <h2>Open your sandbox</h2><p>Use the private console access key supplied with this environment.</p>
       <form id="login-form"><label for="access-key">Console access key</label><input id="access-key" type="password" autocomplete="off" required minlength="32" maxlength="128"><button type="submit">Sign in</button></form>
@@ -36,7 +36,7 @@
         <h3>Recent notifications</h3><p id="empty-receipts">No notifications loaded.</p><ul id="receipts"></ul>
       </section>
       <section id="order-panel" class="card" hidden><div class="section-title"><h2>Order review</h2><span id="order-state" class="badge"></span></div>
-        <p id="order-id" class="mono"></p><pre id="order-json" tabindex="0" aria-label="Complete Uber order including item and customer instructions"></pre>
+        <p id="order-id" class="mono"></p><textarea id="order-json" readonly rows="18" aria-label="Complete Uber order including item and customer instructions"></textarea>
         <label class="check"><input id="reviewed" type="checkbox"> I reviewed all items, customer instructions and special requests.</label>
         <label for="reason">Decision reason</label><input id="reason" type="text" maxlength="250" placeholder="For example: Sandbox acceptance test">
         <div class="actions"><button id="accept">Accept order</button><button id="deny" class="secondary">Deny order</button><button id="refresh-order" class="text-button">Refresh order</button></div>

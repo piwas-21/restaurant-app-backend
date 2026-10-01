@@ -63,7 +63,7 @@ public sealed class SandboxOrders(IOptions<UberWebhookSettings> options, IUberSa
             throw;
         }
         // Known replies are outside the transport catch: an old rejected attempt cannot touch a retry.
-        var outcome = result.IsSuccess ? "Succeeded" : result.Status is >= 400 and < 500 ? "Failed" : "Unknown";
+        var outcome = DecisionOutcome(result);
         await Finish(orderId, outcome);
         ProviderJson.RequireSuccess(result, "order decision");
         return ProviderJson.Encode(new { action, state = outcome, message = "Uber acknowledged the decision. Refresh for the current order state." });
@@ -74,6 +74,12 @@ public sealed class SandboxOrders(IOptions<UberWebhookSettings> options, IUberSa
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         if ((await repository.FindAction(ClientId, StoreId, orderId, timeout.Token))?.State == "Pending")
             await repository.FinishAction(ClientId, StoreId, orderId, "Unknown", timeout.Token);
+    }
+
+    private static string DecisionOutcome(ProviderReply reply)
+    {
+        if (reply.IsSuccess) return "Succeeded";
+        return reply.Status is >= 400 and < 500 ? "Failed" : "Unknown";
     }
 
     private async Task Finish(string orderId, string state)

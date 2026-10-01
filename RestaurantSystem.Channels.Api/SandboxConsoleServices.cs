@@ -19,6 +19,7 @@ public static class SandboxConsoleServices
         services.AddScoped<ISandboxSessions, SandboxSessions>();
         services.AddScoped<ISandboxTokens, SandboxTokens>();
         services.AddScoped<ISandboxConnection, SandboxConnection>();
+        services.AddScoped<ISandboxAuthorization, SandboxAuthorization>();
         services.AddScoped<ISandboxMenu, SandboxMenu>();
         services.AddScoped<ISandboxOrders, SandboxOrders>();
         services.AddScoped<IChannelCommandHandler<ConsoleCommand, System.Text.Json.JsonElement>, ConsoleCommandHandler>();

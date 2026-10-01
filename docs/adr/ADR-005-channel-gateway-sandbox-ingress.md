@@ -97,6 +97,11 @@ This console proves provider behavior; it does not create tenant POS orders or p
 Sandbox-only operator testing is the next acceptance gate before tenant routing is designed and released.
 The deploy runbook defines backup, rollback and key rotation for this environment.
 
+Static-analysis classification: the hand-authored SQL is PostgreSQL 16, verified by applying it in gateway
+integration tests. Oracle PL/SQL suggestions to replace CHAR/VARCHAR with VARCHAR2 are inapplicable and are
+reviewed as false positives, not implemented. The custom CQRS query marker's generic result type binds its
+handler/dispatcher constraints at compile time, matching the existing tenant mediator convention.
+
 Sources: [Uber webhooks](https://developer.uber.com/docs/eats/guides/webhooks),
 [order notification](https://developer.uber.com/docs/eats/references/api/webhooks.orders-notification),
 [store provisioning](https://developer.uber.com/docs/eats/references/api/webhooks/store-provisioned).

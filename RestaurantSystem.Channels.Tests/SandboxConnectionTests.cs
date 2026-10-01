@@ -13,6 +13,17 @@ namespace RestaurantSystem.Channels.Tests;
 public sealed class SandboxConnectionTests(GatewayFixture fixture) : ConsoleFixture(fixture)
 {
     [Fact]
+    public async Task OmittedBooleanActionsAreRejectedInsteadOfDefaultingToPauseOrUnreviewedDecision()
+    {
+        await Login();
+        using var enable = await Client.PostAsJsonAsync("/api/sandbox/uber/enable", new { });
+        Assert.Equal(HttpStatusCode.BadRequest, enable.StatusCode);
+        using var decision = await Client.PostAsJsonAsync("/api/sandbox/uber/orders/" + Guid.NewGuid() + "/decision",
+            new { action = "accept", reason = "Incomplete fixture" });
+        Assert.Equal(HttpStatusCode.BadRequest, decision.StatusCode);
+        Assert.Empty(Provider.Calls); Assert.Empty(Provider.Grants);
+    }
+    [Fact]
     public async Task AnonymousAndCrossOriginCallsAreDeniedAndLogoutInvalidatesSession()
     {
         using var anonymous = await Client.GetAsync("/api/sandbox/uber/receipts");

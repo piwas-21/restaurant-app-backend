@@ -27,7 +27,7 @@ public sealed class SandboxConsoleMiddleware(RequestDelegate next)
         catch (ChannelConsoleException ex) { await Error(context, ex.Status, ex.Message); }
         catch (NpgsqlException) { await Error(context, 503, "Sandbox storage is unavailable. Refresh status before retrying."); }
         catch (CryptographicException) { await Error(context, 503, "Sandbox token protection failed. Contact the administrator."); }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { context.Abort(); }
     }
 
     private static async Task Error(HttpContext context, int status, string message)
