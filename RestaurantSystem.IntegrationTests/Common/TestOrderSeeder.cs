@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -14,14 +15,17 @@ namespace RestaurantSystem.IntegrationTests.Common;
 /// with 23503 (foreign key violation).
 ///
 /// The seeded order is minimal (Pending status, no items, no FKs to other tables)
-/// and idempotent via <c>FindAsync</c>, so callers don't need to reason about
+/// and idempotent via a tracked/local or scalar existence check, so callers don't need to reason about
 /// duplicate inserts within a test.
 /// </summary>
 public static class TestOrderSeeder
 {
     public static async Task SeedOrderAsync(ApplicationDbContext context, Guid orderId, Guid? userId = null)
     {
-        if (await context.Orders.FindAsync(orderId) is not null)
+        // Migration tests also seed orders against historical schemas. A scalar existence probe
+        // must not join a later AutoInclude reference whose table intentionally does not exist yet.
+        if (context.Orders.Local.Any(order => order.Id == orderId)
+            || await context.Orders.IgnoreAutoIncludes().AnyAsync(order => order.Id == orderId))
         {
             return;
         }

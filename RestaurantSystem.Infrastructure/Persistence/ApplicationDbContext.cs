@@ -451,7 +451,13 @@ namespace RestaurantSystem.Infrastructure.Persistence
                 .Distinct()
                 .ToArray();
 
+            if (changedOrderIds.Length == 0)
+            {
+                return;
+            }
+
             foreach (var order in Orders
+                .IgnoreAutoIncludes()
                 .Where(value => changedOrderIds.Contains(value.Id)).ToList())
             {
                 orderEntries[order.Id] = Entry(order);
