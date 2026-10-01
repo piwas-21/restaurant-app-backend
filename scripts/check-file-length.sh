@@ -49,8 +49,11 @@ limit_for_path() {
     RestaurantSystem.Api/Features/**/*Controller.cs)                 echo 150 ;;
     RestaurantSystem.Api/Features/*ControllerBase.cs)                echo 150 ;;
     RestaurantSystem.Api/Features/**/*ControllerBase.cs)             echo 150 ;;
+    RestaurantSystem.Channels.Api/*Controller.cs)                    echo 150 ;;
+    RestaurantSystem.Channels.Api/*ControllerBase.cs)                echo 150 ;;
     # Domain entities
     RestaurantSystem.Domain/*.cs|RestaurantSystem.Domain/**/*.cs)    echo 100 ;;
+    RestaurantSystem.Channels.Domain/*.cs)                          echo 100 ;;
     # Command / Query handlers
     *Command.cs|*CommandHandler.cs)                                  echo 200 ;;
     *Query.cs|*QueryHandler.cs)                                      echo 200 ;;
@@ -77,6 +80,8 @@ limit_for_path() {
     # those extractions established. §4 has no row for this kind, so they are gated as the service
     # classes they most resemble, pending a §4 decision (#315).
     RestaurantSystem.Api/Common/Validation/*.cs)                     echo 300 ;;
+    RestaurantSystem.Channels.Api/*.cs)                             echo 300 ;;
+    RestaurantSystem.Channels.Infrastructure/*.cs)                   echo 300 ;;
     *)                                                               echo 0 ;;
   esac
 }
@@ -94,7 +99,7 @@ is_baselined() {
 
 # Walk the API + Domain trees.
 list_all_files() {
-  find RestaurantSystem.Api RestaurantSystem.Domain -name "*.cs" -type f \
+  find RestaurantSystem.Api RestaurantSystem.Domain RestaurantSystem.Channels.Api RestaurantSystem.Channels.Domain RestaurantSystem.Channels.Infrastructure -name "*.cs" -type f \
     -not -path "*/bin/*" -not -path "*/obj/*" -not -path "*/Migrations/*" 2>/dev/null
 }
 
