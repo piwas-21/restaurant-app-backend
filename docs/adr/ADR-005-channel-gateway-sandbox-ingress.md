@@ -54,6 +54,30 @@ explicitly before the API; no startup migrations. No existing EF migration or te
 
 ## Consequences and scope
 
+### Tenant source contract
+
+The tenant Domain uses an optional one-to-one `ExternalOrderReference`, independent of the gateway projects.
+Migration `20261001174539_AddExternalOrderReference` creates its table with a unique local order link and a
+unique provider/store/external-order key. The provider is a stable string; adding an adapter does not require
+another tenant enum migration. References retain hashes and monetary evidence, never raw provider bodies.
+
+`Orders.Remove` becomes a soft delete during auditing. The reference relationship uses `ClientNoAction`, so EF
+cannot delete the loaded idempotency anchor before that conversion. A physical order purge must explicitly
+address the reference under the applicable retention policy; a normal operator deletion cannot free its key.
+Reference-only updates touch the principal order's version, audit timestamp and change journal, so staff/printer
+delta readers see provider-state changes.
+
+Order DTOs carry one optional `externalOrder` object: provider/display ID, provider state/event time, frozen
+currency, merchant amount, nullable reported tax, fulfilment type and sandbox marker. Internal store/order IDs
+and payload hashes remain outside this shared customer/staff/printer contract. Ordinary orders omit the object,
+preserving the existing printer wire snapshot. A marketplace currency precedes tender/tenant display defaults.
+
+Merchant revenue and consumer checkout totals are different. The observed test meal pays the merchant EUR 5.00,
+while checkout includes marketplace fees. Missing provider tax is explicitly null, distinct from reported zero;
+it must not be inferred from tenant defaults or a published-menu tax fixture. This schema/projection slice adds
+no order writer, credentials, background importer or public endpoint. The dedicated authenticated ingress,
+mapping validation, payment custody and provider-confirmed kitchen release remain required before activation.
+
 - The test store can be linked to an actual signed, durable webhook while the full connector is built.
 - Production scope/key support, tenant routing, automatic workers/reconciliation, tenant catalogue publishing,
   customer-data retention and staff/printer contracts require subsequent slices. No live merchant onboarding

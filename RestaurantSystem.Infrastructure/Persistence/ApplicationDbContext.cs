@@ -92,6 +92,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
 
         // Order-related DbSets
         public DbSet<Order> Orders { get; set; }
+        public DbSet<ExternalOrderReference> ExternalOrderReferences { get; set; }
         public DbSet<OrderNumberSequence> OrderNumberSequences { get; set; }
         public DbSet<TableServiceSession> TableServiceSessions { get; set; }
         public DbSet<OrderChange> OrderChanges { get; set; }
@@ -440,6 +441,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
                     FidelityPointsTransaction points => points.OrderId ?? Guid.Empty,
                     OrderAddress address => address.OrderId,
                     OrderRoutingState routingState => routingState.OrderId,
+                    ExternalOrderReference externalReference => externalReference.OrderId,
                     OrderItem item => item.OrderId,
                     OrderItemIngredient ingredient when orderItemEntries.TryGetValue(
                         ingredient.OrderItemId, out var ownerId) => ownerId,
@@ -449,7 +451,13 @@ namespace RestaurantSystem.Infrastructure.Persistence
                 .Distinct()
                 .ToArray();
 
+            if (changedOrderIds.Length == 0)
+            {
+                return;
+            }
+
             foreach (var order in Orders
+                .IgnoreAutoIncludes()
                 .Where(value => changedOrderIds.Contains(value.Id)).ToList())
             {
                 orderEntries[order.Id] = Entry(order);
@@ -481,9 +489,27 @@ namespace RestaurantSystem.Infrastructure.Persistence
             TouchDirectOrderOwners<FidelityPointsTransaction>(points => points.OrderId, orderEntries);
             TouchDirectOrderOwners<OrderAddress>(address => address.OrderId, orderEntries);
             TouchDirectOrderOwners<OrderRoutingState>(state => state.OrderId, orderEntries);
+            TouchExternalOrderOwners(orderEntries);
             TouchDirectOrderOwners<OrderItem>(item => item.OrderId, orderEntries);
             TouchOrderItemIngredientOwners(orderEntries, orderItemEntries);
             TouchOwnedOrderOwners(orderEntries);
+        }
+
+        private void TouchExternalOrderOwners(IReadOnlyDictionary<Guid, EntityEntry<Order>> orderEntries)
+        {
+            foreach (var entry in ChangeTracker.Entries<ExternalOrderReference>().ToArray())
+            {
+                if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted) ||
+                    !orderEntries.TryGetValue(entry.Entity.OrderId, out var owner) || owner.State != EntityState.Unchanged)
+                {
+                    continue;
+                }
+                TouchOrderOwner(entry.Entity.OrderId, orderEntries, entry.State);
+                // Promoting an unchanged owner marks every property modified. These two were not
+                // caller-assigned: allow the audit backfill below to advance the delta-feed timestamp.
+                owner.Property(order => order.UpdatedAt).IsModified = false;
+                owner.Property(order => order.UpdatedBy).IsModified = false;
+            }
         }
 
         private void TouchDirectOrderOwners<TEntity>(
