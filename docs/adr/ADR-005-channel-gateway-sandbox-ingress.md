@@ -17,10 +17,15 @@ mapping is configured. Future provider adapters extend this seam, rather than ch
 untrusted provider payloads.
 
 `POST /api/webhooks/uber-eats` verifies `X-Uber-Signature` with HMAC-SHA256 over untouched bytes and a
-constant-time comparison. It requires `X-Environment: sandbox`, a configured app, and a configured test-store
+constant-time comparison. It requires the testing app's signing key and a configured test-store
 allowlist. A provisioning envelope's declared app identity must match that app. Settings are IOptions/env,
 and size/rate limits bound unauthenticated traffic. The controller dispatches a command through a custom
 mediator; no MediatR dependency is introduced.
+
+Uber's webhook contract guarantees `X-Uber-Signature`, not `X-Environment`. A missing environment header is
+accepted only after signature verification; an explicit value other than `sandbox` is refused. The testing
+key, exact-store allowlist and sandbox-only outbound domains establish isolation. Rejection logs contain only
+code-owned categories and HTTP status, never incoming headers, payloads, URLs or identifiers.
 
 Persist a minimal notification receipt using parameterized PostgreSQL statements. Its primary key is the
 app's client ID plus provider event ID. This database currently contains Uber receipts exclusively; adding

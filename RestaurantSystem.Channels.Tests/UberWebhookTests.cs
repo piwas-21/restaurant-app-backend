@@ -62,8 +62,8 @@ public sealed class UberWebhookTests(GatewayFixture fixture)
 
     [Theory]
     [InlineData("production")]
-    [InlineData("")]
-    public async Task ProductionOrMissingEnvironmentIsRefused(string environment)
+    [InlineData("Sandbox")]
+    public async Task UnexpectedExplicitEnvironmentIsRefused(string environment)
     {
         var eventId = Guid.NewGuid().ToString();
         using var host = fixture.Host();
@@ -71,6 +71,38 @@ public sealed class UberWebhookTests(GatewayFixture fixture)
         using var response = await Send(client, Notification(eventId), environment);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal(0, await fixture.Count(eventId));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task DocumentedSignatureWithoutEnvironmentHeaderIsDurable(string? environment)
+    {
+        var eventId = Guid.NewGuid().ToString();
+        var body = Notification(eventId);
+        using var host = fixture.Host();
+        using var client = host.CreateClient();
+        using var response = await Send(client, body, environment);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync());
+        using var duplicate = await Send(client, body, environment);
+        Assert.Equal(HttpStatusCode.OK, duplicate.StatusCode);
+        Assert.Equal(1, await fixture.Count(eventId));
+    }
+
+    [Fact]
+    public async Task MissingEnvironmentDoesNotBypassSignatureOrStoreChecks()
+    {
+        var forgedId = Guid.NewGuid().ToString();
+        var unapprovedId = Guid.NewGuid().ToString();
+        using var host = fixture.Host();
+        using var client = host.CreateClient();
+        using var forged = await Send(client, Notification(forgedId), null, "bad-signature");
+        using var unapproved = await Send(client, Notification(unapprovedId, Guid.NewGuid()), null);
+        Assert.Equal(HttpStatusCode.Unauthorized, forged.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, unapproved.StatusCode);
+        Assert.Equal(0, await fixture.Count(forgedId));
+        Assert.Equal(0, await fixture.Count(unapprovedId));
     }
 
     [Fact]
@@ -189,11 +221,11 @@ public sealed class UberWebhookTests(GatewayFixture fixture)
         });
 
     private static async Task<HttpResponseMessage> Send(HttpClient client, string body,
-        string environment = "sandbox", string? signature = null)
+        string? environment = "sandbox", string? signature = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, WebhookPath);
         request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-        request.Headers.Add("X-Environment", environment);
+        if (environment is not null) request.Headers.Add("X-Environment", environment);
         request.Headers.Add("X-Uber-Signature", signature ?? Convert.ToHexStringLower(
             HMACSHA256.HashData(Encoding.UTF8.GetBytes(GatewayFixture.SigningKey), Encoding.UTF8.GetBytes(body))));
         return await client.SendAsync(request);
