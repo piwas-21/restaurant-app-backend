@@ -74,9 +74,36 @@ preserving the existing printer wire snapshot. A marketplace currency precedes t
 
 Merchant revenue and consumer checkout totals are different. The observed test meal pays the merchant EUR 5.00,
 while checkout includes marketplace fees. Missing provider tax is explicitly null, distinct from reported zero;
-it must not be inferred from tenant defaults or a published-menu tax fixture. This schema/projection slice adds
-no order writer, credentials, background importer or public endpoint. The dedicated authenticated ingress,
-mapping validation, payment custody and provider-confirmed kitchen release remain required before activation.
+it must not be inferred from tenant defaults or a published-menu tax fixture.
+
+### Disabled tenant import foundation
+
+`POST /api/delivery-channels/orders` requires the real API-token scheme, its authentication-method claim and
+`channels:orders:write`. Human identities and existing `orders:write` tokens cannot import. Deployment-owned
+`DeliveryChannels` options default to disabled and sandbox-only; each enabled binding declares provider,
+store ID, tenant currency and sandbox identity. An incoming request cannot select another tenant or declare
+itself production/sandbox. The tenant must declare a matching currency; no currency is inferred.
+
+This first contract supports simple mapped items and variations with provider delivery. It rejects unknown
+JSON fields, bundles/modifier products, restaurant delivery/cash and totals containing unsupported adjustments.
+Required source monetary fields distinguish an omitted amount from an explicit zero. Numeric precision and
+text limits match existing order/item/tender storage; instructions are preserved without truncation and printer
+control bytes are refused. The gateway must validate canonical provider evidence and its complete mapping
+before calling this machine endpoint. A hash supplied by the gateway is evidence, not a replacement for that
+validation; no raw provider payload or credential enters the tenant request.
+
+One transaction and a per-provider/store/order advisory lock persist the order, snapshot items, source reference
+and externally held tender. Identical concurrent retries return one durable identity; changed normalized content
+or reuse after soft deletion returns 409. The fingerprint includes canonical evidence and all normalized fields.
+Catalogue prices, discounts, loyalty, local guest identity and email credentials do not alter marketplace data.
+The externally collected tender names its provider and currency; it does not claim a bank settlement or local refund.
+
+Imported orders remain PendingApproval with kitchen release held. Ordinary status, cancellation, approval,
+counter-edit/release, collection, refund and deletion paths refuse them. Staff action projections mirror these
+guards; notes and focus remain operational tools. Receipts and provider decisions need their dedicated flow.
+No gateway forwarding, tenant deployment activation or provider-confirmed kitchen release is enabled by this
+foundation. Catalogue revisions/modifiers, decision outbox/reconciliation and source-aware staff/printer rendering
+must land and pass end-to-end tests before it is activated.
 
 - The test store can be linked to an actual signed, durable webhook while the full connector is built.
 - Production scope/key support, tenant routing, automatic workers/reconciliation, tenant catalogue publishing,

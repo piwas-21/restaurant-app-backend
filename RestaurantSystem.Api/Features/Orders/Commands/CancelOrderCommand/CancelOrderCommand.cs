@@ -62,10 +62,12 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
-        var authorizationFailure = AuthorizeCancellation(order);
-        if (authorizationFailure is not null)
+        ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+
+        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(_currentUserService.Role, order);
+        if (!authorization.Allowed)
         {
-            return authorizationFailure;
+            return ApiResponse<OrderDto>.FailureWithCode(authorization.Message!, authorization.ErrorCode!);
         }
 
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
@@ -163,16 +165,6 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
             order.OrderNumber, _currentUserService.UserId, command.CancellationReason);
 
         return ApiResponse<OrderDto>.SuccessWithData(orderDto, "Order cancelled successfully");
-    }
-
-    private ApiResponse<OrderDto>? AuthorizeCancellation(Order order)
-    {
-        var authorization = OrderWriteAuthorizationPolicy.ForCancellation(
-            _currentUserService.Role, order);
-        return authorization.Allowed
-            ? null
-            : ApiResponse<OrderDto>.FailureWithCode(
-                authorization.Message!, authorization.ErrorCode!);
     }
 
     private async Task SendCancellationEmailAsync(Order order, string cancellationReason)

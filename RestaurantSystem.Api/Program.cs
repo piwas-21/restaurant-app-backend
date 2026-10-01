@@ -56,6 +56,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddApiRegistration();
+builder.Services.AddDeliveryChannelServices();
 
 // Configure Kestrel for long-lived SSE connections
 builder.WebHost.ConfigureKestrel(serverOptions =>

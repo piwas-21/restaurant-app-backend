@@ -64,8 +64,9 @@ public sealed class StaffOrderOperationStore : IStaffOrderOperationStore
             : new StaffOrderOperationReplay(StaffOrderOperationReplayOutcome.Replay, operation, order);
     }
 
-    public Task<Order?> LoadOrderAsync(Guid orderId, CancellationToken cancellationToken) =>
-        _context.Orders
+    public async Task<Order?> LoadOrderAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        var order = await _context.Orders
             .IncludeOrderLineGraph()
             .Include(order => order.Payments)
             .Include(order => order.StatusHistory)
@@ -73,4 +74,8 @@ public sealed class StaffOrderOperationStore : IStaffOrderOperationStore
             .Include(order => order.RoutingStates)
             .AsSplitQuery()
             .SingleOrDefaultAsync(order => order.Id == orderId && !order.IsDeleted, cancellationToken);
+        if (order is not null)
+            ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+        return order;
+    }
 }

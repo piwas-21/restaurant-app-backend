@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.Orders.Services;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -40,6 +41,8 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
             await transaction.RollbackAsync(cancellationToken);
             return ApiResponse<bool>.Failure("Order not found");
         }
+
+        ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
 
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {

@@ -50,6 +50,8 @@ public class ApproveDelayCommandHandler : ICommandHandler<ApproveDelayCommand, A
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
+        ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             return ApiResponse<OrderDto>.FailureWithCode(
