@@ -31,6 +31,8 @@ public sealed class GatewayFixture : IAsyncLifetime
         await using var migration = connection.CreateCommand();
         migration.CommandText = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "001_webhook_inbox.sql"));
         await migration.ExecuteNonQueryAsync();
+        migration.CommandText = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "002_sandbox_console.sql"));
+        await migration.ExecuteNonQueryAsync();
     }
 
     public WebApplicationFactory<Program> Host(string? signingKey = null, string? connectionString = null)
@@ -60,3 +62,6 @@ public sealed class GatewayFixture : IAsyncLifetime
             await _postgres.DisposeAsync();
     }
 }
+
+[CollectionDefinition("Channel gateway")]
+public sealed class GatewayCollection : ICollectionFixture<GatewayFixture>;

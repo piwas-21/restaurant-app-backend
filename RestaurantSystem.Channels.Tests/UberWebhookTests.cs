@@ -5,7 +5,8 @@ using System.Text.Json;
 
 namespace RestaurantSystem.Channels.Tests;
 
-public sealed class UberWebhookTests(GatewayFixture fixture) : IClassFixture<GatewayFixture>
+[Collection("Channel gateway")]
+public sealed class UberWebhookTests(GatewayFixture fixture)
 {
     private const string WebhookPath = "/api/webhooks/uber-eats";
 
