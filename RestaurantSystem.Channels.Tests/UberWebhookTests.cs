@@ -61,22 +61,13 @@ public sealed class UberWebhookTests(GatewayFixture fixture)
     }
 
     [Theory]
-    [InlineData("production")]
-    [InlineData("Sandbox")]
-    public async Task UnexpectedExplicitEnvironmentIsRefused(string environment)
-    {
-        var eventId = Guid.NewGuid().ToString();
-        using var host = fixture.Host();
-        using var client = host.CreateClient();
-        using var response = await Send(client, Notification(eventId), environment);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Equal(0, await fixture.Count(eventId));
-    }
-
-    [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public async Task DocumentedSignatureWithoutEnvironmentHeaderIsDurable(string? environment)
+    [InlineData("sandbox")]
+    [InlineData("production")]
+    [InlineData("Sandbox")]
+    [InlineData("arbitrary-transport-label")]
+    public async Task AuthenticatedTestStoreDoesNotDependOnUnsignedTransportLabel(string? environment)
     {
         var eventId = Guid.NewGuid().ToString();
         var body = Notification(eventId);
@@ -90,15 +81,18 @@ public sealed class UberWebhookTests(GatewayFixture fixture)
         Assert.Equal(1, await fixture.Count(eventId));
     }
 
-    [Fact]
-    public async Task MissingEnvironmentDoesNotBypassSignatureOrStoreChecks()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("production")]
+    [InlineData("arbitrary-transport-label")]
+    public async Task TransportLabelDoesNotBypassSignatureOrStoreChecks(string? environment)
     {
         var forgedId = Guid.NewGuid().ToString();
         var unapprovedId = Guid.NewGuid().ToString();
         using var host = fixture.Host();
         using var client = host.CreateClient();
-        using var forged = await Send(client, Notification(forgedId), null, "bad-signature");
-        using var unapproved = await Send(client, Notification(unapprovedId, Guid.NewGuid()), null);
+        using var forged = await Send(client, Notification(forgedId), environment, "bad-signature");
+        using var unapproved = await Send(client, Notification(unapprovedId, Guid.NewGuid()), environment);
         Assert.Equal(HttpStatusCode.Unauthorized, forged.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, unapproved.StatusCode);
         Assert.Equal(0, await fixture.Count(forgedId));
