@@ -16,16 +16,18 @@ public sealed class ReceiveUberWebhookCommandHandler(
     {
         var settings = options.Value;
         if (!settings.IsConfigured)
-            return StatusCodes.Status503ServiceUnavailable;
+            return Reject(StatusCodes.Status503ServiceUnavailable, "missing-configuration");
         if (!UberSignature.Verify(command.Body, command.Signature, settings.ClientSecret))
-            return StatusCodes.Status401Unauthorized;
-        if (!string.Equals(command.Environment, "sandbox", StringComparison.Ordinal))
-            return StatusCodes.Status403Forbidden;
+            return Reject(StatusCodes.Status401Unauthorized, "invalid-signature");
+        // Uber documents the signature header, but does not promise an environment header.
+        // The testing client's HMAC key and approved store establish the sandbox boundary.
+        if (command.Environment.Length > 0 && !string.Equals(command.Environment, "sandbox", StringComparison.Ordinal))
+            return Reject(StatusCodes.Status403Forbidden, "unexpected-environment");
         var receipt = UberNotification.Parse(command.Body, settings.ClientId, timeProvider.GetUtcNow());
         if (receipt is null)
-            return StatusCodes.Status400BadRequest;
+            return Reject(StatusCodes.Status400BadRequest, "invalid-envelope");
         if (!settings.StoreIds.Contains(receipt.StoreId))
-            return StatusCodes.Status403Forbidden;
+            return Reject(StatusCodes.Status403Forbidden, "unapproved-store");
         try
         {
             var result = await inbox.Receive(receipt, cancellationToken);
@@ -43,5 +45,12 @@ public sealed class ReceiveUberWebhookCommandHandler(
             logger.LogError("Channel webhook persistence timed out; event was not acknowledged.");
             return StatusCodes.Status503ServiceUnavailable;
         }
+    }
+
+    private int Reject(int status, string reason)
+    {
+        // Only code-owned categories: never headers, bodies, provider URLs or identifiers.
+        logger.LogWarning("Channel webhook rejected: {Reason} ({Status}).", reason, status);
+        return status;
     }
 }
