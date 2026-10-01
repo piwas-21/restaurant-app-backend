@@ -93,6 +93,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         // Order-related DbSets
         public DbSet<Order> Orders { get; set; }
         public DbSet<ExternalOrderReference> ExternalOrderReferences { get; set; }
+        public DbSet<ChannelOrderDecision> ChannelOrderDecisions { get; set; }
         public DbSet<OrderNumberSequence> OrderNumberSequences { get; set; }
         public DbSet<TableServiceSession> TableServiceSessions { get; set; }
         public DbSet<OrderChange> OrderChanges { get; set; }

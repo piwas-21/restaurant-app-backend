@@ -23,6 +23,8 @@ public static class DeliveryChannelServiceExtensions
                     && (!settings.SandboxOnly || store.IsSandbox)), "Enabled channels require explicit store/currency bindings.")
             .ValidateOnStart();
         services.AddScoped<IExternalOrderImporter, ExternalOrderImporter>();
+        services.AddScoped<IChannelDecisionQueue, ChannelDecisionQueue>();
+        services.AddScoped<IChannelDecisionDelivery, ChannelDecisionDelivery>();
         return services;
     }
 }
