@@ -1,6 +1,6 @@
 # ADR-005: central channel gateway, starting with Uber sandbox ingress
 
-Status: proposed; production order routing remains gated.
+Status: accepted for sandbox ingress; production order routing remains gated.
 
 ## Context
 

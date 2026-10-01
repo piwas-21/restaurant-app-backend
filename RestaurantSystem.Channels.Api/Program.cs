@@ -13,6 +13,9 @@ app.MapGet("/api/health", () => Results.Ok(new
     version = Environment.GetEnvironmentVariable("GIT_SHA") ?? "unknown",
     builtAt = Environment.GetEnvironmentVariable("BUILD_TIME") ?? "unknown",
 }));
-app.Run();
+await app.RunAsync();
 
-public partial class Program;
+public partial class Program
+{
+    protected Program() { }
+}

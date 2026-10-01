@@ -14,7 +14,10 @@ public sealed class UberWebhookController(
     // over the original bytes before parsing and binds the event to an approved sandbox store.
     [HttpPost]
     [EnableRateLimiting("uber-webhook")]
-    public async Task<IActionResult> Receive(CancellationToken cancellationToken)
+    public async Task<IActionResult> Receive(
+        [FromHeader(Name = "X-Uber-Signature")] string? signature,
+        [FromHeader(Name = "X-Environment")] string? environment,
+        CancellationToken cancellationToken)
     {
         if (Request.ContentLength > options.Value.MaxBodyBytes)
             return StatusCode(StatusCodes.Status413PayloadTooLarge);
@@ -27,8 +30,7 @@ public sealed class UberWebhookController(
                 return StatusCode(StatusCodes.Status413PayloadTooLarge);
             await body.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
         }
-        var command = new ReceiveUberWebhookCommand(body.ToArray(),
-            Request.Headers["X-Uber-Signature"].ToString(), Request.Headers["X-Environment"].ToString());
+        var command = new ReceiveUberWebhookCommand(body.ToArray(), signature ?? string.Empty, environment ?? string.Empty);
         return StatusCode(await mediator.SendCommand<ReceiveUberWebhookCommand, int>(command, cancellationToken));
     }
 }
