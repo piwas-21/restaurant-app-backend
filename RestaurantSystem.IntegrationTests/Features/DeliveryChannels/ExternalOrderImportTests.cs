@@ -113,15 +113,17 @@ public sealed class ExternalOrderImportTests(DatabaseFixture fixture) : External
         var imported = await ImportAsync(request);
         await using (var context = DatabaseFixture.CreateContext())
         {
-            context.Orders.Remove(await context.Orders.SingleAsync(order => order.Id == imported.OrderId));
+            var removed = await context.Orders.SingleAsync(order => order.Id == imported.OrderId);
+            context.Orders.Remove(removed);
             await context.SaveChangesAsync();
+            removed.IsDeleted.Should().BeTrue();
         }
         var response = await PostAsJsonAsync(Endpoint, request);
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         await using var readback = DatabaseFixture.CreateContext();
         (await readback.Orders.CountAsync()).Should().Be(0);
-        (await readback.Orders.IgnoreQueryFilters().CountAsync()).Should().Be(1);
-        (await readback.ExternalOrderReferences.CountAsync()).Should().Be(1);
+        var retained = await readback.ExternalOrderReferences.SingleAsync();
+        retained.OrderId.Should().Be(imported.OrderId);
     }
 
     [Theory]
