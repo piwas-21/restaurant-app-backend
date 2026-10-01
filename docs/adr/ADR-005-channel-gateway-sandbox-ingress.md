@@ -22,10 +22,13 @@ allowlist. A provisioning envelope's declared app identity must match that app. 
 and size/rate limits bound unauthenticated traffic. The controller dispatches a command through a custom
 mediator; no MediatR dependency is introduced.
 
-Uber's webhook contract guarantees `X-Uber-Signature`, not `X-Environment`. A missing environment header is
-accepted only after signature verification; an explicit value other than `sandbox` is refused. The testing
-key, exact-store allowlist and sandbox-only outbound domains establish isolation. Rejection logs contain only
-code-owned categories and HTTP status, never incoming headers, payloads, URLs or identifiers.
+Uber's event reference documents `X-Environment` as a delivery infrastructure label. That header is not
+covered by the body HMAC and cannot establish application or store identity. A real test order's signature
+passed while the previous exact `sandbox` label check rejected delivery. Accept notifications based on the
+testing app's key and exact-store allowlist, independently of that unsigned label; outbound requests remain
+restricted to sandbox domains. Logs classify the label using only fixed sandbox/production/absent/other
+categories, never arbitrary headers, payloads, URLs or identifiers. Forged signatures and other stores remain
+rejected for every transport label. No production credentials or tenant mapping are configured.
 
 Persist a minimal notification receipt using parameterized PostgreSQL statements. Its primary key is the
 app's client ID plus provider event ID. This database currently contains Uber receipts exclusively; adding
@@ -35,7 +38,7 @@ the same key returns 409. Events may arrive out of order; their integer provider
 without assuming a unit (the provider documentation contains both seconds and nanosecond examples).
 
 Only after the row commits does the API return an empty 200. Database failure/throttling returns 503 to
-request provider retries. Missing secrets return 503; invalid signatures 401; wrong environment/store 403;
+request provider retries. Missing secrets return 503; invalid signatures 401; unapproved stores 403;
 malformed metadata 400; oversized requests 413. Neither a 200 nor `Received` claims that an order was
 accepted, fetched or injected. The private console retrieves referenced orders separately.
 

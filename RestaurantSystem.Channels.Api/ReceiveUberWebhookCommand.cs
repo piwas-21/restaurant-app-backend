@@ -19,15 +19,22 @@ public sealed class ReceiveUberWebhookCommandHandler(
             return Reject(StatusCodes.Status503ServiceUnavailable, "missing-configuration");
         if (!UberSignature.Verify(command.Body, command.Signature, settings.ClientSecret))
             return Reject(StatusCodes.Status401Unauthorized, "invalid-signature");
-        // Uber documents the signature header, but does not promise an environment header.
-        // The testing client's HMAC key and approved store establish the sandbox boundary.
-        if (command.Environment.Length > 0 && !string.Equals(command.Environment, "sandbox", StringComparison.Ordinal))
-            return Reject(StatusCodes.Status403Forbidden, "unexpected-environment");
+        // X-Environment describes Uber's delivery infrastructure; it is not covered by the HMAC.
+        // Only the testing app's key, approved test store and fixed outbound domains establish isolation.
+        // Code-owned categories allow diagnosis without logging an arbitrary incoming header.
+        var environment = command.Environment switch
+        {
+            "sandbox" => "sandbox",
+            "production" => "production",
+            "" => "absent",
+            _ => "other",
+        };
         var receipt = UberNotification.Parse(command.Body, settings.ClientId, timeProvider.GetUtcNow());
         if (receipt is null)
             return Reject(StatusCodes.Status400BadRequest, "invalid-envelope");
         if (!settings.StoreIds.Contains(receipt.StoreId))
             return Reject(StatusCodes.Status403Forbidden, "unapproved-store");
+        logger.LogInformation("Authenticated test-store webhook received; transport environment: {Environment}.", environment);
         try
         {
             var result = await inbox.Receive(receipt, cancellationToken);
