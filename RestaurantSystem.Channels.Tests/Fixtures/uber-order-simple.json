@@ -1,0 +1,30 @@
+{
+  "id": "2cb52df5-3fb7-4201-bcdf-967427a91000",
+  "display_id": "91000",
+  "current_state": "CREATED",
+  "type": "DELIVERY_BY_UBER",
+  "store": { "id": "89dd9741-66b5-4bb4-b216-a813f3b21b4f" },
+  "placed_at": "2026-10-01T19:25:07+02:00",
+  "eater": { "first_name": "Test" },
+  "cart": {
+    "special_instructions": "SANDBOX TEST ONLY: do not prepare food or dispatch a courier.",
+    "fulfillment_issues": [],
+    "items": [{
+      "id": "published-meal-v1",
+      "title": "Test meal",
+      "quantity": 1,
+      "special_instructions": "No peanuts; severe allergy.\nKeep this instruction.",
+      "selected_modifier_groups": null,
+      "price": {
+        "unit_price": { "amount": 500, "currency_code": "EUR" },
+        "total_price": { "amount": 500, "currency_code": "EUR" },
+        "base_unit_price": { "amount": 500, "currency_code": "EUR" },
+        "base_total_price": { "amount": 500, "currency_code": "EUR" }
+      }
+    }]
+  },
+  "payment": { "charges": {
+    "total": { "amount": 500, "currency_code": "EUR" },
+    "sub_total": { "amount": 500, "currency_code": "EUR" }
+  } }
+}

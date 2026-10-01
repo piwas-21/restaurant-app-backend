@@ -142,6 +142,45 @@ provider reconciliation worker or automatic tenant activation is included in thi
 - Place test orders only with the private console open and an operator ready to accept/deny within Uber's
   acceptance window. A notification acknowledgment does not accept the order.
 
+## Disabled gateway tenant-import bridge
+
+An additive `TenantBridge` service remains disabled by default. Enabling it requires the existing sandbox-only
+connection, exactly the approved store, an explicit enrollment timestamp, tenant HTTPS origin/API token,
+EUR/CHF currency and a reviewed catalogue revision/menu hash with unique provider-item mappings. Nothing in a
+webhook selects a tenant URL, token or local product identity. No paying tenant is activated by the code change.
+
+Migration `003_tenant_import_jobs.sql` belongs only to the dedicated gateway database and is applied explicitly.
+Jobs are unique by app/store/order; the first tenant and catalogue revision are retained across discovery retries.
+Only authenticated `orders.notification` receipts within the enrollment window create jobs; malformed resource
+IDs, other stores/apps, old receipts and scheduled events are excluded. Opaque leased claims use PostgreSQL
+`FOR UPDATE SKIP LOCKED`; every state mutation checks exact client/store/order/tenant and unexpired lease ownership.
+
+Before an HTTP import, the worker retrieves the canonical order through the existing exact-store read path.
+The current simple-item contract refuses terminal states, cash/restaurant delivery, modifiers, promotions,
+fulfillment corrections, packaging and unsupported contact phone-code instructions rather than discarding them.
+All currency/money/quantity/item identities and customer/item instruction limits are validated without truncation.
+`payment.charges.total` is merchant revenue; the consumer checkout total is not used. Missing reported tax remains
+null, distinct from zero. Unsupported orders are quarantined for marketplace fallback without a tenant call.
+This simple contract does not yet satisfy the full menu/modifier capability or operator exception interface.
+
+The normalized tenant request is encrypted with AES-GCM and app/store/order/tenant/catalogue-bound associated data,
+and commits before its first import attempt. No raw provider body, eater UUID, courier profile, address or tax
+profile is stored. Exact prepared content survives gateway restart and a lost tenant response; a changed canonical
+read cannot replace it. Tenant import itself remains idempotent and held. Fixed deployment HTTPS origin,
+Bearer token, no redirects, bounded replies/deadline and a valid durable local order ID gate confirmation.
+A successful HTTP status without that identity stays uncertain. Contract conflicts/refusals quarantine the job.
+
+Encrypted requests clear immediately on confirmed import or quarantine. Their maximum pending retention is
+seven days, configurable only downward; the active gateway erases expired ciphertext even with forwarding
+paused or disabled, retaining minimal identity/hash/result metadata. Cleanup tolerates ingress-only databases
+where migration 003 has not yet been applied. Before rolling back to an older gateway without this cleanup,
+pause forwarding and clear remaining encrypted requests under the documented retention procedure; an offline
+process cannot enforce deletion. Backup/restore procedures must preserve this same lifetime for ciphertext.
+
+This bridge does not dispatch staff decisions, reconcile later terminal states or activate tenant configuration.
+Those paths, catalogue publishing/stock compatibility and deployed staff/printer acceptance remain required
+before full integration verification.
+
 ## Private sandbox connection and testing
 
 An opt-in console at `/console/` serves the one configured sandbox store. It has no tenant authentication,
