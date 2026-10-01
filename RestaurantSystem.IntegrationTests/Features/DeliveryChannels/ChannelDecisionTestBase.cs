@@ -61,6 +61,12 @@ public abstract class ChannelDecisionTestBase(DatabaseFixture fixture) : Externa
             State = state,
             CanonicalState = canonicalState,
             CanonicalHash = canonicalState == "UNKNOWN" ? string.Empty : new string('b', 64),
-            ObservedAt = DateTimeOffset.UtcNow
+            ObservedAt = PostgreSqlTimestamp()
         };
+    private static DateTimeOffset PostgreSqlTimestamp()
+    {
+        // PostgreSQL timestamps retain microseconds; keep the exact persistence assertion strict.
+        var now = DateTimeOffset.UtcNow;
+        return now.AddTicks(-(now.Ticks % TimeSpan.TicksPerMicrosecond));
+    }
 }
