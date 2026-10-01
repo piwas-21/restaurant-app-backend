@@ -44,6 +44,20 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             or OrderAction.CancelOrder
             or OrderAction.MarkUrgent;
 
+        // Marketplace decisions, settlement and receipts need their dedicated workflow. Keep
+        // ordinary staff notes/focus available; a held order still cannot print a kitchen ticket.
+        if (order.ExternalReference is not null && action is not (OrderAction.AddOperationalNote
+            or OrderAction.MarkUrgent or OrderAction.PrintKitchen))
+        {
+            return new OrderPermittedActionDto
+            {
+                Action = action.ToString(),
+                Allowed = false,
+                ReasonCode = OrderActionReasonCodes.DeliveryChannelManaged,
+                RequiresReason = requiresReason,
+            };
+        }
+
         var (allowed, reasonCode) = action switch
         {
             OrderAction.Accept => AcceptAction(order),
@@ -246,6 +260,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 /// <summary>Stable machine-readable reasons for denied order actions.</summary>
 public static class OrderActionReasonCodes
 {
+    public const string DeliveryChannelManaged = "DeliveryChannelManaged";
     public const string StaffRequired = "StaffRequired";
     public const string KitchenReleaseRequired = ErrorCodes.KitchenReleaseRequired;
     public const string AdminRequired = "AdminRequired";

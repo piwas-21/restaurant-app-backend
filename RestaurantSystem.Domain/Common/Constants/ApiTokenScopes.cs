@@ -27,6 +27,9 @@ public static class ApiTokenScopes
     /// <summary>Advance or cancel an order. Never refunds — those move money.</summary>
     public const string OrdersWrite = "orders:write";
 
+    /// <summary>Import externally priced marketplace orders through the deployment-bound channel ingress.</summary>
+    public const string ChannelOrdersWrite = "channels:orders:write";
+
     /// <summary>Read reservations.</summary>
     public const string ReservationsRead = "reservations:read";
 
@@ -58,7 +61,7 @@ public static class ApiTokenScopes
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         MenuRead, MenuWrite,
-        OrdersRead, OrdersWrite,
+        OrdersRead, OrdersWrite, ChannelOrdersWrite,
         ReservationsRead, ReservationsWrite,
         TenantRead, TenantWrite,
         MaintenanceWrite

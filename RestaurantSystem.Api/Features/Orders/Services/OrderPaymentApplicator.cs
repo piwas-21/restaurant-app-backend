@@ -65,6 +65,8 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound);
         }
 
+        ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+
         if (tender.ExpectedVersion.HasValue && order.Version != tender.ExpectedVersion.Value)
         {
             return PaymentApplicationResult.VersionConflict();
