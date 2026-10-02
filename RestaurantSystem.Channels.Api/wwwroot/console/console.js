@@ -64,8 +64,10 @@ async function receipts() {
 }
 async function stock() {
   const status = await api('uber/availability');
-  el('stock-status').textContent = status.enabled ? 'Stock synchronization enabled.' :
-    status.paused ? 'Stock synchronization paused.' : 'Stock synchronization is not enabled.';
+  let message = 'Stock synchronization is not enabled.';
+  if (status.enabled) { message = 'Stock synchronization enabled.'; }
+  else if (status.paused) { message = 'Stock synchronization paused.'; }
+  el('stock-status').textContent = message;
   el('stock-items').replaceChildren();
   for (const row of status.items) {
     const li = document.createElement('li');

@@ -29,6 +29,12 @@ public sealed class ChannelAvailabilityProcessor(IOptions<TenantBridgeSettings> 
                 await lease.Observe(item.ProviderItemId, desired.Revision, "Uncertain", null, null, clock.GetUtcNow(), cancellationToken);
             throw;
         }
+        await Reconcile(lease, store, desired, actual, options.AvailabilityMaxWrites, cancellationToken);
+    }
+
+    private async Task Reconcile(IChannelAvailabilityLease lease, TenantStoreBinding store, TenantAvailabilitySnapshot desired,
+        UberAvailabilitySnapshot actual, int maximumWrites, CancellationToken cancellationToken)
+    {
         var writes = 0;
         foreach (var item in desired.Items)
         {
@@ -37,7 +43,7 @@ public sealed class ChannelAvailabilityProcessor(IOptions<TenantBridgeSettings> 
                 await Observe(lease, desired.Revision, item, actual, cancellationToken);
                 continue;
             }
-            if (writes >= options.AvailabilityMaxWrites)
+            if (writes >= maximumWrites)
             {
                 await lease.Observe(item.ProviderItemId, desired.Revision, "Pending", actual.Items[item.ProviderItemId],
                     actual.Hash, clock.GetUtcNow(), cancellationToken);

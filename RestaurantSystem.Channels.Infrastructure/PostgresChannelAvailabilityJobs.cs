@@ -11,16 +11,15 @@ public sealed class PostgresChannelAvailabilityJobs(NpgsqlDataSource source) : I
     public async Task<IChannelAvailabilityLease?> TryLease(AvailabilityBinding binding, CancellationToken cancellationToken)
     {
         var connection = await source.OpenConnectionAsync(cancellationToken);
+        var leased = false;
         try
         {
             await using var command = new NpgsqlCommand("SELECT pg_try_advisory_lock(" + LockKey + ")", connection);
             Identity(command, binding, false);
-            if (await command.ExecuteScalarAsync(cancellationToken) is true)
-                return new PostgresAvailabilityLease(connection, binding);
-            await connection.DisposeAsync();
-            return null;
+            leased = await command.ExecuteScalarAsync(cancellationToken) is true;
+            return leased ? new PostgresAvailabilityLease(connection, binding) : null;
         }
-        catch { await connection.DisposeAsync(); throw; }
+        finally { if (!leased) await connection.DisposeAsync(); }
     }
 
     public async Task<IReadOnlyList<ChannelAvailabilityState>> Read(AvailabilityBinding binding, CancellationToken cancellationToken)
