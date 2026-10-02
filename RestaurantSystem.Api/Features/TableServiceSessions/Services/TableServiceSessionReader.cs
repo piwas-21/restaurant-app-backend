@@ -21,6 +21,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
     private readonly ITableBillAssembler _bills;
     private readonly TimeProvider _timeProvider;
     private readonly decimal _paymentTolerance;
+    private readonly int _accountActivityPageSize;
     private readonly ICurrentUserService? _currentUser;
 
     public TableServiceSessionReader(
@@ -34,6 +35,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         _bills = bills;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
+        _accountActivityPageSize = (settings?.Value ?? new TableServiceSessionSettings()).AccountActivityPageSize;
         _currentUser = currentUser;
     }
 
@@ -80,7 +82,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         bill.AccountRevision = session.AccountRevision;
         bill.Currency = currency;
         bill.GeneratedAt = now;
-        var activity = await TableAccountActivityReader.ReadManyAsync(_context, [session.Id], cancellationToken);
+        var activity = await TableAccountActivityReader.ReadManyAsync(_context, [session.Id], _accountActivityPageSize, cancellationToken);
         ApplyActivity(bill, session.Id, activity);
         var legacy = await ReadLegacyOrdersAsync(
             session.TableId, session.TableNumber, cancellationToken);
@@ -112,7 +114,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         var handoffs = await TableServicePaymentHandoffReader.ReadLatestManyAsync(
             _context, sessionRows, cancellationToken);
         var activity = await TableAccountActivityReader.ReadManyAsync(
-            _context, sessionRows.Select(session => session.Id).ToArray(), cancellationToken);
+            _context, sessionRows.Select(session => session.Id).ToArray(), _accountActivityPageSize, cancellationToken);
         var sessions = new List<TableServiceSessionDto>(sessionRows.Count);
 
         for (var index = 0; index < sessionRows.Count; index++)

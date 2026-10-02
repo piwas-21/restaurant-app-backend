@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -14,12 +16,14 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <summary>Stages a durable per-destination preparation job with the amendment, before commit.</summary>
 public sealed class OrderKitchenChangeWriter : IOrderKitchenChangeWriter
 {
-    private const int MaximumSummaryLength = 500;
+    private readonly int _maximumSummaryLength;
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
 
-    public OrderKitchenChangeWriter(ApplicationDbContext context, ICurrentUserService currentUser)
+    public OrderKitchenChangeWriter(ApplicationDbContext context, ICurrentUserService currentUser,
+        IOptions<PrinterFeedSettings>? settings = null)
     {
+        _maximumSummaryLength = (settings?.Value ?? new PrinterFeedSettings()).KitchenChangeSummaryMaximumLength;
         _context = context;
         _currentUser = currentUser;
     }
@@ -42,7 +46,7 @@ public sealed class OrderKitchenChangeWriter : IOrderKitchenChangeWriter
         }
 
         var text = summary.Trim();
-        if (text.Length == 0 || text.Length > MaximumSummaryLength)
+        if (text.Length == 0 || text.Length > _maximumSummaryLength)
         {
             throw new BadRequestException("A concise kitchen change summary is required.");
         }

@@ -2,6 +2,9 @@ using System.Net;
 using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -100,6 +103,32 @@ public sealed class KitchenChangeFeedTests(DatabaseFixture fixture) : Integratio
         var reuse = () => replayWriter.StageAsync(replayOrder, amendmentId, null, DevicePrintTarget.General,
             changes, "ADD 1 soup", CancellationToken.None);
         await reuse.Should().ThrowAsync<BadRequestException>();
+    }
+
+    [Fact]
+    public async Task Configured_summary_limit_rejects_overlong_text_without_rejecting_the_boundary()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var user = scope.ServiceProvider.GetRequiredService<ICurrentUserService>();
+        var writer = new OrderKitchenChangeWriter(context, user,
+            Options.Create(new PrinterFeedSettings { KitchenChangeSummaryMaximumLength = 3 }));
+        var order = NewOrder();
+        context.Orders.Add(order);
+        await context.SaveChangesAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var changes = new[] { new PrinterFeedChangeDto
+        {
+            Kind = KitchenChangeKind.Add,
+            Current = new OrderItemDto { Id = Guid.NewGuid(), ProductName = "Soup", Quantity = 1 }
+        } };
+        var overlong = () => writer.StageAsync(order, Guid.NewGuid(), null, DevicePrintTarget.General,
+            changes, "ADD soup", CancellationToken.None);
+        await overlong.Should().ThrowAsync<BadRequestException>();
+        context.OrderOperationalNotes.Local.Should().BeEmpty();
+        var id = await writer.StageAsync(order, Guid.NewGuid(), null, DevicePrintTarget.General,
+            changes, "ADD", CancellationToken.None);
+        context.OrderOperationalNotes.Local.Should().ContainSingle(note => note.Id == id);
     }
 
     [Fact]

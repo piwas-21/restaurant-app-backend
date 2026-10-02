@@ -9,8 +9,10 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 [Collection("Database Lane 3")]
 public sealed class TableAccountActivityTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
-    [Fact]
-    public async Task Activity_is_bounded_per_visit_and_keeps_cancelled_rounds_without_private_notes()
+    [Theory]
+    [InlineData(100)]
+    [InlineData(3)]
+    public async Task Activity_is_bounded_per_visit_and_keeps_cancelled_rounds_without_private_notes(int pageSize)
     {
         var first = Guid.NewGuid();
         var second = Guid.NewGuid();
@@ -19,7 +21,7 @@ public sealed class TableAccountActivityTests(DatabaseFixture fixture) : Integra
         var busy = Order(first, OrderStatus.Confirmed);
         var cancelled = Order(second, OrderStatus.Cancelled);
         context.Orders.AddRange(busy, cancelled);
-        for (var index = 0; index < TableAccountActivityReader.PageSize + 10; index++)
+        for (var index = 0; index < 110; index++)
         {
             context.OrderStatusHistories.Add(History(busy.Id, index));
         }
@@ -29,9 +31,9 @@ public sealed class TableAccountActivityTests(DatabaseFixture fixture) : Integra
         context.OrderStatusHistories.Add(cancellation);
         await context.SaveChangesAsync();
 
-        var pages = await TableAccountActivityReader.ReadManyAsync(context, [first, second], CancellationToken.None);
+        var pages = await TableAccountActivityReader.ReadManyAsync(context, [first, second], pageSize, CancellationToken.None);
 
-        pages[first].Events.Should().HaveCount(100);
+        pages[first].Events.Should().HaveCount(pageSize);
         pages[first].HasMore.Should().BeTrue();
         pages[second].Events.Should().HaveCount(2, "one busy visit cannot crowd out another visit's events");
         pages[second].HasMore.Should().BeFalse();
