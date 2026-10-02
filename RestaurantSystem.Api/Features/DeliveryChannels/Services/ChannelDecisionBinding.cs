@@ -27,12 +27,15 @@ internal static class ChannelDecisionBinding
     }
 
     internal static void Require(ExternalOrderReference reference, IOptions<DeliveryChannelSettings> options)
+        => Require(reference.Provider, reference.ExternalStoreId, reference.Currency, reference.IsSandbox, options);
+
+    internal static void Require(string provider, string storeId, string currency, bool isSandbox, IOptions<DeliveryChannelSettings> options)
     {
         var settings = options.Value;
-        var bindings = settings.Stores.Where(store => store.Provider == reference.Provider
-            && store.StoreId == reference.ExternalStoreId && store.Currency == reference.Currency
-            && store.IsSandbox == reference.IsSandbox).ToArray();
-        if (!settings.Enabled || bindings.Length != 1 || settings.SandboxOnly && !reference.IsSandbox)
+        var bindings = settings.Stores.Where(store => store.Provider == provider
+            && store.StoreId == storeId && store.Currency == currency
+            && store.IsSandbox == isSandbox).ToArray();
+        if (!settings.Enabled || bindings.Length != 1 || settings.SandboxOnly && !isSandbox)
             throw new ForbiddenException("This marketplace store is not enabled for this tenant.");
     }
 

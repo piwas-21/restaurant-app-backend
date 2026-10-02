@@ -12,8 +12,9 @@ hold raw orders or provider secrets, and live tenant APIs must not become a cros
 
 Keep a separate .NET API, pure Domain and Infrastructure project in the backend repository. It builds a
 separate container; the existing tenant API never references these projects. The first deployment is a
-dedicated **sandbox-only** service and PostgreSQL database on the staging box. No production key or tenant
-mapping is configured. Future provider adapters extend this seam, rather than changing tenant APIs to ingest
+dedicated **sandbox-only** service and PostgreSQL database on the staging box. Only an explicitly approved
+sandbox tenant mapping is configured; no production key is present. Future provider adapters extend this seam,
+rather than changing tenant APIs to ingest
 untrusted provider payloads.
 
 `POST /api/webhooks/uber-eats` verifies `X-Uber-Signature` with HMAC-SHA256 over untouched bytes and a
@@ -28,7 +29,7 @@ passed while the previous exact `sandbox` label check rejected delivery. Accept 
 testing app's key and exact-store allowlist, independently of that unsigned label; outbound requests remain
 restricted to sandbox domains. Logs classify the label using only fixed sandbox/production/absent/other
 categories, never arbitrary headers, payloads, URLs or identifiers. Forged signatures and other stores remain
-rejected for every transport label. No production credentials or tenant mapping are configured.
+rejected for every transport label. No production credentials or production tenant mapping are configured.
 
 Persist a minimal notification receipt using parameterized PostgreSQL statements. Its primary key is the
 app's client ID plus provider event ID. This database currently contains Uber receipts exclusively; adding
@@ -76,7 +77,7 @@ Merchant revenue and consumer checkout totals are different. The observed test m
 while checkout includes marketplace fees. Missing provider tax is explicitly null, distinct from reported zero;
 it must not be inferred from tenant defaults or a published-menu tax fixture.
 
-### Disabled tenant import foundation
+### Tenant import contract
 
 `POST /api/delivery-channels/orders` requires the real API-token scheme, its authentication-method claim and
 `channels:orders:write`. Human identities and existing `orders:write` tokens cannot import. Deployment-owned
@@ -100,9 +101,28 @@ The externally collected tender names its provider and currency; it does not cla
 
 Imported orders remain PendingApproval with kitchen release held. Ordinary status, cancellation, approval,
 counter-edit/release, collection, refund and deletion paths refuse them. Staff action projections mirror these
-guards; notes and focus remain operational tools. Source-aware staff/browser and printer rendering use the shared source contract. No gateway forwarding or tenant
-deployment activation is enabled by the import foundation. Catalogue revisions/modifiers, gateway decision
-execution/reconciliation and deployed end-to-end tests remain required before activation.
+guards; notes and focus remain operational tools. Source-aware staff/browser and printer rendering use the shared
+source contract. Forwarding and decision dispatch require an explicit deployment-owned sandbox binding and
+enrollment cutoff. Full catalogue/modifier support and deployed end-to-end acceptance remain required for
+production verification.
+
+### Tenant availability source
+
+`POST /api/delivery-channels/catalogue/availability` is a read operation requiring the actual API-token scheme
+and the dedicated `channels:catalogue:read` scope. Human identities, general menu readers and order-ingress
+tokens cannot use it. The exact enabled provider/store/currency/sandbox binding and tenant currency must match.
+The request selects 1–200 distinct product/variation identities and rejects unknown JSON fields.
+
+A repeatable-read transaction protects split-query catalogue reads from mixed snapshots. Missing, deleted,
+inactive, out-of-stock, component and delivery-disabled products remain unavailable. Product channel overrides,
+primary-category inheritance and required variation/degradation use the existing catalogue rules. Bundles and
+unsupported choice products remain unavailable under the same predicate used by order import; this endpoint
+cannot silently expand the supported order contract. The reply contains only selected identities, availability
+and fixed reason codes, with a deterministic binding-aware SHA-256 revision; it contains no customer data.
+
+This source does not mutate provider stock or claim publication success. A separate gateway synchronizer must
+validate complete mapped coverage, send sparse item changes and verify independent provider readback before
+reporting availability synchronization. No database migration is required for the read contract.
 
 ### Durable tenant decision outbox
 
@@ -199,8 +219,9 @@ stores only UUID, placement/enrollment boundaries, source marker and SHA-256; it
 customer fields. The entire response is validated before a transaction inserts eligible candidates. Duplicate
 and late webhook delivery cannot replace the first tenant, catalogue revision or prepared ciphertext.
 
-Canonical GET still checks the returned UUID and exact store. For polled identities, it also checks the persisted
-enrollment boundary before any tenant delivery or decision. Existing signed evidence remains valid without the
+Canonical GET still checks the returned UUID and exact store. For polled identities, it also requires an explicit
+ISO8601 timezone, a nondefault timestamp no later than the current clock and the persisted enrollment boundary
+before any tenant delivery or decision. Existing signed evidence remains valid without the
 new migration; unknown identities are refused. Migration application remains explicit and polling stays disabled
 until the dedicated database is upgraded. No new database-role grants, tenant DTOs or printer contracts are needed.
 
@@ -297,8 +318,9 @@ acknowledged, definitively rejected or uncertain outcomes; uncertain calls canno
 Only a matching ACCEPTED/DENIED readback reconciles an uncertain decision. Known 4xx rejection permits
 manual retry after another fresh order read. Restart preserves these guards. Order JSON remains ephemeral.
 
-This console proves provider behavior; it does not create tenant POS orders or print kitchen tickets.
-Sandbox-only operator testing is the next acceptance gate before tenant routing is designed and released.
+The console proves provider behavior. Separately enabled gateway forwarding creates held tenant orders and
+delivers only human-originated decisions. Staff preparation and printer feed acceptance require verified
+provider state and the deployed tenant contract; the console itself never prints kitchen tickets.
 The deploy runbook defines backup, rollback and key rotation for this environment.
 
 Static-analysis classification: the hand-authored SQL is PostgreSQL 16, verified by applying it in gateway

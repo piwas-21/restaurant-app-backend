@@ -8,6 +8,7 @@ namespace RestaurantSystem.Api.Common.Extensions;
 public static class DeliveryChannelServiceExtensions
 {
     public const string MachineIngressPolicy = "DeliveryChannelMachineIngress";
+    public const string MachineCataloguePolicy = "DeliveryChannelMachineCatalogue";
 
     public static IServiceCollection AddDeliveryChannelServices(this IServiceCollection services)
     {
@@ -16,6 +17,11 @@ public static class DeliveryChannelServiceExtensions
             .RequireAuthenticatedUser()
             .RequireClaim(ApiTokenDefaults.AuthMethodClaimType, ApiTokenDefaults.ApiTokenAuthMethod)
             .RequireClaim(ApiTokenDefaults.ScopeClaimType, ApiTokenScopes.ChannelOrdersWrite)));
+        services.AddAuthorization(options => options.AddPolicy(MachineCataloguePolicy, policy => policy
+            .AddAuthenticationSchemes(ApiTokenDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(ApiTokenDefaults.AuthMethodClaimType, ApiTokenDefaults.ApiTokenAuthMethod)
+            .RequireClaim(ApiTokenDefaults.ScopeClaimType, ApiTokenScopes.ChannelCatalogueRead)));
         services.AddOptions<DeliveryChannelSettings>().BindConfiguration(DeliveryChannelSettings.SectionName)
             .Validate(settings => !settings.Enabled || settings.Stores.Count > 0
                 && settings.Stores.All(store => !string.IsNullOrWhiteSpace(store.Provider)
@@ -27,6 +33,7 @@ public static class DeliveryChannelServiceExtensions
                 "Channel decision lease, retry and clock durations must remain within operational bounds.")
             .ValidateOnStart();
         services.AddScoped<IExternalOrderImporter, ExternalOrderImporter>();
+        services.AddScoped<IChannelAvailabilityReader, ChannelAvailabilityReader>();
         services.AddScoped<IChannelDecisionQueue, ChannelDecisionQueue>();
         services.AddScoped<IChannelOrderObserver, ChannelOrderObserver>();
         services.AddScoped<IChannelDecisionDelivery, ChannelDecisionDelivery>();

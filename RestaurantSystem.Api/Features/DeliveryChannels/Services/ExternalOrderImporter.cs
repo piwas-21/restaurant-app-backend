@@ -96,8 +96,7 @@ public sealed class ExternalOrderImporter(ApplicationDbContext context, IOptions
             throw new BadRequestException("A marketplace variation does not belong to its mapped tenant product.");
         if (!item.VariationId.HasValue && BaseProductVisibility.IsBaseHidden(product))
             throw new BadRequestException("This marketplace product requires a mapped variation.");
-        if (product.Type == ProductType.Menu || product.CustomizationGroups.Any(group => group.IsActive)
-            || product.SauceMin > 0 || product.DetailedIngredients.Count > 0)
+        if (ChannelProductContract.IsUnsupported(product))
             throw new BadRequestException("Bundles and modifier products require the full channel mapping contract before import.");
     }
 }
