@@ -30,6 +30,9 @@ public static class ApiTokenScopes
     /// <summary>Import externally priced marketplace orders through the deployment-bound channel ingress.</summary>
     public const string ChannelOrdersWrite = "channels:orders:write";
 
+    /// <summary>Read bounded, deployment-bound marketplace catalogue availability snapshots.</summary>
+    public const string ChannelCatalogueRead = "channels:catalogue:read";
+
     /// <summary>Read reservations.</summary>
     public const string ReservationsRead = "reservations:read";
 
@@ -61,7 +64,7 @@ public static class ApiTokenScopes
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         MenuRead, MenuWrite,
-        OrdersRead, OrdersWrite, ChannelOrdersWrite,
+        OrdersRead, OrdersWrite, ChannelOrdersWrite, ChannelCatalogueRead,
         ReservationsRead, ReservationsWrite,
         TenantRead, TenantWrite,
         MaintenanceWrite
