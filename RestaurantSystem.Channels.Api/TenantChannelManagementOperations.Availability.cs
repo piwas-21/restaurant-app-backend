@@ -65,6 +65,8 @@ public sealed partial class TenantChannelManagementOperations
         RequireEnabled();
         if (request.DurationMinutes is not (null or 15 or 30 or 60 or 240))
             throw new ChannelConsoleException(400, "Choose a supported pause duration or pause until resumed.");
+        await using var lease = await _availabilityJobs.TryLease(Binding(), cancellationToken);
+        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Reload before changing availability.");
         var now = _clock.GetUtcNow(); DateTimeOffset? until = request.DurationMinutes is { } duration ? now.AddMinutes(duration) : null;
         await _audit.Record(Binding(), actorId, "AvailabilityPause", "Intent", null, now, cancellationToken);
         var overrideState = await _availabilityOverrides.Set(Binding(), true, until, actorId, now, cancellationToken);
@@ -81,6 +83,8 @@ public sealed partial class TenantChannelManagementOperations
     public async Task<JsonElement> Resume(Guid actorId, CancellationToken cancellationToken)
     {
         RequireEnabled();
+        await using var lease = await _availabilityJobs.TryLease(Binding(), cancellationToken);
+        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Reload before changing availability.");
         var now = _clock.GetUtcNow();
         await _audit.Record(Binding(), actorId, "AvailabilityResume", "Intent", null, now, cancellationToken);
         await _availabilityOverrides.Set(Binding(), false, null, actorId, now, cancellationToken);

@@ -81,8 +81,19 @@ public sealed partial class TenantChannelManagementOperations
         var revision = row.MappingSnapshot is { } snapshot ? ProviderJson.Text(snapshot, "catalogueRevision") : string.Empty;
         if (revision.Length == 0) return Result(row.Id, "uncertain", "MappingSnapshotUnavailable", false);
         var binding = new AvailabilityBinding(_webhook.Value.ClientId, ConfiguredStore.StoreId, ConfiguredStore.TenantId, revision);
+        await using var lease = await _availabilityJobs.TryLease(binding, cancellationToken);
+        if (lease is null) return Result(row.Id, "reconciling", "PublicationInProgress", false);
+
+        // The initial lookup happened before the lease. Refresh both identities while holding it so a
+        // stale exception cannot reconcile a publication superseded by a concurrent publish.
+        row = await _publications.Find(binding, row.Id, cancellationToken)
+            ?? throw new ChannelConsoleException(404, "Publication was not found for this store.");
         var current = await _publications.Latest(binding, cancellationToken);
         if (current?.Id != row.Id) return Result(row.Id, "uncertain", "A newer publication requires review", false);
+        row = current;
+        if (row.State == CataloguePublicationStates.Verified) return Result(row.Id, "resolved", null, false);
+        if (row.State != CataloguePublicationStates.Pending)
+            return Result(row.Id, "open", "PublicationNoLongerPending", false);
         await _audit.Record(binding, actorId, "PublicationReconcile", "Intent", row.Id, _clock.GetUtcNow(), cancellationToken);
         var actual = await _menu.Read(cancellationToken);
         var now = _clock.GetUtcNow();

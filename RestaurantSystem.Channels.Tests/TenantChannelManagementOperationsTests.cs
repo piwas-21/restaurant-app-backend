@@ -121,6 +121,85 @@ public sealed class TenantChannelManagementOperationsTests
         Assert.Equal("Confirmed", ready.Audit.Records[^1].ResultCode);
     }
 
+    [Fact]
+    public async Task PublicationReconciliationHoldsStoreLeaseAcrossReadbackAndStateChange()
+    {
+        var busy = CreateHarness();
+        var busyPublication = await SeedPendingPublication(busy);
+        busy.Jobs.LeaseAvailable = false;
+        var busyResult = await busy.Operations.Reconcile(busyPublication.Id, ActorId, default);
+        Assert.Equal("reconciling", busyResult.GetProperty("status").GetString());
+        Assert.Equal("PublicationInProgress", busyResult.GetProperty("code").GetString());
+        Assert.Equal(0, busy.MenuProvider.ReadCount);
+        Assert.Empty(busy.Audit.Records);
+
+        var harness = CreateHarness();
+        var publication = await SeedPendingPublication(harness);
+        var readEntered = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.MenuProvider.BeforeRead = async menu =>
+        {
+            readEntered.TrySetResult(menu);
+            await releaseRead.Task;
+        };
+        var reconciliation = harness.Operations.Reconcile(publication.Id, ActorId, default);
+        var captured = await readEntered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.Equal(Menu().GetRawText(), captured.GetRawText());
+
+        await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Publication.Publish(
+            Menu(), publication.Revision, harness.Store, default));
+        Assert.Equal(0, harness.MenuProvider.UploadCount);
+        releaseRead.TrySetResult();
+
+        var result = await reconciliation.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.Equal("resolved", result.GetProperty("status").GetString());
+        Assert.Equal("PreviousMenuConfirmed", result.GetProperty("code").GetString());
+        Assert.Equal(CataloguePublicationStates.Abandoned, (await harness.Publications.Find(
+            new("sandbox-client", harness.Store.StoreId, harness.Store.TenantId, harness.Store.CatalogueRevision),
+            publication.Id, default))?.State);
+        Assert.Equal(1, harness.MenuProvider.ReadCount);
+    }
+
+    [Fact]
+    public async Task ManagerPauseAndResumeFailClosedWhileAvailabilityWriteHoldsStoreLease()
+    {
+        var harness = CreateHarness();
+        var updateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpdate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var provider = new UberAvailability(new Dictionary<string, bool> { ["meal"] = false })
+        {
+            BeforeUpdate = async () =>
+            {
+                updateEntered.TrySetResult();
+                await releaseUpdate.Task;
+            }
+        };
+        var processor = new ChannelAvailabilityProcessor(Options.Create(harness.Bridge), Options.Create(harness.Webhook),
+            new Source(), provider, harness.Jobs, TimeProvider.System, new Resolver(harness.Store), harness.Overrides);
+        var processing = processor.Process(default);
+        await updateEntered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.Pause(new(15), ActorId, default));
+        await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.Resume(ActorId, default));
+        Assert.Equal(0, harness.Overrides.SetCount);
+        Assert.Empty(harness.Audit.Records);
+        releaseUpdate.TrySetResult();
+
+        await processing.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(provider.Items["meal"]);
+        Assert.Equal(0, harness.Overrides.SetCount);
+    }
+
+    private static async Task<CataloguePublication> SeedPendingPublication(OperationsHarness harness)
+    {
+        var preview = await harness.Publication.Preview(Menu(), harness.Store, default);
+        var menu = preview.GetProperty("menu").Clone();
+        return await harness.Publications.Begin(new("sandbox-client", harness.Store.StoreId, harness.Store.TenantId,
+                harness.Store.CatalogueRevision), CatalogueMenuPlanner.MappingHash(harness.Store),
+            ProviderJson.Text(preview, "sourceRevision"), ProviderJson.Text(preview, "revision"), menu, Menu(), default,
+            ProviderJson.Encode(new { catalogueRevision = harness.Store.CatalogueRevision, items = Array.Empty<object>() }));
+    }
+
     private static TenantChannelManagementOperations CreateOperations(string readFault = "", JsonElement? imports = null)
         => CreateHarness(readFault, imports).Operations;
 
@@ -158,11 +237,14 @@ public sealed class TenantChannelManagementOperationsTests
             new Resolver(store), drafts, new AvailabilityStatus(), overrides, jobs, audit, new Imports(imports),
             new Source(), new UberAvailability(), connectionState, TimeProvider.System);
 
-        return new(operations, audit, flows, overrides, connectionState, connection, drafts, jobs);
+        return new(operations, audit, flows, overrides, connectionState, connection, drafts, jobs, publication, publications,
+            menuProvider, store, bridge.Value, webhook.Value);
     }
 
     private sealed record OperationsHarness(TenantChannelManagementOperations Operations, Audit Audit,
-        OAuthFlows Flows, Overrides Overrides, ConnectionState ConnectionState, Connection Connection, Drafts Drafts, Jobs Jobs);
+        OAuthFlows Flows, Overrides Overrides, ConnectionState ConnectionState, Connection Connection, Drafts Drafts, Jobs Jobs,
+        TenantCataloguePublication Publication, Publications Publications, MenuProvider MenuProvider, TenantStoreBinding Store,
+        TenantBridgeSettings Bridge, UberWebhookSettings Webhook);
 
     private static JsonElement Menu() => JsonDocument.Parse("""
         {"menus":[{"id":"menu","service_availability":[{"day_of_week":"monday","time_periods":[{"start_time":"09:00","end_time":"17:00"}]}]}],
@@ -186,8 +268,17 @@ public sealed class TenantChannelManagementOperationsTests
     private sealed class MenuProvider(JsonElement menu) : ITenantMenuProvider
     {
         private JsonElement _menu = menu;
-        public Task<JsonElement> Read(CancellationToken cancellationToken) => Task.FromResult(_menu.Clone());
-        public Task Upload(JsonElement value, CancellationToken cancellationToken) { _menu = value.Clone(); return Task.CompletedTask; }
+        public int ReadCount { get; private set; }
+        public int UploadCount { get; private set; }
+        public Func<JsonElement, Task>? BeforeRead { get; set; }
+        public async Task<JsonElement> Read(CancellationToken cancellationToken)
+        {
+            var snapshot = _menu.Clone(); ReadCount++;
+            if (BeforeRead is not null) await BeforeRead(snapshot);
+            return snapshot;
+        }
+        public Task Upload(JsonElement value, CancellationToken cancellationToken)
+        { UploadCount++; _menu = value.Clone(); return Task.CompletedTask; }
     }
 
     private sealed class SandboxMenuStub(JsonElement menu, MenuProvider provider) : ISandboxMenu
@@ -250,16 +341,26 @@ public sealed class TenantChannelManagementOperationsTests
 
     private sealed class Jobs : IChannelAvailabilityJobs
     {
+        private int _held;
         public bool LeaseAvailable { get; set; } = true;
         public Task<IChannelAvailabilityLease?> TryLease(AvailabilityBinding binding, CancellationToken cancellationToken)
-            => Task.FromResult<IChannelAvailabilityLease?>(LeaseAvailable ? new Lease() : null);
+        {
+            if (!LeaseAvailable || Interlocked.CompareExchange(ref _held, 1, 0) != 0)
+                return Task.FromResult<IChannelAvailabilityLease?>(null);
+            return Task.FromResult<IChannelAvailabilityLease?>(new Lease(() => Interlocked.Exchange(ref _held, 0)));
+        }
         public Task<IReadOnlyList<ChannelAvailabilityState>> Read(AvailabilityBinding binding, CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<ChannelAvailabilityState>>([]);
     }
 
-    private sealed class Lease : IChannelAvailabilityLease
+    private sealed class Lease(Action release) : IChannelAvailabilityLease
     {
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        private int _disposed;
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0) release();
+            return ValueTask.CompletedTask;
+        }
         public Task<bool> Queue(string sourceRevision, IReadOnlyList<ChannelAvailabilityDesired> items, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<bool> Observe(string itemId, string sourceRevision, string state, bool? observedAvailable, string? providerHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult(true);
     }
@@ -319,9 +420,16 @@ public sealed class TenantChannelManagementOperationsTests
 
     private sealed class UberAvailability : IUberAvailabilityClient
     {
+        public UberAvailability(Dictionary<string, bool>? items = null) => Items = items ?? new(StringComparer.Ordinal);
+        public Dictionary<string, bool> Items { get; }
+        public Func<Task>? BeforeUpdate { get; init; }
         public Task<UberAvailabilitySnapshot> Read(TenantStoreBinding store, string clientId, CancellationToken cancellationToken)
-            => Task.FromResult(new UberAvailabilitySnapshot("hash", new Dictionary<string, bool>()));
-        public Task Update(TenantStoreBinding store, TenantAvailabilityItem item, CancellationToken cancellationToken) => Task.CompletedTask;
+            => Task.FromResult(new UberAvailabilitySnapshot("hash", new Dictionary<string, bool>(Items, StringComparer.Ordinal)));
+        public async Task Update(TenantStoreBinding store, TenantAvailabilityItem item, CancellationToken cancellationToken)
+        {
+            if (BeforeUpdate is not null) await BeforeUpdate();
+            Items[item.ProviderItemId] = item.Available;
+        }
     }
 
     private sealed class Connection : ISandboxConnection
