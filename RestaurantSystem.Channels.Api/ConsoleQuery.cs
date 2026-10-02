@@ -4,12 +4,14 @@ namespace RestaurantSystem.Channels.Api;
 
 public sealed record ConsoleQuery(string Operation, string OrderId = "") : IChannelQuery<JsonElement>;
 
-public sealed class ConsoleQueryHandler(ISandboxConnection connection, ISandboxMenu menu, ISandboxOrders orders)
+public sealed class ConsoleQueryHandler(ISandboxConnection connection, ISandboxMenu menu, ISandboxOrders orders,
+    IChannelAvailabilityStatus availability)
     : IChannelQueryHandler<ConsoleQuery, JsonElement>
 {
     public async Task<JsonElement> Handle(ConsoleQuery query, CancellationToken cancellationToken)
         => query.Operation switch
         {
+            "availability" => await availability.Read(cancellationToken),
             "configuration" => await connection.Configuration(cancellationToken),
             "preview" => menu.Preview(),
             "menu" => await menu.Read(cancellationToken),

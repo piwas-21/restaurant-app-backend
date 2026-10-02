@@ -29,10 +29,15 @@
         <div class="actions"><button id="publish">Publish test menu &amp; verify</button><button id="verify-menu" class="secondary">Verify current test menu</button><button id="read-menu" class="secondary">Read current Uber menu</button></div>
         <details id="menu-readback" hidden><summary>Menu returned by Uber</summary><pre id="menu-result"></pre></details>
       </section>
+      <section class="card" aria-labelledby="stock-title"><div class="section-title"><h2 id="stock-title">Item availability</h2></div>
+        <p>Availability follows the two reviewed Sofra items. Each update is checked against Uber’s menu; the time below shows the last successful check.</p>
+        <p id="stock-status" aria-live="polite">Stock status has not been loaded.</p><ul id="stock-items"></ul>
+        <button id="refresh-stock" class="secondary">Refresh stock status</button>
+      </section>
       <section class="card"><div class="section-title"><span class="number">03</span><h2>Receive test orders</h2></div>
         <p>Enable order testing after menu verification. Keep this screen open while placing a test order in Uber Eats; each order needs your explicit decision.</p>
         <div class="actions"><button id="enable">Enable order testing</button><button id="pause" class="secondary">Pause order testing</button></div>
-        <p class="hint">Use the test store’s Hoofddorp address in Uber Eats and set the restaurant to Open in Uber Eats Orders. These orders remain in this sandbox console.</p>
+        <p class="hint">Use the test store’s Hoofddorp address in Uber Eats and set the restaurant to Open in Uber Eats Orders. The configured gateway forwards supported orders to the approved Sofra sandbox tenant. Use that tenant’s staff order screen for accept, reject and preparation; unsupported orders require review here.</p>
         <h3>Recent notifications</h3><p id="empty-receipts">No notifications loaded.</p><ul id="receipts"></ul>
       </section>
       <section id="order-panel" class="card" hidden><div class="section-title"><h2>Order review</h2><span id="order-state" class="badge"></span></div>

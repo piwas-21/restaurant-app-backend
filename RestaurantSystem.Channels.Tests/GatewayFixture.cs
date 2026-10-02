@@ -39,6 +39,8 @@ public sealed class GatewayFixture : IAsyncLifetime
         await migration.ExecuteNonQueryAsync();
         migration.CommandText = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "005_created_order_recovery.sql"));
         await migration.ExecuteNonQueryAsync();
+        migration.CommandText = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "006_availability_sync.sql"));
+        await migration.ExecuteNonQueryAsync();
     }
 
     public WebApplicationFactory<Program> Host(string? signingKey = null, string? connectionString = null)

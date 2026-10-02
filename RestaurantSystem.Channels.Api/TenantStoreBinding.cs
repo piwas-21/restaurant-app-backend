@@ -7,6 +7,7 @@ public sealed class TenantStoreBinding
     public string TenantId { get; set; } = string.Empty;
     public string BaseUrl { get; set; } = string.Empty;
     public string ApiToken { get; set; } = string.Empty;
+    public string CatalogueApiToken { get; set; } = string.Empty;
     public string Currency { get; set; } = string.Empty;
     public string CatalogueRevision { get; set; } = string.Empty;
     public string PublishedMenuHash { get; set; } = string.Empty;

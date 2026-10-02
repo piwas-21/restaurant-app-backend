@@ -62,8 +62,25 @@ async function receipts() {
     el('receipts').append(li);
   }
 }
+async function stock() {
+  const status = await api('uber/availability');
+  el('stock-status').textContent = status.enabled ? 'Stock synchronization enabled.' :
+    status.paused ? 'Stock synchronization paused.' : 'Stock synchronization is not enabled.';
+  el('stock-items').replaceChildren();
+  for (const row of status.items) {
+    const li = document.createElement('li');
+    const checked = row.verifiedAt ? new Date(row.verifiedAt).toLocaleString() : 'Not verified';
+    const state = row.state === 'Verified' && !row.fresh ? 'Verification is stale' : row.state;
+    li.textContent = row.itemId + ' · Sofra: ' + (row.desiredAvailable ? 'Available' : 'Unavailable') +
+      ' · ' + state + ' · Last verified: ' + checked + ' · ' + row.sourceReason;
+    el('stock-items').append(li);
+  }
+  if (!status.items.length) {
+    const li = document.createElement('li'); li.textContent = 'No availability observations yet.'; el('stock-items').append(li);
+  }
+}
 async function refresh() {
-  await receipts();
+  await receipts(); await stock();
   try { renderConfig(await api('uber/configuration')); notice('Sandbox status refreshed.'); }
   catch (error) {
     el('connection-badge').textContent = 'Connect your test store'; el('configuration').replaceChildren(); throw error;
@@ -96,6 +113,7 @@ el('login-form').addEventListener('submit', event => {
 });
 bind('logout', async () => { await api('auth/logout', {}); showLogin(); notice('Signed out.'); });
 bind('refresh', refresh);
+bind('refresh-stock', stock);
 bind('connect', async () => { authorize(await api('uber/connect', {})); });
 bind('publish', async () => { await api('uber/publish', {}); notice('Test menu published and verified against Uber’s readback.'); });
 bind('verify-menu', async () => { await api('uber/verification'); notice('Current test menu verified against Uber’s readback.'); });
@@ -132,4 +150,4 @@ await work(async () => {
       'Authorization was not completed. Sign in and start a new connection; check that you used the test merchant account.', callbackResult !== 'complete');
   }
 });
-setInterval(() => { if (loggedIn && !busy && !document.hidden) { void work(receipts); } }, 30000);
+setInterval(() => { if (loggedIn && !busy && !document.hidden) { void work(async () => { await receipts(); await stock(); }); } }, 30000);
