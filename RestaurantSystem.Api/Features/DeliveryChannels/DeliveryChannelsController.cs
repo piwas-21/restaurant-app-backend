@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Common.Extensions;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Features.DeliveryChannels.Commands.CreateExternalOrderCommand;
 using RestaurantSystem.Api.Features.DeliveryChannels.Dtos;
+using RestaurantSystem.Api.Features.DeliveryChannels.Commands.ObserveChannelOrderCommand;
 using RestaurantSystem.Domain.Common.Constants;
 
 namespace RestaurantSystem.Api.Features.DeliveryChannels;
@@ -19,4 +20,8 @@ public sealed class DeliveryChannelsController(CustomMediator mediator) : Contro
     [RequestSizeLimit(ExternalOrderLimits.RequestBytes)]
     public async Task<ActionResult<ExternalOrderImportDto>> Import(ExternalOrderRequest request)
         => Ok(await mediator.SendCommand(new CreateExternalOrderCommand(request), HttpContext.RequestAborted));
+    [HttpPost("orders/{orderId:guid}/observe")]
+    [RequestSizeLimit(ExternalOrderLimits.RequestBytes)]
+    public async Task<ActionResult<ChannelOrderObservationDto>> Observe(Guid orderId, ChannelOrderObservation observation)
+        => Ok(await mediator.SendCommand(new ObserveChannelOrderCommand(orderId, observation), HttpContext.RequestAborted));
 }

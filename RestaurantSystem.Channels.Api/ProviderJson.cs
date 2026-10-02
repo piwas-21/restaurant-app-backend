@@ -13,6 +13,8 @@ public static class ProviderJson
         => json.ValueKind == JsonValueKind.Object && json.TryGetProperty(key, out var value)
             && value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
     public static JsonElement Encode(object value) => JsonSerializer.SerializeToElement(value);
+    public static string Hash(JsonElement body)
+        => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(body)));
     public static void RequireSuccess(ProviderReply reply, string operation)
     {
         if (reply.IsSuccess) return;

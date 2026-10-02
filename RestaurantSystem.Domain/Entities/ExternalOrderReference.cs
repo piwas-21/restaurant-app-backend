@@ -18,6 +18,8 @@ public sealed class ExternalOrderReference : Entity
     /// <summary>Null means the provider did not report tax; zero means it explicitly reported zero.</summary>
     public decimal? ReportedTax { get; set; }
     public string PayloadHash { get; set; } = string.Empty;
+    /// <summary>Latest provider-read evidence; separate from the immutable import fingerprint.</summary>
+    public string? CanonicalHash { get; set; }
     public string FulfillmentType { get; set; } = string.Empty;
     public bool IsSandbox { get; set; }
     public Order Order { get; set; } = null!;

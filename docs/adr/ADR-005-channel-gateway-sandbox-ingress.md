@@ -177,9 +177,9 @@ where migration 003 has not yet been applied. Before rolling back to an older ga
 pause forwarding and clear remaining encrypted requests under the documented retention procedure; an offline
 process cannot enforce deletion. Backup/restore procedures must preserve this same lifetime for ciphertext.
 
-This bridge does not dispatch staff decisions, reconcile later terminal states or activate tenant configuration.
-Those paths, catalogue publishing/stock compatibility and deployed staff/printer acceptance remain required
-before full integration verification.
+The bridge includes opt-in staff decision dispatch and imported-order lifecycle reconciliation. Tenant activation,
+catalogue publishing/stock compatibility and deployed staff/printer acceptance remain required before full
+integration verification.
 
 ## Disabled tenant-decision dispatcher
 
@@ -202,9 +202,32 @@ when disabled). Machine lease/report responses validate identity, types and expe
 Only hashes/state/identities persist, with no canonical customer payload or exception-value
 logging. The worker uses the existing bounded poll interval and scope-per-cycle convention.
 
-This slice does not activate forwarding, reconcile later terminal changes, add preparation-time
-editing, or provide local kitchen preparation/ready actions. Deployment must keep dispatch
-paused while bindings, tokens, catalogue or provider-manager configuration are changed.
+Forwarding remains deployment-gated. Preparation-time editing and extended menu support remain open. Deployment
+must keep dispatch paused while bindings, tokens, catalogue or provider-manager configuration are changed.
+
+## Canonical lifecycle reconciliation and local preparation
+
+Migration `20261002010447_AddExternalCanonicalHash` adds nullable `canonical_hash varchar(64)` to the tenant's
+retained reference, separate from its immutable import fingerprint. The scoped machine-only observation endpoint
+matches local UUID plus provider/store/external order before any write. Observations reject stale/future timestamps,
+conflicting same-time evidence and reversal of accepted/terminal states. Repeated accepted reads preserve local
+preparation and never release a held order without the human decision outbox.
+
+`CANCELED`/`DENIED` close the local order; `FINISHED` completes it. All terminal states close kitchen release while
+preserving prior release audit, frozen merchant charges, provider-held payment and unknown tax. Pending decisions
+are finalized from terminal evidence and their opaque leases invalidated; already completed decision history
+remains unchanged. A later stale delivery report cannot reopen preparation. Status events occur after commit;
+there is no local customer email or refund.
+
+Gateway migration `004_order_observations.sql` stores only identity/state/hash/time and leased scheduling metadata.
+Imported jobs are joined on all retained identities before claim and completion. `SKIP LOCKED`, bounded retry and
+least-available ordering keep reconciliation recoverable and fair. Lost tenant replies trigger another canonical
+GET; polling stops only after the tenant confirms the terminal state. Paused/disabled forwarding makes no claim.
+
+Released, provider-accepted Uber-delivery orders permit only local `Preparing`/`Ready` transitions, with a required
+current order version and the established kitchen role policy. Local preparation adds no guessed provider ETA.
+Payment, cancellation, handover and completion retain their dedicated channel restrictions. Frontend preparation
+controls must send the additive version field; staff/printer source DTOs retain their existing fields.
 
 ## Private sandbox connection and testing
 

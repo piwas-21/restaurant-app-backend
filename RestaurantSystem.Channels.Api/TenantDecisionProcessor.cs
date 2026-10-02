@@ -52,9 +52,9 @@ public sealed class TenantDecisionProcessor(IOptions<TenantBridgeSettings> setti
             || ProviderJson.Text(store, "id") != lease.StoreId) return Unknown(lease);
         var state = ProviderJson.Text(canonical, "current_state");
         if (lease.Action == "accept" && state is "ACCEPTED" or "FINISHED" || lease.Action == "deny" && state == "DENIED")
-            return new(lease.LeaseId, "Succeeded", state, CanonicalHash(canonical), clock.GetUtcNow());
-        if (state == "CANCELED") return new(lease.LeaseId, "Failed", state, CanonicalHash(canonical), clock.GetUtcNow());
-        if (state == "CREATED") return new(lease.LeaseId, "Unknown", state, CanonicalHash(canonical), clock.GetUtcNow());
+            return new(lease.LeaseId, "Succeeded", state, ProviderJson.Hash(canonical), clock.GetUtcNow());
+        if (state == "CANCELED") return new(lease.LeaseId, "Failed", state, ProviderJson.Hash(canonical), clock.GetUtcNow());
+        if (state == "CREATED") return new(lease.LeaseId, "Unknown", state, ProviderJson.Hash(canonical), clock.GetUtcNow());
         // Conflicting/unrecognized evidence stays on hold for canonical reconciliation, never guessed into success.
         return Unknown(lease);
     }
@@ -62,6 +62,4 @@ public sealed class TenantDecisionProcessor(IOptions<TenantBridgeSettings> setti
     private TenantDecisionReport Unknown(TenantDecisionLease lease, string state = "Unknown")
         => new(lease.LeaseId, state, "UNKNOWN", string.Empty, clock.GetUtcNow());
 
-    private static string CanonicalHash(JsonElement body)
-        => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(body)));
 }

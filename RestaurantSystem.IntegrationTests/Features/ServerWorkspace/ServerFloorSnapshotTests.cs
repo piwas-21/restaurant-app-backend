@@ -724,6 +724,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         public string? Email => TestEmail("floor-test");
         public UserRole? Role => role;
         public bool IsAuthenticated => true;
+        public bool IsApiToken => false;
         public bool IsAdmin => role == UserRole.Admin;
         public Task<ApplicationUser?> GetUserAsync() => Task.FromResult<ApplicationUser?>(null);
         public string GetAuditIdentifier() => "floor-test";
