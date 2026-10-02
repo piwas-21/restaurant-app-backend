@@ -21,7 +21,7 @@ public sealed class TenantDecisionProcessor(IOptions<TenantBridgeSettings> setti
             await tenant.Report(store, lease, Unknown(lease), cancellationToken);
             return true;
         }
-        var report = Unknown(lease);
+        TenantDecisionReport report;
         try
         {
             var canonical = await orders.Read(lease.ExternalOrderId, cancellationToken);
@@ -37,9 +37,9 @@ public sealed class TenantDecisionProcessor(IOptions<TenantBridgeSettings> setti
             }
             report = Observe(lease, canonical);
         }
-        catch (ChannelConsoleException) { /* Lease recovery re-reads provider truth before considering a resend. */ }
-        catch (HttpRequestException) { /* Transport failure cannot authorize kitchen release. */ }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+        catch (ChannelConsoleException) { report = Unknown(lease); }
+        catch (HttpRequestException) { report = Unknown(lease); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { report = Unknown(lease); }
         // No successful POST/204 can release an order without this independent canonical GET.
         await tenant.Report(store, lease, report, cancellationToken);
         return true;
