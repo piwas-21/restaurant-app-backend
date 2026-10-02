@@ -21,11 +21,35 @@ public sealed partial class PostgresConsoleRepository
     }
 
     public async Task<bool> HasOrder(string clientId, Guid storeId, string orderId, CancellationToken cancellationToken)
-        => await Scalar("""
+    {
+        if (await Scalar("""
             SELECT EXISTS(SELECT 1 FROM channel_webhook_receipts
               WHERE client_id = $1 AND store_id = $2 AND resource_id = $3
               AND event_type IN ('orders.notification', 'orders.scheduled.notification', 'orders.release', 'orders.cancel'))
-            """, cancellationToken, clientId, storeId, orderId) is true;
+            """, cancellationToken, clientId, storeId, orderId) is true) return true;
+        // Ingress-only/older bridge deployments remain readable before the additive recovery migration.
+        if (!await HasRecoverySchema(cancellationToken) || !Guid.TryParseExact(orderId, "D", out var id)) return false;
+        return await Scalar("""
+            SELECT EXISTS(SELECT 1 FROM channel_import_jobs WHERE client_id = $1 AND store_id = $2
+              AND order_id = $3 AND discovery_source = 'provider_poll' AND discovery_hash IS NOT NULL)
+            """, cancellationToken, clientId, storeId, id) is true;
+    }
+
+    public async Task<DateTimeOffset?> RecoveryEnrollment(string clientId, Guid storeId, Guid orderId, CancellationToken cancellationToken)
+    {
+        if (!await HasRecoverySchema(cancellationToken)) return null;
+        var value = await Scalar("""
+            SELECT recovery_enrolled_at FROM channel_import_jobs WHERE client_id = $1 AND store_id = $2
+              AND order_id = $3 AND discovery_source = 'provider_poll'
+            """, cancellationToken, clientId, storeId, orderId);
+        return value is DateTime date ? new DateTimeOffset(date) : null;
+    }
+
+    private async Task<bool> HasRecoverySchema(CancellationToken cancellationToken)
+        => await Scalar("""
+            SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
+              AND table_name = 'channel_import_jobs' AND column_name = 'recovery_enrolled_at')
+            """, cancellationToken) is true;
 
     public async Task<bool> ClaimAction(string clientId, Guid storeId, string orderId, string action, CancellationToken cancellationToken)
         => await Execute("""

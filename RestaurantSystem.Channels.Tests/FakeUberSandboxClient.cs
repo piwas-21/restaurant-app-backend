@@ -11,9 +11,13 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
     public Guid MerchantStoreId { get; set; } = GatewayFixture.StoreId;
     public Guid OrderStoreId { get; set; } = GatewayFixture.StoreId;
     public JsonElement Menu { get; set; } = ProviderJson.Encode(new { menus = Array.Empty<object>() });
+    public JsonElement CreatedOrders { get; set; } = ProviderJson.Encode(new { orders = Array.Empty<object>() });
+    public string CreatedOrdersClientId { get; set; } = string.Empty;
+    public int CreatedOrdersStatus { get; set; } = 200;
     public bool CorruptMenuReadback { get; set; }
     public bool ThrowOnDecision { get; set; }
     public int DecisionStatus { get; set; } = 204;
+    public JsonElement? CanonicalOrder { get; set; }
     public string OrderState { get; set; } = "CREATED";
     public Func<Task>? BeforeDecision { get; set; }
 
@@ -36,6 +40,8 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
         var status = 200;
         if (path.StartsWith("/v1/eats/stores?", StringComparison.Ordinal))
             json = ProviderJson.Encode(new { stores = new[] { new { store_id = MerchantStoreId } } });
+        else if (path.Contains("/created-orders?", StringComparison.Ordinal))
+            return new(CreatedOrdersStatus, CreatedOrders, CreatedOrdersClientId);
         else if (path.EndsWith("/pos_data", StringComparison.Ordinal))
             json = ProviderJson.Encode(new
             {
@@ -51,7 +57,7 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
             json = CorruptMenuReadback ? ProviderJson.Encode(new { menus = Array.Empty<object>() }) : Menu;
         }
         else if (path.StartsWith("/v2/eats/order/", StringComparison.Ordinal))
-            json = ProviderJson.Encode(new
+            json = CanonicalOrder ?? ProviderJson.Encode(new
             {
                 id = path.Split('/')[^1],
                 current_state = OrderState,

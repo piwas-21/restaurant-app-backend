@@ -9,26 +9,32 @@ public sealed class SandboxTokens(IOptions<UberWebhookSettings> webhookOptions, 
     TokenRefreshLock refreshLock) : ISandboxTokens
 {
     private const string AppScopes = "eats.store eats.order";
+    private const string CreatedOrderScope = "eats.store.orders.read";
 
-    public async Task<string> AppToken(CancellationToken cancellationToken)
+    public Task<string> AppToken(CancellationToken cancellationToken) => CachedToken("app", AppScopes, cancellationToken);
+
+    public Task<string> CreatedOrdersToken(CancellationToken cancellationToken)
+        => CachedToken("created-orders", CreatedOrderScope, cancellationToken);
+
+    private async Task<string> CachedToken(string kind, string scopes, CancellationToken cancellationToken)
     {
         await refreshLock.Gate.WaitAsync(cancellationToken);
-        try { return await CachedAppToken(cancellationToken); }
+        try { return await CachedAppToken(kind, scopes, cancellationToken); }
         finally { refreshLock.Gate.Release(); }
     }
 
-    private async Task<string> CachedAppToken(CancellationToken cancellationToken)
+    private async Task<string> CachedAppToken(string kind, string scopes, CancellationToken cancellationToken)
     {
         var settings = webhookOptions.Value;
         var store = settings.StoreIds.Single();
-        var saved = await repository.FindToken(settings.ClientId, store, "app", cancellationToken);
+        var saved = await repository.FindToken(settings.ClientId, store, kind, cancellationToken);
         if (saved is not null && saved.ExpiresAt > timeProvider.GetUtcNow().AddMinutes(5))
-            return crypto.Unprotect(saved.Cipher, Purpose("app"));
-        var token = await provider.Token(Fields("client_credentials", new() { ["scope"] = AppScopes }), cancellationToken);
+            return crypto.Unprotect(saved.Cipher, Purpose(kind));
+        var token = await provider.Token(Fields("client_credentials", new() { ["scope"] = scopes }), cancellationToken);
         ProviderJson.RequireSuccess(token, "authentication");
-        RequireToken(token.Body, AppScopes);
+        RequireToken(token.Body, scopes);
         var access = ProviderJson.Text(token.Body, "access_token");
-        await repository.SaveToken(new(settings.ClientId, store, "app", crypto.Protect(access, Purpose("app")),
+        await repository.SaveToken(new(settings.ClientId, store, kind, crypto.Protect(access, Purpose(kind)),
             timeProvider.GetUtcNow().AddSeconds(token.Body.GetProperty("expires_in").GetInt32())), cancellationToken);
         return access;
     }

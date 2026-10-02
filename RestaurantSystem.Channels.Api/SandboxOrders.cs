@@ -5,7 +5,7 @@ using RestaurantSystem.Channels.Domain;
 namespace RestaurantSystem.Channels.Api;
 
 public sealed class SandboxOrders(IOptions<UberWebhookSettings> options, IUberSandboxClient provider,
-    ISandboxTokens tokens, IConsoleRepository repository, ISandboxConnection connection) : ISandboxOrders
+    ISandboxTokens tokens, IConsoleRepository repository, ISandboxConnection connection, TimeProvider clock) : ISandboxOrders
 {
     private string ClientId => options.Value.ClientId;
     private Guid StoreId => options.Value.StoreIds.Single();
@@ -17,13 +17,17 @@ public sealed class SandboxOrders(IOptions<UberWebhookSettings> options, IUberSa
     {
         if (!Guid.TryParseExact(orderId, "D", out var id)
             || !await repository.HasOrder(ClientId, StoreId, id.ToString(), cancellationToken))
-            throw new ChannelConsoleException(404, "No authenticated order notification exists for this sandbox store.");
+            throw new ChannelConsoleException(404, "No authenticated provider order evidence exists for this sandbox store.");
         var result = await provider.Send(HttpMethod.Get, $"/v2/eats/order/{id:D}", await tokens.AppToken(cancellationToken), null, cancellationToken);
         ProviderJson.RequireSuccess(result, "order retrieval");
         if (!Guid.TryParse(ProviderJson.Text(result.Body, "id"), out var returned) || returned != id
             || !result.Body.TryGetProperty("store", out var store)
             || !Guid.TryParse(ProviderJson.Text(store, "id"), out var storeId) || storeId != StoreId)
             throw new ChannelConsoleException(502, "Uber returned an order outside this sandbox store.");
+        var enrolledAt = await repository.RecoveryEnrollment(ClientId, StoreId, id, cancellationToken);
+        if (enrolledAt is not null && (!ProviderOrderTimestamp.TryRead(ProviderJson.Text(result.Body, "placed_at"),
+            clock.GetUtcNow(), out var placedAt) || placedAt < enrolledAt))
+            throw new ChannelConsoleException(502, "Uber's canonical order timestamp is invalid or predates its recovered enrollment boundary.");
         var recorded = await repository.FindAction(ClientId, StoreId, orderId, cancellationToken);
         var state = ProviderJson.Text(result.Body, "current_state");
         if (recorded is { State: "Pending" or "Unknown" }

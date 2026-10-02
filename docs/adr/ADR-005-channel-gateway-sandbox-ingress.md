@@ -151,7 +151,8 @@ webhook selects a tenant URL, token or local product identity. No paying tenant 
 
 Migration `003_tenant_import_jobs.sql` belongs only to the dedicated gateway database and is applied explicitly.
 Jobs are unique by app/store/order; the first tenant and catalogue revision are retained across discovery retries.
-Only authenticated `orders.notification` receipts within the enrollment window create jobs; malformed resource
+Authenticated `orders.notification` receipts within the enrollment window create jobs; opt-in created-order
+recovery can also discover an identity from the approved store's authenticated provider list. Malformed resource
 IDs, other stores/apps, old receipts and scheduled events are excluded. Opaque leased claims use PostgreSQL
 `FOR UPDATE SKIP LOCKED`; every state mutation checks exact client/store/order/tenant and unexpired lease ownership.
 
@@ -184,6 +185,24 @@ process cannot enforce deletion. Backup/restore procedures must preserve this sa
 The bridge includes opt-in staff decision dispatch and imported-order lifecycle reconciliation. Tenant activation,
 catalogue publishing/stock compatibility and deployed staff/printer acceptance remain required before full
 integration verification.
+
+## Missing-notification recovery
+
+`TenantBridge:RecoverCreatedOrders` is independently opt-in and requires an enabled, unpaused exact-store bridge.
+A separate worker polls `GET /v1/eats/stores/{store_id}/created-orders` using only `eats.store.orders.read`, with a
+separate encrypted token cache/purpose. Its default interval is thirty seconds (bounds 5–300), list limit 200
+(bounds 1–200). It never accepts, denies or releases an order. Full lists remain recoverable and emit a fixed
+backlog warning; an oversized or malformed list is refused.
+
+Migration `005_created_order_recovery.sql` adds provenance and response-hash metadata to import jobs. Polling
+stores only UUID, placement/enrollment boundaries, source marker and SHA-256; it never stores a raw response or
+customer fields. The entire response is validated before a transaction inserts eligible candidates. Duplicate
+and late webhook delivery cannot replace the first tenant, catalogue revision or prepared ciphertext.
+
+Canonical GET still checks the returned UUID and exact store. For polled identities, it also checks the persisted
+enrollment boundary before any tenant delivery or decision. Existing signed evidence remains valid without the
+new migration; unknown identities are refused. Migration application remains explicit and polling stays disabled
+until the dedicated database is upgraded. No new database-role grants, tenant DTOs or printer contracts are needed.
 
 ## Disabled tenant-decision dispatcher
 
