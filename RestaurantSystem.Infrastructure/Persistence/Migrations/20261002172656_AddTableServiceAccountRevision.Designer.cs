@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002172656_AddTableServiceAccountRevision")]
+    partial class AddTableServiceAccountRevision
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4570,14 +4573,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnName("id")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<long?>("AccountRevision")
-                        .HasColumnType("bigint")
-                        .HasColumnName("account_revision");
-
-                    b.Property<Guid?>("AmendmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("amendment_id");
-
                     b.Property<string>("Audience")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -4598,15 +4593,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("created_by");
-
-                    b.Property<string>("KitchenChangesJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("kitchen_changes_json");
-
-                    b.Property<string>("KitchenTarget")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("kitchen_target");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
@@ -4634,10 +4620,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId", "CreatedAt");
 
-                    b.ToTable("OrderOperationalNotes", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_order_operational_notes_kitchen_change", "(kitchen_changes_json IS NULL AND amendment_id IS NULL AND kitchen_target IS NULL AND account_revision IS NULL) OR (kitchen_changes_json IS NOT NULL AND amendment_id IS NOT NULL AND kitchen_target IS NOT NULL AND audience = 'Kitchen' AND (account_revision IS NULL OR account_revision > 0))");
-                        });
+                    b.ToTable("OrderOperationalNotes", (string)null);
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderPayment", b =>

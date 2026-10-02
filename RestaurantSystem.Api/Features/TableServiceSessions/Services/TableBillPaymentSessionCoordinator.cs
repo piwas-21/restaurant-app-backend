@@ -55,7 +55,7 @@ public sealed class TableBillPaymentSessionCoordinator : ITableBillPaymentSessio
             _paymentTolerance,
             _timeProvider,
             cancellationToken);
-        session.Version++;
+        session.RecordAccountChange();
         await _context.SaveChangesAsync(cancellationToken);
     }
 }

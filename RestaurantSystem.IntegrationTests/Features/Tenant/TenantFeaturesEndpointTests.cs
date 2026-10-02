@@ -32,6 +32,8 @@ public sealed class TenantFeaturesEndpointTests : IAsyncLifetime
             new Dictionary<string, string>
             {
                 ["TenantFeatures:ServerWorkspaceV2"] = "true",
+                ["TenantFeatures:TableAccountV1"] = "true",
+                ["TenantFeatures:OrderAmendmentsV1"] = "true",
                 ["TenantFeatures:EnforceSauceMinimum"] = "true",
                 ["TenantFeatures:OptionSetMaterializationEnabled"] = "true"
             });
@@ -60,6 +62,8 @@ public sealed class TenantFeaturesEndpointTests : IAsyncLifetime
         root.GetProperty("success").GetBoolean().Should().BeTrue();
         var data = root.GetProperty("data");
         data.GetProperty("serverWorkspaceV2").GetBoolean().Should().BeTrue();
+        data.GetProperty("tableAccountV1").GetBoolean().Should().BeTrue();
+        data.GetProperty("orderAmendmentsV1").GetBoolean().Should().BeTrue();
         data.GetProperty("enforceSauceMinimum").GetBoolean().Should().BeTrue();
         data.GetProperty("optionSetMaterializationEnabled").GetBoolean().Should().BeTrue();
         data.TryGetProperty("ServerWorkspaceV2", out _).Should().BeFalse();

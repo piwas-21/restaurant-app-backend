@@ -14,6 +14,13 @@ public sealed class TenantFeatureSettings
     /// </summary>
     public bool ServerWorkspaceV2 { get; set; }
 
+    /// <summary>Enables the staff visit-account presentation; defaults off pending pilot verification.
+    /// This display switch does not grant amendment or payment permissions.</summary>
+    public bool TableAccountV1 { get; set; }
+
+    /// <summary>Opt-in amendment writes; disabled until contracts and money reconciliation are verified.</summary>
+    public bool OrderAmendmentsV1 { get; set; }
+
     /// <summary>
     /// Requires configured minimum sauce choices at write time. Defaults off for existing guest,
     /// staff and mobile clients until each tenant's payload compatibility is verified.

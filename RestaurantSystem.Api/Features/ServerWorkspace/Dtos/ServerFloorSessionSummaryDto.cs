@@ -13,6 +13,8 @@ public sealed record ServerFloorSessionSummaryDto
     public int ActiveRoundCount { get; init; }
     public int ReadyRoundCount { get; init; }
     public bool CanCollect { get; init; }
+    public bool CanRequestPaymentHandoff { get; init; }
+    public bool HasPendingPaymentHandoff { get; init; }
     public bool CanClose { get; init; }
     public bool HasLegacyAmbiguity { get; init; }
 }

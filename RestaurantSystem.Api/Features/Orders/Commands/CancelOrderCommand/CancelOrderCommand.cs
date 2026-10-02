@@ -51,6 +51,8 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
 
     public async Task<ApiResponse<OrderDto>> Handle(CancelOrderCommand command, CancellationToken cancellationToken)
     {
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, command.OrderId, cancellationToken);
         var order = await _context.Orders
             .Include(o => o.Items)
             .Include(o => o.Payments)
@@ -144,7 +146,9 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
 
         try
         {
+            accountMutation.RecordAccountChange();
             await _context.SaveChangesAsync(cancellationToken);
+            await accountMutation.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {

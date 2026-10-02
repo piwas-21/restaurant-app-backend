@@ -87,17 +87,17 @@ public sealed class CloseTableServiceSessionCommandHandler
                 .Where(order => !order.IsDeleted
                     && order.Type == OrderType.DineIn
                     && order.ServiceSessionId == null)
-                .Select(order => new { order.Status, order.RemainingAmount })
+                .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus })
                 .ToListAsync(cancellationToken);
             var memberRows = await _context.Orders
                 .Where(order => !order.IsDeleted && order.ServiceSessionId == session.Id)
-                .Select(order => new { order.Status, order.RemainingAmount, order.OrderNumber })
+                .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus, order.OrderNumber })
                 .ToListAsync(cancellationToken);
             var assessment = TableServiceSessionCloseRules.Assess(
                 memberRows.Select(order =>
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount)),
+                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)),
                 legacyOrders.Select(order =>
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount)),
+                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)),
                 _paymentTolerance);
             if (assessment.LegacyActiveOrderCount > 0)
             {
@@ -106,7 +106,7 @@ public sealed class CloseTableServiceSessionCommandHandler
 
             var unresolved = memberRows
                 .Where(order => TableServiceSessionCloseRules.IsUnresolvedMemberOrder(
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount)))
+                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)))
                 .Select(order => order.OrderNumber)
                 .ToList();
             if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
@@ -126,7 +126,7 @@ public sealed class CloseTableServiceSessionCommandHandler
 
             session.Status = TableServiceSessionStatus.Closed;
             session.ClosedAt = now;
-            session.Version++;
+            session.RecordAccountChange();
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return await ReadResultAsync(session.Id, cancellationToken);

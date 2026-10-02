@@ -114,6 +114,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         result.Data.TableLabel.Should().Be("T-REPAIR");
         result.Data.RoundCount.Should().Be(1);
         result.Data.HasUnassignedActiveOrders.Should().BeFalse();
+        result.Data.AccountRevision.Should().Be(1);
         await using var verify = _fixture.CreateContext();
         var adopted = await verify.Orders.SingleAsync(order => order.Id == legacyId);
         adopted.ServiceSessionId.Should().Be(result.Data.ServiceSessionId);
@@ -143,6 +144,8 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         first.Data!.ServiceSessionId.Should().Be(sessionId);
         retry.Data!.ServiceSessionId.Should().Be(sessionId);
         retry.Data.LegacyActiveOrderCount.Should().Be(0);
+        first.Data.AccountRevision.Should().Be(2);
+        retry.Data.AccountRevision.Should().Be(2);
         await using var verify = _fixture.CreateContext();
         (await verify.TableServiceSessions.CountAsync()).Should().Be(1);
         (await verify.Orders.SingleAsync(order => order.Id == legacyId)).ServiceSessionId.Should().Be(sessionId);
@@ -278,6 +281,8 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         summary.RoundCount.Should().Be(1);
         summary.Outstanding.Should().Be(17m);
         summary.Version.Should().Be(1);
+        summary.AccountRevision.Should().Be(1);
+        summary.Bill.AccountRevision.Should().Be(1);
         summary.AgeMinutes.Should().BeGreaterThanOrEqualTo(0);
     }
 
@@ -460,6 +465,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var session = await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId);
         session.Status.Should().Be(TableServiceSessionStatus.Closed);
         session.Version.Should().Be(2);
+        session.AccountRevision.Should().Be(2);
     }
 
     [Fact]
@@ -475,8 +481,9 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         results.Count(result => result.Success).Should().Be(1);
         results.Should().Contain(result => result.ErrorCode == ErrorCodes.TableServiceSessionStale);
         await using var verify = _fixture.CreateContext();
-        (await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId))
-            .Version.Should().Be(2);
+        var session = await verify.TableServiceSessions.SingleAsync(value => value.Id == sessionId);
+        session.Version.Should().Be(2);
+        session.AccountRevision.Should().Be(2);
     }
 
     [Fact]
@@ -503,11 +510,15 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         var partial = await PayAsync(sessionId, expectedVersion: 1, amount: 40m);
         partial.Success.Should().BeTrue();
         partial.Data!.Version.Should().Be(2);
+        partial.Data.AccountRevision.Should().Be(2);
+        partial.Data.Bill.AccountRevision.Should().Be(2);
         partial.Data.Bill.Remaining.Should().Be(10m);
 
         var full = await PayAsync(sessionId, expectedVersion: 2, amount: 10m);
         full.Success.Should().BeTrue();
         full.Data!.Version.Should().Be(3);
+        full.Data.AccountRevision.Should().Be(3);
+        full.Data.Bill.AccountRevision.Should().Be(3);
         full.Data.Bill.Remaining.Should().Be(0m);
 
         await using var verify = _fixture.CreateContext();
@@ -532,6 +543,7 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
 
         var paid = await PayAsync(sessionId, expectedVersion: 1, amount: 25m);
         paid.Success.Should().BeTrue();
+        paid.Data!.AccountRevision.Should().Be(2);
 
         var stillUnresolved = await CloseAsync(sessionId, expectedVersion: 2);
         stillUnresolved.Success.Should().BeFalse();
@@ -542,10 +554,12 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         closed.Success.Should().BeTrue();
         closed.Data!.Status.Should().Be(nameof(TableServiceSessionStatus.Closed));
         closed.Data.Version.Should().Be(3);
+        closed.Data.AccountRevision.Should().Be(3);
 
         var retry = await CloseAsync(sessionId, expectedVersion: 2);
         retry.Success.Should().BeTrue();
         retry.Data!.Status.Should().Be(nameof(TableServiceSessionStatus.Closed));
+        retry.Data.AccountRevision.Should().Be(3);
     }
 
     [Fact]
@@ -588,6 +602,33 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
         refundedRow.Payments.Should().ContainSingle(payment => payment.Status == PaymentStatus.Refunded);
         eligibleRow.Payments.Should().ContainSingle(payment =>
             payment.Status == PaymentStatus.Completed && payment.Amount == 10m);
+    }
+
+    [Fact]
+    public async Task Fully_refunded_completed_round_allows_account_close_but_unserved_work_does_not()
+    {
+        var sessionId = await SeedSessionAsync(74);
+        var orderId = await SeedOrderAsync(sessionId, 74, 10m, Utc(12, 0));
+        await MarkRefundedAsync(orderId);
+        await using (var context = _fixture.CreateContext())
+        {
+            var reader = new TableServiceSessionReader(context, new TableBillAssembler(context,
+                new OrderMappingService(context, new OrderDisplayCurrencyResolver(context),
+                    NullLogger<OrderMappingService>.Instance), NullLogger<TableBillAssembler>.Instance));
+            var account = await reader.ReadAsync(sessionId, CancellationToken.None);
+            account!.CanClose.Should().BeTrue();
+            account.Outstanding.Should().Be(0m);
+        }
+        var closed = await CloseAsync(sessionId, expectedVersion: 1);
+        closed.Success.Should().BeTrue();
+
+        var unserved = TableServiceSessionCloseRules.Assess(
+            [new TableServiceSessionOrderState(OrderStatus.Preparing, 10m, IsFullyRefunded: true)], [], 0.01m);
+        unserved.Outstanding.Should().Be(0m);
+        unserved.CanClose.Should().BeFalse("refunding money does not finish preparation");
+        var partial = TableServiceSessionCloseRules.Assess(
+            [new TableServiceSessionOrderState(OrderStatus.Completed, 5m)], [], 0.01m);
+        partial.CanClose.Should().BeFalse("an unresolved remainder is not a full refund");
     }
 
     [Fact]

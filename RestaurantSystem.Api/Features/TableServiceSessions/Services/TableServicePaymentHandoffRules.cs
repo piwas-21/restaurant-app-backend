@@ -30,9 +30,9 @@ public static class TableServicePaymentHandoffRules
         var rows = await TableServiceSessionCloseRules.ForUnassignedSession(
                 context.Orders.Where(order => !order.IsDeleted && order.Type == OrderType.DineIn
                     && order.ServiceSessionId == null), session.TableId, session.TableNumber)
-            .Select(order => new { order.Status, order.RemainingAmount })
+            .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus })
             .ToListAsync(cancellationToken);
         return rows.Any(row => TableServiceSessionCloseRules.IsBlockingLegacyOrder(
-            new TableServiceSessionOrderState(row.Status, row.RemainingAmount), paymentTolerance));
+            new TableServiceSessionOrderState(row.Status, row.RemainingAmount, row.PaymentStatus == PaymentStatus.Refunded), paymentTolerance));
     }
 }

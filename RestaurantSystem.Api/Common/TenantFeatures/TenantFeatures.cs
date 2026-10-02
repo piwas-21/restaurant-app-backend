@@ -12,11 +12,17 @@ public sealed class TenantFeatures : ITenantFeatures
     {
         ArgumentNullException.ThrowIfNull(options);
         ServerWorkspaceV2 = options.Value.ServerWorkspaceV2;
+        TableAccountV1 = options.Value.TableAccountV1;
+        OrderAmendmentsV1 = options.Value.OrderAmendmentsV1;
         EnforceSauceMinimum = options.Value.EnforceSauceMinimum;
         OptionSetMaterializationEnabled = options.Value.OptionSetMaterializationEnabled;
     }
 
     public bool ServerWorkspaceV2 { get; }
+
+    public bool TableAccountV1 { get; }
+
+    public bool OrderAmendmentsV1 { get; }
 
     public bool EnforceSauceMinimum { get; }
 

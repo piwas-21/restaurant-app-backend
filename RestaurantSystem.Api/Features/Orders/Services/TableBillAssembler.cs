@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Features.Orders.Dtos;
@@ -60,6 +61,11 @@ public class TableBillAssembler : ITableBillAssembler
     /// <summary>Assembles the durable bill for one explicit visit, including settled rounds.</summary>
     public async Task<TableBillDto?> AssembleAsync(Guid serviceSessionId, CancellationToken cancellationToken)
     {
+        await using var snapshot = _context.Database.CurrentTransaction is null
+            ? await _context.Database.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead, cancellationToken)
+            : null;
+
         var session = await _context.TableServiceSessions
             .AsNoTracking()
             .Include(value => value.Table)
@@ -73,7 +79,7 @@ public class TableBillAssembler : ITableBillAssembler
             && o.Status != OrderStatus.Cancelled, cancellationToken);
         return BuildBill(
             orders, session.TableNumber, session.TableId, session.Table?.TableNumber,
-            session.Id, session.Version, session.Currency);
+            session.Id, session.Version, session.AccountRevision, session.Currency);
     }
 
     /// <summary>
@@ -100,7 +106,7 @@ public class TableBillAssembler : ITableBillAssembler
         return sessions.Select(session => ordersBySession.TryGetValue(session.Id, out var members)
                 ? BuildBill(
                     members, session.TableNumber, session.TableId, session.Table?.TableNumber,
-                    session.Id, session.Version, session.Currency)
+                    session.Id, session.Version, session.AccountRevision, session.Currency)
                 : null)
             .ToList();
     }
@@ -114,7 +120,7 @@ public class TableBillAssembler : ITableBillAssembler
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
             && o.ServiceSessionId == null, cancellationToken,
             OrderSettlementEligibility.OperationalQueuePredicate());
-        return BuildBill(orders, tableNumber, null, null, null, null, null);
+        return BuildBill(orders, tableNumber, null, null, null, null, null, null);
     }
 
     private async Task<List<Order>> QueryOrders(
@@ -146,6 +152,7 @@ public class TableBillAssembler : ITableBillAssembler
         string? tableLabel,
         Guid? serviceSessionId,
         int? serviceSessionVersion,
+        long? accountRevision,
         string? currency)
     {
         if (orders.Count == 0)
@@ -160,6 +167,7 @@ public class TableBillAssembler : ITableBillAssembler
             TableLabel = tableLabel ?? tableNumber?.ToString(CultureInfo.InvariantCulture),
             ServiceSessionId = serviceSessionId,
             ServiceSessionVersion = serviceSessionVersion,
+            AccountRevision = accountRevision,
             Currency = CurrencyCode.Normalize(currency),
             GeneratedAt = DateTime.UtcNow,
             OrderCount = orders.Count,
@@ -189,6 +197,11 @@ public class TableBillAssembler : ITableBillAssembler
         }
 
         Summarize(bill);
+        if (accountRevision.HasValue)
+        {
+            bill.AccountItems = TableAccountItemProjection.Project(bill.Orders);
+        }
+
         _logger.LogInformation(
             "Assembled bill for table {TableNumber}, session {ServiceSessionId}: {OrderCount} orders, remaining {Remaining}",
             tableNumber, serviceSessionId, bill.OrderCount, bill.Remaining);

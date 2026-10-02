@@ -20,6 +20,8 @@ public class TenantFeaturesTests
         var features = Create(new TenantFeatureSettings());
 
         features.ServerWorkspaceV2.Should().BeFalse();
+        features.TableAccountV1.Should().BeFalse();
+        features.OrderAmendmentsV1.Should().BeFalse();
         features.EnforceSauceMinimum.Should().BeFalse();
         features.OptionSetMaterializationEnabled.Should().BeFalse();
     }
@@ -79,6 +81,8 @@ public class TenantFeaturesTests
         var controller = new TenantFeaturesController(Create(new TenantFeatureSettings
         {
             ServerWorkspaceV2 = enabled,
+            TableAccountV1 = enabled,
+            OrderAmendmentsV1 = enabled,
             EnforceSauceMinimum = enabled,
             OptionSetMaterializationEnabled = enabled,
         }))
@@ -91,6 +95,8 @@ public class TenantFeaturesTests
 
         body.Success.Should().BeTrue();
         body.Data!.ServerWorkspaceV2.Should().Be(enabled);
+        body.Data.TableAccountV1.Should().Be(enabled);
+        body.Data.OrderAmendmentsV1.Should().Be(enabled);
         body.Data.EnforceSauceMinimum.Should().Be(enabled);
         body.Data.OptionSetMaterializationEnabled.Should().Be(enabled);
         controller.Response.Headers.CacheControl.ToString().Should().Be("no-store");

@@ -5,7 +5,7 @@ namespace RestaurantSystem.Api.Features.Orders.Dtos;
 /// explicit service-session read uses immutable membership and also retains settled rounds for a
 /// durable receipt. Per-order grouping is preserved so the waiter can see each round.
 /// </summary>
-public record TableBillDto
+public partial record TableBillDto
 {
     public int? TableNumber { get; set; }
     public Guid? TableId { get; set; }
