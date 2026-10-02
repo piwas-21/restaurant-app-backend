@@ -5,15 +5,21 @@ public sealed class TenantBridgeSettings
     public const string Section = "TenantBridge";
     public bool Enabled { get; set; }
     public bool Paused { get; set; }
+    public bool DispatchDecisions { get; set; }
+    public int HttpTimeoutSeconds { get; set; } = 20;
     public DateTimeOffset EnrollmentStartedAt { get; set; }
     public int PollSeconds { get; set; } = 5;
     public int RetrySeconds { get; set; } = 30;
     public int PayloadRetentionDays { get; set; } = 7;
     public TenantStoreBinding Store { get; set; } = new();
 
+    private bool HasOperationalBounds() => HttpTimeoutSeconds is >= 5 and <= 30
+        && (!DispatchDecisions || Enabled) && PollSeconds is >= 1 and <= 60
+        && RetrySeconds is >= 10 and <= 300 && PayloadRetentionDays is >= 1 and <= 7;
+
     public bool IsValid()
     {
-        if (PollSeconds is < 1 or > 60 || RetrySeconds is < 10 or > 300 || PayloadRetentionDays is < 1 or > 7) return false;
+        if (!HasOperationalBounds()) return false;
         if (!Enabled) return true;
         return Store.StoreId != Guid.Empty && Store.TenantId.Length is > 0 and <= 100
             && Store.ApiToken.Length > 0 && Store.Currency is "EUR" or "CHF"

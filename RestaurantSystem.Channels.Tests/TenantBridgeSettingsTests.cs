@@ -8,6 +8,9 @@ public sealed class TenantBridgeSettingsTests
     public void DisabledDefaultsAreCompatibleButCleanupCadenceStillMustBeBounded()
     {
         Assert.True(new TenantBridgeSettings().IsValid());
+        Assert.False(new TenantBridgeSettings { DispatchDecisions = true }.IsValid());
+        Assert.False(new TenantBridgeSettings { HttpTimeoutSeconds = 4 }.IsValid());
+        Assert.False(new TenantBridgeSettings { HttpTimeoutSeconds = 31 }.IsValid());
         Assert.False(new TenantBridgeSettings { PollSeconds = 0 }.IsValid());
         Assert.False(new TenantBridgeSettings { PollSeconds = -1 }.IsValid());
         Assert.False(new TenantBridgeSettings { PayloadRetentionDays = 8 }.IsValid());

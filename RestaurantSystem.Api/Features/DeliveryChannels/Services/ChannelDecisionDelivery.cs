@@ -43,7 +43,7 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
         await SaveAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new(job.Id, job.LeaseId.Value, job.LeaseUntil.Value, source.Provider, source.ExternalStoreId,
-            source.ExternalOrderId, job.Action, job.Reason, job.Attempts);
+            source.ExternalOrderId, job.Action, job.Reason, job.Attempts, job.OrderId);
     }
 
     public async Task<ChannelDecisionDto> ReportAsync(Guid decisionId, ChannelDecisionReport report, CancellationToken cancellationToken)
