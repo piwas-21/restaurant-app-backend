@@ -10,7 +10,7 @@ public sealed partial class TenantChannelCatalogueService
     private const string MenusProperty = "menus";
     private const string ServiceAvailabilityProperty = "service_availability";
 
-    private object[] Rows(TenantStoreBinding store, TenantCatalogueSnapshot source,
+    private static object[] Rows(TenantStoreBinding store, TenantCatalogueSnapshot source,
         JsonElement preview, JsonElement providerMenu, JsonElement template, string providerPriceStatus)
     {
         var planItems = preview.ValueKind == JsonValueKind.Object
@@ -155,15 +155,24 @@ public sealed partial class TenantChannelCatalogueService
     }
 
     internal static object? PublicationSummary(CataloguePublication? publication)
-        => publication is null ? null : new
+    {
+        if (publication is null) return null;
+        var mappingRevision = string.Empty;
+        if (publication.MappingSnapshot is { } snapshot)
+            mappingRevision = ProviderJson.Text(snapshot, "catalogueRevision");
+        var state = PublicationState(publication.State);
+        string? resultCode = null;
+        if (state != "verified") resultCode = "PublicationUnconfirmed";
+        return new
         {
             id = publication.Id,
-            mappingRevision = publication.MappingSnapshot is { } snapshot ? ProviderJson.Text(snapshot, "catalogueRevision") : string.Empty,
+            mappingRevision,
             publicationRevision = publication.Revision,
-            state = PublicationState(publication.State),
+            state,
             verifiedAt = publication.VerifiedAt,
-            resultCode = PublicationState(publication.State) == "verified" ? null : "PublicationUnconfirmed"
+            resultCode
         };
+    }
 
     private static string PublicationState(string? state) => state switch
     {

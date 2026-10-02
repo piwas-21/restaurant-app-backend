@@ -95,7 +95,7 @@ public sealed class TenantCataloguePublication(TenantManagementContext context, 
         return await provider.Read(cancellationToken);
     }
 
-    private async Task RequireCurrentIntent(Func<CancellationToken, Task<bool>>? intentStillCurrent,
+    private static async Task RequireCurrentIntent(Func<CancellationToken, Task<bool>>? intentStillCurrent,
         CancellationToken cancellationToken)
     {
         if (intentStillCurrent is not null && !await intentStillCurrent(cancellationToken)) throw Unconfirmed();

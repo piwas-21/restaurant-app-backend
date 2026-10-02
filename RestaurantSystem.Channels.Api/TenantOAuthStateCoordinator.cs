@@ -19,6 +19,7 @@ public sealed class TenantOAuthStateCoordinator(TenantManagementContext context,
     private const string OAuthAction = "OAuth";
     private const string CallbackAction = "OAuthCallback";
     private const string ConnectionStateAction = "OAuthConnectionState";
+    private const string OAuthStartAction = "OAuthStart";
     private const string Intent = "Intent";
     private const string NoOpCode = "NoOp";
 
@@ -33,12 +34,12 @@ public sealed class TenantOAuthStateCoordinator(TenantManagementContext context,
         await using var lease = await jobs.TryLease(Binding, cancellationToken);
         if (lease is null) throw OperationBusy();
         var flowId = Guid.NewGuid();
-        await audit.Record(Binding, actorId, "OAuthStart", Intent, flowId, context.Clock.GetUtcNow(), cancellationToken);
+        await audit.Record(Binding, actorId, OAuthStartAction, Intent, flowId, context.Clock.GetUtcNow(), cancellationToken);
         var prepared = await PrepareAuthorization(flowId, actorId, enableOrderAcceptance, cancellationToken);
         var flow = prepared.Flow;
         await SupersedePrevious(flow, cancellationToken);
         await flows.Create(flow, cancellationToken);
-        await audit.Record(Binding, actorId, "OAuthStart", Pending, flow.Id, context.Clock.GetUtcNow(), cancellationToken);
+        await audit.Record(Binding, actorId, OAuthStartAction, Pending, flow.Id, context.Clock.GetUtcNow(), cancellationToken);
         return new(flow.Id, prepared.AuthorizationUrl, flow.ExpiresAt);
     }
 
@@ -48,19 +49,19 @@ public sealed class TenantOAuthStateCoordinator(TenantManagementContext context,
         try { return await provider.Prepare(flowId, actorId, enableOrderAcceptance, cancellationToken); }
         catch (ChannelConsoleException)
         {
-            await audit.Record(Binding, actorId, "OAuthStart", "PreflightFailed", flowId,
+            await audit.Record(Binding, actorId, OAuthStartAction, "PreflightFailed", flowId,
                 context.Clock.GetUtcNow(), cancellationToken);
             throw;
         }
         catch (HttpRequestException)
         {
-            await audit.Record(Binding, actorId, "OAuthStart", "PreflightUnconfirmed", flowId,
+            await audit.Record(Binding, actorId, OAuthStartAction, "PreflightUnconfirmed", flowId,
                 context.Clock.GetUtcNow(), cancellationToken);
             throw;
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            await audit.Record(Binding, actorId, "OAuthStart", "PreflightUnconfirmed", flowId,
+            await audit.Record(Binding, actorId, OAuthStartAction, "PreflightUnconfirmed", flowId,
                 context.Clock.GetUtcNow(), cancellationToken);
             throw;
         }
@@ -70,7 +71,7 @@ public sealed class TenantOAuthStateCoordinator(TenantManagementContext context,
     {
         var count = await flows.CancelPending(Binding, AuthorizationSuperseded, context.Clock.GetUtcNow(), cancellationToken);
         var outcome = count == 0 ? "NoPreviousFlow" : "SupersededPreviousFlows";
-        await audit.Record(Binding, flow.ActorId, "OAuthStart", outcome, flow.Id,
+        await audit.Record(Binding, flow.ActorId, OAuthStartAction, outcome, flow.Id,
             context.Clock.GetUtcNow(), cancellationToken);
     }
 
@@ -209,7 +210,7 @@ public sealed class TenantOAuthStateCoordinator(TenantManagementContext context,
         }, context.ConfiguredStore.StoreId, flow.Status == Connected,
             flow.CreatedAt, flow.ExpiresAt, flow.CompletedAt, flow.ErrorCode);
 
-    private void EnsureActor(TenantOAuthFlow? flow, Guid actorId)
+    private static void EnsureActor(TenantOAuthFlow? flow, Guid actorId)
     {
         if (flow is null || flow.ActorId != actorId || actorId == Guid.Empty)
             throw new ChannelConsoleException(404, "Authorization flow was not found.");
