@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddChannelGateway(builder.Configuration);
 builder.Services.AddSandboxConsole(builder.Configuration);
+builder.Services.AddTenantBridge(builder.Configuration);
 var app = builder.Build();
 app.UseMiddleware<SandboxConsoleMiddleware>();
 app.UseRateLimiter();
