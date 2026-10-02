@@ -21,15 +21,23 @@ public sealed class SandboxConnection(IOptions<UberWebhookSettings> webhookOptio
         if (error.Length > 0 || code.Length == 0)
             throw new ChannelConsoleException(400, "Uber authorization was not completed. Start a new connection.");
         var merchantToken = await tokens.Exchange(code, saved.Verifier, cancellationToken);
+        await ConnectTenant(merchantToken, saved.EnableTesting, cancellationToken);
+    }
+
+    public async Task<JsonElement> ConnectTenant(string merchantToken, CancellationToken cancellationToken)
+        => await ConnectTenant(merchantToken, false, cancellationToken);
+
+    public async Task<JsonElement> ConnectTenant(string merchantToken, bool enableOrderAcceptance, CancellationToken cancellationToken)
+    {
         await VerifyMerchant(merchantToken, cancellationToken);
         // Nominate using merchant consent, but retain tablet acceptance until menu verification.
         await Activate(merchantToken, true, cancellationToken);
-        if (saved.EnableTesting)
+        if (enableOrderAcceptance)
         {
             await menu.RequireVerified(cancellationToken);
             await Activate(merchantToken, false, cancellationToken);
         }
-        await Configuration(cancellationToken);
+        return await Configuration(cancellationToken);
     }
 
     public async Task<JsonElement> Configuration(CancellationToken cancellationToken)

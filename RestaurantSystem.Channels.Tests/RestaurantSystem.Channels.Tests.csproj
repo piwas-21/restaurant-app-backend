@@ -32,5 +32,7 @@
              Link="006_availability_sync.sql" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/007_catalogue_publications.sql"
              Link="007_catalogue_publications.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/008_tenant_management.sql"
+             Link="008_tenant_management.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

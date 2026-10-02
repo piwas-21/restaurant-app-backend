@@ -11,7 +11,7 @@ public sealed class PostgresCataloguePublications(NpgsqlDataSource source) : ICa
     {
         await using var command = source.CreateCommand("""
             SELECT id, mapping_hash, source_revision, publication_revision, menu::text, previous_menu::text,
-                   state, provider_hash, verified_at
+                   state, provider_hash, verified_at, mapping_snapshot::text
             FROM channel_catalogue_publications
             WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3
             ORDER BY sequence DESC LIMIT 1
@@ -19,13 +19,31 @@ public sealed class PostgresCataloguePublications(NpgsqlDataSource source) : ICa
         Identity(command, binding);
         await using var row = await command.ExecuteReaderAsync(cancellationToken);
         if (!await row.ReadAsync(cancellationToken)) return null;
-        return new(row.GetGuid(0), row.GetString(1), row.GetString(2), row.GetString(3),
-            JsonSerializer.Deserialize<JsonElement>(row.GetString(4)), JsonSerializer.Deserialize<JsonElement>(row.GetString(5)),
-            row.GetString(6), row.IsDBNull(7) ? null : row.GetString(7), row.IsDBNull(8) ? null : row.GetFieldValue<DateTimeOffset>(8));
+        return Read(row);
     }
 
+    public async Task<CataloguePublication?> Find(AvailabilityBinding binding, Guid id, CancellationToken cancellationToken)
+    {
+        await using var command = source.CreateCommand("""
+            SELECT id, mapping_hash, source_revision, publication_revision, menu::text, previous_menu::text,
+                   state, provider_hash, verified_at, mapping_snapshot::text
+            FROM channel_catalogue_publications
+            WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3 AND id = $4
+            """);
+        Identity(command, binding); command.Parameters.AddWithValue(id);
+        await using var row = await command.ExecuteReaderAsync(cancellationToken);
+        return await row.ReadAsync(cancellationToken) ? Read(row) : null;
+    }
+
+    private static CataloguePublication Read(NpgsqlDataReader row)
+        => new(row.GetGuid(0), row.GetString(1), row.GetString(2), row.GetString(3),
+            JsonSerializer.Deserialize<JsonElement>(row.GetString(4)), JsonSerializer.Deserialize<JsonElement>(row.GetString(5)),
+            row.GetString(6), row.IsDBNull(7) ? null : row.GetString(7), row.IsDBNull(8) ? null : row.GetFieldValue<DateTimeOffset>(8),
+            row.IsDBNull(9) ? null : JsonSerializer.Deserialize<JsonElement>(row.GetString(9)));
+
     public async Task<CataloguePublication> Begin(AvailabilityBinding binding, string mappingHash, string sourceRevision,
-        string revision, JsonElement menu, JsonElement previousMenu, CancellationToken cancellationToken)
+        string revision, JsonElement menu, JsonElement previousMenu, CancellationToken cancellationToken,
+        JsonElement? mappingSnapshot = null)
     {
         await using var connection = await source.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -37,15 +55,16 @@ public sealed class PostgresCataloguePublications(NpgsqlDataSource source) : ICa
         var id = Guid.NewGuid();
         await using var command = new NpgsqlCommand("""
             INSERT INTO channel_catalogue_publications(id, client_id, store_id, tenant_id, catalogue_revision,
-                mapping_hash, source_revision, publication_revision, menu, previous_menu)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                mapping_hash, source_revision, publication_revision, menu, previous_menu, mapping_snapshot)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             """, connection, transaction);
         command.Parameters.AddWithValue(id); PostgresChannelAvailabilityJobs.Identity(command, binding);
         command.Parameters.AddWithValue(mappingHash); command.Parameters.AddWithValue(sourceRevision); command.Parameters.AddWithValue(revision);
         command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, menu.GetRawText());
         command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, previousMenu.GetRawText());
+        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, mappingSnapshot is { } snapshot ? snapshot.GetRawText() : DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
-        return new(id, mappingHash, sourceRevision, revision, menu, previousMenu, CataloguePublicationStates.Pending, null, null);
+        return new(id, mappingHash, sourceRevision, revision, menu, previousMenu, CataloguePublicationStates.Pending, null, null, mappingSnapshot);
     }
 
     public async Task<bool> Verify(AvailabilityBinding binding, Guid id, string providerHash, DateTimeOffset now, CancellationToken cancellationToken)

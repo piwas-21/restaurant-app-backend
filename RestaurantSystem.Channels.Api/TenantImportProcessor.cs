@@ -6,7 +6,8 @@ namespace RestaurantSystem.Channels.Api;
 
 public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> settings, IOptions<UberWebhookSettings> webhook,
     IChannelImportJobs jobs, ISandboxOrders orders, IUberOrderNormalizer normalizer, ISandboxCrypto crypto,
-    ITenantOrderClient tenant, TimeProvider clock, ITenantCataloguePublication? catalogue = null) : ITenantImportProcessor
+    ITenantOrderClient tenant, TimeProvider clock, ITenantCataloguePublication? catalogue = null,
+    ICatalogueMappingResolver? mappings = null, IChannelManagementConnectionState? connectionState = null) : ITenantImportProcessor
 {
     private static readonly JsonSerializerOptions Wire = new(JsonSerializerDefaults.Web);
 
@@ -16,8 +17,11 @@ public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> setting
         // Retention continues during pause/disable and application rollback with this gateway version.
         await jobs.ExpirePayloads(cancellationToken);
         if (!options.Enabled || options.Paused) return false;
+        var configured = options.Store;
+        if (connectionState is not null && (await connectionState.Read(new(webhook.Value.ClientId, configured.StoreId,
+            configured.TenantId, configured.CatalogueRevision), cancellationToken)).IsDisconnected) return false;
         await RequirePublication(options, cancellationToken);
-        var store = options.Store;
+        var store = mappings is null ? options.Store : await mappings.Active(cancellationToken);
         await jobs.Discover(webhook.Value.ClientId, store.StoreId, store.TenantId, store.CatalogueRevision,
             options.EnrollmentStartedAt, cancellationToken);
         var job = await jobs.Claim(webhook.Value.ClientId, store.StoreId, store.TenantId, cancellationToken);
@@ -34,8 +38,10 @@ public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> setting
             }
             else
             {
-                if (job.CatalogueRevision != store.CatalogueRevision) throw UberOrderValue.Unsupported();
-                request = normalizer.Normalize(await orders.Read(job.OrderId.ToString("D"), cancellationToken), job.OrderId, store);
+                var historical = mappings is null
+                    ? job.CatalogueRevision == store.CatalogueRevision ? store : throw UberOrderValue.Unsupported()
+                    : await mappings.ForRevision(job.CatalogueRevision, cancellationToken);
+                request = normalizer.Normalize(await orders.Read(job.OrderId.ToString("D"), cancellationToken), job.OrderId, historical);
                 var json = JsonSerializer.Serialize(request, Wire);
                 if (!await jobs.Prepare(job, crypto.Protect(json, Purpose(job)), crypto.Hash(json),
                     now.AddDays(options.PayloadRetentionDays), cancellationToken)) return true;

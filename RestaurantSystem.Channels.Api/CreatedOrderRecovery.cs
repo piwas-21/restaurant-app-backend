@@ -8,13 +8,17 @@ using RestaurantSystem.Channels.Domain;
 namespace RestaurantSystem.Channels.Api;
 
 public sealed class CreatedOrderRecovery(IOptions<TenantBridgeSettings> settings, IOptions<UberWebhookSettings> webhook,
-    ISandboxTokens tokens, IUberSandboxClient provider, ICreatedOrderDiscoveries discoveries, TimeProvider clock, ILogger<CreatedOrderRecovery> logger) : ICreatedOrderRecovery
+    ISandboxTokens tokens, IUberSandboxClient provider, ICreatedOrderDiscoveries discoveries, TimeProvider clock, ILogger<CreatedOrderRecovery> logger,
+    ICatalogueMappingResolver? mappings = null, IChannelManagementConnectionState? connectionState = null) : ICreatedOrderRecovery
 {
     public async Task Process(CancellationToken cancellationToken)
     {
         var options = settings.Value;
         if (!options.Enabled || options.Paused || !options.RecoverCreatedOrders) return;
-        var store = options.Store;
+        var configured = options.Store;
+        if (connectionState is not null && (await connectionState.Read(new(webhook.Value.ClientId, configured.StoreId,
+            configured.TenantId, configured.CatalogueRevision), cancellationToken)).IsDisconnected) return;
+        var store = mappings is null ? options.Store : await mappings.Active(cancellationToken);
         if (webhook.Value.StoreIds.Length != 1 || webhook.Value.StoreIds[0] != store.StoreId)
             throw new ChannelConsoleException(409, "Recovery requires the approved sandbox store binding.");
         var path = $"/v1/eats/stores/{store.StoreId:D}/created-orders?limit={options.RecoveryListLimit.ToString(CultureInfo.InvariantCulture)}";

@@ -8,6 +8,7 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
 {
     public ConcurrentQueue<(HttpMethod Method, string Path, JsonElement? Body)> Calls { get; } = new();
     public ConcurrentQueue<IReadOnlyDictionary<string, string>> Grants { get; } = new();
+    public bool ManualAcceptance { get; set; }
     public Guid MerchantStoreId { get; set; } = GatewayFixture.StoreId;
     public Guid OrderStoreId { get; set; } = GatewayFixture.StoreId;
     public JsonElement Menu { get; set; } = ProviderJson.Encode(new { menus = Array.Empty<object>() });
@@ -55,7 +56,7 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
                 integration_enabled = true,
                 order_manager_client_id = GatewayFixture.ClientId,
                 is_order_manager_pending = false,
-                require_manual_acceptance = false
+                require_manual_acceptance = ManualAcceptance
             });
         else if (path.Contains("/menus/items/", StringComparison.Ordinal))
         {

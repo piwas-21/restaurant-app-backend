@@ -207,9 +207,11 @@ public sealed class OperationalQueueCursorTests
         var firstHash = OperationalOrderQueryBuilder.FilterHash(first, caller);
         var changedHash = OperationalOrderQueryBuilder.FilterHash(changed, caller);
         var rangeHash = OperationalOrderQueryBuilder.FilterHash(tenantRange, caller);
+        var marketplaceHash = OperationalOrderQueryBuilder.FilterHash(first with { MarketplaceOnly = true }, caller);
 
         firstHash.Should().NotBe(changedHash);
         rangeHash.Should().NotBe(firstHash, "tenant-day range boundaries are cursor-bound filters");
+        marketplaceHash.Should().NotBe(firstHash, "marketplace cursors cannot be reused for all orders");
     }
 
     private static OperationalQueueCursor CreateCursor(string tenant, TimeProvider? clock = null) =>
