@@ -51,19 +51,27 @@ public sealed class ChannelCatalogueReader(ApplicationDbContext context, IOption
         var variation = selection.VariationId.HasValue ? product.Variations.SingleOrDefault(row => row.Id == selection.VariationId && row.IsActive) : null;
         if (selection.VariationId.HasValue && variation is null) return Block(selection, "UnavailableVariation");
         if (!selection.VariationId.HasValue && BaseProductVisibility.IsBaseHidden(product)) return Block(selection, "VariationRequired");
-        var names = variation?.Descriptions.Where(row => row.LanguageCode == language).ToArray();
-        if (variation is not null && (names?.Length != 1 || string.IsNullOrWhiteSpace(names[0].Name))) return Block(selection, "MissingTranslation");
-        var variationName = names?.Single().Name;
-        if (variationName is not null && (variationName.Length > ExternalOrderLimits.VariationNameLength || variationName.Any(char.IsControl))) return Block(selection, "InvalidText");
-        var name = variationName is null ? translation.Name : $"{translation.Name} — {variationName}";
-        var variationDescription = names?.Single().Description;
-        var description = Description(translation.Description, variationDescription);
-        if (name.Length > ExternalOrderLimits.ItemNameLength || description.Length > ExternalOrderLimits.CatalogueDescriptionLength
-            || name.Any(char.IsControl)) return Block(selection, "InvalidText");
+        var text = Text(translation, variation, language);
+        if (text.BlockReason.Length > 0) return Block(selection, text.BlockReason);
         var minor = (product.BasePrice + (variation?.PriceModifier ?? 0)) * ExternalOrderLimits.MinorUnitsPerWholeUnit;
         if (minor < 0 || minor > int.MaxValue || decimal.Truncate(minor) != minor) return Block(selection, "InvalidPrice");
-        return new(selection.ProductId, selection.VariationId, name, description, variationName, (int)minor,
+        return new(selection.ProductId, selection.VariationId, text.Name, text.Description, text.VariationName, (int)minor,
             product.IsAvailable, string.Empty);
+    }
+
+    private static (string Name, string Description, string? VariationName, string BlockReason) Text(
+        ProductDescription translation, ProductVariation? variation, string language)
+    {
+        var names = variation?.Descriptions.Where(row => row.LanguageCode == language).ToArray() ?? [];
+        if (variation is not null && (names.Length != 1 || string.IsNullOrWhiteSpace(names[0].Name))) return ("", "", null, "MissingTranslation");
+        var variationName = names.SingleOrDefault()?.Name;
+        if (variationName is not null && (variationName.Length > ExternalOrderLimits.VariationNameLength || variationName.Any(char.IsControl))) return ("", "", null, "InvalidText");
+        var name = variationName is null ? translation.Name : $"{translation.Name} — {variationName}";
+        var variationDescription = names.SingleOrDefault()?.Description;
+        var description = Description(translation.Description, variationDescription);
+        if (name.Length > ExternalOrderLimits.ItemNameLength || description.Length > ExternalOrderLimits.CatalogueDescriptionLength
+            || name.Any(char.IsControl)) return ("", "", null, "InvalidText");
+        return (name, description, variationName, string.Empty);
     }
 
     private static ChannelCatalogueItem Block(ChannelAvailabilitySelection selection, string reason)
