@@ -240,7 +240,7 @@ public class OrderEmailLinkAuthorizationTests : IntegrationTestBase
             context,
             new AnonymousCurrentUser(),
             scope.ServiceProvider.GetRequiredService<ITenantClock>(),
-            scope.ServiceProvider.GetRequiredService<IOrderMappingService>(),
+            scope.ServiceProvider.GetRequiredService<IOrderQueueProjection>(),
             scope.ServiceProvider.GetRequiredService<IOperationalQueueCursor>(),
             scope.ServiceProvider.GetRequiredService<IOperationalQueueSyncReader>(),
             NullLogger<GetOrdersQueryHandler>.Instance);
@@ -276,6 +276,7 @@ public class OrderEmailLinkAuthorizationTests : IntegrationTestBase
         public string? Email => null;
         public UserRole? Role => null;
         public bool IsAuthenticated => false;
+        public bool IsApiToken => false;
         public bool IsAdmin => false;
         public Task<ApplicationUser?> GetUserAsync() => Task.FromResult<ApplicationUser?>(null);
     }

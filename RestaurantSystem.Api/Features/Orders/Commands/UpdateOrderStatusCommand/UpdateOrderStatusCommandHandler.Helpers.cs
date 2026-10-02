@@ -62,6 +62,8 @@ public partial class UpdateOrderStatusCommandHandler
 
     private int? ApplyStatusChange(Order order, UpdateOrderStatusCommand command)
     {
+        // Marketplace pickup/delivery timing belongs to the provider; local preparation adds no guessed ETA.
+        if (order.ExternalReference is not null) return null;
         switch (command.NewStatus)
         {
             case OrderStatus.Confirmed:

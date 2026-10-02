@@ -11,7 +11,8 @@ internal sealed record FloorSessionRow(
     string? Currency,
     int Version,
     DateTime OpenedAt,
-    TableBillDto? Bill);
+    TableBillDto? Bill,
+    bool HasPendingPaymentHandoff = false);
 
 internal sealed record FloorOrderRow(
     Guid Id,

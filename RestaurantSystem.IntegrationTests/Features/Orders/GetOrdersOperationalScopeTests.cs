@@ -38,9 +38,13 @@ public class GetOrdersOperationalScopeTests : IntegrationTestBase
         first.TotalCount.Should().Be(12);
         first.TotalPages.Should().Be(3);
         first.Items.Should().HaveCount(5);
+        first.Items.Should().OnlyContain(order => order.PermittedActions != null);
         second.Items.Should().HaveCount(5);
         first.Items.Select(order => order.Id).Should().NotIntersectWith(second.Items.Select(order => order.Id));
         repeatedFirst.Items.Select(order => order.Id).Should().Equal(first.Items.Select(order => order.Id));
+
+        var legacy = await GetOrders("search=OPS-PAGE&page=1&pageSize=5");
+        legacy.Items.Should().OnlyContain(order => order.PermittedActions == null);
     }
 
     [Fact]

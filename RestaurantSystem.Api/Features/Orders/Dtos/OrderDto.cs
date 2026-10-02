@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
-public record OrderDto
+public partial record OrderDto
 {
     public Guid Id { get; set; }
     public string OrderNumber { get; set; } = string.Empty;

@@ -6,7 +6,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 
 /// <summary>
 /// Order-currency resolution for every <see cref="OrderDto"/> surface (POS plan C18):
-/// the first payment tender that carries a <see cref="OrderPayment.Currency"/>, else the
+/// a marketplace's frozen currency, else the first payment tender that carries a <see cref="OrderPayment.Currency"/>, else the
 /// tenant's declared <see cref="RestaurantInfo.Currency"/>, else null. A consumer receiving
 /// null must not invent a label — an invented one is how receipts printed CHF on a EUR
 /// tenant's paper in the first place.
@@ -47,6 +47,12 @@ public class OrderDisplayCurrencyResolver : IOrderDisplayCurrencyResolver
 
     public string? Resolve(Order order)
     {
+        // A marketplace order has a frozen currency even before a tender is settled.
+        if (order.ExternalReference is { } externalReference)
+        {
+            return externalReference.Currency;
+        }
+
         var fromTender = order.Payments?
             .Where(p => !string.IsNullOrWhiteSpace(p.Currency))
             .OrderBy(p => p.PaymentDate)

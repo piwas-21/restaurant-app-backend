@@ -169,13 +169,13 @@ public sealed class OperationalQueueCursorTests
             new DbContextOptionsBuilder<ApplicationDbContext>().Options);
         var caller = new Mock<ICurrentUserService>();
         var clock = new Mock<ITenantClock>();
-        var mapping = new Mock<IOrderMappingService>();
+        var projection = new Mock<IOrderQueueProjection>();
         var cursor = CreateCursor("tenant-a");
         var sync = new OperationalQueueSyncReader(
-            context, caller.Object, clock.Object, mapping.Object, cursor,
+            context, caller.Object, clock.Object, projection.Object, cursor,
             NullLogger<OperationalQueueSyncReader>.Instance);
         var handler = new GetOrdersQueryHandler(
-            context, caller.Object, clock.Object, mapping.Object, cursor, sync,
+            context, caller.Object, clock.Object, projection.Object, cursor, sync,
             NullLogger<GetOrdersQueryHandler>.Instance);
         var query = new GetOrdersQuery(
             Status: null, PaymentStatus: null, OrderType: null,
@@ -207,9 +207,11 @@ public sealed class OperationalQueueCursorTests
         var firstHash = OperationalOrderQueryBuilder.FilterHash(first, caller);
         var changedHash = OperationalOrderQueryBuilder.FilterHash(changed, caller);
         var rangeHash = OperationalOrderQueryBuilder.FilterHash(tenantRange, caller);
+        var marketplaceHash = OperationalOrderQueryBuilder.FilterHash(first with { MarketplaceOnly = true }, caller);
 
         firstHash.Should().NotBe(changedHash);
         rangeHash.Should().NotBe(firstHash, "tenant-day range boundaries are cursor-bound filters");
+        marketplaceHash.Should().NotBe(firstHash, "marketplace cursors cannot be reused for all orders");
     }
 
     private static OperationalQueueCursor CreateCursor(string tenant, TimeProvider? clock = null) =>
@@ -258,6 +260,7 @@ public sealed class OperationalQueueCursorTests
         public string? Email => null;
         public UserRole? Role => UserRole.Cashier;
         public bool IsAuthenticated => true;
+        public bool IsApiToken => false;
         public bool IsAdmin => false;
         public Task<ApplicationUser?> GetUserAsync() => Task.FromResult<ApplicationUser?>(null);
         public string GetAuditIdentifier() => id.ToString();

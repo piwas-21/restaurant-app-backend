@@ -74,6 +74,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         table.PermittedActions.Should().Contain(["AddRound", "ViewBill", "OpenTasks"]);
         table.PermittedActions.Should().NotContain("CollectPayment",
             "Server tender entry is not an incidental consequence of floor access");
+        table.PermittedActions.Should().Contain("RequestPaymentHandoff");
         table.PermittedActions.Should().Contain("ReviewLegacy");
 
         var futureReserved = snapshot.Tables.Single(item => item.TableId == _futureReservedTableId);
@@ -142,12 +143,101 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
             "/api/staff/server-workspace/floor");
         cashier!.Data!.Tables.Single(table => table.TableId == _stableTableId)
             .PermittedActions.Should().Contain("CollectPayment");
+        cashier.Data.Tables.Single(table => table.TableId == _stableTableId)
+            .PermittedActions.Should().NotContain("RequestPaymentHandoff");
 
         AuthenticateAsRole(UserRole.Server);
         var server = await GetFromJsonAsync<ApiResponse<ServerFloorSnapshotDto>>(
             "/api/staff/server-workspace/floor");
         server!.Data!.Tables.Single(table => table.TableId == _stableTableId)
             .PermittedActions.Should().NotContain("CollectPayment");
+    }
+
+    [Fact]
+    public async Task Pending_handoff_disables_duplicate_request_and_invalidates_floor_snapshot()
+    {
+        AuthenticateAsRole(UserRole.Server);
+        var before = await GetFromJsonAsync<ApiResponse<ServerFloorSnapshotDto>>(
+            "/api/staff/server-workspace/floor");
+        before!.Data!.Tables.Single(table => table.TableId == _stableTableId)
+            .PermittedActions.Should().Contain("RequestPaymentHandoff");
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.TableServicePaymentHandoffs.Add(new TableServicePaymentHandoff
+            {
+                ServiceSessionId = _sessionId,
+                OperationId = Guid.NewGuid(),
+                ExpectedVersion = 1,
+                RequestedAmount = 25m,
+                RequestedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var after = await GetFromJsonAsync<ApiResponse<ServerFloorSnapshotDto>>(
+            "/api/staff/server-workspace/floor");
+        var tableAfter = after!.Data!.Tables.Single(table => table.TableId == _stableTableId);
+        tableAfter.Session!.HasPendingPaymentHandoff.Should().BeTrue();
+        tableAfter.Session.CanRequestPaymentHandoff.Should().BeFalse();
+        tableAfter.PermittedActions.Should().NotContain("RequestPaymentHandoff");
+        after.Data.Version.Should().NotBe(before.Data.Version,
+            "the pending handoff is visible state even if no order balance changed");
+    }
+
+    [Fact]
+    public async Task Pending_handoff_blocks_close_even_when_the_account_has_no_remaining_debt()
+    {
+        var tableId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.Tables.Add(new Table
+            {
+                Id = tableId,
+                TableNumber = "HANDOFF",
+                MaxGuests = 2,
+                CreatedBy = "test"
+            });
+            context.TableServiceSessions.Add(new TableServiceSession
+            {
+                Id = sessionId,
+                TableId = tableId,
+                OpenedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        AuthenticateAsRole(UserRole.Server);
+        var before = await GetFromJsonAsync<ApiResponse<ServerFloorSnapshotDto>>(
+            "/api/staff/server-workspace/floor");
+        before!.Data!.Tables.Single(table => table.TableId == tableId)
+            .PermittedActions.Should().Contain("CloseVisit");
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.TableServicePaymentHandoffs.Add(new TableServicePaymentHandoff
+            {
+                ServiceSessionId = sessionId,
+                OperationId = Guid.NewGuid(),
+                ExpectedVersion = 1,
+                RequestedAmount = 10m,
+                RequestedAt = DateTime.UtcNow,
+                CreatedBy = "test"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var after = await GetFromJsonAsync<ApiResponse<ServerFloorSnapshotDto>>(
+            "/api/staff/server-workspace/floor");
+        var tableAfter = after!.Data!.Tables.Single(table => table.TableId == tableId);
+        tableAfter.Session!.CanClose.Should().BeFalse();
+        tableAfter.PermittedActions.Should().NotContain("CloseVisit");
     }
 
     [Fact]
@@ -724,6 +814,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         public string? Email => TestEmail("floor-test");
         public UserRole? Role => role;
         public bool IsAuthenticated => true;
+        public bool IsApiToken => false;
         public bool IsAdmin => role == UserRole.Admin;
         public Task<ApplicationUser?> GetUserAsync() => Task.FromResult<ApplicationUser?>(null);
         public string GetAuditIdentifier() => "floor-test";

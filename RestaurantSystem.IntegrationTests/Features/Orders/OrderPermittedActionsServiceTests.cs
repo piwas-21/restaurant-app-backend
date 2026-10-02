@@ -55,6 +55,7 @@ public class OrderPermittedActionsServiceTests
     }
 
     [Theory]
+    [InlineData(OrderStatus.Confirmed, OrderAction.StartPreparing)]
     [InlineData(OrderStatus.Preparing, OrderAction.MarkReady)]
     public void Kitchen_actions_are_not_granted_to_server(OrderStatus status, OrderAction action)
     {
@@ -62,6 +63,63 @@ public class OrderPermittedActionsServiceTests
 
         Action(actions, action).Allowed.Should().BeFalse();
         Action(actions, action).ReasonCode.Should().Be(OrderActionReasonCodes.KitchenRoleRequired);
+    }
+
+    [Fact]
+    public void Server_preparation_actions_are_limited_to_accepted_released_uber_delivery()
+    {
+        var accepted = MarketplaceOrder(OrderStatus.Confirmed);
+        var acceptedActions = Actions(accepted, UserRole.Server);
+
+        Action(acceptedActions, OrderAction.StartPreparing).Allowed.Should().BeTrue();
+        Action(acceptedActions, OrderAction.MarkReady).Allowed.Should().BeFalse();
+        Action(acceptedActions, OrderAction.Accept).Allowed.Should().BeFalse();
+        Action(acceptedActions, OrderAction.CollectPayment).Allowed.Should().BeFalse();
+        Action(acceptedActions, OrderAction.RefundPayment).Allowed.Should().BeFalse();
+
+        foreach (var role in new[] { UserRole.Admin, UserRole.KitchenStaff })
+        {
+            var roleActions = Actions(accepted, role);
+            Action(roleActions, OrderAction.StartPreparing).Allowed.Should().BeTrue();
+            Action(roleActions, OrderAction.CollectPayment).Allowed.Should().BeFalse();
+            Action(roleActions, OrderAction.RefundPayment).Allowed.Should().BeFalse();
+        }
+
+        var preparing = MarketplaceOrder(OrderStatus.Preparing);
+        foreach (var role in new[] { UserRole.Admin, UserRole.KitchenStaff, UserRole.Server })
+        {
+            Action(Actions(preparing, role), OrderAction.MarkReady).Allowed.Should().BeTrue();
+        }
+
+        var pendingActions = Actions(
+            MarketplaceOrder(OrderStatus.PendingApproval, externalState: "CREATED", kitchenReleased: false),
+            UserRole.Server);
+        Action(pendingActions, OrderAction.Accept).Allowed.Should().BeFalse();
+        Action(pendingActions, OrderAction.StartPreparing).Allowed.Should().BeFalse();
+        Action(pendingActions, OrderAction.MarkReady).Allowed.Should().BeFalse();
+
+        var unreleasedActions = Actions(
+            MarketplaceOrder(OrderStatus.Confirmed, kitchenReleased: false),
+            UserRole.Server);
+        Action(unreleasedActions, OrderAction.StartPreparing).Allowed.Should().BeFalse();
+
+        var wrongProvider = MarketplaceOrder(OrderStatus.Confirmed);
+        wrongProvider.ExternalReference!.Provider = "other-provider";
+        Action(Actions(wrongProvider, UserRole.Server), OrderAction.StartPreparing).Allowed.Should().BeFalse();
+
+        var pickup = MarketplaceOrder(OrderStatus.Confirmed);
+        pickup.ExternalReference!.FulfillmentType = "PICKUP_BY_RESTAURANT";
+        Action(Actions(pickup, UserRole.Server), OrderAction.StartPreparing).Allowed.Should().BeFalse();
+
+        var customerActions = Actions(accepted, UserRole.Customer);
+        Action(customerActions, OrderAction.StartPreparing).Allowed.Should().BeFalse();
+        Action(customerActions, OrderAction.Accept).Allowed.Should().BeFalse();
+
+        var machineActions = MachineActions(accepted);
+        Action(machineActions, OrderAction.StartPreparing).Allowed.Should().BeFalse();
+        Action(machineActions, OrderAction.Accept).Allowed.Should().BeFalse();
+        Action(machineActions, OrderAction.CollectPayment).Allowed.Should().BeFalse();
+        Action(machineActions, OrderAction.RefundPayment).Allowed.Should().BeFalse();
     }
 
     [Theory]
@@ -172,6 +230,15 @@ public class OrderPermittedActionsServiceTests
         return new OrderPermittedActionsService(currentUser.Object).GetPermittedActions(order);
     }
 
+    private static IReadOnlyList<OrderPermittedActionDto> MachineActions(Order order)
+    {
+        var currentUser = new Mock<ICurrentUserService>();
+        currentUser.SetupGet(user => user.Role).Returns((UserRole?)null);
+        currentUser.SetupGet(user => user.IsApiToken).Returns(true);
+        currentUser.SetupGet(user => user.IsStaff).Returns(false);
+        return new OrderPermittedActionsService(currentUser.Object).GetPermittedActions(order);
+    }
+
     private static OrderPermittedActionDto Action(
         IReadOnlyList<OrderPermittedActionDto> actions, OrderAction action) =>
         actions.Single(item => item.Action == action.ToString());
@@ -186,6 +253,26 @@ public class OrderPermittedActionsServiceTests
             Total = total,
             TotalPaid = totalPaid,
             RemainingAmount = total - totalPaid,
+            CreatedBy = nameof(OrderPermittedActionsServiceTests),
+        };
+
+    private static Order MarketplaceOrder(
+        OrderStatus status, string externalState = "ACCEPTED", bool kitchenReleased = true) => new()
+        {
+            OrderNumber = "MARKETPLACE-ACTIONS",
+            Type = OrderType.Delivery,
+            Status = status,
+            IsKitchenReleased = kitchenReleased,
+            PaymentStatus = PaymentStatus.Pending,
+            Total = 10m,
+            RemainingAmount = 10m,
+            ExternalReference = new ExternalOrderReference
+            {
+                Provider = "uber-eats",
+                ExternalState = externalState,
+                FulfillmentType = "DELIVERY_BY_UBER",
+                CreatedBy = nameof(OrderPermittedActionsServiceTests),
+            },
             CreatedBy = nameof(OrderPermittedActionsServiceTests),
         };
 }

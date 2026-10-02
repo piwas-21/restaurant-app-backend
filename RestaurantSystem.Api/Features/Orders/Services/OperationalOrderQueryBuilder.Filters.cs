@@ -88,6 +88,7 @@ internal static partial class OperationalOrderQueryBuilder
         var search = query.Search.ToLower();
         return orders.Where(order =>
             order.OrderNumber.ToLower().Contains(search)
+            || (order.ExternalReference != null && order.ExternalReference.ExternalDisplayId.ToLower().Contains(search))
             || (order.CustomerName != null && order.CustomerName.ToLower().Contains(search))
             || (order.CustomerEmail != null && order.CustomerEmail.ToLower().Contains(search))
             || (order.CustomerPhone != null && order.CustomerPhone.ToLower().Contains(search))

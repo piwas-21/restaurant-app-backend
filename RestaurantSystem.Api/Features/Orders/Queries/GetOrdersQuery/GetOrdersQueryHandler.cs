@@ -15,7 +15,7 @@ public sealed class GetOrdersQueryHandler
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly ITenantClock _clock;
-    private readonly IOrderMappingService _mapping;
+    private readonly IOrderQueueProjection _projection;
     private readonly IOperationalQueueCursor _cursor;
     private readonly IOperationalQueueSyncReader _sync;
     private readonly ILogger<GetOrdersQueryHandler> _logger;
@@ -24,7 +24,7 @@ public sealed class GetOrdersQueryHandler
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         ITenantClock clock,
-        IOrderMappingService mapping,
+        IOrderQueueProjection projection,
         IOperationalQueueCursor cursor,
         IOperationalQueueSyncReader sync,
         ILogger<GetOrdersQueryHandler> logger)
@@ -32,7 +32,7 @@ public sealed class GetOrdersQueryHandler
         _context = context;
         _currentUser = currentUser;
         _clock = clock;
-        _mapping = mapping;
+        _projection = projection;
         _cursor = cursor;
         _sync = sync;
         _logger = logger;
@@ -98,7 +98,8 @@ public sealed class GetOrdersQueryHandler
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
-        var items = rows.Select(_mapping.MapToOrderDto).ToList();
+        var items = rows.Select(order =>
+            _projection.Project(order, query.Scope == OrderListScope.Operational)).ToList();
         var result = new PagedResult<OrderDto>(
             items, totalCount, query.Page, query.PageSize,
             (int)Math.Ceiling(totalCount / (double)query.PageSize));

@@ -49,6 +49,8 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return ApiResponse<OrderPaymentDto>.Failure("Order not found");
         }
 
+        ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
             return ApiResponse<OrderPaymentDto>.FailureWithCode(

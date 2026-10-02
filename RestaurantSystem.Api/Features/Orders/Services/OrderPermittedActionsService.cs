@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.DeliveryChannels.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -44,15 +45,34 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             or OrderAction.CancelOrder
             or OrderAction.MarkUrgent;
 
+        // Marketplace decisions, settlement and receipts need their dedicated workflow. Keep
+        // ordinary staff notes/focus available; a held order still cannot print a kitchen ticket.
+        if (order.ExternalReference is not null && !AllowsChannelPreparation(order, action)
+            && action is not (OrderAction.AddOperationalNote
+            or OrderAction.MarkUrgent or OrderAction.PrintKitchen or OrderAction.PrintReceipt))
+        {
+            return new OrderPermittedActionDto
+            {
+                Action = action.ToString(),
+                Allowed = false,
+                ReasonCode = OrderActionReasonCodes.DeliveryChannelManaged,
+                RequiresReason = requiresReason,
+            };
+        }
+
+        if (order.ExternalReference is not null && ExternalOrderPrintPolicy.Blocks(order, action))
+            return new OrderPermittedActionDto
+            {
+                Action = action.ToString(),
+                Allowed = false,
+                ReasonCode = OrderActionReasonCodes.DeliveryChannelManaged
+            };
+
         var (allowed, reasonCode) = action switch
         {
             OrderAction.Accept => AcceptAction(order),
-            OrderAction.StartPreparing => IsServer
-                ? (false, OrderActionReasonCodes.KitchenRoleRequired)
-                : StatusAction(order, OrderStatus.Preparing),
-            OrderAction.MarkReady => IsServer
-                ? (false, OrderActionReasonCodes.KitchenRoleRequired)
-                : StatusAction(order, OrderStatus.Ready),
+            OrderAction.StartPreparing => StatusAction(order, OrderStatus.Preparing),
+            OrderAction.MarkReady => StatusAction(order, OrderStatus.Ready),
             OrderAction.HandOver => HandOverAction(order),
             OrderAction.CollectPayment => CollectPaymentAction(order),
             OrderAction.AddOperationalNote => RoleAction(
@@ -74,6 +94,14 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             RequiresReason = requiresReason
         };
     }
+
+    private bool AllowsChannelPreparation(Order order, OrderAction action)
+        => !_currentUser.IsApiToken && action switch
+        {
+            OrderAction.StartPreparing => ExternalOrderLocalMutationGuard.AllowsPreparation(order, OrderStatus.Preparing),
+            OrderAction.MarkReady => ExternalOrderLocalMutationGuard.AllowsPreparation(order, OrderStatus.Ready),
+            _ => false,
+        };
 
     private (bool Allowed, string? ReasonCode) StatusAction(Order order, OrderStatus target)
     {
@@ -246,6 +274,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 /// <summary>Stable machine-readable reasons for denied order actions.</summary>
 public static class OrderActionReasonCodes
 {
+    public const string DeliveryChannelManaged = "DeliveryChannelManaged";
     public const string StaffRequired = "StaffRequired";
     public const string KitchenReleaseRequired = ErrorCodes.KitchenReleaseRequired;
     public const string AdminRequired = "AdminRequired";

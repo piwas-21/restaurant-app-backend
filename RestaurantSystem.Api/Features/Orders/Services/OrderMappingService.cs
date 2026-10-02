@@ -44,6 +44,7 @@ public class OrderMappingService : IOrderMappingService
         {
             Id = order.Id,
             OrderNumber = order.OrderNumber,
+            ExternalOrder = ExternalOrderProjection.Map(order),
             GuestStatusToken = order.GuestStatusToken,
             UserId = order.UserId,
             CustomerName = order.CustomerName,
@@ -247,6 +248,11 @@ public class OrderMappingService : IOrderMappingService
 
     public async Task<OrderDto> MapToOrderDtoAsync(Order order, CancellationToken cancellationToken = default)
     {
+        if (!_context.Entry(order).Reference(o => o.ExternalReference).IsLoaded)
+        {
+            await _context.Entry(order).Reference(o => o.ExternalReference).LoadAsync(cancellationToken);
+        }
+
         // Load related data if not already loaded
         if (!_context.Entry(order).Collection(o => o.Items).IsLoaded)
         {

@@ -10,7 +10,8 @@ public static class OrderWriteAuthorizationPolicy
     public static OrderWriteAuthorizationDecision ForStatus(
         UserRole? role, Order order, OrderStatus target)
     {
-        if (role != UserRole.Server || IsAllowedServerHandoff(order, target))
+        if (role != UserRole.Server || IsAllowedServerHandoff(order, target)
+            || ExternalOrderLocalMutationGuard.AllowsPreparation(order, target))
         {
             return OrderWriteAuthorizationDecision.Allow();
         }

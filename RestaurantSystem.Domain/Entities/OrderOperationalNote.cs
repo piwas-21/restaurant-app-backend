@@ -14,5 +14,11 @@ public class OrderOperationalNote : Entity
     public OrderNoteAudience Audience { get; set; }
     public Guid ClientOperationId { get; set; }
 
+    /// <summary>Optional immutable preparation payload. Legacy text notes leave these null.</summary>
+    public Guid? AmendmentId { get; set; }
+    public long? AccountRevision { get; set; }
+    public DevicePrintTarget? KitchenTarget { get; set; }
+    public string? KitchenChangesJson { get; set; }
+
     public virtual Order Order { get; set; } = null!;
 }

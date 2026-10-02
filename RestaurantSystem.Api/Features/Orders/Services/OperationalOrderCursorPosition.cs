@@ -113,6 +113,8 @@ internal static partial class OperationalOrderQueryBuilder
             $"descending={query.Descending}",
             $"tableNumber={query.TableNumber?.ToString(CultureInfo.InvariantCulture) ?? string.Empty}");
 
+        // Preserve existing all-order cursors while binding a marketplace-only walk to its narrower scope.
+        if (query.MarketplaceOnly) canonical += "\u001fmarketplaceOnly=true";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
     }
 

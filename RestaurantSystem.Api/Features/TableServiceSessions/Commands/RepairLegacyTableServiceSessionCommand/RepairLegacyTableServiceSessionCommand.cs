@@ -135,7 +135,7 @@ public sealed class RepairLegacyTableServiceSessionCommandHandler
 
         if (!created && legacyOrders.Count > 0)
         {
-            session.Version++;
+            session.RecordAccountChange();
         }
 
         await _context.SaveChangesAsync(cancellationToken);

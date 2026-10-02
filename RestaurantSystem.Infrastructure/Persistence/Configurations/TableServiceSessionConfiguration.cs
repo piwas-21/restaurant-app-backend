@@ -20,6 +20,8 @@ public class TableServiceSessionConfiguration : IEntityTypeConfiguration<TableSe
             .IsRequired()
             .IsConcurrencyToken();
 
+        builder.Property(session => session.AccountRevision).IsRequired().HasDefaultValue(1L).IsConcurrencyToken();
+
         builder.Property(session => session.OpenedAt).IsRequired();
 
         // A table may have one open visit at a time. Closed visits remain durable for receipts,

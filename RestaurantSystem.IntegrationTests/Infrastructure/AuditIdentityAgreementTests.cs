@@ -45,6 +45,7 @@ public class AuditIdentityAgreementTests
         public string? Email => null;
         public UserRole? Role => null;
         public bool IsAuthenticated => UserId.HasValue;
+        public bool IsApiToken => false;
         public bool IsAdmin => false;
         public Task<ApplicationUser?> GetUserAsync() => Task.FromResult<ApplicationUser?>(null);
     }

@@ -97,7 +97,7 @@ public sealed class AddTableServiceSessionPaymentCommandHandler
                 _paymentTolerance,
                 _timeProvider,
                 cancellationToken);
-            session.Version++;
+            session.RecordAccountChange();
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 

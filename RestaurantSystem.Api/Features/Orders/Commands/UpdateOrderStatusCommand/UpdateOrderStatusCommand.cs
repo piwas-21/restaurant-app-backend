@@ -65,6 +65,8 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
             return ApiResponse<OrderDto>.Failure("Order not found");
         }
 
+        ExternalOrderLocalMutationGuard.RequireStatusMutation(order, command.NewStatus, command.ExpectedVersion, _currentUserService.IsApiToken);
+
         var validationFailure = ValidateOrderStatusUpdate(order, command);
         if (validationFailure is not null)
         {
