@@ -47,7 +47,7 @@ public sealed class PostgresTenantOAuthFlows(NpgsqlDataSource source) : ITenantO
         return await row.ReadAsync(cancellationToken) ? Map(row) : null;
     }
 
-    public async Task Expire(AvailabilityBinding binding, DateTimeOffset now, CancellationToken cancellationToken)
+    public async Task Expire(AvailabilityBinding binding, Guid id, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var command = source.CreateCommand("""
             UPDATE channel_tenant_oauth_flows
@@ -55,10 +55,21 @@ public sealed class PostgresTenantOAuthFlows(NpgsqlDataSource source) : ITenantO
                 error_code = CASE WHEN status = 'Pending' THEN 'AuthorizationExpired' ELSE 'ConnectionUnconfirmed' END,
                 completed_at = $4, verifier_cipher = ''
             WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3
-              AND status IN ('Pending', 'Processing') AND expires_at <= $4
+              AND flow_id = $5 AND status IN ('Pending', 'Processing') AND expires_at <= $4
+            """);
+        Identity(command, binding); command.Parameters.AddWithValue(now.ToUniversalTime()); command.Parameters.AddWithValue(id);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<int> CancelPending(AvailabilityBinding binding, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var command = source.CreateCommand("""
+            UPDATE channel_tenant_oauth_flows
+            SET status = 'Failed', error_code = 'ConnectionDisconnected', completed_at = $4, verifier_cipher = ''
+            WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3 AND status = 'Pending'
             """);
         Identity(command, binding); command.Parameters.AddWithValue(now.ToUniversalTime());
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<TenantOAuthFlow?> Claim(AvailabilityBinding binding, string stateHash, DateTimeOffset now,
@@ -77,6 +88,21 @@ public sealed class PostgresTenantOAuthFlows(NpgsqlDataSource source) : ITenantO
         Identity(command, binding); command.Parameters.AddWithValue(stateHash); command.Parameters.AddWithValue(now.ToUniversalTime());
         await using var row = await command.ExecuteReaderAsync(cancellationToken);
         return await row.ReadAsync(cancellationToken) ? Map(row) : null;
+    }
+
+    public async Task<bool> FailPending(AvailabilityBinding binding, Guid id, string stateHash, string errorCode,
+        DateTimeOffset completedAt, CancellationToken cancellationToken)
+    {
+        if (errorCode is not ("ConnectionOperationBusy" or "ConnectionDisconnected")) return false;
+        await using var command = source.CreateCommand("""
+            UPDATE channel_tenant_oauth_flows SET status = 'Failed', error_code = $6,
+                completed_at = $7, verifier_cipher = ''
+            WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3 AND flow_id = $4
+              AND state_hash = $5 AND status = 'Pending'
+            """);
+        Identity(command, binding); command.Parameters.AddWithValue(id); command.Parameters.AddWithValue(stateHash);
+        command.Parameters.AddWithValue(errorCode); command.Parameters.AddWithValue(completedAt.ToUniversalTime());
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     public async Task<bool> Finish(AvailabilityBinding binding, Guid id, string status, string? errorCode,

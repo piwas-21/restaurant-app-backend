@@ -86,7 +86,45 @@ public sealed class TenantChannelManagementOperationsTests
         Assert.Equal(first.GetRawText(), detail.GetRawText());
     }
 
+    [Fact]
+    public async Task AuditFailurePreventsDisconnectPauseAndDraftMutations()
+    {
+        var harness = CreateHarness();
+        harness.Audit.FailWrites = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Operations.Disconnect(GatewayFixture.StoreId, ActorId, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Operations.Pause(new(15), ActorId, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Operations.SaveDraft(new(null, [new("meal", ProductId, null)]), ActorId, default));
+
+        Assert.Equal(0, harness.Flows.CancelPendingCount);
+        Assert.Equal(0, harness.ConnectionState.SetCount);
+        Assert.Equal(0, harness.Overrides.SetCount);
+        Assert.Equal(0, harness.Connection.EnableOrdersCount);
+        Assert.Equal(0, harness.Drafts.SaveCount);
+    }
+
+    [Fact]
+    public async Task DisconnectUsesTheStoreLeaseAndCancelsPendingAuthorizationAfterIntent()
+    {
+        var busy = CreateHarness();
+        busy.Jobs.LeaseAvailable = false;
+        await Assert.ThrowsAsync<ChannelConsoleException>(() => busy.Operations.Disconnect(GatewayFixture.StoreId, ActorId, default));
+        Assert.Empty(busy.Audit.Records);
+        Assert.Equal(0, busy.Flows.CancelPendingCount);
+        Assert.Equal(0, busy.Connection.EnableOrdersCount);
+
+        var ready = CreateHarness();
+        var response = await ready.Operations.Disconnect(GatewayFixture.StoreId, ActorId, default);
+        Assert.Equal("disconnected", response.GetProperty("status").GetString());
+        Assert.Equal(1, ready.Flows.CancelPendingCount);
+        Assert.Equal("Intent", ready.Audit.Records[0].ResultCode);
+        Assert.Equal("Confirmed", ready.Audit.Records[^1].ResultCode);
+    }
+
     private static TenantChannelManagementOperations CreateOperations(string readFault = "", JsonElement? imports = null)
+        => CreateHarness(readFault, imports).Operations;
+
+    private static OperationsHarness CreateHarness(string readFault = "", JsonElement? imports = null)
     {
         var store = new TenantStoreBinding
         {
@@ -101,6 +139,8 @@ public sealed class TenantChannelManagementOperationsTests
             Items = [new() { ProviderItemId = "meal", ProductId = Guid.Parse("30000000-0000-0000-0000-000000000001") }]
         };
         var drafts = new Drafts(); var publications = new Publications(); var jobs = new Jobs();
+        var flows = new OAuthFlows(); var overrides = new Overrides(); var connectionState = new ConnectionState();
+        var connection = new Connection(); var audit = new Audit();
         var catalogue = new Source(); var menuProvider = new MenuProvider(Menu());
         var webhook = Options.Create(new UberWebhookSettings { ClientId = "sandbox-client", StoreIds = [store.StoreId] });
         var bridge = Options.Create(new TenantBridgeSettings
@@ -113,13 +153,16 @@ public sealed class TenantChannelManagementOperationsTests
         var publication = new TenantCataloguePublication(bridge, webhook, catalogue, publications, jobs,
             menuProvider, TimeProvider.System, new Resolver(store));
         var operations = new TenantChannelManagementOperations(bridge,
-            Options.Create(new TenantManagementGatewaySettings { Enabled = true }), webhook, new Connection(),
-            new SandboxMenuStub(Menu(), menuProvider) { ReadFault = readFault }, catalogue, new OAuthFlows(), publication, publications,
-            new Resolver(store), drafts, new AvailabilityStatus(), new Overrides(), jobs, new Audit(), new Imports(imports),
-            new Source(), new UberAvailability(), new ConnectionState(), TimeProvider.System);
+            Options.Create(new TenantManagementGatewaySettings { Enabled = true }), webhook, connection,
+            new SandboxMenuStub(Menu(), menuProvider) { ReadFault = readFault }, catalogue, flows, publication, publications,
+            new Resolver(store), drafts, new AvailabilityStatus(), overrides, jobs, audit, new Imports(imports),
+            new Source(), new UberAvailability(), connectionState, TimeProvider.System);
 
-        return operations;
+        return new(operations, audit, flows, overrides, connectionState, connection, drafts, jobs);
     }
+
+    private sealed record OperationsHarness(TenantChannelManagementOperations Operations, Audit Audit,
+        OAuthFlows Flows, Overrides Overrides, ConnectionState ConnectionState, Connection Connection, Drafts Drafts, Jobs Jobs);
 
     private static JsonElement Menu() => JsonDocument.Parse("""
         {"menus":[{"id":"menu","service_availability":[{"day_of_week":"monday","time_periods":[{"start_time":"09:00","end_time":"17:00"}]}]}],
@@ -166,9 +209,11 @@ public sealed class TenantChannelManagementOperationsTests
     private sealed class Drafts : ICatalogueMappingDrafts
     {
         private CatalogueMappingDraft? _draft;
+        public int SaveCount { get; private set; }
         public Task<CatalogueMappingDraft?> Read(AvailabilityBinding binding, CancellationToken cancellationToken) => Task.FromResult(_draft);
         public Task<bool> Save(AvailabilityBinding binding, CatalogueMappingDraft draft, string? expectedRevision, CancellationToken cancellationToken)
         {
+            SaveCount++;
             if (_draft?.Revision != expectedRevision) return Task.FromResult(false);
             _draft = draft; return Task.FromResult(true);
         }
@@ -205,8 +250,9 @@ public sealed class TenantChannelManagementOperationsTests
 
     private sealed class Jobs : IChannelAvailabilityJobs
     {
+        public bool LeaseAvailable { get; set; } = true;
         public Task<IChannelAvailabilityLease?> TryLease(AvailabilityBinding binding, CancellationToken cancellationToken)
-            => Task.FromResult<IChannelAvailabilityLease?>(new Lease());
+            => Task.FromResult<IChannelAvailabilityLease?>(LeaseAvailable ? new Lease() : null);
         public Task<IReadOnlyList<ChannelAvailabilityState>> Read(AvailabilityBinding binding, CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<ChannelAvailabilityState>>([]);
     }
@@ -220,33 +266,45 @@ public sealed class TenantChannelManagementOperationsTests
 
     private sealed class Audit : IChannelManagementAudit
     {
-        public Task Record(AvailabilityBinding binding, Guid actorId, string action, string resultCode, Guid? operationId, DateTimeOffset occurredAt, CancellationToken cancellationToken) => Task.CompletedTask;
+        public bool FailWrites { get; set; }
+        public List<(string Action, string ResultCode)> Records { get; } = [];
+        public Task Record(AvailabilityBinding binding, Guid actorId, string action, string resultCode, Guid? operationId, DateTimeOffset occurredAt, CancellationToken cancellationToken)
+        {
+            if (FailWrites) throw new InvalidOperationException("Audit store unavailable.");
+            Records.Add((action, resultCode)); return Task.CompletedTask;
+        }
         public Task<IReadOnlyList<ChannelManagementAuditRecord>> Read(AvailabilityBinding binding, long? beforeSequence, int limit, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ChannelManagementAuditRecord>>([]);
     }
 
     private sealed class OAuthFlows : ITenantOAuthFlows
     {
+        public int CancelPendingCount { get; private set; }
         public Task Create(TenantOAuthFlow flow, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<TenantOAuthFlow?> Read(AvailabilityBinding binding, Guid id, CancellationToken cancellationToken) => Task.FromResult<TenantOAuthFlow?>(null);
         public Task<TenantOAuthFlow?> FindByStateHash(AvailabilityBinding binding, string stateHash, CancellationToken cancellationToken) => Task.FromResult<TenantOAuthFlow?>(null);
-        public Task Expire(AvailabilityBinding binding, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Expire(AvailabilityBinding binding, Guid id, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<TenantOAuthFlow?> Claim(AvailabilityBinding binding, string stateHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult<TenantOAuthFlow?>(null);
+        public Task<bool> FailPending(AvailabilityBinding binding, Guid id, string stateHash, string errorCode, DateTimeOffset completedAt, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<int> CancelPending(AvailabilityBinding binding, DateTimeOffset now, CancellationToken cancellationToken)
+        { CancelPendingCount++; return Task.FromResult(1); }
         public Task<bool> Finish(AvailabilityBinding binding, Guid id, string status, string? errorCode, DateTimeOffset completedAt, CancellationToken cancellationToken) => Task.FromResult(false);
     }
 
     private sealed class Overrides : IChannelAvailabilityOverrides
     {
+        public int SetCount { get; private set; }
         public Task<ChannelAvailabilityOverride?> Read(AvailabilityBinding binding, CancellationToken cancellationToken) => Task.FromResult<ChannelAvailabilityOverride?>(null);
         public Task<ChannelAvailabilityOverride> Set(AvailabilityBinding binding, bool isPaused, DateTimeOffset? pausedUntil, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken)
-            => Task.FromResult(new ChannelAvailabilityOverride(isPaused, pausedUntil, actorId, now));
+        { SetCount++; return Task.FromResult(new ChannelAvailabilityOverride(isPaused, pausedUntil, actorId, now)); }
     }
 
     private sealed class ConnectionState : IChannelManagementConnectionState
     {
+        public int SetCount { get; private set; }
         public Task<ChannelManagementConnectionState> Read(AvailabilityBinding binding, CancellationToken cancellationToken)
             => Task.FromResult(new ChannelManagementConnectionState(false, null, null));
         public Task<ChannelManagementConnectionState> Set(AvailabilityBinding binding, bool isDisconnected, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken)
-            => Task.FromResult(new ChannelManagementConnectionState(isDisconnected, actorId, now));
+        { SetCount++; return Task.FromResult(new ChannelManagementConnectionState(isDisconnected, actorId, now)); }
     }
 
     private sealed class AvailabilityStatus : IChannelAvailabilityStatus
@@ -268,11 +326,13 @@ public sealed class TenantChannelManagementOperationsTests
 
     private sealed class Connection : ISandboxConnection
     {
+        public int EnableOrdersCount { get; private set; }
         public Task<string> Start(string sessionHash, CancellationToken cancellationToken, bool enableTesting = false) => Task.FromResult(string.Empty);
         public Task Complete(string sessionHash, string state, string code, string error, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<JsonElement> ConnectTenant(string merchantToken, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
         public Task<JsonElement> ConnectTenant(string merchantToken, bool enableOrderAcceptance, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
         public Task<JsonElement> Configuration(CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
-        public Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
+        public Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken)
+        { EnableOrdersCount++; return Task.FromResult(ProviderJson.Encode(new { })); }
     }
 }

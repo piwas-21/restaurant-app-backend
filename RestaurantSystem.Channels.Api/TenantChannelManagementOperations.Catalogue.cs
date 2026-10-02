@@ -71,9 +71,10 @@ public sealed partial class TenantChannelManagementOperations
             throw new ChannelConsoleException(409, "A previous menu publication is unresolved. Reconcile its provider readback before changing product mappings.");
         var revision = Guid.NewGuid().ToString("D"); var now = _clock.GetUtcNow();
         var draft = new CatalogueMappingDraft(revision, mappingRevision, MappingSnapshot(mappingRevision, mapped), actorId, now);
+        await _audit.Record(Binding(store), actorId, "CatalogueDraftSave", "Intent", null, now, cancellationToken);
         if (!await _drafts.Save(Binding(), draft, request.ExpectedDraftRevision, cancellationToken))
             throw new ChannelConsoleException(409, "The catalogue draft changed in another session. Reload before saving.");
-        await _audit.Record(Binding(store), actorId, "CatalogueDraftSaved", "Saved", null, now, cancellationToken);
+        await _audit.Record(Binding(store), actorId, "CatalogueDraftSaved", "Saved", null, _clock.GetUtcNow(), cancellationToken);
         var providerMenu = await ProviderMenu(pending, cancellationToken);
         return ProviderJson.Encode(new
         {
@@ -130,6 +131,7 @@ public sealed partial class TenantChannelManagementOperations
         if (!ProviderJson.Flag(preview, "canPublish") || ProviderJson.Text(preview, "revision") != request.PublicationRevision)
             throw new ChannelConsoleException(409, "The source or reviewed menu changed. Refresh the preview before publishing.");
         var now = _clock.GetUtcNow();
+        await _audit.Record(Binding(store), actorId, "CataloguePublish", "Intent", null, now, cancellationToken);
         try
         {
             await _publication.Publish(_menu.Preview(), request.PublicationRevision, store, cancellationToken,

@@ -83,6 +83,7 @@ public sealed partial class TenantChannelManagementOperations
         var binding = new AvailabilityBinding(_webhook.Value.ClientId, ConfiguredStore.StoreId, ConfiguredStore.TenantId, revision);
         var current = await _publications.Latest(binding, cancellationToken);
         if (current?.Id != row.Id) return Result(row.Id, "uncertain", "A newer publication requires review", false);
+        await _audit.Record(binding, actorId, "PublicationReconcile", "Intent", row.Id, _clock.GetUtcNow(), cancellationToken);
         var actual = await _menu.Read(cancellationToken);
         var now = _clock.GetUtcNow();
         if (Matches(row.Menu, actual))
@@ -114,6 +115,9 @@ public sealed partial class TenantChannelManagementOperations
             return Result(StableId("availability:" + state.ProviderItemId), "open", "AvailabilityIntentChanged", false);
         await using var lease = await _availabilityJobs.TryLease(binding, cancellationToken);
         if (lease is null) return Result(StableId("availability:" + state.ProviderItemId), "reconciling", "AvailabilitySyncInProgress", false);
+        var operationId = StableId("availability:" + state.ProviderItemId);
+        await _audit.Record(binding, actorId, "AvailabilityReconcile", "Intent", operationId,
+            _clock.GetUtcNow(), cancellationToken);
         var actual = await _uberAvailability.Read(store, _webhook.Value.ClientId, cancellationToken);
         var observed = actual.Items[state.ProviderItemId]; var now = _clock.GetUtcNow();
         var sourceItem = source.Items.SingleOrDefault(item => item.ProviderItemId == state.ProviderItemId);
@@ -122,7 +126,7 @@ public sealed partial class TenantChannelManagementOperations
         if (matches) await lease.Observe(state.ProviderItemId, state.SourceRevision, "Verified", observed, actual.Hash, now, cancellationToken);
         else await lease.Observe(state.ProviderItemId, state.SourceRevision, "Mismatch", observed, actual.Hash, now, cancellationToken);
         await _audit.Record(binding, actorId, "AvailabilityReconcile", matches ? "Verified" : "Mismatch",
-            StableId("availability:" + state.ProviderItemId), now, cancellationToken);
+            operationId, now, cancellationToken);
         return Result(StableId("availability:" + state.ProviderItemId), matches ? "resolved" : "open",
             matches ? null : "ProviderAvailabilityMismatch", false, now);
     }
@@ -201,7 +205,7 @@ public sealed partial class TenantChannelManagementOperations
         var records = await _audit.Read(Binding(), null, ExceptionPageSize, cancellationToken);
         var rows = new List<ExceptionView>();
         var latestOAuth = records.FirstOrDefault(row => row.Action is "OAuthStart" or "OAuth");
-        if (latestOAuth is { Action: "OAuth", ResultCode: "Failed" or "Expired", OperationId: { } flowId })
+        if (latestOAuth is { Action: "OAuth", OperationId: { } flowId })
         {
             var flow = await _oauthFlows.Read(Binding(), flowId, cancellationToken);
             if (flow is { Status: "Failed" or "Expired" })

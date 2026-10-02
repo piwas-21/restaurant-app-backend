@@ -22,6 +22,7 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
     public bool CorruptMenuReadback { get; set; }
     public bool ThrowAfterMenuUpload { get; set; }
     public Func<Task>? BeforeMenuUpload { get; set; }
+    public Func<Task>? BeforeConnectionConfiguration { get; set; }
     public bool ThrowOnDecision { get; set; }
     public int DecisionStatus { get; set; } = 204;
     public JsonElement? CanonicalOrder { get; set; }
@@ -50,6 +51,8 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
         else if (path.Contains("/created-orders?", StringComparison.Ordinal))
             return new(CreatedOrdersStatus, CreatedOrders, CreatedOrdersClientId);
         else if (path.EndsWith("/pos_data", StringComparison.Ordinal))
+        {
+            if (BeforeConnectionConfiguration is not null) await BeforeConnectionConfiguration();
             json = ProviderJson.Encode(new
             {
                 store_id = GatewayFixture.StoreId,
@@ -58,6 +61,7 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
                 is_order_manager_pending = false,
                 require_manual_acceptance = ManualAcceptance
             });
+        }
         else if (path.Contains("/menus/items/", StringComparison.Ordinal))
         {
             if (StockUpdateStatus == 204 && !IgnoreStockUpdate)

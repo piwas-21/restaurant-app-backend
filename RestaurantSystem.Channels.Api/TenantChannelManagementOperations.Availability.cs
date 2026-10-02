@@ -66,8 +66,9 @@ public sealed partial class TenantChannelManagementOperations
         if (request.DurationMinutes is not (null or 15 or 30 or 60 or 240))
             throw new ChannelConsoleException(400, "Choose a supported pause duration or pause until resumed.");
         var now = _clock.GetUtcNow(); DateTimeOffset? until = request.DurationMinutes is { } duration ? now.AddMinutes(duration) : null;
+        await _audit.Record(Binding(), actorId, "AvailabilityPause", "Intent", null, now, cancellationToken);
         var overrideState = await _availabilityOverrides.Set(Binding(), true, until, actorId, now, cancellationToken);
-        await _audit.Record(Binding(), actorId, "AvailabilityPause", "Pending", null, now, cancellationToken);
+        await _audit.Record(Binding(), actorId, "AvailabilityPause", "Pending", null, _clock.GetUtcNow(), cancellationToken);
         return ProviderJson.Encode(new
         {
             state = "pending",
@@ -81,8 +82,9 @@ public sealed partial class TenantChannelManagementOperations
     {
         RequireEnabled();
         var now = _clock.GetUtcNow();
+        await _audit.Record(Binding(), actorId, "AvailabilityResume", "Intent", null, now, cancellationToken);
         await _availabilityOverrides.Set(Binding(), false, null, actorId, now, cancellationToken);
-        await _audit.Record(Binding(), actorId, "AvailabilityResume", "Pending", null, now, cancellationToken);
+        await _audit.Record(Binding(), actorId, "AvailabilityResume", "Pending", null, _clock.GetUtcNow(), cancellationToken);
         return ProviderJson.Encode(new
         {
             state = "pending",
@@ -96,7 +98,11 @@ public sealed partial class TenantChannelManagementOperations
     {
         RequireEnabled();
         if (storeId != ConfiguredStore.StoreId) throw new ChannelConsoleException(404, "The approved Uber store was not found.");
+        await using var lease = await _availabilityJobs.TryLease(Binding(), cancellationToken);
+        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Reload before disconnecting.");
         var now = _clock.GetUtcNow();
+        await _audit.Record(Binding(), actorId, "Disconnect", "Intent", null, now, cancellationToken);
+        await _oauthFlows.CancelPending(Binding(), now, cancellationToken);
         await _connectionState.Set(Binding(), true, actorId, now, cancellationToken);
         await _availabilityOverrides.Set(Binding(), true, null, actorId, now, cancellationToken);
         try
@@ -116,7 +122,8 @@ public sealed partial class TenantChannelManagementOperations
                 null, _clock.GetUtcNow(), cancellationToken);
             return result;
         }
-        catch (ChannelConsoleException)
+        catch (Exception exception) when (exception is ChannelConsoleException or HttpRequestException
+            || exception is TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             await _audit.Record(Binding(), actorId, "Disconnect", "Unconfirmed", null, _clock.GetUtcNow(), cancellationToken);
             return ProviderJson.Encode(new

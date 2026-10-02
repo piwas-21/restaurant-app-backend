@@ -10,7 +10,8 @@ public sealed class TenantManagementOAuth(IOptions<TenantBridgeSettings> bridgeO
     IOptions<TenantManagementGatewaySettings> managementOptions, IOptions<SandboxConsoleSettings> consoleOptions,
     IOptions<UberWebhookSettings> webhookOptions, ITenantOAuthFlows flows, ISandboxCrypto crypto,
     ISandboxTokens tokens, ISandboxConnection connection, ISandboxMenu menu,
-    IChannelManagementConnectionState connectionState, IChannelManagementAudit audit, TimeProvider clock) : ITenantManagementOAuth
+    IChannelAvailabilityJobs availabilityJobs, IChannelManagementConnectionState connectionState,
+    IChannelManagementAudit audit, TimeProvider clock) : ITenantManagementOAuth
 {
     private TenantStoreBinding Store => bridgeOptions.Value.Store;
     private AvailabilityBinding Binding => new(webhookOptions.Value.ClientId, Store.StoreId, Store.TenantId, Store.CatalogueRevision);
@@ -19,12 +20,15 @@ public sealed class TenantManagementOAuth(IOptions<TenantBridgeSettings> bridgeO
     public async Task<TenantOAuthStart> Start(Guid actorId, bool enableOrderAcceptance, CancellationToken cancellationToken)
     {
         if (!bridgeOptions.Value.Enabled || !managementOptions.Value.Enabled || actorId == Guid.Empty) throw Disabled();
+        await using var lease = await availabilityJobs.TryLease(Binding, cancellationToken);
+        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Retry authorization after it finishes.");
         if (enableOrderAcceptance) await menu.RequireVerified(cancellationToken);
         var flowId = Guid.NewGuid(); var state = crypto.RandomToken(); var verifier = crypto.RandomToken();
         var now = clock.GetUtcNow(); var expires = now.AddMinutes(managementOptions.Value.AuthorizationMinutes);
+        await audit.Record(Binding, actorId, "OAuthStart", "Intent", flowId, now, cancellationToken);
         await flows.Create(new(flowId, Binding.ClientId, Store.StoreId, Store.TenantId, actorId, crypto.Hash(state),
             crypto.Protect(verifier, Purpose(flowId)), enableOrderAcceptance, "Pending", null, now, expires, null), cancellationToken);
-        await audit.Record(Binding, actorId, "OAuthStart", "Pending", flowId, now, cancellationToken);
+        await audit.Record(Binding, actorId, "OAuthStart", "Pending", flowId, clock.GetUtcNow(), cancellationToken);
         var url = QueryHelpers.AddQueryString(consoleOptions.Value.AuthBaseUrl.TrimEnd('/') + "/oauth/v2/authorize",
             new Dictionary<string, string?>
             {
@@ -41,9 +45,21 @@ public sealed class TenantManagementOAuth(IOptions<TenantBridgeSettings> bridgeO
 
     public async Task<TenantOAuthStatus> Read(Guid flowId, Guid actorId, CancellationToken cancellationToken)
     {
-        await flows.Expire(Binding, clock.GetUtcNow(), cancellationToken);
         var flow = await flows.Read(Binding, flowId, cancellationToken);
         if (flow is null || flow.ActorId != actorId || actorId == Guid.Empty) throw new ChannelConsoleException(404, "Authorization flow was not found.");
+        if (flow.ExpiresAt <= clock.GetUtcNow() && flow.Status is ("Pending" or "Processing"))
+        {
+            await using var lease = await availabilityJobs.TryLease(Binding, cancellationToken);
+            if (lease is null) return Status(flow);
+            flow = await flows.Read(Binding, flowId, cancellationToken) ?? flow;
+            if (flow.ActorId != actorId || actorId == Guid.Empty) throw new ChannelConsoleException(404, "Authorization flow was not found.");
+            if (flow.ExpiresAt > clock.GetUtcNow() || flow.Status is not ("Pending" or "Processing")) return Status(flow);
+            var now = clock.GetUtcNow();
+            await audit.Record(Binding, actorId, "OAuth", "ExpiryIntent", flowId, now, cancellationToken);
+            await flows.Expire(Binding, flowId, now, cancellationToken);
+            flow = await flows.Read(Binding, flowId, cancellationToken) ?? flow;
+            await audit.Record(Binding, actorId, "OAuth", flow.Status, flowId, clock.GetUtcNow(), cancellationToken);
+        }
         return Status(flow);
     }
 
@@ -51,13 +67,38 @@ public sealed class TenantManagementOAuth(IOptions<TenantBridgeSettings> bridgeO
         CancellationToken cancellationToken)
     {
         if (!managementOptions.Value.Enabled || !bridgeOptions.Value.Enabled || state.Length is < 32 or > 128) return null;
-        var now = clock.GetUtcNow();
-        await flows.Expire(Binding, now, cancellationToken);
         var known = await flows.FindByStateHash(Binding, crypto.Hash(state), cancellationToken);
         if (known is null) return null;
+        await using var lease = await availabilityJobs.TryLease(Binding, cancellationToken);
+        if (lease is null)
+        {
+            var busyAt = clock.GetUtcNow();
+            await audit.Record(Binding, known.ActorId, "OAuth", "CallbackBusyIntent", known.Id, busyAt, cancellationToken);
+            var failed = await flows.FailPending(Binding, known.Id, known.StateHash, "ConnectionOperationBusy", busyAt, cancellationToken);
+            await audit.Record(Binding, known.ActorId, failed ? "OAuth" : "OAuthCallback",
+                failed ? "Failed" : "BusyNoOp", known.Id, clock.GetUtcNow(), cancellationToken);
+            return Callback(known.Id);
+        }
+        known = await flows.FindByStateHash(Binding, crypto.Hash(state), cancellationToken);
+        if (known is null) return null;
+        var now = clock.GetUtcNow();
+        await audit.Record(Binding, known.ActorId, "OAuth", "CallbackIntent", known.Id, now, cancellationToken);
         var flow = await flows.Claim(Binding, known.StateHash, now, cancellationToken);
-        if (flow is null || flow.Status == "Expired") return Callback(known.Id);
-        if (flow.Status != "Processing") return Callback(flow.Id);
+        if (flow is null)
+        {
+            await audit.Record(Binding, known.ActorId, "OAuthCallback", "NoOp", known.Id, clock.GetUtcNow(), cancellationToken);
+            return Callback(known.Id);
+        }
+        if (flow.Status == "Expired")
+        {
+            await audit.Record(Binding, flow.ActorId, "OAuth", "Expired", flow.Id, clock.GetUtcNow(), cancellationToken);
+            return Callback(flow.Id);
+        }
+        if (flow.Status != "Processing")
+        {
+            await audit.Record(Binding, flow.ActorId, "OAuthCallback", "NoOp", flow.Id, clock.GetUtcNow(), cancellationToken);
+            return Callback(flow.Id);
+        }
         if (code.Length is 0 or > 8192 || error.Length > 128 || error.Length > 0)
         {
             await Finish(flow, "Failed", "AuthorizationDenied", cancellationToken);
@@ -75,7 +116,13 @@ public sealed class TenantManagementOAuth(IOptions<TenantBridgeSettings> bridgeO
                 || ProviderJson.OptionalFlag(actual, "manualAcceptance") != expectedManual)
                 throw new ChannelConsoleException(409, "Uber has not confirmed this store connection. Refresh health before continuing.");
             if (await Finish(flow, "Connected", null, cancellationToken))
+            {
+                await audit.Record(Binding, flow.ActorId, "OAuthConnectionState", "Intent", flow.Id,
+                    clock.GetUtcNow(), cancellationToken);
                 await connectionState.Set(Binding, false, flow.ActorId, clock.GetUtcNow(), cancellationToken);
+                await audit.Record(Binding, flow.ActorId, "OAuthConnectionState", "Connected", flow.Id,
+                    clock.GetUtcNow(), cancellationToken);
+            }
         }
         catch (ChannelConsoleException)
         {
@@ -95,8 +142,13 @@ public sealed class TenantManagementOAuth(IOptions<TenantBridgeSettings> bridgeO
     private async Task<bool> Finish(TenantOAuthFlow flow, string status, string? code, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        if (!await flows.Finish(Binding, flow.Id, status, code, now, cancellationToken)) return false;
-        await audit.Record(Binding, flow.ActorId, "OAuth", status, flow.Id, now, cancellationToken);
+        await audit.Record(Binding, flow.ActorId, "OAuth", "FinishIntent", flow.Id, now, cancellationToken);
+        if (!await flows.Finish(Binding, flow.Id, status, code, now, cancellationToken))
+        {
+            await audit.Record(Binding, flow.ActorId, "OAuth", "FinishSkipped", flow.Id, clock.GetUtcNow(), cancellationToken);
+            return false;
+        }
+        await audit.Record(Binding, flow.ActorId, "OAuth", status, flow.Id, clock.GetUtcNow(), cancellationToken);
         return true;
     }
 
