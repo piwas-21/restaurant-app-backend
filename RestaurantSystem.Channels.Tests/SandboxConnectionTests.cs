@@ -127,4 +127,23 @@ public sealed class SandboxConnectionTests(GatewayFixture fixture) : ConsoleFixt
             return Task.FromResult(true);
         });
     }
+    [Fact]
+    public async Task RecoveryTokenUsesSeparateLeastScopeCacheAndEncryptedPurpose()
+    {
+        await InScope(s => s.GetRequiredService<ISandboxTokens>().AppToken(default));
+        await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => InScope(s => s.GetRequiredService<ISandboxTokens>().CreatedOrdersToken(default))));
+        Assert.Equal(2, Provider.Grants.Count);
+        Assert.Single(Provider.Grants, grant => grant["scope"] == "eats.store.orders.read");
+        await InScope(async services =>
+        {
+            var token = await services.GetRequiredService<IConsoleRepository>().FindToken(GatewayFixture.ClientId, GatewayFixture.StoreId, "created-orders", default);
+            Assert.NotNull(token);
+            var crypto = services.GetRequiredService<ISandboxCrypto>();
+            Assert.DoesNotContain("app-token-not-for-logs", token.Cipher, StringComparison.Ordinal);
+            Assert.Equal("app-token-not-for-logs", crypto.Unprotect(token.Cipher, $"uber-sandbox:{GatewayFixture.ClientId}:{GatewayFixture.StoreId:D}:created-orders"));
+            Assert.Throws<AuthenticationTagMismatchException>(() => crypto.Unprotect(token.Cipher, $"uber-sandbox:{GatewayFixture.ClientId}:{GatewayFixture.StoreId:D}:app"));
+            return true;
+        });
+    }
+
 }

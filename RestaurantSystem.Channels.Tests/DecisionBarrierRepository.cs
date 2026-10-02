@@ -17,6 +17,7 @@ public sealed class DecisionBarrierRepository(IConsoleRepository inner) : IConso
     public Task<StoredToken?> FindToken(string clientId, Guid storeId, string kind, CancellationToken cancellationToken) => inner.FindToken(clientId, storeId, kind, cancellationToken);
     public Task<IReadOnlyList<WebhookReceipt>> RecentReceipts(string clientId, Guid storeId, CancellationToken cancellationToken) => inner.RecentReceipts(clientId, storeId, cancellationToken);
     public Task<bool> HasOrder(string clientId, Guid storeId, string orderId, CancellationToken cancellationToken) => inner.HasOrder(clientId, storeId, orderId, cancellationToken);
+    public Task<DateTimeOffset?> RecoveryEnrollment(string clientId, Guid storeId, Guid orderId, CancellationToken cancellationToken) => inner.RecoveryEnrollment(clientId, storeId, orderId, cancellationToken);
     public Task<bool> ClaimAction(string clientId, Guid storeId, string orderId, string action, CancellationToken cancellationToken) => inner.ClaimAction(clientId, storeId, orderId, action, cancellationToken);
     public Task<OrderAction?> FindAction(string clientId, Guid storeId, string orderId, CancellationToken cancellationToken) => inner.FindAction(clientId, storeId, orderId, cancellationToken);
     public async Task FinishAction(string clientId, Guid storeId, string orderId, string state, CancellationToken cancellationToken)

@@ -6,6 +6,9 @@ public sealed class TenantBridgeSettings
     public bool Enabled { get; set; }
     public bool Paused { get; set; }
     public bool DispatchDecisions { get; set; }
+    public bool RecoverCreatedOrders { get; set; }
+    public int RecoveryPollSeconds { get; set; } = 30;
+    public int RecoveryListLimit { get; set; } = 200;
     public int HttpTimeoutSeconds { get; set; } = 20;
     public DateTimeOffset EnrollmentStartedAt { get; set; }
     public int PollSeconds { get; set; } = 5;
@@ -14,7 +17,8 @@ public sealed class TenantBridgeSettings
     public TenantStoreBinding Store { get; set; } = new();
 
     private bool HasOperationalBounds() => HttpTimeoutSeconds is >= 5 and <= 30
-        && (!DispatchDecisions || Enabled) && PollSeconds is >= 1 and <= 60
+        && (!DispatchDecisions || Enabled) && (!RecoverCreatedOrders || Enabled)
+        && RecoveryPollSeconds is >= 5 and <= 300 && RecoveryListLimit is >= 1 and <= 200 && PollSeconds is >= 1 and <= 60
         && RetrySeconds is >= 10 and <= 300 && PayloadRetentionDays is >= 1 and <= 7;
 
     public bool IsValid()

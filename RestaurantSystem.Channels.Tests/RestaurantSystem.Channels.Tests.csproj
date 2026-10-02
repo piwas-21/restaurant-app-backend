@@ -26,5 +26,7 @@
              Link="003_tenant_import_jobs.sql" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/004_order_observations.sql"
              Link="004_order_observations.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/005_created_order_recovery.sql"
+             Link="005_created_order_recovery.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
