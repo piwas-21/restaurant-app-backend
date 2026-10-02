@@ -27,11 +27,11 @@ public sealed class SandboxConsoleController(ISandboxSessions sessions, ISandbox
         }
     }
 
-    [HttpGet("{operation:regex(^(configuration|preview|menu|verification|receipts|availability)$)}")]
-    public async Task<IActionResult> Query(string operation, CancellationToken cancellationToken)
+    [HttpGet("{operation:regex(^(configuration|preview|menu|verification|receipts|availability|imports)$)}")]
+    public async Task<IActionResult> Query(string operation, [FromQuery] string cursor = "", CancellationToken cancellationToken = default)
     {
         await sessions.Require(HttpContext, false, cancellationToken);
-        return Ok(await mediator.SendQuery<ConsoleQuery, System.Text.Json.JsonElement>(new(operation), cancellationToken));
+        return Ok(await mediator.SendQuery<ConsoleQuery, System.Text.Json.JsonElement>(new(operation, Cursor: cursor), cancellationToken));
     }
 
     [HttpGet("orders/{orderId}")]

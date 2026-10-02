@@ -368,3 +368,19 @@ Tenant decision timing is deployment configuration: `DeliveryChannels:DecisionLe
 (60–300 allowed), `DecisionRetrySeconds` defaults to 30 (10–300), and `DecisionClockToleranceSeconds` defaults
 to 30 (0–60). Bounds are validated even while the channel is disabled. Clock tolerance never replaces the
 monotonic canonical observation check or lease ownership. Gateway transport deadlines must fit the selected lease.
+
+### Private import exception review
+
+The session-protected `imports` console query reads existing SQL003 job metadata for the exact app/store/tenant,
+including earlier catalogue revisions. Quarantined jobs appear first, followed by retrying and pending jobs,
+then imported identities. Each page has at most50 rows and a validated stable priority/time/UUID cursor;
+refresh resets pagination because job state can move while an operator reviews it. Customer payloads, ciphertext,
+credentials and raw database failure text are excluded; unknown failure codes become ReviewRequired.
+
+The view distinguishes requires-review from active reconciliation. A quarantined order has unconfirmed delivery to
+Sofra: an import may have committed while its response was lost. The operator must check existing Sofra and Uber
+handling before any fallback decision, especially after DeliveryUncertain or PayloadExpired. Review canonical
+customer instructions and avoid duplicate preparation. Only Imported with a known tenant order ID is confirmed. Retrying jobs remain under gateway reconciliation and must not be handled twice. The
+review action uses the existing authenticated canonical GET and exact-store verification; it does not alter,
+retry or clear a job. The staff link comes from the reviewed tenant origin. Paused gateway jobs remain visible;
+disabled ingress-only deployments need no import table. No schema migration or tenant/printer DTO change is made.
