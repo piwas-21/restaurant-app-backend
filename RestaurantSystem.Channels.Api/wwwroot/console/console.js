@@ -84,9 +84,7 @@ async function stock() {
     const li = document.createElement('li'); li.textContent = 'No availability observations yet.'; el('stock-items').append(li);
   }
 }
-async function imports(cursor = '') {
-  const status = await api('uber/imports' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''));
-  importsCursor = cursor; nextImportsCursor = status.nextCursor || '';
+function staffDestination(status) {
   el('open-staff-orders').hidden = true;
   if (status.enabled && status.tenantUrl) {
     const origin = new URL(status.tenantUrl);
@@ -96,28 +94,34 @@ async function imports(cursor = '') {
     el('open-staff-orders').href = new URL('/admin/orders-management', origin).href;
     el('open-staff-orders').hidden = false;
   }
+}
+function importRow(row) {
+  const li = document.createElement('li'); const text = document.createElement('span');
+  let state = row.state;
+  if (row.reviewRequired) { state = 'Delivery unconfirmed — requires review'; } else if (row.retrying) { state = 'Retrying'; }
+  text.textContent = row.orderId + ' · ' + state +
+    ' · Attempts: ' + row.attempts + (row.code ? ' · ' + row.code : '') +
+    ' · Updated: ' + new Date(row.updatedAt).toLocaleString() + (row.tenantOrderId ? ' · Sofra order: ' + row.tenantOrderId : '');
+  li.append(text);
+  if (row.reviewRequired) {
+    const button = document.createElement('button'); button.className = 'secondary'; button.textContent = 'Review provider order';
+    button.addEventListener('click', () => { void work(async () => {
+      await readOrder(row.orderId); notice('Delivery to Sofra is unconfirmed. Check existing Sofra and Uber handling before any fallback decision to avoid duplicate preparation. Review all customer instructions.');
+    }); }); li.append(button);
+  }
+  return li;
+}
+async function imports(cursor = '') {
+  const status = await api('uber/imports' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''));
+  importsCursor = cursor; nextImportsCursor = status.nextCursor || '';
+  staffDestination(status);
   el('more-imports').hidden = !nextImportsCursor;
   let message = 'Import status refreshed. Refresh to see new or changed jobs.';
   if (!status.enabled) { message = 'Forwarding is not enabled.'; }
   else if (status.paused) { message = 'Forwarding is paused; retained jobs remain visible.'; }
   el('imports-status').textContent = message;
   el('imports').replaceChildren();
-  for (const row of status.items) {
-    const li = document.createElement('li'); const text = document.createElement('span');
-    let state = row.state;
-    if (row.reviewRequired) { state = 'Delivery unconfirmed — requires review'; } else if (row.retrying) { state = 'Retrying'; }
-    text.textContent = row.orderId + ' · ' + state +
-      ' · Attempts: ' + row.attempts + (row.code ? ' · ' + row.code : '') +
-      ' · Updated: ' + new Date(row.updatedAt).toLocaleString() + (row.tenantOrderId ? ' · Sofra order: ' + row.tenantOrderId : '');
-    li.append(text);
-    if (row.reviewRequired) {
-      const button = document.createElement('button'); button.className = 'secondary'; button.textContent = 'Review provider order';
-      button.addEventListener('click', () => { void work(async () => {
-        await readOrder(row.orderId); notice('Delivery to Sofra is unconfirmed. Check existing Sofra and Uber handling before any fallback decision to avoid duplicate preparation. Review all customer instructions.');
-      }); }); li.append(button);
-    }
-    el('imports').append(li);
-  }
+  for (const row of status.items) { el('imports').append(importRow(row)); }
   if (!status.items.length) {
     const li = document.createElement('li'); li.textContent = 'No import jobs on this review page.'; el('imports').append(li);
   }
