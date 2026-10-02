@@ -82,7 +82,23 @@ public sealed class DeliveryChannelManagementAuthorizationTests(DatabaseFixture 
         sent.Uri.Should().Be("https://gateway.example/api/tenant-management/uber/summary");
         (await response.Content.ReadAsStringAsync()).Should().NotContain(new string('a', 64));
         Factory.Services.GetRequiredService<IOptions<DeliveryChannelManagementSettings>>().Value.Enabled = false;
-        (await Client.GetAsync(Route)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var disabled = await Client.GetAsync(Route);
+        disabled.StatusCode.Should().Be(HttpStatusCode.OK);
+        disabled.Headers.CacheControl!.NoStore.Should().BeTrue();
+        using var summary = JsonDocument.Parse(await disabled.Content.ReadAsStringAsync());
+        summary.RootElement.GetProperty("enabled").GetBoolean().Should().BeFalse();
+        summary.RootElement.GetProperty("degradedReason").GetString().Should().Be("IntegrationNotProvisioned");
+        summary.RootElement.GetProperty("storeId").GetGuid().Should().Be(Guid.Empty);
+        summary.RootElement.GetProperty("currency").GetString().Should().BeEmpty();
+        summary.RootElement.GetProperty("requireManualAcceptance").GetBoolean().Should().BeTrue();
+        summary.RootElement.GetProperty("capabilities").EnumerateObject()
+            .Should().OnlyContain(property => !property.Value.GetBoolean());
+        Factory.Services.GetRequiredService<IOptions<DeliveryChannelManagementSettings>>().Value.Enabled = true;
+        Factory.Services.GetRequiredService<IOptions<DeliveryChannelSettings>>().Value.Enabled = false;
+        using var channelDisabled = await Client.GetAsync(Route);
+        channelDisabled.StatusCode.Should().Be(HttpStatusCode.OK);
+        _gateway.Calls.Should().HaveCount(1);
+        (await Client.GetAsync($"{Route}/availability")).StatusCode.Should().Be(HttpStatusCode.NotFound);
         _gateway.Calls.Should().HaveCount(1);
     }
 

@@ -9,5 +9,6 @@ public interface ISandboxConnection
     Task<JsonElement> ConnectTenant(string merchantToken, CancellationToken cancellationToken);
     Task<JsonElement> ConnectTenant(string merchantToken, bool enableOrderAcceptance, CancellationToken cancellationToken);
     Task<JsonElement> Configuration(CancellationToken cancellationToken);
+    Task<string?> StoreDisplayName(CancellationToken cancellationToken);
     Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken);
 }

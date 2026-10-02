@@ -10,6 +10,9 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
     public ConcurrentQueue<IReadOnlyDictionary<string, string>> Grants { get; } = new();
     public bool ManualAcceptance { get; set; }
     public Guid MerchantStoreId { get; set; } = GatewayFixture.StoreId;
+    public Guid StoreDetailsStoreId { get; set; } = GatewayFixture.StoreId;
+    public string StoreName { get; set; } = "Sofra Sandbox Kitchen";
+    public int StoreDetailsStatus { get; set; } = 200;
     public Guid OrderStoreId { get; set; } = GatewayFixture.StoreId;
     public JsonElement Menu { get; set; } = ProviderJson.Encode(new { menus = Array.Empty<object>() });
     public JsonElement CreatedOrders { get; set; } = ProviderJson.Encode(new { orders = Array.Empty<object>() });
@@ -62,6 +65,8 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
                 require_manual_acceptance = ManualAcceptance
             });
         }
+        else if (path == $"/v1/eats/stores/{GatewayFixture.StoreId:D}")
+            return new(StoreDetailsStatus, ProviderJson.Encode(new { store_id = StoreDetailsStoreId, name = StoreName }), "");
         else if (path.Contains("/menus/items/", StringComparison.Ordinal))
         {
             if (StockUpdateStatus == 204 && !IgnoreStockUpdate)

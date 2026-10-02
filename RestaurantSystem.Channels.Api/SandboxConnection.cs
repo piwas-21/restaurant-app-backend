@@ -59,6 +59,23 @@ public sealed class SandboxConnection(IOptions<UberWebhookSettings> webhookOptio
         });
     }
 
+    public async Task<string?> StoreDisplayName(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var path = $"/v1/eats/stores/{StoreId:D}";
+            var result = await provider.Send(HttpMethod.Get, path, await tokens.AppToken(cancellationToken), null, cancellationToken);
+            if (!result.IsSuccess || !Guid.TryParse(ProviderJson.Text(result.Body, "store_id"), out var returnedStore)
+                || returnedStore != StoreId) return null;
+            var name = ProviderJson.Text(result.Body, "name").Trim();
+            return name.Length is > 0 and <= 160 && !name.Any(char.IsControl) ? name : null;
+        }
+        catch (ChannelConsoleException)
+        {
+            return null;
+        }
+    }
+
     public async Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken)
     {
         if (enable) throw new ChannelConsoleException(400, "Enable testing through a new merchant authorization.");
