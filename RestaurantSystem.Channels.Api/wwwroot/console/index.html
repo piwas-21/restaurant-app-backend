@@ -40,6 +40,12 @@
         <p class="hint">Use the test store’s Hoofddorp address in Uber Eats and set the restaurant to Open in Uber Eats Orders. The configured gateway forwards supported orders to the approved Sofra sandbox tenant. Use that tenant’s staff order screen for accept, reject and preparation; unsupported orders require review here.</p>
         <h3>Recent notifications</h3><p id="empty-receipts">No notifications loaded.</p><ul id="receipts"></ul>
       </section>
+      <section class="card" aria-labelledby="imports-title"><div class="section-title"><h2 id="imports-title">Order delivery to Sofra</h2></div>
+        <p>Orders requiring review appear first. Delivery of a quarantined order is unconfirmed. Check Sofra and Uber for existing handling before any fallback decision, especially after a timeout or expired payload. Read all customer instructions before handling it. Retrying orders remain under gateway reconciliation; avoid duplicate handling.</p>
+        <a id="open-staff-orders" class="secondary" hidden target="_blank" rel="noopener noreferrer">Open Sofra staff orders</a>
+        <p id="imports-status" aria-live="polite">Import status has not been loaded.</p><ul id="imports"></ul>
+        <div class="actions"><button id="refresh-imports" class="secondary">Refresh order delivery</button><button id="more-imports" class="secondary" hidden>Next review page</button></div>
+      </section>
       <section id="order-panel" class="card" hidden><div class="section-title"><h2>Order review</h2><span id="order-state" class="badge"></span></div>
         <p id="order-id" class="mono"></p><textarea id="order-json" readonly rows="18" aria-label="Complete Uber order including item and customer instructions"></textarea>
         <label class="check"><input id="reviewed" type="checkbox"> I reviewed all items, customer instructions and special requests.</label>

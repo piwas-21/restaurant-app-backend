@@ -111,6 +111,41 @@ public sealed class TenantImportProcessorTests(GatewayFixture fixture)
     }
 
     [Fact]
+    public async Task ExpiredLostResponseRemainsUnconfirmedEvenWhenTenantCommittedTheOrder()
+    {
+        await using var source = NpgsqlDataSource.Create(fixture.ConnectionString);
+        var store = Guid.NewGuid(); var order = Guid.NewGuid(); await Seed(source, store, order);
+        var settings = Settings(store); var jobs = new PostgresChannelImportJobs(source);
+        var committedOrders = new HashSet<Guid>();
+        var destination = new RecordingTenant(_ =>
+        {
+            committedOrders.Add(order);
+            return Task.FromException(new ChannelConsoleException(502, "Public fixture lost response after commit."));
+        });
+        Assert.True(await Processor(settings, jobs, new OrderReader(Canonical(store, order)), destination).Process(default));
+        Assert.Contains(order, committedOrders); Assert.Single(destination.Requests);
+        await using (var expire = source.CreateCommand("UPDATE channel_import_jobs SET payload_expires_at = now() - interval '1 second' WHERE store_id = $1 AND order_id = $2"))
+        {
+            expire.Parameters.AddWithValue(store); expire.Parameters.AddWithValue(order);
+            Assert.Equal(1, await expire.ExecuteNonQueryAsync());
+        }
+        await jobs.ExpirePayloads(default);
+        var view = new ChannelImportView(Options.Create(settings), Options.Create(new UberWebhookSettings
+        {
+            ClientId = GatewayFixture.ClientId,
+            StoreIds = [store]
+        }), new PostgresChannelImportStatus(source), TimeProvider.System);
+        var body = await view.Read("", default); var row = Assert.Single(body.GetProperty("items").EnumerateArray());
+        Assert.Equal(order, row.GetProperty("orderId").GetGuid());
+        Assert.Equal("Quarantined", row.GetProperty("state").GetString());
+        Assert.Equal("PayloadExpired", row.GetProperty("code").GetString());
+        Assert.True(row.GetProperty("reviewRequired").GetBoolean());
+        Assert.False(row.GetProperty("deliveryConfirmed").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("tenantOrderId").ValueKind);
+        Assert.Contains(order, committedOrders);
+    }
+
+    [Fact]
     public async Task UnsupportedCanonicalItemIsQuarantinedWithoutTenantCall()
     {
         await using var source = NpgsqlDataSource.Create(fixture.ConnectionString);

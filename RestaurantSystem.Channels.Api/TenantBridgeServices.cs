@@ -21,6 +21,8 @@ public static class TenantBridgeServices
         services.AddScoped<IChannelAvailabilityProcessor, ChannelAvailabilityProcessor>();
         services.AddScoped<IChannelAvailabilityStatus, ChannelAvailabilityStatus>();
         services.AddHostedService<ChannelAvailabilityWorker>();
+        services.AddScoped<IChannelImportStatus, PostgresChannelImportStatus>();
+        services.AddScoped<IChannelImportView, ChannelImportView>();
         services.AddScoped<IChannelImportJobs, PostgresChannelImportJobs>();
         services.AddScoped<ICreatedOrderDiscoveries, PostgresCreatedOrderDiscoveries>();
         services.AddScoped<ICreatedOrderRecovery, CreatedOrderRecovery>();

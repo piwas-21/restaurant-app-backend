@@ -5,6 +5,8 @@ const notice = (text, error = false) => {
   el('notice').classList.toggle('error', error);
 };
 let currentOrder = '';
+let importsCursor = '';
+let nextImportsCursor = '';
 let busy = false;
 let loggedIn = false;
 async function api(path, body) {
@@ -19,7 +21,8 @@ async function api(path, body) {
   return value;
 }
 function showLogin() {
-  loggedIn = false; currentOrder = '';
+  loggedIn = false; currentOrder = ''; importsCursor = ''; nextImportsCursor = '';
+  el('imports').replaceChildren(); el('open-staff-orders').hidden = true;
   el('workspace').hidden = true; el('order-panel').hidden = true;
   el('order-json').value = ''; el('login-panel').hidden = false;
 }
@@ -81,8 +84,46 @@ async function stock() {
     const li = document.createElement('li'); li.textContent = 'No availability observations yet.'; el('stock-items').append(li);
   }
 }
+async function imports(cursor = '') {
+  const status = await api('uber/imports' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''));
+  importsCursor = cursor; nextImportsCursor = status.nextCursor || '';
+  el('open-staff-orders').hidden = true;
+  if (status.enabled && status.tenantUrl) {
+    const origin = new URL(status.tenantUrl);
+    if (origin.protocol !== 'https:' || origin.username || origin.password || origin.pathname !== '/') {
+      throw new Error('The staff destination is not a reviewed tenant origin.');
+    }
+    el('open-staff-orders').href = new URL('/admin/orders-management', origin).href;
+    el('open-staff-orders').hidden = false;
+  }
+  el('more-imports').hidden = !nextImportsCursor;
+  let message = 'Import status refreshed. Refresh to see new or changed jobs.';
+  if (!status.enabled) { message = 'Forwarding is not enabled.'; }
+  else if (status.paused) { message = 'Forwarding is paused; retained jobs remain visible.'; }
+  el('imports-status').textContent = message;
+  el('imports').replaceChildren();
+  for (const row of status.items) {
+    const li = document.createElement('li'); const text = document.createElement('span');
+    let state = row.state;
+    if (row.reviewRequired) { state = 'Delivery unconfirmed — requires review'; } else if (row.retrying) { state = 'Retrying'; }
+    text.textContent = row.orderId + ' · ' + state +
+      ' · Attempts: ' + row.attempts + (row.code ? ' · ' + row.code : '') +
+      ' · Updated: ' + new Date(row.updatedAt).toLocaleString() + (row.tenantOrderId ? ' · Sofra order: ' + row.tenantOrderId : '');
+    li.append(text);
+    if (row.reviewRequired) {
+      const button = document.createElement('button'); button.className = 'secondary'; button.textContent = 'Review provider order';
+      button.addEventListener('click', () => { void work(async () => {
+        await readOrder(row.orderId); notice('Delivery to Sofra is unconfirmed. Check existing Sofra and Uber handling before any fallback decision to avoid duplicate preparation. Review all customer instructions.');
+      }); }); li.append(button);
+    }
+    el('imports').append(li);
+  }
+  if (!status.items.length) {
+    const li = document.createElement('li'); li.textContent = 'No import jobs on this review page.'; el('imports').append(li);
+  }
+}
 async function refresh() {
-  await receipts(); await stock();
+  await receipts(); await stock(); await imports();
   try { renderConfig(await api('uber/configuration')); notice('Sandbox status refreshed.'); }
   catch (error) {
     el('connection-badge').textContent = 'Connect your test store'; el('configuration').replaceChildren(); throw error;
@@ -116,6 +157,8 @@ el('login-form').addEventListener('submit', event => {
 bind('logout', async () => { await api('auth/logout', {}); showLogin(); notice('Signed out.'); });
 bind('refresh', refresh);
 bind('refresh-stock', stock);
+bind('refresh-imports', () => imports());
+bind('more-imports', () => imports(nextImportsCursor));
 bind('connect', async () => { authorize(await api('uber/connect', {})); });
 bind('publish', async () => { await api('uber/publish', {}); notice('Test menu published and verified against Uber’s readback.'); });
 bind('verify-menu', async () => { await api('uber/verification'); notice('Current test menu verified against Uber’s readback.'); });
@@ -152,4 +195,4 @@ await work(async () => {
       'Authorization was not completed. Sign in and start a new connection; check that you used the test merchant account.', callbackResult !== 'complete');
   }
 });
-setInterval(() => { if (loggedIn && !busy && !document.hidden) { void work(async () => { await receipts(); await stock(); }); } }, 30000);
+setInterval(() => { if (loggedIn && !busy && !document.hidden) { void work(async () => { await receipts(); await stock(); await imports(importsCursor); }); } }, 30000);
