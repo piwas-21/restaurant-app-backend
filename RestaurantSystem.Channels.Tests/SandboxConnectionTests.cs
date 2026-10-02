@@ -127,6 +127,25 @@ public sealed class SandboxConnectionTests(GatewayFixture fixture) : ConsoleFixt
             return Task.FromResult(true);
         });
     }
+
+    [Fact]
+    public async Task StoreDisplayNameIsReturnedOnlyForTheConfiguredUberStoreAndSafeNames()
+    {
+        Assert.Equal("Sofra Sandbox Kitchen", await InScope(s => s.GetRequiredService<ISandboxConnection>().StoreDisplayName(default)));
+        Assert.Contains(Provider.Calls, call => call.Method == HttpMethod.Get
+            && call.Path == $"/v1/eats/stores/{GatewayFixture.StoreId:D}");
+
+        Provider.StoreDetailsStoreId = Guid.NewGuid();
+        Assert.Null(await InScope(s => s.GetRequiredService<ISandboxConnection>().StoreDisplayName(default)));
+        Provider.StoreDetailsStoreId = GatewayFixture.StoreId;
+        Provider.StoreName = new string('x', 161);
+        Assert.Null(await InScope(s => s.GetRequiredService<ISandboxConnection>().StoreDisplayName(default)));
+        Provider.StoreName = "Sofra Sandbox Kitchen\nOther Store";
+        Assert.Null(await InScope(s => s.GetRequiredService<ISandboxConnection>().StoreDisplayName(default)));
+        Provider.StoreName = "Sofra Sandbox Kitchen";
+        Provider.StoreDetailsStatus = 404;
+        Assert.Null(await InScope(s => s.GetRequiredService<ISandboxConnection>().StoreDisplayName(default)));
+    }
     [Fact]
     public async Task RecoveryTokenUsesSeparateLeastScopeCacheAndEncryptedPurpose()
     {

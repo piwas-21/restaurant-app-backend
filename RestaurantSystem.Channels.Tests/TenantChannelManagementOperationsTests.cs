@@ -37,6 +37,33 @@ public sealed class TenantChannelManagementOperationsTests
         Assert.Equal(725, publishedCatalogue.GetProperty("items")[0].GetProperty("providerPriceMinor").GetInt32());
     }
 
+    [Fact]
+    public async Task SummaryUsesExactProviderStoreNameAndToleratesNameReadFailure()
+    {
+        var harness = CreateHarness();
+        var summary = await harness.Operations.Summary(default);
+        Assert.Equal("Sofra Sandbox Kitchen", summary.GetProperty("storeDisplayName").GetString());
+
+        harness.Connection.ConfigurationState = ProviderJson.Encode(new
+        {
+            enabled = true,
+            orderManager = true,
+            pending = false,
+            manualAcceptance = true,
+            storeId = GatewayFixture.StoreId.ToString("D")
+        });
+        harness.AvailabilityStatus.State = ProviderJson.Encode(new
+        {
+            items = new[] { new { fresh = true } }
+        });
+        harness.Connection.FailStoreName = true;
+        summary = await harness.Operations.Summary(default);
+        Assert.Equal(JsonValueKind.Null, summary.GetProperty("storeDisplayName").ValueKind);
+        Assert.Equal("connected", summary.GetProperty("connectionStatus").GetString());
+        Assert.Equal("healthy", summary.GetProperty("healthStatus").GetString());
+        Assert.Equal(JsonValueKind.Null, summary.GetProperty("degradedReason").ValueKind);
+    }
+
     [Theory]
     [InlineData("unavailable")]
     [InlineData("missing-item")]
@@ -253,13 +280,13 @@ public sealed class TenantChannelManagementOperationsTests
             exceptionOperations, connectionOperations);
 
         return new(operations, audit, flows, overrides, connectionState, connection, drafts, jobs, publication, publications,
-            menuProvider, store, bridge.Value, webhook.Value);
+            menuProvider, store, bridge.Value, webhook.Value, availabilityStatus);
     }
 
     private sealed record OperationsHarness(TenantChannelManagementOperations Operations, Audit Audit,
         OAuthFlows Flows, Overrides Overrides, ConnectionState ConnectionState, Connection Connection, Drafts Drafts, Jobs Jobs,
         TenantCataloguePublication Publication, Publications Publications, MenuProvider MenuProvider, TenantStoreBinding Store,
-        TenantBridgeSettings Bridge, UberWebhookSettings Webhook);
+        TenantBridgeSettings Bridge, UberWebhookSettings Webhook, AvailabilityStatus AvailabilityStatus);
 
     private static JsonElement Menu() => JsonDocument.Parse("""
         {"menus":[{"id":"menu","service_availability":[{"day_of_week":"monday","time_periods":[{"start_time":"09:00","end_time":"17:00"}]}]}],
@@ -425,7 +452,8 @@ public sealed class TenantChannelManagementOperationsTests
 
     private sealed class AvailabilityStatus : IChannelAvailabilityStatus
     {
-        public Task<JsonElement> Read(CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { enabled = true, paused = false, items = Array.Empty<object>() }));
+        public JsonElement State { get; set; } = ProviderJson.Encode(new { enabled = true, paused = false, items = Array.Empty<object>() });
+        public Task<JsonElement> Read(CancellationToken cancellationToken) => Task.FromResult(State);
     }
 
     private sealed class Imports(JsonElement? body = null) : IChannelImportView
@@ -450,11 +478,16 @@ public sealed class TenantChannelManagementOperationsTests
     private sealed class Connection : ISandboxConnection
     {
         public int EnableOrdersCount { get; private set; }
+        public bool FailStoreName { get; set; }
+        public JsonElement ConfigurationState { get; set; } = ProviderJson.Encode(new { });
         public Task<string> Start(string sessionHash, CancellationToken cancellationToken, bool enableTesting = false) => Task.FromResult(string.Empty);
         public Task Complete(string sessionHash, string state, string code, string error, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<JsonElement> ConnectTenant(string merchantToken, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
         public Task<JsonElement> ConnectTenant(string merchantToken, bool enableOrderAcceptance, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
-        public Task<JsonElement> Configuration(CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
+        public Task<JsonElement> Configuration(CancellationToken cancellationToken) => Task.FromResult(ConfigurationState);
+        public Task<string?> StoreDisplayName(CancellationToken cancellationToken) => FailStoreName
+            ? Task.FromException<string?>(new ChannelConsoleException(502, "Provider store details are unavailable."))
+            : Task.FromResult<string?>("Sofra Sandbox Kitchen");
         public Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken)
         { EnableOrdersCount++; return Task.FromResult(ProviderJson.Encode(new { })); }
     }

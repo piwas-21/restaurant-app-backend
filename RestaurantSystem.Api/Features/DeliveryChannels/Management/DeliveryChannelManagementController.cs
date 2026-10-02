@@ -10,6 +10,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.DeliveryChannels.Dtos;
 using RestaurantSystem.Api.Features.DeliveryChannels.Management.Dtos;
 using RestaurantSystem.Api.Features.DeliveryChannels.Queries.GetChannelCatalogueCandidatesQuery;
+using RestaurantSystem.Api.Features.DeliveryChannels.Queries.GetDeliveryChannelManagementSummaryQuery;
 using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.DeliveryChannels.Management;
@@ -26,7 +27,10 @@ public sealed class DeliveryChannelManagementController(
 {
     [HttpGet]
     public Task<DeliveryChannelManagementSummaryDto> Summary(CancellationToken cancellationToken)
-        => Read<DeliveryChannelManagementSummaryDto>("summary", cancellationToken);
+    {
+        Response.Headers.CacheControl = "no-store";
+        return mediator.SendQuery(new GetDeliveryChannelManagementSummaryQuery(), cancellationToken);
+    }
 
     [HttpPost("oauth/start")]
     [RequestSizeLimit(4096)]

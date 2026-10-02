@@ -344,6 +344,7 @@ public sealed class TenantManagementOAuthTests(GatewayFixture fixture) : Console
                 manualAcceptance = !enableOrderAcceptance
             }));
         public Task<JsonElement> Configuration(CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
+        public Task<string?> StoreDisplayName(CancellationToken cancellationToken) => Task.FromResult<string?>("Sofra Sandbox Kitchen");
         public Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
     }
     private static TenantChannelManagementOperations Operations(IServiceProvider services, TenantBridgeSettings bridge,

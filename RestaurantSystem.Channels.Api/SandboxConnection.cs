@@ -7,6 +7,8 @@ namespace RestaurantSystem.Channels.Api;
 public sealed class SandboxConnection(IOptions<UberWebhookSettings> webhookOptions, ISandboxAuthorization authorization,
     ISandboxTokens tokens, IUberSandboxClient provider, ISandboxMenu menu) : ISandboxConnection
 {
+    private const int MaximumStoreDisplayNameLength = 160;
+
     private Guid StoreId => webhookOptions.Value.StoreIds.Single();
     private string StorePath => $"/v1/eats/stores/{StoreId:D}/pos_data";
 
@@ -57,6 +59,23 @@ public sealed class SandboxConnection(IOptions<UberWebhookSettings> webhookOptio
             pending = ProviderJson.Flag(result.Body, "is_order_manager_pending"),
             manualAcceptance = ProviderJson.OptionalFlag(result.Body, "require_manual_acceptance"),
         });
+    }
+
+    public async Task<string?> StoreDisplayName(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var path = $"/v1/eats/stores/{StoreId:D}";
+            var result = await provider.Send(HttpMethod.Get, path, await tokens.AppToken(cancellationToken), null, cancellationToken);
+            if (!result.IsSuccess || !Guid.TryParse(ProviderJson.Text(result.Body, "store_id"), out var returnedStore)
+                || returnedStore != StoreId) return null;
+            var name = ProviderJson.Text(result.Body, "name").Trim();
+            return name.Length is > 0 and <= MaximumStoreDisplayNameLength && !name.Any(char.IsControl) ? name : null;
+        }
+        catch (ChannelConsoleException)
+        {
+            return null;
+        }
     }
 
     public async Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken)

@@ -17,6 +17,7 @@ public sealed class TenantChannelSummaryService(TenantManagementContext context,
         var disconnected = await connectionState.Read(binding, cancellationToken);
         var latest = await publications.Latest(binding, cancellationToken);
         var provider = await ReadProviderHealth(cancellationToken);
+        var storeDisplayName = provider.Configuration is null ? null : await ReadStoreDisplayName(cancellationToken);
         var connectionStatus = ConnectionStatus(provider, disconnected.IsDisconnected);
         var availabilityStatus = await availability.Read(cancellationToken);
         var fresh = AvailabilityIsFresh(availabilityStatus);
@@ -34,7 +35,7 @@ public sealed class TenantChannelSummaryService(TenantManagementContext context,
             storeId = store.StoreId,
             currency = store.Currency,
             storeConfirmed = ProviderStoreConfirmed(provider, store.StoreId),
-            storeDisplayName = (string?)null,
+            storeDisplayName,
             integrationEnabled = provider.Enabled,
             isOrderManager = provider.OrderManager,
             pendingMerchantActivation = provider.Pending,
@@ -67,6 +68,12 @@ public sealed class TenantChannelSummaryService(TenantManagementContext context,
         {
             return ProviderHealth.Unavailable;
         }
+    }
+
+    private async Task<string?> ReadStoreDisplayName(CancellationToken cancellationToken)
+    {
+        try { return await connection.StoreDisplayName(cancellationToken); }
+        catch (ChannelConsoleException) { return null; }
     }
 
     private static ProviderHealth ParseProviderHealth(JsonElement configuration)
