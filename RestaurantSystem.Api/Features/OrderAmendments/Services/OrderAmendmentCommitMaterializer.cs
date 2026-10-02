@@ -53,12 +53,15 @@ internal sealed class OrderAmendmentCommitMaterializer(
     {
         var snapshot = snapshotJson is null ? null
             : OrderAmendmentJson.Deserialize<OrderAmendmentSupplementSnapshot>(snapshotJson);
-        if (supplement is not null && snapshot is not null)
-            OrderAmendmentSnapshots.RestoreSupplementIdentity(supplement, snapshot);
-        var dto = supplement is null ? null : OrderAmendmentSnapshots.MapBuiltOrder(mapping, supplement);
-        if ((supplement is null) != (snapshot is null))
-            throw PriceChanged();
-        if (dto is not null && snapshot is not null && !string.Equals(snapshot.PricingFingerprint,
+        if (supplement is null)
+        {
+            if (snapshot is not null) throw PriceChanged();
+            return null;
+        }
+        if (snapshot is null) throw PriceChanged();
+        OrderAmendmentSnapshots.RestoreSupplementIdentity(supplement, snapshot);
+        var dto = OrderAmendmentSnapshots.MapBuiltOrder(mapping, supplement);
+        if (!string.Equals(snapshot.PricingFingerprint,
                 OrderAmendmentJson.PricingFingerprint(dto), StringComparison.Ordinal))
             throw PriceChanged();
         return dto;
