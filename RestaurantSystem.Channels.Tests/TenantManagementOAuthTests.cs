@@ -5,6 +5,7 @@ using Npgsql;
 using RestaurantSystem.Channels.Api;
 using RestaurantSystem.Channels.Domain;
 using RestaurantSystem.Channels.Infrastructure;
+using System.Text.Json;
 
 namespace RestaurantSystem.Channels.Tests;
 
@@ -154,7 +155,7 @@ public sealed class TenantManagementOAuthTests(GatewayFixture fixture) : Console
             await flows.Create(new(otherId, otherBinding.ClientId, otherBinding.StoreId, otherBinding.TenantId,
                 Guid.NewGuid(), services.GetRequiredService<ISandboxCrypto>().Hash(Guid.NewGuid().ToString()),
                 "encrypted-verifier-fixture", false, "Pending", null, now, now.AddMinutes(5), null), default);
-            Assert.Equal(1, await flows.CancelPending(Binding(bridge), DateTimeOffset.UtcNow, default));
+            Assert.Equal(1, await flows.CancelPending(Binding(bridge), "ConnectionDisconnected", DateTimeOffset.UtcNow, default));
 
             var response = await oauth.CompleteIfKnown(state, "stale-authorization-code", "", default);
 
@@ -233,6 +234,48 @@ public sealed class TenantManagementOAuthTests(GatewayFixture fixture) : Console
         });
     }
 
+    [Fact]
+    public async Task LatestAuthorizationIntentSupersedesPendingFlowsAcrossAcceptanceModes()
+    {
+        await InScope(async services =>
+        {
+            await using var database = NpgsqlDataSource.Create(Database.ConnectionString);
+            var flows = new PostgresTenantOAuthFlows(database);
+            var bridge = Bridge(); var binding = Binding(bridge); var actor = Guid.NewGuid();
+            var oauth = OAuth(services, flows, bridge, new Clock(DateTimeOffset.UtcNow),
+                menu: new VerifiedMenu(), connection: new ConfirmedConnection());
+
+            Provider.ManualAcceptance = true;
+            var initial = await oauth.Start(actor, false, default);
+            var initialState = State(initial.AuthorizationUrl);
+            var enableAcceptance = await oauth.Start(actor, true, default);
+            var initialFlow = (await flows.Read(binding, initial.FlowId, default))!;
+            Assert.Equal("Failed", initialFlow.Status);
+            Assert.Equal("AuthorizationSuperseded", initialFlow.ErrorCode);
+            Assert.Empty(initialFlow.VerifierCipher);
+            await oauth.CompleteIfKnown(initialState, "superseded-initial-code", "", default);
+            Assert.Empty(Provider.Grants);
+            Assert.Empty(Provider.Calls);
+
+            Provider.ManualAcceptance = false;
+            await oauth.CompleteIfKnown(State(enableAcceptance.AuthorizationUrl), "enable-acceptance-code", "", default);
+            var enabledFlow = (await flows.Read(binding, enableAcceptance.FlowId, default))!;
+            Assert.True(enabledFlow.Status == "Connected", $"Unexpected outcome: {enabledFlow.Status}/{enabledFlow.ErrorCode}");
+            Assert.Single(Provider.Grants);
+
+            var olderEnabled = await oauth.Start(actor, true, default);
+            var manualOnly = await oauth.Start(actor, false, default);
+            Assert.Equal("AuthorizationSuperseded", (await flows.Read(binding, olderEnabled.FlowId, default))!.ErrorCode);
+            await oauth.CompleteIfKnown(State(olderEnabled.AuthorizationUrl), "stale-enabled-code", "", default);
+            Assert.Single(Provider.Grants);
+            Provider.ManualAcceptance = true;
+            await oauth.CompleteIfKnown(State(manualOnly.AuthorizationUrl), "manual-acceptance-code", "", default);
+            Assert.Equal("Connected", (await flows.Read(binding, manualOnly.FlowId, default))!.Status);
+            Assert.Equal(2, Provider.Grants.Count);
+            return true;
+        });
+    }
+
     private static TenantBridgeSettings Bridge() => new()
     {
         Enabled = true,
@@ -250,29 +293,86 @@ public sealed class TenantManagementOAuthTests(GatewayFixture fixture) : Console
     private static AvailabilityBinding Binding(TenantBridgeSettings bridge)
         => new(GatewayFixture.ClientId, GatewayFixture.StoreId, bridge.Store.TenantId, bridge.Store.CatalogueRevision);
     private static TenantManagementOAuth OAuth(IServiceProvider services, ITenantOAuthFlows flows, TenantBridgeSettings bridge,
-        TimeProvider clock, IChannelManagementAudit? audit = null)
-        => new(Options.Create(bridge), Options.Create(new TenantManagementGatewaySettings
+        TimeProvider clock, IChannelManagementAudit? audit = null, ISandboxMenu? menu = null,
+        ISandboxConnection? connection = null)
+    {
+        var management = Options.Create(new TenantManagementGatewaySettings
         {
             Enabled = true,
             ReturnUrl = "https://tenant.example/admin/delivery-channels/callback"
-        }), services.GetRequiredService<IOptions<SandboxConsoleSettings>>(),
-            services.GetRequiredService<IOptions<UberWebhookSettings>>(), flows, services.GetRequiredService<ISandboxCrypto>(),
-            services.GetRequiredService<ISandboxTokens>(), services.GetRequiredService<ISandboxConnection>(), services.GetRequiredService<ISandboxMenu>(),
+        });
+        var context = new TenantManagementContext(Options.Create(bridge), management,
+            services.GetRequiredService<IOptions<UberWebhookSettings>>(), clock);
+        var provider = new TenantOAuthProvider(context, services.GetRequiredService<IOptions<SandboxConsoleSettings>>(),
+            services.GetRequiredService<ISandboxCrypto>(), services.GetRequiredService<ISandboxTokens>(),
+            connection ?? services.GetRequiredService<ISandboxConnection>(), menu ?? services.GetRequiredService<ISandboxMenu>());
+        var coordinator = new TenantOAuthStateCoordinator(context, flows, provider,
             services.GetRequiredService<IChannelAvailabilityJobs>(), services.GetRequiredService<IChannelManagementConnectionState>(),
-            audit ?? services.GetRequiredService<IChannelManagementAudit>(), clock);
+            audit ?? services.GetRequiredService<IChannelManagementAudit>());
+        return new TenantManagementOAuth(context, coordinator);
+    }
+
+    private static string State(string authorizationUrl)
+        => QueryHelpers.ParseQuery(new Uri(authorizationUrl).Query)["state"].ToString();
+
+    private sealed class VerifiedMenu : ISandboxMenu
+    {
+        public JsonElement Preview() => ProviderJson.Encode(new { items = Array.Empty<object>() });
+        public Task<JsonElement> Preview(CancellationToken cancellationToken) => Task.FromResult(Preview());
+        public Task<JsonElement> Read(CancellationToken cancellationToken) => Task.FromResult(Preview());
+        public Task<JsonElement> Publish(CancellationToken cancellationToken) => Task.FromResult(Preview());
+        public Task<JsonElement> Publish(string revision, CancellationToken cancellationToken) => Task.FromResult(Preview());
+        public Task RequireVerified(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<JsonElement> Expected(CancellationToken cancellationToken) => Task.FromResult(Preview());
+    }
+
+    private sealed class ConfirmedConnection : ISandboxConnection
+    {
+        public Task<string> Start(string sessionHash, CancellationToken cancellationToken, bool enableTesting = false)
+            => Task.FromResult(string.Empty);
+        public Task Complete(string sessionHash, string state, string code, string error, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+        public Task<JsonElement> ConnectTenant(string merchantToken, CancellationToken cancellationToken)
+            => ConnectTenant(merchantToken, false, cancellationToken);
+        public Task<JsonElement> ConnectTenant(string merchantToken, bool enableOrderAcceptance, CancellationToken cancellationToken)
+            => Task.FromResult(ProviderJson.Encode(new
+            {
+                storeId = GatewayFixture.StoreId,
+                enabled = true,
+                orderManager = true,
+                pending = false,
+                manualAcceptance = !enableOrderAcceptance
+            }));
+        public Task<JsonElement> Configuration(CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
+        public Task<JsonElement> EnableOrders(bool enable, CancellationToken cancellationToken) => Task.FromResult(ProviderJson.Encode(new { }));
+    }
     private static TenantChannelManagementOperations Operations(IServiceProvider services, TenantBridgeSettings bridge,
         ITenantOAuthFlows flows, IChannelAvailabilityJobs jobs, IChannelManagementAudit audit,
         IChannelManagementConnectionState connectionState, TimeProvider clock)
     {
         var webhook = services.GetRequiredService<IOptions<UberWebhookSettings>>();
-        return new(Options.Create(bridge), Options.Create(new TenantManagementGatewaySettings { Enabled = true }), webhook,
-            services.GetRequiredService<ISandboxConnection>(), services.GetRequiredService<ISandboxMenu>(),
-            services.GetRequiredService<ITenantCatalogueClient>(), flows, services.GetRequiredService<ITenantCataloguePublication>(),
-            services.GetRequiredService<ICataloguePublications>(), services.GetRequiredService<ICatalogueMappingResolver>(),
-            services.GetRequiredService<ICatalogueMappingDrafts>(), services.GetRequiredService<IChannelAvailabilityStatus>(),
-            services.GetRequiredService<IChannelAvailabilityOverrides>(), jobs, audit,
-            services.GetRequiredService<IChannelImportView>(), services.GetRequiredService<ITenantAvailabilityClient>(),
-            services.GetRequiredService<IUberAvailabilityClient>(), connectionState, clock);
+        var management = Options.Create(new TenantManagementGatewaySettings { Enabled = true });
+        var context = new TenantManagementContext(Options.Create(bridge), management, webhook, clock);
+        var catalogueState = new TenantCatalogueManagementState(services.GetRequiredService<ICatalogueMappingDrafts>(),
+            services.GetRequiredService<ICataloguePublications>(), services.GetRequiredService<ICatalogueMappingResolver>(), jobs);
+        var availabilityState = new TenantChannelAvailabilityState(services.GetRequiredService<ICatalogueMappingResolver>(), jobs,
+            services.GetRequiredService<IChannelAvailabilityOverrides>());
+        var connection = services.GetRequiredService<ISandboxConnection>();
+        var menu = services.GetRequiredService<ISandboxMenu>();
+        var status = services.GetRequiredService<IChannelAvailabilityStatus>();
+        var tenantAvailability = services.GetRequiredService<ITenantAvailabilityClient>();
+        var summary = new TenantChannelSummaryService(context, connectionState, services.GetRequiredService<ICataloguePublications>(), connection, status);
+        var catalogue = new TenantChannelCatalogueService(context, catalogueState, menu, services.GetRequiredService<ITenantCatalogueClient>(),
+            services.GetRequiredService<ITenantCataloguePublication>(), audit);
+        var availability = new TenantChannelAvailabilityService(context, availabilityState, status, tenantAvailability, audit);
+        var exceptionData = new TenantChannelExceptionData(context, catalogueState, availabilityState,
+            services.GetRequiredService<IChannelImportView>(), audit, flows, connectionState);
+        var exceptions = new TenantChannelExceptionService(context, exceptionData,
+            new TenantChannelPublicationReconciler(context, catalogueState, menu, audit),
+            new TenantChannelAvailabilityReconciler(context, availabilityState, tenantAvailability,
+                services.GetRequiredService<IUberAvailabilityClient>(), audit));
+        var connectionService = new TenantChannelConnectionService(context, connection, flows, connectionState, availabilityState, audit);
+        return new(summary, catalogue, availability, exceptions, connectionService);
     }
     private sealed class FailingAudit : IChannelManagementAudit
     {

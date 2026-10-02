@@ -35,13 +35,15 @@ public sealed class DisconnectedChannelWorkerTests(GatewayFixture fixture) : Con
             });
             var webhook = Options.Create(new UberWebhookSettings { ClientId = binding.ClientId, StoreIds = [binding.StoreId] });
             var destination = new Destination();
-            var imports = new TenantImportProcessor(settings, webhook, new PostgresChannelImportJobs(database),
+            var policy = new TenantChannelOrderProcessingPolicy(settings, webhook,
+                ChannelProcessingPolicyTestSupport.Mapping(settings.Value.Store), state, ChannelProcessingPolicyTestSupport.Catalogue);
+            var imports = new TenantImportProcessor(new PostgresChannelImportJobs(database),
                 services.GetRequiredService<ISandboxOrders>(), new UberOrderNormalizer(), services.GetRequiredService<ISandboxCrypto>(),
-                destination, TimeProvider.System, connectionState: state);
+                destination, TimeProvider.System, policy);
             Assert.False(await imports.Process(default));
-            await new CreatedOrderRecovery(settings, webhook, services.GetRequiredService<ISandboxTokens>(), Provider,
+            await new CreatedOrderRecovery(services.GetRequiredService<ISandboxTokens>(), Provider,
                 new PostgresCreatedOrderDiscoveries(database), TimeProvider.System, NullLogger<CreatedOrderRecovery>.Instance,
-                connectionState: state).Process(default);
+                policy).Process(default);
             Assert.False(destination.Called); Assert.Empty(Provider.Calls); Assert.Empty(Provider.Grants);
             await state.Set(binding, false, Guid.NewGuid(), DateTimeOffset.UtcNow, default);
             Assert.False((await state.Read(binding, default)).IsDisconnected);

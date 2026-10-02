@@ -25,13 +25,13 @@ public sealed class CatalogueMappingHistoryTests(GatewayFixture fixture) : Conso
             }
         });
         var menu = System.Text.Json.JsonSerializer.SerializeToElement(new { items = Array.Empty<object>() });
-        var old = await publications.Begin(binding, new string('a', 64), new string('b', 64), new string('c', 64),
-            menu, menu, default, snapshot);
+        var old = await publications.Begin(binding, new(new string('a', 64), new string('b', 64), new string('c', 64),
+            menu, menu, snapshot), default);
         Assert.Null(await history.FindVerified(binding, binding.CatalogueRevision, default));
         Assert.True(await publications.Verify(binding, old.Id, new string('d', 64), DateTimeOffset.UtcNow, default));
         var pendingBinding = binding with { CatalogueRevision = "unconfirmed-replacement" };
-        var pending = await publications.Begin(pendingBinding, new string('e', 64), new string('f', 64), new string('1', 64),
-            menu, menu, default, snapshot);
+        var pending = await publications.Begin(pendingBinding, new(new string('e', 64), new string('f', 64), new string('1', 64),
+            menu, menu, snapshot), default);
         Assert.Equal(pending.Id, (await publications.Latest(binding, default))!.Id);
         Assert.Null(await history.FindVerified(binding, pendingBinding.CatalogueRevision, default));
         var retained = (await history.FindVerified(binding, binding.CatalogueRevision, default))!;

@@ -61,14 +61,16 @@ public sealed class PostgresTenantOAuthFlows(NpgsqlDataSource source) : ITenantO
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    public async Task<int> CancelPending(AvailabilityBinding binding, DateTimeOffset now, CancellationToken cancellationToken)
+    public async Task<int> CancelPending(AvailabilityBinding binding, string errorCode, DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
+        if (errorCode is not ("ConnectionDisconnected" or "AuthorizationSuperseded")) return 0;
         await using var command = source.CreateCommand("""
             UPDATE channel_tenant_oauth_flows
-            SET status = 'Failed', error_code = 'ConnectionDisconnected', completed_at = $4, verifier_cipher = ''
+            SET status = 'Failed', error_code = $4, completed_at = $5, verifier_cipher = ''
             WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3 AND status = 'Pending'
             """);
-        Identity(command, binding); command.Parameters.AddWithValue(now.ToUniversalTime());
+        Identity(command, binding); command.Parameters.AddWithValue(errorCode); command.Parameters.AddWithValue(now.ToUniversalTime());
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

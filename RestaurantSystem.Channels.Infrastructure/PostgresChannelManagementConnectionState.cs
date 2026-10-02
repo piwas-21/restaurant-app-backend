@@ -12,9 +12,10 @@ public sealed class PostgresChannelManagementConnectionState(NpgsqlDataSource so
             WHERE client_id = $1 AND store_id = $2 AND tenant_id = $3
             """);
         Identity(command, binding); await using var row = await command.ExecuteReaderAsync(cancellationToken);
-        return await row.ReadAsync(cancellationToken)
-            ? new(row.GetBoolean(0), row.IsDBNull(1) ? null : row.GetGuid(1), row.IsDBNull(2) ? null : row.GetFieldValue<DateTimeOffset>(2))
-            : new(false, null, null);
+        if (!await row.ReadAsync(cancellationToken)) return new(false, null, null);
+        Guid? actorId = row.IsDBNull(1) ? null : row.GetGuid(1);
+        DateTimeOffset? updatedAt = row.IsDBNull(2) ? null : row.GetFieldValue<DateTimeOffset>(2);
+        return new(row.GetBoolean(0), actorId, updatedAt);
     }
 
     public async Task<ChannelManagementConnectionState> Set(AvailabilityBinding binding, bool isDisconnected,

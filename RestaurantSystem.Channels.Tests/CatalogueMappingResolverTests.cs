@@ -105,8 +105,8 @@ public sealed class CatalogueMappingResolverTests
             => Task.FromResult<CataloguePublication?>(LatestPublication);
         public Task<CataloguePublication?> FindVerified(AvailabilityBinding binding, string catalogueRevision, CancellationToken cancellationToken)
         { RequestedRevision = catalogueRevision; return Task.FromResult(Historical); }
-        public Task<CataloguePublication> Begin(AvailabilityBinding binding, string mappingHash, string sourceRevision,
-            string revision, JsonElement menu, JsonElement previousMenu, CancellationToken cancellationToken, JsonElement? mappingSnapshot = null)
+        public Task<CataloguePublication> Begin(AvailabilityBinding binding, CataloguePublicationIntent intent,
+            CancellationToken cancellationToken)
             => throw new NotSupportedException();
         public Task<bool> Verify(AvailabilityBinding binding, Guid id, string providerHash, DateTimeOffset now, CancellationToken cancellationToken)
             => throw new NotSupportedException();

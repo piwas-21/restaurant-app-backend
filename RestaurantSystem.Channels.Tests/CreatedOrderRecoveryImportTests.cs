@@ -54,14 +54,17 @@ public sealed class CreatedOrderRecoveryImportTests(GatewayFixture fixture) : Co
         Provider.CanonicalOrder = JsonSerializer.SerializeToElement(canonical);
         await using var source = NpgsqlDataSource.Create(Database.ConnectionString);
         using var scope = Host.Services.CreateScope(); var services = scope.ServiceProvider;
-        await new CreatedOrderRecovery(Options.Create(options), Options.Create(new UberWebhookSettings
-        { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), services.GetRequiredService<ISandboxTokens>(),
-            Provider, new PostgresCreatedOrderDiscoveries(source), TimeProvider.System,
-            NullLogger<CreatedOrderRecovery>.Instance).Process(default);
+        var webhook = new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] };
+        var policy = ChannelProcessingPolicyTestSupport.OrderProcessing(options, webhook,
+            ChannelProcessingPolicyTestSupport.Mapping(options.Store), ChannelProcessingPolicyTestSupport.Connected,
+            ChannelProcessingPolicyTestSupport.Catalogue);
+        await new CreatedOrderRecovery(services.GetRequiredService<ISandboxTokens>(), Provider,
+            new PostgresCreatedOrderDiscoveries(source), TimeProvider.System,
+            NullLogger<CreatedOrderRecovery>.Instance, policy).Process(default);
         var tenant = new RecordingTenant();
-        var importer = new TenantImportProcessor(Options.Create(options), Options.Create(new UberWebhookSettings { ClientId = GatewayFixture.ClientId }),
+        var importer = new TenantImportProcessor(
             new PostgresChannelImportJobs(source), services.GetRequiredService<ISandboxOrders>(), new UberOrderNormalizer(),
-            services.GetRequiredService<ISandboxCrypto>(), tenant, TimeProvider.System);
+            services.GetRequiredService<ISandboxCrypto>(), tenant, TimeProvider.System, policy);
         Assert.True(await importer.Process(default));
         if (mode == "valid")
         {

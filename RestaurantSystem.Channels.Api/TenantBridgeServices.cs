@@ -15,6 +15,7 @@ public static class TenantBridgeServices
                     && webhook.Value.StoreIds[0] == settings.Store.StoreId,
                 "Tenant bridge requires the existing sandbox-only provider connection for exactly its configured store.")
             .ValidateOnStart();
+        services.AddScoped<TenantManagementContext>();
         services.AddScoped<IChannelAvailabilityJobs, PostgresChannelAvailabilityJobs>();
         services.AddScoped<IChannelAvailabilityOverrides, PostgresChannelAvailabilityOverrides>();
         services.AddScoped<IChannelManagementConnectionState, PostgresChannelManagementConnectionState>();
@@ -28,6 +29,7 @@ public static class TenantBridgeServices
         services.AddScoped<ITenantCataloguePublication, TenantCataloguePublication>();
         services.AddScoped<ITenantAvailabilityClient, TenantAvailabilityClient>();
         services.AddScoped<IUberAvailabilityClient, UberAvailabilityClient>();
+        services.AddScoped<IChannelAvailabilityPolicy, TenantChannelAvailabilityPolicy>();
         services.AddScoped<IChannelAvailabilityProcessor, ChannelAvailabilityProcessor>();
         services.AddScoped<IChannelAvailabilityStatus, ChannelAvailabilityStatus>();
         services.AddHostedService<ChannelAvailabilityWorker>();
@@ -35,6 +37,7 @@ public static class TenantBridgeServices
         services.AddScoped<IChannelImportView, ChannelImportView>();
         services.AddScoped<IChannelImportJobs, PostgresChannelImportJobs>();
         services.AddScoped<ICreatedOrderDiscoveries, PostgresCreatedOrderDiscoveries>();
+        services.AddScoped<ITenantChannelOrderProcessingPolicy, TenantChannelOrderProcessingPolicy>();
         services.AddScoped<ICreatedOrderRecovery, CreatedOrderRecovery>();
         services.AddHostedService<CreatedOrderRecoveryWorker>();
         services.AddScoped<IUberOrderNormalizer, UberOrderNormalizer>();

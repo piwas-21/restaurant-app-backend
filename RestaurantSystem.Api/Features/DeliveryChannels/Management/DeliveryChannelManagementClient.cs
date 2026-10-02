@@ -65,7 +65,8 @@ public sealed class DeliveryChannelManagementClient(
         try
         {
             using var document = JsonDocument.Parse(content);
-            if (document.RootElement.TryGetProperty("message", out var value)
+            if (document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("message", out var value)
                 && value.ValueKind == JsonValueKind.String)
             {
                 var message = value.GetString();
@@ -73,7 +74,10 @@ public sealed class DeliveryChannelManagementClient(
                     return message;
             }
         }
-        catch (JsonException) { }
+        catch (JsonException)
+        {
+            // Malformed gateway bodies use the safe fallback; never expose an untrusted response.
+        }
         return "The delivery integration could not complete this action. Refresh its status before retrying.";
     }
 

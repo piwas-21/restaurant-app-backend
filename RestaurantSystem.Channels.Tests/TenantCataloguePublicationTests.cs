@@ -39,11 +39,14 @@ public sealed class TenantCataloguePublicationTests(GatewayFixture fixture) : Co
         {
             await using var source = NpgsqlDataSource.Create(Database.ConnectionString);
             var repository = new PostgresCataloguePublications(source);
-            var publication = new TenantCataloguePublication(Options.Create(settings), Options.Create(new UberWebhookSettings
-            { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), tenant, repository,
+            var webhook = Options.Create(new UberWebhookSettings
+            { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] });
+            var context = new TenantManagementContext(Options.Create(settings),
+                Options.Create(new TenantManagementGatewaySettings()), webhook, TimeProvider.System);
+            var publication = new TenantCataloguePublication(context, tenant, repository,
                 new PostgresChannelAvailabilityJobs(source), new TenantMenuProvider(Options.Create(settings),
                 Options.Create(new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }),
-                Provider, services.GetRequiredService<ISandboxTokens>()), TimeProvider.System);
+                Provider, services.GetRequiredService<ISandboxTokens>()));
             var template = services.GetRequiredService<ISandboxMenu>().Preview();
             if (Provider.Menu.GetProperty("menus").GetArrayLength() == 0) Provider.Menu = template;
             return await action(publication, template, repository);

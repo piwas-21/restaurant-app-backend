@@ -174,8 +174,9 @@ public sealed class TenantChannelManagementOperationsTests
                 await releaseUpdate.Task;
             }
         };
-        var processor = new ChannelAvailabilityProcessor(Options.Create(harness.Bridge), Options.Create(harness.Webhook),
-            new Source(), provider, harness.Jobs, TimeProvider.System, new Resolver(harness.Store), harness.Overrides);
+        var policy = ChannelProcessingPolicyTestSupport.Availability(harness.Bridge, harness.Webhook,
+            new Source(), new Resolver(harness.Store), harness.Overrides, TimeProvider.System);
+        var processor = new ChannelAvailabilityProcessor(provider, harness.Jobs, TimeProvider.System, policy);
         var processing = processor.Process(default);
         await updateEntered.Task.WaitAsync(TimeSpan.FromSeconds(3));
 
@@ -195,9 +196,9 @@ public sealed class TenantChannelManagementOperationsTests
         var preview = await harness.Publication.Preview(Menu(), harness.Store, default);
         var menu = preview.GetProperty("menu").Clone();
         return await harness.Publications.Begin(new("sandbox-client", harness.Store.StoreId, harness.Store.TenantId,
-                harness.Store.CatalogueRevision), CatalogueMenuPlanner.MappingHash(harness.Store),
-            ProviderJson.Text(preview, "sourceRevision"), ProviderJson.Text(preview, "revision"), menu, Menu(), default,
-            ProviderJson.Encode(new { catalogueRevision = harness.Store.CatalogueRevision, items = Array.Empty<object>() }));
+                harness.Store.CatalogueRevision), new(CatalogueMenuPlanner.MappingHash(harness.Store),
+            ProviderJson.Text(preview, "sourceRevision"), ProviderJson.Text(preview, "revision"), menu, Menu(),
+            ProviderJson.Encode(new { catalogueRevision = harness.Store.CatalogueRevision, items = Array.Empty<object>() })), default);
     }
 
     private static TenantChannelManagementOperations CreateOperations(string readFault = "", JsonElement? imports = null)
@@ -229,13 +230,27 @@ public sealed class TenantChannelManagementOperationsTests
             SyncAvailability = true,
             Store = store
         });
-        var publication = new TenantCataloguePublication(bridge, webhook, catalogue, publications, jobs,
-            menuProvider, TimeProvider.System, new Resolver(store));
-        var operations = new TenantChannelManagementOperations(bridge,
-            Options.Create(new TenantManagementGatewaySettings { Enabled = true }), webhook, connection,
-            new SandboxMenuStub(Menu(), menuProvider) { ReadFault = readFault }, catalogue, flows, publication, publications,
-            new Resolver(store), drafts, new AvailabilityStatus(), overrides, jobs, audit, new Imports(imports),
-            new Source(), new UberAvailability(), connectionState, TimeProvider.System);
+        var management = Options.Create(new TenantManagementGatewaySettings { Enabled = true });
+        var context = new TenantManagementContext(bridge, management, webhook, TimeProvider.System);
+        var publication = new TenantCataloguePublication(context, catalogue, publications, jobs,
+            menuProvider, new Resolver(store));
+        var catalogueState = new TenantCatalogueManagementState(drafts, publications, new Resolver(store), jobs);
+        var availabilityState = new TenantChannelAvailabilityState(new Resolver(store), jobs, overrides);
+        var availabilityStatus = new AvailabilityStatus(); var tenantAvailability = new Source();
+        var menu = new SandboxMenuStub(Menu(), menuProvider) { ReadFault = readFault };
+        var summary = new TenantChannelSummaryService(context, connectionState, publications, connection, availabilityStatus);
+        var catalogueOperations = new TenantChannelCatalogueService(context, catalogueState, menu, catalogue, publication, audit);
+        var availabilityOperations = new TenantChannelAvailabilityService(context, availabilityState, availabilityStatus,
+            tenantAvailability, audit);
+        var exceptionData = new TenantChannelExceptionData(context, catalogueState, availabilityState,
+            new Imports(imports), audit, flows, connectionState);
+        var exceptionOperations = new TenantChannelExceptionService(context, exceptionData,
+            new TenantChannelPublicationReconciler(context, catalogueState, menu, audit),
+            new TenantChannelAvailabilityReconciler(context, availabilityState, tenantAvailability, new UberAvailability(), audit));
+        var connectionOperations = new TenantChannelConnectionService(context, connection, flows, connectionState,
+            availabilityState, audit);
+        var operations = new TenantChannelManagementOperations(summary, catalogueOperations, availabilityOperations,
+            exceptionOperations, connectionOperations);
 
         return new(operations, audit, flows, overrides, connectionState, connection, drafts, jobs, publication, publications,
             menuProvider, store, bridge.Value, webhook.Value);
@@ -316,10 +331,10 @@ public sealed class TenantChannelManagementOperationsTests
         public Task<CataloguePublication?> Latest(AvailabilityBinding binding, CancellationToken cancellationToken) => Task.FromResult(_latest);
         public Task<CataloguePublication?> Find(AvailabilityBinding binding, Guid id, CancellationToken cancellationToken)
             => Task.FromResult(_latest?.Id == id ? _latest : null);
-        public Task<CataloguePublication> Begin(AvailabilityBinding binding, string mappingHash, string sourceRevision,
-            string revision, JsonElement menu, JsonElement previousMenu, CancellationToken cancellationToken, JsonElement? mappingSnapshot = null)
-            => Task.FromResult(_latest = new(Guid.NewGuid(), mappingHash, sourceRevision, revision, menu, previousMenu,
-                CataloguePublicationStates.Pending, null, null, mappingSnapshot));
+        public Task<CataloguePublication> Begin(AvailabilityBinding binding, CataloguePublicationIntent intent,
+            CancellationToken cancellationToken)
+            => Task.FromResult(_latest = new(Guid.NewGuid(), intent.MappingHash, intent.SourceRevision, intent.Revision,
+                intent.Menu, intent.PreviousMenu, CataloguePublicationStates.Pending, null, null, intent.MappingSnapshot));
         public Task<bool> Verify(AvailabilityBinding binding, Guid id, string providerHash, DateTimeOffset now, CancellationToken cancellationToken)
         {
             if (_latest?.Id != id) return Task.FromResult(false);
@@ -386,7 +401,7 @@ public sealed class TenantChannelManagementOperationsTests
         public Task Expire(AvailabilityBinding binding, Guid id, DateTimeOffset now, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<TenantOAuthFlow?> Claim(AvailabilityBinding binding, string stateHash, DateTimeOffset now, CancellationToken cancellationToken) => Task.FromResult<TenantOAuthFlow?>(null);
         public Task<bool> FailPending(AvailabilityBinding binding, Guid id, string stateHash, string errorCode, DateTimeOffset completedAt, CancellationToken cancellationToken) => Task.FromResult(false);
-        public Task<int> CancelPending(AvailabilityBinding binding, DateTimeOffset now, CancellationToken cancellationToken)
+        public Task<int> CancelPending(AvailabilityBinding binding, string errorCode, DateTimeOffset now, CancellationToken cancellationToken)
         { CancelPendingCount++; return Task.FromResult(1); }
         public Task<bool> Finish(AvailabilityBinding binding, Guid id, string status, string? errorCode, DateTimeOffset completedAt, CancellationToken cancellationToken) => Task.FromResult(false);
     }

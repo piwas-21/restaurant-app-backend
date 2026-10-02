@@ -13,10 +13,9 @@ public sealed class PostgresChannelAvailabilityOverrides(NpgsqlDataSource source
             """);
         Identity(command, binding);
         await using var row = await command.ExecuteReaderAsync(cancellationToken);
-        return await row.ReadAsync(cancellationToken)
-            ? new(row.GetBoolean(0), row.IsDBNull(1) ? null : row.GetFieldValue<DateTimeOffset>(1),
-                row.GetGuid(2), row.GetFieldValue<DateTimeOffset>(3))
-            : null;
+        if (!await row.ReadAsync(cancellationToken)) return null;
+        DateTimeOffset? pausedUntil = row.IsDBNull(1) ? null : row.GetFieldValue<DateTimeOffset>(1);
+        return new(row.GetBoolean(0), pausedUntil, row.GetGuid(2), row.GetFieldValue<DateTimeOffset>(3));
     }
 
     public async Task<ChannelAvailabilityOverride> Set(AvailabilityBinding binding, bool isPaused,

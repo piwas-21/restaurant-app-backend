@@ -26,9 +26,11 @@ public sealed class ChannelAvailabilityOverrideTests(GatewayFixture fixture) : C
             await overrides.Set(binding, true, clock.GetUtcNow().AddMinutes(15), Guid.NewGuid(), clock.GetUtcNow(), default);
             var jobs = new PostgresChannelAvailabilityJobs(database);
             var webhook = Options.Create(new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] });
-            var processor = new ChannelAvailabilityProcessor(Options.Create(settings), webhook, new Source(),
+            var policy = ChannelProcessingPolicyTestSupport.Availability(settings, webhook.Value, new Source(),
+                ChannelProcessingPolicyTestSupport.Mapping(settings.Store), overrides, clock);
+            var processor = new ChannelAvailabilityProcessor(
                 new UberAvailabilityClient(Provider, services.GetRequiredService<ISandboxTokens>(), services.GetRequiredService<ISandboxMenu>(), clock),
-                jobs, clock, overrides: overrides);
+                jobs, clock, policy);
             var status = new ChannelAvailabilityStatus(Options.Create(settings), webhook, jobs, clock, overrides: overrides);
             await processor.Process(default);
             var paused = await status.Read(default);
@@ -66,10 +68,12 @@ public sealed class ChannelAvailabilityOverrideTests(GatewayFixture fixture) : C
             var clock = new Clock(DateTimeOffset.UtcNow); var settings = Settings();
             var overrides = new ChangingOverride(clock.Now);
             var jobs = new PostgresChannelAvailabilityJobs(database);
-            var processor = new ChannelAvailabilityProcessor(Options.Create(settings), Options.Create(new UberWebhookSettings
-            { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), new Source(),
+            var webhook = new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] };
+            var policy = ChannelProcessingPolicyTestSupport.Availability(settings, webhook, new Source(),
+                ChannelProcessingPolicyTestSupport.Mapping(settings.Store), overrides, clock);
+            var processor = new ChannelAvailabilityProcessor(
                 new UberAvailabilityClient(Provider, services.GetRequiredService<ISandboxTokens>(), services.GetRequiredService<ISandboxMenu>(), clock),
-                jobs, clock, overrides: overrides);
+                jobs, clock, policy);
             await processor.Process(default);
             Assert.DoesNotContain(Provider.Calls, call => call.Method == HttpMethod.Post);
             Assert.All(await jobs.Read(new(GatewayFixture.ClientId, GatewayFixture.StoreId, settings.Store.TenantId,

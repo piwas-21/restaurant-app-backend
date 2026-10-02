@@ -3,58 +3,30 @@ using RestaurantSystem.Channels.Domain;
 
 namespace RestaurantSystem.Channels.Api;
 
-public sealed partial class TenantChannelManagementOperations
+public sealed class TenantChannelAvailabilityService(TenantManagementContext context,
+    ITenantChannelAvailabilityState state, IChannelAvailabilityStatus availability,
+    ITenantAvailabilityClient tenantAvailability, IChannelManagementAudit audit) : ITenantChannelAvailabilityService
 {
+    private const string Unknown = "unknown";
+
     public async Task<JsonElement> Availability(CancellationToken cancellationToken)
     {
-        RequireEnabled();
-        var snapshot = await _availability.Read(cancellationToken);
-        TenantStoreBinding? store = null;
-        try { store = await _mappingResolver.Active(cancellationToken); }
-        catch (ChannelConsoleException) { }
-        if (store is null)
-            return ProviderJson.Encode(new
-            {
-                enabled = false,
-                paused = ProviderJson.Flag(snapshot, "paused"),
-                pausedUntil = NullableTime(snapshot, "pausedUntil"),
-                checkedAt = NullableTime(snapshot, "checkedAt") ?? _clock.GetUtcNow(),
-                storeStatus = "needsAttention",
-                items = Array.Empty<object>()
-            });
-        TenantAvailabilitySnapshot? source = null;
-        try { source = await _tenantAvailability.Read(store, cancellationToken); }
-        catch (ChannelConsoleException) { }
-        var states = snapshot.TryGetProperty("items", out var rows) && rows.ValueKind == JsonValueKind.Array
-            ? rows.EnumerateArray().ToDictionary(row => ProviderJson.Text(row, "itemId"), StringComparer.Ordinal)
-            : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-        var sourceItems = source?.Items.ToDictionary(row => row.ProviderItemId, StringComparer.Ordinal)
-            ?? new Dictionary<string, TenantAvailabilityItem>(StringComparer.Ordinal);
+        context.RequireEnabled();
+        var snapshot = await availability.Read(cancellationToken);
+        var store = await ActiveStore(cancellationToken);
+        if (store is null) return EmptyAvailability(snapshot);
+
+        var sourceItems = await SourceItems(store, cancellationToken);
+        var states = AvailabilityStates(snapshot);
         var paused = ProviderJson.Flag(snapshot, "paused");
-        var items = store.Items.Select(mapping =>
-        {
-            var hasState = states.TryGetValue(mapping.ProviderItemId, out var state);
-            sourceItems.TryGetValue(mapping.ProviderItemId, out var desired);
-            return new
-            {
-                providerItemId = mapping.ProviderItemId,
-                productId = mapping.ProductId,
-                variationId = mapping.VariationId,
-                desiredAvailable = !paused && (desired?.Available ?? (hasState && ProviderJson.Flag(state, "desiredAvailable"))),
-                confirmedAvailable = hasState ? NullableFlag(state, "observedAvailable") : null,
-                state = hasState ? ProviderJson.Text(state, "state").ToLowerInvariant() : "unknown",
-                verifiedAt = hasState ? NullableTime(state, "verifiedAt") : null,
-                isStale = desired is null || !hasState || !state.TryGetProperty("fresh", out var fresh) || fresh.ValueKind != JsonValueKind.True,
-                reasonCode = paused ? "ManagerPaused" : desired?.Reason
-            };
-        }).ToArray();
+        var items = store.Items.Select(mapping => AvailabilityItem(mapping, states, sourceItems, paused)).ToArray();
         return ProviderJson.Encode(new
         {
             enabled = ProviderJson.Flag(snapshot, "enabled"),
             paused,
-            pausedUntil = NullableTime(snapshot, "pausedUntil"),
-            checkedAt = NullableTime(snapshot, "checkedAt") ?? _clock.GetUtcNow(),
-            storeStatus = paused ? "paused" : ProviderJson.Flag(snapshot, "enabled") ? "active" : "needsAttention",
+            pausedUntil = ChannelManagementJson.NullableTime(snapshot, "pausedUntil"),
+            checkedAt = ChannelManagementJson.NullableTime(snapshot, "checkedAt") ?? context.Clock.GetUtcNow(),
+            storeStatus = StoreAvailabilityStatus(paused, ProviderJson.Flag(snapshot, "enabled")),
             items
         });
     }
@@ -62,15 +34,14 @@ public sealed partial class TenantChannelManagementOperations
     public async Task<JsonElement> Pause(TenantManagementPauseRequest request, Guid actorId,
         CancellationToken cancellationToken)
     {
-        RequireEnabled();
+        context.RequireEnabled();
         if (request.DurationMinutes is not (null or 15 or 30 or 60 or 240))
             throw new ChannelConsoleException(400, "Choose a supported pause duration or pause until resumed.");
-        await using var lease = await _availabilityJobs.TryLease(Binding(), cancellationToken);
-        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Reload before changing availability.");
-        var now = _clock.GetUtcNow(); DateTimeOffset? until = request.DurationMinutes is { } duration ? now.AddMinutes(duration) : null;
-        await _audit.Record(Binding(), actorId, "AvailabilityPause", "Intent", null, now, cancellationToken);
-        var overrideState = await _availabilityOverrides.Set(Binding(), true, until, actorId, now, cancellationToken);
-        await _audit.Record(Binding(), actorId, "AvailabilityPause", "Pending", null, _clock.GetUtcNow(), cancellationToken);
+        var binding = context.Binding();
+        await using var lease = await state.TryLease(binding, cancellationToken);
+        if (lease is null) throw Busy();
+        var now = context.Clock.GetUtcNow();
+        var overrideState = await RecordOverride(binding, true, PauseUntil(request.DurationMinutes, now), actorId, now, cancellationToken);
         return ProviderJson.Encode(new
         {
             state = "pending",
@@ -82,13 +53,12 @@ public sealed partial class TenantChannelManagementOperations
 
     public async Task<JsonElement> Resume(Guid actorId, CancellationToken cancellationToken)
     {
-        RequireEnabled();
-        await using var lease = await _availabilityJobs.TryLease(Binding(), cancellationToken);
-        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Reload before changing availability.");
-        var now = _clock.GetUtcNow();
-        await _audit.Record(Binding(), actorId, "AvailabilityResume", "Intent", null, now, cancellationToken);
-        await _availabilityOverrides.Set(Binding(), false, null, actorId, now, cancellationToken);
-        await _audit.Record(Binding(), actorId, "AvailabilityResume", "Pending", null, _clock.GetUtcNow(), cancellationToken);
+        context.RequireEnabled();
+        var binding = context.Binding();
+        await using var lease = await state.TryLease(binding, cancellationToken);
+        if (lease is null) throw Busy();
+        var now = context.Clock.GetUtcNow();
+        await RecordOverride(binding, false, null, actorId, now, cancellationToken);
         return ProviderJson.Encode(new
         {
             state = "pending",
@@ -98,54 +68,96 @@ public sealed partial class TenantChannelManagementOperations
         });
     }
 
-    public async Task<JsonElement> Disconnect(Guid storeId, Guid actorId, CancellationToken cancellationToken)
+    private async Task<ChannelAvailabilityOverride> RecordOverride(AvailabilityBinding binding, bool paused,
+        DateTimeOffset? until, Guid actorId, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        RequireEnabled();
-        if (storeId != ConfiguredStore.StoreId) throw new ChannelConsoleException(404, "The approved Uber store was not found.");
-        await using var lease = await _availabilityJobs.TryLease(Binding(), cancellationToken);
-        if (lease is null) throw new ChannelConsoleException(409, "A channel operation is in progress. Reload before disconnecting.");
-        var now = _clock.GetUtcNow();
-        await _audit.Record(Binding(), actorId, "Disconnect", "Intent", null, now, cancellationToken);
-        await _oauthFlows.CancelPending(Binding(), now, cancellationToken);
-        await _connectionState.Set(Binding(), true, actorId, now, cancellationToken);
-        await _availabilityOverrides.Set(Binding(), true, null, actorId, now, cancellationToken);
-        try
+        var action = paused ? "AvailabilityPause" : "AvailabilityResume";
+        await audit.Record(binding, actorId, action, "Intent", null, now, cancellationToken);
+        var updated = await state.SetOverride(binding, paused, until, actorId, now, cancellationToken);
+        await audit.Record(binding, actorId, action, "Pending", null, context.Clock.GetUtcNow(), cancellationToken);
+        return updated;
+    }
+
+    private async Task<TenantStoreBinding?> ActiveStore(CancellationToken cancellationToken)
+    {
+        try { return await state.Active(cancellationToken); }
+        catch (ChannelConsoleException)
         {
-            var actual = await _connection.EnableOrders(false, cancellationToken);
-            var relinquished = !ProviderJson.Flag(actual, "enabled") && !ProviderJson.Flag(actual, "orderManager")
-                && !ProviderJson.Flag(actual, "pending");
-            var result = ProviderJson.Encode(new
-            {
-                status = relinquished ? "disconnected" : "uncertain",
-                providerManagerRelinquished = relinquished,
-                localBridgePaused = true,
-                resultCode = relinquished ? null : "ProviderRevocationUnconfirmed",
-                completedAt = _clock.GetUtcNow()
-            });
-            await _audit.Record(Binding(), actorId, "Disconnect", relinquished ? "Confirmed" : "Unconfirmed",
-                null, _clock.GetUtcNow(), cancellationToken);
-            return result;
-        }
-        catch (Exception exception) when (exception is ChannelConsoleException or HttpRequestException
-            || exception is TaskCanceledException && !cancellationToken.IsCancellationRequested)
-        {
-            await _audit.Record(Binding(), actorId, "Disconnect", "Unconfirmed", null, _clock.GetUtcNow(), cancellationToken);
-            return ProviderJson.Encode(new
-            {
-                status = "uncertain",
-                providerManagerRelinquished = false,
-                localBridgePaused = true,
-                resultCode = "ProviderRevocationUnconfirmed",
-                completedAt = _clock.GetUtcNow()
-            });
+            // Without an active reviewed mapping, expose an attention state instead of a guessed menu.
+            return null;
         }
     }
 
-    private static bool? NullableFlag(JsonElement value, string name)
-        => value.TryGetProperty(name, out var field) && field.ValueKind is JsonValueKind.True or JsonValueKind.False
-            ? field.GetBoolean() : null;
+    private async Task<Dictionary<string, TenantAvailabilityItem>> SourceItems(TenantStoreBinding store,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var source = await tenantAvailability.Read(store, cancellationToken);
+            return source.Items.ToDictionary(row => row.ProviderItemId, StringComparer.Ordinal);
+        }
+        catch (ChannelConsoleException)
+        {
+            // Current provider observations remain visible when the Sofra stock source is unavailable.
+            return new(StringComparer.Ordinal);
+        }
+    }
 
-    private static DateTimeOffset? NullableTime(JsonElement value, string name)
-        => value.TryGetProperty(name, out var field) && field.ValueKind == JsonValueKind.String
-            && field.TryGetDateTimeOffset(out var date) ? date : null;
+    private JsonElement EmptyAvailability(JsonElement snapshot)
+        => ProviderJson.Encode(new
+        {
+            enabled = false,
+            paused = ProviderJson.Flag(snapshot, "paused"),
+            pausedUntil = ChannelManagementJson.NullableTime(snapshot, "pausedUntil"),
+            checkedAt = ChannelManagementJson.NullableTime(snapshot, "checkedAt") ?? context.Clock.GetUtcNow(),
+            storeStatus = "needsAttention",
+            items = Array.Empty<object>()
+        });
+
+    private static Dictionary<string, JsonElement> AvailabilityStates(JsonElement snapshot)
+        => snapshot.TryGetProperty("items", out var rows) && rows.ValueKind == JsonValueKind.Array
+            ? rows.EnumerateArray().ToDictionary(row => ProviderJson.Text(row, "itemId"), StringComparer.Ordinal)
+            : new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+
+    private static object AvailabilityItem(TenantItemMapping mapping, Dictionary<string, JsonElement> states,
+        Dictionary<string, TenantAvailabilityItem> sourceItems, bool paused)
+    {
+        var hasState = states.TryGetValue(mapping.ProviderItemId, out var observed);
+        sourceItems.TryGetValue(mapping.ProviderItemId, out var desired);
+        var state = hasState ? ProviderJson.Text(observed, "state").ToLowerInvariant() : Unknown;
+        var desiredAvailable = DesiredAvailable(desired, hasState, observed);
+        return new
+        {
+            providerItemId = mapping.ProviderItemId,
+            productId = mapping.ProductId,
+            variationId = mapping.VariationId,
+            desiredAvailable = !paused && desiredAvailable,
+            confirmedAvailable = hasState ? ChannelManagementJson.NullableFlag(observed, "observedAvailable") : null,
+            state,
+            verifiedAt = hasState ? ChannelManagementJson.NullableTime(observed, "verifiedAt") : null,
+            isStale = desired is null || !hasState || !IsFresh(observed),
+            reasonCode = paused ? "ManagerPaused" : desired?.Reason
+        };
+    }
+
+    private static bool IsFresh(JsonElement state)
+        => state.TryGetProperty("fresh", out var fresh) && fresh.ValueKind == JsonValueKind.True;
+
+    private static bool DesiredAvailable(TenantAvailabilityItem? source, bool hasState, JsonElement observed)
+    {
+        if (source is not null) return source.Available;
+        return hasState && ProviderJson.Flag(observed, "desiredAvailable");
+    }
+
+    private static DateTimeOffset? PauseUntil(int? durationMinutes, DateTimeOffset now)
+        => durationMinutes is { } duration ? now.AddMinutes(duration) : null;
+
+    private static string StoreAvailabilityStatus(bool paused, bool enabled)
+    {
+        if (paused) return "paused";
+        return enabled ? "active" : "needsAttention";
+    }
+
+    private static ChannelConsoleException Busy()
+        => new(409, "A channel operation is in progress. Reload before changing availability.");
 }

@@ -41,9 +41,8 @@ public sealed class PostgresCataloguePublications(NpgsqlDataSource source) : ICa
             row.GetString(6), row.IsDBNull(7) ? null : row.GetString(7), row.IsDBNull(8) ? null : row.GetFieldValue<DateTimeOffset>(8),
             row.IsDBNull(9) ? null : JsonSerializer.Deserialize<JsonElement>(row.GetString(9)));
 
-    public async Task<CataloguePublication> Begin(AvailabilityBinding binding, string mappingHash, string sourceRevision,
-        string revision, JsonElement menu, JsonElement previousMenu, CancellationToken cancellationToken,
-        JsonElement? mappingSnapshot = null)
+    public async Task<CataloguePublication> Begin(AvailabilityBinding binding, CataloguePublicationIntent intent,
+        CancellationToken cancellationToken)
     {
         await using var connection = await source.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -59,12 +58,12 @@ public sealed class PostgresCataloguePublications(NpgsqlDataSource source) : ICa
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             """, connection, transaction);
         command.Parameters.AddWithValue(id); PostgresChannelAvailabilityJobs.Identity(command, binding);
-        command.Parameters.AddWithValue(mappingHash); command.Parameters.AddWithValue(sourceRevision); command.Parameters.AddWithValue(revision);
-        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, menu.GetRawText());
-        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, previousMenu.GetRawText());
-        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, mappingSnapshot is { } snapshot ? snapshot.GetRawText() : DBNull.Value);
+        command.Parameters.AddWithValue(intent.MappingHash); command.Parameters.AddWithValue(intent.SourceRevision); command.Parameters.AddWithValue(intent.Revision);
+        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, intent.Menu.GetRawText());
+        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, intent.PreviousMenu.GetRawText());
+        command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, intent.MappingSnapshot is { } snapshot ? snapshot.GetRawText() : DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
-        return new(id, mappingHash, sourceRevision, revision, menu, previousMenu, CataloguePublicationStates.Pending, null, null, mappingSnapshot);
+        return new(id, intent.MappingHash, intent.SourceRevision, intent.Revision, intent.Menu, intent.PreviousMenu, CataloguePublicationStates.Pending, null, null, intent.MappingSnapshot);
     }
 
     public async Task<bool> Verify(AvailabilityBinding binding, Guid id, string providerHash, DateTimeOffset now, CancellationToken cancellationToken)

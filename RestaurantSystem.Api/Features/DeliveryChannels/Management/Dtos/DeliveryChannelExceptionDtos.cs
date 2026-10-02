@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 namespace RestaurantSystem.Api.Features.DeliveryChannels.Management.Dtos;
 
 public sealed record DeliveryChannelExceptionInboxDto(
@@ -34,4 +35,4 @@ public sealed record DeliveryChannelDisconnectResultDto(
     string? ResultCode,
     DateTimeOffset CompletedAt);
 
-public sealed record DeliveryChannelDisconnectRequest(Guid StoreId);
+public sealed record DeliveryChannelDisconnectRequest([property: JsonRequired] Guid StoreId);

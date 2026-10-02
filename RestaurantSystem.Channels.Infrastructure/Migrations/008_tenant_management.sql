@@ -4,9 +4,9 @@ ALTER TABLE channel_catalogue_publications ADD COLUMN IF NOT EXISTS mapping_snap
 
 CREATE TABLE channel_tenant_oauth_flows (
     flow_id uuid PRIMARY KEY,
-    client_id varchar(128) NOT NULL,
+    client_id text NOT NULL CHECK (char_length(client_id) <= 128),
     store_id uuid NOT NULL,
-    tenant_id varchar(100) NOT NULL,
+    tenant_id text NOT NULL CHECK (char_length(tenant_id) <= 100),
     actor_id uuid NOT NULL,
     state_hash char(64) NOT NULL UNIQUE CHECK (state_hash ~ '^[a-f0-9]{64}$'),
     verifier_cipher text NOT NULL,
@@ -24,9 +24,9 @@ CREATE TABLE channel_tenant_oauth_flows (
 CREATE INDEX ix_channel_tenant_oauth_tenant ON channel_tenant_oauth_flows(client_id, store_id, tenant_id, created_at DESC);
 
 CREATE TABLE channel_catalogue_mapping_drafts (
-    client_id varchar(128) NOT NULL,
+    client_id text NOT NULL CHECK (char_length(client_id) <= 128),
     store_id uuid NOT NULL,
-    tenant_id varchar(100) NOT NULL,
+    tenant_id text NOT NULL CHECK (char_length(tenant_id) <= 100),
     draft_revision uuid NOT NULL,
     mapping_revision char(64) NOT NULL CHECK (mapping_revision ~ '^[a-f0-9]{64}$'),
     mapping_snapshot jsonb NOT NULL CHECK (jsonb_typeof(mapping_snapshot) = 'object'),
@@ -38,9 +38,9 @@ CREATE TABLE channel_catalogue_mapping_drafts (
 );
 
 CREATE TABLE channel_availability_overrides (
-    client_id varchar(128) NOT NULL,
+    client_id text NOT NULL CHECK (char_length(client_id) <= 128),
     store_id uuid NOT NULL,
-    tenant_id varchar(100) NOT NULL,
+    tenant_id text NOT NULL CHECK (char_length(tenant_id) <= 100),
     paused boolean NOT NULL,
     paused_until timestamptz,
     actor_id uuid NOT NULL,
@@ -53,9 +53,9 @@ CREATE TABLE channel_availability_overrides (
 
 CREATE TABLE channel_management_audit (
     sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    client_id varchar(128) NOT NULL,
+    client_id text NOT NULL CHECK (char_length(client_id) <= 128),
     store_id uuid NOT NULL,
-    tenant_id varchar(100) NOT NULL,
+    tenant_id text NOT NULL CHECK (char_length(tenant_id) <= 100),
     actor_id uuid NOT NULL,
     action varchar(40) NOT NULL,
     result_code varchar(48) NOT NULL,
@@ -67,9 +67,9 @@ CREATE TABLE channel_management_audit (
 CREATE INDEX ix_channel_management_audit_tenant ON channel_management_audit(client_id, store_id, tenant_id, sequence DESC);
 
 CREATE TABLE channel_management_connections (
-    client_id varchar(128) NOT NULL,
+    client_id text NOT NULL CHECK (char_length(client_id) <= 128),
     store_id uuid NOT NULL,
-    tenant_id varchar(100) NOT NULL,
+    tenant_id text NOT NULL CHECK (char_length(tenant_id) <= 100),
     disconnected boolean NOT NULL,
     actor_id uuid,
     updated_at timestamptz,

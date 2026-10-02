@@ -32,8 +32,13 @@ public sealed class TenantImportProcessorTests(GatewayFixture fixture)
     private static SandboxCrypto Crypto() => new(Options.Create(new SandboxConsoleSettings { EncryptionKey = Convert.ToBase64String(new byte[32]) }));
     private static TenantImportProcessor Processor(TenantBridgeSettings settings, IChannelImportJobs jobs,
         ISandboxOrders orders, ITenantOrderClient tenant)
-        => new(Options.Create(settings), Options.Create(new UberWebhookSettings { ClientId = GatewayFixture.ClientId }),
-            jobs, orders, new UberOrderNormalizer(), Crypto(), tenant, TimeProvider.System);
+    {
+        var policy = ChannelProcessingPolicyTestSupport.OrderProcessing(settings,
+            new UberWebhookSettings { ClientId = GatewayFixture.ClientId },
+            ChannelProcessingPolicyTestSupport.Mapping(settings.Store), ChannelProcessingPolicyTestSupport.Connected,
+            ChannelProcessingPolicyTestSupport.Catalogue);
+        return new TenantImportProcessor(jobs, orders, new UberOrderNormalizer(), Crypto(), tenant, TimeProvider.System, policy);
+    }
 
     private static JsonNode Canonical(Guid store, Guid order)
     {

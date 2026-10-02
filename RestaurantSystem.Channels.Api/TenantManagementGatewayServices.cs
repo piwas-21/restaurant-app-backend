@@ -22,7 +22,19 @@ public static class TenantManagementGatewayServices
                 "Tenant management requires exactly one configured Uber sandbox store.")
             .ValidateOnStart();
         services.AddScoped<ITenantManagementOAuth, TenantManagementOAuth>();
+        services.AddScoped<ITenantOAuthProvider, TenantOAuthProvider>();
+        services.AddScoped<ITenantOAuthStateCoordinator, TenantOAuthStateCoordinator>();
         services.AddScoped<IChannelManagementAudit, PostgresChannelManagementAudit>();
+        services.AddScoped<ITenantCatalogueManagementState, TenantCatalogueManagementState>();
+        services.AddScoped<ITenantChannelAvailabilityState, TenantChannelAvailabilityState>();
+        services.AddScoped<ITenantChannelExceptionData, TenantChannelExceptionData>();
+        services.AddScoped<ITenantChannelPublicationReconciler, TenantChannelPublicationReconciler>();
+        services.AddScoped<ITenantChannelAvailabilityReconciler, TenantChannelAvailabilityReconciler>();
+        services.AddScoped<ITenantChannelSummaryService, TenantChannelSummaryService>();
+        services.AddScoped<ITenantChannelCatalogueService, TenantChannelCatalogueService>();
+        services.AddScoped<ITenantChannelAvailabilityService, TenantChannelAvailabilityService>();
+        services.AddScoped<ITenantChannelExceptionService, TenantChannelExceptionService>();
+        services.AddScoped<ITenantChannelConnectionService, TenantChannelConnectionService>();
         services.AddScoped<ITenantChannelManagementOperations, TenantChannelManagementOperations>();
         return services;
     }
