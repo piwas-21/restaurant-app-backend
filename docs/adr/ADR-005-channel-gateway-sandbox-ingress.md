@@ -157,7 +157,11 @@ IDs, other stores/apps, old receipts and scheduled events are excluded. Opaque l
 
 Before an HTTP import, the worker retrieves the canonical order through the existing exact-store read path.
 The current simple-item contract refuses terminal states, cash/restaurant delivery, modifiers, promotions,
-fulfillment corrections, packaging and unsupported contact phone-code instructions rather than discarding them.
+fulfillment corrections and packaging rather than discarding them. The anonymized customer phone access code is
+retained as a separate bounded optional source field. A code requires its phone number; malformed codes are refused.
+Authenticated staff and cashier receipts label it; kitchen headers omit it. It is operational customer contact data,
+subject to the existing order-data privacy boundary, never an OAuth credential or a logging field. Null codes are
+omitted from the import fingerprint so pre-field normalized replay remains compatible.
 All currency/money/quantity/item identities and customer/item instruction limits are validated without truncation.
 `payment.charges.total` is merchant revenue; the consumer checkout total is not used. Missing reported tax remains
 null, distinct from zero. Unsupported orders are quarantined for marketplace fallback without a tenant call.

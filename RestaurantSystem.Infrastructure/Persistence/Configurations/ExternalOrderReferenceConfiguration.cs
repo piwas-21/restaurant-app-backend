@@ -23,6 +23,7 @@ public sealed class ExternalOrderReferenceConfiguration : IEntityTypeConfigurati
         builder.Property(reference => reference.Currency).IsRequired().HasMaxLength(3);
         builder.Property(reference => reference.PayloadHash).IsRequired().HasMaxLength(64);
         builder.Property(reference => reference.CanonicalHash).HasMaxLength(64);
+        builder.Property(reference => reference.CustomerPhoneAccessCode).HasMaxLength(30);
         builder.Property(reference => reference.FulfillmentType).IsRequired().HasMaxLength(64);
         builder.Property(reference => reference.MerchantTotal).HasPrecision(10, 2);
         builder.Property(reference => reference.ReportedTax).HasPrecision(10, 2);

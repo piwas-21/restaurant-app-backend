@@ -43,6 +43,7 @@ internal static class ExternalOrderBuilder
             ReportedTax = request.ReportedTax,
             PayloadHash = fingerprint,
             CanonicalHash = request.CanonicalOrderHash,
+            CustomerPhoneAccessCode = request.CustomerPhoneAccessCode,
             FulfillmentType = request.FulfillmentType,
             IsSandbox = isSandbox,
             CreatedAt = now,
