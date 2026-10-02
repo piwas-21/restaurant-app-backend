@@ -28,8 +28,7 @@ public sealed class UberOrderNormalizer : IUberOrderNormalizer
         var (total, tax) = ReadTotals(order, binding.Currency, items);
         var eater = UberOrderValue.Object(order, "eater");
         var (phone, phoneCode) = Contact(eater);
-        if (UberOrderValue.HasContent(order, "packaging"))
-            throw UberOrderValue.Unsupported();
+        ValidatePackaging(order);
         // Do not retain the provider's private eater UUID, address, courier or tax-profile objects.
         return new("uber-eats", binding.StoreId.ToString("D"), orderId.ToString("D"),
             UberOrderValue.Text(order, "display_id", 100),
@@ -46,6 +45,31 @@ public sealed class UberOrderNormalizer : IUberOrderNormalizer
         if (code is not null && (string.IsNullOrWhiteSpace(phone) || !code.Any(char.IsAsciiDigit)
             || !code.All(c => char.IsAsciiDigit(c) || c == ' '))) throw UberOrderValue.Unsupported();
         return (phone, code);
+    }
+
+    private static void ValidatePackaging(JsonElement order)
+    {
+        var packagingProperties = order.EnumerateObject().Where(property => property.NameEquals("packaging")).ToArray();
+        if (packagingProperties.Length == 0) return;
+        if (packagingProperties.Length == 1 && packagingProperties[0].Value.ValueKind == JsonValueKind.Null) return;
+        if (packagingProperties.Length != 1
+            || !HasOnlyProperty(packagingProperties[0].Value, "disposable_items", out var disposableItems)
+            || !HasOnlyProperty(disposableItems, "should_include", out var shouldInclude)
+            || shouldInclude.ValueKind != JsonValueKind.False)
+            throw UberOrderValue.Unsupported();
+    }
+
+    private static bool HasOnlyProperty(JsonElement value, string expectedName, out JsonElement propertyValue)
+    {
+        propertyValue = default;
+        if (value.ValueKind != JsonValueKind.Object) return false;
+        var count = 0;
+        foreach (var property in value.EnumerateObject())
+        {
+            if (!property.NameEquals(expectedName) || ++count != 1) return false;
+            propertyValue = property.Value;
+        }
+        return count == 1;
     }
 
     private static void ValidateBinding(TenantStoreBinding binding)
