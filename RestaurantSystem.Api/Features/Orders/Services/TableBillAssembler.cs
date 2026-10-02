@@ -78,8 +78,8 @@ public class TableBillAssembler : ITableBillAssembler
         var orders = await QueryOrders(o => o.ServiceSessionId == serviceSessionId
             && o.Status != OrderStatus.Cancelled, cancellationToken);
         return BuildBill(
-            orders, session.TableNumber, session.TableId, session.Table?.TableNumber,
-            session.Id, session.Version, session.AccountRevision, session.Currency);
+            orders, new BillContext(session.TableNumber, session.TableId, session.Table?.TableNumber,
+                session.Id, session.Version, session.AccountRevision, session.Currency));
     }
 
     /// <summary>
@@ -105,8 +105,8 @@ public class TableBillAssembler : ITableBillAssembler
 
         return sessions.Select(session => ordersBySession.TryGetValue(session.Id, out var members)
                 ? BuildBill(
-                    members, session.TableNumber, session.TableId, session.Table?.TableNumber,
-                    session.Id, session.Version, session.AccountRevision, session.Currency)
+                    members, new BillContext(session.TableNumber, session.TableId, session.Table?.TableNumber,
+                        session.Id, session.Version, session.AccountRevision, session.Currency))
                 : null)
             .ToList();
     }
@@ -120,7 +120,7 @@ public class TableBillAssembler : ITableBillAssembler
         var orders = await QueryOrders(o => o.TableNumber == tableNumber
             && o.ServiceSessionId == null, cancellationToken,
             OrderSettlementEligibility.OperationalQueuePredicate());
-        return BuildBill(orders, tableNumber, null, null, null, null, null, null);
+        return BuildBill(orders, new BillContext(tableNumber, null, null, null, null, null, null));
     }
 
     private async Task<List<Order>> QueryOrders(
@@ -145,15 +145,16 @@ public class TableBillAssembler : ITableBillAssembler
             .ToListAsync(cancellationToken);
     }
 
-    private TableBillDto? BuildBill(
-        List<Order> orders,
-        int? tableNumber,
-        Guid? tableId,
-        string? tableLabel,
-        Guid? serviceSessionId,
-        int? serviceSessionVersion,
-        long? accountRevision,
-        string? currency)
+    private sealed record BillContext(
+        int? TableNumber,
+        Guid? TableId,
+        string? TableLabel,
+        Guid? ServiceSessionId,
+        int? ServiceSessionVersion,
+        long? AccountRevision,
+        string? Currency);
+
+    private TableBillDto? BuildBill(List<Order> orders, BillContext identity)
     {
         if (orders.Count == 0)
         {
@@ -162,13 +163,13 @@ public class TableBillAssembler : ITableBillAssembler
 
         var bill = new TableBillDto
         {
-            TableNumber = tableNumber,
-            TableId = tableId,
-            TableLabel = tableLabel ?? tableNumber?.ToString(CultureInfo.InvariantCulture),
-            ServiceSessionId = serviceSessionId,
-            ServiceSessionVersion = serviceSessionVersion,
-            AccountRevision = accountRevision,
-            Currency = CurrencyCode.Normalize(currency),
+            TableNumber = identity.TableNumber,
+            TableId = identity.TableId,
+            TableLabel = identity.TableLabel ?? identity.TableNumber?.ToString(CultureInfo.InvariantCulture),
+            ServiceSessionId = identity.ServiceSessionId,
+            ServiceSessionVersion = identity.ServiceSessionVersion,
+            AccountRevision = identity.AccountRevision,
+            Currency = CurrencyCode.Normalize(identity.Currency),
             GeneratedAt = DateTime.UtcNow,
             OrderCount = orders.Count,
         };
@@ -197,14 +198,14 @@ public class TableBillAssembler : ITableBillAssembler
         }
 
         Summarize(bill);
-        if (accountRevision.HasValue)
+        if (identity.AccountRevision.HasValue)
         {
             bill.AccountItems = TableAccountItemProjection.Project(bill.Orders);
         }
 
         _logger.LogInformation(
             "Assembled bill for table {TableNumber}, session {ServiceSessionId}: {OrderCount} orders, remaining {Remaining}",
-            tableNumber, serviceSessionId, bill.OrderCount, bill.Remaining);
+            identity.TableNumber, identity.ServiceSessionId, bill.OrderCount, bill.Remaining);
         return bill;
     }
 
