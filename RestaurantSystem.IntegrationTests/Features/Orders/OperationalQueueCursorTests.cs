@@ -169,13 +169,13 @@ public sealed class OperationalQueueCursorTests
             new DbContextOptionsBuilder<ApplicationDbContext>().Options);
         var caller = new Mock<ICurrentUserService>();
         var clock = new Mock<ITenantClock>();
-        var mapping = new Mock<IOrderMappingService>();
+        var projection = new Mock<IOrderQueueProjection>();
         var cursor = CreateCursor("tenant-a");
         var sync = new OperationalQueueSyncReader(
-            context, caller.Object, clock.Object, mapping.Object, cursor,
+            context, caller.Object, clock.Object, projection.Object, cursor,
             NullLogger<OperationalQueueSyncReader>.Instance);
         var handler = new GetOrdersQueryHandler(
-            context, caller.Object, clock.Object, mapping.Object, cursor, sync,
+            context, caller.Object, clock.Object, projection.Object, cursor, sync,
             NullLogger<GetOrdersQueryHandler>.Instance);
         var query = new GetOrdersQuery(
             Status: null, PaymentStatus: null, OrderType: null,

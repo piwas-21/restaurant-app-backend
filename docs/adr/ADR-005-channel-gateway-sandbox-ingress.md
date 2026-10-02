@@ -340,10 +340,15 @@ Imported jobs are joined on all retained identities before claim and completion.
 least-available ordering keep reconciliation recoverable and fair. Lost tenant replies trigger another canonical
 GET; polling stops only after the tenant confirms the terminal state. Paused/disabled forwarding makes no claim.
 
-Released, provider-accepted Uber-delivery orders permit only local `Preparing`/`Ready` transitions, with a required
-current order version and the established kitchen role policy. Local preparation adds no guessed provider ETA.
-Payment, cancellation, handover and completion retain their dedicated channel restrictions. Frontend preparation
-controls must send the additive version field; staff/printer source DTOs retain their existing fields.
+After an Admin or Cashier records a human acceptance and the tenant confirms canonical `ACCEPTED` plus kitchen
+release, signed-in Admin, Cashier, KitchenStaff and Server staff may move an Uber `DELIVERY_BY_UBER` order through
+`Preparing` and `Ready`, using its current order version. Server receives only those two preparation actions for
+this provider order; Server cannot accept/reject it or manage channel integration, which remains Admin-only. Local
+preparation adds no guessed provider ETA, while payment custody, collection and refunds remain with the provider.
+Operational snapshot, change and offset pages carry the existing `permittedActions` contract as order detail does,
+so each role sees only its available actions.
+Cancellation, handover and completion retain their dedicated channel restrictions. Frontend preparation controls
+must send the additive version field; staff/printer source DTOs retain their existing fields.
 
 ## Private sandbox connection and testing
 

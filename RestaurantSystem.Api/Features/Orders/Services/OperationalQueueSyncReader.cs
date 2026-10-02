@@ -18,7 +18,7 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly ITenantClock _clock;
-    private readonly IOrderMappingService _mapping;
+    private readonly IOrderQueueProjection _projection;
     private readonly IOperationalQueueCursor _cursor;
     private readonly ILogger<OperationalQueueSyncReader> _logger;
 
@@ -26,14 +26,14 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         ITenantClock clock,
-        IOrderMappingService mapping,
+        IOrderQueueProjection projection,
         IOperationalQueueCursor cursor,
         ILogger<OperationalQueueSyncReader> logger)
     {
         _context = context;
         _currentUser = currentUser;
         _clock = clock;
-        _mapping = mapping;
+        _projection = projection;
         _cursor = cursor;
         _logger = logger;
     }
@@ -134,7 +134,7 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
             // An item in Changes mode is an Upsert. The DTO is read from the current matching row;
             // the journal sequence is the ordering marker, so a client can apply pages in order and
             // ignore an older response that arrives after a newer one.
-            items.Add(await _mapping.MapToOrderDtoAsync(order, cancellationToken));
+            items.Add(await _projection.ProjectAsync(order, true, cancellationToken));
         }
 
         var hasMore = rows.Count > pageSize;
@@ -217,7 +217,7 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
             });
 
         return new PagedResult<OrderDto>(
-            pageRows.Select(_mapping.MapToOrderDto).ToList(),
+            pageRows.Select(order => _projection.Project(order, true)).ToList(),
             totalCount,
             pageNumber,
             pageSize,

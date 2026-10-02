@@ -12,6 +12,7 @@ public static class OperationalQueueServiceExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IOperationalQueueCursor, OperationalQueueCursor>();
+        services.AddScoped<IOrderQueueProjection, OrderQueueProjection>();
         services.AddScoped<IOperationalQueueSyncReader, OperationalQueueSyncReader>();
         return services;
     }
