@@ -45,7 +45,8 @@ public sealed class SandboxConsoleController(ISandboxSessions sessions, ISandbox
     public Task<IActionResult> Connect(CancellationToken cancellationToken) => Command(new("connect"), cancellationToken);
 
     [HttpPost("publish")]
-    public Task<IActionResult> Publish(CancellationToken cancellationToken) => Command(new("publish"), cancellationToken);
+    public Task<IActionResult> Publish(ConsolePublishRequest request, CancellationToken cancellationToken)
+        => Command(new("publish", PublicationRevision: request.Revision), cancellationToken);
 
     [HttpPost("enable")]
     public Task<IActionResult> Enable(ConsoleEnableRequest request, CancellationToken cancellationToken)

@@ -10,6 +10,7 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
     // Uber documents suspend_until as an int. Preserve indefinite Sofra stock intent up to its wire maximum;
     // refuse when this representation can no longer express a future suspension.
     public const int MaximumSuspensionTimestamp = int.MaxValue;
+    private const string Overrides = "overrides";
 
     public async Task<UberAvailabilitySnapshot> Read(TenantStoreBinding store, string clientId, CancellationToken cancellationToken)
     {
@@ -18,7 +19,7 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
         ProviderJson.RequireSuccess(response, "availability readback");
         if (response.ClientId.Length > 0 && response.ClientId != clientId)
             throw InvalidMenu();
-        SandboxMenuVerifier.Require(menu.Preview(), response.Body);
+        SandboxMenuVerifier.Require(await menu.Expected(cancellationToken), response.Body);
         var expected = store.Items.Select(item => item.ProviderItemId).ToHashSet(StringComparer.Ordinal);
         var states = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var row in response.Body.GetProperty("items").EnumerateArray())
@@ -32,20 +33,25 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
         return new(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(response.Body.GetRawText()))), states);
     }
 
-    private static void RequireSimpleItem(JsonElement row)
+    internal static void RequireSimpleItem(JsonElement row)
     {
-        var price = row.GetProperty("price_info");
-        if (price.TryGetProperty("overrides", out var overrides) && !EmptyCollection(overrides)) throw InvalidMenu();
+        if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("price_info", out var price)
+            || price.ValueKind != JsonValueKind.Object) throw InvalidMenu();
+        if (price.TryGetProperty(Overrides, out var overrides) && !EmptyCollection(overrides)) throw InvalidMenu();
         foreach (var key in new[] { "bundled_items", "modifier_group_ids", "quantity_info" })
         {
             if (!row.TryGetProperty(key, out var value) || value.ValueKind == JsonValueKind.Null) continue;
-            if (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0) continue;
-            // Canonical defaults may contain empty ids/overrides, but no actual choice or quantity rules.
-            if (value.ValueKind == JsonValueKind.Object && value.EnumerateObject().All(property =>
-                property.Name is "ids" or "overrides" && EmptyCollection(property.Value))) continue;
+            if (IsEmptyChoice(value)) continue;
             throw InvalidMenu();
         }
+        // Full menu replacement must not erase unsupported provider stock rules either.
+        _ = Available(row, 0);
     }
+
+    private static bool IsEmptyChoice(JsonElement value)
+        => value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0
+            || value.ValueKind == JsonValueKind.Object && value.EnumerateObject().All(property =>
+                property.Name is "ids" or Overrides && EmptyCollection(property.Value));
 
     private static bool EmptyCollection(JsonElement value)
         => value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0;
@@ -73,10 +79,18 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
     {
         if (!row.TryGetProperty("suspension_info", out var rules) || rules.ValueKind == JsonValueKind.Null) return true;
         if (rules.ValueKind != JsonValueKind.Object) throw InvalidMenu();
-        if (rules.TryGetProperty("overrides", out var overrides) && overrides.ValueKind != JsonValueKind.Null
+        if (rules.EnumerateObject().Any(property => property.Name is not ("suspension" or Overrides))) throw InvalidMenu();
+        if (rules.TryGetProperty(Overrides, out var overrides) && overrides.ValueKind != JsonValueKind.Null
             && (overrides.ValueKind != JsonValueKind.Array || overrides.GetArrayLength() != 0)) throw InvalidMenu();
         if (!rules.TryGetProperty("suspension", out var suspension) || suspension.ValueKind == JsonValueKind.Null) return true;
+        return SimpleSuspensionExpired(suspension, now);
+    }
+
+    private static bool SimpleSuspensionExpired(JsonElement suspension, long now)
+    {
         if (suspension.ValueKind != JsonValueKind.Object) throw InvalidMenu();
+        if (suspension.EnumerateObject().Any(property => property.Name is not ("suspend_until" or "reason"))
+            || suspension.TryGetProperty("reason", out var reason) && reason.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) throw InvalidMenu();
         if (!suspension.TryGetProperty("suspend_until", out var until) || until.ValueKind == JsonValueKind.Null) return true;
         return SuspensionExpired(until, now);
     }

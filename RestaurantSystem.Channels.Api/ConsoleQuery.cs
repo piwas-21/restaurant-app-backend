@@ -14,7 +14,7 @@ public sealed class ConsoleQueryHandler(ISandboxConnection connection, ISandboxM
             "imports" => await imports.Read(query.Cursor, cancellationToken),
             "availability" => await availability.Read(cancellationToken),
             "configuration" => await connection.Configuration(cancellationToken),
-            "preview" => menu.Preview(),
+            "preview" => await menu.Preview(cancellationToken),
             "menu" => await menu.Read(cancellationToken),
             "verification" => await VerifyMenu(cancellationToken),
             "receipts" => await orders.Receipts(cancellationToken),
@@ -25,6 +25,6 @@ public sealed class ConsoleQueryHandler(ISandboxConnection connection, ISandboxM
     private async Task<JsonElement> VerifyMenu(CancellationToken cancellationToken)
     {
         await menu.RequireVerified(cancellationToken);
-        return ProviderJson.Encode(new { verified = true, revision = "sandbox-menu-v1" });
+        return ProviderJson.Encode(new { verified = true });
     }
 }

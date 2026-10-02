@@ -16,6 +16,10 @@ public static class TenantBridgeServices
                 "Tenant bridge requires the existing sandbox-only provider connection for exactly its configured store.")
             .ValidateOnStart();
         services.AddScoped<IChannelAvailabilityJobs, PostgresChannelAvailabilityJobs>();
+        services.AddScoped<ICataloguePublications, PostgresCataloguePublications>();
+        services.AddScoped<ITenantCatalogueClient, TenantCatalogueClient>();
+        services.AddScoped<ITenantMenuProvider, TenantMenuProvider>();
+        services.AddScoped<ITenantCataloguePublication, TenantCataloguePublication>();
         services.AddScoped<ITenantAvailabilityClient, TenantAvailabilityClient>();
         services.AddScoped<IUberAvailabilityClient, UberAvailabilityClient>();
         services.AddScoped<IChannelAvailabilityProcessor, ChannelAvailabilityProcessor>();
