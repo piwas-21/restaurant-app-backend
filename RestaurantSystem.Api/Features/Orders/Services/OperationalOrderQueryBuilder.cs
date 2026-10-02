@@ -27,6 +27,7 @@ internal static partial class OperationalOrderQueryBuilder
     {
         var orders = CreateBaseQuery(context);
         orders = ApplyCallerFilter(orders, currentUser);
+        if (query.MarketplaceOnly) orders = orders.Where(order => order.ExternalReference != null);
         orders = ApplyScopeFilter(orders, query);
         orders = ApplyEnumFilters(orders, query);
         orders = ApplyDateFilters(orders, query, clock, logger);

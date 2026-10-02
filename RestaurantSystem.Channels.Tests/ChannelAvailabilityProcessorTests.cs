@@ -34,10 +34,14 @@ public sealed class ChannelAvailabilityProcessorTests(GatewayFixture fixture) : 
     private Task<bool> Process(TenantBridgeSettings settings, SourceClient? tenant = null) => InScope(async services =>
     {
         await using var source = NpgsqlDataSource.Create(Database.ConnectionString);
-        await new ChannelAvailabilityProcessor(Options.Create(settings), Options.Create(new UberWebhookSettings
-        { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), tenant ?? new(Snapshot()),
+        var webhook = new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] };
+        var sourceClient = tenant ?? new(Snapshot());
+        var policy = ChannelProcessingPolicyTestSupport.Availability(settings, webhook, sourceClient,
+            ChannelProcessingPolicyTestSupport.Mapping(settings.Store), ChannelProcessingPolicyTestSupport.NoOverrides,
+            TimeProvider.System);
+        await new ChannelAvailabilityProcessor(
             new UberAvailabilityClient(Provider, services.GetRequiredService<ISandboxTokens>(), services.GetRequiredService<ISandboxMenu>(), TimeProvider.System),
-            new PostgresChannelAvailabilityJobs(source), TimeProvider.System).Process(default);
+            new PostgresChannelAvailabilityJobs(source), TimeProvider.System, policy).Process(default);
         return true;
     });
     private async Task<IReadOnlyList<ChannelAvailabilityState>> States(TenantBridgeSettings settings)

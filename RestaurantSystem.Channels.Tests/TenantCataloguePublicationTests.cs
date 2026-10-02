@@ -39,11 +39,14 @@ public sealed class TenantCataloguePublicationTests(GatewayFixture fixture) : Co
         {
             await using var source = NpgsqlDataSource.Create(Database.ConnectionString);
             var repository = new PostgresCataloguePublications(source);
-            var publication = new TenantCataloguePublication(Options.Create(settings), Options.Create(new UberWebhookSettings
-            { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), tenant, repository,
+            var webhook = Options.Create(new UberWebhookSettings
+            { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] });
+            var context = new TenantManagementContext(Options.Create(settings),
+                Options.Create(new TenantManagementGatewaySettings()), webhook, TimeProvider.System);
+            var publication = new TenantCataloguePublication(context, tenant, repository,
                 new PostgresChannelAvailabilityJobs(source), new TenantMenuProvider(Options.Create(settings),
                 Options.Create(new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }),
-                Provider, services.GetRequiredService<ISandboxTokens>()), TimeProvider.System);
+                Provider, services.GetRequiredService<ISandboxTokens>()));
             var template = services.GetRequiredService<ISandboxMenu>().Preview();
             if (Provider.Menu.GetProperty("menus").GetArrayLength() == 0) Provider.Menu = template;
             return await action(publication, template, repository);
@@ -73,6 +76,62 @@ public sealed class TenantCataloguePublicationTests(GatewayFixture fixture) : Co
             Assert.Single(Provider.Calls, call => call.Method == HttpMethod.Put);
             await publication.Publish(template, revision, default); Assert.Single(Provider.Calls, call => call.Method == HttpMethod.Put);
             var expected = await publication.Expected(default); Assert.False(expected.GetProperty("items")[0].TryGetProperty("suspension_info", out _));
+            return true;
+        });
+    }
+
+    [Fact]
+    public async Task DraftRevisionGuardRefusesStaleIntentBeforeDispatchAndAgainBeforeUpload()
+    {
+        var settings = Settings(); var tenant = new SourceClient(Snapshot(settings));
+        await WithPublication(settings, tenant, async (publication, template, repository) =>
+        {
+            var preview = await publication.Preview(template, default);
+            var revision = preview.GetProperty("revision").GetString()!;
+            await Assert.ThrowsAsync<ChannelConsoleException>(() => publication.Publish(template, revision, settings.Store,
+                default, _ => Task.FromResult(false)));
+            Assert.Empty(Provider.Calls);
+            Assert.Null(await repository.Latest(Binding(settings), default));
+            var checks = 0;
+            await Assert.ThrowsAsync<ChannelConsoleException>(() => publication.Publish(template, revision, settings.Store,
+                default, _ => Task.FromResult(++checks < 2)));
+            Assert.Equal(2, checks);
+            Assert.DoesNotContain(Provider.Calls, call => call.Method == HttpMethod.Put);
+            Assert.Equal("Pending", (await repository.Latest(Binding(settings), default))!.State);
+            return true;
+        });
+    }
+
+    [Fact]
+    public async Task ReviewedDraftPromotesOnlyAfterReadbackAndDoesNotMutateBootstrapMapping()
+    {
+        var settings = Settings(); var originalProduct = settings.Store.Items[0].ProductId;
+        var tenant = new SourceClient(Snapshot(settings));
+        await WithPublication(settings, tenant, async (publication, template, repository) =>
+        {
+            var original = await publication.Preview(template, default);
+            await publication.Publish(template, original.GetProperty("revision").GetString()!, default);
+            var draft = Settings(); draft.Store.TenantId = settings.Store.TenantId;
+            draft.Store.CatalogueRevision = "selected-tenant-menu-v2";
+            tenant.Value = Snapshot(draft, 725, "b");
+            var preview = await publication.Preview(template, draft.Store, default);
+            Assert.Equal(originalProduct, settings.Store.Items[0].ProductId);
+            Assert.Equal("reviewed-selection-v1", (await repository.Latest(Binding(settings), default))!
+                .MappingSnapshot!.Value.GetProperty("catalogueRevision").GetString());
+            await publication.Publish(template, preview.GetProperty("revision").GetString()!, draft.Store, default);
+            Assert.Equal(originalProduct, settings.Store.Items[0].ProductId);
+            await using var database = NpgsqlDataSource.Create(Database.ConnectionString);
+            var history = new PostgresCatalogueMappingHistory(database);
+            Assert.NotNull(await history.FindVerified(Binding(settings), "reviewed-selection-v1", default));
+            var active = (await history.FindVerified(Binding(settings), "selected-tenant-menu-v2", default))!;
+            Assert.Equal(draft.Store.Items[0].ProductId.ToString(), active.MappingSnapshot!.Value
+                .GetProperty("items")[0].GetProperty("productId").GetString());
+            Assert.Equal(725, active.Menu.GetProperty("items")[0].GetProperty("price_info").GetProperty("price").GetInt32());
+            draft.Store.StoreId = Guid.NewGuid();
+            var callsBefore = Provider.Calls.Count;
+            await Assert.ThrowsAsync<ChannelConsoleException>(() => publication.Publish(template,
+                preview.GetProperty("revision").GetString()!, draft.Store, default));
+            Assert.Equal(callsBefore, Provider.Calls.Count);
             return true;
         });
     }

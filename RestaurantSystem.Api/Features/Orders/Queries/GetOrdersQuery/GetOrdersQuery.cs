@@ -48,5 +48,6 @@ public record GetOrdersQuery(
     int PageSize = 10,
     OrderListScope Scope = OrderListScope.All,
     int? TableNumber = null,
-    string? SyncCursor = null
+    string? SyncCursor = null,
+    bool MarketplaceOnly = false
 ) : IQuery<ApiResponse<PagedResult<OrderDto>>>;

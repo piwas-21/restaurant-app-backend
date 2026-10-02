@@ -39,13 +39,20 @@ public sealed class SandboxTokens(IOptions<UberWebhookSettings> webhookOptions, 
         return access;
     }
 
-    public async Task<string> Exchange(string code, string verifier, CancellationToken cancellationToken)
+    public Task<string> Exchange(string code, string verifier, CancellationToken cancellationToken)
+        => Exchange(code, verifier, consoleOptions.Value.PublicBaseUrl.TrimEnd('/') + SandboxConsoleSettings.CallbackPath,
+            cancellationToken);
+
+    public async Task<string> Exchange(string code, string verifier, string redirectUri, CancellationToken cancellationToken)
     {
+        var expectedRedirect = consoleOptions.Value.PublicBaseUrl.TrimEnd('/') + SandboxConsoleSettings.CallbackPath;
+        if (!string.Equals(redirectUri, expectedRedirect, StringComparison.Ordinal))
+            throw new ChannelConsoleException(400, "Authorization callback does not match the registered Uber redirect.");
         var token = await provider.Token(Fields("authorization_code", new()
         {
             ["code"] = code,
             ["code_verifier"] = verifier,
-            ["redirect_uri"] = consoleOptions.Value.PublicBaseUrl.TrimEnd('/') + SandboxConsoleSettings.CallbackPath,
+            ["redirect_uri"] = redirectUri,
         }), cancellationToken);
         ProviderJson.RequireSuccess(token, "merchant authorization");
         RequireToken(token.Body, "eats.pos_provisioning");

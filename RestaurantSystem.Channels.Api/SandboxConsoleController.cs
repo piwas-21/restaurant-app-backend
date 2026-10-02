@@ -8,7 +8,7 @@ namespace RestaurantSystem.Channels.Api;
 [EnableRateLimiting("sandbox-console")]
 [RequestSizeLimit(4096)]
 public sealed class SandboxConsoleController(ISandboxSessions sessions, ISandboxConnection connection,
-    ChannelMediator mediator) : ControllerBase
+    ChannelMediator mediator, ITenantManagementOAuth tenantOAuth) : ControllerBase
 {
     [HttpGet("callback")]
     public async Task<IActionResult> Callback([FromQuery] string state = "", [FromQuery] string code = "",
@@ -16,6 +16,8 @@ public sealed class SandboxConsoleController(ISandboxSessions sessions, ISandbox
     {
         try
         {
+            var tenantFlow = await tenantOAuth.CompleteIfKnown(state, code, error, cancellationToken);
+            if (tenantFlow is not null) return Redirect(tenantFlow.ReturnUrl);
             var session = await sessions.Require(HttpContext, false, cancellationToken);
             await connection.Complete(session, state, code, error, cancellationToken);
             return Redirect("/console/?connection=complete");

@@ -24,10 +24,13 @@ public sealed class CreatedOrderRecoveryTests(GatewayFixture fixture) : ConsoleF
     private Task<bool> Process(TenantBridgeSettings settings) => InScope(async services =>
     {
         await using var source = NpgsqlDataSource.Create(Database.ConnectionString);
-        await new CreatedOrderRecovery(Options.Create(settings), Options.Create(new UberWebhookSettings
-        { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), services.GetRequiredService<ISandboxTokens>(),
-            Provider, new PostgresCreatedOrderDiscoveries(source),
-            TimeProvider.System, NullLogger<CreatedOrderRecovery>.Instance).Process(default);
+        var webhook = new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] };
+        var policy = ChannelProcessingPolicyTestSupport.OrderProcessing(settings, webhook,
+            ChannelProcessingPolicyTestSupport.Mapping(settings.Store), ChannelProcessingPolicyTestSupport.Connected,
+            ChannelProcessingPolicyTestSupport.Catalogue);
+        await new CreatedOrderRecovery(services.GetRequiredService<ISandboxTokens>(), Provider,
+            new PostgresCreatedOrderDiscoveries(source), TimeProvider.System,
+            NullLogger<CreatedOrderRecovery>.Instance, policy).Process(default);
         return true;
     });
 

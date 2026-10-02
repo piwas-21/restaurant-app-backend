@@ -11,8 +11,9 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
 {
     private static AvailabilityBinding Binding() => new(Guid.NewGuid().ToString(), Guid.NewGuid(), "tenant-fixture", "selection-v1");
     private static Task<CataloguePublication> Begin(PostgresCataloguePublications repository, AvailabilityBinding binding)
-        => repository.Begin(binding, new string('a', 64), new string('b', 64), new string('c', 64),
-            ProviderJson.Encode(new { items = new[] { new { id = "public-fixture" } } }), ProviderJson.Encode(new { items = Array.Empty<object>() }), default);
+        => repository.Begin(binding, new(new string('a', 64), new string('b', 64), new string('c', 64),
+            ProviderJson.Encode(new { items = new[] { new { id = "public-fixture" } } }),
+            ProviderJson.Encode(new { items = Array.Empty<object>() })), default);
 
     [Fact]
     public async Task FirstTenantAnchorRejectsRebindingAcrossMappingRevisionsAndReadIsExactlyScoped()
@@ -86,9 +87,10 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
     {
         await using var source = NpgsqlDataSource.Create(fixture.ConnectionString);
         var repository = new PostgresCataloguePublications(source); var binding = Binding();
-        var malformed = await Assert.ThrowsAsync<PostgresException>(() => repository.Begin(binding, new string('x', 64),
-            new string('b', 64), new string('c', 64), ProviderJson.Encode(new { items = Array.Empty<object>() }),
-            ProviderJson.Encode(new { items = Array.Empty<object>() }), default));
+        var malformed = await Assert.ThrowsAsync<PostgresException>(() => repository.Begin(binding, new(
+            new string('x', 64), new string('b', 64), new string('c', 64),
+            ProviderJson.Encode(new { items = Array.Empty<object>() }),
+            ProviderJson.Encode(new { items = Array.Empty<object>() })), default));
         Assert.Equal(PostgresErrorCodes.CheckViolation, malformed.SqlState);
         Assert.Null(await repository.Latest(binding, default));
         var row = await Begin(repository, binding);
