@@ -71,12 +71,8 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         var (allowed, reasonCode) = action switch
         {
             OrderAction.Accept => AcceptAction(order),
-            OrderAction.StartPreparing => IsServer
-                ? (false, OrderActionReasonCodes.KitchenRoleRequired)
-                : StatusAction(order, OrderStatus.Preparing),
-            OrderAction.MarkReady => IsServer
-                ? (false, OrderActionReasonCodes.KitchenRoleRequired)
-                : StatusAction(order, OrderStatus.Ready),
+            OrderAction.StartPreparing => StatusAction(order, OrderStatus.Preparing),
+            OrderAction.MarkReady => StatusAction(order, OrderStatus.Ready),
             OrderAction.HandOver => HandOverAction(order),
             OrderAction.CollectPayment => CollectPaymentAction(order),
             OrderAction.AddOperationalNote => RoleAction(

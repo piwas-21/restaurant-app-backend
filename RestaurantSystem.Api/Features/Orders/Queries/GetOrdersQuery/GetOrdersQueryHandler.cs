@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Queries.GetOrdersQuery;
 
@@ -16,6 +17,7 @@ public sealed class GetOrdersQueryHandler
     private readonly ICurrentUserService _currentUser;
     private readonly ITenantClock _clock;
     private readonly IOrderMappingService _mapping;
+    private readonly IOrderPermittedActionsService _permittedActions;
     private readonly IOperationalQueueCursor _cursor;
     private readonly IOperationalQueueSyncReader _sync;
     private readonly ILogger<GetOrdersQueryHandler> _logger;
@@ -25,6 +27,7 @@ public sealed class GetOrdersQueryHandler
         ICurrentUserService currentUser,
         ITenantClock clock,
         IOrderMappingService mapping,
+        IOrderPermittedActionsService permittedActions,
         IOperationalQueueCursor cursor,
         IOperationalQueueSyncReader sync,
         ILogger<GetOrdersQueryHandler> logger)
@@ -33,6 +36,7 @@ public sealed class GetOrdersQueryHandler
         _currentUser = currentUser;
         _clock = clock;
         _mapping = mapping;
+        _permittedActions = permittedActions;
         _cursor = cursor;
         _sync = sync;
         _logger = logger;
@@ -98,13 +102,24 @@ public sealed class GetOrdersQueryHandler
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync(cancellationToken);
-        var items = rows.Select(_mapping.MapToOrderDto).ToList();
+        var items = rows.Select(order => MapListRow(order, query.Scope)).ToList();
         var result = new PagedResult<OrderDto>(
             items, totalCount, query.Page, query.PageSize,
             (int)Math.Ceiling(totalCount / (double)query.PageSize));
 
         _logger.LogInformation("Retrieved {Count} orders out of {TotalCount} total", items.Count, totalCount);
         return ApiResponse<PagedResult<OrderDto>>.SuccessWithData(result);
+    }
+
+    private OrderDto MapListRow(Order order, OrderListScope scope)
+    {
+        var dto = _mapping.MapToOrderDto(order);
+        if (scope == OrderListScope.Operational)
+        {
+            dto.PermittedActions = _permittedActions.GetPermittedActions(order);
+        }
+
+        return dto;
     }
 
     private static BadRequestException InvalidCursor() => new(
