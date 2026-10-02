@@ -19,6 +19,10 @@ public static class TenantBridgeServices
         services.AddScoped<IUberOrderNormalizer, UberOrderNormalizer>();
         services.AddScoped<ITenantImportProcessor, TenantImportProcessor>();
         services.AddScoped<ITenantOrderClient, TenantOrderClient>();
+        services.AddScoped<IChannelObservationJobs, PostgresChannelObservationJobs>();
+        services.AddScoped<ITenantObservationClient, TenantObservationClient>();
+        services.AddScoped<ITenantObservationProcessor, TenantObservationProcessor>();
+        services.AddHostedService<TenantObservationWorker>();
         services.AddScoped<ITenantDecisionClient, TenantDecisionClient>();
         services.AddScoped<IChannelOrderLinks, PostgresChannelOrderLinks>();
         services.AddScoped<ITenantDecisionProcessor, TenantDecisionProcessor>();

@@ -258,6 +258,7 @@ public sealed class OperationalQueueCursorTests
         public string? Email => null;
         public UserRole? Role => UserRole.Cashier;
         public bool IsAuthenticated => true;
+        public bool IsApiToken => false;
         public bool IsAdmin => false;
         public Task<ApplicationUser?> GetUserAsync() => Task.FromResult<ApplicationUser?>(null);
         public string GetAuditIdentifier() => id.ToString();

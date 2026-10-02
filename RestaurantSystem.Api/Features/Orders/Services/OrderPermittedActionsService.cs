@@ -47,7 +47,8 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
 
         // Marketplace decisions, settlement and receipts need their dedicated workflow. Keep
         // ordinary staff notes/focus available; a held order still cannot print a kitchen ticket.
-        if (order.ExternalReference is not null && action is not (OrderAction.AddOperationalNote
+        if (order.ExternalReference is not null && !AllowsChannelPreparation(order, action)
+            && action is not (OrderAction.AddOperationalNote
             or OrderAction.MarkUrgent or OrderAction.PrintKitchen or OrderAction.PrintReceipt))
         {
             return new OrderPermittedActionDto
@@ -97,6 +98,14 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
             RequiresReason = requiresReason
         };
     }
+
+    private bool AllowsChannelPreparation(Order order, OrderAction action)
+        => !_currentUser.IsApiToken && action switch
+        {
+            OrderAction.StartPreparing => ExternalOrderLocalMutationGuard.AllowsPreparation(order, OrderStatus.Preparing),
+            OrderAction.MarkReady => ExternalOrderLocalMutationGuard.AllowsPreparation(order, OrderStatus.Ready),
+            _ => false,
+        };
 
     private (bool Allowed, string? ReasonCode) StatusAction(Order order, OrderStatus target)
     {

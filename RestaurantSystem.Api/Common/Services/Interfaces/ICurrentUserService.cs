@@ -11,6 +11,8 @@ namespace RestaurantSystem.Api.Common.Services.Interfaces
         string? Email { get; }
         UserRole? Role { get; }
         bool IsAuthenticated { get; }
+        /// <summary>Actual API-token authentication, independent of its synthesized staff role.</summary>
+        bool IsApiToken { get; }
         bool IsAdmin { get; }
         Task<ApplicationUser?> GetUserAsync();
 

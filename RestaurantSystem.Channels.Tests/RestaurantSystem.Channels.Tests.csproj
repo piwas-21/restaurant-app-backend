@@ -24,5 +24,7 @@
              Link="002_sandbox_console.sql" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/003_tenant_import_jobs.sql"
              Link="003_tenant_import_jobs.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/004_order_observations.sql"
+             Link="004_order_observations.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@ using RestaurantSystem.Domain.Common.Enums;
 using System.Security.Claims;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Common.Authentication;
 
 
 namespace RestaurantSystem.Api.Common.Services
@@ -45,6 +46,9 @@ namespace RestaurantSystem.Api.Common.Services
         }
 
         public bool IsAuthenticated => _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
+
+        public bool IsApiToken => _httpContextAccessor.HttpContext?.User.FindFirstValue(ApiTokenDefaults.AuthMethodClaimType)
+            == ApiTokenDefaults.ApiTokenAuthMethod;
 
         public bool IsAdmin => Role == UserRole.Admin;
 

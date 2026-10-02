@@ -117,6 +117,7 @@ public sealed class ChannelDecisionDelivery(ApplicationDbContext context, IOptio
             job.Order.KitchenReleasedAt = report.ObservedAt.UtcDateTime;
             job.Order.KitchenReleasedBy = job.CreatedBy;
         }
+        source.CanonicalHash = report.CanonicalHash;
         source.ExternalState = report.CanonicalState;
         source.LastEventAt = report.ObservedAt.UtcDateTime;
         if (previous != job.Order.Status)
