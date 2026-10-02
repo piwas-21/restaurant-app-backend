@@ -250,8 +250,12 @@ IDs, other stores/apps, old receipts and scheduled events are excluded. Opaque l
 
 Before an HTTP import, the worker retrieves the canonical order through the existing exact-store read path.
 The current simple-item contract refuses terminal states, cash/restaurant delivery, modifiers, promotions,
-fulfillment corrections and packaging rather than discarding them. The anonymized customer phone access code is
-retained as a separate bounded optional source field. A code requires its phone number; malformed codes are refused.
+fulfillment corrections and unsupported packaging instructions. Uber documents `packaging.disposable_items.should_include`
+as optional; absent or top-level `packaging: null` remains equivalent to no selection for compatibility, and only
+an exact `{"disposable_items":{"should_include":false}}` selection is accepted. True or null/missing nested
+selections, unknown/duplicate fields and malformed packaging are held rather than discarded. The anonymized
+customer phone access code is retained as a separate bounded optional source field. A code requires its phone
+number; malformed codes are refused.
 Authenticated staff and cashier receipts label it; kitchen headers omit it. It is operational customer contact data,
 subject to the existing order-data privacy boundary, never an OAuth credential or a logging field. Null codes are
 omitted from the import fingerprint so pre-field normalized replay remains compatible.

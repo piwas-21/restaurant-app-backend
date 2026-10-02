@@ -22,6 +22,17 @@ public sealed class UberOrderNormalizerTests
     private static JsonNode Order() => JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures/uber-order-simple.json")))!;
     private TenantOrderRequest Normalize(JsonNode order, TenantStoreBinding? binding = null)
         => _normalizer.Normalize(JsonSerializer.SerializeToElement(order), OrderId, binding ?? Binding());
+    private TenantOrderRequest NormalizeRaw(string orderJson)
+    {
+        using var document = JsonDocument.Parse(orderJson);
+        return _normalizer.Normalize(document.RootElement, OrderId, Binding());
+    }
+
+    private static string OrderWithRawPackaging(string packagingJson)
+    {
+        var orderJson = Order().ToJsonString();
+        return $"{orderJson[..^1]},\"packaging\":{packagingJson}}}";
+    }
 
     [Fact]
     public void CapturedSimpleShapePreservesProviderMoneyIdentityAndInstructions()
@@ -37,6 +48,52 @@ public sealed class UberOrderNormalizerTests
         Assert.Equal("No peanuts; severe allergy.\nKeep this instruction.", item.Instructions);
         Assert.Equal("SANDBOX TEST ONLY: do not prepare food or dispatch a courier.", result.Instructions);
         Assert.Matches("^[a-f0-9]{64}$", result.CanonicalOrderHash);
+    }
+
+    [Fact]
+    public void ExplicitNoDisposableItemsSelectionIsSupported()
+    {
+        var result = Normalize(OrderWithPackaging("{\"disposable_items\":{\"should_include\":false}}"));
+        Assert.Equal(5m, result.MerchantTotal);
+    }
+
+    [Fact]
+    public void NullTopLevelPackagingRetainsOptionalFieldBehavior()
+    {
+        var result = NormalizeRaw(OrderWithRawPackaging("null"));
+        Assert.Equal(5m, result.MerchantTotal);
+    }
+
+    [Theory]
+    [InlineData("{\"disposable_items\":{\"should_include\":true}}")]
+    [InlineData("{\"disposable_items\":{\"should_include\":null}}")]
+    [InlineData("{\"disposable_items\":{}}")]
+    [InlineData("{\"disposable_items\":{\"should_include\":false,\"reason\":\"unknown\"}}")]
+    [InlineData("{\"disposable_items\":{\"should_include\":true,\"should_include\":false}}")]
+    [InlineData("{\"disposable_items\":{\"should_include\":false},\"unknown\":true}")]
+    [InlineData("[]")]
+    [InlineData("false")]
+    [InlineData("\"unknown\"")]
+    public void UnsupportedPackagingShapeRemainsHeld(string packagingJson)
+    {
+        Assert.Equal(422, Assert.Throws<ChannelConsoleException>(
+            () => NormalizeRaw(OrderWithRawPackaging(packagingJson))).Status);
+    }
+
+    [Fact]
+    public void DuplicatePackagingEvidenceCannotHideUnsupportedSelection()
+    {
+        var orderJson = Order().ToJsonString();
+        var duplicated = $"{orderJson[..^1]},\"packaging\":{{\"disposable_items\":{{\"should_include\":true}}}},"
+            + "\"packaging\":{\"disposable_items\":{\"should_include\":false}}}";
+        Assert.Equal(422, Assert.Throws<ChannelConsoleException>(() => NormalizeRaw(duplicated)).Status);
+    }
+
+    private static JsonNode OrderWithPackaging(string packagingJson)
+    {
+        var order = Order();
+        order["packaging"] = JsonNode.Parse(packagingJson);
+        return order;
     }
 
     [Fact]
