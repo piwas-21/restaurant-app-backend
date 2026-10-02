@@ -5,6 +5,8 @@ public sealed class TenantBridgeSettings
     public const string Section = "TenantBridge";
     public bool Enabled { get; set; }
     public bool Paused { get; set; }
+    public bool DispatchDecisions { get; set; }
+    public int HttpTimeoutSeconds { get; set; } = 20;
     public DateTimeOffset EnrollmentStartedAt { get; set; }
     public int PollSeconds { get; set; } = 5;
     public int RetrySeconds { get; set; } = 30;
@@ -13,6 +15,7 @@ public sealed class TenantBridgeSettings
 
     public bool IsValid()
     {
+        if (HttpTimeoutSeconds is < 5 or > 30 || DispatchDecisions && !Enabled) return false;
         if (PollSeconds is < 1 or > 60 || RetrySeconds is < 10 or > 300 || PayloadRetentionDays is < 1 or > 7) return false;
         if (!Enabled) return true;
         return Store.StoreId != Guid.Empty && Store.TenantId.Length is > 0 and <= 100

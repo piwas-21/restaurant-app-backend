@@ -18,9 +18,14 @@ public static class TenantBridgeServices
         services.AddScoped<IChannelImportJobs, PostgresChannelImportJobs>();
         services.AddScoped<IUberOrderNormalizer, UberOrderNormalizer>();
         services.AddScoped<ITenantImportProcessor, TenantImportProcessor>();
-        services.AddHttpClient<ITenantOrderClient, TenantOrderClient>()
+        services.AddScoped<ITenantOrderClient, TenantOrderClient>();
+        services.AddScoped<ITenantDecisionClient, TenantDecisionClient>();
+        services.AddScoped<IChannelOrderLinks, PostgresChannelOrderLinks>();
+        services.AddScoped<ITenantDecisionProcessor, TenantDecisionProcessor>();
+        services.AddHttpClient<ITenantChannelTransport, TenantChannelTransport>()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHostedService<TenantImportWorker>();
+        services.AddHostedService<TenantDecisionWorker>();
         return services;
     }
 }

@@ -181,6 +181,31 @@ This bridge does not dispatch staff decisions, reconcile later terminal states o
 Those paths, catalogue publishing/stock compatibility and deployed staff/printer acceptance remain required
 before full integration verification.
 
+## Disabled tenant-decision dispatcher
+
+`TenantBridge:DispatchDecisions` remains false until the isolated tenant/store import is
+verified. The machine lease adds the local UUID `orderId`, joined against all five retained
+import identities and `Imported` state before any provider call. Unconfirmed/wrong links remain retryable and held;
+paused/disabled dispatch never claims a job. No new database migration is needed.
+
+The dispatcher reads canonical provider state before any POST. Existing durable console
+`Pending`/`Unknown`/`Succeeded` actions are never resent after a lost response or restart.
+A provider acknowledgement is followed by another GET; only matching `ACCEPTED`/`FINISHED`
+for accept or `DENIED` for deny is reported succeeded. `CANCELED` reports failure; unrecognized
+or conflicting evidence remains held for subsequent reconciliation. Reports use the opaque
+lease and current observation time; stale ownership is rejected by the tenant. A lost tenant
+report reclaims and re-reads provider state rather than sending another successful action.
+
+Import/claim/report share one HTTPS-origin, bearer-authenticated transport with redirects
+disabled, a 64 KiB reply limit and configured `HttpTimeoutSeconds` (20; bounds 5–30 even
+when disabled). Machine lease/report responses validate identity, types and expected state.
+Only hashes/state/identities persist, with no canonical customer payload or exception-value
+logging. The worker uses the existing bounded poll interval and scope-per-cycle convention.
+
+This slice does not activate forwarding, reconcile later terminal changes, add preparation-time
+editing, or provide local kitchen preparation/ready actions. Deployment must keep dispatch
+paused while bindings, tokens, catalogue or provider-manager configuration are changed.
+
 ## Private sandbox connection and testing
 
 An opt-in console at `/console/` serves the one configured sandbox store. It has no tenant authentication,

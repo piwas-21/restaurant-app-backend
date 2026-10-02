@@ -19,6 +19,7 @@ public sealed class ChannelDecisionDeliveryTests(DatabaseFixture fixture) : Chan
     {
         var (orderId, request) = await HeldOrder(action); await Queue(orderId, request);
         var lease = await Claim();
+        lease.OrderId.Should().Be(orderId);
         var report = Report(lease, canonicalState: canonical);
         (await PostAsJsonAsync(ReportEndpoint(lease.DecisionId), report)).StatusCode.Should().Be(HttpStatusCode.OK);
         // Exact report replay after a lost HTTP response must not change the order again.
