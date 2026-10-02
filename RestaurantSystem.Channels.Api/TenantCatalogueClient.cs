@@ -54,6 +54,16 @@ public sealed class TenantCatalogueClient(ITenantChannelTransport transport) : I
             || !row.TryGetProperty("blockReason", out var reasonValue) || reasonValue.ValueKind != JsonValueKind.String
             || !row.TryGetProperty("name", out var nameValue) || nameValue.ValueKind != JsonValueKind.String
             || !row.TryGetProperty("description", out var descriptionValue) || descriptionValue.ValueKind != JsonValueKind.String) throw Invalid();
+        var (variation, variationName) = Variation(variationValue, variationNameValue);
+        var price = Price(priceValue);
+        var reason = ProviderJson.Text(row, "blockReason");
+        var name = ProviderJson.Text(row, "name"); var description = ProviderJson.Text(row, "description");
+        RequireContent(reason, name, description, variation, variationName, price, available.GetBoolean());
+        return new(product, variation, name, description, variationName, price, available.GetBoolean(), reason);
+    }
+
+    private static (Guid? Id, string? Name) Variation(JsonElement variationValue, JsonElement variationNameValue)
+    {
         Guid? variation = null;
         if (variationValue.ValueKind != JsonValueKind.Null)
         {
@@ -66,21 +76,29 @@ public sealed class TenantCatalogueClient(ITenantChannelTransport transport) : I
             if (variationNameValue.ValueKind != JsonValueKind.String) throw Invalid();
             variationName = variationNameValue.GetString();
         }
+        return (variation, variationName);
+    }
+
+    private static int? Price(JsonElement priceValue)
+    {
         int? price = null;
         if (priceValue.ValueKind != JsonValueKind.Null)
         {
             if (priceValue.ValueKind != JsonValueKind.Number || !priceValue.TryGetInt32(out var value) || value < 0) throw Invalid();
             price = value;
         }
-        var reason = ProviderJson.Text(row, "blockReason");
+        return price;
+    }
+
+    private static void RequireContent(string reason, string name, string description, Guid? variation,
+        string? variationName, int? price, bool available)
+    {
         if (reason is not ("" or "MissingProduct" or "UnavailableProduct" or "DeliveryDisabled" or "UnsupportedChoices"
             or "UnmappedAllergens" or "MissingTranslation" or "UnavailableVariation" or "VariationRequired" or "InvalidText" or "InvalidPrice")) throw Invalid();
-        var name = ProviderJson.Text(row, "name"); var description = ProviderJson.Text(row, "description");
         if (reason.Length == 0 && (price is null || string.IsNullOrWhiteSpace(name) || name.Length > TenantCatalogueLimits.ItemNameLength || name.Any(char.IsControl)
             || description.Length > TenantCatalogueLimits.DescriptionLength || variation.HasValue != (variationName is not null)
             || variationName is not null && (string.IsNullOrWhiteSpace(variationName) || variationName.Length > TenantCatalogueLimits.VariationNameLength || variationName.Any(char.IsControl)))) throw Invalid();
-        if (reason.Length > 0 && (price is not null || available.GetBoolean())) throw Invalid();
-        return new(product, variation, name, description, variationName, price, available.GetBoolean(), reason);
+        if (reason.Length > 0 && (price is not null || available)) throw Invalid();
     }
 
     private static ChannelConsoleException Invalid() => new(502, "The tenant catalogue snapshot is malformed or outside its reviewed selection.");

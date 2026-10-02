@@ -45,7 +45,7 @@ public sealed class PostgresCataloguePublications(NpgsqlDataSource source) : ICa
         command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, menu.GetRawText());
         command.Parameters.AddWithValue(NpgsqlDbType.Jsonb, previousMenu.GetRawText());
         await command.ExecuteNonQueryAsync(cancellationToken); await transaction.CommitAsync(cancellationToken);
-        return new(id, mappingHash, sourceRevision, revision, menu, previousMenu, "Pending", null, null);
+        return new(id, mappingHash, sourceRevision, revision, menu, previousMenu, CataloguePublicationStates.Pending, null, null);
     }
 
     public async Task<bool> Verify(AvailabilityBinding binding, Guid id, string providerHash, DateTimeOffset now, CancellationToken cancellationToken)

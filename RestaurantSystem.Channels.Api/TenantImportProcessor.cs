@@ -16,11 +16,7 @@ public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> setting
         // Retention continues during pause/disable and application rollback with this gateway version.
         await jobs.ExpirePayloads(cancellationToken);
         if (!options.Enabled || options.Paused) return false;
-        if (options.UseTenantCatalogue)
-        {
-            if (catalogue is null) throw new ChannelConsoleException(409, "Tenant catalogue publication is unavailable.");
-            await catalogue.RequireActive(cancellationToken);
-        }
+        await RequirePublication(options, cancellationToken);
         var store = options.Store;
         await jobs.Discover(webhook.Value.ClientId, store.StoreId, store.TenantId, store.CatalogueRevision,
             options.EnrollmentStartedAt, cancellationToken);
@@ -53,6 +49,15 @@ public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> setting
             await jobs.Defer(job, terminal ? "ContractRejected" : "DeliveryUncertain", now.AddSeconds(options.RetrySeconds), terminal, cancellationToken);
         }
         return true;
+    }
+
+    private async Task RequirePublication(TenantBridgeSettings options, CancellationToken cancellationToken)
+    {
+        if (options.UseTenantCatalogue)
+        {
+            if (catalogue is null) throw new ChannelConsoleException(409, "Tenant catalogue publication is unavailable.");
+            await catalogue.RequireActive(cancellationToken);
+        }
     }
 
     private static string Purpose(ChannelImportJob job)

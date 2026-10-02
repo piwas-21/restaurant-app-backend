@@ -174,7 +174,8 @@ variation selection; adding categories, items or choice structures requires a re
 
 Apply additive SQL007 only to the dedicated channels database after SQL006. Its append-only
 `channel_catalogue_publications` ledger stores UUID identity, ordered sequence, app/store/tenant binding,
-reviewed mapping/source/publication hashes, proposed and previous menu JSON, state and verification metadata.
+reviewed mapping/source/publication hashes (a PostgreSQL `channel_catalogue_hash` domain over checked char64),
+proposed and previous menu JSON, state and verification metadata.
 Its foreign key retains SQL006's first-tenant binding. Runtime grants are SELECT/INSERT on this table,
 UPDATE **only** `(state, provider_hash, verified_at)` and USAGE on its identity sequence. Do not grant table-wide
 UPDATE or DELETE; proposed/previous menu bodies cannot be rewritten. No tenant migration is required.

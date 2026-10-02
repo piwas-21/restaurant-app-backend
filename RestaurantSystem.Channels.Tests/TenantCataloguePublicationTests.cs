@@ -41,7 +41,9 @@ public sealed class TenantCataloguePublicationTests(GatewayFixture fixture) : Co
             var repository = new PostgresCataloguePublications(source);
             var publication = new TenantCataloguePublication(Options.Create(settings), Options.Create(new UberWebhookSettings
             { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }), tenant, repository,
-                new PostgresChannelAvailabilityJobs(source), Provider, services.GetRequiredService<ISandboxTokens>(), TimeProvider.System);
+                new PostgresChannelAvailabilityJobs(source), new TenantMenuProvider(Options.Create(settings),
+                Options.Create(new UberWebhookSettings { ClientId = GatewayFixture.ClientId, StoreIds = [GatewayFixture.StoreId] }),
+                Provider, services.GetRequiredService<ISandboxTokens>()), TimeProvider.System);
             var template = services.GetRequiredService<ISandboxMenu>().Preview();
             if (Provider.Menu.GetProperty("menus").GetArrayLength() == 0) Provider.Menu = template;
             return await action(publication, template, repository);

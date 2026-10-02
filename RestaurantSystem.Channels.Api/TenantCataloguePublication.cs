@@ -6,11 +6,10 @@ namespace RestaurantSystem.Channels.Api;
 
 public sealed class TenantCataloguePublication(IOptions<TenantBridgeSettings> settings, IOptions<UberWebhookSettings> webhook,
     ITenantCatalogueClient tenant, ICataloguePublications repository, IChannelAvailabilityJobs leases,
-    IUberSandboxClient provider, ISandboxTokens tokens, TimeProvider clock) : ITenantCataloguePublication
+    ITenantMenuProvider provider, TimeProvider clock) : ITenantCataloguePublication
 {
     private TenantStoreBinding Store => settings.Value.Store;
     private AvailabilityBinding Binding => new(webhook.Value.ClientId, Store.StoreId, Store.TenantId, Store.CatalogueRevision);
-    private string MenuPath => $"/v2/eats/stores/{Store.StoreId:D}/menus";
 
     public async Task<JsonElement> Preview(JsonElement template, CancellationToken cancellationToken)
     {
@@ -50,22 +49,19 @@ public sealed class TenantCataloguePublication(IOptions<TenantBridgeSettings> se
         if (!plan.CanPublish || plan.Revision != revision || revision.Length != TenantCatalogueLimits.RevisionLength)
             throw new ChannelConsoleException(409, "The tenant catalogue changed or has blocked selections. Refresh and review the complete preview.");
         var latest = await repository.Latest(Binding, cancellationToken);
-        if (latest is { State: "Pending" } && latest.MappingHash != plan.MappingHash) throw Unconfirmed();
-        var actual = await ReadProvider(cancellationToken);
+        if (latest is { State: CataloguePublicationStates.Pending } && latest.MappingHash != plan.MappingHash) throw Unconfirmed();
+        var actual = await provider.Read(cancellationToken);
         latest = await ResolveStalePending(latest, revision, actual, cancellationToken);
         var matches = Matches(plan.Menu, actual);
-        var baseline = latest is { State: "Pending" or "Abandoned" } ? latest.PreviousMenu : latest?.Menu ?? template;
+        var baseline = latest is { State: CataloguePublicationStates.Pending or CataloguePublicationStates.Abandoned } ? latest.PreviousMenu : latest?.Menu ?? template;
         if (!matches) SandboxMenuVerifier.Require(CatalogueMenuPlanner.Structural(baseline), actual);
-        if (latest is not { State: "Pending" } && !(latest is { State: "Verified" } && latest.Revision == revision))
-            latest = await repository.Begin(Binding, plan.MappingHash, plan.SourceRevision, plan.Revision, plan.Menu, baseline, cancellationToken);
-        if (latest is null) throw Unconfirmed();
+        latest = await BeginIfNeeded(latest, plan, baseline, cancellationToken);
         if (!matches)
         {
             // Source intent is checked again immediately before the full replacement.
             if ((await tenant.Read(Store, cancellationToken)).Revision != plan.SourceRevision) throw Unconfirmed();
-            var reply = await provider.Send(HttpMethod.Put, MenuPath, await tokens.AppToken(cancellationToken), plan.Menu, cancellationToken);
-            RequireReply(reply, "tenant menu upload");
-            actual = await ReadProvider(cancellationToken);
+            await provider.Upload(plan.Menu, cancellationToken);
+            actual = await provider.Read(cancellationToken);
         }
         SandboxMenuVerifier.Require(CatalogueMenuPlanner.Structural(plan.Menu), actual);
         if (!await repository.Verify(Binding, latest.Id, ProviderJson.Hash(actual), clock.GetUtcNow(), cancellationToken)) throw Unconfirmed();
@@ -75,41 +71,34 @@ public sealed class TenantCataloguePublication(IOptions<TenantBridgeSettings> se
     public async Task<JsonElement> Expected(CancellationToken cancellationToken)
     {
         RequireEnabled(); var latest = await repository.Latest(Binding, cancellationToken);
-        if (latest is not { State: "Verified" } || latest.MappingHash != CatalogueMenuPlanner.MappingHash(Store)) throw Unconfirmed();
+        if (latest is not { State: CataloguePublicationStates.Verified } || latest.MappingHash != CatalogueMenuPlanner.MappingHash(Store)) throw Unconfirmed();
         return CatalogueMenuPlanner.Structural(latest.Menu);
     }
 
     public async Task RequireActive(CancellationToken cancellationToken) => _ = await Expected(cancellationToken);
 
+    private async Task<CataloguePublication> BeginIfNeeded(CataloguePublication? latest, CatalogueMenuPlan plan,
+        JsonElement baseline, CancellationToken cancellationToken)
+    {
+        if (latest is not { State: CataloguePublicationStates.Pending }
+            && !(latest is { State: CataloguePublicationStates.Verified } && latest.Revision == plan.Revision))
+            latest = await repository.Begin(Binding, plan.MappingHash, plan.SourceRevision, plan.Revision, plan.Menu, baseline, cancellationToken);
+        return latest ?? throw Unconfirmed();
+    }
+
     private async Task<CataloguePublication?> ResolveStalePending(CataloguePublication? latest, string revision,
         JsonElement actual, CancellationToken cancellationToken)
     {
-        if (latest is not { State: "Pending" } || latest.Revision == revision) return latest;
+        if (latest is not { State: CataloguePublicationStates.Pending } || latest.Revision == revision) return latest;
         if (Matches(latest.Menu, actual))
         {
             if (!await repository.Verify(Binding, latest.Id, ProviderJson.Hash(actual), clock.GetUtcNow(), cancellationToken)) throw Unconfirmed();
-            return latest with { State = "Verified" };
+            return latest with { State = CataloguePublicationStates.Verified };
         }
         // A changed source may supersede an unsent draft only after independent proof the previous menu remains.
         SandboxMenuVerifier.Require(CatalogueMenuPlanner.Structural(latest.PreviousMenu), actual);
         if (!await repository.Abandon(Binding, latest.Id, cancellationToken)) throw Unconfirmed();
-        return latest with { State = "Abandoned" };
-    }
-
-    private async Task<JsonElement> ReadProvider(CancellationToken cancellationToken)
-    {
-        var reply = await provider.Send(HttpMethod.Get, MenuPath, await tokens.AppToken(cancellationToken), null, cancellationToken);
-        RequireReply(reply, "tenant menu readback");
-        if (reply.Body.ValueKind != JsonValueKind.Object || !reply.Body.TryGetProperty("items", out var items)
-            || items.ValueKind != JsonValueKind.Array) throw Unconfirmed();
-        foreach (var item in items.EnumerateArray()) UberAvailabilityClient.RequireSimpleItem(item);
-        return reply.Body;
-    }
-
-    private void RequireReply(ProviderReply reply, string operation)
-    {
-        ProviderJson.RequireSuccess(reply, operation);
-        if (reply.ClientId.Length > 0 && reply.ClientId != webhook.Value.ClientId) throw Unconfirmed();
+        return latest with { State = CataloguePublicationStates.Abandoned };
     }
 
     private void RequireEnabled()

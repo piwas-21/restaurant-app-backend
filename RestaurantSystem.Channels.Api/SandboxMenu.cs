@@ -15,6 +15,10 @@ public sealed class SandboxMenu(IOptions<UberWebhookSettings> options, IUberSand
         return document.RootElement.Clone();
     }
 
+    public Task<JsonElement> Preview(CancellationToken cancellationToken)
+        => bridge?.Value.UseTenantCatalogue == true
+            ? RequireCatalogue().Preview(Preview(), cancellationToken) : Task.FromResult(Preview());
+
     public async Task<JsonElement> Read(CancellationToken cancellationToken)
     {
         var result = await provider.Send(HttpMethod.Get, MenuPath, await tokens.AppToken(cancellationToken), null, cancellationToken);
@@ -32,20 +36,16 @@ public sealed class SandboxMenu(IOptions<UberWebhookSettings> options, IUberSand
         return ProviderJson.Encode(new { verified = true, revision = "sandbox-menu-v1" });
     }
 
+    public Task<JsonElement> Publish(string revision, CancellationToken cancellationToken)
+        => bridge?.Value.UseTenantCatalogue == true
+            ? RequireCatalogue().Publish(Preview(), revision, cancellationToken) : Publish(cancellationToken);
+
     public async Task RequireVerified(CancellationToken cancellationToken)
         => SandboxMenuVerifier.Require(await Expected(cancellationToken), await Read(cancellationToken));
-
-    public Task<JsonElement> Preview(CancellationToken cancellationToken)
-        => bridge?.Value.UseTenantCatalogue == true
-            ? RequireCatalogue().Preview(Preview(), cancellationToken) : Task.FromResult(Preview());
 
     public Task<JsonElement> Expected(CancellationToken cancellationToken)
         => bridge?.Value.UseTenantCatalogue == true
             ? RequireCatalogue().Expected(cancellationToken) : Task.FromResult(Preview());
-
-    public Task<JsonElement> Publish(string revision, CancellationToken cancellationToken)
-        => bridge?.Value.UseTenantCatalogue == true
-            ? RequireCatalogue().Publish(Preview(), revision, cancellationToken) : Publish(cancellationToken);
 
     private ITenantCataloguePublication RequireCatalogue()
         => catalogue ?? throw new ChannelConsoleException(409, "Tenant catalogue publication is unavailable.");

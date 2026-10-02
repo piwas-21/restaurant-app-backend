@@ -18,6 +18,7 @@ public static class TenantBridgeServices
         services.AddScoped<IChannelAvailabilityJobs, PostgresChannelAvailabilityJobs>();
         services.AddScoped<ICataloguePublications, PostgresCataloguePublications>();
         services.AddScoped<ITenantCatalogueClient, TenantCatalogueClient>();
+        services.AddScoped<ITenantMenuProvider, TenantMenuProvider>();
         services.AddScoped<ITenantCataloguePublication, TenantCataloguePublication>();
         services.AddScoped<ITenantAvailabilityClient, TenantAvailabilityClient>();
         services.AddScoped<IUberAvailabilityClient, UberAvailabilityClient>();

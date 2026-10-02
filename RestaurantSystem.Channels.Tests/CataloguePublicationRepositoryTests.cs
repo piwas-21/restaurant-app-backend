@@ -45,10 +45,16 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
     {
         await using var source = NpgsqlDataSource.Create(fixture.ConnectionString); var repository = new PostgresCataloguePublications(source);
         var binding = Binding(); var row = await Begin(repository, binding); var role = "catalogue_runtime_" + Guid.NewGuid().ToString("N");
-        await using (var grant = source.CreateCommand($"CREATE ROLE {role} NOLOGIN; GRANT SELECT, INSERT ON channel_catalogue_publications TO {role}; GRANT UPDATE(state, provider_hash, verified_at) ON channel_catalogue_publications TO {role};"))
+        await using (var grant = source.CreateCommand($"CREATE ROLE {role} NOLOGIN; GRANT SELECT, INSERT ON channel_catalogue_publications, channel_availability_bindings TO {role}; GRANT UPDATE(state, provider_hash, verified_at) ON channel_catalogue_publications TO {role}; GRANT USAGE ON SEQUENCE channel_catalogue_publications_sequence_seq TO {role};"))
             await grant.ExecuteNonQueryAsync();
         try
         {
+            var runtimeConnection = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Options = $"-c role={role}" };
+            await using var runtimeSource = NpgsqlDataSource.Create(runtimeConnection.ConnectionString);
+            var runtimeRepository = new PostgresCataloguePublications(runtimeSource);
+            var appended = await Begin(runtimeRepository, binding);
+            Assert.Equal(appended.Id, (await runtimeRepository.Latest(binding, default))!.Id);
+            row = appended;
             await using var connection = await source.OpenConnectionAsync();
             await using (var select = new NpgsqlCommand($"SET ROLE {role}; SELECT current_user", connection))
                 Assert.Equal(role, await select.ExecuteScalarAsync());
@@ -71,5 +77,22 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
             await using var remove = source.CreateCommand($"DROP OWNED BY {role}; DROP ROLE {role}");
             await remove.ExecuteNonQueryAsync();
         }
+    }
+
+    [Fact]
+    public async Task HashDomainRefusesMalformedIntentAndVerificationHashes()
+    {
+        await using var source = NpgsqlDataSource.Create(fixture.ConnectionString);
+        var repository = new PostgresCataloguePublications(source); var binding = Binding();
+        var malformed = await Assert.ThrowsAsync<PostgresException>(() => repository.Begin(binding, new string('x', 64),
+            new string('b', 64), new string('c', 64), ProviderJson.Encode(new { items = Array.Empty<object>() }),
+            ProviderJson.Encode(new { items = Array.Empty<object>() }), default));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, malformed.SqlState);
+        Assert.Null(await repository.Latest(binding, default));
+        var row = await Begin(repository, binding);
+        var invalidProof = await Assert.ThrowsAsync<PostgresException>(() => repository.Verify(binding, row.Id,
+            new string('D', 64), DateTimeOffset.UtcNow, default));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, invalidProof.SqlState);
+        Assert.Equal("Pending", (await repository.Latest(binding, default))!.State);
     }
 }
