@@ -27,15 +27,25 @@ public sealed class UberOrderNormalizer : IUberOrderNormalizer
         var items = sourceItems.EnumerateArray().Select(item => Item(item, binding)).ToArray();
         var (total, tax) = ReadTotals(order, binding.Currency, items);
         var eater = UberOrderValue.Object(order, "eater");
-        if (UberOrderValue.HasContent(order, "packaging") || !string.IsNullOrEmpty(Optional(eater, "phone_code", 30)))
+        var (phone, phoneCode) = Contact(eater);
+        if (UberOrderValue.HasContent(order, "packaging"))
             throw UberOrderValue.Unsupported();
         // Do not retain the provider's private eater UUID, address, courier or tax-profile objects.
         return new("uber-eats", binding.StoreId.ToString("D"), orderId.ToString("D"),
             UberOrderValue.Text(order, "display_id", 100),
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(order.GetRawText()))),
             binding.Currency, total, tax, placedAt, type,
-            Optional(eater, "first_name", 100), Optional(eater, "phone", 20),
-            Optional(cart, "special_instructions", 1000, notes: true), items);
+            Optional(eater, "first_name", 100), phone,
+            Optional(cart, "special_instructions", 1000, notes: true), items, phoneCode);
+    }
+
+    private static (string? Phone, string? AccessCode) Contact(JsonElement eater)
+    {
+        var phone = Optional(eater, "phone", 20);
+        var code = Optional(eater, "phone_code", 30);
+        if (code is not null && (string.IsNullOrWhiteSpace(phone) || !code.Any(char.IsAsciiDigit)
+            || !code.All(c => char.IsAsciiDigit(c) || c == ' '))) throw UberOrderValue.Unsupported();
+        return (phone, code);
     }
 
     private static void ValidateBinding(TenantStoreBinding binding)

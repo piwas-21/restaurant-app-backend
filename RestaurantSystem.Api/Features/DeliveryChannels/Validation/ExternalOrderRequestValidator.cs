@@ -23,6 +23,9 @@ public sealed class ExternalOrderRequestValidator : AbstractValidator<ExternalOr
         RuleFor(request => request.FulfillmentType).Equal("DELIVERY_BY_UBER");
         RuleFor(request => request.CustomerName).MaximumLength(OrderFieldLimits.CustomerNameMaxLength).Must(IsText);
         RuleFor(request => request.CustomerPhone).MaximumLength(OrderFieldLimits.CustomerPhoneMaxLength).Must(IsText);
+        RuleFor(request => request.CustomerPhoneAccessCode).MaximumLength(30)
+            .Must(value => value is null || !string.IsNullOrWhiteSpace(value) && value.All(c => char.IsAsciiDigit(c) || c == ' '));
+        RuleFor(request => request.CustomerPhone).NotEmpty().When(request => request.CustomerPhoneAccessCode is not null);
         RuleFor(request => request.Instructions).MaximumLength(OrderFieldLimits.NotesMaxLength).Must(IsText);
         RuleFor(request => request.Items).NotEmpty().Must(items => items is not null && items.Count <= ExternalOrderLimits.MaxItems);
         RuleForEach(request => request.Items).NotNull().SetValidator(new ExternalOrderItemRequestValidator());

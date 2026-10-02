@@ -83,6 +83,34 @@ public sealed class TenantImportProcessorTests(GatewayFixture fixture)
     }
 
     [Fact]
+    public async Task PreparedWireFromBeforeContactCodeUpgradeSurvivesLostResponseAndRestart()
+    {
+        await using var source = NpgsqlDataSource.Create(fixture.ConnectionString);
+        var store = Guid.NewGuid(); var order = Guid.NewGuid(); await Seed(source, store, order);
+        var settings = Settings(store); var jobs = new PostgresChannelImportJobs(source);
+        // Manually authored old contract, independent of the current serializer and optional field.
+        var original = $$"""
+            {"provider":"uber-eats","storeId":"{{store:D}}","externalOrderId":"{{order:D}}","displayId":"OLD","canonicalOrderHash":"{{new string('a', 64)}}","currency":"EUR","merchantTotal":5,"reportedTax":null,"placedAt":"2026-10-01T00:00:00+00:00","fulfillmentType":"DELIVERY_BY_UBER","customerName":null,"customerPhone":null,"instructions":null,"items":[{"productId":"{{settings.Store.Items[0].ProductId:D}}","variationId":null,"name":"Old meal","variationName":null,"quantity":1,"unitPrice":5,"total":5,"instructions":null}]}
+            """;
+        await jobs.Discover(GatewayFixture.ClientId, store, settings.Store.TenantId, "published-v1", settings.EnrollmentStartedAt, default);
+        var claim = (await jobs.Claim(GatewayFixture.ClientId, store, settings.Store.TenantId, default))!;
+        var purpose = $"tenant-import:{claim.ClientId}:{claim.StoreId:D}:{claim.OrderId:D}:{claim.TenantId}:{claim.CatalogueRevision}";
+        Assert.True(await jobs.Prepare(claim, Crypto().Protect(original, purpose), Crypto().Hash(original), DateTimeOffset.UtcNow.AddDays(1), default));
+        await jobs.Defer(claim, "DeliveryUncertain", DateTimeOffset.UtcNow, false, default);
+        var provider = new OrderReader(Canonical(store, order));
+        var destination = new RecordingTenant(call => call == 1
+            ? Task.FromException(new ChannelConsoleException(502, "Public fixture lost reply.")) : Task.CompletedTask);
+        Assert.True(await Processor(settings, jobs, provider, destination).Process(default));
+        await using (var ready = source.CreateCommand("UPDATE channel_import_jobs SET available_at = now() WHERE store_id = $1"))
+        {
+            ready.Parameters.AddWithValue(store); Assert.Equal(1, await ready.ExecuteNonQueryAsync());
+        }
+        Assert.True(await Processor(settings, new PostgresChannelImportJobs(source), provider, destination).Process(default));
+        Assert.Equal(0, provider.Reads); Assert.Equal(2, destination.Requests.Count);
+        Assert.All(destination.Requests, request => Assert.Equal(original, request));
+    }
+
+    [Fact]
     public async Task UnsupportedCanonicalItemIsQuarantinedWithoutTenantCall()
     {
         await using var source = NpgsqlDataSource.Create(fixture.ConnectionString);

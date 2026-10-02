@@ -40,6 +40,30 @@ public sealed class UberOrderNormalizerTests
     }
 
     [Fact]
+    public void AnonymizedPhoneAccessCodeIsPreservedSeparatelyFromNotes()
+    {
+        var order = Order();
+        order["eater"]!["phone"] = "+31 200000000";
+        order["eater"]!["phone_code"] = "555 55 555";
+        var result = Normalize(order);
+        Assert.Equal("+31 200000000", result.CustomerPhone);
+        Assert.Equal("555 55 555", result.CustomerPhoneAccessCode);
+        Assert.Equal("SANDBOX TEST ONLY: do not prepare food or dispatch a courier.", result.Instructions);
+    }
+
+    [Theory]
+    [InlineData("", "12345")]
+    [InlineData("+31 200000000", "wrong")]
+    [InlineData("+31 200000000", " ")]
+    [InlineData("+31 200000000", "123\u001b45")]
+    [InlineData("+31 200000000", "1234567890123456789012345678901")]
+    public void InvalidPhoneAccessCodeCannotBeForwarded(string phone, string code)
+    {
+        var order = Order(); order["eater"]!["phone"] = phone; order["eater"]!["phone_code"] = code;
+        Assert.Throws<ChannelConsoleException>(() => Normalize(order));
+    }
+
+    [Fact]
     public void ReportedZeroTaxRemainsDistinctFromMissingTax()
     {
         var order = Order(); order["payment"]!["charges"]!["tax"] = JsonNode.Parse("{\"amount\":0,\"currency_code\":\"EUR\"}");
@@ -108,7 +132,7 @@ public sealed class UberOrderNormalizerTests
             case "quantity-string": item["quantity"] = "1"; break;
             case "quantity-zero": item["quantity"] = 0; break;
             case "packaging": order["packaging"] = JsonNode.Parse("{\"disposable_items\":{}}"); break;
-            case "phone-code": order["eater"]!["phone_code"] = "12345"; break;
+            case "phone-code": order["eater"]!["phone_code"] = "123\u001b45"; break;
         }
         Assert.Equal(422, Assert.Throws<ChannelConsoleException>(() => Normalize(order, binding)).Status);
     }

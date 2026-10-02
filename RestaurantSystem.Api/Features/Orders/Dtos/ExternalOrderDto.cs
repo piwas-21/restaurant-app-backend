@@ -12,4 +12,5 @@ public sealed record ExternalOrderDto(
     decimal MerchantTotal,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] decimal? ReportedTax,
     string FulfillmentType,
-    bool IsSandbox);
+    bool IsSandbox,
+    string? CustomerPhoneAccessCode = null);

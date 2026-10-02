@@ -20,6 +20,8 @@ public sealed record ExternalOrderRequest
     public string FulfillmentType { get; init; } = string.Empty;
     public string? CustomerName { get; init; }
     public string? CustomerPhone { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CustomerPhoneAccessCode { get; init; }
     public string? Instructions { get; init; }
     public List<ExternalOrderItemRequest> Items { get; init; } = [];
 }
