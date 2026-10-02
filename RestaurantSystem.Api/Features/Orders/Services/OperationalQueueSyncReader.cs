@@ -18,8 +18,7 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly ITenantClock _clock;
-    private readonly IOrderMappingService _mapping;
-    private readonly IOrderPermittedActionsService _permittedActions;
+    private readonly IOrderQueueProjection _projection;
     private readonly IOperationalQueueCursor _cursor;
     private readonly ILogger<OperationalQueueSyncReader> _logger;
 
@@ -27,16 +26,14 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
         ApplicationDbContext context,
         ICurrentUserService currentUser,
         ITenantClock clock,
-        IOrderMappingService mapping,
-        IOrderPermittedActionsService permittedActions,
+        IOrderQueueProjection projection,
         IOperationalQueueCursor cursor,
         ILogger<OperationalQueueSyncReader> logger)
     {
         _context = context;
         _currentUser = currentUser;
         _clock = clock;
-        _mapping = mapping;
-        _permittedActions = permittedActions;
+        _projection = projection;
         _cursor = cursor;
         _logger = logger;
     }
@@ -137,7 +134,7 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
             // An item in Changes mode is an Upsert. The DTO is read from the current matching row;
             // the journal sequence is the ordering marker, so a client can apply pages in order and
             // ignore an older response that arrives after a newer one.
-            items.Add(await MapOrderAsync(order, cancellationToken));
+            items.Add(await _projection.ProjectAsync(order, true, cancellationToken));
         }
 
         var hasMore = rows.Count > pageSize;
@@ -220,7 +217,7 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
             });
 
         return new PagedResult<OrderDto>(
-            pageRows.Select(MapOrder).ToList(),
+            pageRows.Select(order => _projection.Project(order, true)).ToList(),
             totalCount,
             pageNumber,
             pageSize,
@@ -245,20 +242,6 @@ public sealed class OperationalQueueSyncReader : IOperationalQueueSyncReader
         int pageSize) =>
         ApiResponse<PagedResult<OrderDto>>.SuccessWithData(
             BuildSnapshotResult(query, filterHash, upperSequence, totalCount, rows, pageNumber, pageSize));
-
-    private OrderDto MapOrder(Order order)
-    {
-        var dto = _mapping.MapToOrderDto(order);
-        dto.PermittedActions = _permittedActions.GetPermittedActions(order);
-        return dto;
-    }
-
-    private async Task<OrderDto> MapOrderAsync(Order order, CancellationToken cancellationToken)
-    {
-        var dto = await _mapping.MapToOrderDtoAsync(order, cancellationToken);
-        dto.PermittedActions = _permittedActions.GetPermittedActions(order);
-        return dto;
-    }
 
     private async Task<long> CurrentSequenceAsync(CancellationToken cancellationToken) =>
         await _context.OrderChanges

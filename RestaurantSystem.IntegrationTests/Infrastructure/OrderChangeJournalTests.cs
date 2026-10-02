@@ -253,6 +253,7 @@ public sealed class OrderChangeJournalTests : IntegrationTestBase
         var permittedActions = new Mock<IOrderPermittedActionsService>();
         permittedActions.Setup(service => service.GetPermittedActions(It.IsAny<Order>()))
             .Returns(Array.Empty<OrderPermittedActionDto>());
+        var projection = new OrderQueueProjection(mapping.Object, permittedActions.Object);
         var cursor = new OperationalQueueCursor(
             new EphemeralDataProtectionProvider(NullLoggerFactory.Instance),
             Microsoft.Extensions.Options.Options.Create(new RestaurantSystem.Api.Settings.OperationalQueueSyncOptions
@@ -262,10 +263,10 @@ public sealed class OrderChangeJournalTests : IntegrationTestBase
             }),
             TimeProvider.System);
         var reader = new OperationalQueueSyncReader(
-            context, caller.Object, clock.Object, mapping.Object, permittedActions.Object, cursor,
+            context, caller.Object, clock.Object, projection, cursor,
             NullLogger<OperationalQueueSyncReader>.Instance);
         return (new GetOrdersQueryHandler(
-            context, caller.Object, clock.Object, mapping.Object, permittedActions.Object, cursor, reader,
+            context, caller.Object, clock.Object, projection, cursor, reader,
             NullLogger<GetOrdersQueryHandler>.Instance), cursor);
     }
 
@@ -290,6 +291,7 @@ public sealed class OrderChangeJournalTests : IntegrationTestBase
         var permittedActions = new Mock<IOrderPermittedActionsService>();
         permittedActions.Setup(service => service.GetPermittedActions(It.IsAny<Order>()))
             .Returns(Array.Empty<OrderPermittedActionDto>());
+        var projection = new OrderQueueProjection(mapping.Object, permittedActions.Object);
 
         var cursor = new OperationalQueueCursor(
             new EphemeralDataProtectionProvider(NullLoggerFactory.Instance),
@@ -303,8 +305,7 @@ public sealed class OrderChangeJournalTests : IntegrationTestBase
             context,
             caller.Object,
             clock.Object,
-            mapping.Object,
-            permittedActions.Object,
+            projection,
             cursor,
             NullLogger<OperationalQueueSyncReader>.Instance);
         return (reader, cursor, caller);

@@ -240,8 +240,7 @@ public class OrderEmailLinkAuthorizationTests : IntegrationTestBase
             context,
             new AnonymousCurrentUser(),
             scope.ServiceProvider.GetRequiredService<ITenantClock>(),
-            scope.ServiceProvider.GetRequiredService<IOrderMappingService>(),
-            scope.ServiceProvider.GetRequiredService<IOrderPermittedActionsService>(),
+            scope.ServiceProvider.GetRequiredService<IOrderQueueProjection>(),
             scope.ServiceProvider.GetRequiredService<IOperationalQueueCursor>(),
             scope.ServiceProvider.GetRequiredService<IOperationalQueueSyncReader>(),
             NullLogger<GetOrdersQueryHandler>.Instance);
