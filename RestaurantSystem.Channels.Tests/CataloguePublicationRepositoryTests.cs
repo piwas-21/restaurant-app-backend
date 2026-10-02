@@ -45,7 +45,9 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
     {
         await using var source = NpgsqlDataSource.Create(fixture.ConnectionString); var repository = new PostgresCataloguePublications(source);
         var binding = Binding(); var row = await Begin(repository, binding); var role = "catalogue_runtime_" + Guid.NewGuid().ToString("N");
-        await using (var grant = source.CreateCommand($"CREATE ROLE {role} NOLOGIN; GRANT SELECT, INSERT ON channel_catalogue_publications, channel_availability_bindings TO {role}; GRANT UPDATE(state, provider_hash, verified_at) ON channel_catalogue_publications TO {role}; GRANT USAGE ON SEQUENCE channel_catalogue_publications_sequence_seq TO {role};"))
+        using var identifiers = new NpgsqlCommandBuilder();
+        var quotedRole = identifiers.QuoteIdentifier(role);
+        await using (var grant = source.CreateCommand($"CREATE ROLE {quotedRole} NOLOGIN; GRANT SELECT, INSERT ON channel_catalogue_publications, channel_availability_bindings TO {quotedRole}; GRANT UPDATE(state, provider_hash, verified_at) ON channel_catalogue_publications TO {quotedRole}; GRANT USAGE ON SEQUENCE channel_catalogue_publications_sequence_seq TO {quotedRole};"))
             await grant.ExecuteNonQueryAsync();
         try
         {
@@ -56,7 +58,7 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
             Assert.Equal(appended.Id, (await runtimeRepository.Latest(binding, default))!.Id);
             row = appended;
             await using var connection = await source.OpenConnectionAsync();
-            await using (var select = new NpgsqlCommand($"SET ROLE {role}; SELECT current_user", connection))
+            await using (var select = new NpgsqlCommand($"SET ROLE {quotedRole}; SELECT current_user", connection))
                 Assert.Equal(role, await select.ExecuteScalarAsync());
             await using (var rewrite = new NpgsqlCommand("UPDATE channel_catalogue_publications SET menu = '{}'::jsonb WHERE id = $1", connection))
             {
@@ -74,7 +76,7 @@ public sealed class CataloguePublicationRepositoryTests(GatewayFixture fixture)
         }
         finally
         {
-            await using var remove = source.CreateCommand($"DROP OWNED BY {role}; DROP ROLE {role}");
+            await using var remove = source.CreateCommand($"DROP OWNED BY {quotedRole}; DROP ROLE {quotedRole}");
             await remove.ExecuteNonQueryAsync();
         }
     }
