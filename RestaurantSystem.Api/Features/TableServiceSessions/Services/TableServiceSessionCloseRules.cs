@@ -25,13 +25,14 @@ public static class TableServiceSessionCloseRules
     public static bool IsBlockingLegacyOrder(
         TableServiceSessionOrderState order, decimal paymentTolerance) =>
         order.Status is not OrderStatus.Completed and not OrderStatus.Cancelled
-        || order.Status == OrderStatus.Completed && order.RemainingAmount > paymentTolerance;
+        || order.Status == OrderStatus.Completed && Outstanding(order) > paymentTolerance;
 
     public static bool IsUnresolvedMemberOrder(TableServiceSessionOrderState order) =>
         order.Status is not OrderStatus.Completed and not OrderStatus.Cancelled;
 
     public static decimal Outstanding(TableServiceSessionOrderState order) =>
-        order.Status == OrderStatus.Cancelled ? 0m : Math.Max(0m, order.RemainingAmount);
+        order.Status == OrderStatus.Cancelled || order.IsFullyRefunded
+            ? 0m : Math.Max(0m, order.RemainingAmount);
 
     public static TableServiceSessionCloseAssessment Assess(
         IEnumerable<TableServiceSessionOrderState> memberOrders,
@@ -49,7 +50,7 @@ public static class TableServiceSessionCloseRules
 }
 
 public sealed record TableServiceSessionOrderState(
-    OrderStatus Status, decimal RemainingAmount);
+    OrderStatus Status, decimal RemainingAmount, bool IsFullyRefunded = false);
 
 public sealed record TableServiceSessionCloseAssessment(
     int LegacyActiveOrderCount,

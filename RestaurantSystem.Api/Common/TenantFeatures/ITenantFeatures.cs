@@ -8,6 +8,12 @@ public interface ITenantFeatures
     /// <summary>Whether the Server Workspace V2 entry seam is enabled.</summary>
     bool ServerWorkspaceV2 { get; }
 
+    /// <summary>Whether staff bill views present the single visit account.</summary>
+    bool TableAccountV1 { get; }
+
+    /// <summary>Whether authorized native amendment quote and commit endpoints are enabled.</summary>
+    bool OrderAmendmentsV1 { get; }
+
     /// <summary>Whether server writes enforce each product's minimum selected sauces.</summary>
     bool EnforceSauceMinimum { get; }
 

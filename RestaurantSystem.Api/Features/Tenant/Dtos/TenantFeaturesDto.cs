@@ -4,4 +4,6 @@ namespace RestaurantSystem.Api.Features.Tenant.Dtos;
 public sealed record TenantFeaturesDto(
     bool ServerWorkspaceV2,
     bool EnforceSauceMinimum,
-    bool OptionSetMaterializationEnabled);
+    bool OptionSetMaterializationEnabled,
+    bool TableAccountV1 = false,
+    bool OrderAmendmentsV1 = false);

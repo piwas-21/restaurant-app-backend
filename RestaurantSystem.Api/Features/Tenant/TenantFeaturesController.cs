@@ -32,7 +32,9 @@ public sealed class TenantFeaturesController : ControllerBase
         var dto = new TenantFeaturesDto(
             _features.ServerWorkspaceV2,
             _features.EnforceSauceMinimum,
-            _features.OptionSetMaterializationEnabled);
+            _features.OptionSetMaterializationEnabled,
+            _features.TableAccountV1,
+            _features.OrderAmendmentsV1);
         return Ok(ApiResponse<TenantFeaturesDto>.SuccessWithData(dto));
     }
 }

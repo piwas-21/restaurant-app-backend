@@ -12,6 +12,7 @@ public record TableServiceSessionDto
     public string? Currency { get; init; }
     public string Status { get; init; } = string.Empty;
     public int Version { get; init; }
+    public long AccountRevision { get; init; }
     public DateTime OpenedAt { get; init; }
     public DateTime? ClosedAt { get; init; }
     public int RoundCount { get; init; }

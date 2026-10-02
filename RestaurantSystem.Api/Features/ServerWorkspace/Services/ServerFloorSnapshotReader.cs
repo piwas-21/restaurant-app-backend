@@ -120,6 +120,12 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         CancellationToken cancellationToken)
     {
         var bills = await _bills.AssembleManyAsync(sessionEntities, cancellationToken);
+        var sessionIds = sessionEntities.Select(session => session.Id).ToArray();
+        var pendingHandoffs = await _context.TableServicePaymentHandoffs.AsNoTracking()
+            .Where(handoff => sessionIds.Contains(handoff.ServiceSessionId)
+                && handoff.Status == TableServicePaymentHandoffStatus.Requested)
+            .Select(handoff => handoff.ServiceSessionId)
+            .ToHashSetAsync(cancellationToken);
         var rows = new List<FloorSessionRow>(sessionEntities.Count);
         for (var index = 0; index < sessionEntities.Count; index++)
         {
@@ -131,7 +137,8 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
                 CurrencyCode.Normalize(session.Currency) ?? tenantCurrency,
                 session.Version,
                 session.OpenedAt,
-                bills[index]));
+                bills[index],
+                pendingHandoffs.Contains(session.Id)));
         }
 
         return rows;

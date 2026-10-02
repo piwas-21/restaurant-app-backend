@@ -37,7 +37,7 @@ internal static class ServerFloorSnapshotVersionBuilder
                     + $"{table.Width}:{table.Height}:{table.Shape}:{table.Rotation}"))
             + ';' + string.Join('|', sessions.OrderBy(session => session.Id)
                 .Select(session => $"s:{session.Id}:{session.Version}:{session.TableId}:{session.TableNumber}:"
-                    + $"{session.Currency}"))
+                    + $"{session.Currency}:{session.HasPendingPaymentHandoff}"))
             + ';' + string.Join('|', orders.Where(order => IsVersionRelevant(order, paymentTolerance))
                 .OrderBy(order => order.Id)
                 .Select(order => $"o:{order.Id}:{order.ServiceSessionId}:{order.TableId}:{order.TableNumber}:"

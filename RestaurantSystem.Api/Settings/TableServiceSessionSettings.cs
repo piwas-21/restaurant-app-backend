@@ -14,4 +14,7 @@ public sealed class TableServiceSessionSettings
 
     [Range(1, 1000)]
     public int PendingPaymentHandoffQueueLimit { get; set; } = 200;
+
+    [Range(1, 1000)]
+    public int AccountActivityPageSize { get; set; } = 100;
 }

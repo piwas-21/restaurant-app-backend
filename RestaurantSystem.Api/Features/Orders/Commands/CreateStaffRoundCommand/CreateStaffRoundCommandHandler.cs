@@ -95,6 +95,7 @@ public sealed class CreateStaffRoundCommandHandler
 
             var build = await _builder.BuildAsync(command, command.ReleaseToKitchen, cancellationToken);
             _context.Orders.Add(build.Order);
+            session.RecordAccountChange();
             if (command.ReleaseToKitchen)
             {
                 await _routing.EnsureRoutesAsync(build.Order, cancellationToken);

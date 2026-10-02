@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -45,9 +46,10 @@ public class PrinterFeedUpdatesQueryHandler
             // printer boundary: Staff notes can never reach a printer through role inference.
             .Where(note => note.Audience == OrderNoteAudience.Kitchen
                 && !note.Order.IsDeleted
-                // A note may be added after the original ticket while preparation is in flight.
-                // Exclude unreleased/terminal work, but keep the released kitchen states.
-                && (note.Order.Status == OrderStatus.Confirmed
+                // Ordinary notes follow the existing preparation states. Frozen amendment jobs
+                // survive terminal status: an offline kitchen still needs the cancellation ticket.
+                && (note.KitchenChangesJson != null
+                    || note.Order.Status == OrderStatus.Confirmed
                     || note.Order.Status == OrderStatus.Preparing
                     || note.Order.Status == OrderStatus.Ready));
 
@@ -68,30 +70,37 @@ public class PrinterFeedUpdatesQueryHandler
             }
         }
 
-        var updates = await updatesQuery
+        var storedUpdates = await updatesQuery
             .OrderBy(note => note.CreatedAt)
             .ThenBy(note => note.Id)
             // Read one sentinel row so the response can tell the printer-app whether another page
             // exists without making it advance a timestamp cursor past unseen work.
             .Take(_updatePageSize + 1)
-            .Select(note => new PrinterFeedUpdateDto
+            .Select(note => new StoredKitchenUpdate(new PrinterFeedUpdateDto
             {
                 JobId = note.Id,
                 // Each immutable note is one update job. A future editable-note contract can
                 // introduce later revisions without changing the current retry identity.
                 Revision = 1,
                 JobType = DevicePrintJobType.Update,
-                Target = DevicePrintTarget.General,
+                Target = note.KitchenTarget ?? DevicePrintTarget.General,
                 OrderId = note.OrderId,
                 OrderNumber = note.Order.OrderNumber,
                 TableId = note.Order.TableId,
                 TableLabel = note.Order.TableLabel,
                 TableNumber = note.Order.TableNumber,
+                ServiceSessionId = note.Order.ServiceSessionId,
+                AmendmentId = note.AmendmentId,
+                AccountRevision = note.AccountRevision,
                 Audience = nameof(OrderNoteAudience.Kitchen),
                 Text = note.Text,
                 CreatedAt = note.CreatedAt,
-            })
+            }, note.KitchenChangesJson))
             .ToListAsync(cancellationToken);
+        var updates = storedUpdates.Select(stored => stored.Update with
+        {
+            Changes = KitchenChangeSnapshot.Deserialize(stored.ChangesJson)
+        }).ToList();
 
         var hasMore = updates.Count > _updatePageSize;
         if (hasMore)
@@ -120,4 +129,6 @@ public class PrinterFeedUpdatesQueryHandler
     {
         return string.IsNullOrWhiteSpace(value) ? null : PrinterFeedUpdateCursor.Decode(value);
     }
+
+    private sealed record StoredKitchenUpdate(PrinterFeedUpdateDto Update, string? ChangesJson);
 }

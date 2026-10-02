@@ -109,9 +109,9 @@ internal sealed class ServerFloorSnapshotProjector
             Legacy = legacyDto,
             HasLegacyAmbiguity = hasLegacyAmbiguity,
             Reservation = reservation,
-            PermittedActions = PermittedActions(
+            PermittedActions = ServerFloorActionProjection.Project(
                 table, summary, hasLegacyAmbiguity, legacyDto is not null, readyCount,
-                reservation?.IsCurrent == true)
+                reservation?.IsCurrent == true, _currentUser.Role)
         };
     }
     private ServerFloorSessionSummaryDto SummarizeSession(
@@ -121,7 +121,8 @@ internal sealed class ServerFloorSnapshotProjector
     {
         var members = session.Bill?.Rounds
             .Select(round => new TableServiceSessionOrderState(
-                ParseStatus(round.Order.Status), round.Outstanding))
+                ParseStatus(round.Order.Status), round.Order.RemainingAmount,
+                round.Order.PaymentStatus == nameof(PaymentStatus.Refunded)))
             .ToList() ?? [];
         var legacyStates = legacy.Select(order =>
             new TableServiceSessionOrderState(order.Status, order.RemainingAmount));
@@ -141,7 +142,10 @@ internal sealed class ServerFloorSnapshotProjector
             ActiveRoundCount = bill?.Rounds.Count(round => IsActiveRound(ParseStatus(round.Order.Status))) ?? 0,
             ReadyRoundCount = bill?.Rounds.Count(round => IsReady(ParseStatus(round.Order.Status))) ?? 0,
             CanCollect = bill?.EligibleOutstanding > _paymentTolerance,
-            CanClose = assessment.CanClose,
+            CanRequestPaymentHandoff = _currentUser.Role == UserRole.Server
+                && bill?.EligibleOutstanding > _paymentTolerance && !session.HasPendingPaymentHandoff,
+            HasPendingPaymentHandoff = session.HasPendingPaymentHandoff,
+            CanClose = assessment.CanClose && !session.HasPendingPaymentHandoff,
             HasLegacyAmbiguity = assessment.LegacyActiveOrderCount > 0
         };
     }
@@ -157,49 +161,6 @@ internal sealed class ServerFloorSnapshotProjector
         if (hasOpenSession) return "Open";
         if (hasLegacyAmbiguity) return "Ambiguous";
         return hasCurrentReservation ? "Reserved" : "Available";
-    }
-
-    private List<string> PermittedActions(
-        Table table,
-        ServerFloorSessionSummaryDto? session,
-        bool hasLegacyAmbiguity,
-        bool hasLegacyOrders,
-        int readyCount,
-        bool hasCurrentReservation)
-    {
-        if (!table.IsActive)
-        {
-            return [];
-        }
-
-        if (session is null)
-        {
-            if (hasLegacyOrders || hasLegacyAmbiguity) return ["ReviewLegacy"];
-            return hasCurrentReservation ? [] : ["StartTable"];
-        }
-
-        var actions = new List<string> { "AddRound", "ViewBill" };
-        if (readyCount > 0)
-        {
-            actions.Add("OpenTasks");
-        }
-
-        if (session.CanCollect && _currentUser.Role is UserRole.Admin or UserRole.Cashier)
-        {
-            actions.Add("CollectPayment");
-        }
-
-        if (session.CanClose)
-        {
-            actions.Add("CloseVisit");
-        }
-
-        if (hasLegacyAmbiguity)
-        {
-            actions.Add("ReviewLegacy");
-        }
-
-        return actions;
     }
 
     private static FloorSessionRow? ResolveSession(

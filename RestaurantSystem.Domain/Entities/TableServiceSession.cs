@@ -26,6 +26,19 @@ public class TableServiceSession : Entity
     /// <summary>Optimistic-concurrency version returned on every session read.</summary>
     public int Version { get; set; } = 1;
 
+    /// <summary>
+    /// Monotonic revision for bill-affecting account changes. It is independent from Version so
+    /// service and table lifecycle changes can keep their existing concurrency contract.
+    /// </summary>
+    public long AccountRevision { get; set; } = 1;
+
+    /// <summary>Advances both session-write and account-content concurrency markers.</summary>
+    public void RecordAccountChange()
+    {
+        Version++;
+        AccountRevision++;
+    }
+
     public DateTime OpenedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
 

@@ -14,6 +14,7 @@ public static class StaffOrderServiceExtensions
         services.AddScoped<IOrderRoutingReadinessSnapshotProvider, OrderRoutingReadinessSnapshotProvider>();
         services.AddScoped<IOrderRoutingAcknowledgementService, OrderRoutingAcknowledgementService>();
         services.AddScoped<IOrderRoutingService, OrderRoutingService>();
+        services.AddScoped<IOrderKitchenChangeWriter, OrderKitchenChangeWriter>();
         return services;
     }
 }
