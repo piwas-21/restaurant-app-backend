@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
@@ -21,6 +22,10 @@ public record CreateOrderFromBasketCommand : ICommand<ApiResponse<OrderDto>>
     // of the request-body schema so a body value can't bind (and it stays out of the OpenAPI docs).
     [JsonIgnore]
     public string SessionId { get; set; } = string.Empty;
+
+    // Trusted only when set by the dedicated guest visit endpoint; never body-bound.
+    [JsonIgnore]
+    internal TableGuestRoundContext? GuestRoundContext { get; set; }
 
     public string? CustomerName { get; set; }
     public string? CustomerEmail { get; set; }

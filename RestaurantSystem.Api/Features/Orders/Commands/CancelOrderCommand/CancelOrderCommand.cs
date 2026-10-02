@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -88,6 +89,9 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
         {
             return ApiResponse<OrderDto>.Failure("Order is already cancelled");
         }
+
+        await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+            _context, order.Id, cancellationToken);
 
         // Computed BEFORE the status-history row is built, because the row's Notes carry it: the
         // cancellation and the money still owed on it are one audit entry, not two.

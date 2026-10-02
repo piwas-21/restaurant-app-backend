@@ -4238,6 +4238,140 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("OrderAddresses", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("ChangesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("changes_json");
+
+                    b.Property<Guid?>("ClientOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_operation_id");
+
+                    b.Property<string>("CommitPayloadHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("commit_payload_hash");
+
+                    b.Property<string>("CommitResultJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("commit_result_json");
+
+                    b.Property<long?>("CommittedAccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("committed_account_revision");
+
+                    b.Property<DateTime?>("CommittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("committed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<long?>("ExpectedAccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_account_revision");
+
+                    b.Property<int>("ExpectedOrderVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_order_version");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("FinancialResolutionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("financial_resolution_json");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("request_json");
+
+                    b.Property<Guid?>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<Guid>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
+
+                    b.Property<string>("SourceSnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("source_snapshot_json");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid?>("SupplementOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplement_order_id");
+
+                    b.Property<string>("SupplementSnapshotJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("supplement_snapshot_json");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_amendments");
+
+                    b.HasIndex("SupplementOrderId");
+
+                    b.HasIndex("ActorUserId", "ClientOperationId")
+                        .IsUnique()
+                        .HasFilter("\"client_operation_id\" IS NOT NULL");
+
+                    b.HasIndex("ServiceSessionId", "State");
+
+                    b.HasIndex("SourceOrderId", "CreatedAt");
+
+                    b.ToTable("order_amendments", (string)null);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderChange", b =>
                 {
                     b.Property<long>("Sequence")
@@ -7019,6 +7153,193 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("table_bill_payment_operations");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestAdmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_guest_admissions");
+
+                    b.HasIndex("ServiceSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_table_guest_admissions_service_session_id")
+                        .HasFilter("\"revoked_at\" IS NULL");
+
+                    b.ToTable("table_guest_admissions");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestParticipant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AdmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admission_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("token_hash")
+                        .IsFixedLength();
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_guest_participants");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("AdmissionId", "ServiceSessionId");
+
+                    b.HasIndex("ServiceSessionId", "RevokedAt");
+
+                    b.ToTable("table_guest_participants");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestRoundOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("participant_id");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("request_hash")
+                        .IsFixedLength();
+
+                    b.Property<Guid>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_guest_round_operations");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_table_guest_round_operations_order_id");
+
+                    b.HasIndex("ParticipantId", "ServiceSessionId");
+
+                    b.HasIndex("ServiceSessionId", "OperationId")
+                        .IsUnique();
+
+                    b.ToTable("table_guest_round_operations");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableReservation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8561,6 +8882,25 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("UserAddress");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendment", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("SupplementOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderChange", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
@@ -9000,6 +9340,71 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("ServiceSession");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestAdmission", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_guest_admissions_tableservicesessions_service_session~");
+
+                    b.Navigation("ServiceSession");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestParticipant", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_guest_participants_tableservicesessions_service_sessi~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableGuestAdmission", "Admission")
+                        .WithMany("Participants")
+                        .HasForeignKey("AdmissionId", "ServiceSessionId")
+                        .HasPrincipalKey("Id", "ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_guest_participants_table_guest_admissions_admission_id");
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("ServiceSession");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestRoundOperation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_guest_round_operations_orders_order_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_guest_round_operations_tableservicesessions_service_s~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableGuestParticipant", "Participant")
+                        .WithMany()
+                        .HasForeignKey("ParticipantId", "ServiceSessionId")
+                        .HasPrincipalKey("Id", "ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_table_guest_round_operations_table_guest_participants_parti~");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Participant");
+
+                    b.Navigation("ServiceSession");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableReservation", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
@@ -9249,6 +9654,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableBillPaymentOperation", b =>
                 {
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableGuestAdmission", b =>
+                {
+                    b.Navigation("Participants");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServiceSession", b =>

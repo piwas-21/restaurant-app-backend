@@ -89,6 +89,11 @@ public class MutatingEndpointAuthorizationCoverageTests
         "OrdersController.CreateOrderFromBasket [POST]",
         "PaymentsController.CreateCheckoutSession [POST]",
         "ReservationsController.CreateReservation [POST]",
+        // A guest joins with the table QR plus short-lived staff admission code, then adds a
+        // round with a hashed visit participant capability, reviewed basket digest and replay key.
+        // Both services enforce the default-off flag, open visit and endpoint rate limit.
+        "TableGuestVisitsController.CreateRound [POST]",
+        "TableGuestVisitsController.Join [POST]",
         "UserController.ConfirmDeletion [POST]",
         "UserController.RegisterCustomer [POST]",
         "UserGroupController.ValidateQRCode [POST]",

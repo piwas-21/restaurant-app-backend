@@ -14,6 +14,9 @@ public interface ITenantFeatures
     /// <summary>Whether authorized native amendment quote and commit endpoints are enabled.</summary>
     bool OrderAmendmentsV1 { get; }
 
+    /// <summary>Whether scoped guest visit admission and rounds are enabled.</summary>
+    bool TableGuestVisitsV1 { get; }
+
     /// <summary>Whether server writes enforce each product's minimum selected sauces.</summary>
     bool EnforceSauceMinimum { get; }
 

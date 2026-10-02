@@ -8,4 +8,10 @@ public record PrinterFeedChangeDto
     public KitchenChangeKind Kind { get; init; }
     public OrderItemDto? Previous { get; init; }
     public OrderItemDto? Current { get; init; }
+    /// <summary>
+    /// For Replace only: the separately released supplement ticket that prepares Current. The
+    /// printer renders Current here as a linked reference, never as a second preparation action.
+    /// </summary>
+    public Guid? ReplacementDispatchedOrderId { get; init; }
+    public string? ReplacementDispatchedOrderNumber { get; init; }
 }

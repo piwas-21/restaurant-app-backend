@@ -21,6 +21,9 @@ public sealed class TenantFeatureSettings
     /// <summary>Opt-in amendment writes; disabled until contracts and money reconciliation are verified.</summary>
     public bool OrderAmendmentsV1 { get; set; }
 
+    /// <summary>Opt-in guest visit admission and rounds; disabled until isolation is verified.</summary>
+    public bool TableGuestVisitsV1 { get; set; }
+
     /// <summary>
     /// Requires configured minimum sauce choices at write time. Defaults off for existing guest,
     /// staff and mobile clients until each tenant's payload compatibility is verified.
