@@ -34,6 +34,7 @@ public static class DeliveryChannelServiceExtensions
             .ValidateOnStart();
         services.AddScoped<IExternalOrderImporter, ExternalOrderImporter>();
         services.AddScoped<IChannelAvailabilityReader, ChannelAvailabilityReader>();
+        services.AddScoped<IChannelCatalogueReader, ChannelCatalogueReader>();
         services.AddScoped<IChannelDecisionQueue, ChannelDecisionQueue>();
         services.AddScoped<IChannelOrderObserver, ChannelOrderObserver>();
         services.AddScoped<IChannelDecisionDelivery, ChannelDecisionDelivery>();

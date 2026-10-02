@@ -19,10 +19,7 @@ public sealed class ChannelAvailabilityReader(ApplicationDbContext context, IOpt
 {
     public async Task<ChannelAvailabilitySnapshot> Read(ChannelAvailabilityRequest request, CancellationToken cancellationToken)
     {
-        if (request.Items is null || request.Items.Count is < 1 or > ExternalOrderLimits.MaxItems
-            || request.Items.Any(item => item is null || item.ProductId == Guid.Empty || item.VariationId == Guid.Empty)
-            || request.Items.Distinct().Count() != request.Items.Count)
-            throw new BadRequestException("Select 1–200 distinct product/variation identities for availability.");
+        ChannelCatalogueSelection.Require(request.Items);
         ChannelDecisionBinding.Require(request.Provider, request.StoreId, request.Currency, request.IsSandbox, options);
         // Split includes must describe one catalogue snapshot even while staff edit stock or choices.
         await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
