@@ -24,13 +24,15 @@
         <dl id="configuration"></dl><button id="connect">Connect with Uber</button>
       </section>
       <section class="card"><div class="section-title"><span class="number">02</span><h2>Prepare the menu</h2></div>
-        <p>This replaces the approved sandbox store’s entire menu with two test items: a €5 meal and a €2 drink. Test availability is every day, 00:00–23:59. Nothing is prepared or charged.</p>
-        <details><summary>Preview the exact test menu</summary><pre id="menu-preview"></pre></details>
+        <p>Review the selected Sofra products, prices, descriptions and any blocked items before replacing the approved sandbox store’s entire menu. Tax settings and test service hours are shown in the preview. Nothing is prepared or charged.</p>
+        <details><summary>Preview the menu and product mapping</summary><pre id="menu-preview"></pre></details>
+        <button id="refresh-preview" class="secondary">Refresh menu preview</button>
+        <label class="check"><input id="review-menu" type="checkbox"> I reviewed the products, prices, descriptions, tax settings and service hours.</label>
         <div class="actions"><button id="publish">Publish test menu &amp; verify</button><button id="verify-menu" class="secondary">Verify current test menu</button><button id="read-menu" class="secondary">Read current Uber menu</button></div>
         <details id="menu-readback" hidden><summary>Menu returned by Uber</summary><pre id="menu-result"></pre></details>
       </section>
       <section class="card" aria-labelledby="stock-title"><div class="section-title"><h2 id="stock-title">Item availability</h2></div>
-        <p>Availability follows the two reviewed Sofra items. Each update is checked against Uber’s menu; the time below shows the last successful check.</p>
+        <p>Availability follows the reviewed Sofra items. Each update is checked against Uber’s menu; the time below shows the last successful check.</p>
         <p id="stock-status" aria-live="polite">Stock status has not been loaded.</p><ul id="stock-items"></ul>
         <button id="refresh-stock" class="secondary">Refresh stock status</button>
       </section>

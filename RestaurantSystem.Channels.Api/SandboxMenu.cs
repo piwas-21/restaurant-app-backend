@@ -4,7 +4,8 @@ using Microsoft.Extensions.Options;
 namespace RestaurantSystem.Channels.Api;
 
 public sealed class SandboxMenu(IOptions<UberWebhookSettings> options, IUberSandboxClient provider,
-    ISandboxTokens tokens, IWebHostEnvironment environment) : ISandboxMenu
+    ISandboxTokens tokens, IWebHostEnvironment environment, IOptions<TenantBridgeSettings>? bridge = null,
+    ITenantCataloguePublication? catalogue = null) : ISandboxMenu
 {
     private string MenuPath => $"/v2/eats/stores/{options.Value.StoreIds.Single():D}/menus";
 
@@ -23,6 +24,8 @@ public sealed class SandboxMenu(IOptions<UberWebhookSettings> options, IUberSand
 
     public async Task<JsonElement> Publish(CancellationToken cancellationToken)
     {
+        if (bridge?.Value.UseTenantCatalogue == true)
+            throw new ChannelConsoleException(409, "Review the tenant preview and submit its publication revision.");
         var result = await provider.Send(HttpMethod.Put, MenuPath, await tokens.AppToken(cancellationToken), Preview(), cancellationToken);
         ProviderJson.RequireSuccess(result, "sandbox menu upload");
         await RequireVerified(cancellationToken);
@@ -30,5 +33,20 @@ public sealed class SandboxMenu(IOptions<UberWebhookSettings> options, IUberSand
     }
 
     public async Task RequireVerified(CancellationToken cancellationToken)
-        => SandboxMenuVerifier.Require(Preview(), await Read(cancellationToken));
+        => SandboxMenuVerifier.Require(await Expected(cancellationToken), await Read(cancellationToken));
+
+    public Task<JsonElement> Preview(CancellationToken cancellationToken)
+        => bridge?.Value.UseTenantCatalogue == true
+            ? RequireCatalogue().Preview(Preview(), cancellationToken) : Task.FromResult(Preview());
+
+    public Task<JsonElement> Expected(CancellationToken cancellationToken)
+        => bridge?.Value.UseTenantCatalogue == true
+            ? RequireCatalogue().Expected(cancellationToken) : Task.FromResult(Preview());
+
+    public Task<JsonElement> Publish(string revision, CancellationToken cancellationToken)
+        => bridge?.Value.UseTenantCatalogue == true
+            ? RequireCatalogue().Publish(Preview(), revision, cancellationToken) : Publish(cancellationToken);
+
+    private ITenantCataloguePublication RequireCatalogue()
+        => catalogue ?? throw new ChannelConsoleException(409, "Tenant catalogue publication is unavailable.");
 }

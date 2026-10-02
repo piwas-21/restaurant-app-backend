@@ -9,6 +9,7 @@ let importsCursor = '';
 let nextImportsCursor = '';
 let busy = false;
 let loggedIn = false;
+let menuPreview = null;
 async function api(path, body) {
   const response = await fetch('/api/sandbox/' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
@@ -135,8 +136,13 @@ async function refresh() {
 }
 async function openWorkspace() {
   loggedIn = true; el('login-panel').hidden = true; el('workspace').hidden = false;
-  el('menu-preview').textContent = JSON.stringify(await api('uber/preview'), null, 2);
+  await previewMenu();
   await refresh();
+}
+async function previewMenu() {
+  menuPreview = await api('uber/preview');
+  el('menu-preview').textContent = JSON.stringify(menuPreview, null, 2);
+  el('review-menu').checked = false;
 }
 function authorize(result) {
   const url = new URL(result.url);
@@ -164,7 +170,14 @@ bind('refresh-stock', stock);
 bind('refresh-imports', () => imports());
 bind('more-imports', () => imports(nextImportsCursor));
 bind('connect', async () => { authorize(await api('uber/connect', {})); });
-bind('publish', async () => { await api('uber/publish', {}); notice('Test menu published and verified against Uber’s readback.'); });
+bind('refresh-preview', previewMenu);
+bind('publish', async () => {
+  if (!el('review-menu').checked || menuPreview?.canPublish === false) {
+    throw new Error('Review the complete menu preview and resolve blocked selections before publishing.');
+  }
+  await api('uber/publish', { revision: menuPreview?.revision || '' });
+  await previewMenu(); notice('Menu published and verified against Uber’s readback.');
+});
 bind('verify-menu', async () => { await api('uber/verification'); notice('Current test menu verified against Uber’s readback.'); });
 bind('read-menu', async () => {
   el('menu-result').textContent = JSON.stringify(await api('uber/menu'), null, 2);

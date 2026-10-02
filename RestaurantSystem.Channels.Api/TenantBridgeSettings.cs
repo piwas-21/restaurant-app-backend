@@ -7,6 +7,7 @@ public sealed class TenantBridgeSettings
     public bool Paused { get; set; }
     public bool DispatchDecisions { get; set; }
     public bool SyncAvailability { get; set; }
+    public bool UseTenantCatalogue { get; set; }
     public int AvailabilityPollSeconds { get; set; } = 30;
     public int AvailabilityMaxWrites { get; set; } = 10;
     public bool RecoverCreatedOrders { get; set; }
@@ -22,6 +23,7 @@ public sealed class TenantBridgeSettings
     private bool HasOperationalBounds() => HttpTimeoutSeconds is >= 5 and <= 30
         && (!DispatchDecisions || Enabled) && (!RecoverCreatedOrders || Enabled)
         && (!SyncAvailability || Enabled && Store.CatalogueApiToken.Length > 0)
+        && (!UseTenantCatalogue || Enabled && SyncAvailability && Store.CatalogueApiToken.Length > 0)
         && AvailabilityPollSeconds is >= 10 and <= 300 && AvailabilityMaxWrites is >= 1 and <= 20
         && RecoveryPollSeconds is >= 5 and <= 300 && RecoveryListLimit is >= 1 and <= 200 && PollSeconds is >= 1 and <= 60
         && RetrySeconds is >= 10 and <= 300 && PayloadRetentionDays is >= 1 and <= 7;

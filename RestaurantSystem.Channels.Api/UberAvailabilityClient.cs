@@ -18,7 +18,7 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
         ProviderJson.RequireSuccess(response, "availability readback");
         if (response.ClientId.Length > 0 && response.ClientId != clientId)
             throw InvalidMenu();
-        SandboxMenuVerifier.Require(menu.Preview(), response.Body);
+        SandboxMenuVerifier.Require(await menu.Expected(cancellationToken), response.Body);
         var expected = store.Items.Select(item => item.ProviderItemId).ToHashSet(StringComparer.Ordinal);
         var states = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var row in response.Body.GetProperty("items").EnumerateArray())
@@ -32,9 +32,10 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
         return new(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(response.Body.GetRawText()))), states);
     }
 
-    private static void RequireSimpleItem(JsonElement row)
+    internal static void RequireSimpleItem(JsonElement row)
     {
-        var price = row.GetProperty("price_info");
+        if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("price_info", out var price)
+            || price.ValueKind != JsonValueKind.Object) throw InvalidMenu();
         if (price.TryGetProperty("overrides", out var overrides) && !EmptyCollection(overrides)) throw InvalidMenu();
         foreach (var key in new[] { "bundled_items", "modifier_group_ids", "quantity_info" })
         {
@@ -45,6 +46,8 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
                 property.Name is "ids" or "overrides" && EmptyCollection(property.Value))) continue;
             throw InvalidMenu();
         }
+        // Full menu replacement must not erase unsupported provider stock rules either.
+        _ = Available(row, 0);
     }
 
     private static bool EmptyCollection(JsonElement value)
@@ -73,10 +76,13 @@ public sealed class UberAvailabilityClient(IUberSandboxClient provider, ISandbox
     {
         if (!row.TryGetProperty("suspension_info", out var rules) || rules.ValueKind == JsonValueKind.Null) return true;
         if (rules.ValueKind != JsonValueKind.Object) throw InvalidMenu();
+        if (rules.EnumerateObject().Any(property => property.Name is not ("suspension" or "overrides"))) throw InvalidMenu();
         if (rules.TryGetProperty("overrides", out var overrides) && overrides.ValueKind != JsonValueKind.Null
             && (overrides.ValueKind != JsonValueKind.Array || overrides.GetArrayLength() != 0)) throw InvalidMenu();
         if (!rules.TryGetProperty("suspension", out var suspension) || suspension.ValueKind == JsonValueKind.Null) return true;
         if (suspension.ValueKind != JsonValueKind.Object) throw InvalidMenu();
+        if (suspension.EnumerateObject().Any(property => property.Name is not ("suspend_until" or "reason"))
+            || suspension.TryGetProperty("reason", out var reason) && reason.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) throw InvalidMenu();
         if (!suspension.TryGetProperty("suspend_until", out var until) || until.ValueKind == JsonValueKind.Null) return true;
         return SuspensionExpired(until, now);
     }

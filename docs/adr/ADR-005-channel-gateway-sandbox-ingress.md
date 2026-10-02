@@ -153,8 +153,47 @@ provider state before sending another idempotent stock update. Provider bodies, 
 never enter worker logs. The private session-protected availability view displays item-level state and the
 last verified time; observations older than twice the polling interval are labelled stale.
 
-This worker follows only the reviewed two-item sandbox mapping. It does not publish an arbitrary tenant
-catalogue, encode modifier/bundle choices or make the broader catalogue publication criteria complete.
+This worker follows only the reviewed sandbox mapping. With tenant publication enabled, its structural
+baseline is the latest verified publication; otherwise it uses the reviewed two-item fixture. Arbitrary
+modifier/bundle choices and production catalogue certification remain outside this simple-item contract.
+
+### Reviewed tenant catalogue publication
+
+`TenantBridge:UseTenantCatalogue` defaults to false and requires the separately deployed tenant
+`POST /api/delivery-channels/catalogue/snapshot`, the dedicated catalogue-read credential and enabled stock
+synchronization. The selected identities must match the reviewed deployment mapping and exact
+provider/store/currency/sandbox binding. The source returns translated names/descriptions, exact minor-unit
+prices, stock and explicit refusal reasons; unsupported choices and unmapped allergens block publication.
+The gateway independently checks the complete source revision. No order/customer data is returned.
+
+The private console refreshes and displays the complete proposed menu, source revision, selected identities,
+prices and blocked rows. Publishing requires the reviewed revision and rechecks the source before upload.
+The reviewed template still supplies stable provider identities, category topology, service hours and tax
+rates; none are inferred from tenant defaults. This initial publisher supports the reviewed simple-item or
+variation selection; adding categories, items or choice structures requires a reviewed template/mapping.
+
+Apply additive SQL007 only to the dedicated channels database after SQL006. Its append-only
+`channel_catalogue_publications` ledger stores UUID identity, ordered sequence, app/store/tenant binding,
+reviewed mapping/source/publication hashes, proposed and previous menu JSON, state and verification metadata.
+Its foreign key retains SQL006's first-tenant binding. Runtime grants are SELECT/INSERT on this table,
+UPDATE **only** `(state, provider_hash, verified_at)` and USAGE on its identity sequence. Do not grant table-wide
+UPDATE or DELETE; proposed/previous menu bodies cannot be rewritten. No tenant migration is required.
+
+Publication and stock share the store-scoped advisory lease. Before any full replacement, independent Uber
+readback must match the known menu and contain no unsupported price, choice, quantity or suspension rules.
+A Pending ledger row commits before PUT. Only an independent matching GET makes that row Verified; HTTP success
+alone cannot. A lost reply is recovered by GET before retry. A changed source may supersede an unsent Pending
+row only after proving the previous menu remains; it becomes Abandoned before the new intent is appended.
+Unknown provider content or an unresolved old mapping stays blocked. Only the latest verified exact mapping
+supplies the stock/import baseline; structural comparison excludes separately reconciled suspension state.
+
+Activation requires a validated isolated database backup, live source authorization/binding checks and a live
+source-hash roundtrip before setting the flag. Pause imports and dispatch while changing bindings. Review and
+publish through the private console, verify the provider menu and fresh item stock observations, then resume
+only the approved sandbox. Preserve the enrollment cutoff and credentials; do not enroll old orders again.
+Rollback must pause imports/dispatch and disable stock before disabling tenant publication: an older fixture
+baseline cannot prove a newly published tenant menu. Restore and independently verify the reviewed prior menu
+or keep the current compatible ledger-aware image; resume only once its matching baseline is proven.
 
 ### Durable tenant decision outbox
 
@@ -328,8 +367,8 @@ PKCE verifiers and app tokens, and per-order action metadata. Migration 001 and 
 unchanged. Apply 002 explicitly and grant CRUD on only its four tables to the API role; receipt permissions
 remain INSERT/SELECT. Back up the isolated DB and key separately before deployment/rotation.
 
-Menu upload is an explicit replacement of a versioned two-item sandbox fixture, previewed with its test
-hours and EUR prices. Readback must preserve published content and stable IDs before a publish is
+Menu upload explicitly replaces either the reviewed tenant-source selection or, while tenant publication is
+disabled, the versioned two-item sandbox fixture. The preview includes the reviewed service hours and prices. Readback must preserve published content and stable IDs before a publish is
 reported verified or order-manager testing enabled. Uber's actual sandbox GET normalizes an empty
 modifier-group array to null and omits `type: ITEM` on category entities. Only those two equivalences are
 allowed: an explicit different type, changed prices/tax/hours/content/IDs, missing fields and nonempty

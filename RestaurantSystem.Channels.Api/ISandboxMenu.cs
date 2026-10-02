@@ -8,4 +8,7 @@ public interface ISandboxMenu
     Task<JsonElement> Read(CancellationToken cancellationToken);
     Task<JsonElement> Publish(CancellationToken cancellationToken);
     Task RequireVerified(CancellationToken cancellationToken);
+    Task<JsonElement> Preview(CancellationToken cancellationToken) => Task.FromResult(Preview());
+    Task<JsonElement> Expected(CancellationToken cancellationToken) => Task.FromResult(Preview());
+    Task<JsonElement> Publish(string revision, CancellationToken cancellationToken) => Publish(cancellationToken);
 }

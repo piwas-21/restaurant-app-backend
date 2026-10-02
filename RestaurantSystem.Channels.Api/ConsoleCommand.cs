@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace RestaurantSystem.Channels.Api;
 
 public sealed record ConsoleCommand(string Operation, string SessionHash = "", string OrderId = "",
-    bool Enable = false, ConsoleDecisionRequest? Decision = null) : IChannelCommand<JsonElement>;
+    bool Enable = false, ConsoleDecisionRequest? Decision = null, string PublicationRevision = "") : IChannelCommand<JsonElement>;
 
 public sealed class ConsoleCommandHandler(ISandboxConnection connection, ISandboxMenu menu, ISandboxOrders orders)
     : IChannelCommandHandler<ConsoleCommand, JsonElement>
@@ -12,7 +12,7 @@ public sealed class ConsoleCommandHandler(ISandboxConnection connection, ISandbo
         => command.Operation switch
         {
             "connect" => ProviderJson.Encode(new { url = await connection.Start(command.SessionHash, cancellationToken) }),
-            "publish" => await menu.Publish(cancellationToken),
+            "publish" => await menu.Publish(command.PublicationRevision, cancellationToken),
             "enable" when command.Enable => ProviderJson.Encode(new { url = await connection.Start(command.SessionHash, cancellationToken, true) }),
             "enable" => await connection.EnableOrders(false, cancellationToken),
             "decision" when command.Decision is { ReviewedInstructions: true } decision

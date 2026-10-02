@@ -24,7 +24,7 @@ public abstract class ConsoleFixture(GatewayFixture fixture) : IAsyncLifetime
     {
         await using var db = new NpgsqlConnection(fixture.ConnectionString);
         await db.OpenAsync();
-        await using var clean = new NpgsqlCommand("TRUNCATE channel_availability_states, channel_availability_bindings, channel_console_sessions, channel_authorization_states, channel_sandbox_tokens, channel_sandbox_order_actions", db);
+        await using var clean = new NpgsqlCommand("TRUNCATE channel_catalogue_publications, channel_availability_states, channel_availability_bindings, channel_console_sessions, channel_authorization_states, channel_sandbox_tokens, channel_sandbox_order_actions", db);
         await clean.ExecuteNonQueryAsync();
         Host.Dispose(); Client.Dispose();
         Host = fixture.Host().WithWebHostBuilder(builder =>

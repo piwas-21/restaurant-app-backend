@@ -6,7 +6,7 @@ namespace RestaurantSystem.Channels.Api;
 
 public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> settings, IOptions<UberWebhookSettings> webhook,
     IChannelImportJobs jobs, ISandboxOrders orders, IUberOrderNormalizer normalizer, ISandboxCrypto crypto,
-    ITenantOrderClient tenant, TimeProvider clock) : ITenantImportProcessor
+    ITenantOrderClient tenant, TimeProvider clock, ITenantCataloguePublication? catalogue = null) : ITenantImportProcessor
 {
     private static readonly JsonSerializerOptions Wire = new(JsonSerializerDefaults.Web);
 
@@ -16,6 +16,11 @@ public sealed class TenantImportProcessor(IOptions<TenantBridgeSettings> setting
         // Retention continues during pause/disable and application rollback with this gateway version.
         await jobs.ExpirePayloads(cancellationToken);
         if (!options.Enabled || options.Paused) return false;
+        if (options.UseTenantCatalogue)
+        {
+            if (catalogue is null) throw new ChannelConsoleException(409, "Tenant catalogue publication is unavailable.");
+            await catalogue.RequireActive(cancellationToken);
+        }
         var store = options.Store;
         await jobs.Discover(webhook.Value.ClientId, store.StoreId, store.TenantId, store.CatalogueRevision,
             options.EnrollmentStartedAt, cancellationToken);

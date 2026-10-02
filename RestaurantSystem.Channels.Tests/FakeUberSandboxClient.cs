@@ -19,6 +19,8 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
     public bool ThrowAfterStockUpdate { get; set; }
     public string MenuClientId { get; set; } = string.Empty;
     public bool CorruptMenuReadback { get; set; }
+    public bool ThrowAfterMenuUpload { get; set; }
+    public Func<Task>? BeforeMenuUpload { get; set; }
     public bool ThrowOnDecision { get; set; }
     public int DecisionStatus { get; set; } = 204;
     public JsonElement? CanonicalOrder { get; set; }
@@ -70,7 +72,12 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
         }
         else if (path.EndsWith("/menus", StringComparison.Ordinal))
         {
-            if (method == HttpMethod.Put) Menu = body!.Value;
+            if (method == HttpMethod.Put)
+            {
+                if (BeforeMenuUpload is not null) await BeforeMenuUpload();
+                Menu = body!.Value;
+                if (ThrowAfterMenuUpload) throw new ChannelConsoleException(504, "Fixture lost response after menu upload.");
+            }
             json = CorruptMenuReadback ? ProviderJson.Encode(new { menus = Array.Empty<object>() }) : Menu;
             return new(status, json, MenuClientId);
         }
