@@ -18,8 +18,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
     private readonly ITenantFeatures _features;
     private readonly ICurrentUserService _currentUser;
     private readonly OrderAmendmentSupplementBuilder _supplements;
-    private readonly IStaffCounterOrderPricing _serverPricing;
-    private readonly IOrderItemFactory _itemFactory;
+    private readonly OrderAmendmentChangeBuilder _changes;
     private readonly IOrderMappingService _mapping;
     private readonly IOrderAmendmentFinancialResolution _financial;
 
@@ -28,8 +27,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         ITenantFeatures features,
         ICurrentUserService currentUser,
         OrderAmendmentSupplementBuilder supplements,
-        IStaffCounterOrderPricing serverPricing,
-        IOrderItemFactory itemFactory,
+        OrderAmendmentChangeBuilder changes,
         IOrderMappingService mapping,
         IOrderAmendmentFinancialResolution financial)
     {
@@ -37,8 +35,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         _features = features;
         _currentUser = currentUser;
         _supplements = supplements;
-        _serverPricing = serverPricing;
-        _itemFactory = itemFactory;
+        _changes = changes;
         _mapping = mapping;
         _financial = financial;
     }
@@ -61,7 +58,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
                     ?? throw new NotFoundException("The source order was not found.");
                 OrderAmendmentPolicy.ValidateOrderContext(source, normalized);
                 OrderAmendmentPolicy.ValidateChangeAuthority(source, normalized, _currentUser);
-                var sourceDto = _mapping.MapToOrderDto(source);
+                var sourceDto = await _mapping.MapToOrderDtoAsync(source, cancellationToken);
                 var sourceLines = source.Items.Where(item => !item.ParentOrderItemId.HasValue).ToList();
                 var sourceQuantities = sourceLines.ToDictionary(item => item.Id, item => item.Quantity);
                 await OrderAmendmentRangeValidator.ValidateAsync(
@@ -71,10 +68,9 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
                 // A rolled-back preview cannot reserve a human-facing daily order number.
                 if (supplement is not null)
                     supplement.OrderNumber = string.Empty;
-                var supplementDto = supplement is null ? null : _mapping.MapToOrderDto(supplement);
-                var changes = await OrderAmendmentChangeBuilder.BuildAsync(
-                    source, sourceDto, normalized, supplementDto, _serverPricing,
-                    _itemFactory, _mapping, cancellationToken);
+                var supplementDto = supplement is null ? null : OrderAmendmentSnapshots.MapBuiltOrder(_mapping, supplement);
+                var changes = await _changes.BuildAsync(
+                    source, sourceDto, normalized, supplementDto, cancellationToken);
                 var financial = await _financial.PreviewAsync(source, changes, supplement, cancellationToken);
 
                 var amendmentId = Guid.NewGuid();

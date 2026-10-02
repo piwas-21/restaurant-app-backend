@@ -27,4 +27,15 @@ public sealed partial class CloseTableServiceSessionCommandHandler
     private static ApiResponse<TableServiceSessionDto> Ambiguous() =>
         ApiResponse<TableServiceSessionDto>.FailureWithCode(
             TableBillTargetResolver.AmbiguousMessage, ErrorCodes.TableServiceSessionAmbiguous);
+    private ApiResponse<TableServiceSessionDto> Unresolved(decimal outstanding, List<string> unresolved)
+    {
+        var errors = new List<string>();
+        if (outstanding > _paymentTolerance)
+            errors.Add($"The session still has an outstanding balance of {outstanding:0.00}.");
+        if (unresolved.Count > 0)
+            errors.Add("The session still has unresolved rounds: " + string.Join(", ", unresolved));
+        return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+            errors, ErrorCodes.TableServiceSessionNotClosable);
+    }
+
 }

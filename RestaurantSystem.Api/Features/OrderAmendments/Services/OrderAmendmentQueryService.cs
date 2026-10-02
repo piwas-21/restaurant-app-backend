@@ -95,7 +95,7 @@ public sealed class OrderAmendmentQueryService : IOrderAmendmentQueryService
             var order = await LoadSupplementAsync(supplementId, cancellationToken);
             if (order is not null)
                 supplement = OrderAmendmentResponseRedactor.RedactOrder(
-                    _mapping.MapToOrderDto(order));
+                    await _mapping.MapToOrderDtoAsync(order, cancellationToken));
         }
 
         return OrderAmendmentResponseRedactor.RedactCommit(new OrderAmendmentCommitDto
@@ -127,10 +127,13 @@ public sealed class OrderAmendmentQueryService : IOrderAmendmentQueryService
             .Include(order => order.Payments)
             .Include(order => order.ExternalReference)
             .Include(order => order.RoutingStates)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
-        return orders.ToDictionary(
-            order => order.Id,
-            order => OrderAmendmentResponseRedactor.RedactOrder(_mapping.MapToOrderDto(order)));
+        var results = new Dictionary<Guid, OrderDto>();
+        foreach (var order in orders)
+            results.Add(order.Id, OrderAmendmentResponseRedactor.RedactOrder(
+                await _mapping.MapToOrderDtoAsync(order, cancellationToken)));
+        return results;
     }
 
     private async Task<Order?> LoadSupplementAsync(Guid orderId, CancellationToken cancellationToken) =>
@@ -140,5 +143,6 @@ public sealed class OrderAmendmentQueryService : IOrderAmendmentQueryService
             .Include(order => order.Payments)
             .Include(order => order.ExternalReference)
             .Include(order => order.RoutingStates)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
 }

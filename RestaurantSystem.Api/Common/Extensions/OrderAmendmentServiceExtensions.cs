@@ -13,6 +13,9 @@ public static class OrderAmendmentServiceExtensions
         services.AddScoped<IOrderAmendmentCommitService, OrderAmendmentCommitService>();
         services.AddScoped<IOrderAmendmentQueryService, OrderAmendmentQueryService>();
         services.AddScoped<OrderAmendmentSupplementBuilder>();
+        services.AddScoped<OrderAmendmentChangeBuilder>();
+        services.AddScoped<OrderAmendmentCommitMaterializer>();
+        services.AddScoped<OrderAmendmentCommitWriter>();
         services.AddScoped<OrderAmendmentKitchenStager>();
         services.TryAddScoped<IOrderAmendmentReservationGuard, UnavailableOrderAmendmentReservationGuard>();
         return services;

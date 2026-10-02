@@ -47,13 +47,18 @@ public sealed class QuoteOrderAmendmentCommandValidator : AbstractValidator<Quot
             .Must(line => line.Current is null || InstructionsFit(line.Current))
             .WithMessage("Item instructions cannot exceed 500 characters.");
             change.RuleFor(line => line)
-            .Must(line => line.Kind == OrderAmendmentChangeKind.InstructionChange
-                ? line.StartOrdinal == 0 && line.Quantity == 0 && line.Current is not null
-                : line.StartOrdinal > 0 && line.Quantity > 0
-                        && (line.Kind == OrderAmendmentChangeKind.Replace
-                            ? line.Current is not null : line.Current is null))
+            .Must(HasValidChangeShape)
                 .WithMessage("Use a one-based quantity range for void/replace, or a whole-line snapshot for instruction changes.");
         });
+    }
+
+    private static bool HasValidChangeShape(OrderAmendmentLineChangeRequest line)
+    {
+        if (line.Kind == OrderAmendmentChangeKind.InstructionChange)
+            return line.StartOrdinal == 0 && line.Quantity == 0 && line.Current is not null;
+        var currentMatchesKind = line.Kind == OrderAmendmentChangeKind.Replace
+            ? line.Current is not null : line.Current is null;
+        return line.StartOrdinal > 0 && line.Quantity > 0 && currentMatchesKind;
     }
 
     private static bool InstructionsFit(CreateOrderItemDto item) =>

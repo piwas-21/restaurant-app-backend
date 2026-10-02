@@ -27,24 +27,27 @@ internal static class OrderAmendmentRangeValidator
             .Select(amendment => amendment.ChangesJson)
             .ToListAsync(cancellationToken);
 
-        foreach (var json in priorChanges)
-            foreach (var prior in OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(json))
-            {
-                if (prior.Kind == OrderAmendmentChangeKind.InstructionChange)
-                {
-                    if (instructions.Contains(prior.OrderItemId) || requested.ContainsKey(prior.OrderItemId))
-                        throw new ConflictException("This source line already has a committed instruction change.");
-                    continue;
-                }
+        foreach (var prior in priorChanges.SelectMany(json =>
+                     OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(json)))
+            ValidatePrior(prior, requested, instructions);
+    }
 
-                if (instructions.Contains(prior.OrderItemId))
-                    throw new ConflictException("This source line has committed quantity changes and cannot be changed as a whole.");
-                if (!requested.TryGetValue(prior.OrderItemId, out var ranges))
-                    continue;
-
-                var priorEnd = (long)prior.StartOrdinal + prior.Quantity - 1;
-                if (ranges.Any(range => prior.StartOrdinal <= range.End && priorEnd >= range.Start))
-                    throw new ConflictException("One or more selected item quantities were already amended. Refresh the order.");
-            }
+    private static void ValidatePrior(
+        OrderAmendmentChangeSnapshot prior,
+        Dictionary<Guid, List<(int Start, int End)>> requested, HashSet<Guid> instructions)
+    {
+        if (prior.Kind == OrderAmendmentChangeKind.InstructionChange)
+        {
+            if (instructions.Contains(prior.OrderItemId) || requested.ContainsKey(prior.OrderItemId))
+                throw new ConflictException("This source line already has a committed instruction change.");
+            return;
+        }
+        if (instructions.Contains(prior.OrderItemId))
+            throw new ConflictException("This source line has committed quantity changes and cannot be changed as a whole.");
+        if (!requested.TryGetValue(prior.OrderItemId, out var ranges))
+            return;
+        var priorEnd = (long)prior.StartOrdinal + prior.Quantity - 1;
+        if (ranges.Any(range => prior.StartOrdinal <= range.End && priorEnd >= range.Start))
+            throw new ConflictException("One or more selected item quantities were already amended. Refresh the order.");
     }
 }

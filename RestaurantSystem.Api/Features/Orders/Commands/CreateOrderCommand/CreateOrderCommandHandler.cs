@@ -136,12 +136,12 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             _paymentBuilder.AddPayments(order, command.Payments);
             _paymentBuilder.UpdatePaymentSummary(order);
 
-            if (guestSession is not null && guestParticipant is not null && guestContext is not null)
+            if (guestSession is not null && guestParticipant is not null)
             {
                 GuestRoundOrderPolicy.RecordAccountChange(
                     _context, _guestRounds ?? throw new InvalidOperationException(
                         "Guest round operations are not registered."),
-                    guestContext, guestSession, guestParticipant, order, auditId, now);
+                    guestContext!, guestSession, guestParticipant, order);
             }
 
             order.StatusHistory.Add(new OrderStatusHistory

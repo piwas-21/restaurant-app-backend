@@ -45,7 +45,10 @@ internal sealed class OrderAmendmentKitchenStager
                          .Where(target => target != DevicePrintTarget.Cashier).Distinct())
             {
                 if (!byTarget.TryGetValue(target, out var targetChanges))
-                    byTarget.Add(target, targetChanges = []);
+                {
+                    targetChanges = [];
+                    byTarget.Add(target, targetChanges);
+                }
                 targetChanges.Add(printerChange);
             }
         }

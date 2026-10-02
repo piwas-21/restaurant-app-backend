@@ -1,10 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace RestaurantSystem.Api.Features.TableGuestVisits.Dtos;
 
 public sealed record CreateGuestRoundRequest
 {
-    [Required]
+    [JsonRequired]
     public Guid OperationId { get; init; }
 
     [Range(1, long.MaxValue)]

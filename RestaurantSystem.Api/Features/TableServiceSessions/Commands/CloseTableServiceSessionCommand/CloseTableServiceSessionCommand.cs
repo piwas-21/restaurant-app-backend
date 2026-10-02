@@ -115,17 +115,7 @@ public sealed partial class CloseTableServiceSessionCommandHandler
                 .ToList();
             if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
             {
-                var errors = new List<string>();
-                if (assessment.Outstanding > _paymentTolerance)
-                {
-                    errors.Add($"The session still has an outstanding balance of {assessment.Outstanding:0.00}.");
-                }
-                if (unresolved.Count > 0)
-                {
-                    errors.Add("The session still has unresolved rounds: " + string.Join(", ", unresolved));
-                }
-                return ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                    errors, ErrorCodes.TableServiceSessionNotClosable);
+                return Unresolved(assessment.Outstanding, unresolved);
             }
 
             if (_guestVisits is not null)

@@ -10,9 +10,13 @@ public sealed record OrderAmendmentQuoteRequest
     public int ExpectedOrderVersion { get; init; }
     public long? ExpectedAccountRevision { get; init; }
     public string? Reason { get; init; }
+    [JsonRequired]
     public bool ReviewAcknowledged { get; init; }
+    [JsonRequired]
     public bool PreparingOverrideAcknowledged { get; init; }
+    [JsonRequired]
     public bool ReleaseAdditionsToKitchen { get; init; }
+    [JsonRequired]
     public bool LocalProviderSupplementConsent { get; init; }
     public string? ProviderConsentNote { get; init; }
     public int? PointsToRedeem { get; init; }
@@ -44,5 +48,6 @@ public sealed record OrderAmendmentCommitRequest
     [JsonRequired]
     public int ExpectedOrderVersion { get; init; }
     public long? ExpectedAccountRevision { get; init; }
+    [JsonRequired]
     public bool ReviewAcknowledged { get; init; }
 }

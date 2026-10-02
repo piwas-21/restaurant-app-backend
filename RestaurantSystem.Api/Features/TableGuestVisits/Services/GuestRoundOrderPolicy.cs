@@ -40,10 +40,10 @@ internal static class GuestRoundOrderPolicy
     public static void RecordAccountChange(
         ApplicationDbContext context, ITableGuestRoundOperationStore operations,
         TableGuestRoundContext guestContext, TableServiceSession session,
-        TableGuestParticipant participant, Order order, string auditId, DateTime createdAt)
+        TableGuestParticipant participant, Order order)
     {
         session.RecordAccountChange();
         context.Set<TableGuestRoundOperation>().Add(operations.CreateOperation(
-            guestContext, participant.Id, order.Id, auditId, createdAt));
+            guestContext, participant.Id, order.Id, order.CreatedBy, order.CreatedAt));
     }
 }

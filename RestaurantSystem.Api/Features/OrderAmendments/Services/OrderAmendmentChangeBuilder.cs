@@ -8,23 +8,27 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
-internal static class OrderAmendmentChangeBuilder
+internal sealed class OrderAmendmentChangeBuilder
 {
-    internal static async Task<List<OrderAmendmentChangeSnapshot>> BuildAsync(
+    private readonly OrderAmendmentLineSnapshotBuilder _lineBuilder;
+
+    public OrderAmendmentChangeBuilder(
+        IStaffCounterOrderPricing serverPricing, IOrderItemFactory itemFactory, IOrderMappingService mapping)
+    {
+        _lineBuilder = new OrderAmendmentLineSnapshotBuilder(serverPricing, itemFactory, mapping);
+    }
+
+    internal async Task<List<OrderAmendmentChangeSnapshot>> BuildAsync(
         Order source,
         OrderDto sourceDto,
         OrderAmendmentQuoteRequest request,
         OrderDto? supplementDto,
-        IStaffCounterOrderPricing serverPricing,
-        IOrderItemFactory itemFactory,
-        IOrderMappingService mapping,
         CancellationToken cancellationToken)
     {
         var replacements = request.Changes
             .Where(change => change.Kind == OrderAmendmentChangeKind.Replace).ToList();
         var supplementOffset = request.Additions.Count;
         var result = new List<OrderAmendmentChangeSnapshot>(request.Changes.Count);
-        var lineBuilder = new OrderAmendmentLineSnapshotBuilder(serverPricing, itemFactory, mapping);
 
         foreach (var change in request.Changes)
         {
@@ -57,7 +61,7 @@ internal static class OrderAmendmentChangeBuilder
                 continue;
             }
 
-            var currentInstruction = await lineBuilder.BuildInstructionCurrentAsync(
+            var currentInstruction = await _lineBuilder.BuildInstructionCurrentAsync(
                 previous, change.Current!, cancellationToken);
             result.Add(new OrderAmendmentChangeSnapshot(
                 entity.Id, change.Kind, 0, 0, true, previous, currentInstruction));

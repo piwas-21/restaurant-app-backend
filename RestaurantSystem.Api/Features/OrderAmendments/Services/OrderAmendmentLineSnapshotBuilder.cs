@@ -37,7 +37,7 @@ internal sealed class OrderAmendmentLineSnapshotBuilder
             throw new BadRequestException(error);
 
         OrderAmendmentJson.EnsureItemIdentity(transient);
-        var mapped = _mapping.MapToOrderDto(transient).Items.Single();
+        var mapped = OrderAmendmentSnapshots.MapBuiltOrder(_mapping, transient).Items.Single();
         EnsureSameNestedIdentity(previous, mapped);
         if (!string.Equals(PaidAddOnFingerprint(previous), PaidAddOnFingerprint(mapped),
                 StringComparison.Ordinal))

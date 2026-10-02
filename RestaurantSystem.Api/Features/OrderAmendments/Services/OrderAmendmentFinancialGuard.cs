@@ -22,13 +22,8 @@ public static class OrderAmendmentFinancialGuard
             .Select(amendment => amendment.FinancialResolutionJson)
             .ToListAsync(cancellationToken);
 
-        foreach (var json in resolutions)
-        {
-            if (string.IsNullOrWhiteSpace(json) || HasUnresolvedOutcome(json))
-            {
-                throw PendingResolution();
-            }
-        }
+        if (resolutions.Any(json => string.IsNullOrWhiteSpace(json) || HasUnresolvedOutcome(json)))
+            throw PendingResolution();
     }
 
     private static bool HasUnresolvedOutcome(string json)

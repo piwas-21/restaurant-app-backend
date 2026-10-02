@@ -1,6 +1,7 @@
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -31,6 +32,11 @@ internal sealed record OrderAmendmentSupplementSnapshot(
 
 internal static class OrderAmendmentSnapshots
 {
+    // Built supplements/instruction drafts already contain their priced item graph and have no
+    // persisted order identity to lazy-load. Project them without querying the database for that id.
+    internal static OrderDto MapBuiltOrder(IOrderMappingService mapping, Order order) =>
+        mapping.MapToOrderDto(order);
+
     internal static OrderItemDto FindItem(OrderDto order, Guid itemId) =>
         order.Items.SelectMany(Flatten).SingleOrDefault(item => item.Id == itemId)
         ?? throw new InvalidOperationException("The source item was not projected.");

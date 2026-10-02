@@ -16,5 +16,6 @@ internal static class OrderAmendmentOrderLoader
             .Include(order => order.ExternalReference)
             .Include(order => order.ServiceSession)
             .Include(order => order.RoutingStates)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
 }

@@ -45,14 +45,14 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         var hasCredit = removed > 0;
         var hasLoyalty = hasCredit
             && (source.FidelityPointsEarned > 0 || source.FidelityPointsRedeemed > 0);
-        var refundState = !hasCredit || captured.Count == 0
-            ? OrderAmendmentRefundState.None
-            : captured.Any(TenderCustody.IsHeldByGateway)
+        var refundState = OrderAmendmentRefundState.None;
+        if (hasCredit && captured.Count > 0)
+            refundState = captured.Any(TenderCustody.IsHeldByGateway)
                 ? OrderAmendmentRefundState.GatewayRefundRequired
                 : OrderAmendmentRefundState.PendingTillRefund;
-        var creditState = !hasCredit
-            ? OrderAmendmentCreditState.None
-            : captured.Count == 0
+        var creditState = OrderAmendmentCreditState.None;
+        if (hasCredit)
+            creditState = captured.Count == 0
                 ? OrderAmendmentCreditState.BalanceReduction
                 : OrderAmendmentCreditState.PendingAllocationReview;
         var loyaltyState = hasLoyalty

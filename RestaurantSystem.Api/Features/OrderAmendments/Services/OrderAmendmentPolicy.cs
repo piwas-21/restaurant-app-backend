@@ -41,6 +41,16 @@ internal static class OrderAmendmentPolicy
                 "This order has refund activity that must be reconciled before it can be amended.");
         }
 
+        ValidateAccountContext(source, request);
+
+        if (request.ExpectedOrderVersion != source.Version)
+            throw new ConflictException("The order changed. Refresh and quote the amendment again.");
+
+        ValidateProviderContext(source, request);
+    }
+
+    private static void ValidateAccountContext(Order source, OrderAmendmentQuoteRequest request)
+    {
         if (source.Type == OrderType.DineIn)
         {
             if (source.ServiceSession is null || source.ServiceSession.Status != TableServiceSessionStatus.Open)
@@ -53,9 +63,10 @@ internal static class OrderAmendmentPolicy
             throw new BadRequestException("Only a dine-in order can use a table account revision.");
         }
 
-        if (request.ExpectedOrderVersion != source.Version)
-            throw new ConflictException("The order changed. Refresh and quote the amendment again.");
+    }
 
+    private static void ValidateProviderContext(Order source, OrderAmendmentQuoteRequest request)
+    {
         if (source.ExternalReference is null)
         {
             if (request.LocalProviderSupplementConsent || !string.IsNullOrWhiteSpace(request.ProviderConsentNote))
