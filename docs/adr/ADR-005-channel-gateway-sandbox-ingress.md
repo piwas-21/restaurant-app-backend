@@ -124,6 +124,38 @@ This source does not mutate provider stock or claim publication success. A separ
 validate complete mapped coverage, send sparse item changes and verify independent provider readback before
 reporting availability synchronization. No database migration is required for the read contract.
 
+### Reviewed sandbox stock synchronization
+
+`TenantBridge:SyncAvailability` remains false by default. Opt-in requires the existing exact sandbox store,
+reviewed published-item mapping and a separate `Store:CatalogueApiToken` carrying only
+`channels:catalogue:read`; the order-ingress credential is never reused. Apply additive gateway SQL006 to the
+**dedicated channels database** before opting in, then grant the runtime role SELECT/INSERT/UPDATE on
+`channel_availability_states` and only SELECT/INSERT on the immutable `channel_availability_bindings`. No tenant migration or printer DTO change is involved.
+
+A store-scoped PostgreSQL advisory lease serializes normal worker cycles across replicas and catalogue
+revisions. A complete bound tenant snapshot queues desired item metadata atomically; the first tenant binding
+cannot be replaced by another tenant, including across catalogue revisions. A store-level binding and composite
+foreign key also prevent direct orphaned item metadata. Each cycle validates the entire canonical Uber menu against the reviewed
+fixture and mapping before any mutation. Unsupported context overrides or changed prices/identities stop the
+cycle. A fresh source revision check precedes each sparse stock POST. The cycle has a two-minute deadline,
+10–300 second polling interval and 1–20 writes per cycle. Remaining items stay Pending for the next cycle.
+
+Only `suspension_info` is sent through Uber's sparse Update Item API. Available items clear suspension. A
+manually unavailable Sofra product suspends until the API's maximum signed-int Unix timestamp (2038-01-19);
+this is a wire-format bound, not a business reopening time. The implementation refuses a future suspension
+once that bound is reached. Restore the product in Sofra to clear it earlier. Live provider acceptance of this
+wire value and stock restoration must be proven in the approved sandbox before enabling the worker.
+
+Before a provider write, durable state becomes Uncertain. HTTP success alone cannot verify it: a subsequent
+independent menu GET must match the desired state, and Verified requires its body hash, observed boolean and
+timestamp. A failed or disagreeing readback leaves Uncertain or Mismatch. Restart recovery reads the current
+provider state before sending another idempotent stock update. Provider bodies, credentials and exception text
+never enter worker logs. The private session-protected availability view displays item-level state and the
+last verified time; observations older than twice the polling interval are labelled stale.
+
+This worker follows only the reviewed two-item sandbox mapping. It does not publish an arbitrary tenant
+catalogue, encode modifier/bundle choices or make the broader catalogue publication criteria complete.
+
 ### Durable tenant decision outbox
 
 Migration `20261001200651_AddChannelOrderDecision` adds a retained, one-per-order decision with a unique operation

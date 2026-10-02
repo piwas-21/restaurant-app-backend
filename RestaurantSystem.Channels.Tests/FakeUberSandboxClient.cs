@@ -14,6 +14,10 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
     public JsonElement CreatedOrders { get; set; } = ProviderJson.Encode(new { orders = Array.Empty<object>() });
     public string CreatedOrdersClientId { get; set; } = string.Empty;
     public int CreatedOrdersStatus { get; set; } = 200;
+    public int StockUpdateStatus { get; set; } = 204;
+    public bool IgnoreStockUpdate { get; set; }
+    public bool ThrowAfterStockUpdate { get; set; }
+    public string MenuClientId { get; set; } = string.Empty;
     public bool CorruptMenuReadback { get; set; }
     public bool ThrowOnDecision { get; set; }
     public int DecisionStatus { get; set; } = 204;
@@ -51,10 +55,24 @@ public sealed class FakeUberSandboxClient : IUberSandboxClient
                 is_order_manager_pending = false,
                 require_manual_acceptance = false
             });
+        else if (path.Contains("/menus/items/", StringComparison.Ordinal))
+        {
+            if (StockUpdateStatus == 204 && !IgnoreStockUpdate)
+            {
+                var menu = System.Text.Json.Nodes.JsonNode.Parse(Menu.GetRawText())!.AsObject();
+                var itemId = Uri.UnescapeDataString(path.Split('/')[^1]);
+                var item = menu["items"]!.AsArray().Single(row => row!["id"]!.GetValue<string>() == itemId)!;
+                item["suspension_info"] = System.Text.Json.Nodes.JsonNode.Parse(body!.Value.GetProperty("suspension_info").GetRawText());
+                Menu = JsonSerializer.SerializeToElement(menu);
+            }
+            if (ThrowAfterStockUpdate) throw new ChannelConsoleException(504, "Private fixture timeout; token must never be logged");
+            return new(StockUpdateStatus, json, "");
+        }
         else if (path.EndsWith("/menus", StringComparison.Ordinal))
         {
             if (method == HttpMethod.Put) Menu = body!.Value;
             json = CorruptMenuReadback ? ProviderJson.Encode(new { menus = Array.Empty<object>() }) : Menu;
+            return new(status, json, MenuClientId);
         }
         else if (path.StartsWith("/v2/eats/order/", StringComparison.Ordinal))
             json = CanonicalOrder ?? ProviderJson.Encode(new

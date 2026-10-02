@@ -28,5 +28,7 @@
              Link="004_order_observations.sql" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/005_created_order_recovery.sql"
              Link="005_created_order_recovery.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../RestaurantSystem.Channels.Infrastructure/Migrations/006_availability_sync.sql"
+             Link="006_availability_sync.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

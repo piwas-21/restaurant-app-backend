@@ -15,6 +15,12 @@ public static class TenantBridgeServices
                     && webhook.Value.StoreIds[0] == settings.Store.StoreId,
                 "Tenant bridge requires the existing sandbox-only provider connection for exactly its configured store.")
             .ValidateOnStart();
+        services.AddScoped<IChannelAvailabilityJobs, PostgresChannelAvailabilityJobs>();
+        services.AddScoped<ITenantAvailabilityClient, TenantAvailabilityClient>();
+        services.AddScoped<IUberAvailabilityClient, UberAvailabilityClient>();
+        services.AddScoped<IChannelAvailabilityProcessor, ChannelAvailabilityProcessor>();
+        services.AddScoped<IChannelAvailabilityStatus, ChannelAvailabilityStatus>();
+        services.AddHostedService<ChannelAvailabilityWorker>();
         services.AddScoped<IChannelImportJobs, PostgresChannelImportJobs>();
         services.AddScoped<ICreatedOrderDiscoveries, PostgresCreatedOrderDiscoveries>();
         services.AddScoped<ICreatedOrderRecovery, CreatedOrderRecovery>();
