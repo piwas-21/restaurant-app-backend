@@ -28,7 +28,13 @@ public sealed class CreatedOrderRecovery(IOptions<TenantBridgeSettings> settings
         var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(response.Body.GetRawText())));
         if (rows.GetArrayLength() == options.RecoveryListLimit)
             logger.LogWarning("Sandbox created-order recovery reached its list bound; review the store backlog.");
-        var now = clock.GetUtcNow();
+        var candidates = ParseCandidates(rows, clock.GetUtcNow(), options.EnrollmentStartedAt, hash);
+        await discoveries.Record(webhook.Value.ClientId, store.StoreId, store.TenantId, store.CatalogueRevision,
+            options.EnrollmentStartedAt, candidates, cancellationToken);
+    }
+
+    private static CreatedOrderCandidate[] ParseCandidates(JsonElement rows, DateTimeOffset now, DateTimeOffset enrolledAt, string hash)
+    {
         var candidates = new List<CreatedOrderCandidate>();
         var identities = new Dictionary<Guid, DateTimeOffset>();
         foreach (var row in rows.EnumerateArray())
@@ -40,10 +46,9 @@ public sealed class CreatedOrderRecovery(IOptions<TenantBridgeSettings> settings
             if (identities.TryGetValue(id, out var previous) && previous != placedAt)
                 throw new ChannelConsoleException(502, "Uber returned conflicting created-order timestamps.");
             identities[id] = placedAt;
-            if (placedAt >= options.EnrollmentStartedAt) candidates.Add(new(id, placedAt, hash));
+            if (placedAt >= enrolledAt) candidates.Add(new(id, placedAt, hash));
         }
         // Validate the entire batch before persisting any candidate. Canonical GET still verifies order/store.
-        await discoveries.Record(webhook.Value.ClientId, store.StoreId, store.TenantId, store.CatalogueRevision, options.EnrollmentStartedAt,
-            candidates.OrderBy(order => order.PlacedAt).ThenBy(order => order.OrderId).DistinctBy(order => order.OrderId).ToArray(), cancellationToken);
+        return candidates.OrderBy(order => order.PlacedAt).ThenBy(order => order.OrderId).DistinctBy(order => order.OrderId).ToArray();
     }
 }
