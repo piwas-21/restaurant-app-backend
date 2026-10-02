@@ -9,5 +9,8 @@ internal static class ExternalOrderLimits
     internal const int ItemNameLength = 100;
     internal const int VariationNameLength = 50;
     internal const int ItemInstructionsLength = 500;
+    internal const int CatalogueDescriptionLength = 1000;
+    // Both supported binding currencies (EUR and CHF) have two decimal minor units.
+    internal const decimal MinorUnitsPerWholeUnit = 100m;
     internal const int RequestBytes = 256 * 1024;
 }

@@ -58,9 +58,9 @@ public sealed class ChannelCatalogueReader(ApplicationDbContext context, IOption
         var name = variationName is null ? translation.Name : $"{translation.Name} — {variationName}";
         var variationDescription = names?.Single().Description;
         var description = Description(translation.Description, variationDescription);
-        if (name.Length > ExternalOrderLimits.ItemNameLength || description.Length > 1000
+        if (name.Length > ExternalOrderLimits.ItemNameLength || description.Length > ExternalOrderLimits.CatalogueDescriptionLength
             || name.Any(char.IsControl)) return Block(selection, "InvalidText");
-        var minor = (product.BasePrice + (variation?.PriceModifier ?? 0)) * 100;
+        var minor = (product.BasePrice + (variation?.PriceModifier ?? 0)) * ExternalOrderLimits.MinorUnitsPerWholeUnit;
         if (minor < 0 || minor > int.MaxValue || decimal.Truncate(minor) != minor) return Block(selection, "InvalidPrice");
         return new(selection.ProductId, selection.VariationId, name, description, variationName, (int)minor,
             product.IsAvailable, string.Empty);
