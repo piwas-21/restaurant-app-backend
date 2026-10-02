@@ -7,6 +7,8 @@ namespace RestaurantSystem.Channels.Api;
 public sealed class SandboxConnection(IOptions<UberWebhookSettings> webhookOptions, ISandboxAuthorization authorization,
     ISandboxTokens tokens, IUberSandboxClient provider, ISandboxMenu menu) : ISandboxConnection
 {
+    private const int MaximumStoreDisplayNameLength = 160;
+
     private Guid StoreId => webhookOptions.Value.StoreIds.Single();
     private string StorePath => $"/v1/eats/stores/{StoreId:D}/pos_data";
 
@@ -68,7 +70,7 @@ public sealed class SandboxConnection(IOptions<UberWebhookSettings> webhookOptio
             if (!result.IsSuccess || !Guid.TryParse(ProviderJson.Text(result.Body, "store_id"), out var returnedStore)
                 || returnedStore != StoreId) return null;
             var name = ProviderJson.Text(result.Body, "name").Trim();
-            return name.Length is > 0 and <= 160 && !name.Any(char.IsControl) ? name : null;
+            return name.Length is > 0 and <= MaximumStoreDisplayNameLength && !name.Any(char.IsControl) ? name : null;
         }
         catch (ChannelConsoleException)
         {
