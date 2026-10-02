@@ -100,14 +100,42 @@ The externally collected tender names its provider and currency; it does not cla
 
 Imported orders remain PendingApproval with kitchen release held. Ordinary status, cancellation, approval,
 counter-edit/release, collection, refund and deletion paths refuse them. Staff action projections mirror these
-guards; notes and focus remain operational tools. Receipts and provider decisions need their dedicated flow.
-No gateway forwarding, tenant deployment activation or provider-confirmed kitchen release is enabled by this
-foundation. Catalogue revisions/modifiers, decision outbox/reconciliation and source-aware staff/printer rendering
-must land and pass end-to-end tests before it is activated.
+guards; notes and focus remain operational tools. Source-aware staff/browser and printer rendering use the shared source contract. No gateway forwarding or tenant
+deployment activation is enabled by the import foundation. Catalogue revisions/modifiers, gateway decision
+execution/reconciliation and deployed end-to-end tests remain required before activation.
+
+### Durable tenant decision outbox
+
+Migration `20261001200651_AddChannelOrderDecision` adds a retained, one-per-order decision with a unique operation
+ID and normalized request hash. A signed-in cashier/admin queues accept or deny using the current order version;
+machine tokens cannot originate that staff decision. Operation/order advisory locks and the principal row lock
+serialize retries and competing decisions. An identical retry returns the existing operation; changed content,
+a competing action, a stale version or an order beyond held CREATED returns conflict. Queueing never releases
+preparation or issues a provider call. Staff can still read an existing result while integration is paused.
+
+The dedicated machine claim/report endpoints require the same actual API-token scheme and `channels:orders:write`
+as import. Claims select only current exact store/currency/sandbox bindings before choosing the oldest eligible
+job, so a retained paused-store job cannot starve another enabled store. An opaque two-minute lease and atomic
+claim/report serialization prevent concurrent workers from applying different results. Expired/replaced lease
+reports conflict; exact reports can replay without repeating local lifecycle effects. Unknown outcomes remain
+held and become claimable after a bounded retry delay. The gateway must reconcile canonical provider state
+before deciding whether another provider request is safe; a claim alone does not authorize blind POST retries.
+
+Success requires canonical ACCEPTED/FINISHED for accept or DENIED for deny. CANCELED is a failed decision;
+stale/future observations and mismatched canonical states are refused. Only confirmed ACCEPTED creates routes,
+captures release time and originating staff audit identity, and emits the existing order-created notification
+after the transaction commits. FINISHED, DENIED and CANCELED never start preparation. Status history, source
+state and observation hash update without changing the imported money, tax evidence or original payload hash.
+
+The API-key printer feed provides explicit source/lifecycle PrintKitchen and PrintReceipt grants without a
+human role. It shares those source rules with staff projections; held, canceled and finished orders cannot
+become new kitchen tickets. An actual HTTP device-feed test verifies held exclusion and the accepted wire
+contract. Provider identifiers and opaque leases remain outside staff/printer DTOs. No gateway dispatcher,
+provider reconciliation worker or automatic tenant activation is included in this tenant outbox.
 
 - The test store can be linked to an actual signed, durable webhook while the full connector is built.
 - Production scope/key support, tenant routing, automatic workers/reconciliation, tenant catalogue publishing,
-  customer-data retention and staff/printer contracts require subsequent slices. No live merchant onboarding
+  customer-data retention and deployed staff/printer acceptance require subsequent slices. No live merchant onboarding
   or production verification is requested by this receiver.
 - Sandbox receipts remain diagnostic metadata in the isolated DB. Establish the supported retention,
   encrypted payload storage, backup/restore and alerting policy before advancing to order processing.
@@ -171,3 +199,8 @@ handler/dispatcher constraints at compile time, matching the existing tenant med
 Sources: [Uber webhooks](https://developer.uber.com/docs/eats/guides/webhooks),
 [order notification](https://developer.uber.com/docs/eats/references/api/webhooks.orders-notification),
 [store provisioning](https://developer.uber.com/docs/eats/references/api/webhooks/store-provisioned).
+
+Tenant decision timing is deployment configuration: `DeliveryChannels:DecisionLeaseSeconds` defaults to 120
+(60–300 allowed), `DecisionRetrySeconds` defaults to 30 (10–300), and `DecisionClockToleranceSeconds` defaults
+to 30 (0–60). Bounds are validated even while the channel is disabled. Clock tolerance never replaces the
+monotonic canonical observation check or lease ownership. Gateway transport deadlines must fit the selected lease.

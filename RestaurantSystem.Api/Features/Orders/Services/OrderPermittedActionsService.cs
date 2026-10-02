@@ -1,5 +1,6 @@
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.DeliveryChannels.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -47,7 +48,7 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
         // Marketplace decisions, settlement and receipts need their dedicated workflow. Keep
         // ordinary staff notes/focus available; a held order still cannot print a kitchen ticket.
         if (order.ExternalReference is not null && action is not (OrderAction.AddOperationalNote
-            or OrderAction.MarkUrgent or OrderAction.PrintKitchen))
+            or OrderAction.MarkUrgent or OrderAction.PrintKitchen or OrderAction.PrintReceipt))
         {
             return new OrderPermittedActionDto
             {
@@ -57,6 +58,14 @@ public sealed class OrderPermittedActionsService : IOrderPermittedActionsService
                 RequiresReason = requiresReason,
             };
         }
+
+        if (order.ExternalReference is not null && ExternalOrderPrintPolicy.Blocks(order, action))
+            return new OrderPermittedActionDto
+            {
+                Action = action.ToString(),
+                Allowed = false,
+                ReasonCode = OrderActionReasonCodes.DeliveryChannelManaged
+            };
 
         var (allowed, reasonCode) = action switch
         {

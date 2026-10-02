@@ -5,6 +5,9 @@ public sealed class DeliveryChannelSettings
 {
     public const string SectionName = "DeliveryChannels";
     public bool Enabled { get; set; }
+    public int DecisionLeaseSeconds { get; set; } = 120;
+    public int DecisionRetrySeconds { get; set; } = 30;
+    public int DecisionClockToleranceSeconds { get; set; } = 30;
     public bool SandboxOnly { get; set; } = true;
     public List<DeliveryChannelStore> Stores { get; set; } = [];
 }
