@@ -7,13 +7,10 @@ internal static class AccountCheckoutDiagnostics
     {
         var failureType = failure.GetType().Name;
         // No inner exception, original message, stack trace or Data: SDK errors can embed secrets.
-        var diagnostic = new SanitizedCheckoutException(failureType);
+        var diagnostic = new Exception($"Account checkout failed with {failureType}.");
         logger.LogWarning(diagnostic, "Account checkout {Phase} deferred for {AttemptId}: {FailureType}",
             phase, attemptId, failureType);
     }
-
-    private sealed class SanitizedCheckoutException(string failureType)
-        : Exception($"Account checkout failed with {failureType}.");
 }
 
 internal enum AccountCheckoutFailurePhase

@@ -58,10 +58,10 @@ public sealed class AccountCheckoutWebhookController(CustomMediator mediator,
         if (signatureHeaders is null || signatureHeaders.Length == 0) return string.Empty;
         var combinedLength = signatureHeaders.Length - 1;
         if (combinedLength > maximumLength) return null;
-        foreach (var header in signatureHeaders)
+        foreach (var headerLength in signatureHeaders.Select(header => header.Length))
         {
-            if (header.Length > maximumLength - combinedLength) return null;
-            combinedLength += header.Length;
+            if (headerLength > maximumLength - combinedLength) return null;
+            combinedLength += headerLength;
         }
         return string.Join(',', signatureHeaders);
     }
