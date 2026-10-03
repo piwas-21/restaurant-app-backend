@@ -22,8 +22,6 @@ public sealed partial class OrderAmendmentResolutionService
         var providerRefunds = await refundProvider.ListForChargeAsync(leg.ProviderChargeId!, cancellationToken);
         var stored = await ReadChargeRefundEvidenceAsync(leg, cancellationToken);
         var scopes = await ReadRefundScopeMapsAsync(stored, leg, cancellationToken);
-        var operation = await context.OrderAmendmentResolutionOperations.AsNoTracking()
-            .SingleAsync(value => value.Id == operationId, cancellationToken);
         var lastAttemptId = leg.Attempts.OrderByDescending(value => value.Sequence).First().Id;
         var total = OrderAmendmentRefundProviderProof.RequireCanonicalHistory(stored, providerRefunds,
             providerContext, leg.ProviderChargeId!, leg.ProviderIntentId!, leg.Currency,

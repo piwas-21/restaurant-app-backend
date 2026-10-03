@@ -312,10 +312,10 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         (await final.OrderBillingCredits.SingleAsync(value => value.AmendmentId == _amendmentId))
             .AmountMinor.Should().Be(1000);
         var reversal = await final.AccountPaymentAllocationReversals.SingleAsync();
-        await AssertImmutableHistoryAsync("order_amendment_refund_attempts",
+        await AssertImmutableHistoryAsync(ImmutableHistoryTable.RefundAttempts,
             leg.Attempts.OrderBy(value => value.Sequence).First().Id);
-        await AssertImmutableHistoryAsync("order_amendment_refund_evidence", observations[0].Id);
-        await AssertImmutableHistoryAsync("account_payment_allocation_reversals", reversal.Id);
+        await AssertImmutableHistoryAsync(ImmutableHistoryTable.RefundEvidence, observations[0].Id);
+        await AssertImmutableHistoryAsync(ImmutableHistoryTable.AllocationReversals, reversal.Id);
         await AssertRollbackRetainsPaidHistoryAsync(retried.Result.OperationId);
     }
 
@@ -351,13 +351,28 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
             TimeProvider.System).RecordAsync(journal, evidence, CancellationToken.None);
     }
 
-    private async Task AssertImmutableHistoryAsync(string table, Guid id)
+    private async Task AssertImmutableHistoryAsync(ImmutableHistoryTable table, Guid id)
     {
-        foreach (var sql in new[]
-                 {
-                     $"UPDATE {table} SET created_by = 'attempted-mutation' WHERE id = @id",
-                     $"DELETE FROM {table} WHERE id = @id"
-                 })
+        var commands = table switch
+        {
+            ImmutableHistoryTable.RefundAttempts => new[]
+            {
+                "UPDATE order_amendment_refund_attempts SET created_by = 'attempted-mutation' WHERE id = @id",
+                "DELETE FROM order_amendment_refund_attempts WHERE id = @id"
+            },
+            ImmutableHistoryTable.RefundEvidence => new[]
+            {
+                "UPDATE order_amendment_refund_evidence SET created_by = 'attempted-mutation' WHERE id = @id",
+                "DELETE FROM order_amendment_refund_evidence WHERE id = @id"
+            },
+            ImmutableHistoryTable.AllocationReversals => new[]
+            {
+                "UPDATE account_payment_allocation_reversals SET created_by = 'attempted-mutation' WHERE id = @id",
+                "DELETE FROM account_payment_allocation_reversals WHERE id = @id"
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(table))
+        };
+        foreach (var sql in commands)
         {
             await using var connection = new NpgsqlConnection(DatabaseFixture.ConnectionString);
             await connection.OpenAsync();
@@ -368,6 +383,13 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
             exception.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
             exception.MessageText.Should().Be("Paid amendment financial history is immutable");
         }
+    }
+
+    private enum ImmutableHistoryTable
+    {
+        RefundAttempts,
+        RefundEvidence,
+        AllocationReversals
     }
 
     private async Task AssertRollbackRetainsPaidHistoryAsync(Guid operationId)
