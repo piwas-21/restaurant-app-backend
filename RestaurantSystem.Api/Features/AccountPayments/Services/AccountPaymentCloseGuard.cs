@@ -14,6 +14,7 @@ internal static class AccountPaymentCloseGuard
         ApplicationDbContext context, Guid serviceSessionId, ITenantFeatures? features,
         CancellationToken cancellationToken)
     {
+        await AccountCheckoutLedgerGuard.RequireReconciledAsync(context, serviceSessionId, cancellationToken);
         await AccountPaymentLedgerGuard.RequireNoPendingAsync(context, serviceSessionId, cancellationToken);
         await OrderAmendmentFinancialGuard.AssertNoPendingSessionResolutionAsync(
             context, serviceSessionId, cancellationToken);

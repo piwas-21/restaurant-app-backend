@@ -27,6 +27,34 @@ public sealed class AccountPaymentCaptureWriter(
         MarkCaptured(attempt, now, audit);
     }
 
+    public async Task RecordVerifiedProviderAsync(AccountPaymentAttempt attempt, AccountCheckoutJournal journal,
+        CancellationToken cancellationToken)
+    {
+        RequireVerifiedProvider(attempt, journal);
+        var account = await new AccountDebtSnapshotReader(context)
+            .ReadForVerifiedCaptureAsync(attempt.ServiceSessionId, attempt.Id, cancellationToken);
+        var scopes = CreateAndValidateScopes(attempt, account.Money.Currency);
+        AccountDebtMath.Subtract(account.Debt.Outstanding, scopes);
+        var orders = await LoadScopedOrdersAsync(attempt, scopes, cancellationToken);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var order in orders)
+            PostOrderPayment(order, attempt, account.Money, now, attempt.CreatedBy, journal.ProviderChargeId);
+        MarkCaptured(attempt, now, attempt.CreatedBy);
+    }
+
+    private void RequireVerifiedProvider(AccountPaymentAttempt attempt, AccountCheckoutJournal journal)
+    {
+        if (context.Database.CurrentTransaction is null || journal.AttemptId != attempt.Id
+            || attempt.PaymentMethod != PaymentMethod.OnlinePayment
+            || attempt.State != AccountPaymentState.Processing || attempt.AmountMinor != journal.AmountMinor
+            || attempt.Currency != journal.Currency || journal.ProviderCapturedMinor != attempt.AmountMinor
+            || journal.ProviderRefundedMinor != 0 || journal.ProviderSessionId != attempt.ProviderSessionId
+            || journal.ProviderAccountId != attempt.ProviderAccountId
+            || journal.ProviderChargeId != attempt.ProviderChargeId
+            || journal.ProviderChargeId?.StartsWith("ch_", StringComparison.Ordinal) != true)
+            throw new ConflictException("Online collection requires exact canonical provider capture evidence.");
+    }
+
     private void RequireManualTransaction(AccountPaymentAttempt attempt)
     {
         if (context.Database.CurrentTransaction is null || attempt.State != AccountPaymentState.Reserved
@@ -70,12 +98,18 @@ public sealed class AccountPaymentCaptureWriter(
     }
 
     private void PostOrderPayment(
-        Order order, AccountPaymentAttempt attempt, AccountMoney money, DateTime now, string audit)
+        Order order, AccountPaymentAttempt attempt, AccountMoney money, DateTime now, string audit,
+        string? providerChargeId = null)
     {
         var allocations = attempt.Allocations.Where(value => value.OrderId == order.Id).ToArray();
         var amount = money.ToMajor(allocations.Sum(value => value.AmountMinor));
         RemovePendingPlaceholders(order);
         var payment = CreatePayment(order.Id, amount, attempt.PaymentMethod, money, now, audit);
+        if (providerChargeId is not null)
+        {
+            payment.TransactionId = providerChargeId;
+            payment.PaymentGateway = "Stripe";
+        }
         order.Payments.Add(payment);
         context.OrderPayments.Add(payment);
         LinkAllocations(allocations, payment);

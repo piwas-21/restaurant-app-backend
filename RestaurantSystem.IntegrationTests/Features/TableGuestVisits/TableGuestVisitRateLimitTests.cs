@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Extensions;
+using RestaurantSystem.Api.Features.AccountPayments;
 using RestaurantSystem.Api.Features.TableGuestVisits;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Settings;
@@ -57,6 +58,40 @@ public sealed class TableGuestVisitRateLimitPolicyTests
             .Should().Be(TableGuestVisitRateLimitPolicies.RoundPolicyName);
         TableGuestVisitRateLimitPolicies.AccountPolicyName
             .Should().NotBe(TableGuestVisitRateLimitPolicies.RoundPolicyName);
+        PaymentPolicyFor(nameof(GuestAccountPaymentsController.CreateQuote))
+            .Should().Be(TableGuestVisitRateLimitPolicies.PaymentPolicyName);
+        PaymentPolicyFor(nameof(GuestAccountPaymentsController.Reserve))
+            .Should().Be(TableGuestVisitRateLimitPolicies.PaymentPolicyName);
+        PaymentPolicyFor(nameof(GuestAccountPaymentsController.GetOperation))
+            .Should().Be(TableGuestVisitRateLimitPolicies.AccountPolicyName);
+        PaymentPolicyFor(nameof(GuestAccountPaymentsController.Release))
+            .Should().Be(TableGuestVisitRateLimitPolicies.PaymentPolicyName);
+    }
+
+    [Fact]
+    public void Guest_payment_actions_are_anonymous_no_store_and_have_no_collection_route()
+    {
+        var controller = typeof(GuestAccountPaymentsController);
+
+        controller.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true)
+            .Should().BeEmpty("anonymous authority must be granted only to explicit participant routes");
+        var anonymousActions = controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(method => method.IsDefined(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true))
+            .Select(method => method.Name);
+        anonymousActions.Should().BeEquivalentTo(new[]
+        {
+            nameof(GuestAccountPaymentsController.GetAccount),
+            nameof(GuestAccountPaymentsController.CreateQuote),
+            nameof(GuestAccountPaymentsController.CreateEqualSharePlan),
+            nameof(GuestAccountPaymentsController.GetOperation),
+            nameof(GuestAccountPaymentsController.Reserve),
+            nameof(GuestAccountPaymentsController.Release),
+            nameof(GuestAccountPaymentsController.GetEqualSharePlan),
+        });
+        controller.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.ResponseCacheAttribute), true)
+            .Cast<Microsoft.AspNetCore.Mvc.ResponseCacheAttribute>()
+            .Single().NoStore.Should().BeTrue();
+        controller.GetMethods().Select(method => method.Name).Should().NotContain("CaptureManual");
     }
 
     [Fact]
@@ -85,6 +120,10 @@ public sealed class TableGuestVisitRateLimitPolicyTests
     }
 
     private static string? PolicyFor(string actionName) => typeof(TableGuestVisitsController)
+        .GetMethod(actionName)!
+        .GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName;
+
+    private static string? PaymentPolicyFor(string actionName) => typeof(GuestAccountPaymentsController)
         .GetMethod(actionName)!
         .GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName;
 

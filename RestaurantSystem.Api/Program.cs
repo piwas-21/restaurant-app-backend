@@ -810,6 +810,8 @@ builder.Services.AddOrderPaymentServices();
 builder.Services.AddOrderAmendmentServices();
 builder.Services.AddTableGuestVisitServices();
 builder.Services.AddAccountPaymentServices();
+builder.Services.AddAccountCheckoutServices();
+builder.Services.AddAccountCheckoutWebhookServices();
 builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddServerWorkspaceServices();

@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -14,6 +15,8 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 public sealed class AccountEqualSharePlanService(
     ApplicationDbContext context,
     IAccountPaymentActorResolver actors,
+    ITableGuestParticipantPaymentAuthorization guestAuthorization,
+    IGuestAccountPaymentPolicy guestPolicy,
     ITenantFeatures features,
     IOptions<AccountPaymentSettings> options,
     TimeProvider timeProvider) : IAccountEqualSharePlanService
@@ -24,18 +27,43 @@ public sealed class AccountEqualSharePlanService(
         ValidateCreateRequest(sessionId, request);
 
         var actor = actors.ResolveStaffActor();
+        return await CreateCoreAsync(sessionId, null, request, actor, guest: false, cancellationToken);
+    }
+
+    public async Task<AccountEqualSharePlanDto> CreateGuestAsync(
+        Guid sessionId,
+        string? participantCredential,
+        CreateAccountEqualSharePlanRequest request,
+        CancellationToken cancellationToken)
+    {
+        guestPolicy.RequireNewPayment();
+        ValidateCreateRequest(sessionId, request);
+        return await CreateCoreAsync(sessionId, participantCredential, request, null, guest: true, cancellationToken);
+    }
+
+    private async Task<AccountEqualSharePlanDto> CreateCoreAsync(
+        Guid sessionId,
+        string? participantCredential,
+        CreateAccountEqualSharePlanRequest request,
+        AccountPaymentActor? staffActor,
+        bool guest,
+        CancellationToken cancellationToken)
+    {
         var hash = AccountPaymentRequestRules.PlanHash(sessionId, request);
         await using var transaction = await AccountPaymentTransaction.BeginAsync(context, cancellationToken);
         try
         {
             var session = await TableServiceSessionRowLock.LoadAsync(context, sessionId, cancellationToken)
                 ?? throw new NotFoundException("Table account was not found.");
+            var actor = guest
+                ? await guestAuthorization.AuthorizeLockedAsync(session, participantCredential, cancellationToken)
+                : staffActor!;
             await AccountPaymentOperationKeyLock.AcquireAsync(context, request.OperationId, cancellationToken);
             var existing = await context.AccountEqualSharePlans.SingleOrDefaultAsync(
                 value => value.OperationId == request.OperationId, cancellationToken);
             if (existing is not null)
             {
-                if (existing.ServiceSessionId != sessionId || existing.CreatedBy != actor.AuditIdentifier
+                if (existing.ServiceSessionId != sessionId || !IsOwnedBy(existing, actor)
                     || existing.PayloadHash != hash)
                     throw new ConflictException("The operation id has already been used.");
                 await transaction.CommitAsync(cancellationToken);
@@ -114,6 +142,8 @@ public sealed class AccountEqualSharePlanService(
             Currency = account.Money.Currency,
             PayloadHash = hash,
             ScopeJson = AccountPaymentSnapshots.Serialize(account.Debt.Available),
+            ActorId = actor.ActorId,
+            ActorKind = actor.Kind,
             SupersedesPlanId = request.SupersedesPlanId,
             CreatedAt = now,
             CreatedBy = actor.AuditIdentifier
@@ -149,8 +179,8 @@ public sealed class AccountEqualSharePlanService(
             throw new ConflictException("Review and explicitly supersede the active equal-share plan first.");
 
         var superseded = activePlans[0];
-        if (superseded.CreatedBy != actor.AuditIdentifier)
-            throw new ConflictException("The equal-share plan cannot be superseded by this cashier.");
+        if (!IsOwnedBy(superseded, actor))
+            throw new ConflictException("The equal-share plan cannot be superseded by this account participant.");
 
         var knownUnprotected = AccountPaymentStateRules.KnownUnprotectedStates;
         if (await context.AccountPaymentAttempts.AnyAsync(attempt =>
@@ -163,4 +193,7 @@ public sealed class AccountEqualSharePlanService(
 
         return superseded;
     }
+
+    private static bool IsOwnedBy(AccountEqualSharePlan plan, AccountPaymentActor actor) =>
+        plan.ActorId == actor.ActorId && plan.ActorKind == actor.Kind;
 }

@@ -30,7 +30,10 @@ public sealed record AccountPaymentAttemptSummaryDto(
     int? EqualShareOrdinal,
     bool IsOwnOperation);
 
-public sealed record AccountPaymentLimitsDto(int MaximumSelectedUnits, int MaximumEqualShares);
+public sealed record AccountOnlineContributionLimitsDto(string Currency, long MinimumAmountMinor, long MaximumAmountMinor);
+
+public sealed record AccountPaymentLimitsDto(int MaximumSelectedUnits, int MaximumEqualShares,
+    AccountOnlineContributionLimitsDto? Online = null);
 
 public sealed record AccountPaymentAccountDto(
     Guid ServiceSessionId,

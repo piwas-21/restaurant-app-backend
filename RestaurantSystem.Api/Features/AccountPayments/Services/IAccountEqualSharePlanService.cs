@@ -6,4 +6,8 @@ public interface IAccountEqualSharePlanService
 {
     Task<AccountEqualSharePlanDto> CreateAsync(
         Guid sessionId, CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken);
+
+    Task<AccountEqualSharePlanDto> CreateGuestAsync(
+        Guid sessionId, string? participantCredential, CreateAccountEqualSharePlanRequest request,
+        CancellationToken cancellationToken);
 }

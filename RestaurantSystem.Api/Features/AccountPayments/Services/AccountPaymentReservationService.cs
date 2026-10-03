@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -14,10 +15,15 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 public sealed class AccountPaymentReservationService(
     ApplicationDbContext context,
     IAccountPaymentActorResolver actors,
+    ITableGuestParticipantPaymentAuthorization guestAuthorization,
+    IGuestAccountPaymentPolicy guestPolicy,
     ITenantFeatures features,
     IOptions<AccountPaymentSettings> options,
     TimeProvider timeProvider) : IAccountPaymentReservationService
 {
+    private const string PaymentOperationNotFoundMessage =
+        "The payment operation was not found for this table visit.";
+
     private static readonly AccountPaymentState[] ClaimedEqualShareStates =
     [
         AccountPaymentState.Reserved,
@@ -33,19 +39,51 @@ public sealed class AccountPaymentReservationService(
         CancellationToken cancellationToken)
     {
         ValidateReservationRequest(sessionId, operationId, request);
-        var actor = actors.ResolveStaffActor();
+        return await ReserveCoreAsync(sessionId, operationId, null, request, guest: false, cancellationToken);
+    }
+
+    public async Task<AccountPaymentOperationDto> ReserveGuestAsync(
+        Guid sessionId,
+        Guid operationId,
+        string? participantCredential,
+        ReserveAccountPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        ValidateRouteAndVersion(sessionId, operationId, request.ExpectedVersion);
+        if (request.ExpectedAccountRevision <= 0)
+            throw new BadRequestException("A positive account revision is required.");
+        return await ReserveCoreAsync(
+            sessionId, operationId, participantCredential, request, guest: true, cancellationToken);
+    }
+
+    private async Task<AccountPaymentOperationDto> ReserveCoreAsync(
+        Guid sessionId,
+        Guid operationId,
+        string? participantCredential,
+        ReserveAccountPaymentRequest request,
+        bool guest,
+        CancellationToken cancellationToken)
+    {
+        var staffActor = guest ? null : actors.ResolveStaffActor();
         await using var transaction = await AccountPaymentTransaction.BeginAsync(context, cancellationToken);
         try
         {
             var session = await TableServiceSessionRowLock.LoadAsync(context, sessionId, cancellationToken)
                 ?? throw new NotFoundException("Table account was not found.");
+            var actor = guest
+                ? await guestAuthorization.AuthorizeLockedAsync(session, participantCredential, cancellationToken)
+                : staffActor!;
             var attempt = await LoadLockedAttemptAsync(sessionId, operationId, cancellationToken);
             RequireOwner(attempt, sessionId, actor);
+            if (guest && attempt.PaymentMethod != PaymentMethod.OnlinePayment)
+                throw new NotFoundException(PaymentOperationNotFoundMessage);
             if (IsReservationReplay(attempt, request))
             {
                 await transaction.CommitAsync(cancellationToken);
                 return AccountPaymentSnapshots.ToOperation(attempt);
             }
+            if (guest)
+                guestPolicy.RequireContribution(attempt.AmountMinor, attempt.Currency);
             ValidateQuotedReservation(session, attempt, request);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -141,21 +179,53 @@ public sealed class AccountPaymentReservationService(
         CancellationToken cancellationToken)
     {
         ValidateRouteAndVersion(sessionId, operationId, request.ExpectedVersion);
-        var actor = actors.ResolveStaffActor();
+        return await ReleaseCoreAsync(sessionId, operationId, null, request, guest: false, cancellationToken);
+    }
+
+    public async Task<AccountPaymentOperationDto> ReleaseGuestAsync(
+        Guid sessionId,
+        Guid operationId,
+        string? participantCredential,
+        ReleaseAccountPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        ValidateRouteAndVersion(sessionId, operationId, request.ExpectedVersion);
+        return await ReleaseCoreAsync(
+            sessionId, operationId, participantCredential, request, guest: true, cancellationToken);
+    }
+
+    private async Task<AccountPaymentOperationDto> ReleaseCoreAsync(
+        Guid sessionId,
+        Guid operationId,
+        string? participantCredential,
+        ReleaseAccountPaymentRequest request,
+        bool guest,
+        CancellationToken cancellationToken)
+    {
+        var staffActor = guest ? null : actors.ResolveStaffActor();
         await using var transaction = await AccountPaymentTransaction.BeginAsync(context, cancellationToken);
         try
         {
-            _ = await TableServiceSessionRowLock.LoadAsync(context, sessionId, cancellationToken)
+            var session = await TableServiceSessionRowLock.LoadAsync(context, sessionId, cancellationToken)
                 ?? throw new NotFoundException("Table account was not found.");
+            var actor = guest
+                ? await guestAuthorization.AuthorizeLockedAsync(session, participantCredential, cancellationToken)
+                : staffActor!;
             var attempt = await LoadLockedAttemptAsync(sessionId, operationId, cancellationToken);
             RequireOwner(attempt, sessionId, actor);
+            if (guest && attempt.PaymentMethod != PaymentMethod.OnlinePayment)
+                throw new NotFoundException(PaymentOperationNotFoundMessage);
             if (attempt.State == AccountPaymentState.Released
                 && attempt.Version == (long)request.ExpectedVersion + 1L)
             {
                 await transaction.CommitAsync(cancellationToken);
                 return AccountPaymentSnapshots.ToOperation(attempt);
             }
-            if (attempt.Version != request.ExpectedVersion || !attempt.State.CanReleaseLocally())
+            if (attempt.Version != request.ExpectedVersion
+                || !attempt.State.CanReleaseLocally()
+                || attempt.StartedAt is not null
+                || attempt.ProviderSessionId is not null
+                || attempt.ProviderChargeId is not null)
                 throw new ConflictException("This payment attempt may have reached a provider and cannot be released locally.");
 
             attempt.State = AccountPaymentState.Released;
@@ -178,7 +248,7 @@ public sealed class AccountPaymentReservationService(
             .FromSqlInterpolated($"SELECT * FROM account_payment_attempts WHERE service_session_id = {sessionId} AND operation_id = {operationId} FOR UPDATE")
             .Include(value => value.Allocations)
             .SingleOrDefaultAsync(cancellationToken)
-        ?? throw new NotFoundException("The payment operation was not found for this table visit.");
+        ?? throw new NotFoundException(PaymentOperationNotFoundMessage);
 
     private static AccountDebtSegment[] ReadSegments(AccountPaymentAttempt attempt)
     {
@@ -199,7 +269,7 @@ public sealed class AccountPaymentReservationService(
     {
         if (attempt.ServiceSessionId != sessionId || attempt.ActorId != actor.ActorId
             || attempt.ActorKind != actor.Kind)
-            throw new NotFoundException("The payment operation was not found for this table visit.");
+            throw new NotFoundException(PaymentOperationNotFoundMessage);
     }
 
     private static void ValidateRouteAndVersion(Guid sessionId, Guid operationId, int expectedVersion)

@@ -24,6 +24,7 @@ public class TenantFeaturesTests
         features.OrderAmendmentsV1.Should().BeFalse();
         features.TableGuestVisitsV1.Should().BeFalse();
         features.TableAccountPaymentsV1.Should().BeFalse();
+        features.TableGuestAccountPaymentsV1.Should().BeFalse();
         features.EnforceSauceMinimum.Should().BeFalse();
         features.OptionSetMaterializationEnabled.Should().BeFalse();
     }
@@ -87,6 +88,7 @@ public class TenantFeaturesTests
             OrderAmendmentsV1 = enabled,
             TableGuestVisitsV1 = enabled,
             TableAccountPaymentsV1 = enabled,
+            TableGuestAccountPaymentsV1 = enabled,
             EnforceSauceMinimum = enabled,
             OptionSetMaterializationEnabled = enabled,
         }))
@@ -103,6 +105,7 @@ public class TenantFeaturesTests
         body.Data.OrderAmendmentsV1.Should().Be(enabled);
         body.Data.TableGuestVisitsV1.Should().Be(enabled);
         body.Data.TableAccountPaymentsV1.Should().Be(enabled);
+        body.Data.TableGuestAccountPaymentsV1.Should().Be(enabled);
         body.Data.EnforceSauceMinimum.Should().Be(enabled);
         body.Data.OptionSetMaterializationEnabled.Should().Be(enabled);
         controller.Response.Headers.CacheControl.ToString().Should().Be("no-store");
