@@ -20,6 +20,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
     private readonly OrderAmendmentSupplementBuilder _supplements;
     private readonly OrderAmendmentChangeBuilder _changes;
     private readonly IOrderMappingService _mapping;
+    private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly IOrderAmendmentFinancialResolution _financial;
 
     public OrderAmendmentQuoteService(
@@ -29,6 +30,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         OrderAmendmentSupplementBuilder supplements,
         OrderAmendmentChangeBuilder changes,
         IOrderMappingService mapping,
+        IOrderDisplayCurrencyResolver currencyResolver,
         IOrderAmendmentFinancialResolution financial)
     {
         _context = context;
@@ -37,6 +39,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         _supplements = supplements;
         _changes = changes;
         _mapping = mapping;
+        _currencyResolver = currencyResolver;
         _financial = financial;
     }
 
@@ -56,7 +59,11 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
             {
                 var source = await OrderAmendmentOrderLoader.LoadSourceAsync(_context, orderId, cancellationToken)
                     ?? throw new NotFoundException("The source order was not found.");
-                OrderAmendmentPolicy.ValidateOrderContext(source, normalized);
+                await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+                    _context, source.Id, cancellationToken);
+                var refundAuthority = await OrderAmendmentRefundAuthorityReader.ReadAsync(
+                    _context, source, _currencyResolver, cancellationToken);
+                OrderAmendmentPolicy.ValidateOrderContext(source, normalized, refundAuthority);
                 OrderAmendmentPolicy.ValidateChangeAuthority(source, normalized, _currentUser);
                 var sourceDto = await _mapping.MapToOrderDtoAsync(source, cancellationToken);
                 var sourceLines = source.Items.Where(item => !item.ParentOrderItemId.HasValue).ToList();

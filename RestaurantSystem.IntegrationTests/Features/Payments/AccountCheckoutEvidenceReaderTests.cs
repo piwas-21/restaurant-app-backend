@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Interfaces;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.IntegrationTests.Features.Payments;
@@ -115,7 +116,8 @@ public sealed class AccountCheckoutEvidenceReaderTests
         (AccountCheckoutStatusReader.SafeCheckoutUrl(url) is not null).Should().Be(allowed);
     }
 
-    private AccountCheckoutEvidenceReader Reader() => new(_provider.Object, new FixedClock());
+    private AccountCheckoutEvidenceReader Reader() => new(_provider.Object,
+        Mock.Of<IOrderAmendmentRefundProvider>(), new FixedClock());
 
     private AccountCheckoutJournal Journal()
     {

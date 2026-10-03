@@ -35,7 +35,8 @@ internal static class OrderBillingCreditConsistency
             || orders.Select(value => value.Id).Distinct().Count() != orders.Count
             || amendments.Select(value => value.Id).Distinct().Count() != amendments.Count)
             throw InvalidJournal();
-        var resolved = ReadResolvedOutcomes(amendments);
+        var creditAmendmentIds = credits.Select(value => value.AmendmentId).ToHashSet();
+        var resolved = ReadResolvedOutcomes(amendments, creditAmendmentIds);
         if (resolved.Count != credits.Count)
             throw InvalidJournal();
         RequireMatchingCreditEntries(credits, resolved);
@@ -45,20 +46,40 @@ internal static class OrderBillingCreditConsistency
     }
 
     private static Dictionary<Guid, (BillingCreditAmendment Amendment, OrderAmendmentFinancialPreviewDto Outcome)>
-        ReadResolvedOutcomes(IReadOnlyList<BillingCreditAmendment> amendments)
+        ReadResolvedOutcomes(IReadOnlyList<BillingCreditAmendment> amendments,
+            HashSet<Guid> creditAmendmentIds)
     {
         var resolved = new Dictionary<Guid, (BillingCreditAmendment Amendment, OrderAmendmentFinancialPreviewDto Outcome)>();
         foreach (var amendment in amendments)
         {
-            OrderAmendmentFinancialGuard.AssertResolved(amendment.FinancialResolutionJson);
-            var outcome = OrderAmendmentJson.Deserialize<OrderAmendmentFinancialPreviewDto>(amendment.FinancialResolutionJson);
+            var outcome = OrderAmendmentFinancialGuard.ReadValidSnapshot(amendment.FinancialResolutionJson);
+            if (outcome.ResolutionStatus == OrderAmendmentFinancialResolutionStatus.Pending)
+            {
+                if (outcome.PotentialCreditMinor <= 0
+                    || outcome.CreditState != OrderAmendmentCreditState.PendingAllocationReview
+                    || creditAmendmentIds.Contains(amendment.Id))
+                    throw InvalidJournal();
+                continue;
+            }
             if (outcome.PotentialCreditMinor > 0)
             {
-                if (outcome.CreditState is not (OrderAmendmentCreditState.BalanceReduction or OrderAmendmentCreditState.Resolved)
-                    || outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.Resolved)
+                var appliedBalanceReduction = outcome.CreditState == OrderAmendmentCreditState.BalanceReduction
+                    && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
+                    && outcome.RefundState == OrderAmendmentRefundState.None;
+                var reconciledTenderCredit = outcome.CreditState == OrderAmendmentCreditState.Resolved
+                    && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
+                    && outcome.RefundState == OrderAmendmentRefundState.Resolved;
+                if (outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.Resolved
+                    || !appliedBalanceReduction && !reconciledTenderCredit)
                     throw InvalidJournal();
                 resolved.Add(amendment.Id, (amendment, outcome));
             }
+            else if (outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.NotRequired
+                || outcome.CreditState != OrderAmendmentCreditState.None
+                || outcome.LoyaltyState != OrderAmendmentLoyaltyState.None
+                || outcome.RefundState != OrderAmendmentRefundState.None
+                || creditAmendmentIds.Contains(amendment.Id))
+                throw InvalidJournal();
         }
         return resolved;
     }

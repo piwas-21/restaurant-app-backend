@@ -9,10 +9,14 @@ public static class OrderAmendmentServiceExtensions
     public static IServiceCollection AddOrderAmendmentServices(this IServiceCollection services)
     {
         services.AddScoped<IOrderAmendmentFinancialResolution, OrderAmendmentFinancialResolutionService>();
+        services.AddScoped<IOrderAmendmentResolutionService, OrderAmendmentResolutionService>();
+        services.AddScoped<IOrderAmendmentRefundProvider, StripeOrderAmendmentRefundProvider>();
+        services.AddScoped<OrderAmendmentResolutionFinalizer>();
         services.AddScoped<IOrderBillingAdjustmentWriter, OrderBillingAdjustmentWriter>();
         services.AddScoped<IOrderAmendmentQuoteService, OrderAmendmentQuoteService>();
         services.AddScoped<IOrderAmendmentCommitService, OrderAmendmentCommitService>();
         services.AddScoped<IOrderAmendmentQueryService, OrderAmendmentQueryService>();
+        services.AddScoped<IOrderAmendmentEligibilityService, OrderAmendmentEligibilityService>();
         services.AddScoped<OrderAmendmentSupplementBuilder>();
         services.AddScoped<OrderAmendmentChangeBuilder>();
         services.AddScoped<OrderAmendmentCommitMaterializer>();

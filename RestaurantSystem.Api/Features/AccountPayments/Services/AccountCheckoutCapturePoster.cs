@@ -46,7 +46,8 @@ public sealed class AccountCheckoutCapturePoster(ApplicationDbContext context,
             || current.CreatePayloadHash != verified.CreatePayloadHash
             || current.LastVerifiedAt is null || current.LastVerifiedAt != verified.LastVerifiedAt
             || current.ProviderCapturedMinor != verified.ProviderCapturedMinor
-            || current.ProviderRefundedMinor != 0 || current.ProviderChargeId != verified.ProviderChargeId)
+            || current.ProviderRefundedMinor != verified.ProviderRefundedMinor
+            || current.ProviderChargeId != verified.ProviderChargeId)
             throw new ConflictException("Canonical payment evidence changed before allocation posting.");
     }
 

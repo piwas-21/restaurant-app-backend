@@ -87,7 +87,8 @@ public sealed class AccountBillingAllocationCompatibilityTests
             Changes = [new OrderAmendmentLineChangeRequest
                 { OrderItemId = ItemId, Kind = kind, StartOrdinal = 1, Quantity = 1 }]
         };
-        var quoteOrCommit = () => OrderAmendmentPolicy.ValidateOrderContext(order, request);
+        var quoteOrCommit = () => OrderAmendmentPolicy.ValidateOrderContext(
+            order, request, NoRefundAuthority());
         quoteOrCommit.Should().Throw<ConflictException>().WithMessage("*financial reconciliation*");
     }
 
@@ -110,4 +111,7 @@ public sealed class AccountBillingAllocationCompatibilityTests
         CreatedBy = "test",
         Items = [new OrderItem { Id = ItemId, OrderId = OrderId, Quantity = 1, ItemTotal = 10m, CreatedBy = "test" }]
     };
+
+    private static OrderAmendmentRefundAuthoritySnapshot NoRefundAuthority() =>
+        new(new AccountMoney("CHF"), new Dictionary<Guid, long>());
 }

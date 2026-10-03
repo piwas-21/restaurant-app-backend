@@ -28,18 +28,13 @@ internal static class OrderAmendmentPolicy
 
     internal static void ValidateOrderContext(
         Order source,
-        OrderAmendmentQuoteRequest request)
+        OrderAmendmentQuoteRequest request,
+        OrderAmendmentRefundAuthoritySnapshot refundAuthority)
     {
         if (source.Status is OrderStatus.Cancelled or OrderStatus.Refunded)
             throw new BadRequestException("A cancelled or refunded order cannot be amended.");
 
-        if (source.PaymentStatus is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded
-            || source.Payments.Any(payment => payment.Status is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded
-                || payment.IsRefunded || payment.RefundedAmount.HasValue || payment.RefundDate.HasValue))
-        {
-            throw new ConflictException(
-                "This order has refund activity that must be reconciled before it can be amended.");
-        }
+        ValidateRefundActivity(source, refundAuthority);
 
         ValidateAccountContext(source, request);
 
@@ -47,6 +42,53 @@ internal static class OrderAmendmentPolicy
             throw new ConflictException("The order changed. Refresh and quote the amendment again.");
 
         ValidateProviderContext(source, request);
+    }
+
+    internal static void ValidateRefundActivity(
+        Order source, OrderAmendmentRefundAuthoritySnapshot refundAuthority)
+    {
+        var money = refundAuthority.Money;
+        var hasAuthorizedRefund = false;
+        foreach (var payment in source.Payments)
+        {
+            long actualRefund;
+            long paymentAmount;
+            try
+            {
+                paymentAmount = money.ToMinor(payment.Amount);
+                actualRefund = money.ToMinor(payment.RefundedAmount
+                    ?? (payment.IsRefunded || payment.Status == PaymentStatus.Refunded ? payment.Amount : 0m));
+            }
+            catch (BadRequestException)
+            {
+                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+            }
+
+            var authorizedRefund = refundAuthority.AuthorizedRefundMinorByPayment
+                .GetValueOrDefault(payment.Id);
+            if (actualRefund != authorizedRefund || actualRefund > paymentAmount
+                || payment.RefundDate.HasValue != (authorizedRefund > 0))
+                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+
+            if (authorizedRefund == 0)
+            {
+                if (payment.IsRefunded || payment.Status is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded)
+                    throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+                continue;
+            }
+
+            hasAuthorizedRefund = true;
+            var isFullyRefunded = authorizedRefund == paymentAmount;
+            if (!payment.Status.IsCaptured()
+                || payment.IsRefunded != isFullyRefunded
+                || isFullyRefunded != (payment.Status == PaymentStatus.Refunded)
+                || !isFullyRefunded && payment.Status != PaymentStatus.PartiallyRefunded)
+                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+        }
+
+        if (source.PaymentStatus == PaymentStatus.Refunded
+            || source.PaymentStatus == PaymentStatus.PartiallyRefunded && !hasAuthorizedRefund)
+            throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
     }
 
     private static void ValidateAccountContext(Order source, OrderAmendmentQuoteRequest request)

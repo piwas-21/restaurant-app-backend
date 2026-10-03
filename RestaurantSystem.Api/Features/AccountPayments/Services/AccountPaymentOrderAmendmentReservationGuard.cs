@@ -21,11 +21,12 @@ public sealed class AccountPaymentOrderAmendmentReservationGuard(
         var knownUnprotected = AccountPaymentStateRules.KnownUnprotectedStates;
         var allocations = await context.AccountPaymentAllocations.AsNoTracking()
             .Where(value => value.OrderId == orderId && !knownUnprotected.Contains(value.Attempt!.State))
-            .Select(value => new { value.OrderItemId, value.StartOrdinal, value.UnitCount })
+            .Select(value => new { value.OrderItemId, value.StartOrdinal, value.UnitCount, State = value.Attempt!.State })
             .ToListAsync(cancellationToken);
 
         var intersects = allocations.Any(allocation => allocation.OrderItemId is null
             || scopes.Any(scope => scope.OrderItemId == allocation.OrderItemId
+                && !(allocation.State == AccountPaymentState.Captured && scope.AllowCapturedReversal)
                 && (scope.WholeLine
                     || allocation.StartOrdinal < (long)scope.StartOrdinal + scope.Count
                     && (long)allocation.StartOrdinal + allocation.UnitCount > scope.StartOrdinal)));
