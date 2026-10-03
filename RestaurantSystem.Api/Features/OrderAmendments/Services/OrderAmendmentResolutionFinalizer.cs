@@ -13,8 +13,9 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 /// <summary>Posts the frozen refund and credit only after every custody leg has durable proof.</summary>
 public sealed class OrderAmendmentResolutionFinalizer(
     ApplicationDbContext context, ICurrentUserService currentUser, TimeProvider clock)
+    : IOrderAmendmentResolutionFinalizer
 {
-    internal async Task TryFinalizeAsync(
+    public async Task TryFinalizeAsync(
         Guid operationId, Guid actorId, CancellationToken cancellationToken)
     {
         var sourceOrderId = await context.OrderAmendmentResolutionOperations.AsNoTracking()

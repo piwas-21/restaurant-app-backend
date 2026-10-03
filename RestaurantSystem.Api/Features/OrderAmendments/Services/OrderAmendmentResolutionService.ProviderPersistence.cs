@@ -191,7 +191,7 @@ public sealed partial class OrderAmendmentResolutionService
 
     private async Task SetProviderLegStateAsync(
         Guid operationId, Guid legId, Guid expectedAttemptId, OrderAmendmentRefundLegState state,
-        Guid actorId, CancellationToken cancellationToken,
+        CancellationToken cancellationToken,
         bool recoverFromReconciliation = false)
     {
         await using var scope = await LockResolutionSourceAsync(operationId, cancellationToken);
@@ -228,7 +228,7 @@ public sealed partial class OrderAmendmentResolutionService
                 operation.State = OrderAmendmentResolutionOperationState.ReconciliationRequired;
                 operation.FailureCode = "provider_refund_requires_reconciliation";
                 operation.UpdatedAt = clock.GetUtcNow().UtcDateTime;
-                operation.UpdatedBy = actorId.ToString("D");
+                operation.UpdatedBy = currentUser.GetAuditIdentifier();
                 await context.SaveChangesAsync(cancellationToken);
             }
             else if (state == OrderAmendmentRefundLegState.Succeeded && recoverFromReconciliation
@@ -237,7 +237,7 @@ public sealed partial class OrderAmendmentResolutionService
                 await RefreshOperationStateAsync(operation, cancellationToken,
                     recoverFromReconciliation: true);
                 operation.UpdatedAt = clock.GetUtcNow().UtcDateTime;
-                operation.UpdatedBy = actorId.ToString("D");
+                operation.UpdatedBy = currentUser.GetAuditIdentifier();
                 await context.SaveChangesAsync(cancellationToken);
             }
             await scope.CommitAsync(cancellationToken);
@@ -249,7 +249,7 @@ public sealed partial class OrderAmendmentResolutionService
         leg.FailureCode = ProviderFailureCode(state);
         await RefreshOperationStateAsync(operation, cancellationToken, recoverFromReconciliation);
         operation.UpdatedAt = clock.GetUtcNow().UtcDateTime;
-        operation.UpdatedBy = actorId.ToString("D");
+        operation.UpdatedBy = currentUser.GetAuditIdentifier();
         await context.SaveChangesAsync(cancellationToken);
         await scope.CommitAsync(cancellationToken);
     }

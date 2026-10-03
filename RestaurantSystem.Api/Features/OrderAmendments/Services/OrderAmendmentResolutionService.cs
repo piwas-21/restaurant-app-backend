@@ -19,7 +19,7 @@ public sealed partial class OrderAmendmentResolutionService(
     IOrderAmendmentRefundProvider refundProvider,
     TimeProvider clock,
     ILogger<OrderAmendmentResolutionService> logger,
-    OrderAmendmentResolutionFinalizer finalizer,
+    IOrderAmendmentResolutionFinalizer finalizer,
     IOrderDisplayCurrencyResolver currencyResolver)
     : IOrderAmendmentResolutionService
 {

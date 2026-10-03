@@ -31,7 +31,7 @@ public sealed partial class OrderAmendmentResolutionService
         if (canonical.Charge?.RefundedMinor != total)
         {
             await SetProviderLegStateAsync(operationId, legId, attemptId,
-                OrderAmendmentRefundLegState.ReconciliationRequired, actorId, cancellationToken);
+                OrderAmendmentRefundLegState.ReconciliationRequired, cancellationToken);
             return false;
         }
 
@@ -41,11 +41,11 @@ public sealed partial class OrderAmendmentResolutionService
         if (succeeded.Length != 1 || succeeded[0].AmountMinor != leg.AmountMinor)
         {
             await SetProviderLegStateAsync(operationId, legId, attemptId,
-                OrderAmendmentRefundLegState.ReconciliationRequired, actorId, cancellationToken);
+                OrderAmendmentRefundLegState.ReconciliationRequired, cancellationToken);
             return false;
         }
         await SetProviderLegStateAsync(operationId, legId, attemptId,
-            OrderAmendmentRefundLegState.Succeeded, actorId, cancellationToken,
+            OrderAmendmentRefundLegState.Succeeded, cancellationToken,
             recoverFromReconciliation: true);
         return true;
     }

@@ -11,7 +11,7 @@ public static class OrderAmendmentServiceExtensions
         services.AddScoped<IOrderAmendmentFinancialResolution, OrderAmendmentFinancialResolutionService>();
         services.AddScoped<IOrderAmendmentResolutionService, OrderAmendmentResolutionService>();
         services.AddScoped<IOrderAmendmentRefundProvider, StripeOrderAmendmentRefundProvider>();
-        services.AddScoped<OrderAmendmentResolutionFinalizer>();
+        services.AddScoped<IOrderAmendmentResolutionFinalizer, OrderAmendmentResolutionFinalizer>();
         services.AddScoped<IOrderBillingAdjustmentWriter, OrderBillingAdjustmentWriter>();
         services.AddScoped<IOrderAmendmentQuoteService, OrderAmendmentQuoteService>();
         services.AddScoped<IOrderAmendmentCommitService, OrderAmendmentCommitService>();
