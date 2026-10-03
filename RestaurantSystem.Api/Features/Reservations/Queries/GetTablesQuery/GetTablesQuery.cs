@@ -82,15 +82,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
 
             if (query.IncludeOccupancy)
             {
-                foreach (var table in tables)
-                {
-                    if (activeOrders.TryGet(table, out var orderInfo))
-                    {
-                        table.IsOccupied = true;
-                        table.ActiveOrderCount = orderInfo.OrderCount;
-                        table.Occupants = orderInfo.Occupants;
-                    }
-                }
+                activeOrders.ApplyTo(tables);
             }
 
             return ApiResponse<List<TableDto>>.SuccessWithData(tables);

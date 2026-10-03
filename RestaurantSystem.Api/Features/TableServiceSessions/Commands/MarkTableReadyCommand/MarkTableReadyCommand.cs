@@ -1,6 +1,4 @@
 using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -9,7 +7,6 @@ using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
-using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.TableServiceSessions.Commands.MarkTableReadyCommand;
@@ -32,7 +29,7 @@ public sealed record TableReadinessOperationDto(
     string ReadinessState,
     int ReadinessVersion);
 
-public sealed class MarkTableReadyCommandHandler
+public sealed partial class MarkTableReadyCommandHandler
     : ICommandHandler<MarkTableReadyCommand, ApiResponse<TableReadinessOperationDto>>
 {
     private readonly ApplicationDbContext _context;
@@ -73,23 +70,8 @@ public sealed class MarkTableReadyCommandHandler
             return Failure("The selected table was not found.", ErrorCodes.TableServiceTableNotFound);
         }
 
-        var replay = await _context.TableReadyOperations.AsNoTracking()
-            .SingleOrDefaultAsync(operation => operation.TableId == table.Id
-                && operation.OperationId == command.OperationId, cancellationToken);
-        if (replay is not null)
-        {
-            if (replay.ActorUserId != _currentUser.UserId.Value
-                || replay.ActorRole != _currentUser.Role
-                || replay.ExpectedReadinessVersion != command.ExpectedReadinessVersion)
-            {
-                return Failure(
-                    "This operation id was already used for a different staff request.",
-                    ErrorCodes.TableReadinessOperationMismatch);
-            }
-
-            await transaction.CommitAsync(cancellationToken);
-            return TableReadinessOperationResponses.ToResponse(replay);
-        }
+        var replayResponse = await ReplayIfPresentAsync(table, command, transaction, cancellationToken);
+        if (replayResponse is not null) return replayResponse;
 
         if (!_features.TableVisitReadinessV1)
         {
@@ -98,92 +80,9 @@ public sealed class MarkTableReadyCommandHandler
                 ErrorCodes.TableReadinessFeatureDisabled);
         }
 
-        if (!table.IsActive)
-        {
-            return await RecordFailureAsync(
-                table, command, ErrorCodes.TableServiceTableInactive, transaction, cancellationToken);
-        }
+        var refusal = await RecordPreconditionFailureAsync(table, command, transaction, cancellationToken);
+        if (refusal is not null) return refusal;
 
-        if (table.ReadinessVersion != command.ExpectedReadinessVersion)
-        {
-            return await RecordFailureAsync(
-                table, command, ErrorCodes.TableReadinessVersionStale, transaction, cancellationToken);
-        }
-
-        var tableNumber = TableReadinessLegacyRules.CanonicalNumber(table.TableNumber);
-        if (await TableReadinessLegacyRules.HasStableOpenVisitAsync(
-            _context, table.Id, cancellationToken))
-        {
-            return await RecordFailureAsync(
-                table, command, ErrorCodes.TableReadinessVisitOpen, transaction, cancellationToken);
-        }
-
-        if (await TableReadinessLegacyRules.HasAmbiguousLegacyOpenVisitAsync(
-            _context, tableNumber, cancellationToken))
-        {
-            return await RecordFailureAsync(
-                table, command, ErrorCodes.TableServiceSessionAmbiguous, transaction, cancellationToken);
-        }
-
-        if (await TableReadinessLegacyRules.HasBlockingLegacyRoundAsync(
-            _context, table.Id, tableNumber, _paymentTolerance, cancellationToken))
-        {
-            return await RecordFailureAsync(
-                table, command, ErrorCodes.TableServiceSessionAmbiguous, transaction, cancellationToken);
-        }
-
-        if (table.ReadinessState != TableReadinessState.NeedsReset)
-        {
-            return await RecordFailureAsync(
-                table, command, ErrorCodes.TableReadinessNotAvailable, transaction, cancellationToken);
-        }
-
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var operation = CreateOperation(table, command, now);
-        operation.Succeeded = true;
-        operation.OutcomeState = TableReadinessState.ReadyForGuests;
-        operation.OutcomeReadinessVersion = checked(table.ReadinessVersion + 1);
-        table.ReadinessState = operation.OutcomeState;
-        table.ReadinessVersion = operation.OutcomeReadinessVersion;
-        _context.TableReadyOperations.Add(operation);
-        await _context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return TableReadinessOperationResponses.ToResponse(operation);
+        return await RecordSuccessAsync(table, command, transaction, cancellationToken);
     }
-
-    private async Task<ApiResponse<TableReadinessOperationDto>> RecordFailureAsync(
-        Table table,
-        MarkTableReadyCommand command,
-        string errorCode,
-        IDbContextTransaction transaction,
-        CancellationToken cancellationToken)
-    {
-        var operation = CreateOperation(table, command, _timeProvider.GetUtcNow().UtcDateTime);
-        operation.Succeeded = false;
-        operation.OutcomeErrorCode = errorCode;
-        operation.OutcomeState = table.ReadinessState;
-        operation.OutcomeReadinessVersion = table.ReadinessVersion;
-        _context.TableReadyOperations.Add(operation);
-        await _context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return TableReadinessOperationResponses.ToResponse(operation);
-    }
-
-    private TableReadyOperation CreateOperation(
-        Table table, MarkTableReadyCommand command, DateTime recordedAt) => new()
-        {
-            TableId = table.Id,
-            OperationId = command.OperationId,
-            ActorUserId = _currentUser.UserId.GetValueOrDefault(),
-            ActorRole = _currentUser.Role.GetValueOrDefault(),
-            ExpectedReadinessVersion = command.ExpectedReadinessVersion,
-            OutcomeState = table.ReadinessState,
-            OutcomeReadinessVersion = table.ReadinessVersion,
-            RecordedAt = recordedAt,
-            CreatedAt = recordedAt,
-            CreatedBy = _currentUser.GetAuditIdentifier()
-        };
-
-    private static ApiResponse<TableReadinessOperationDto> Failure(string message, string code) =>
-        ApiResponse<TableReadinessOperationDto>.FailureWithCode(message, code);
 }

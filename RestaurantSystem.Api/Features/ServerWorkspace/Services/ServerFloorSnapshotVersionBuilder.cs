@@ -8,6 +8,11 @@ using FloorPlanEntity = RestaurantSystem.Domain.Entities.FloorPlan;
 
 namespace RestaurantSystem.Api.Features.ServerWorkspace.Services;
 
+internal sealed record ServerFloorSnapshotVersionContext(
+    DateTimeOffset? NextStateChangeAt,
+    decimal PaymentTolerance,
+    bool HasUnidentifiedLegacy);
+
 internal static class ServerFloorSnapshotVersionBuilder
 {
     public static string Create(
@@ -16,9 +21,7 @@ internal static class ServerFloorSnapshotVersionBuilder
         IEnumerable<FloorSessionRow> sessions,
         IEnumerable<FloorOrderRow> orders,
         IReadOnlyDictionary<Guid, ServerFloorReservationDto> reservations,
-        DateTimeOffset? nextStateChangeAt,
-        decimal paymentTolerance,
-        bool hasUnidentifiedLegacy = false)
+        ServerFloorSnapshotVersionContext context)
     {
         var source = string.Join('|', plans.OrderBy(plan => plan.Id)
                 .Select(plan => $"p:{plan.Id}:{plan.UpdatedAt:O}:{plan.Name}:{plan.WidthMeters}:{plan.HeightMeters}:"
@@ -40,7 +43,7 @@ internal static class ServerFloorSnapshotVersionBuilder
             + ';' + string.Join('|', sessions.OrderBy(session => session.Id)
                 .Select(session => $"s:{session.Id}:{session.Version}:{session.TableId}:{session.TableNumber}:"
                     + $"{session.Currency}:{session.HasPendingPaymentHandoff}"))
-            + ';' + string.Join('|', orders.Where(order => IsVersionRelevant(order, paymentTolerance))
+            + ';' + string.Join('|', orders.Where(order => IsVersionRelevant(order, context.PaymentTolerance))
                 .OrderBy(order => order.Id)
                 .Select(order => $"o:{order.Id}:{order.ServiceSessionId}:{order.TableId}:{order.TableNumber}:"
                     + $"{order.Status}:{order.Total}:{order.BillingCreditAmount}:{order.TotalPaid}:"
@@ -49,7 +52,7 @@ internal static class ServerFloorSnapshotVersionBuilder
                 .Select(item => $"r:{item.Value.ReservationId}:{item.Key}:{item.Value.CustomerName}:"
                     + $"{item.Value.ReservationDate:O}:{item.Value.Status}:{item.Value.StartTime}:"
                     + $"{item.Value.EndTime}:{item.Value.GuestCount}:{item.Value.IsCurrent}"))
-            + $";next:{nextStateChangeAt:O};unidentified:{hasUnidentifiedLegacy}";
+            + $";next:{context.NextStateChangeAt:O};unidentified:{context.HasUnidentifiedLegacy}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)))[..16];
     }
 

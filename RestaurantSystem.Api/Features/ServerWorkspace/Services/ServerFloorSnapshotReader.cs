@@ -76,7 +76,9 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         var reservations = await LoadReservationsAsync(tenantTime, cancellationToken);
         var projection = new ServerFloorSnapshotProjector(
             _clock, _currentUser, _paymentTolerance, _tableVisitReadinessEnabled).Project(
-                plans, tables, sessions, orders, reservations, tenantTime, serverTime, hasUnidentifiedLegacyOrders);
+                new ServerFloorSnapshotInput(
+                    plans, tables, sessions, orders, reservations, tenantTime, serverTime,
+                    hasUnidentifiedLegacyOrders));
         var snapshot = new ServerFloorSnapshotDto
         {
             ServerTime = serverTime,

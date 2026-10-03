@@ -281,8 +281,9 @@ public sealed class TableServiceEffectiveOutstandingTests(DatabaseFixture fixtur
     private static ServerFloorProjection Project(ServerFloorSnapshotProjector projector,
         IReadOnlyCollection<Table> tables, IReadOnlyCollection<FloorSessionRow> sessions,
         IReadOnlyCollection<FloorOrderRow> orders, DateTime now) => projector.Project(
-        Array.Empty<RestaurantSystem.Domain.Entities.FloorPlan>(), tables, sessions, orders, Array.Empty<ReservationRow>(),
-        new DateTimeOffset(now, TimeSpan.Zero), now);
+        new ServerFloorSnapshotInput(
+            Array.Empty<RestaurantSystem.Domain.Entities.FloorPlan>(), tables, sessions, orders,
+            Array.Empty<ReservationRow>(), new DateTimeOffset(now, TimeSpan.Zero), now));
 
     private static Table Table(string label) => new()
     {

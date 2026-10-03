@@ -54,12 +54,13 @@ public sealed class ServerFloorReadinessActionTests
         ServerFloorActionProjection.Project(
             table,
             session,
-            hasLegacyAmbiguity,
-            hasLegacyOrders,
-            readyCount: 0,
-            hasCurrentReservation: false,
-            currentRole: UserRole.Server,
-            tableVisitReadinessEnabled: readinessEnabled);
+            new ServerFloorActionContext(
+                hasLegacyAmbiguity,
+                hasLegacyOrders,
+                ReadyCount: 0,
+                HasCurrentReservation: false,
+                CurrentRole: UserRole.Server,
+                TableVisitReadinessEnabled: readinessEnabled));
 
     private static Table NewTable(TableReadinessState state) => new()
     {
