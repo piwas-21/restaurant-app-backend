@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Features.Basket.Dtos;
 using RestaurantSystem.Api.Features.Basket.Dtos.Requests;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using System.Text.Json;
@@ -23,15 +24,18 @@ public class BasketMappingService : IBasketMappingService
     private readonly ApplicationDbContext _context;
     private readonly ICustomerDiscountService _customerDiscountService;
     private readonly ILogger<BasketMappingService> _logger;
+    private readonly IBasketToOrderTranslator _orderTranslator;
 
     public BasketMappingService(
         ApplicationDbContext context,
         ICustomerDiscountService customerDiscountService,
-        ILogger<BasketMappingService> logger)
+        ILogger<BasketMappingService> logger,
+        IBasketToOrderTranslator orderTranslator)
     {
         _context = context;
         _customerDiscountService = customerDiscountService;
         _logger = logger;
+        _orderTranslator = orderTranslator;
     }
 
     public async Task<BasketDto> MapAsync(DomainBasket basket)
@@ -176,6 +180,7 @@ public class BasketMappingService : IBasketMappingService
             ExpiresAt = basket.ExpiresAt,
             Notes = basket.Notes,
             OrderType = basket.OrderType,
+            PurchaseFingerprint = BasketPurchaseFingerprint.Compute(basket.OrderType, rootItems, _orderTranslator),
             Items = rootItems
         };
     }

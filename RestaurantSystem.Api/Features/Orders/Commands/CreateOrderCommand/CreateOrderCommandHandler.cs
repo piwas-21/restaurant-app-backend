@@ -4,6 +4,9 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
+using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -25,6 +28,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderPermittedActionsService _permittedActionsService;
     private readonly IOrderFactory _orderFactory;
     private readonly IPreferredLanguageCapture _languages;
+    private readonly ITableGuestRoundOperationStore? _guestRounds;
 
     public CreateOrderCommandHandler(
         ApplicationDbContext context,
@@ -39,7 +43,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderPermittedActionsService permittedActionsService,
         IOrderFactory orderFactory,
         IPreferredLanguageCapture languages,
-        ILogger<CreateOrderCommandHandler> logger)
+        ILogger<CreateOrderCommandHandler> logger,
+        ITableGuestRoundOperationStore? guestRounds = null)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -54,20 +59,43 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _notifications = notifications;
         _permittedActionsService = permittedActionsService;
         _logger = logger;
+        _guestRounds = guestRounds;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(CreateOrderCommand command, CancellationToken cancellationToken)
     {
-        // Before the transaction on purpose: everything after this line runs behind the order-number
-        // generator's day-wide advisory lock, and a failed statement inside a transaction poisons it,
-        // so a lookup for a cosmetic field would become a way to lose an order (GAP-2 S4 review).
-        var ownerId = command.UserId ?? _currentUserService.UserId;
+        // Validate guest context before entering the order-number transaction and advisory lock.
+        var guestContext = command.GuestRoundContext;
+        if (guestContext is not null)
+        {
+            GuestRoundOrderPolicy.Validate(command);
+        }
+
+        var ownerId = guestContext is null ? command.UserId ?? _currentUserService.UserId : null;
         var language = await _languages.ForUserAsync(ownerId, cancellationToken);
 
         using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         try
         {
+            TableServiceSession? guestSession = null;
+            TableGuestParticipant? guestParticipant = null;
+            if (guestContext is not null)
+            {
+                var guestRounds = _guestRounds ?? throw new InvalidOperationException(
+                    "Guest round operations are not registered.");
+                var preparation = await guestRounds.PrepareUnderLockAsync(guestContext, cancellationToken);
+                if (preparation.Replay is not null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                    return preparation.Replay;
+                }
+
+                guestSession = preparation.Session;
+                guestParticipant = preparation.Participant;
+                command.TableNumber = guestSession.TableNumber;
+            }
+
             var draft = await _orderFactory.CreateAsync(command, ownerId, language, cancellationToken);
 
             if (draft.IsFailed)
@@ -76,6 +104,12 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             }
 
             var order = draft.Order;
+            if (guestSession is not null)
+            {
+                await GuestRoundOrderPolicy.AttachVisitAsync(
+                    _context, order, guestSession, cancellationToken);
+            }
+
             var userId = draft.UserId;
             var auditId = draft.AuditId;
             var now = draft.Now;
@@ -93,9 +127,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 }
             }
 
-            // Every money field is derived from these server-resolved items, never from the request
-            // body (S0b). FidelityPointsDiscount is still 0 — redemption needs the order to exist,
-            // so Total is recomputed after the save below.
+            // Money is derived from server-resolved items; fidelity redemption is recomputed after save.
             var itemsTotal = order.Items.Sum(i => i.ItemTotal);
             await _pricingService.ApplyAsync(order, itemsTotal, command, userId, cancellationToken);
 
@@ -103,6 +135,14 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             _paymentBuilder.AddPayments(order, command.Payments);
             _paymentBuilder.UpdatePaymentSummary(order);
+
+            if (guestSession is not null && guestParticipant is not null)
+            {
+                GuestRoundOrderPolicy.RecordAccountChange(
+                    _context, _guestRounds ?? throw new InvalidOperationException(
+                        "Guest round operations are not registered."),
+                    guestContext!, guestSession, guestParticipant, order);
+            }
 
             order.StatusHistory.Add(new OrderStatusHistory
             {
@@ -117,9 +157,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Redemption must happen after SaveChangesAsync — the redemption
-            // transaction has a FK to the order, which doesn't exist in the
-            // DB until the save above.
+            // Redemption has an order FK, so it must happen after SaveChangesAsync.
             await _fidelity.RedeemAsync(order, command.PointsToRedeem, userId, cancellationToken);
 
             // Gated on the server-computed order.PaymentStatus: a caller cannot declare itself paid

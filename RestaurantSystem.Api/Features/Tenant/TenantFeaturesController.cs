@@ -34,7 +34,8 @@ public sealed class TenantFeaturesController : ControllerBase
             _features.EnforceSauceMinimum,
             _features.OptionSetMaterializationEnabled,
             _features.TableAccountV1,
-            _features.OrderAmendmentsV1);
+            _features.OrderAmendmentsV1,
+            _features.TableGuestVisitsV1);
         return Ok(ApiResponse<TenantFeaturesDto>.SuccessWithData(dto));
     }
 }

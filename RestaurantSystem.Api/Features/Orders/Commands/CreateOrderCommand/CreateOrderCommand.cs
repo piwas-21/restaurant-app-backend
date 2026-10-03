@@ -2,6 +2,7 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand;
@@ -61,6 +62,12 @@ public record CreateOrderCommand : ICommand<ApiResponse<OrderDto>>
     // a hand-built POST /api/orders is priced from the catalogue.
     [JsonIgnore]
     public bool ItemsAreServerPriced { get; set; }
+
+    // Created only by the table-guest round handler after it has bound the route/header values.
+    // Keeping the property internal and ignored by JSON prevents a direct order request from
+    // attaching itself to a guest visit or asserting a participant identity.
+    [JsonIgnore]
+    internal TableGuestRoundContext? GuestRoundContext { get; set; }
 
     // Multiple Payments
     public List<CreateOrderPaymentDto> Payments { get; set; } = new();
