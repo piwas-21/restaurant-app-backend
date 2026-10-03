@@ -2,12 +2,15 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Settings;
+using Microsoft.Extensions.Options;
 using Stripe;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 public sealed class StripeOrderAmendmentRefundProvider(
-    IStripeGateway gateway, Microsoft.Extensions.Options.IOptions<StripeSettings> options)
+    IStripeGateway gateway,
+    IOptions<StripeSettings> options,
+    IOptions<OrderAmendmentResolutionSettings> resolutionSettings)
     : IOrderAmendmentRefundProvider
 {
     internal const string SchemaKey = "sofra_amendment_refund_schema";
@@ -53,9 +56,13 @@ public sealed class StripeOrderAmendmentRefundProvider(
         if (string.IsNullOrWhiteSpace(chargeId))
             throw new BadRequestException("The frozen charge identity is unavailable.");
         var service = new RefundService(gateway.Client);
-        var pageOptions = new RefundListOptions { Charge = chargeId, Limit = 100 };
+        var pageOptions = new RefundListOptions
+        {
+            Charge = chargeId,
+            Limit = resolutionSettings.Value.ProviderRefundPageSize
+        };
         var results = new List<AmendmentRefundEvidence>();
-        for (var page = 0; page < 10; page++)
+        for (var page = 0; page < resolutionSettings.Value.MaximumProviderRefundPages; page++)
         {
             var response = await service.ListAsync(pageOptions, gateway.BuildRequestOptions(), cancellationToken);
             results.AddRange(response.Data.Select(Map));

@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -13,7 +15,6 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
 {
-    private static readonly TimeSpan QuoteLifetime = TimeSpan.FromMinutes(5);
     private readonly ApplicationDbContext _context;
     private readonly ITenantFeatures _features;
     private readonly ICurrentUserService _currentUser;
@@ -22,6 +23,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
     private readonly IOrderMappingService _mapping;
     private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly IOrderAmendmentFinancialResolution _financial;
+    private readonly OrderAmendmentResolutionSettings _resolutionSettings;
 
     public OrderAmendmentQuoteService(
         ApplicationDbContext context,
@@ -31,7 +33,8 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         OrderAmendmentChangeBuilder changes,
         IOrderMappingService mapping,
         IOrderDisplayCurrencyResolver currencyResolver,
-        IOrderAmendmentFinancialResolution financial)
+        IOrderAmendmentFinancialResolution financial,
+        IOptions<OrderAmendmentResolutionSettings> resolutionSettings)
     {
         _context = context;
         _features = features;
@@ -41,6 +44,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         _mapping = mapping;
         _currencyResolver = currencyResolver;
         _financial = financial;
+        _resolutionSettings = resolutionSettings.Value;
     }
 
     public async Task<OrderAmendmentQuoteDto> QuoteAsync(
@@ -81,7 +85,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
                 var financial = await _financial.PreviewAsync(source, changes, supplement, cancellationToken);
 
                 var amendmentId = Guid.NewGuid();
-                var expiresAt = now.Add(QuoteLifetime);
+                var expiresAt = now.AddMinutes(_resolutionSettings.AmendmentQuoteLifetimeMinutes);
                 amendment = new OrderAmendment
                 {
                     Id = amendmentId,

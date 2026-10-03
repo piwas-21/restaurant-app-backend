@@ -17,7 +17,8 @@ public sealed partial class OrderAmendmentResolutionService
         if (request.ExpiresAt <= now)
             return await PersistRefusalAsync(orderId, amendmentId, request, requestHash, actorId,
                 OrderAmendmentResolutionRefusalCodes.QuoteExpired, now, cancellationToken);
-        if (request.ExpiresAt > now.Add(QuoteLifetime))
+        if (request.ExpiresAt > now.AddMinutes(
+                resolutionSettings.Value.FinancialResolutionQuoteLifetimeMinutes))
             return await PersistRefusalAsync(orderId, amendmentId, request, requestHash, actorId,
                 OrderAmendmentResolutionRefusalCodes.QuoteChanged, now, cancellationToken);
 

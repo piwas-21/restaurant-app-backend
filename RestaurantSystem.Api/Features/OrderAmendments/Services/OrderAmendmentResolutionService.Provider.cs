@@ -104,7 +104,8 @@ public sealed partial class OrderAmendmentResolutionService
                  && latest.RefundAttemptId == attempt.Id)
             throw new ConflictException("The original provider refund request still needs reconciliation.");
 
-        if (clock.GetUtcNow().UtcDateTime - attempt.RequestedAt >= TimeSpan.FromHours(23))
+        var idempotencyWindow = TimeSpan.FromHours(resolutionSettings.Value.ProviderIdempotencySafetyWindowHours);
+        if (clock.GetUtcNow().UtcDateTime - attempt.RequestedAt >= idempotencyWindow)
             throw new ConflictException("The provider idempotency window is too old for automatic retry.");
         var request = BuildProviderRequest(leg, operationId, attempt);
         var response = await refundProvider.CreateAsync(request, cancellationToken);

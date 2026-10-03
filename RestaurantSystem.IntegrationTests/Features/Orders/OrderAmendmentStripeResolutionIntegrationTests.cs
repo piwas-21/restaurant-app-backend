@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Common;
@@ -22,6 +24,22 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(DatabaseFixture fixture)
     : IntegrationTestBase(fixture)
 {
+    [Fact]
+    public void Host_binds_bounded_resolution_settings_and_resolves_the_finalizer_interface()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        var settings = services.GetRequiredService<IOptions<OrderAmendmentResolutionSettings>>().Value;
+
+        settings.AmendmentQuoteLifetimeMinutes.Should().Be(5);
+        settings.FinancialResolutionQuoteLifetimeMinutes.Should().Be(2);
+        settings.ProviderRefundPageSize.Should().Be(100);
+        settings.MaximumProviderRefundPages.Should().Be(10);
+        settings.ProviderIdempotencySafetyWindowHours.Should().Be(23);
+        services.GetRequiredService<IOrderAmendmentResolutionFinalizer>().Should().NotBeNull();
+        services.GetRequiredService<IOrderAmendmentResolutionService>().Should().NotBeNull();
+    }
+
     private static readonly Guid AdminId = Guid.Parse(TestAuthHandler.AdminUserId);
     private readonly Guid _sessionId = Guid.NewGuid();
     private readonly Guid _orderId = Guid.NewGuid();

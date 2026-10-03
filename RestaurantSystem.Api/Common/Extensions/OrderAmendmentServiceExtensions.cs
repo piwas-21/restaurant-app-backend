@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Common.Extensions;
 
@@ -8,6 +9,10 @@ public static class OrderAmendmentServiceExtensions
 {
     public static IServiceCollection AddOrderAmendmentServices(this IServiceCollection services)
     {
+        services.AddOptions<OrderAmendmentResolutionSettings>()
+            .BindConfiguration(OrderAmendmentResolutionSettings.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<IOrderAmendmentFinancialResolution, OrderAmendmentFinancialResolutionService>();
         services.AddScoped<IOrderAmendmentResolutionService, OrderAmendmentResolutionService>();
         services.AddScoped<IOrderAmendmentRefundProvider, StripeOrderAmendmentRefundProvider>();

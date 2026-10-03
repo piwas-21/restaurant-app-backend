@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -20,11 +22,10 @@ public sealed partial class OrderAmendmentResolutionService(
     TimeProvider clock,
     ILogger<OrderAmendmentResolutionService> logger,
     IOrderAmendmentResolutionFinalizer finalizer,
+    IOptions<OrderAmendmentResolutionSettings> resolutionSettings,
     IOrderDisplayCurrencyResolver currencyResolver)
     : IOrderAmendmentResolutionService
 {
-    private static readonly TimeSpan QuoteLifetime = TimeSpan.FromMinutes(2);
-
     public async Task<OrderAmendmentResolutionQuoteDto> QuoteAsync(
         Guid orderId, Guid amendmentId, OrderAmendmentResolutionQuoteRequest request,
         CancellationToken cancellationToken)
@@ -33,7 +34,8 @@ public sealed partial class OrderAmendmentResolutionService(
         OrderAmendmentPolicy.RequireFeature(features);
         ValidateQuoteRequest(request);
         var state = await ReadPlanningStateAsync(orderId, amendmentId, request, cancellationToken);
-        var expiresAt = clock.GetUtcNow().UtcDateTime.Add(QuoteLifetime);
+        var lifetime = TimeSpan.FromMinutes(resolutionSettings.Value.FinancialResolutionQuoteLifetimeMinutes);
+        var expiresAt = clock.GetUtcNow().UtcDateTime.Add(lifetime);
         return OrderAmendmentResolutionQuoteFactory.Create(
             orderId, amendmentId, actorId, request, state.Plan, expiresAt);
     }
