@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -14,6 +15,8 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 public sealed class AccountPaymentQuoteService(
     ApplicationDbContext context,
     IAccountPaymentActorResolver actors,
+    ITableGuestParticipantPaymentAuthorization guestAuthorization,
+    IGuestAccountPaymentPolicy guestPolicy,
     ITenantFeatures features,
     IOptions<AccountPaymentSettings> options,
     TimeProvider timeProvider) : IAccountPaymentQuoteService
@@ -23,19 +26,39 @@ public sealed class AccountPaymentQuoteService(
     {
         if (!features.TableAccountPaymentsV1)
             throw new NotFoundException("Table account payments are not enabled.");
+        return await CreateQuoteCoreAsync(sessionId, null, request, guest: false, cancellationToken);
+    }
+
+    public async Task<AccountPaymentOperationDto> CreateGuestQuoteAsync(
+        Guid sessionId, string? participantCredential, CreateAccountPaymentQuoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        guestPolicy.RequireNewPayment();
+        return await CreateQuoteCoreAsync(sessionId, participantCredential, request, guest: true, cancellationToken);
+    }
+
+    private async Task<AccountPaymentOperationDto> CreateQuoteCoreAsync(
+        Guid sessionId, string? participantCredential, CreateAccountPaymentQuoteRequest request,
+        bool guest, CancellationToken cancellationToken)
+    {
         if (sessionId == Guid.Empty) throw new BadRequestException("A table visit is required.");
-        AccountPaymentRequestRules.ValidateQuote(request);
+        AccountPaymentRequestRules.ValidateQuote(request, allowOnlinePayment: guest);
+        if (guest && request.PaymentMethod != PaymentMethod.OnlinePayment)
+            throw new BadRequestException("Guest account payments support online payment only.");
         var settings = options.Value;
         if (request.SelectedUnits.Count > settings.MaximumSelectedUnits)
             throw new BadRequestException("The item selection is too large.");
 
-        var actor = actors.ResolveStaffActor();
-        var hash = AccountPaymentRequestRules.QuoteHash(sessionId, request);
+        var staffActor = guest ? null : actors.ResolveStaffActor();
+        var hash = AccountPaymentRequestRules.QuoteHash(sessionId, request, allowOnlinePayment: guest);
         await using var transaction = await AccountPaymentTransaction.BeginAsync(context, cancellationToken);
         try
         {
             var session = await TableServiceSessionRowLock.LoadAsync(context, sessionId, cancellationToken)
                 ?? throw new NotFoundException("Table account was not found.");
+            var actor = guest
+                ? await guestAuthorization.AuthorizeLockedAsync(session, participantCredential, cancellationToken)
+                : staffActor!;
             await AccountPaymentOperationKeyLock.AcquireAsync(context, request.OperationId, cancellationToken);
             var existing = await context.AccountPaymentAttempts.Include(value => value.Allocations)
                 .SingleOrDefaultAsync(value => value.OperationId == request.OperationId, cancellationToken);
@@ -56,6 +79,7 @@ public sealed class AccountPaymentQuoteService(
             if (segments.Count > settings.MaximumScopeSegments)
                 throw new BadRequestException("The payment scope exceeds the configured segment limit.");
             var amount = AccountDebtMath.Total(segments);
+            if (guest) guestPolicy.RequireContribution(amount, account.Money.Currency);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var quoteExpires = now.AddMinutes(settings.QuoteLifetimeMinutes);
             var attempt = new AccountPaymentAttempt

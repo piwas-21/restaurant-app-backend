@@ -20,13 +20,18 @@ public sealed class AccountCheckoutJournal : Entity
     public string? ProviderSessionId { get; set; }
     public string? ProviderIntentId { get; set; }
     public string? ProviderChargeId { get; set; }
+    public long ProviderCapturedMinor { get; set; }
     public long ProviderRefundedMinor { get; set; }
+    public bool ReconciliationRequired { get; set; }
+    public DateTime? CancelRequestedAt { get; set; }
     public DateTime? LastVerifiedAt { get; set; }
     public DateTime NextReconcileAt { get; set; }
+    public bool WebhookWakeupPending { get; set; }
     public Guid? LeaseId { get; set; }
     public DateTime? LeaseExpiresAt { get; set; }
     public int ReconcileFailureCount { get; set; }
     public string? LastFailureCode { get; set; }
     public string? ReceiptCredentialHash { get; set; }
     public DateTime? ReceiptExpiresAt { get; set; }
+    public AccountPaymentAttempt? Attempt { get; set; }
 }

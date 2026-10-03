@@ -6,9 +6,10 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 internal static class AccountPaymentRequestRules
 {
-    internal static string QuoteHash(Guid sessionId, CreateAccountPaymentQuoteRequest request)
+    internal static string QuoteHash(
+        Guid sessionId, CreateAccountPaymentQuoteRequest request, bool allowOnlinePayment = false)
     {
-        ValidateQuote(request);
+        ValidateQuote(request, allowOnlinePayment);
         var units = request.SelectedUnits.OrderBy(value => value.OrderId)
             .ThenBy(value => value.OrderItemId).ThenBy(value => value.Ordinal).ToArray();
         return AccountPaymentSnapshots.Hash(new
@@ -35,12 +36,13 @@ internal static class AccountPaymentRequestRules
             request.SupersedesPlanId
         });
 
-    internal static void ValidateQuote(CreateAccountPaymentQuoteRequest request)
+    internal static void ValidateQuote(CreateAccountPaymentQuoteRequest request, bool allowOnlinePayment = false)
     {
         if (request.OperationId == Guid.Empty || request.ExpectedAccountRevision <= 0
             || !Enum.IsDefined(request.Mode) || !Enum.IsDefined(request.PaymentMethod))
             throw new BadRequestException("A valid operation, account revision, payment mode and method are required.");
-        if (request.PaymentMethod is not (PaymentMethod.Cash or PaymentMethod.CreditCard))
+        if (request.PaymentMethod is not (PaymentMethod.Cash or PaymentMethod.CreditCard)
+            && !(allowOnlinePayment && request.PaymentMethod == PaymentMethod.OnlinePayment))
             throw new BadRequestException("Table account collection currently supports cash or manual card only.");
 
         var units = request.SelectedUnits ?? throw new BadRequestException("Selected units are required.");

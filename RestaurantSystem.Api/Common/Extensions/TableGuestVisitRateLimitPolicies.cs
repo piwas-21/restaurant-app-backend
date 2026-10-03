@@ -12,6 +12,7 @@ public static class TableGuestVisitRateLimitPolicies
 {
     public const string AccountPolicyName = "table-guest-account";
     public const string RoundPolicyName = "table-guest-round";
+    public const string PaymentPolicyName = "table-guest-payment";
 
     public static RateLimiterOptions AddTableGuestVisitCredentialPolicies(this RateLimiterOptions options)
     {
@@ -21,6 +22,9 @@ public static class TableGuestVisitRateLimitPolicies
             context.RequestServices.GetRequiredService<IOptions<TableGuestVisitSettings>>()
                 .Value.AccountReadsPerMinute));
         options.AddPolicy(RoundPolicyName, context => CreateParticipantLimiter(context,
+            context.RequestServices.GetRequiredService<IOptions<TableGuestVisitSettings>>()
+                .Value.RoundAttemptsPerMinute));
+        options.AddPolicy(PaymentPolicyName, context => CreateParticipantLimiter(context,
             context.RequestServices.GetRequiredService<IOptions<TableGuestVisitSettings>>()
                 .Value.RoundAttemptsPerMinute));
         var coarseLimiter = PartitionedRateLimiter.Create<HttpContext, string>(CreateCoarsePartition);
@@ -33,7 +37,7 @@ public static class TableGuestVisitRateLimitPolicies
     private static RateLimitPartition<string> CreateCoarsePartition(HttpContext context)
     {
         var policy = context.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
-        if (policy is not (AccountPolicyName or RoundPolicyName))
+        if (policy is not (AccountPolicyName or RoundPolicyName or PaymentPolicyName))
             return RateLimitPartition.GetNoLimiter("other-endpoints");
 
         var settings = context.RequestServices.GetRequiredService<IOptions<TableGuestVisitSettings>>().Value;

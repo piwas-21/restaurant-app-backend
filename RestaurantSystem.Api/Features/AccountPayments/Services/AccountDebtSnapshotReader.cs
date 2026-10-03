@@ -19,8 +19,17 @@ internal sealed record AccountPaymentAccountSnapshot(
 /// <summary>Reads one consistent visit ledger; expiry alone never releases provider-held money.</summary>
 internal sealed class AccountDebtSnapshotReader(ApplicationDbContext context) : IAccountDebtSnapshotReader
 {
-    public async Task<AccountPaymentAccountSnapshot> ReadAsync(
-        Guid serviceSessionId, CancellationToken cancellationToken)
+    public Task<AccountPaymentAccountSnapshot> ReadAsync(
+        Guid serviceSessionId, CancellationToken cancellationToken) =>
+        ReadCoreAsync(serviceSessionId, null, cancellationToken);
+
+    /// <summary>The capture writer may ignore only its own already verified journal while posting its tender.</summary>
+    internal Task<AccountPaymentAccountSnapshot> ReadForVerifiedCaptureAsync(
+        Guid serviceSessionId, Guid attemptId, CancellationToken cancellationToken) =>
+        ReadCoreAsync(serviceSessionId, attemptId, cancellationToken);
+
+    private async Task<AccountPaymentAccountSnapshot> ReadCoreAsync(
+        Guid serviceSessionId, Guid? verifiedAttemptId, CancellationToken cancellationToken)
     {
         await using var transaction = context.Database.CurrentTransaction is null
             ? await context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken)
@@ -28,6 +37,7 @@ internal sealed class AccountDebtSnapshotReader(ApplicationDbContext context) : 
         var session = await context.TableServiceSessions.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Id == serviceSessionId, cancellationToken)
             ?? throw new NotFoundException("Table account was not found.");
+        await AccountCheckoutLedgerGuard.RequireReconciledAsync(context, serviceSessionId, cancellationToken, verifiedAttemptId);
         var money = new AccountMoney(session.Currency);
         var orders = await context.Orders.AsNoTracking()
             .Where(value => value.ServiceSessionId == serviceSessionId && !value.IsDeleted)

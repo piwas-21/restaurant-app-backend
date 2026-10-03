@@ -4,12 +4,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Infrastructure;
@@ -365,8 +368,9 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
         Guid sessionId, CreateAccountEqualSharePlanRequest request)
     {
         await using var context = fixture.CreateContext();
-        return await new AccountEqualSharePlanService(context, ActorResolver(), Features(),
-            Options.Create(new AccountPaymentSettings()), TimeProvider.System)
+        var features = Features();
+        return await new AccountEqualSharePlanService(context, ActorResolver(), GuestAuthorization(), GuestPolicy(features),
+            features, Options.Create(new AccountPaymentSettings()), TimeProvider.System)
             .CreateAsync(sessionId, request, CancellationToken.None);
     }
 
@@ -383,8 +387,9 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
         Guid sessionId, Guid operationId, int expectedVersion, ITenantFeatures? features = null)
     {
         await using var context = fixture.CreateContext();
-        return await new AccountPaymentReservationService(context, ActorResolver(),
-            features ?? Features(), Options.Create(new AccountPaymentSettings()), TimeProvider.System)
+        var activeFeatures = features ?? Features();
+        return await new AccountPaymentReservationService(context, ActorResolver(), GuestAuthorization(),
+            GuestPolicy(activeFeatures), activeFeatures, Options.Create(new AccountPaymentSettings()), TimeProvider.System)
             .ReleaseAsync(sessionId, operationId, new ReleaseAccountPaymentRequest { ExpectedVersion = expectedVersion },
                 CancellationToken.None);
     }
@@ -414,17 +419,28 @@ public sealed class AccountPaymentQuoteReservationTests(DatabaseFixture fixture)
         Guid sessionId, Guid operationId, Guid? actorId = null)
     {
         await using var context = fixture.CreateContext();
-        return await new AccountPaymentOperationReader(context, ActorResolver(actorId))
+        return await new AccountPaymentOperationReader(context, ActorResolver(actorId), GuestAuthorization())
             .GetAttemptAsync(sessionId, operationId, CancellationToken.None);
     }
 
     private AccountPaymentQuoteService QuoteService(
         RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext context, Guid? actorId = null) =>
-        new(context, ActorResolver(actorId), Features(), Options.Create(new AccountPaymentSettings()), TimeProvider.System);
+        new(context, ActorResolver(actorId), GuestAuthorization(), GuestPolicy(Features()), Features(),
+            Options.Create(new AccountPaymentSettings()), TimeProvider.System);
 
     private AccountPaymentReservationService ReservationService(
         RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext context, Guid? actorId = null) =>
-        new(context, ActorResolver(actorId), Features(), Options.Create(new AccountPaymentSettings()), TimeProvider.System);
+        new(context, ActorResolver(actorId), GuestAuthorization(), GuestPolicy(Features()), Features(),
+            Options.Create(new AccountPaymentSettings()), TimeProvider.System);
+
+    private static ITableGuestParticipantPaymentAuthorization GuestAuthorization() =>
+        Mock.Of<ITableGuestParticipantPaymentAuthorization>();
+
+    private static GuestAccountPaymentPolicy GuestPolicy(ITenantFeatures features) => new(
+        features,
+        Mock.Of<ITenantModules>(value => value.IsEnabled(ModuleIds.OnlinePayments)),
+        Mock.Of<IStripeGateway>(value => value.IsConfigured),
+        Options.Create(new AccountOnlineContributionSettings { SettlementCurrency = "CHF" }));
 
     private TestActorResolver ActorResolver(Guid? actorId = null) => new(actorId ?? _actorId);
 

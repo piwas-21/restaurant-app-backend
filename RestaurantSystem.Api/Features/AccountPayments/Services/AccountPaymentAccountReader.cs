@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -13,6 +14,8 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 public sealed class AccountPaymentAccountReader(
     ApplicationDbContext context,
     IAccountPaymentActorResolver actors,
+    ITableGuestParticipantPaymentAuthorization guestAuthorization,
+    IGuestAccountPaymentPolicy guestPolicy,
     ITenantFeatures features,
     IOptions<AccountPaymentSettings> options) : IAccountPaymentAccountReader
 {
@@ -32,10 +35,28 @@ public sealed class AccountPaymentAccountReader(
             throw new BadRequestException("A table visit is required.");
 
         var actor = actors.ResolveStaffActor();
+        return await ReadAsync(sessionId, actor, null, cancellationToken);
+    }
+
+    public async Task<AccountPaymentAccountDto> GetGuestAsync(
+        Guid sessionId, string? participantCredential, CancellationToken cancellationToken)
+    {
+        guestPolicy.RequireAccountRead();
+        if (sessionId == Guid.Empty)
+            throw new BadRequestException("A table visit is required.");
+        return await ReadAsync(sessionId, null, participantCredential, cancellationToken);
+    }
+
+    private async Task<AccountPaymentAccountDto> ReadAsync(
+        Guid sessionId, AccountPaymentActor? knownActor, string? participantCredential,
+        CancellationToken cancellationToken)
+    {
         await using var transaction = context.Database.CurrentTransaction is null
             ? await context.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken)
             : null;
 
+        var actor = knownActor ?? await guestAuthorization.AuthorizeActiveAsync(
+            sessionId, participantCredential, cancellationToken);
         var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
         var settings = options.Value;
         if (account.Debt.Outstanding.Count > settings.MaximumScopeSegments
@@ -51,7 +72,7 @@ public sealed class AccountPaymentAccountReader(
             .Select(value => (long?)value.AmountMinor)
             .SumAsync(cancellationToken) ?? 0L;
 
-        return new AccountPaymentAccountDto(
+        var dto = new AccountPaymentAccountDto(
             sessionId,
             account.Session.Status,
             account.Session.AccountRevision,
@@ -64,7 +85,18 @@ public sealed class AccountPaymentAccountReader(
             AccountPaymentSnapshots.ToDtos(account.Debt.Available),
             plan,
             attempts,
-            new AccountPaymentLimitsDto(settings.MaximumSelectedUnits, settings.MaximumEqualShares));
+            new AccountPaymentLimitsDto(settings.MaximumSelectedUnits, settings.MaximumEqualShares,
+                knownActor is null ? guestPolicy.ReadLimits(account.Money.Currency) : null));
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
+        if (knownActor is null)
+        {
+            var currentActor = await guestAuthorization.AuthorizeActiveAsync(
+                sessionId, participantCredential, cancellationToken);
+            if (currentActor.ActorId != actor.ActorId || currentActor.Kind != actor.Kind)
+                throw new NotFoundException("Guest access is unavailable for this table visit.");
+        }
+        return dto;
     }
 
     private async Task<AccountPaymentEqualShareSummaryDto?> ReadActivePlanAsync(
@@ -102,7 +134,7 @@ public sealed class AccountPaymentAccountReader(
             plan.TotalMinor,
             plan.ShareCount,
             plan.Currency,
-            plan.CreatedBy == actor.AuditIdentifier,
+            plan.ActorId == actor.ActorId && plan.ActorKind == actor.Kind,
             slots,
             AccountPaymentSnapshots.ToDtos(scope));
     }

@@ -8,6 +8,7 @@ public static class TableGuestVisitServiceExtensions
     {
         services.AddScoped<ITableGuestAdmissionService, TableGuestAdmissionService>();
         services.AddScoped<ITableGuestAccountReader, TableGuestAccountReader>();
+        services.AddScoped<ITableGuestParticipantPaymentAuthorization, TableGuestParticipantPaymentAuthorization>();
         services.AddScoped<ITableGuestVisitRevoker, TableGuestVisitRevoker>();
         services.AddScoped<ITableGuestRoundOperationStore, TableGuestRoundOperationStore>();
         return services;

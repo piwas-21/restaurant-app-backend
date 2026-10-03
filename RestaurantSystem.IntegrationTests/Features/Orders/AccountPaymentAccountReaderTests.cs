@@ -5,12 +5,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Infrastructure;
@@ -81,8 +84,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
     {
         await using var context = fixture.CreateContext();
         var actors = new Mock<IAccountPaymentActorResolver>();
-        var reader = new AccountPaymentAccountReader(context, actors.Object, Features(enabled: false),
-            Options.Create(new AccountPaymentSettings()));
+        var reader = NewReader(context, actors.Object, Features(enabled: false));
 
         var read = () => reader.GetAsync(Guid.NewGuid(), CancellationToken.None);
         await read.Should().ThrowAsync<NotFoundException>();
@@ -96,8 +98,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
     {
         await using var context = fixture.CreateContext();
         var currentUser = CurrentUser(_actorId, UserRole.Admin, authenticated, isApiToken);
-        var reader = new AccountPaymentAccountReader(context, new AccountPaymentActorResolver(currentUser),
-            Features(enabled: true), Options.Create(new AccountPaymentSettings()));
+        var reader = NewReader(context, new AccountPaymentActorResolver(currentUser), Features(enabled: true));
 
         var read = () => reader.GetAsync(Guid.NewGuid(), CancellationToken.None);
         await read.Should().ThrowAsync<ForbiddenException>();
@@ -109,8 +110,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         var identity = await SeedPartiallyPaidAccount();
         await using var context = fixture.CreateContext();
         var settings = new AccountPaymentSettings { MaximumActiveAttemptSummaries = 1 };
-        var reader = new AccountPaymentAccountReader(context, ActorResolver(_actorId), Features(enabled: true),
-            Options.Create(settings));
+        var reader = NewReader(context, ActorResolver(_actorId), Features(enabled: true), settings);
 
         var read = () => reader.GetAsync(identity.SessionId, CancellationToken.None);
         await read.Should().ThrowAsync<ConflictException>().WithMessage("*too many active payment attempts*");
@@ -164,8 +164,21 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
 
     private AccountPaymentAccountReader Reader(
         RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext context) =>
-        new AccountPaymentAccountReader(context, ActorResolver(_actorId), Features(enabled: true),
-            Options.Create(new AccountPaymentSettings()));
+        NewReader(context, ActorResolver(_actorId), Features(enabled: true));
+
+    private static AccountPaymentAccountReader NewReader(
+        RestaurantSystem.Infrastructure.Persistence.ApplicationDbContext context,
+        IAccountPaymentActorResolver actorResolver,
+        ITenantFeatures features,
+        AccountPaymentSettings? settings = null) =>
+        new(context, actorResolver, Mock.Of<ITableGuestParticipantPaymentAuthorization>(),
+            GuestPolicy(features), features, Options.Create(settings ?? new AccountPaymentSettings()));
+
+    private static GuestAccountPaymentPolicy GuestPolicy(ITenantFeatures features) => new(
+        features,
+        Mock.Of<ITenantModules>(value => value.IsEnabled(ModuleIds.OnlinePayments)),
+        Mock.Of<IStripeGateway>(value => value.IsConfigured),
+        Options.Create(new AccountOnlineContributionSettings { SettlementCurrency = "CHF" }));
 
     private async Task<(Guid SessionId, Guid OrderId)> SeedAccount(decimal total, int quantity)
     {
@@ -202,7 +215,9 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         Guid sessionId, CreateAccountEqualSharePlanRequest request)
     {
         await using var context = fixture.CreateContext();
-        return await new AccountEqualSharePlanService(context, ActorResolver(_actorId), Features(enabled: true),
+        var features = Features(enabled: true);
+        return await new AccountEqualSharePlanService(context, ActorResolver(_actorId),
+                Mock.Of<ITableGuestParticipantPaymentAuthorization>(), GuestPolicy(features), features,
                 Options.Create(new AccountPaymentSettings()), TimeProvider.System)
             .CreateAsync(sessionId, request, CancellationToken.None);
     }
@@ -211,7 +226,9 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         Guid sessionId, CreateAccountPaymentQuoteRequest request)
     {
         await using var context = fixture.CreateContext();
-        return await new AccountPaymentQuoteService(context, ActorResolver(_actorId), Features(enabled: true),
+        var features = Features(enabled: true);
+        return await new AccountPaymentQuoteService(context, ActorResolver(_actorId),
+                Mock.Of<ITableGuestParticipantPaymentAuthorization>(), GuestPolicy(features), features,
                 Options.Create(new AccountPaymentSettings()), TimeProvider.System)
             .CreateQuoteAsync(sessionId, request, CancellationToken.None);
     }
@@ -220,7 +237,9 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         Guid sessionId, Guid operationId, int expectedVersion, long revision)
     {
         await using var context = fixture.CreateContext();
-        return await new AccountPaymentReservationService(context, ActorResolver(_actorId), Features(enabled: true),
+        var features = Features(enabled: true);
+        return await new AccountPaymentReservationService(context, ActorResolver(_actorId),
+                Mock.Of<ITableGuestParticipantPaymentAuthorization>(), GuestPolicy(features), features,
                 Options.Create(new AccountPaymentSettings()), TimeProvider.System)
             .ReserveAsync(sessionId, operationId,
                 new ReserveAccountPaymentRequest { ExpectedVersion = expectedVersion, ExpectedAccountRevision = revision },
@@ -295,6 +314,8 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
             Currency = "CHF",
             PayloadHash = new string('a', 64),
             ScopeJson = AccountPaymentSnapshots.Serialize(planScope),
+            ActorId = _actorId,
+            ActorKind = AccountPaymentActorKind.Staff,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = _actorId.ToString()
         };

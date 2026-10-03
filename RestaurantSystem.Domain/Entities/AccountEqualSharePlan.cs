@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -13,6 +14,10 @@ public sealed class AccountEqualSharePlan : Entity
     public string Currency { get; set; } = string.Empty;
     public string PayloadHash { get; set; } = string.Empty;
     public string ScopeJson { get; set; } = string.Empty;
+    /// <summary>Typed owner for idempotent replay; null on legacy plans whose owner cannot be proven.</summary>
+    public Guid? ActorId { get; set; }
+    /// <summary>Typed owner category; null on legacy plans whose owner cannot be proven.</summary>
+    public AccountPaymentActorKind? ActorKind { get; set; }
     public DateTime? InvalidatedAt { get; set; }
     public Guid? SupersedesPlanId { get; set; }
     public TableServiceSession? ServiceSession { get; set; }
