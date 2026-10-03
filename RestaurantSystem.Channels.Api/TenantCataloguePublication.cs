@@ -36,11 +36,44 @@ public sealed class TenantCataloguePublication(TenantManagementContext context, 
                 available = item.Available,
                 blockReason = item.BlockReason
             }),
+            selectionMode = plan.CategorySelection ? "categoryItemsV1" : "fixedItemsV1",
+            selectedItems = plan.CategorySelection
+                ? plan.Items.Select(item => (object)CategoryItem(item)).ToArray() : Array.Empty<object>(),
+            taxProfile = plan.CategorySelection && plan.TaxProfileRevision.Length == TenantCatalogueLimits.RevisionLength
+                ? new
+                {
+                    source = "reviewedSandboxTemplate",
+                    profileRevision = plan.TaxProfileRevision,
+                    vatRatePercentage = plan.VatRatePercentage,
+                    merchantVerificationRequired = true
+                } : null,
+            taxProfileRevision = plan.CategorySelection ? plan.TaxProfileRevision : string.Empty,
             menu = plan.CanPublish ? (JsonElement?)plan.Menu : null,
             publicationState = latest?.State ?? "NotPublished",
             verifiedAt = latest?.VerifiedAt
         });
     }
+
+    private static object CategoryItem(CatalogueMenuSelection item)
+        => new
+        {
+            selectionKey = item.SelectionKey,
+            providerItemId = item.ItemId,
+            productId = item.ProductId,
+            variationId = item.VariationId,
+            categoryId = item.CategoryId,
+            categoryName = item.CategoryName,
+            categoryDisplayOrder = item.CategoryDisplayOrder,
+            itemDisplayOrder = item.ItemDisplayOrder,
+            name = item.Name,
+            variationName = item.VariationName,
+            description = item.Description,
+            priceMinor = item.PriceMinor,
+            available = item.Available,
+            supported = item.BlockReason.Length == 0,
+            blockReason = item.BlockReason,
+            sourceFingerprint = item.SourceFingerprint
+        };
 
     public async Task<JsonElement> Publish(JsonElement template, string revision, CancellationToken cancellationToken)
         => await Publish(template, revision, await Active(cancellationToken), cancellationToken);
@@ -128,14 +161,18 @@ public sealed class TenantCataloguePublication(TenantManagementContext context, 
         if (latest is not { State: CataloguePublicationStates.Pending }
             && !(latest is { State: CataloguePublicationStates.Verified } && latest.Revision == plan.Revision))
             latest = await repository.Begin(Binding(store), new CataloguePublicationIntent(
-                plan.MappingHash, plan.SourceRevision, plan.Revision, plan.Menu, baseline, ProviderJson.Encode(new
-                {
-                    catalogueRevision = store.CatalogueRevision,
-                    items = store.Items.Select(item => new
-                    { providerItemId = item.ProviderItemId, productId = item.ProductId, variationId = item.VariationId, variationName = item.VariationName })
-                })), cancellationToken);
+                plan.MappingHash, plan.SourceRevision, plan.Revision, plan.Menu, baseline, MappingSnapshot(store)), cancellationToken);
         return latest ?? throw Unconfirmed();
     }
+
+    private static JsonElement MappingSnapshot(TenantStoreBinding store)
+        => store.SourceRevision.Length > 0 ? TenantCatalogueCategorySnapshot.ForPublication(store)
+            : ProviderJson.Encode(new
+            {
+                catalogueRevision = store.CatalogueRevision,
+                items = store.Items.Select(item => new
+                { providerItemId = item.ProviderItemId, productId = item.ProductId, variationId = item.VariationId, variationName = item.VariationName })
+            });
 
     private async Task<CataloguePublication?> ResolveStalePending(AvailabilityBinding binding, CataloguePublication? latest, string revision,
         JsonElement actual, CancellationToken cancellationToken)

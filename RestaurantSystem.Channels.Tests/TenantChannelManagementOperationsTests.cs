@@ -38,6 +38,72 @@ public sealed class TenantChannelManagementOperationsTests
     }
 
     [Fact]
+    public async Task CategoryDraftCanBeExplicitlyRestoredToFixedModeAfterCapabilityRollback()
+    {
+        var harness = CreateHarness(categorySelectionEnabled: true);
+        var initial = await harness.Operations.CatalogueCategories(default);
+        Assert.Equal("categoryItemsV1", initial.GetProperty("selectionMode").GetString());
+        Assert.Equal(1_000, initial.GetProperty("maximumCategoryCount").GetInt32());
+        Assert.Equal(2_000, initial.GetProperty("maximumItemOverrideCount").GetInt32());
+
+        var categoryDraft = new TenantManagementDraftRequest(initial.GetProperty("draftRevision").GetString(), [])
+        {
+            ExpectedSourceRevision = initial.GetProperty("sourceRevision").GetString()!,
+            CategoryIds = [Source.CategoryId]
+        };
+        var savedCategory = await harness.Operations.SaveDraft(categoryDraft, ActorId, default);
+        var categoryRevision = savedCategory.GetProperty("draftRevision").GetString()!;
+        Assert.Equal("categoryItemsV1", savedCategory.GetProperty("selectionMode").GetString());
+
+        harness.Management.CategorySelectionEnabled = false;
+        var fixedView = await harness.Operations.Catalogue(default);
+        Assert.Equal("fixedItemsV1", fixedView.GetProperty("selectionMode").GetString());
+        Assert.Equal(categoryRevision, fixedView.GetProperty("draftRevision").GetString());
+        var fixedCategories = await harness.Operations.CatalogueCategories(default);
+        Assert.Equal("fixedItemsV1", fixedCategories.GetProperty("selectionMode").GetString());
+        Assert.Equal(categoryRevision, fixedCategories.GetProperty("draftRevision").GetString());
+        await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.Preview(new(categoryRevision), ActorId, default));
+
+        var restored = await harness.Operations.SaveDraft(new(categoryRevision, [new("meal", ProductId, null)]), ActorId, default);
+        var restoredRevision = restored.GetProperty("draftRevision").GetString()!;
+        var preview = await harness.Operations.Preview(new(restoredRevision), ActorId, default);
+        Assert.True(preview.GetProperty("canPublish").GetBoolean());
+        var published = await harness.Operations.Publish(new(restoredRevision,
+            preview.GetProperty("publicationRevision").GetString()!), ActorId, default);
+        Assert.Equal("verified", published.GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task NullCategoryCollectionsAreRejectedAsClientErrors()
+    {
+        var harness = CreateHarness(categorySelectionEnabled: true);
+
+        var saveError = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.SaveDraft(
+            new(null, []) { ExpectedSourceRevision = new string('b', 64), CategoryIds = null! }, ActorId, default));
+        var checkError = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.CheckCategorySelection(
+            new(new string('b', 64), null!, [], []), default));
+
+        Assert.Equal(400, saveError.Status);
+        Assert.Equal(400, checkError.Status);
+    }
+
+    [Fact]
+    public async Task CategoryCheckReturnsFreshSupportStatusForRetainedOverride()
+    {
+        var harness = CreateHarness(categorySelectionEnabled: true);
+        var response = await harness.Operations.CheckCategorySelection(new(new string('b', 64),
+            [Source.CategoryId], [new(ProductId, null, Source.CategoryId)],
+            [new(ProductId, null, Source.CategoryId, false)]), default);
+
+        var status = Assert.Single(response.GetProperty("itemStatuses").EnumerateArray());
+        Assert.Equal($"{ProductId:D}:base", status.GetProperty("selectionKey").GetString());
+        Assert.Equal(ProductId, status.GetProperty("productId").GetGuid());
+        Assert.Equal(Source.CategoryId, status.GetProperty("categoryId").GetGuid());
+        Assert.Equal(Source.CategoryId, status.GetProperty("currentCategoryId").GetGuid());
+        Assert.False(status.GetProperty("supported").GetBoolean());
+    }
+
+    [Fact]
     public async Task SummaryUsesExactProviderStoreNameAndToleratesNameReadFailure()
     {
         var harness = CreateHarness();
@@ -231,7 +297,8 @@ public sealed class TenantChannelManagementOperationsTests
     private static TenantChannelManagementOperations CreateOperations(string readFault = "", JsonElement? imports = null)
         => CreateHarness(readFault, imports).Operations;
 
-    private static OperationsHarness CreateHarness(string readFault = "", JsonElement? imports = null)
+    private static OperationsHarness CreateHarness(string readFault = "", JsonElement? imports = null,
+        bool categorySelectionEnabled = false)
     {
         var store = new TenantStoreBinding
         {
@@ -257,7 +324,9 @@ public sealed class TenantChannelManagementOperationsTests
             SyncAvailability = true,
             Store = store
         });
-        var management = Options.Create(new TenantManagementGatewaySettings { Enabled = true });
+        var managementSettings = new TenantManagementGatewaySettings
+        { Enabled = true, CategorySelectionEnabled = categorySelectionEnabled };
+        var management = Options.Create(managementSettings);
         var context = new TenantManagementContext(bridge, management, webhook, TimeProvider.System);
         var publication = new TenantCataloguePublication(context, catalogue, publications, jobs,
             menuProvider, new Resolver(store));
@@ -280,13 +349,14 @@ public sealed class TenantChannelManagementOperationsTests
             exceptionOperations, connectionOperations);
 
         return new(operations, audit, flows, overrides, connectionState, connection, drafts, jobs, publication, publications,
-            menuProvider, store, bridge.Value, webhook.Value, availabilityStatus);
+            menuProvider, store, bridge.Value, webhook.Value, availabilityStatus, managementSettings);
     }
 
     private sealed record OperationsHarness(TenantChannelManagementOperations Operations, Audit Audit,
         OAuthFlows Flows, Overrides Overrides, ConnectionState ConnectionState, Connection Connection, Drafts Drafts, Jobs Jobs,
         TenantCataloguePublication Publication, Publications Publications, MenuProvider MenuProvider, TenantStoreBinding Store,
-        TenantBridgeSettings Bridge, UberWebhookSettings Webhook, AvailabilityStatus AvailabilityStatus);
+        TenantBridgeSettings Bridge, UberWebhookSettings Webhook, AvailabilityStatus AvailabilityStatus,
+        TenantManagementGatewaySettings Management);
 
     private static JsonElement Menu() => JsonDocument.Parse("""
         {"menus":[{"id":"menu","service_availability":[{"day_of_week":"monday","time_periods":[{"start_time":"09:00","end_time":"17:00"}]}]}],
@@ -298,6 +368,32 @@ public sealed class TenantChannelManagementOperationsTests
     private sealed class Source : ITenantCatalogueClient, ITenantAvailabilityClient
     {
         private static readonly string Revision = new('b', 64);
+        private static readonly string Fingerprint = new('c', 64);
+        public static readonly Guid CategoryId = Guid.Parse("40000000-0000-0000-0000-000000000001");
+        public Task<TenantCatalogueCategories> Categories(TenantStoreBinding store, string expectedSourceRevision,
+            IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemReference> itemReferences,
+            IReadOnlyList<TenantCatalogueItemOverride> overrides, CancellationToken cancellationToken)
+            => Task.FromResult(new TenantCatalogueCategories(Revision, "en",
+                [new(CategoryId, "Main menu", 0, 1, 1, 0, true)])
+            {
+                ItemStatuses = itemReferences.Concat(overrides.Select(row => new TenantCatalogueItemReference(
+                        row.ProductId, row.VariationId, row.CategoryId)))
+                    .GroupBy(row => (row.ProductId, row.VariationId)).Select(group => group.First())
+                    .Select(row => new TenantCatalogueItemStatus($"{row.ProductId:D}:{row.VariationId?.ToString("D") ?? "base"}",
+                        row.ProductId, row.VariationId, row.CategoryId!.Value, row.CategoryId, false)).ToArray()
+            });
+
+        public Task<TenantCatalogueSelection> ReadSelection(TenantStoreBinding store, string expectedSourceRevision,
+            IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemOverride> overrides,
+            CancellationToken cancellationToken)
+        {
+            var item = new TenantCatalogueSelectionItem($"{ProductId:D}:base", ProductId, null, CategoryId,
+                "Main menu", 0, 0, "Sofra meal", "Reviewed description", null, 725, true, true, "", Fingerprint);
+            var category = new TenantCatalogueSelectionCategory(CategoryId, "Main menu", 0, 1, 1, 0, 1, 0, true);
+            return Task.FromResult(new TenantCatalogueSelection(Revision, "en", [category], categoryIds,
+                [], [item]));
+        }
+
         public Task<TenantCatalogueSnapshot> Read(TenantStoreBinding store, CancellationToken cancellationToken)
             => Task.FromResult(new TenantCatalogueSnapshot(Revision, store.Items.Select(item =>
                 new TenantCatalogueItem(item.ProductId, item.VariationId, "Sofra meal", "Reviewed description",

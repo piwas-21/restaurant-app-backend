@@ -25,6 +25,8 @@ public sealed class DeliveryChannelManagementController(
     IOptions<DeliveryChannelManagementSettings> managementSettings,
     IOptions<DeliveryChannelSettings> channelSettings) : ControllerBase
 {
+    private const int CategoryReferenceRequestBytes = ExternalOrderLimits.CategoryReferenceRequestBytes;
+
     [HttpGet]
     public Task<DeliveryChannelManagementSummaryDto> Summary(CancellationToken cancellationToken)
     {
@@ -48,16 +50,27 @@ public sealed class DeliveryChannelManagementController(
 
     [HttpGet("catalogue/candidates")]
     public async Task<ActionResult<ChannelCatalogueCandidatesDto>> Candidates(
-        [FromQuery] string search = "", [FromQuery] string cursor = "", CancellationToken cancellationToken = default)
+        [FromQuery] string search = "", [FromQuery] string cursor = "", [FromQuery] Guid? categoryId = null,
+        [FromQuery] string sourceRevision = "", CancellationToken cancellationToken = default)
     {
         RequireEnabled();
         Response.Headers.CacheControl = "no-store";
-        var result = await mediator.SendQuery(new GetChannelCatalogueCandidatesQuery(search, cursor, "en"), cancellationToken);
+        var result = await mediator.SendQuery(new GetChannelCatalogueCandidatesQuery(search, cursor, "", categoryId, sourceRevision), cancellationToken);
         return Ok(result);
     }
 
+    [HttpGet("catalogue/categories")]
+    public Task<DeliveryChannelCategoriesDto> CatalogueCategories(CancellationToken cancellationToken)
+        => Read<DeliveryChannelCategoriesDto>("catalogue/categories", cancellationToken);
+
+    [HttpPost("catalogue/categories/check")]
+    [RequestSizeLimit(CategoryReferenceRequestBytes)]
+    public Task<DeliveryChannelCategoryChangesDto> CheckCategorySelection(DeliveryChannelCategoryChangesRequest request,
+        CancellationToken cancellationToken)
+        => Write<DeliveryChannelCategoryChangesDto>("catalogue/categories/check", request, cancellationToken);
+
     [HttpPut("catalogue/draft")]
-    [RequestSizeLimit(ExternalOrderLimits.RequestBytes)]
+    [RequestSizeLimit(CategoryReferenceRequestBytes)]
     public Task<DeliveryChannelCatalogueDraftDto> SaveDraft(DeliveryChannelCatalogueDraftRequest request,
         CancellationToken cancellationToken)
         => Put<DeliveryChannelCatalogueDraftDto>("catalogue/draft", request, cancellationToken);
@@ -112,7 +125,6 @@ public sealed class DeliveryChannelManagementController(
     public Task<DeliveryChannelDisconnectResultDto> Disconnect(DeliveryChannelDisconnectRequest request,
         CancellationToken cancellationToken)
         => Write<DeliveryChannelDisconnectResultDto>("disconnect", request, cancellationToken);
-
     private Task<TResponse> Read<TResponse>(string path, CancellationToken cancellationToken)
         => Send<TResponse>(HttpMethod.Get, path, null, cancellationToken);
 

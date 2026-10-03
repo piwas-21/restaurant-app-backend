@@ -4,8 +4,23 @@ namespace RestaurantSystem.Channels.Api;
 
 public sealed class TenantCatalogueClient(ITenantChannelTransport transport) : ITenantCatalogueClient
 {
+    public Task<TenantCatalogueCategories> Categories(TenantStoreBinding store, string expectedSourceRevision,
+        IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemReference> itemReferences,
+        IReadOnlyList<TenantCatalogueItemOverride> overrides,
+        CancellationToken cancellationToken)
+        => new TenantCatalogueSelectionReader(transport).Categories(store, expectedSourceRevision,
+            categoryIds, itemReferences, overrides, cancellationToken);
+
+    public Task<TenantCatalogueSelection> ReadSelection(TenantStoreBinding store, string expectedSourceRevision,
+        IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemOverride> overrides,
+        CancellationToken cancellationToken)
+        => new TenantCatalogueSelectionReader(transport).ReadSelection(store, expectedSourceRevision,
+            categoryIds, overrides, cancellationToken);
+
     public async Task<TenantCatalogueSnapshot> Read(TenantStoreBinding store, CancellationToken cancellationToken)
     {
+        if (store.Categories.Count > 0 || store.SourceRevision.Length > 0)
+            return await ReadCategorySelection(store, cancellationToken);
         if (store.CatalogueApiToken.Length == 0 || store.Items.Count < 1 || store.Items.Count > TenantCatalogueLimits.SelectionCount) throw Invalid();
         var expected = store.Items.Select(row => (row.ProductId, row.VariationId)).ToHashSet();
         var response = await transport.Post(new() { BaseUrl = store.BaseUrl, ApiToken = store.CatalogueApiToken },
@@ -43,6 +58,47 @@ public sealed class TenantCatalogueClient(ITenantChannelTransport transport) : I
         }));
         if (computed != revision) throw Invalid();
         return new(revision, items);
+    }
+
+    private async Task<TenantCatalogueSnapshot> ReadCategorySelection(TenantStoreBinding store,
+        CancellationToken cancellationToken)
+    {
+        var selection = await ReadSelection(store, store.SourceRevision, store.SelectedCategoryIds,
+            store.ItemOverrides.Select(row => new TenantCatalogueItemOverride(row.ProductId, row.VariationId,
+                row.CategoryId, row.Selected)).ToArray(), cancellationToken);
+        var byIdentity = selection.Items.ToDictionary(row => (row.ProductId, row.VariationId));
+        if (selection.Items.Count != store.Items.Count || selection.Language != store.Language
+            || selection.SelectedCategoryIds.Except(store.SelectedCategoryIds).Any()
+            || store.SelectedCategoryIds.Except(selection.SelectedCategoryIds).Any()
+            || !SameOverrides(store.ItemOverrides, selection.ItemOverrides)) throw Invalid();
+        var mapped = store.Items.Select(mapping =>
+        {
+            if (!byIdentity.TryGetValue((mapping.ProductId, mapping.VariationId), out var row)
+                || row.SelectionKey != mapping.SelectionKey || row.SourceFingerprint != mapping.SourceFingerprint
+                || row.CategoryId != mapping.CategoryId) throw Invalid();
+            return new TenantCatalogueItem(row.ProductId, row.VariationId, row.Name, row.Description, row.VariationName,
+                row.PriceMinor, row.Available, row.BlockReason)
+            {
+                SelectionKey = row.SelectionKey,
+                CategoryId = row.CategoryId,
+                CategoryName = row.CategoryName,
+                CategoryDisplayOrder = row.CategoryDisplayOrder,
+                ItemDisplayOrder = row.ItemDisplayOrder,
+                SourceFingerprint = row.SourceFingerprint
+            };
+        }).ToArray();
+        return new(selection.Revision, mapped) { Language = selection.Language, Categories = selection.Categories };
+    }
+
+    private static bool SameOverrides(List<TenantItemMappingOverride> expected,
+        IReadOnlyList<TenantCatalogueItemOverride> actual)
+    {
+        if (expected.Count != actual.Count) return false;
+        var rows = actual.ToDictionary(row => (row.ProductId, row.VariationId));
+        return expected.All(row => rows.TryGetValue((row.ProductId, row.VariationId), out var current)
+            && current.CategoryId == row.CategoryId && current.Selected == row.Selected
+            && current.SelectionKey == row.SelectionKey && current.SourceFingerprint == row.SourceFingerprint
+            && current.Supported == row.Supported);
     }
 
     private static TenantCatalogueItem Item(JsonElement row)

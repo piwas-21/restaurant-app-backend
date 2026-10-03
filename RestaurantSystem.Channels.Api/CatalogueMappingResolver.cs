@@ -45,8 +45,20 @@ public sealed class CatalogueMappingResolver(IOptions<TenantBridgeSettings> sett
     private TenantStoreBinding ResolveSnapshot(CataloguePublication publication, JsonElement snapshot)
     {
         var revision = SnapshotRevision(snapshot);
+        if (TenantCatalogueCategorySnapshot.IsCategorySnapshot(snapshot))
+        {
+            var category = TenantCatalogueCategorySnapshot.Read(snapshot, revision);
+            var categoryItems = category.Items.ToList();
+            var selection = new TenantCatalogueBindingSelection(category.SourceRevision, category.Language,
+                category.SelectedCategoryIds, category.ItemOverrides, category.Categories);
+            return Verify(publication, CopyConfigured(revision, publication.ProviderHash, categoryItems, selection));
+        }
         var items = SnapshotItems(snapshot);
-        var result = CopyConfigured(revision, publication.ProviderHash, items);
+        return Verify(publication, CopyConfigured(revision, publication.ProviderHash, items));
+    }
+
+    private static TenantStoreBinding Verify(CataloguePublication publication, TenantStoreBinding result)
+    {
         if (CatalogueMenuPlanner.MappingHash(result) != publication.MappingHash) throw Unconfirmed();
         return result;
     }
@@ -68,8 +80,11 @@ public sealed class CatalogueMappingResolver(IOptions<TenantBridgeSettings> sett
         return items;
     }
 
-    private TenantStoreBinding CopyConfigured(string revision, string? providerHash, List<TenantItemMapping> items)
-        => new()
+    private TenantStoreBinding CopyConfigured(string revision, string? providerHash, List<TenantItemMapping> items,
+        TenantCatalogueBindingSelection? selection = null)
+    {
+        var categories = selection?.Categories ?? [];
+        return new TenantStoreBinding
         {
             StoreId = Configured.StoreId,
             TenantId = Configured.TenantId,
@@ -79,7 +94,40 @@ public sealed class CatalogueMappingResolver(IOptions<TenantBridgeSettings> sett
             Currency = Configured.Currency,
             CatalogueRevision = revision,
             PublishedMenuHash = providerHash ?? throw Unconfirmed(),
-            Items = items
+            SourceRevision = selection?.SourceRevision ?? string.Empty,
+            Language = selection?.Language ?? string.Empty,
+            SelectedCategoryIds = selection?.SelectedCategoryIds.ToList() ?? [],
+            ItemOverrides = selection?.ItemOverrides.Select(CloneOverride).ToList() ?? [],
+            Items = items,
+            Categories = categories.Select(CloneCategory).ToList()
+        };
+    }
+
+    private static TenantItemMappingOverride CloneOverride(TenantItemMappingOverride row)
+        => new()
+        {
+            ProductId = row.ProductId,
+            VariationId = row.VariationId,
+            CategoryId = row.CategoryId,
+            Selected = row.Selected,
+            SelectionKey = row.SelectionKey,
+            SourceFingerprint = row.SourceFingerprint,
+            Supported = row.Supported
+        };
+
+    private static TenantCategoryMapping CloneCategory(TenantCategoryMapping row)
+        => new()
+        {
+            CategoryId = row.CategoryId,
+            ProviderCategoryId = row.ProviderCategoryId,
+            Name = row.Name,
+            DisplayOrder = row.DisplayOrder,
+            Active = row.Active,
+            TotalItemCount = row.TotalItemCount,
+            SupportedItemCount = row.SupportedItemCount,
+            UnsupportedItemCount = row.UnsupportedItemCount,
+            SelectedItemCount = row.SelectedItemCount,
+            SelectedUnsupportedItemCount = row.SelectedUnsupportedItemCount
         };
 
     private static TenantItemMapping Item(JsonElement row)

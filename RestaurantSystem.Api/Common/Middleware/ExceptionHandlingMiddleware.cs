@@ -67,9 +67,10 @@ public class ExceptionHandlingMiddleware
                 reasons = badRequestEx.Errors?.ToList();
                 break;
 
-            case ConflictException:
+            case ConflictException conflictEx:
                 statusCode = HttpStatusCode.Conflict;
                 message = exception.Message;
+                errorCode = conflictEx.ErrorCode;
                 break;
 
             case NotFoundException notFoundEx:

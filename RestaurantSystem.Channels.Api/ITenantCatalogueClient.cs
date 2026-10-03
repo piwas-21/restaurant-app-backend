@@ -1,12 +1,13 @@
-using System.Text.Json;
-
 namespace RestaurantSystem.Channels.Api;
-
-public sealed record TenantCatalogueSnapshot(string Revision, IReadOnlyList<TenantCatalogueItem> Items);
-public sealed record TenantCatalogueItem(Guid ProductId, Guid? VariationId, string Name, string Description,
-    string? VariationName, int? PriceMinor, bool Available, string BlockReason);
 
 public interface ITenantCatalogueClient
 {
     Task<TenantCatalogueSnapshot> Read(TenantStoreBinding store, CancellationToken cancellationToken);
+    Task<TenantCatalogueCategories> Categories(TenantStoreBinding store, string expectedSourceRevision,
+        IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemReference> itemReferences,
+        IReadOnlyList<TenantCatalogueItemOverride> overrides,
+        CancellationToken cancellationToken);
+    Task<TenantCatalogueSelection> ReadSelection(TenantStoreBinding store, string expectedSourceRevision,
+        IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemOverride> overrides,
+        CancellationToken cancellationToken);
 }

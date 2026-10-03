@@ -28,7 +28,7 @@ public sealed class TenantManagementGatewayMiddleware(RequestDelegate next)
         }
         context.Items[ActorContextKey] = actorId;
         try { await next(context); }
-        catch (ChannelConsoleException ex) { await Error(context, ex.Status, ex.Message); }
+        catch (ChannelConsoleException ex) { await Error(context, ex.Status, ex.Message, ex.ErrorCode); }
         catch (NpgsqlException) { await Error(context, 503, "Tenant management storage is unavailable. Refresh status before retrying."); }
         catch (CryptographicException) { await Error(context, 503, "Tenant management protection failed. Contact the administrator."); }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { context.Abort(); }
@@ -52,10 +52,11 @@ public sealed class TenantManagementGatewayMiddleware(RequestDelegate next)
         return true;
     }
 
-    private static async Task Error(HttpContext context, int status, string message)
+    private static async Task Error(HttpContext context, int status, string message, string? errorCode = null)
     {
         if (context.Response.HasStarted) return;
         context.Response.StatusCode = status;
-        await context.Response.WriteAsJsonAsync(new { message }, context.RequestAborted);
+        if (errorCode is null) await context.Response.WriteAsJsonAsync(new { message }, context.RequestAborted);
+        else await context.Response.WriteAsJsonAsync(new { message, errorCode }, context.RequestAborted);
     }
 }

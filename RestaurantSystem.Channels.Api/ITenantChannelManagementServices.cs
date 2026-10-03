@@ -10,6 +10,8 @@ public interface ITenantChannelSummaryService
 public interface ITenantChannelCatalogueService
 {
     Task<JsonElement> Catalogue(CancellationToken cancellationToken);
+    Task<JsonElement> CatalogueCategories(CancellationToken cancellationToken);
+    Task<JsonElement> CheckCategorySelection(TenantManagementCategoryChangesRequest request, CancellationToken cancellationToken);
     Task<JsonElement> SaveDraft(TenantManagementDraftRequest request, Guid actorId, CancellationToken cancellationToken);
     Task<JsonElement> Preview(TenantManagementPreviewRequest request, Guid actorId, CancellationToken cancellationToken);
     Task<JsonElement> Publish(TenantManagementPublishRequest request, Guid actorId, CancellationToken cancellationToken);

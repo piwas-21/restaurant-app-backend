@@ -1,107 +1,84 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.DeliveryChannels.Dtos;
 using RestaurantSystem.Api.Features.DeliveryChannels.Services;
+using RestaurantSystem.Api.Features.DeliveryChannels.Queries.GetChannelCatalogueCategoriesQuery;
 using RestaurantSystem.Api.Settings;
-using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.DeliveryChannels.Queries.GetChannelCatalogueCandidatesQuery;
 
-public sealed record GetChannelCatalogueCandidatesQuery(string Search = "", string Cursor = "", string Language = "en")
-    : IQuery<ChannelCatalogueCandidatesDto>;
+public sealed record GetChannelCatalogueCandidatesQuery(string Search = "", string Cursor = "",
+    string Language = "", Guid? CategoryId = null, string SourceRevision = "") : IQuery<ChannelCatalogueCandidatesDto>;
 
-public sealed class GetChannelCatalogueCandidatesQueryHandler(ApplicationDbContext context,
-    IChannelCatalogueReader catalogue, IOptions<DeliveryChannelSettings> options)
+public sealed class GetChannelCatalogueCandidatesQueryHandler(IChannelCatalogueInventoryReader inventory,
+    IOptions<DeliveryChannelSettings> options, IEmailLanguageResolver languages)
     : IQueryHandler<GetChannelCatalogueCandidatesQuery, ChannelCatalogueCandidatesDto>
 {
     private const int PageSize = 50;
     private const int MaximumOffset = 100_000;
     private const int MaximumSearchLength = 100;
 
-    public async Task<ChannelCatalogueCandidatesDto> Handle(GetChannelCatalogueCandidatesQuery query, CancellationToken cancellationToken)
+    public async Task<ChannelCatalogueCandidatesDto> Handle(GetChannelCatalogueCandidatesQuery query,
+        CancellationToken cancellationToken)
     {
-        var offset = Offset(query.Cursor);
+        var language = query.Language.Length == 0 ? languages.TenantDefault : query.Language;
         var search = query.Search.Trim();
         if (search.Length > MaximumSearchLength || search.Any(char.IsControl)
-            || query.Language is not ("en" or "nl" or "fr" or "de" or "tr" or "ar"))
+            || language is not ("en" or "nl" or "fr" or "de" or "tr" or "ar"))
             throw new BadRequestException("Select a supported language and a search of up to 100 characters.");
-        var bindings = options.Value.Stores.Where(row => row.Provider == "uber-eats" && row.IsSandbox).ToArray();
-        if (!options.Value.Enabled || bindings.Length != 1)
-            throw new ForbiddenException("This marketplace store is not enabled for this tenant.");
-        var binding = bindings[0];
-        var currency = await context.RestaurantInfo.AsNoTracking().Select(row => row.Currency).SingleAsync(cancellationToken);
-        if (currency != binding.Currency) throw new BadRequestException("Marketplace and tenant currency must match.");
-
-        // Page the flattened identities in SQL, so a product with many variations cannot expand an unbounded page.
-        var products = context.Products.AsNoTracking().Where(row => !row.IsComponent);
-        var candidates = products.Select(row => new
-        {
-            ProductId = row.Id,
-            VariationId = (Guid?)null,
-            Name = row.Descriptions.Where(text => text.Lang == query.Language).Select(text => text.Name).FirstOrDefault() ?? row.Name,
-            VariationName = (string?)null
-        })
-            .Concat(products.SelectMany(row => row.Variations.Where(variation => variation.IsActive), (row, variation) =>
-                new
-                {
-                    ProductId = row.Id,
-                    VariationId = (Guid?)variation.Id,
-                    Name = row.Descriptions.Where(text => text.Lang == query.Language).Select(text => text.Name).FirstOrDefault() ?? row.Name,
-                    VariationName = (string?)(variation.Descriptions.Where(text => text.LanguageCode == query.Language).Select(text => text.Name).FirstOrDefault() ?? variation.Name)
-                }));
-        if (search.Length > 0)
-        {
-            var pattern = "%" + search.Replace("\\", "\\\\", StringComparison.Ordinal)
-                .Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
-            candidates = candidates.Where(row => EF.Functions.ILike(row.Name, pattern, "\\")
-                || row.VariationName != null && EF.Functions.ILike(row.VariationName, pattern, "\\"));
-        }
-        var page = await candidates.OrderBy(row => row.ProductId).ThenBy(row => row.VariationId)
-            .Skip(offset).Take(PageSize + 1).ToArrayAsync(cancellationToken);
-        var selected = page.Take(PageSize).ToArray();
-        if (selected.Length == 0) return new(currency, query.Language, null, []);
-        var snapshot = await catalogue.Read(new()
-        {
-            Provider = binding.Provider,
-            StoreId = binding.StoreId,
-            Currency = currency,
-            IsSandbox = true,
-            Language = query.Language,
-            Items = selected.Select(row => new ChannelAvailabilitySelection(row.ProductId, row.VariationId)).ToList()
-        }, cancellationToken);
-        var byIdentity = snapshot.Items.ToDictionary(row => (row.ProductId, row.VariationId));
-        var items = selected.Select(row =>
-        {
-            var item = byIdentity[(row.ProductId, row.VariationId)];
-            return new ChannelCatalogueCandidateDto(row.ProductId, row.VariationId,
-                item.Name.Length > 0 ? item.Name : row.Name, item.VariationName ?? row.VariationName,
-                item.PriceMinor, item.Available, item.BlockReason.Length == 0, item.BlockReason);
-        }).ToArray();
-        return new(currency, query.Language, page.Length > PageSize ? Cursor(offset + PageSize) : null, items);
+        var binding = ChannelCatalogueBinding.Require(options.Value);
+        var source = await inventory.Read(binding.Provider, binding.StoreId, binding.Currency, true, language, cancellationToken);
+        var cursor = ReadCursor(query.Cursor, search, query.CategoryId, source.Revision, query.SourceRevision);
+        var rows = source.Items.Where(row => (!query.CategoryId.HasValue || row.CategoryId == query.CategoryId)
+                && (search.Length == 0 || row.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                    || row.VariationName?.Contains(search, StringComparison.OrdinalIgnoreCase) == true))
+            .OrderBy(row => row.CategoryDisplayOrder ?? int.MaxValue).ThenBy(row => row.CategoryId)
+            .ThenBy(row => row.ItemDisplayOrder).ThenBy(row => row.ProductId).ThenBy(row => row.VariationId)
+            .Skip(cursor.Offset).Take(PageSize + 1).ToArray();
+        var items = rows.Take(PageSize).Select(row => new ChannelCatalogueCandidateDto(row.ProductId, row.VariationId,
+            row.Name, row.VariationName, row.PriceMinor, row.Available, row.Supported, row.BlockReason,
+            row.SelectionKey, row.CategoryId, row.CategoryName, row.CategoryDisplayOrder, row.ItemDisplayOrder)).ToArray();
+        var next = rows.Length > PageSize ? Cursor(cursor.Offset + PageSize, search, query.CategoryId, source.Revision) : null;
+        return new(source.Currency, source.Language, next, items, source.Revision);
     }
 
-    private static int Offset(string cursor)
+    private static CursorData ReadCursor(string cursor, string search, Guid? categoryId,
+        string sourceRevision, string requestedRevision)
     {
-        if (cursor.Length == 0) return 0;
+        if (cursor.Length == 0)
+        {
+            if (requestedRevision.Length > 0 && requestedRevision != sourceRevision) throw Changed();
+            return new(0);
+        }
         try
         {
-            if (cursor.Length > 32) throw InvalidCursor();
-            var decoded = System.Text.Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(cursor));
-            if (!int.TryParse(decoded, NumberStyles.None, CultureInfo.InvariantCulture, out var offset)
-                || offset < 0 || offset > MaximumOffset || offset % PageSize != 0 || Cursor(offset) != cursor)
+            if (cursor.Length > 512) throw InvalidCursor();
+            var json = System.Text.Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(cursor));
+            var data = JsonSerializer.Deserialize<CursorData>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (data is null || data.Offset < 0 || data.Offset > MaximumOffset || data.Offset % PageSize != 0
+                || data.Search != search || data.CategoryId != categoryId || !Revision(data.SourceRevision)
+                || Cursor(data.Offset, search, categoryId, data.SourceRevision) != cursor)
                 throw InvalidCursor();
-            return offset;
+            if (data.SourceRevision != sourceRevision || requestedRevision.Length > 0 && requestedRevision != sourceRevision)
+                throw Changed();
+            return data;
         }
         catch (FormatException) { throw InvalidCursor(); }
+        catch (JsonException) { throw InvalidCursor(); }
     }
 
-    private static string Cursor(int offset)
-        => WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(offset.ToString(CultureInfo.InvariantCulture)));
+    private static string Cursor(int offset, string search, Guid? categoryId, string sourceRevision)
+        => WebEncoders.Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new CursorData(offset, search, categoryId, sourceRevision),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
     private static BadRequestException InvalidCursor() => new("Refresh the product search to start a valid page.");
-
+    private static ConflictException Changed() => new("The tenant catalogue changed. Refresh categories and restart this search.", "SourceRevisionChanged");
+    private static bool Revision(string value)
+        => value.Length == 64 && value.All(char.IsAsciiHexDigitLower);
+    private sealed record CursorData(int Offset, string Search = "", Guid? CategoryId = null, string SourceRevision = "");
 }
