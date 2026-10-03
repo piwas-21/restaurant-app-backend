@@ -62,6 +62,11 @@ public sealed class AccountPaymentCompatibilityTests(DatabaseFixture fixture) : 
         await using var transaction = await context.Database.BeginTransactionAsync();
         await TableServiceSessionRowLock.LoadAsync(context, id, CancellationToken.None);
         await AccountPaymentLedgerGuard.RequireLegacyCollectionAsync(context, id, CancellationToken.None);
+        var persistedState = await context.AccountPaymentAttempts
+            .Where(value => value.ServiceSessionId == id)
+            .Select(value => value.State)
+            .SingleAsync();
+        persistedState.Should().Be(state);
     }
 
     [Theory]

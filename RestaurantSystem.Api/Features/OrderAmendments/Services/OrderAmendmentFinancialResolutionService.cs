@@ -22,15 +22,8 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (supplement is null && changes.All(change => change.Kind == OrderAmendmentChangeKind.InstructionChange))
-        {
-            return Task.FromResult(new OrderAmendmentFinancialPreviewDto(
-                null, 0, 0, 0, 0,
-                OrderAmendmentFinancialResolutionStatus.NotRequired,
-                OrderAmendmentCreditState.None,
-                OrderAmendmentLoyaltyState.None,
-                OrderAmendmentRefundState.None));
-        }
+        if (IsInstructionOnly(changes, supplement))
+            return Task.FromResult(CreateInstructionOnlyPreview());
 
         var currencyLabel = source.ServiceSession?.Currency ?? _currencyResolver.Resolve(source);
         var currency = CheckoutAmount.From(1m, currencyLabel).Currency.ToUpperInvariant();
@@ -47,30 +40,61 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         var hasCredit = removed > 0;
         var hasLoyalty = hasCredit
             && (source.FidelityPointsEarned > 0 || source.FidelityPointsRedeemed > 0);
-        var refundState = OrderAmendmentRefundState.None;
-        if (hasCredit && hasCapturedOrUnattributedTender)
-        {
-            refundState = captured.Any(TenderCustody.IsHeldByGateway)
-                ? OrderAmendmentRefundState.GatewayRefundRequired
-                : captured.Count > 0
-                    ? OrderAmendmentRefundState.PendingTillRefund
-                    : OrderAmendmentRefundState.CustodianReviewRequired;
-        }
-        var creditState = OrderAmendmentCreditState.None;
-        if (hasCredit)
-            creditState = !hasCapturedOrUnattributedTender
-                ? OrderAmendmentCreditState.BalanceReduction
-                : OrderAmendmentCreditState.PendingAllocationReview;
-        var loyaltyState = hasLoyalty
-            ? OrderAmendmentLoyaltyState.PendingReview
-            : OrderAmendmentLoyaltyState.None;
-        var status = !hasCredit
-            ? OrderAmendmentFinancialResolutionStatus.NotRequired
-            : OrderAmendmentFinancialResolutionStatus.Pending;
+        var states = ResolveStates(hasCredit, hasLoyalty, hasCapturedOrUnattributedTender, captured);
 
         return Task.FromResult(new OrderAmendmentFinancialPreviewDto(
             currency, added, removed, checked(added - removed), removed,
-            status, creditState, loyaltyState, refundState));
+            states.Status, states.Credit, states.Loyalty, states.Refund));
+    }
+
+    private static bool IsInstructionOnly(
+        IReadOnlyList<OrderAmendmentChangeSnapshot> changes, Order? supplement) =>
+        supplement is null && changes.All(change => change.Kind == OrderAmendmentChangeKind.InstructionChange);
+
+    private static OrderAmendmentFinancialPreviewDto CreateInstructionOnlyPreview() => new(
+        null, 0, 0, 0, 0,
+        OrderAmendmentFinancialResolutionStatus.NotRequired,
+        OrderAmendmentCreditState.None,
+        OrderAmendmentLoyaltyState.None,
+        OrderAmendmentRefundState.None);
+
+    private static ResolutionStates ResolveStates(
+        bool hasCredit,
+        bool hasLoyalty,
+        bool hasCapturedOrUnattributedTender,
+        IReadOnlyList<OrderPayment> captured)
+    {
+        var refund = DetermineRefundState(hasCredit, hasCapturedOrUnattributedTender, captured);
+        var credit = DetermineCreditState(hasCredit, hasCapturedOrUnattributedTender);
+        var loyalty = hasLoyalty ? OrderAmendmentLoyaltyState.PendingReview : OrderAmendmentLoyaltyState.None;
+        var status = hasCredit
+            ? OrderAmendmentFinancialResolutionStatus.Pending
+            : OrderAmendmentFinancialResolutionStatus.NotRequired;
+        return new(status, credit, loyalty, refund);
+    }
+
+    private static OrderAmendmentRefundState DetermineRefundState(
+        bool hasCredit,
+        bool hasCapturedOrUnattributedTender,
+        IReadOnlyList<OrderPayment> captured)
+    {
+        if (!hasCredit || !hasCapturedOrUnattributedTender)
+            return OrderAmendmentRefundState.None;
+        if (captured.Any(TenderCustody.IsHeldByGateway))
+            return OrderAmendmentRefundState.GatewayRefundRequired;
+        if (captured.Count > 0)
+            return OrderAmendmentRefundState.PendingTillRefund;
+        return OrderAmendmentRefundState.CustodianReviewRequired;
+    }
+
+    private static OrderAmendmentCreditState DetermineCreditState(
+        bool hasCredit, bool hasCapturedOrUnattributedTender)
+    {
+        if (!hasCredit)
+            return OrderAmendmentCreditState.None;
+        if (!hasCapturedOrUnattributedTender)
+            return OrderAmendmentCreditState.BalanceReduction;
+        return OrderAmendmentCreditState.PendingAllocationReview;
     }
 
     public Task StageAsync(
@@ -162,4 +186,10 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
 
     private static long ToMinor(decimal amount) => checked(decimal.ToInt64(
         decimal.Round(amount, 2, MidpointRounding.AwayFromZero) * MinorUnitsPerMajor));
+
+    private sealed record ResolutionStates(
+        OrderAmendmentFinancialResolutionStatus Status,
+        OrderAmendmentCreditState Credit,
+        OrderAmendmentLoyaltyState Loyalty,
+        OrderAmendmentRefundState Refund);
 }

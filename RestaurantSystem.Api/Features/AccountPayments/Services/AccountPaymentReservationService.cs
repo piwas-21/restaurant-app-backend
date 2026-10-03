@@ -32,11 +32,7 @@ public sealed class AccountPaymentReservationService(
         Guid sessionId, Guid operationId, ReserveAccountPaymentRequest request,
         CancellationToken cancellationToken)
     {
-        if (!features.TableAccountPaymentsV1)
-            throw new NotFoundException("Table account payments are not enabled.");
-        ValidateRouteAndVersion(sessionId, operationId, request.ExpectedVersion);
-        if (request.ExpectedAccountRevision <= 0)
-            throw new BadRequestException("A positive account revision is required.");
+        ValidateReservationRequest(sessionId, operationId, request);
         var actor = actors.ResolveStaffActor();
         await using var transaction = await AccountPaymentTransaction.BeginAsync(context, cancellationToken);
         try
@@ -45,43 +41,16 @@ public sealed class AccountPaymentReservationService(
                 ?? throw new NotFoundException("Table account was not found.");
             var attempt = await LoadLockedAttemptAsync(sessionId, operationId, cancellationToken);
             RequireOwner(attempt, sessionId, actor);
-            if (attempt.State == AccountPaymentState.Reserved
-                && attempt.Version == (long)request.ExpectedVersion + 1L
-                && attempt.ExpectedAccountRevision == request.ExpectedAccountRevision)
+            if (IsReservationReplay(attempt, request))
             {
                 await transaction.CommitAsync(cancellationToken);
                 return AccountPaymentSnapshots.ToOperation(attempt);
             }
-            if (session.Status != TableServiceSessionStatus.Open)
-                throw new ConflictException("A closed table visit cannot accept a payment reservation.");
-            if (attempt.State != AccountPaymentState.Quoted || attempt.Version != request.ExpectedVersion)
-                throw new ConflictException("The payment quote changed. Refresh it before reserving.");
-            if (attempt.ExpectedAccountRevision != request.ExpectedAccountRevision
-                || session.AccountRevision != attempt.ExpectedAccountRevision)
-                throw new ConflictException("The account changed. Refresh the account before reserving.");
+            ValidateQuotedReservation(session, attempt, request);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            if (attempt.QuoteExpiresAt <= now)
-                throw new ConflictException("The payment quote expired. Review a new quote before reserving.");
-            if (attempt.EqualSharePlanId is Guid planId)
-            {
-                var plan = await context.AccountEqualSharePlans.SingleOrDefaultAsync(
-                    value => value.Id == planId && value.ServiceSessionId == sessionId, cancellationToken)
-                    ?? throw new ConflictException("The equal-share plan requires reconciliation.");
-                if (plan.InvalidatedAt is not null)
-                    throw new ConflictException("The equal-share plan was superseded before reservation.");
-                if (attempt.EqualShareOrdinal is not int ordinal || ordinal < 1 || ordinal > plan.ShareCount)
-                    throw new ConflictException("The equal-share position requires reconciliation.");
-                var claimed = await context.AccountPaymentAttempts.AnyAsync(value =>
-                    value.Id != attempt.Id && value.EqualSharePlanId == planId
-                    && value.EqualShareOrdinal == ordinal && ClaimedEqualShareStates.Contains(value.State),
-                    cancellationToken);
-                if (claimed)
-                {
-                    throw new ConflictException(
-                        "This equal-share position already has a reserved or captured contribution.");
-                }
-            }
+            RequireUnexpiredQuote(attempt.QuoteExpiresAt, now);
+            await ValidateEqualShareSlotAsync(attempt, sessionId, cancellationToken);
 
             var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
             var segments = ReadSegments(attempt);
@@ -89,12 +58,7 @@ public sealed class AccountPaymentReservationService(
                 throw new ConflictException("The payment quote requires reconciliation before reservation.");
             AccountDebtMath.Subtract(account.Debt.Available, segments);
 
-            attempt.State = AccountPaymentState.Reserved;
-            attempt.ReservedAt = now;
-            attempt.ReservationExpiresAt = now.AddMinutes(options.Value.ReservationLifetimeMinutes);
-            attempt.Version++;
-            attempt.UpdatedAt = now;
-            attempt.UpdatedBy = actor.AuditIdentifier;
+            MarkReserved(attempt, now, actor.AuditIdentifier);
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return AccountPaymentSnapshots.ToOperation(attempt);
@@ -103,6 +67,73 @@ public sealed class AccountPaymentReservationService(
         {
             throw new ConflictException("The payment quote changed while it was being reserved.", exception);
         }
+    }
+
+    private void ValidateReservationRequest(
+        Guid sessionId, Guid operationId, ReserveAccountPaymentRequest request)
+    {
+        if (!features.TableAccountPaymentsV1)
+            throw new NotFoundException("Table account payments are not enabled.");
+        ValidateRouteAndVersion(sessionId, operationId, request.ExpectedVersion);
+        if (request.ExpectedAccountRevision <= 0)
+            throw new BadRequestException("A positive account revision is required.");
+    }
+
+    private static bool IsReservationReplay(
+        AccountPaymentAttempt attempt, ReserveAccountPaymentRequest request) =>
+        attempt.State == AccountPaymentState.Reserved
+        && attempt.Version == (long)request.ExpectedVersion + 1L
+        && attempt.ExpectedAccountRevision == request.ExpectedAccountRevision;
+
+    private static void ValidateQuotedReservation(
+        TableServiceSession session, AccountPaymentAttempt attempt, ReserveAccountPaymentRequest request)
+    {
+        if (session.Status != TableServiceSessionStatus.Open)
+            throw new ConflictException("A closed table visit cannot accept a payment reservation.");
+        if (attempt.State != AccountPaymentState.Quoted || attempt.Version != request.ExpectedVersion)
+            throw new ConflictException("The payment quote changed. Refresh it before reserving.");
+        if (attempt.ExpectedAccountRevision != request.ExpectedAccountRevision
+            || session.AccountRevision != attempt.ExpectedAccountRevision)
+            throw new ConflictException("The account changed. Refresh the account before reserving.");
+    }
+
+    private static void RequireUnexpiredQuote(DateTime expiresAt, DateTime now)
+    {
+        if (expiresAt <= now)
+            throw new ConflictException("The payment quote expired. Review a new quote before reserving.");
+    }
+
+    private async Task ValidateEqualShareSlotAsync(
+        AccountPaymentAttempt attempt, Guid sessionId, CancellationToken cancellationToken)
+    {
+        if (attempt.EqualSharePlanId is not Guid planId)
+            return;
+        var plan = await context.AccountEqualSharePlans.SingleOrDefaultAsync(
+            value => value.Id == planId && value.ServiceSessionId == sessionId, cancellationToken)
+            ?? throw new ConflictException("The equal-share plan requires reconciliation.");
+        if (plan.InvalidatedAt is not null)
+            throw new ConflictException("The equal-share plan was superseded before reservation.");
+        if (attempt.EqualShareOrdinal is not int ordinal || ordinal < 1 || ordinal > plan.ShareCount)
+            throw new ConflictException("The equal-share position requires reconciliation.");
+        if (await IsEqualShareSlotClaimedAsync(attempt.Id, planId, ordinal, cancellationToken))
+            throw new ConflictException("This equal-share position already has a reserved or captured contribution.");
+    }
+
+    private Task<bool> IsEqualShareSlotClaimedAsync(
+        Guid attemptId, Guid planId, int ordinal, CancellationToken cancellationToken) =>
+        context.AccountPaymentAttempts.AnyAsync(value =>
+            value.Id != attemptId && value.EqualSharePlanId == planId
+            && value.EqualShareOrdinal == ordinal && ClaimedEqualShareStates.Contains(value.State),
+            cancellationToken);
+
+    private void MarkReserved(AccountPaymentAttempt attempt, DateTime now, string audit)
+    {
+        attempt.State = AccountPaymentState.Reserved;
+        attempt.ReservedAt = now;
+        attempt.ReservationExpiresAt = now.AddMinutes(options.Value.ReservationLifetimeMinutes);
+        attempt.Version++;
+        attempt.UpdatedAt = now;
+        attempt.UpdatedBy = audit;
     }
 
     public async Task<AccountPaymentOperationDto> ReleaseAsync(

@@ -21,15 +21,7 @@ public sealed class AccountEqualSharePlanService(
     public async Task<AccountEqualSharePlanDto> CreateAsync(
         Guid sessionId, CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken)
     {
-        if (!features.TableAccountPaymentsV1)
-            throw new NotFoundException("Table account payments are not enabled.");
-        if (sessionId == Guid.Empty || request.OperationId == Guid.Empty
-            || request.ExpectedAccountRevision <= 0)
-            throw new BadRequestException("A valid table visit, operation and account revision are required.");
-        if (request.ShareCount < 2 || request.ShareCount > options.Value.MaximumEqualShares)
-            throw new BadRequestException("The equal-share count is outside the configured limit.");
-        if (request.SupersedesPlanId == Guid.Empty)
-            throw new BadRequestException("The superseded plan id is invalid.");
+        ValidateCreateRequest(sessionId, request);
 
         var actor = actors.ResolveStaffActor();
         var hash = AccountPaymentRequestRules.PlanHash(sessionId, request);
@@ -63,33 +55,11 @@ public sealed class AccountEqualSharePlanService(
             var account = await new AccountDebtSnapshotReader(context).ReadAsync(sessionId, cancellationToken);
             var scope = account.Debt.Available;
             var total = AccountDebtMath.Total(scope);
-            if (scope.Count == 0 || total < request.ShareCount)
-                throw new BadRequestException("Every reviewed share must contain at least one minor unit.");
-            if (scope.Count > options.Value.MaximumScopeSegments)
-                throw new BadRequestException("The equal-share scope exceeds the configured segment limit.");
+            ValidateScope(scope, total, request.ShareCount);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            var plan = new AccountEqualSharePlan
-            {
-                Id = Guid.NewGuid(),
-                ServiceSessionId = sessionId,
-                OperationId = request.OperationId,
-                AccountRevision = request.ExpectedAccountRevision,
-                TotalMinor = total,
-                ShareCount = request.ShareCount,
-                Currency = account.Money.Currency,
-                PayloadHash = hash,
-                ScopeJson = AccountPaymentSnapshots.Serialize(scope),
-                SupersedesPlanId = request.SupersedesPlanId,
-                CreatedAt = now,
-                CreatedBy = actor.AuditIdentifier
-            };
-            if (superseded is not null)
-            {
-                superseded.InvalidatedAt = now;
-                superseded.UpdatedAt = now;
-                superseded.UpdatedBy = actor.AuditIdentifier;
-            }
+            var plan = CreatePlan(sessionId, request, account.Money.Currency, total, scope, hash, now, actor);
+            InvalidateSupersededPlan(superseded, now, actor);
             context.AccountEqualSharePlans.Add(plan);
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -103,6 +73,61 @@ public sealed class AccountEqualSharePlanService(
         {
             throw AccountPaymentWriteErrors.OperationKeyConflict(exception);
         }
+    }
+
+    private void ValidateCreateRequest(Guid sessionId, CreateAccountEqualSharePlanRequest request)
+    {
+        if (!features.TableAccountPaymentsV1)
+            throw new NotFoundException("Table account payments are not enabled.");
+        if (sessionId == Guid.Empty || request.OperationId == Guid.Empty
+            || request.ExpectedAccountRevision <= 0)
+            throw new BadRequestException("A valid table visit, operation and account revision are required.");
+        if (request.ShareCount < 2 || request.ShareCount > options.Value.MaximumEqualShares)
+            throw new BadRequestException("The equal-share count is outside the configured limit.");
+        if (request.SupersedesPlanId == Guid.Empty)
+            throw new BadRequestException("The superseded plan id is invalid.");
+    }
+
+    private void ValidateScope(IReadOnlyList<AccountDebtSegment> scope, long total, int shareCount)
+    {
+        if (scope.Count == 0 || total < shareCount)
+            throw new BadRequestException("Every reviewed share must contain at least one minor unit.");
+        if (scope.Count > options.Value.MaximumScopeSegments)
+            throw new BadRequestException("The equal-share scope exceeds the configured segment limit.");
+    }
+
+    private static AccountEqualSharePlan CreatePlan(
+        Guid sessionId,
+        CreateAccountEqualSharePlanRequest request,
+        string currency,
+        long total,
+        IReadOnlyList<AccountDebtSegment> scope,
+        string hash,
+        DateTime now,
+        AccountPaymentActor actor) => new()
+        {
+            Id = Guid.NewGuid(),
+            ServiceSessionId = sessionId,
+            OperationId = request.OperationId,
+            AccountRevision = request.ExpectedAccountRevision,
+            TotalMinor = total,
+            ShareCount = request.ShareCount,
+            Currency = currency,
+            PayloadHash = hash,
+            ScopeJson = AccountPaymentSnapshots.Serialize(scope),
+            SupersedesPlanId = request.SupersedesPlanId,
+            CreatedAt = now,
+            CreatedBy = actor.AuditIdentifier
+        };
+
+    private static void InvalidateSupersededPlan(
+        AccountEqualSharePlan? superseded, DateTime now, AccountPaymentActor actor)
+    {
+        if (superseded is null)
+            return;
+        superseded.InvalidatedAt = now;
+        superseded.UpdatedAt = now;
+        superseded.UpdatedBy = actor.AuditIdentifier;
     }
 
     private async Task<AccountEqualSharePlan?> FindSupersededPlanAsync(

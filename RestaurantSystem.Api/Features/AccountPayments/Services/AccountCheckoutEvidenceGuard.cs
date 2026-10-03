@@ -49,43 +49,91 @@ internal static class AccountCheckoutEvidenceGuard
         var clearedIntentIds = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var checkout in checkouts)
-        {
-            if (checkout.ReconciledAt.HasValue && checkout.LastError is not null)
-                throw NeedsReconciliation();
-            if (!Enum.IsDefined(checkout.Status))
-                throw NeedsReconciliation();
-            if (checkout.Status == CheckoutSessionStatus.Created)
-                throw new ConflictException("A Stripe checkout is still active for this table account.");
-            if (checkout.Status != CheckoutSessionStatus.Completed)
-            {
-                if (checkout.OrderPaymentId is Guid terminalPaymentId
-                    && payments.TryGetValue(terminalPaymentId, out var terminalPayment)
-                    && terminalPayment.Status.IsCaptured())
-                    throw NeedsReconciliation();
-                continue;
-            }
+            ValidateCheckout(checkout, ordersById, payments, money, clearedPaymentIds, clearedIntentIds);
 
-            if (!checkout.ReconciledAt.HasValue || checkout.LastError is not null
-                || checkout.OrderPaymentId is not Guid paymentId
-                || !ordersById.TryGetValue(checkout.OrderId, out var order)
-                || !payments.TryGetValue(paymentId, out var payment)
-                || !IsCanonicalIdentity(checkout)
-                || payment.OrderId != order.Id
-                || payment.PaymentMethod != PaymentMethod.OnlinePayment
-                || !payment.Status.IsCaptured()
-                || !string.Equals(payment.PaymentGateway, "Stripe", StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(payment.TransactionId, checkout.PaymentIntentId, StringComparison.Ordinal)
-                || !string.Equals(checkout.Currency, money.Currency, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(payment.Currency, checkout.Currency, StringComparison.OrdinalIgnoreCase)
-                || checkout.AmountMinor <= 0
-                || checkout.AmountReceivedMinor != checkout.AmountMinor
-                || ToMinorOrReconcile(money, payment.Amount) != checkout.AmountMinor
-                || !clearedPaymentIds.Add(payment.Id)
-                || !clearedIntentIds.Add(checkout.PaymentIntentId!))
-                throw NeedsReconciliation();
+        ValidateUnmatchedCapturedPayments(payments.Values, attempts, money, clearedPaymentIds);
+    }
+
+    private static void ValidateCheckout(
+        OrderCheckoutSession checkout,
+        IReadOnlyDictionary<Guid, Order> ordersById,
+        IReadOnlyDictionary<Guid, OrderPayment> payments,
+        AccountMoney money,
+        HashSet<Guid> clearedPaymentIds,
+        HashSet<string> clearedIntentIds)
+    {
+        if (checkout.ReconciledAt.HasValue && checkout.LastError is not null)
+            throw NeedsReconciliation();
+        if (!Enum.IsDefined(checkout.Status))
+            throw NeedsReconciliation();
+        if (checkout.Status == CheckoutSessionStatus.Created)
+            throw new ConflictException("A Stripe checkout is still active for this table account.");
+        if (checkout.Status != CheckoutSessionStatus.Completed)
+        {
+            RejectCapturedPaymentOnUncompletedCheckout(checkout, payments);
+            return;
         }
 
-        foreach (var payment in payments.Values.Where(value => value.PaymentMethod == PaymentMethod.OnlinePayment
+        ValidateCompletedCheckout(checkout, ordersById, payments, money, clearedPaymentIds, clearedIntentIds);
+    }
+
+    private static void RejectCapturedPaymentOnUncompletedCheckout(
+        OrderCheckoutSession checkout, IReadOnlyDictionary<Guid, OrderPayment> payments)
+    {
+        if (checkout.OrderPaymentId is Guid paymentId
+            && payments.TryGetValue(paymentId, out var payment)
+            && payment.Status.IsCaptured())
+            throw NeedsReconciliation();
+    }
+
+    private static void ValidateCompletedCheckout(
+        OrderCheckoutSession checkout,
+        IReadOnlyDictionary<Guid, Order> ordersById,
+        IReadOnlyDictionary<Guid, OrderPayment> payments,
+        AccountMoney money,
+        HashSet<Guid> clearedPaymentIds,
+        HashSet<string> clearedIntentIds)
+    {
+        if (!IsReconciled(checkout)
+            || checkout.OrderPaymentId is not Guid paymentId
+            || !ordersById.TryGetValue(checkout.OrderId, out var order)
+            || !payments.TryGetValue(paymentId, out var payment))
+            throw NeedsReconciliation();
+
+        if (!HasMatchingCapturedPayment(checkout, order, payment)
+            || !HasMatchingCaptureAmounts(checkout, payment, money)
+            || !clearedPaymentIds.Add(payment.Id)
+            || !clearedIntentIds.Add(checkout.PaymentIntentId!))
+            throw NeedsReconciliation();
+    }
+
+    private static bool IsReconciled(OrderCheckoutSession checkout) =>
+        checkout.ReconciledAt.HasValue && checkout.LastError is null;
+
+    private static bool HasMatchingCapturedPayment(
+        OrderCheckoutSession checkout, Order order, OrderPayment payment) =>
+        IsCanonicalIdentity(checkout)
+        && payment.OrderId == order.Id
+        && payment.PaymentMethod == PaymentMethod.OnlinePayment
+        && payment.Status.IsCaptured()
+        && string.Equals(payment.PaymentGateway, "Stripe", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(payment.TransactionId, checkout.PaymentIntentId, StringComparison.Ordinal);
+
+    private static bool HasMatchingCaptureAmounts(
+        OrderCheckoutSession checkout, OrderPayment payment, AccountMoney money) =>
+        string.Equals(checkout.Currency, money.Currency, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(payment.Currency, checkout.Currency, StringComparison.OrdinalIgnoreCase)
+        && checkout.AmountMinor > 0
+        && checkout.AmountReceivedMinor == checkout.AmountMinor
+        && ToMinorOrReconcile(money, payment.Amount) == checkout.AmountMinor;
+
+    private static void ValidateUnmatchedCapturedPayments(
+        IEnumerable<OrderPayment> payments,
+        IReadOnlyList<AccountPaymentAttempt> attempts,
+        AccountMoney money,
+        HashSet<Guid> clearedPaymentIds)
+    {
+        foreach (var payment in payments.Where(value => value.PaymentMethod == PaymentMethod.OnlinePayment
                      && value.Status.IsCaptured()))
         {
             if (clearedPaymentIds.Contains(payment.Id))

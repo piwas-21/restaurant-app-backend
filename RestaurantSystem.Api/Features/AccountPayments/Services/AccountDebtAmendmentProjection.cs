@@ -54,14 +54,34 @@ internal static class AccountDebtAmendmentProjection
 
         if (change.Kind == OrderAmendmentChangeKind.InstructionChange)
         {
-            if (!change.WholeLine || change.StartOrdinal != 0 || change.Quantity != 0
-                || change.Current is null || change.Current.Id != line.Id
-                || change.Previous.Quantity != line.Quantity || change.Current.Quantity != line.Quantity
-                || removedRanges.ContainsKey(key) || !instructionItems.Add(key))
-                throw InvalidAmendment();
+            ValidateInstructionChange(key, line, change, removedRanges, instructionItems);
             return;
         }
 
+        AddRemovedRange(key, line, change, removedRanges, instructionItems);
+    }
+
+    private static void ValidateInstructionChange(
+        (Guid OrderId, Guid ItemId) key,
+        OrderItem line,
+        OrderAmendmentChangeSnapshot change,
+        Dictionary<(Guid OrderId, Guid ItemId), List<(int Start, long End)>> removedRanges,
+        HashSet<(Guid OrderId, Guid ItemId)> instructionItems)
+    {
+        if (!change.WholeLine || change.StartOrdinal != 0 || change.Quantity != 0
+            || change.Current is null || change.Current.Id != line.Id
+            || change.Previous.Quantity != line.Quantity || change.Current.Quantity != line.Quantity
+            || removedRanges.ContainsKey(key) || !instructionItems.Add(key))
+            throw InvalidAmendment();
+    }
+
+    private static void AddRemovedRange(
+        (Guid OrderId, Guid ItemId) key,
+        OrderItem line,
+        OrderAmendmentChangeSnapshot change,
+        Dictionary<(Guid OrderId, Guid ItemId), List<(int Start, long End)>> removedRanges,
+        HashSet<(Guid OrderId, Guid ItemId)> instructionItems)
+    {
         if (change.Kind is not (OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
             || change.WholeLine || change.StartOrdinal < 1 || change.Quantity < 1
             || change.Previous.Quantity != change.Quantity
