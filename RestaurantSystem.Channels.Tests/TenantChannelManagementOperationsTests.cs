@@ -106,10 +106,17 @@ public sealed class TenantChannelManagementOperationsTests
 
         var saveError = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.SaveDraft(
             new(null, []) { ExpectedSourceRevision = new string('b', 64), CategoryIds = null! }, ActorId, default));
+        var nullItemsError = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.SaveDraft(
+            new(null, null!)
+            {
+                ExpectedSourceRevision = new string('b', 64),
+                CategoryIds = [Source.CategoryId]
+            }, ActorId, default));
         var checkError = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.CheckCategorySelection(
             new(new string('b', 64), null!, [], []), default));
 
         Assert.Equal(400, saveError.Status);
+        Assert.Equal(400, nullItemsError.Status);
         Assert.Equal(400, checkError.Status);
     }
 
