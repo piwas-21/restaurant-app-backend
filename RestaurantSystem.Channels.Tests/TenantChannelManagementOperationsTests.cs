@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Channels.Api;
 using RestaurantSystem.Channels.Domain;
@@ -110,6 +111,26 @@ public sealed class TenantChannelManagementOperationsTests
 
         Assert.Equal(400, saveError.Status);
         Assert.Equal(400, checkError.Status);
+    }
+
+    [Fact]
+    public async Task CorruptCategoryDraftWithNullOverrideFailsClosed()
+    {
+        var harness = CreateHarness(categorySelectionEnabled: true);
+        var source = await harness.Operations.CatalogueCategories(default);
+        await harness.Operations.SaveDraft(new(source.GetProperty("draftRevision").GetString(), [])
+        {
+            ExpectedSourceRevision = source.GetProperty("sourceRevision").GetString()!,
+            CategoryIds = [Source.CategoryId]
+        }, ActorId, default);
+        var draft = harness.Drafts.Current!;
+        var corrupt = JsonNode.Parse(draft.Snapshot.GetRawText())!.AsObject();
+        corrupt["itemOverrides"] = new JsonArray((JsonNode?)null);
+        harness.Drafts.Seed(draft with { Snapshot = JsonSerializer.SerializeToElement(corrupt) });
+
+        var error = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.Catalogue(default));
+
+        Assert.Equal(409, error.Status);
     }
 
     [Fact]
@@ -594,6 +615,8 @@ public sealed class TenantChannelManagementOperationsTests
     {
         private CatalogueMappingDraft? _draft;
         public int SaveCount { get; private set; }
+        public CatalogueMappingDraft? Current => _draft;
+        public void Seed(CatalogueMappingDraft draft) => _draft = draft;
         public Task<CatalogueMappingDraft?> Read(AvailabilityBinding binding, CancellationToken cancellationToken) => Task.FromResult(_draft);
         public Task<bool> Save(AvailabilityBinding binding, CatalogueMappingDraft draft, string? expectedRevision, CancellationToken cancellationToken)
         {

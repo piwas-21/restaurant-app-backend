@@ -111,7 +111,7 @@ internal static class TenantCatalogueCategorySnapshot
     private static bool ValidOverrides(TenantCatalogueCategoryDraftSnapshot snapshot, HashSet<Guid> categoryIds)
     {
         var overrides = snapshot.ItemOverrides;
-        if (overrides.Count > TenantCatalogueLimits.MaximumItemOverrides
+        if (overrides.Any(row => row is null) || overrides.Count > TenantCatalogueLimits.MaximumItemOverrides
             || overrides.Select(row => (row.ProductId, row.VariationId)).Distinct().Count() != overrides.Count
             || overrides.Any(row => row.ProductId == Guid.Empty || row.VariationId == Guid.Empty
                 || row.CategoryId is not { } categoryId || !categoryIds.Contains(categoryId)
