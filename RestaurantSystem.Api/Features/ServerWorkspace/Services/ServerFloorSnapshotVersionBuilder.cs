@@ -17,7 +17,8 @@ internal static class ServerFloorSnapshotVersionBuilder
         IEnumerable<FloorOrderRow> orders,
         IReadOnlyDictionary<Guid, ServerFloorReservationDto> reservations,
         DateTimeOffset? nextStateChangeAt,
-        decimal paymentTolerance)
+        decimal paymentTolerance,
+        bool hasUnidentifiedLegacy = false)
     {
         var source = string.Join('|', plans.OrderBy(plan => plan.Id)
                 .Select(plan => $"p:{plan.Id}:{plan.UpdatedAt:O}:{plan.Name}:{plan.WidthMeters}:{plan.HeightMeters}:"
@@ -48,7 +49,7 @@ internal static class ServerFloorSnapshotVersionBuilder
                 .Select(item => $"r:{item.Value.ReservationId}:{item.Key}:{item.Value.CustomerName}:"
                     + $"{item.Value.ReservationDate:O}:{item.Value.Status}:{item.Value.StartTime}:"
                     + $"{item.Value.EndTime}:{item.Value.GuestCount}:{item.Value.IsCurrent}"))
-            + $";next:{nextStateChangeAt:O}";
+            + $";next:{nextStateChangeAt:O};unidentified:{hasUnidentifiedLegacy}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)))[..16];
     }
 

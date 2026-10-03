@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using RestaurantSystem.Domain.Common.Enums;
 
 using RestaurantSystem.Domain.Entities;
@@ -37,6 +38,11 @@ public static class TableServiceSessionCloseRules
             ? orders.Where(order => !order.TableId.HasValue && order.TableNumber == tableNumber)
             : orders.Where(_ => false);
     }
+
+    internal static Expression<Func<Order, bool>> BlockingLegacyQuery(decimal paymentTolerance) => order =>
+        order.Status != OrderStatus.Completed && order.Status != OrderStatus.Cancelled
+        || order.Status == OrderStatus.Completed && order.PaymentStatus != PaymentStatus.Refunded
+            && order.Total - order.BillingCreditAmount - order.TotalPaid > paymentTolerance;
 
     public static bool IsBlockingLegacyOrder(
         TableServiceSessionOrderState order, decimal paymentTolerance) =>

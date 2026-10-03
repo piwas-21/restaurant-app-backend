@@ -21,14 +21,10 @@ internal static class TableServiceSessionOpenHelpers
     {
         var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
             context.Orders.AsNoTracking(), identity.Id, identity.Number);
-        var hasBlockingLegacyRound = await legacyQuery.AnyAsync(order =>
-            !order.IsDeleted
-            && order.Type == OrderType.DineIn
-            && order.ServiceSessionId == null
-            && (order.Status != OrderStatus.Completed
-                && order.Status != OrderStatus.Cancelled
-                || order.Status == OrderStatus.Completed
-                && order.RemainingAmount > paymentTolerance), cancellationToken);
+        var hasBlockingLegacyRound = await legacyQuery
+            .Where(order => !order.IsDeleted && order.Type == OrderType.DineIn
+                && order.ServiceSessionId == null)
+            .AnyAsync(TableServiceSessionCloseRules.BlockingLegacyQuery(paymentTolerance), cancellationToken);
         if (hasBlockingLegacyRound)
         {
             return ApiResponse<TableServiceSessionDto>.FailureWithCode(

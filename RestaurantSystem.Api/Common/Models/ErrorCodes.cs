@@ -190,6 +190,7 @@ public static class ErrorCodes
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
     public const string TableReadinessFeatureDisabled = "TableReadinessFeatureDisabled";
     public const string TableReadinessVersionStale = "TableReadinessVersionStale";
+    public const string TableReadinessOperationNotFound = "TableReadinessOperationNotFound";
     public const string TableReadinessOperationMismatch = "TableReadinessOperationMismatch";
     public const string TableReadinessNotAvailable = "TableReadinessNotAvailable";
     public const string TableReadinessStaffRequired = "TableReadinessStaffRequired";

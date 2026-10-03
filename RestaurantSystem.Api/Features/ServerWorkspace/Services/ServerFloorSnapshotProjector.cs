@@ -40,7 +40,8 @@ internal sealed class ServerFloorSnapshotProjector
         IReadOnlyCollection<FloorOrderRow> orders,
         IReadOnlyCollection<ReservationRow> reservations,
         DateTimeOffset tenantTime,
-        DateTime serverTime)
+        DateTime serverTime,
+        bool hasUnidentifiedLegacyOrders = false)
     {
         var reservationsByTable = ExpandReservations(reservations, tenantTime);
         var nextStateChangeAt = FindNextStateChangeAt(reservations, tenantTime);
@@ -50,6 +51,9 @@ internal sealed class ServerFloorSnapshotProjector
         var legacySessionByNumber = sessions
             .Where(session => !session.TableId.HasValue && session.TableNumber.HasValue)
             .ToDictionary(session => session.TableNumber!.Value);
+        var hasUnidentifiedLegacy = _tableVisitReadinessEnabled
+            && (sessions.Any(session => !session.TableId.HasValue && !session.TableNumber.HasValue)
+                || hasUnidentifiedLegacyOrders);
         var zoneNames = plans.ToDictionary(plan => plan.Id, plan => plan.Name);
         var tableDtos = tables.Select(table => MapTable(
             table,
@@ -57,12 +61,12 @@ internal sealed class ServerFloorSnapshotProjector
             orders,
             reservationsByTable.GetValueOrDefault(table.Id),
             table.FloorPlanId is { } planId ? zoneNames.GetValueOrDefault(planId) : null,
-            serverTime)).ToList();
+            serverTime, hasUnidentifiedLegacy)).ToList();
         return new ServerFloorProjection(
             tableDtos,
             ServerFloorSnapshotVersionBuilder.Create(
                 plans, tables, sessions, orders, reservationsByTable,
-                nextStateChangeAt, _paymentTolerance),
+                nextStateChangeAt, _paymentTolerance, hasUnidentifiedLegacy),
             nextStateChangeAt);
     }
 
@@ -72,11 +76,11 @@ internal sealed class ServerFloorSnapshotProjector
         IReadOnlyCollection<FloorOrderRow> orders,
         ServerFloorReservationDto? reservation,
         string? zoneName,
-        DateTime serverTime)
+        DateTime serverTime, bool hasUnidentifiedLegacy)
     {
         var legacy = LegacyForTable(table, orders);
         var legacyOperational = legacy.Where(IsOccupyingLegacy).ToList();
-        var hasLegacyAmbiguity = legacy.Any(IsBlockingLegacy);
+        var hasLegacyAmbiguity = hasUnidentifiedLegacy || legacy.Any(IsBlockingLegacy);
         var summary = session is null ? null : SummarizeSession(session, legacy, serverTime);
         var readyCount = summary?.ReadyRoundCount ?? legacyOperational.Count(IsReady);
         var state = DetermineTableState(

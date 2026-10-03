@@ -68,10 +68,15 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         var sessionEntities = await LoadSessionsAsync(cancellationToken);
         var sessions = await BuildSessionRowsAsync(sessionEntities, tenantCurrency, cancellationToken);
         var orders = await LoadOrdersAsync(tables, sessions, cancellationToken);
+        var hasUnidentifiedLegacyOrders = _tableVisitReadinessEnabled
+            && await _context.Orders.AsNoTracking().Where(order =>
+                !order.IsDeleted && order.Type == OrderType.DineIn
+                && order.ServiceSessionId == null && order.TableId == null && order.TableNumber == null)
+                .AnyAsync(TableServiceSessionCloseRules.BlockingLegacyQuery(_paymentTolerance), cancellationToken);
         var reservations = await LoadReservationsAsync(tenantTime, cancellationToken);
         var projection = new ServerFloorSnapshotProjector(
             _clock, _currentUser, _paymentTolerance, _tableVisitReadinessEnabled).Project(
-                plans, tables, sessions, orders, reservations, tenantTime, serverTime);
+                plans, tables, sessions, orders, reservations, tenantTime, serverTime, hasUnidentifiedLegacyOrders);
         var snapshot = new ServerFloorSnapshotDto
         {
             ServerTime = serverTime,
@@ -166,10 +171,10 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
                 && ((order.TableId.HasValue && tableIds.Contains(order.TableId.Value))
                     || (!order.TableId.HasValue && order.TableNumber.HasValue
                         && tableNumbers.Contains(order.TableNumber.Value))))
-            .Where(OrderSettlementEligibility.OperationalQueuePredicate());
+            .Where(TableServiceSessionCloseRules.BlockingLegacyQuery(_paymentTolerance));
         // The explicit-session bill above is the authoritative settlement projection. This query
-        // is intentionally limited to unassigned operational rows: terminal history cannot make a
-        // table occupied or ambiguous and must not scale the floor read with old receipts.
+        // includes only unassigned lifecycle blockers. Reversed tenders may prevent collection while
+        // their unresolved charge still requires legacy review; settled history remains excluded.
         var collectibleLegacyIds = await legacy.Where(OrderSettlementEligibility.CanCollectQuery())
             .Select(order => order.Id)
             .ToHashSetAsync(cancellationToken);

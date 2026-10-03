@@ -47,33 +47,13 @@ internal static class TableReadinessLegacyRules
             context.Orders.AsNoTracking(), tableId, tableNumber)
             .Where(order => !order.IsDeleted && order.Type == OrderType.DineIn
                 && order.ServiceSessionId == null);
-        var rows = await unassigned.Select(order => new
-        {
-            order.Status,
-            order.RemainingAmount,
-            IsFullyRefunded = order.PaymentStatus == PaymentStatus.Refunded
-        }).ToListAsync(cancellationToken);
-        if (rows.Any(order => IsBlocking(order.Status, order.RemainingAmount,
-            order.IsFullyRefunded, paymentTolerance)))
-        {
+        if (await unassigned.AnyAsync(
+            TableServiceSessionCloseRules.BlockingLegacyQuery(paymentTolerance), cancellationToken))
             return true;
-        }
 
-        var unidentified = await context.Orders.AsNoTracking().Where(order =>
+        return await context.Orders.AsNoTracking().Where(order =>
             !order.IsDeleted && order.Type == OrderType.DineIn
             && order.ServiceSessionId == null && order.TableId == null && order.TableNumber == null)
-            .Select(order => new
-            {
-                order.Status,
-                order.RemainingAmount,
-                IsFullyRefunded = order.PaymentStatus == PaymentStatus.Refunded
-            }).ToListAsync(cancellationToken);
-        return unidentified.Any(order => IsBlocking(order.Status, order.RemainingAmount,
-            order.IsFullyRefunded, paymentTolerance));
+            .AnyAsync(TableServiceSessionCloseRules.BlockingLegacyQuery(paymentTolerance), cancellationToken);
     }
-
-    private static bool IsBlocking(
-        OrderStatus status, decimal remainingAmount, bool isFullyRefunded, decimal paymentTolerance) =>
-        TableServiceSessionCloseRules.IsBlockingLegacyOrder(
-            new TableServiceSessionOrderState(status, remainingAmount, isFullyRefunded), paymentTolerance);
 }

@@ -9,6 +9,7 @@ using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.ServerWorkspace.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.CloseTableServiceSessionCommand;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
@@ -79,7 +80,8 @@ public sealed class TableServiceEffectiveOutstandingTests(DatabaseFixture fixtur
         beforeClose.CanClose.Should().BeTrue();
 
         var features = Mock.Of<ITenantFeatures>(value => value.TableAccountPaymentsV1 == false);
-        var result = await new CloseTableServiceSessionCommandHandler(context, reader, features: features).Handle(
+        var result = await new CloseTableServiceSessionCommandHandler(
+            context, reader, new TableGuestVisitRevoker(context), features: features).Handle(
             new CloseTableServiceSessionCommand
             {
                 ServiceSessionId = visit.SessionId,

@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
@@ -24,15 +23,7 @@ public class TableConfiguration : IEntityTypeConfiguration<Table>
         builder.Property(t => t.IsOutdoor)
             .HasDefaultValue(false);
 
-        builder.Property(t => t.ReadinessState)
-            .HasConversion<string>()
-            .HasMaxLength(24)
-            .HasDefaultValue(TableReadinessState.NeedsReset)
-            .IsRequired();
-
-        builder.Property(t => t.ReadinessVersion)
-            .HasDefaultValue(1)
-            .IsRequired();
+        TableReadinessConfiguration.Apply(builder);
 
         builder.Property(t => t.PositionX)
             .HasColumnType("decimal(10,2)");

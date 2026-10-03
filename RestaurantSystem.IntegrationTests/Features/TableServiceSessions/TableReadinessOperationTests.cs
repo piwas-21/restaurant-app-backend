@@ -314,7 +314,7 @@ public sealed class TableReadinessOperationTests : IAsyncLifetime
         context.Tables.Add(new Table
         {
             Id = tableId,
-            TableNumber = tableNumber ?? $"R-{Guid.NewGuid():N}",
+            TableNumber = tableNumber ?? $"R-{Guid.NewGuid():N}"[..10],
             MaxGuests = 4,
             IsActive = true,
             ReadinessState = TableReadinessState.NeedsReset,
