@@ -37,7 +37,8 @@ public sealed class TenantFeaturesController : ControllerBase
             _features.OrderAmendmentsV1,
             _features.TableGuestVisitsV1,
             _features.TableAccountPaymentsV1,
-            _features.TableGuestAccountPaymentsV1);
+            _features.TableGuestAccountPaymentsV1,
+            _features.TableVisitReadinessV1);
         return Ok(ApiResponse<TenantFeaturesDto>.SuccessWithData(dto));
     }
 }

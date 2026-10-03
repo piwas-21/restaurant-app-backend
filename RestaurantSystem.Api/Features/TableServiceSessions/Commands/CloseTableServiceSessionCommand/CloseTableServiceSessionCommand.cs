@@ -32,19 +32,19 @@ public sealed partial class CloseTableServiceSessionCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly ITableServiceSessionReader _reader;
     private readonly TimeProvider _timeProvider;
-    private readonly ITableGuestVisitRevoker? _guestVisits;
+    private readonly ITableGuestVisitRevoker _guestVisits;
     private readonly ITenantFeatures? _features;
 
     public CloseTableServiceSessionCommandHandler(
         ApplicationDbContext context,
         ITableServiceSessionReader reader,
+        ITableGuestVisitRevoker guestVisits,
         TimeProvider? timeProvider = null,
         IOptions<TableServiceSessionSettings>? settings = null,
-        ITableGuestVisitRevoker? guestVisits = null,
         ITenantFeatures? features = null)
     {
         _context = context;
-        _guestVisits = guestVisits;
+        _guestVisits = guestVisits ?? throw new ArgumentNullException(nameof(guestVisits));
         _features = features;
         _reader = reader;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -62,11 +62,18 @@ public sealed partial class CloseTableServiceSessionCommandHandler
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var session = await TableServiceSessionRowLock.LoadAsync(
+            var lockedRows = await TableServiceSessionRowLock.LoadForLifecycleAsync(
                 _context, command.ServiceSessionId, cancellationToken);
+            var session = lockedRows.Session;
             if (session is null)
             {
                 return NotFound();
+            }
+
+            if (lockedRows.IdentityChanged
+                || session.TableId.HasValue && lockedRows.Table?.Id != session.TableId.Value)
+            {
+                return Stale(session.Version);
             }
 
             // Retrying a close after its commit is safe and does not require the client to retain the
@@ -125,10 +132,13 @@ public sealed partial class CloseTableServiceSessionCommandHandler
                 return Unresolved(assessment.Outstanding, unresolved);
             }
 
-            if (_guestVisits is not null)
+            await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
+            if (lockedRows.Table is not null)
             {
-                await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
+                lockedRows.Table.ReadinessState = TableReadinessState.NeedsReset;
+                lockedRows.Table.ReadinessVersion++;
             }
+
             session.Status = TableServiceSessionStatus.Closed;
             session.ClosedAt = now;
             session.RecordAccountChange();

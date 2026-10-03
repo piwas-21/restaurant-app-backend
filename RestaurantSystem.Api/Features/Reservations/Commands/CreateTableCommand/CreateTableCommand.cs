@@ -82,6 +82,8 @@ public class CreateTableCommandHandler : ICommandHandler<CreateTableCommand, Api
                 MaxGuests = table.MaxGuests,
                 IsActive = table.IsActive,
                 IsOutdoor = table.IsOutdoor,
+                ReadinessState = table.ReadinessState.ToString(),
+                ReadinessVersion = table.ReadinessVersion,
                 PositionX = table.PositionX,
                 PositionY = table.PositionY,
                 Width = table.Width,

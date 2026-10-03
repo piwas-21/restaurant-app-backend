@@ -17,6 +17,9 @@ public interface ITenantFeatures
     /// <summary>Whether scoped guest visit admission and rounds are enabled.</summary>
     bool TableGuestVisitsV1 { get; }
 
+    /// <summary>Whether table visits require an explicit readiness reset before reopening.</summary>
+    bool TableVisitReadinessV1 { get; }
+
     /// <summary>Whether exact visit payment quotes and reservations are enabled.</summary>
     bool TableAccountPaymentsV1 { get; }
 

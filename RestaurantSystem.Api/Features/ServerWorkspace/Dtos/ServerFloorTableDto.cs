@@ -17,6 +17,8 @@ public sealed record ServerFloorTableDto
     public string Shape { get; init; } = "round";
     public int Rotation { get; init; }
     public string State { get; init; } = "Available";
+    public string ReadinessState { get; init; } = "NeedsReset";
+    public int ReadinessVersion { get; init; } = 1;
     public int ActiveRoundCount { get; init; }
     public int ReadyRoundCount { get; init; }
     public ServerFloorSessionSummaryDto? Session { get; init; }

@@ -146,9 +146,9 @@ public sealed class TableGuestVisitAuthorizationTests : IAsyncLifetime
                     Status = nameof(TableServiceSessionStatus.Closed),
                 });
             var closer = new CloseTableServiceSessionCommandHandler(
-                context, reader.Object, new FixedTimeProvider(FixedNow),
-                Options.Create(new TableServiceSessionSettings()),
-                new TableGuestVisitRevoker(context));
+                context, reader.Object, new TableGuestVisitRevoker(context),
+                new FixedTimeProvider(FixedNow),
+                Options.Create(new TableServiceSessionSettings()));
             var result = await closer.Handle(new CloseTableServiceSessionCommand
             {
                 ServiceSessionId = first.SessionId,
@@ -157,8 +157,44 @@ public sealed class TableGuestVisitAuthorizationTests : IAsyncLifetime
             result.Success.Should().BeTrue();
         }
 
+        await using (var context = _fixture.CreateContext())
+        {
+            var table = await context.Tables.SingleAsync(value => value.Id == first.TableId);
+            table.ReadinessState.Should().Be(TableReadinessState.NeedsReset);
+            table.ReadinessVersion.Should().Be(4);
+            table.ReadinessState = TableReadinessState.ReadyForGuests;
+            table.ReadinessVersion++;
+            await context.SaveChangesAsync();
+        }
+
         var nextVisit = await SeedOpenSessionAsync(first.TableId);
+        await using (var context = _fixture.CreateContext())
+        {
+            var reader = new Mock<ITableServiceSessionReader>();
+            reader.Setup(value => value.ReadAsync(first.SessionId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new TableServiceSessionDto
+                {
+                    ServiceSessionId = first.SessionId,
+                    Status = nameof(TableServiceSessionStatus.Closed),
+                });
+            var closer = new CloseTableServiceSessionCommandHandler(
+                context, reader.Object, new TableGuestVisitRevoker(context),
+                new FixedTimeProvider(FixedNow),
+                Options.Create(new TableServiceSessionSettings()));
+            (await closer.Handle(new CloseTableServiceSessionCommand
+            {
+                ServiceSessionId = first.SessionId,
+                ExpectedVersion = 1,
+            }, CancellationToken.None)).Success.Should().BeTrue();
+        }
+
         await using var nextContext = _fixture.CreateContext();
+        var nextTable = await nextContext.Tables.SingleAsync(value => value.Id == first.TableId);
+        nextTable.ReadinessState.Should().Be(TableReadinessState.ReadyForGuests,
+            "a close retry from the previous visit cannot reset a table now serving another party");
+        nextTable.ReadinessVersion.Should().Be(5);
+        (await nextContext.TableServiceSessions.SingleAsync(value => value.Id == nextVisit))
+            .Status.Should().Be(TableServiceSessionStatus.Open);
         var serviceForNextVisit = AdmissionService(nextContext);
         await Assert.ThrowsAsync<NotFoundException>(() => serviceForNextVisit.JoinAsync(
             first.QrCode, oldAdmissionCode, CancellationToken.None));
@@ -208,6 +244,8 @@ public sealed class TableGuestVisitAuthorizationTests : IAsyncLifetime
             QRCodeData = qrCode,
             IsActive = true,
             MaxGuests = 4,
+            ReadinessState = TableReadinessState.ReadyForGuests,
+            ReadinessVersion = 3,
             CreatedAt = FixedNow.UtcDateTime,
             CreatedBy = nameof(TableGuestVisitAuthorizationTests),
         });

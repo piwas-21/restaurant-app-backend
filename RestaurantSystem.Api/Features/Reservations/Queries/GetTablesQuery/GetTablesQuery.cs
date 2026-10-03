@@ -43,8 +43,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
 
             var now = DateTime.UtcNow;
 
-            // Occupancy is a staff-only projection. The public availability route still returns
-            // the table catalogue and reservation status, but never live customer/order data.
+            // Public table lists omit the live customer and order data in this staff projection.
             var activeOrders = query.IncludeOccupancy
                 ? await ReadActiveOrdersByTableAsync(cancellationToken)
                 : ActiveTableOrderProjection.Empty;
@@ -58,6 +57,8 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                     MaxGuests = t.MaxGuests,
                     IsActive = t.IsActive,
                     IsOutdoor = t.IsOutdoor,
+                    ReadinessState = query.IncludeOccupancy ? t.ReadinessState.ToString() : null,
+                    ReadinessVersion = query.IncludeOccupancy ? t.ReadinessVersion : null,
                     PositionX = t.PositionX,
                     PositionY = t.PositionY,
                     Width = t.Width,
@@ -67,7 +68,6 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
                     Notes = t.Notes,
                     QRCodeData = t.QRCodeData,
                     QRCodeGeneratedAt = t.QRCodeGeneratedAt,
-                    // Check if table has active reservation
                     IsReserved = _context.TableReservations.Any(r =>
                         r.TableId == t.Id &&
                         r.IsActive &&
@@ -82,15 +82,7 @@ public class GetTablesQueryHandler : IQueryHandler<GetTablesQuery, ApiResponse<L
 
             if (query.IncludeOccupancy)
             {
-                foreach (var table in tables)
-                {
-                    if (activeOrders.TryGet(table, out var orderInfo))
-                    {
-                        table.IsOccupied = true;
-                        table.ActiveOrderCount = orderInfo.OrderCount;
-                        table.Occupants = orderInfo.Occupants;
-                    }
-                }
+                activeOrders.ApplyTo(tables);
             }
 
             return ApiResponse<List<TableDto>>.SuccessWithData(tables);

@@ -774,7 +774,8 @@ public sealed class TableServiceSessionTests : IAsyncLifetime
                 NullLogger<OrderMappingService>.Instance),
             NullLogger<TableBillAssembler>.Instance);
         var reader = new TableServiceSessionReader(context, assembler);
-        return await new CloseTableServiceSessionCommandHandler(context, reader).Handle(
+        return await new CloseTableServiceSessionCommandHandler(
+            context, reader, new RestaurantSystem.Api.Features.TableGuestVisits.Services.TableGuestVisitRevoker(context)).Handle(
             new CloseTableServiceSessionCommand
             {
                 ServiceSessionId = sessionId,

@@ -87,6 +87,8 @@ public sealed partial class AccountCheckoutJournalTests(DatabaseFixture fixture)
         receipt.AmountMinor.Should().Be(334);
         receipt.ReceivedMinor.Should().Be(334);
         receipt.ReconciliationRequired.Should().BeTrue();
+        receipt.ReceiptExpiresAt.Should().Be(Now.AddHours(72),
+            "the payer receives the authoritative receipt deadline, independent of visit closure");
         var fields = typeof(AccountPaymentReceiptDto).GetProperties().Select(value => value.Name).ToArray();
         fields.Should().NotContain(new[] { "ServiceSessionId", "Orders", "Allocations", "ProviderAccountId", "GuestName" });
         var other = () => reader.ReadAsync(Guid.NewGuid(), Credential, CancellationToken.None);

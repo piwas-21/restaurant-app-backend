@@ -11,4 +11,5 @@ public sealed record AccountPaymentReceiptDto(
     long ReceivedMinor,
     long RefundedMinor,
     bool ReconciliationRequired,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    DateTime ReceiptExpiresAt);

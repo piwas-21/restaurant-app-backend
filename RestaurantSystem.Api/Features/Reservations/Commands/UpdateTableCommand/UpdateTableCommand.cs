@@ -91,6 +91,8 @@ public class UpdateTableCommandHandler : ICommandHandler<UpdateTableCommand, Api
                 MaxGuests = table.MaxGuests,
                 IsActive = table.IsActive,
                 IsOutdoor = table.IsOutdoor,
+                ReadinessState = table.ReadinessState.ToString(),
+                ReadinessVersion = table.ReadinessVersion,
                 PositionX = table.PositionX,
                 PositionY = table.PositionY,
                 Width = table.Width,

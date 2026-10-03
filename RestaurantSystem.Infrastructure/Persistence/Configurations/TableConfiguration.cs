@@ -23,6 +23,8 @@ public class TableConfiguration : IEntityTypeConfiguration<Table>
         builder.Property(t => t.IsOutdoor)
             .HasDefaultValue(false);
 
+        TableReadinessConfiguration.Apply(builder);
+
         builder.Property(t => t.PositionX)
             .HasColumnType("decimal(10,2)");
 
