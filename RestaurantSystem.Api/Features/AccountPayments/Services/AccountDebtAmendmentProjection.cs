@@ -58,7 +58,8 @@ internal static class AccountDebtAmendmentProjection
             return;
         }
 
-        AddRemovedRange(key, line, change, removedRanges, instructionItems);
+        AddRemovedRange(key, line, change, removedRanges, instructionItems,
+            legacyFullCharge && (source.Tip > 0 || source.DeliveryFee > 0));
     }
 
     private static void ValidateInstructionChange(
@@ -80,7 +81,7 @@ internal static class AccountDebtAmendmentProjection
         OrderItem line,
         OrderAmendmentChangeSnapshot change,
         Dictionary<(Guid OrderId, Guid ItemId), List<(int Start, long End)>> removedRanges,
-        HashSet<(Guid OrderId, Guid ItemId)> instructionItems)
+        HashSet<(Guid OrderId, Guid ItemId)> instructionItems, bool requiresLegacyReconciliation)
     {
         if (change.Kind is not (OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
             || change.WholeLine || change.StartOrdinal < 1 || change.Quantity < 1
@@ -91,7 +92,7 @@ internal static class AccountDebtAmendmentProjection
             || instructionItems.Contains(key))
             throw InvalidAmendment();
 
-        if (legacyFullCharge && (source.Tip > 0 || source.DeliveryFee > 0))
+        if (requiresLegacyReconciliation)
             throw new ConflictException(
                 "This legacy account needs financial reconciliation before its food units can be removed.");
 
