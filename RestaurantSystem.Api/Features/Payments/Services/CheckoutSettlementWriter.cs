@@ -46,87 +46,96 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        Order? order = null;
+        OrderStatus previousStatus = default;
+        bool confirmed = false;
 
-        // Serialize table tender settlement with reviewed allocations and visit closure.
-        // Provider-confirmed money is recorded even after a conflicting historical change;
-        // the exact account projection then requires reconciliation rather than losing capture evidence.
-        var account = await AccountPaymentLedgerGuard.LockOrderAccountAsync(
-            _context, session.OrderId, cancellationToken);
-
-        // THE CLAIM. A conditional UPDATE, not a read-then-write: `WHERE Status = Created` is
-        // evaluated by the database under a row lock, so when the return trip and the reconciler
-        // arrive together, the second one blocks here, then matches zero rows and does nothing.
-        //
-        // It is inside the transaction, and that placement is the whole safety property. Writing
-        // the Completed marker in its own statement would leave a row saying "settled" behind a
-        // tender that was never minted if anything below threw — a dead run that reads as done, and
-        // that no retry would ever pick up again. Rolled back, the row returns to Created and the
-        // next caller settles it properly.
-        var now = DateTime.UtcNow;
-        var auditId = _currentUser.GetAuditIdentifier();
-
-        var claimed = await _context.OrderCheckoutSessions
-            .Where(s => s.Id == session.Id && s.Status == CheckoutSessionStatus.Created)
-            .ExecuteUpdateAsync(
-                s => s
-                    .SetProperty(x => x.Status, CheckoutSessionStatus.Completed)
-                    .SetProperty(x => x.PaymentIntentId, paymentIntentId)
-                    .SetProperty(x => x.AmountReceivedMinor, amountReceivedMinor)
-                    // ExecuteUpdate never reaches ApplicationDbContext's IAuditable stamper, so
-                    // these are set by hand. WHEN a session settled and WHICH caller settled it are
-                    // exactly what support and the reconciler need from the money claim ticket.
-                    .SetProperty(x => x.UpdatedAt, now)
-                    .SetProperty(x => x.UpdatedBy, auditId),
-                cancellationToken);
-
-        if (claimed == 0)
+        await using (var transaction = await _context.Database.BeginTransactionAsync(cancellationToken))
         {
-            await transaction.RollbackAsync(cancellationToken);
-            _logger.LogInformation(
-                "Checkout session {SessionId} was already settled by another caller", session.SessionId);
+            // Serialize table tender settlement with reviewed allocations and visit closure.
+            // Provider-confirmed money is recorded even after a conflicting historical change;
+            // the exact account projection then requires reconciliation rather than losing capture evidence.
+            var account = await AccountPaymentLedgerGuard.LockOrderAccountAsync(
+                _context, session.OrderId, cancellationToken);
 
-            return await DescribeAsync(session.OrderId, cancellationToken);
+            // THE CLAIM. A conditional UPDATE, not a read-then-write: `WHERE Status = Created` is
+            // evaluated by the database under a row lock, so when the return trip and the reconciler
+            // arrive together, the second one blocks here, then matches zero rows and does nothing.
+            //
+            // It is inside the transaction, and that placement is the whole safety property. Writing
+            // the Completed marker in its own statement would leave a row saying "settled" behind a
+            // tender that was never minted if anything below threw — a dead run that reads as done, and
+            // that no retry would ever pick up again. Rolled back, the row returns to Created and the
+            // next caller settles it properly.
+            var now = DateTime.UtcNow;
+            var auditId = _currentUser.GetAuditIdentifier();
+
+            var claimed = await _context.OrderCheckoutSessions
+                .Where(s => s.Id == session.Id && s.Status == CheckoutSessionStatus.Created)
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(x => x.Status, CheckoutSessionStatus.Completed)
+                        .SetProperty(x => x.PaymentIntentId, paymentIntentId)
+                        .SetProperty(x => x.AmountReceivedMinor, amountReceivedMinor)
+                        // ExecuteUpdate never reaches ApplicationDbContext's IAuditable stamper, so
+                        // these are set by hand. WHEN a session settled and WHICH caller settled it are
+                        // exactly what support and the reconciler need from the money claim ticket.
+                        .SetProperty(x => x.UpdatedAt, now)
+                        .SetProperty(x => x.UpdatedBy, auditId),
+                    cancellationToken);
+
+            if (claimed == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                _logger.LogInformation(
+                    "Checkout session {SessionId} was already settled by another caller", session.SessionId);
+            }
+            else
+            {
+                var loadedOrder = await LoadOrderAsync(session.OrderId, cancellationToken);
+
+                // The order was purged while the diner was at Stripe. Money HAS moved, so this needs a human
+                // either way; what it must not do is throw InvalidOperationException from FirstAsync (§5.4)
+                // and hand a diner a 500 on every retry forever.
+                if (loadedOrder is null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    _logger.LogError(
+                        "Checkout session {SessionId} settled at Stripe but order {OrderId} no longer exists — "
+                        + "the payment must be reconciled by hand", session.SessionId, session.OrderId);
+
+                    throw new NotFoundException("Order not found");
+                }
+
+                order = loadedOrder;
+
+                // Captured BEFORE the confirm below moves it. Dine-in also reaches Confirmed from
+                // PendingApproval, so hard-coding Pending here would broadcast a transition that never
+                // happened — the StatusHistory row would say one thing and the SSE payload another.
+                previousStatus = order.Status;
+
+                var tender = OnlineTenderCompletion.Apply(
+                    order, session, paymentIntentId, amountReceivedMinor, auditId, now);
+                _paymentBuilder.UpdatePaymentSummary(order);
+
+                confirmed = ConfirmIfDeferred(order);
+
+                account?.RecordAccountChange();
+                await _context.SaveChangesAsync(cancellationToken);
+
+                // Now that the tender has an id, point the session row at it. A second statement rather
+                // than folding it into the claim above because a newly-minted tender has no id until the
+                // save; both run inside the transaction, so the pair still lands or rolls back together.
+                await _context.OrderCheckoutSessions
+                    .Where(s => s.Id == session.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.OrderPaymentId, tender.Id), cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+            }
         }
 
-        var order = await LoadOrderAsync(session.OrderId, cancellationToken);
+        if (order is null) return await DescribeAsync(session.OrderId, cancellationToken);
 
-        // The order was purged while the diner was at Stripe. Money HAS moved, so this needs a human
-        // either way; what it must not do is throw InvalidOperationException from FirstAsync (§5.4)
-        // and hand a diner a 500 on every retry forever.
-        if (order is null)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            _logger.LogError(
-                "Checkout session {SessionId} settled at Stripe but order {OrderId} no longer exists — "
-                + "the payment must be reconciled by hand", session.SessionId, session.OrderId);
-
-            throw new NotFoundException("Order not found");
-        }
-
-        // Captured BEFORE the confirm below moves it. Dine-in also reaches Confirmed from
-        // PendingApproval, so hard-coding Pending here would broadcast a transition that never
-        // happened — the StatusHistory row would say one thing and the SSE payload another.
-        var previousStatus = order.Status;
-
-        var tender = OnlineTenderCompletion.Apply(
-            order, session, paymentIntentId, amountReceivedMinor, auditId, now);
-        _paymentBuilder.UpdatePaymentSummary(order);
-
-        var confirmed = ConfirmIfDeferred(order);
-
-        account?.RecordAccountChange();
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Now that the tender has an id, point the session row at it. A second statement rather
-        // than folding it into the claim above because a newly-minted tender has no id until the
-        // save; both run inside the transaction, so the pair still lands or rolls back together.
-        await _context.OrderCheckoutSessions
-            .Where(s => s.Id == session.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.OrderPaymentId, tender.Id), cancellationToken);
-
-        await transaction.CommitAsync(cancellationToken);
-        await transaction.DisposeAsync();
         try { await AwardPointsAsync(order, cancellationToken); }
         catch (Exception exception)
         {
