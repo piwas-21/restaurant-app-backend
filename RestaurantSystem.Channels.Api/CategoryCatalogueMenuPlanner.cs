@@ -7,6 +7,8 @@ internal static class CategoryCatalogueMenuPlanner
 {
     private const string UnavailableTax = "ReviewedTaxProfileUnavailable";
     private const string IncompatibleTemplate = "ReviewedTemplateIncompatible";
+    private const string TaxInfoProperty = "tax_info";
+    private const string TitleProperty = "title";
 
     public static CatalogueMenuPlan Build(JsonElement template, TenantStoreBinding store, TenantCatalogueSnapshot source)
     {
@@ -16,7 +18,7 @@ internal static class CategoryCatalogueMenuPlanner
             .ThenBy(row => row.CategoryId).ThenBy(row => row.ItemDisplayOrder)
             .ThenBy(row => row.ProductId).ThenBy(row => row.VariationId)
             .Select(mapping => Map(mapping, sourceItems)).ToArray();
-        var categories = CategoryRows(store, source, selections);
+        var categories = BuildCategoryRows(store, source, selections);
         if (source.Revision != store.SourceRevision || source.Language != store.Language)
             selections = selections.Select(row => row with { BlockReason = "SourceRevisionChanged" }).ToArray();
         if (categories.Length == 0 || categories.Length != selections.Where(row => row.CategoryId.HasValue)
@@ -62,7 +64,7 @@ internal static class CategoryCatalogueMenuPlanner
             null, false, reason, mapping.SelectionKey, mapping.CategoryId, mapping.CategoryName,
             mapping.CategoryDisplayOrder, mapping.ItemDisplayOrder, string.Empty, mapping.SourceFingerprint);
 
-    private static CatalogueMenuCategory[] CategoryRows(TenantStoreBinding store, TenantCatalogueSnapshot source,
+    private static CatalogueMenuCategory[] BuildCategoryRows(TenantStoreBinding store, TenantCatalogueSnapshot source,
         IReadOnlyList<CatalogueMenuSelection> items)
     {
         var summaries = source.Categories.ToDictionary(row => row.CategoryId);
@@ -96,11 +98,11 @@ internal static class CategoryCatalogueMenuPlanner
         if (!template.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array || items.GetArrayLength() == 0) return false;
         var rows = items.EnumerateArray().ToArray();
         var first = rows[0];
-        if (!first.TryGetProperty("tax_info", out taxInfo) || taxInfo.ValueKind != JsonValueKind.Object
+        if (!first.TryGetProperty(TaxInfoProperty, out taxInfo) || taxInfo.ValueKind != JsonValueKind.Object
             || !taxInfo.TryGetProperty("vat_rate_percentage", out var rate) || rate.ValueKind != JsonValueKind.Number
             || !rate.TryGetDecimal(out vatRate) || vatRate is < 0 or > TenantCatalogueLimits.MaximumVatPercentage) return false;
         var selectedTaxInfo = taxInfo;
-        if (rows.Skip(1).Any(row => !row.TryGetProperty("tax_info", out var other)
+        if (rows.Skip(1).Any(row => !row.TryGetProperty(TaxInfoProperty, out var other)
             || !JsonElement.DeepEquals(selectedTaxInfo, other))) return false;
         revision = ProviderJson.Hash(taxInfo);
         return true;
@@ -115,7 +117,7 @@ internal static class CategoryCatalogueMenuPlanner
             || !template.TryGetProperty("categories", out var categories) || categories.ValueKind != JsonValueKind.Array
             || categories.GetArrayLength() == 0) return false;
         return SameItemTemplates(items)
-            && SameStatic(categories, new HashSet<string>(["id", "title", "entities"], StringComparer.Ordinal));
+            && SameStatic(categories, new HashSet<string>(["id", TitleProperty, "entities"], StringComparer.Ordinal));
     }
 
     private static CatalogueMenuSelection[] BlockUnmapped(IReadOnlyList<CatalogueMenuSelection> rows, string reason)
@@ -131,7 +133,7 @@ internal static class CategoryCatalogueMenuPlanner
     private static JsonElement? ComparableItemTemplate(JsonElement value)
     {
         var node = JsonNode.Parse(value.GetRawText())!.AsObject();
-        foreach (var property in new[] { "id", "title", "description", "tax_info", "suspension_info" }) node.Remove(property);
+        foreach (var property in new[] { "id", TitleProperty, "description", TaxInfoProperty, "suspension_info" }) node.Remove(property);
         if (node["price_info"] is not JsonObject priceInfo
             || priceInfo["price"] is not JsonValue price || !price.TryGetValue<decimal>(out var amount) || amount < 0)
             return null;
@@ -159,7 +161,7 @@ internal static class CategoryCatalogueMenuPlanner
         var menu = JsonNode.Parse(template.GetRawText())!.AsObject();
         var locale = UberLocale(store.Language);
         menu["items"] = ItemRows(template, items, taxInfo, locale);
-        menu["categories"] = CategoryRows(template, categories, items, locale);
+        menu["categories"] = BuildProviderCategories(template, categories, items, locale);
         if (menu["menus"] is not JsonArray menus || menus.Count == 0) throw Invalid();
         var categoryIds = categories.Select(row => row.CategoryId).ToArray();
         foreach (var dayMenu in menus)
@@ -179,17 +181,17 @@ internal static class CategoryCatalogueMenuPlanner
         {
             var row = JsonNode.Parse(baseRow.GetRawText())!.AsObject();
             row["id"] = item.ItemId;
-            row["title"] = Translated(item.Name, locale);
+            row[TitleProperty] = Translated(item.Name, locale);
             row["description"] = Translated(item.Description, locale);
             if (row["price_info"] is not JsonObject priceInfo || item.PriceMinor is null) throw Invalid();
             priceInfo["price"] = item.PriceMinor.Value;
-            row["tax_info"] = JsonNode.Parse(taxInfo.GetRawText());
+            row[TaxInfoProperty] = JsonNode.Parse(taxInfo.GetRawText());
             row["suspension_info"] = Suspension(item.Available);
             return (JsonNode?)row;
         }).ToArray());
     }
 
-    private static JsonArray CategoryRows(JsonElement template, IReadOnlyList<CatalogueMenuCategory> categories,
+    private static JsonArray BuildProviderCategories(JsonElement template, IReadOnlyList<CatalogueMenuCategory> categories,
         IReadOnlyList<CatalogueMenuSelection> items, string locale)
     {
         var baseCategory = template.GetProperty("categories")[0];
@@ -197,7 +199,7 @@ internal static class CategoryCatalogueMenuPlanner
         {
             var row = JsonNode.Parse(baseCategory.GetRawText())!.AsObject();
             row["id"] = category.CategoryId;
-            row["title"] = Translated(category.Name, locale);
+            row[TitleProperty] = Translated(category.Name, locale);
             row["entities"] = JsonSerializer.SerializeToNode(items.Where(item => item.CategoryId == category.TenantCategoryId)
                 .OrderBy(item => item.ItemDisplayOrder).ThenBy(item => item.ProductId).ThenBy(item => item.VariationId)
                 .Select(item => new { id = item.ItemId, type = "ITEM" }).ToArray());

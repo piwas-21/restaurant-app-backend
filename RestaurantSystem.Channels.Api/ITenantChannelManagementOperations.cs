@@ -19,7 +19,7 @@ public sealed record TenantManagementItemOverride(
 public sealed record TenantManagementPreviewRequest(string DraftRevision);
 public sealed record TenantManagementPublishRequest(string DraftRevision, string PublicationRevision)
 {
-    public bool ConfirmedTaxProfile { get; init; }
+    public bool? ConfirmedTaxProfile { get; init; }
     public string TaxProfileRevision { get; init; } = string.Empty;
 }
 public sealed record TenantManagementPauseRequest(int? DurationMinutes);

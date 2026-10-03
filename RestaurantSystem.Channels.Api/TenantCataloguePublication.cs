@@ -38,7 +38,7 @@ public sealed class TenantCataloguePublication(TenantManagementContext context, 
             }),
             selectionMode = plan.CategorySelection ? "categoryItemsV1" : "fixedItemsV1",
             selectedItems = plan.CategorySelection
-                ? plan.Items.Select(item => (object)CategoryItem(item)).ToArray() : Array.Empty<object>(),
+                ? plan.Items.Select(CategoryItem).ToArray() : Array.Empty<object>(),
             taxProfile = plan.CategorySelection && plan.TaxProfileRevision.Length == TenantCatalogueLimits.RevisionLength
                 ? new
                 {

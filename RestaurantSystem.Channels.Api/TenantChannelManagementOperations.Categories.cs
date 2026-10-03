@@ -222,5 +222,10 @@ public sealed partial class TenantChannelCatalogueService
         };
 
     private static string SelectionState(int selected, int total)
-        => selected == 0 ? "empty" : selected == total ? "all" : "partial";
+        => selected switch
+        {
+            0 => "empty",
+            _ when selected == total => "all",
+            _ => "partial"
+        };
 }

@@ -36,12 +36,12 @@ public sealed class ChannelCatalogueInventoryReader(ApplicationDbContext context
             .Include(row => row.CustomizationGroups).ThenInclude(row => row.IngredientOptions)
             .Include(row => row.CustomizationGroups).ThenInclude(row => row.ProductOptions)
             .Include(row => row.DetailedIngredients)
-            .Include(row => row.ProductCategories).ThenInclude(row => row.Category).ThenInclude(row => row.Translations)
+            .Include(row => row.ProductCategories).ThenInclude(row => row.Category.Translations)
             .AsSplitQuery().ToArrayAsync(cancellationToken);
 
         var items = products.SelectMany(product => ProductItems(product, language)).ToArray();
         var categorySummaries = categoryEntities.Select(category => Category(category, items, language)).ToArray();
-        var revision = Revision(provider, storeId, currency, isSandbox, language, categoryEntities, categorySummaries, items);
+        var revision = Revision(new(provider, storeId, currency, isSandbox, language, categoryEntities, categorySummaries, items));
         await transaction.CommitAsync(cancellationToken);
         return new(provider, storeId, currency, isSandbox, language, revision, categorySummaries, items);
     }
@@ -150,8 +150,8 @@ public sealed class ChannelCatalogueInventoryReader(ApplicationDbContext context
         var name = mapped.Name.Length > 0 ? mapped.Name : itemTranslation?.Name ?? product.Name;
         var variationName = mapped.VariationName ?? (variationId.HasValue ? variation?.Descriptions.SingleOrDefault(row => row.LanguageCode == language)?.Name ?? variation?.Name : null);
         var description = mapped.Description.Length > 0 ? mapped.Description : itemTranslation?.Description ?? string.Empty;
-        return new SelectionKey(product.Id, variationId).ToDto(product, primary, language, name, variationName,
-            description, mapped.PriceMinor, mapped.Available, reason);
+        return new SelectionKey(product.Id, variationId).ToDto(product,
+            new(primary, language, name, description, variationName, mapped.PriceMinor, mapped.Available, reason));
     }
 
     private static ChannelCatalogueCategoryDto Category(Category category,
@@ -163,17 +163,16 @@ public sealed class ChannelCatalogueInventoryReader(ApplicationDbContext context
         return new(category.Id, name, category.DisplayOrder, rows.Length, supported, rows.Length - supported, category.IsActive);
     }
 
-    private static string Revision(string provider, string storeId, string currency, bool sandbox, string language,
-        Category[] categoryEntities, ChannelCatalogueCategoryDto[] categories, ChannelCatalogueInventoryItemDto[] items)
+    private static string Revision(RevisionInput input)
         => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
         {
-            Provider = provider,
-            StoreId = storeId,
-            Currency = currency,
-            IsSandbox = sandbox,
-            Language = language,
-            Categories = categories,
-            CategorySource = categoryEntities.Select(row => new
+            input.Provider,
+            input.StoreId,
+            input.Currency,
+            input.IsSandbox,
+            input.Language,
+            input.Categories,
+            CategorySource = input.CategoryEntities.Select(row => new
             {
                 row.Id,
                 row.IsActive,
@@ -185,7 +184,7 @@ public sealed class ChannelCatalogueInventoryReader(ApplicationDbContext context
                 Translations = row.Translations.OrderBy(translation => translation.LanguageCode)
                     .Select(translation => new { translation.LanguageCode, translation.Name, translation.Description })
             }),
-            Items = Ordered(items)
+            Items = Ordered(input.Items)
         })));
 
     private static ChannelCatalogueInventoryItemDto[] Ordered(IEnumerable<ChannelCatalogueInventoryItemDto> items)
@@ -202,19 +201,18 @@ public sealed class ChannelCatalogueInventoryReader(ApplicationDbContext context
     private sealed record SelectionKey(Guid ProductId, Guid? VariationId)
     {
         public override string ToString() => $"{ProductId:D}:{VariationId?.ToString("D") ?? "base"}";
-        public ChannelCatalogueInventoryItemDto ToDto(Product product, ProductCategory? primary, string language,
-            string name, string? variationName, string description, int? price, bool available, string reason)
+        public ChannelCatalogueInventoryItemDto ToDto(Product product, ItemProjection projection)
         {
-            var category = primary?.Category;
-            var categoryName = category?.Translations.SingleOrDefault(row => row.LanguageCode == language)?.Name ?? category?.Name;
-            var variation = VariationId is { } id ? product.Variations.Single(row => row.Id == id) : null;
-            var fingerprint = Fingerprint(product, variation, category);
+            var category = projection.PrimaryCategory?.Category;
+            var categoryName = category?.Translations.SingleOrDefault(row => row.LanguageCode == projection.Language)?.Name ?? category?.Name;
+            var fingerprint = Fingerprint(product, category);
             return new(ToString(), ProductId, VariationId, category?.Id, categoryName, category?.DisplayOrder,
-                primary?.DisplayOrder ?? product.DisplayOrder, name, description, variationName, price, available,
-                reason.Length == 0, reason, fingerprint);
+                projection.PrimaryCategory?.DisplayOrder ?? product.DisplayOrder, projection.Name, projection.Description,
+                projection.VariationName, projection.Price, projection.Available, projection.BlockReason.Length == 0,
+                projection.BlockReason, fingerprint);
         }
 
-        private static string Fingerprint(Product product, ProductVariation? variation, Category? category)
+        private static string Fingerprint(Product product, Category? category)
             => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
             {
                 product.Id,
@@ -289,4 +287,11 @@ public sealed class ChannelCatalogueInventoryReader(ApplicationDbContext context
                 PrimaryCategoryAssignmentOrder = product.ProductCategories.SingleOrDefault(row => row.IsPrimary)?.DisplayOrder
             })));
     }
+
+    private sealed record RevisionInput(string Provider, string StoreId, string Currency, bool IsSandbox,
+        string Language, Category[] CategoryEntities, ChannelCatalogueCategoryDto[] Categories,
+        ChannelCatalogueInventoryItemDto[] Items);
+
+    private sealed record ItemProjection(ProductCategory? PrimaryCategory, string Language, string Name,
+        string Description, string? VariationName, int? Price, bool Available, string BlockReason);
 }

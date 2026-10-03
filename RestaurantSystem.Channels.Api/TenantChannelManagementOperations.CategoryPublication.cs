@@ -5,6 +5,9 @@ namespace RestaurantSystem.Channels.Api;
 
 public sealed partial class TenantChannelCatalogueService
 {
+    private const string ReviewedTemplateHoursStatus = "reviewedTemplate";
+    private const string UnknownServiceHoursStatus = "unknown";
+
     private async Task<JsonElement> CategoryCatalogueView(CatalogueMappingDraft? draft, CancellationToken cancellationToken)
     {
         if (draft is null || !TenantCatalogueCategorySnapshot.IsCategorySnapshot(draft.Snapshot))
@@ -40,9 +43,9 @@ public sealed partial class TenantChannelCatalogueService
             items = Rows(store, source, preview, providerMenu.Menu, menu.Preview(), providerMenu.Status),
             serviceAvailability = ServiceHours(planned),
             serviceHoursEditable = false,
-            serviceHoursStatus = "reviewedTemplate",
+            serviceHoursStatus = ReviewedTemplateHoursStatus,
             currentServiceAvailability = ServiceHours(providerMenu.Menu),
-            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : "unknown",
+            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : UnknownServiceHoursStatus,
             blockingCodes = Blocks(preview),
             warningCodes = Array.Empty<string>(),
             latestPublication = PublicationSummary(latest),
@@ -79,9 +82,9 @@ public sealed partial class TenantChannelCatalogueService
             items = Array.Empty<object>(),
             serviceAvailability = ServiceHours(menu.Preview()),
             serviceHoursEditable = false,
-            serviceHoursStatus = "reviewedTemplate",
+            serviceHoursStatus = ReviewedTemplateHoursStatus,
             currentServiceAvailability = ServiceHours(providerMenu.Menu),
-            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : "unknown",
+            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : UnknownServiceHoursStatus,
             blockingCodes = new[] { "source_changed" },
             warningCodes = Array.Empty<string>(),
             latestPublication = PublicationSummary(latest),
@@ -117,9 +120,9 @@ public sealed partial class TenantChannelCatalogueService
             items = Array.Empty<object>(),
             serviceAvailability = ServiceHours(plannedMenu),
             serviceHoursEditable = false,
-            serviceHoursStatus = "reviewedTemplate",
+            serviceHoursStatus = ReviewedTemplateHoursStatus,
             currentServiceAvailability = ServiceHours(providerMenu.Menu),
-            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : "unknown",
+            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : UnknownServiceHoursStatus,
             blockingCodes = new[] { "SaveDraftBeforePublishing" },
             warningCodes = new[] { "SaveDraftBeforePublishing" },
             latestPublication = PublicationSummary(latest),
@@ -156,9 +159,9 @@ public sealed partial class TenantChannelCatalogueService
             items = Array.Empty<object>(),
             serviceAvailability = ServiceHours(planned),
             serviceHoursEditable = false,
-            serviceHoursStatus = "reviewedTemplate",
+            serviceHoursStatus = ReviewedTemplateHoursStatus,
             currentServiceAvailability = ServiceHours(providerMenu.Menu),
-            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : "unknown",
+            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : UnknownServiceHoursStatus,
             blockingCodes = Blocks(preview),
             warningCodes = Array.Empty<string>(),
             selectionMode = CategorySelectionMode,
@@ -209,7 +212,7 @@ public sealed partial class TenantChannelCatalogueService
         var taxRevision = ProviderJson.Text(preview, "taxProfileRevision");
         if (taxRevision.Length != TenantCatalogueLimits.RevisionLength)
             throw new ChannelConsoleException(409, "The reviewed sandbox tax profile is unavailable.", "ReviewedTaxProfileUnavailable");
-        if (!request.ConfirmedTaxProfile)
+        if (request.ConfirmedTaxProfile != true)
             throw new ChannelConsoleException(409, "Confirm the reviewed sandbox tax profile before publishing.", "TaxProfileConfirmationRequired");
         if (request.TaxProfileRevision != taxRevision)
             throw new ChannelConsoleException(409, "The reviewed tax profile changed. Refresh the preview and confirm it again.", "TaxProfileChanged");

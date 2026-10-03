@@ -68,11 +68,6 @@ public sealed class GetChannelCatalogueCategoryChangesQueryHandler(IChannelCatal
         return RemovedReference(row, current.CategoryId, categories.Contains(row.CategoryId!.Value) ? "categoryChanged" : "categoryRemoved");
     }
 
-    private static ChannelCatalogueRemovedItemReferenceDto RemovedReference(ChannelCatalogueItemReferenceRequest row,
-        Guid? currentCategoryId, string reason)
-        => new($"{row.ProductId:D}:{row.VariationId?.ToString("D") ?? "base"}", row.ProductId,
-            row.VariationId, row.CategoryId!.Value, currentCategoryId, reason);
-
     private static ChannelCatalogueRemovedItemOverrideDto? Changed(ChannelCatalogueItemOverrideRequest row,
         Dictionary<(Guid ProductId, Guid? VariationId), ChannelCatalogueInventoryItemDto> items, HashSet<Guid> categories)
     {
@@ -81,6 +76,11 @@ public sealed class GetChannelCatalogueCategoryChangesQueryHandler(IChannelCatal
         if (row.CategoryId == current.CategoryId) return null;
         return Removed(row, current.CategoryId, categories.Contains(row.CategoryId!.Value) ? "categoryChanged" : "categoryRemoved");
     }
+
+    private static ChannelCatalogueRemovedItemReferenceDto RemovedReference(ChannelCatalogueItemReferenceRequest row,
+        Guid? currentCategoryId, string reason)
+        => new($"{row.ProductId:D}:{row.VariationId?.ToString("D") ?? "base"}", row.ProductId,
+            row.VariationId, row.CategoryId!.Value, currentCategoryId, reason);
 
     private static ChannelCatalogueRemovedItemOverrideDto Removed(ChannelCatalogueItemOverrideRequest row,
         Guid? currentCategoryId, string reason)

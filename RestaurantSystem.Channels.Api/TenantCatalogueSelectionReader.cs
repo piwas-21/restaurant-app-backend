@@ -4,6 +4,8 @@ namespace RestaurantSystem.Channels.Api;
 
 internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport transport)
 {
+    private const string CategoryIdField = "categoryId", ProductIdField = "productId", VariationIdField = "variationId", SelectionKeyField = "selectionKey";
+
     public async Task<TenantCatalogueCategories> Categories(TenantStoreBinding store, string expectedSourceRevision,
         IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemReference> itemReferences,
         IReadOnlyList<TenantCatalogueItemOverride> overrides,
@@ -98,7 +100,7 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
 
     private static TenantCatalogueCategory[] ReadCategories(JsonElement rows)
     {
-        var categories = ReadArray(rows, row => new TenantCatalogueCategory(GuidValue(row, "categoryId"),
+        var categories = ReadArray(rows, row => new TenantCatalogueCategory(GuidValue(row, CategoryIdField),
             RequiredText(row, "name", 200), Integer(row, "displayOrder"), Integer(row, "totalItemCount"),
             Integer(row, "supportedItemCount"), Integer(row, "unsupportedItemCount"), Flag(row, "active")));
         if (categories.Length > TenantCatalogueLimits.MaximumCategoryCount) throw Invalid();
@@ -106,7 +108,7 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
     }
 
     private static TenantCatalogueSelectionCategory[] ReadSelectionCategories(JsonElement rows)
-        => ReadArray(rows, row => new TenantCatalogueSelectionCategory(GuidValue(row, "categoryId"),
+        => ReadArray(rows, row => new TenantCatalogueSelectionCategory(GuidValue(row, CategoryIdField),
             RequiredText(row, "name", 200), Integer(row, "displayOrder"), Integer(row, "totalItemCount"),
             Integer(row, "supportedItemCount"), Integer(row, "unsupportedItemCount"), Integer(row, "selectedItemCount"),
             Integer(row, "selectedUnsupportedItemCount"), Flag(row, "active")));
@@ -114,10 +116,10 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
     private static TenantCatalogueSelectionItem[] ReadItems(JsonElement rows)
         => ReadArray(rows, row =>
         {
-            var product = GuidValue(row, "productId");
-            var variation = OptionalGuid(row, "variationId");
-            var category = OptionalGuid(row, "categoryId");
-            var selectionKey = RequiredText(row, "selectionKey", 80);
+            var product = GuidValue(row, ProductIdField);
+            var variation = OptionalGuid(row, VariationIdField);
+            var category = OptionalGuid(row, CategoryIdField);
+            var selectionKey = RequiredText(row, SelectionKeyField, 80);
             if (selectionKey != SelectionKey(product, variation)) throw Invalid();
             var categoryName = OptionalText(row, "categoryName", 200);
             var categoryOrder = OptionalInteger(row, "categoryDisplayOrder");
@@ -140,10 +142,10 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
     private static TenantCatalogueItemOverride[] ReadOverrides(JsonElement rows)
         => ReadArray(rows, row =>
         {
-            var product = GuidValue(row, "productId");
-            var variation = OptionalGuid(row, "variationId");
-            var category = OptionalGuid(row, "categoryId");
-            var key = RequiredText(row, "selectionKey", 80);
+            var product = GuidValue(row, ProductIdField);
+            var variation = OptionalGuid(row, VariationIdField);
+            var category = OptionalGuid(row, CategoryIdField);
+            var key = RequiredText(row, SelectionKeyField, 80);
             var fingerprint = RequiredText(row, "sourceFingerprint", TenantCatalogueLimits.RevisionLength);
             if (key != SelectionKey(product, variation) || fingerprint.Length != TenantCatalogueLimits.RevisionLength
                 || fingerprint.Any(c => !char.IsAsciiHexDigitLower(c)) || category is null) throw Invalid();
@@ -158,11 +160,11 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
     private static TenantCatalogueRemovedItemOverride[] ReadRemovedOverrides(JsonElement rows)
         => ReadArray(rows, row =>
         {
-            var product = GuidValue(row, "productId");
-            var variation = OptionalGuid(row, "variationId");
-            var category = GuidValue(row, "categoryId");
+            var product = GuidValue(row, ProductIdField);
+            var variation = OptionalGuid(row, VariationIdField);
+            var category = GuidValue(row, CategoryIdField);
             var currentCategory = OptionalGuid(row, "currentCategoryId");
-            var selectionKey = RequiredText(row, "selectionKey", 80);
+            var selectionKey = RequiredText(row, SelectionKeyField, 80);
             var reason = RequiredText(row, "reason", 32);
             if (selectionKey != SelectionKey(product, variation)
                 || reason is not ("itemRemoved" or "categoryRemoved" or "categoryChanged")) throw Invalid();
@@ -172,11 +174,11 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
     private static TenantCatalogueRemovedItemReference[] ReadRemovedItems(JsonElement rows)
         => ReadArray(rows, row =>
         {
-            var product = GuidValue(row, "productId");
-            var variation = OptionalGuid(row, "variationId");
-            var category = GuidValue(row, "categoryId");
+            var product = GuidValue(row, ProductIdField);
+            var variation = OptionalGuid(row, VariationIdField);
+            var category = GuidValue(row, CategoryIdField);
             var currentCategory = OptionalGuid(row, "currentCategoryId");
-            var selectionKey = RequiredText(row, "selectionKey", 80);
+            var selectionKey = RequiredText(row, SelectionKeyField, 80);
             var reason = RequiredText(row, "reason", 32);
             if (selectionKey != SelectionKey(product, variation)
                 || reason is not ("itemRemoved" or "categoryRemoved" or "categoryChanged")) throw Invalid();
@@ -191,11 +193,11 @@ internal sealed class TenantCatalogueSelectionReader(ITenantChannelTransport tra
             .GroupBy(row => (row.ProductId, row.VariationId)).ToDictionary(group => group.Key, group => group.First());
         var statuses = ReadArray(rows, row =>
         {
-            var product = GuidValue(row, "productId");
-            var variation = OptionalGuid(row, "variationId");
-            var category = GuidValue(row, "categoryId");
+            var product = GuidValue(row, ProductIdField);
+            var variation = OptionalGuid(row, VariationIdField);
+            var category = GuidValue(row, CategoryIdField);
             var currentCategory = OptionalGuid(row, "currentCategoryId");
-            var key = RequiredText(row, "selectionKey", 80);
+            var key = RequiredText(row, SelectionKeyField, 80);
             if (key != SelectionKey(product, variation)
                 || !requested.TryGetValue((product, variation), out var requestedRow)
                 || requestedRow.CategoryId != category) throw Invalid();

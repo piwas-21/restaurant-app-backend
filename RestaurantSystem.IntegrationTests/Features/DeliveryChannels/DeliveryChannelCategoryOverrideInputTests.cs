@@ -20,4 +20,16 @@ public sealed class DeliveryChannelCategoryOverrideInputTests
         Assert.NotNull(explicitFalse);
         Assert.False(explicitFalse.Selected);
     }
+
+    [Fact]
+    public void HumanPublishContractDistinguishesMissingTaxConfirmationFromFalse()
+    {
+        var omitted = JsonSerializer.Deserialize<DeliveryChannelPublishRequest>(
+            "{\"draftRevision\":\"draft\",\"publicationRevision\":\"publication\"}", Options);
+        var explicitFalse = JsonSerializer.Deserialize<DeliveryChannelPublishRequest>(
+            "{\"draftRevision\":\"draft\",\"publicationRevision\":\"publication\",\"confirmedTaxProfile\":false}", Options);
+
+        Assert.Null(omitted!.ConfirmedTaxProfile);
+        Assert.False(explicitFalse!.ConfirmedTaxProfile);
+    }
 }

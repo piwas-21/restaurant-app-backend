@@ -38,6 +38,31 @@ public sealed class TenantChannelManagementOperationsTests
     }
 
     [Fact]
+    public async Task CategoryPublishRequiresExplicitTaxProfileConfirmation()
+    {
+        var harness = CreateHarness(categorySelectionEnabled: true, providerMenu: CategoryMenu());
+        var source = await harness.Operations.CatalogueCategories(default);
+        var saved = await harness.Operations.SaveDraft(new(source.GetProperty("draftRevision").GetString(), [])
+        {
+            ExpectedSourceRevision = source.GetProperty("sourceRevision").GetString()!,
+            CategoryIds = [Source.CategoryId]
+        }, ActorId, default);
+        var draftRevision = saved.GetProperty("draftRevision").GetString()!;
+        var preview = await harness.Operations.Preview(new(draftRevision), ActorId, default);
+        Assert.True(preview.GetProperty("canPublish").GetBoolean());
+
+        var publicationRevision = preview.GetProperty("publicationRevision").GetString()!;
+        var omitted = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.Publish(
+            new(draftRevision, publicationRevision), ActorId, default));
+        var rejected = await Assert.ThrowsAsync<ChannelConsoleException>(() => harness.Operations.Publish(
+            new(draftRevision, publicationRevision) { ConfirmedTaxProfile = false }, ActorId, default));
+
+        Assert.Equal("TaxProfileConfirmationRequired", omitted.ErrorCode);
+        Assert.Equal("TaxProfileConfirmationRequired", rejected.ErrorCode);
+        Assert.Equal(0, harness.MenuProvider.UploadCount);
+    }
+
+    [Fact]
     public async Task CategoryDraftCanBeExplicitlyRestoredToFixedModeAfterCapabilityRollback()
     {
         var harness = CreateHarness(categorySelectionEnabled: true);
@@ -383,7 +408,7 @@ public sealed class TenantChannelManagementOperationsTests
         => CreateHarness(readFault, imports).Operations;
 
     private static OperationsHarness CreateHarness(string readFault = "", JsonElement? imports = null,
-        bool categorySelectionEnabled = false)
+        bool categorySelectionEnabled = false, JsonElement? providerMenu = null)
     {
         var store = new TenantStoreBinding
         {
@@ -400,7 +425,9 @@ public sealed class TenantChannelManagementOperationsTests
         var drafts = new Drafts(); var publications = new Publications(); var jobs = new Jobs();
         var flows = new OAuthFlows(); var overrides = new Overrides(); var connectionState = new ConnectionState();
         var connection = new Connection(); var audit = new Audit();
-        var catalogue = new Source(); var menuProvider = new MenuProvider(Menu());
+        var catalogue = new Source();
+        var reviewedMenu = providerMenu ?? Menu();
+        var menuProvider = new MenuProvider(reviewedMenu);
         var webhook = Options.Create(new UberWebhookSettings { ClientId = "sandbox-client", StoreIds = [store.StoreId] });
         var bridge = Options.Create(new TenantBridgeSettings
         {
@@ -418,7 +445,7 @@ public sealed class TenantChannelManagementOperationsTests
         var catalogueState = new TenantCatalogueManagementState(drafts, publications, new Resolver(store), jobs);
         var availabilityState = new TenantChannelAvailabilityState(new Resolver(store), jobs, overrides);
         var availabilityStatus = new AvailabilityStatus(); var tenantAvailability = new Source();
-        var menu = new SandboxMenuStub(Menu(), menuProvider) { ReadFault = readFault };
+        var menu = new SandboxMenuStub(reviewedMenu, menuProvider) { ReadFault = readFault };
         var summary = new TenantChannelSummaryService(context, connectionState, publications, connection, availabilityStatus);
         var catalogueOperations = new TenantChannelCatalogueService(context, catalogueState, menu, catalogue, publication, audit);
         var availabilityOperations = new TenantChannelAvailabilityService(context, availabilityState, availabilityStatus,
@@ -452,6 +479,14 @@ public sealed class TenantChannelManagementOperationsTests
          "categories":[],"items":[{"id":"meal","title":{"translations":{"en_us":"Old name"}},
          "description":{"translations":{"en_us":"Old description"}},"price_info":{"price":500},
          "tax_info":{"vat_rate_percentage":9}}],"modifier_groups":[]}
+        """).RootElement.Clone();
+
+    private static JsonElement CategoryMenu() => JsonDocument.Parse("""
+        {"menus":[{"id":"menu","category_ids":[],"service_availability":[{"day_of_week":"monday","time_periods":[{"start_time":"09:00","end_time":"17:00"}]}]}],
+         "categories":[{"id":"template-category","title":{"translations":{"en_us":"Template category"}},"entities":[]}],
+         "items":[{"id":"template-item","title":{"translations":{"en_us":"Template item"}},
+         "description":{"translations":{"en_us":"Template description"}},"price_info":{"price":500},
+         "tax_info":{"vat_rate_percentage":9},"suspension_info":{"suspend_until":null}}],"modifier_groups":[]}
         """).RootElement.Clone();
 
     private sealed class Source : ITenantCatalogueClient, ITenantAvailabilityClient
@@ -496,9 +531,21 @@ public sealed class TenantChannelManagementOperationsTests
             if (ReadError is not null) throw ReadError;
             if (store.SourceRevision.Length > 0 && store.SourceRevision != CurrentRevision)
                 throw new ChannelConsoleException(409, "The tenant catalogue changed.", "SourceRevisionChanged");
-            var snapshot = new TenantCatalogueSnapshot(CurrentRevision, store.Items.Select(item =>
-                new TenantCatalogueItem(item.ProductId, item.VariationId, "Sofra meal", "Reviewed description",
-                    item.VariationName, 725, true, "")).ToArray());
+            var items = store.Items.Select(item => new TenantCatalogueItem(item.ProductId, item.VariationId,
+                "Sofra meal", "Reviewed description", item.VariationName, 725, true, "")
+            {
+                SelectionKey = item.SelectionKey,
+                CategoryId = item.CategoryId,
+                CategoryName = item.CategoryName,
+                CategoryDisplayOrder = item.CategoryDisplayOrder,
+                ItemDisplayOrder = item.ItemDisplayOrder,
+                SourceFingerprint = item.SourceFingerprint
+            }).ToArray();
+            var categories = store.Categories.Select(row => new TenantCatalogueSelectionCategory(row.CategoryId,
+                row.Name, row.DisplayOrder, row.TotalItemCount, row.SupportedItemCount, row.UnsupportedItemCount,
+                row.SelectedItemCount, row.SelectedUnsupportedItemCount, row.Active)).ToArray();
+            var snapshot = new TenantCatalogueSnapshot(CurrentRevision, items)
+            { Language = store.Language, Categories = categories };
             if (ChangeRevisionAfterRead is { } revision)
             {
                 CurrentRevision = revision;

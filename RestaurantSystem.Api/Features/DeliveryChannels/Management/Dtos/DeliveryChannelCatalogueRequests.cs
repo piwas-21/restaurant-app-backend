@@ -26,6 +26,6 @@ public sealed record DeliveryChannelPreviewRequest(string DraftRevision);
 
 public sealed record DeliveryChannelPublishRequest(string DraftRevision, string PublicationRevision)
 {
-    public bool ConfirmedTaxProfile { get; init; }
+    public bool? ConfirmedTaxProfile { get; init; }
     public string TaxProfileRevision { get; init; } = string.Empty;
 }
