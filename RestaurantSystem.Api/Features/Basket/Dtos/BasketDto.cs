@@ -27,5 +27,8 @@ public record BasketDto
     /// </summary>
     public OrderType? OrderType { get; set; }
 
+    /// <summary>Stable digest of the translated purchase fields currently stored in this basket.</summary>
+    public string PurchaseFingerprint { get; set; } = string.Empty;
+
     public List<BasketItemDto> Items { get; set; } = new();
 }

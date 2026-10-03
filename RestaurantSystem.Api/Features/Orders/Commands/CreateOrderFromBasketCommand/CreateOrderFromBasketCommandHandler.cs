@@ -3,9 +3,11 @@ using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.Basket.Services;
 using RestaurantSystem.Api.Features.Basket.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using LegacyCreateOrderCommand = RestaurantSystem.Api.Features.Orders.Commands.CreateOrderCommand.CreateOrderCommand;
 
 namespace RestaurantSystem.Api.Features.Orders.Commands.CreateOrderFromBasketCommand;
@@ -17,24 +19,55 @@ public class CreateOrderFromBasketCommandHandler
     private readonly IBasketToOrderTranslator _translator;
     private readonly ICurrentUserService _currentUserService;
     private readonly CustomMediator _mediator;
+    private readonly ITableGuestRoundOperationStore? _guestRounds;
 
     public CreateOrderFromBasketCommandHandler(
         IBasketService basketService,
         IBasketToOrderTranslator translator,
         ICurrentUserService currentUserService,
-        CustomMediator mediator)
+        CustomMediator mediator,
+        ITableGuestRoundOperationStore? guestRounds = null)
     {
         _basketService = basketService;
         _translator = translator;
         _currentUserService = currentUserService;
         _mediator = mediator;
+        _guestRounds = guestRounds;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(
         CreateOrderFromBasketCommand command, CancellationToken cancellationToken)
     {
+        if (command.GuestRoundContext is not null)
+        {
+            var replay = await (_guestRounds ?? throw new InvalidOperationException(
+                "Guest round operations are not registered.")).FindReplayBeforeBasketAsync(
+                    command.GuestRoundContext, cancellationToken);
+            if (replay is not null)
+            {
+                return replay;
+            }
+        }
+
         var basket = await _basketService.GetBasketAsync(command.SessionId, _currentUserService.UserId);
-        if (basket is null || basket.Items is not { Count: > 0 })
+        if (basket is null)
+        {
+            if (command.GuestRoundContext is not null)
+            {
+                throw BasketChanged();
+            }
+
+            throw new BadRequestException("Cannot create an order from an empty basket.");
+        }
+
+        if (command.GuestRoundContext is not null
+            && !BasketPurchaseFingerprint.Matches(
+                command.GuestRoundContext.ExpectedBasketFingerprint, basket.PurchaseFingerprint))
+        {
+            throw BasketChanged();
+        }
+
+        if (basket.Items is not { Count: > 0 })
         {
             // 400, matching the legacy path's empty-Items rejection (CreateOrderCommandValidator)
             // so this new public surface has a single, consistent order-error contract.
@@ -72,6 +105,7 @@ public class CreateOrderFromBasketCommandHandler
             // These items came from the persisted basket, so their UnitPrice already carries the
             // bundle roll-up and variation modifier the catalogue price alone cannot express.
             ItemsAreServerPriced = true,
+            GuestRoundContext = command.GuestRoundContext,
             Payments = command.Payments,
             // UserId and staff/POS-only fields (focus order, user-limit discount) are left at their
             // CreateOrderCommand defaults — the basket-checkout flow never sets them (UserId falls
@@ -80,4 +114,8 @@ public class CreateOrderFromBasketCommandHandler
 
         return await _mediator.SendCommand(createOrder, cancellationToken);
     }
+
+    private static BadRequestException BasketChanged() => new(
+        "The basket changed since it was reviewed. Refresh the table account before sending this round.",
+        ErrorCodes.TableServiceSessionStale);
 }

@@ -56,9 +56,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// "no violations" into "nothing was looked at". The previous floor here was 50 against an
     /// actual 130 — three-fifths of the surface could vanish and the control still read healthy.
     /// Raise it when the API grows; never lower it without saying which endpoints went away.
-    /// 131 at <c>POST /api/global-ingredients/{'{'}id{'}'}/apply-translations</c>.
+    /// 197 with account payments, including the seven guest-checkout and signed-wakeup writes.
     /// </summary>
-    private const int KnownMutatingActionCount = 131;
+    private const int KnownMutatingActionCount = 197;
 
     /// <summary>
     /// Every write reachable with no credentials at all, measured 2026-09-04. Each is a deliberate
@@ -68,6 +68,9 @@ public class MutatingEndpointAuthorizationCoverageTests
     /// </summary>
     private static readonly string[] AnonymousWrites =
     [
+        // Stripe signature, connected-account/mode checks and bounded ingress authorize this
+        // wakeup only; canonical provider reads remain the sole monetary authority.
+        "AccountCheckoutWebhookController.Receive [POST]",
         "AuthController.AppleLogin [POST]",
         "AuthController.ForgotPassword [POST]",
         "AuthController.GoogleLogin [POST]",
@@ -84,11 +87,25 @@ public class MutatingEndpointAuthorizationCoverageTests
         "BasketController.RemoveFromBasket [DELETE]",
         "BasketController.RemovePromoCode [DELETE]",
         "BasketController.UpdateBasketItem [PUT]",
+        // Each payment action validates the original visit's hashed participant capability,
+        // typed attempt ownership and frozen scope/version. New writes also require feature,
+        // module, gateway and configured contribution limits; recovery preserves original identity.
+        "GuestAccountCheckoutController.Cancel [POST]",
+        "GuestAccountCheckoutController.Start [POST]",
+        "GuestAccountPaymentsController.CreateEqualSharePlan [POST]",
+        "GuestAccountPaymentsController.CreateQuote [POST]",
+        "GuestAccountPaymentsController.Release [POST]",
+        "GuestAccountPaymentsController.Reserve [POST]",
         "OrderEmailController.SendOrderConfirmationEmail [POST]",
         "OrdersController.CreateOrder [POST]",
         "OrdersController.CreateOrderFromBasket [POST]",
         "PaymentsController.CreateCheckoutSession [POST]",
         "ReservationsController.CreateReservation [POST]",
+        // A guest joins with the table QR plus short-lived staff admission code, then adds a
+        // round with a hashed visit participant capability, reviewed basket digest and replay key.
+        // Both services enforce the default-off flag, open visit and endpoint rate limit.
+        "TableGuestVisitsController.CreateRound [POST]",
+        "TableGuestVisitsController.Join [POST]",
         "UserController.ConfirmDeletion [POST]",
         "UserController.RegisterCustomer [POST]",
         "UserGroupController.ValidateQRCode [POST]",

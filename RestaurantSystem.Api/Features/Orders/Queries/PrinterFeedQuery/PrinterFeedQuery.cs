@@ -68,7 +68,7 @@ public partial class PrinterFeedQueryHandler : IQueryHandler<PrinterFeedQuery, L
             _displayTranslator.Apply(orders, query.Language);
         }
 
-        var orderDtos = MapOrders(orders);
+        var orderDtos = await MapOrdersAsync(orders, cancellationToken);
 
         _logger.LogInformation("Printer feed returning {Count} confirmed orders for {Device}",
             orderDtos.Count, deviceId ?? "legacy");

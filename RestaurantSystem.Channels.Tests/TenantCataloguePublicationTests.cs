@@ -232,5 +232,15 @@ public sealed class TenantCataloguePublicationTests(GatewayFixture fixture) : Co
         public int Calls { get; private set; }
         public Task<TenantCatalogueSnapshot> Read(TenantStoreBinding store, CancellationToken cancellationToken)
         { Calls++; AfterRead?.Invoke(Calls); return Task.FromResult(Value); }
+
+        public Task<TenantCatalogueCategories> Categories(TenantStoreBinding store, string expectedSourceRevision,
+            IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemReference> itemReferences,
+            IReadOnlyList<TenantCatalogueItemOverride> overrides, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<TenantCatalogueSelection> ReadSelection(TenantStoreBinding store, string expectedSourceRevision,
+            IReadOnlyList<Guid> categoryIds, IReadOnlyList<TenantCatalogueItemOverride> overrides,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
     }
 }

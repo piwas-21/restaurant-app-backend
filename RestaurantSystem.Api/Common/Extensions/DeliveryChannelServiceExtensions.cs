@@ -60,6 +60,7 @@ public static class DeliveryChannelServiceExtensions
         services.AddScoped<IExternalOrderImporter, ExternalOrderImporter>();
         services.AddScoped<IChannelAvailabilityReader, ChannelAvailabilityReader>();
         services.AddScoped<IChannelCatalogueReader, ChannelCatalogueReader>();
+        services.AddScoped<IChannelCatalogueInventoryReader, ChannelCatalogueInventoryReader>();
         services.AddScoped<IChannelDecisionQueue, ChannelDecisionQueue>();
         services.AddScoped<IChannelOrderObserver, ChannelOrderObserver>();
         services.AddScoped<IChannelDecisionDelivery, ChannelDecisionDelivery>();

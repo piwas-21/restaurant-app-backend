@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
@@ -89,6 +90,7 @@ if (!string.IsNullOrEmpty(sentryDsn))
         options.Dsn = sentryDsn;
         options.SendDefaultPii = false;                // no user identifiers, cookies, or client IPs
         options.MaxRequestBodySize = RequestSize.None; // never capture request bodies
+        options.SetBeforeSend(RestaurantSystem.Api.Common.Utilities.TableGuestTelemetryPrivacy.Filter);
         options.TracesSampleRate = 0;                  // errors only — tracing/performance off
         // SENTRY_ENVIRONMENT distinguishes the prod/staging boxes (both run
         // ASPNETCORE_ENVIRONMENT=Production); fall back to the host environment.
@@ -382,6 +384,16 @@ builder.Services
 builder.Services
     .AddOptions<TableServiceSessionSettings>()
     .Bind(builder.Configuration.GetSection(TableServiceSessionSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services
+    .AddOptions<TableGuestVisitSettings>()
+    .Bind(builder.Configuration.GetSection(TableGuestVisitSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "Table guest visit settings are invalid")
+    .ValidateOnStart();
+builder.Services
+    .AddOptions<AccountPaymentSettings>()
+    .Bind(builder.Configuration.GetSection(AccountPaymentSettings.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services
@@ -683,9 +695,19 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         }));
 
-    // The live guest review screen is intentionally more responsive than payment settlement and
-    // reads only our local order projection. Keep it out of checkout-status so several guests on
-    // the venue's Wi-Fi cannot throttle one another or a diner returning from Stripe.
+    // Joining is unauthenticated and uses an IP partition. Admitted account reads and round
+    // submissions use separate participant-digest partitions so venue Wi-Fi is not a shared budget.
+    options.AddPolicy("table-guest-join", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = context.RequestServices.GetRequiredService<IOptions<TableGuestVisitSettings>>().Value.JoinsPerMinute,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+
+    TableGuestVisitRateLimitPolicies.AddTableGuestVisitCredentialPolicies(options);
+
     options.AddPolicy("guest-order-status", context => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
@@ -785,6 +807,11 @@ builder.Services.AddSingleton<IOutboundEmailLedger, OutboundEmailLedger>();
 builder.Services.AddScoped<IOrderPaymentBuilder, OrderPaymentBuilder>();
 builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationService>();
 builder.Services.AddOrderPaymentServices();
+builder.Services.AddOrderAmendmentServices();
+builder.Services.AddTableGuestVisitServices();
+builder.Services.AddAccountPaymentServices();
+builder.Services.AddAccountCheckoutServices();
+builder.Services.AddAccountCheckoutWebhookServices();
 builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddServerWorkspaceServices();

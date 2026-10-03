@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
@@ -32,6 +33,8 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
     public async Task<ApiResponse<bool>> Handle(DeleteOrderCommand command, CancellationToken cancellationToken)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, command.OrderId, cancellationToken);
 
         var order = await _context.Orders
             .FirstOrDefaultAsync(current => current.Id == command.OrderId, cancellationToken);
@@ -50,6 +53,7 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
             return VersionConflict();
         }
 
+        await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
         var now = DateTime.UtcNow;
         var auditIdentifier = _currentUserService.GetAuditIdentifier();
         var activeReservations = await _context.TableReservations
@@ -67,6 +71,7 @@ public class DeleteOrderCommandHandler : ICommandHandler<DeleteOrderCommand, Api
         // ApplicationDbContext converts this into an audited soft delete and increments Version.
         // The order-change trigger records the update while retaining its durable journal rows.
         _context.Orders.Remove(order);
+        accountMutation.RecordAccountChange();
 
         try
         {

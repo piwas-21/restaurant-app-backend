@@ -4,28 +4,93 @@ using System.Text.Json.Nodes;
 namespace RestaurantSystem.Channels.Api;
 
 public sealed record CatalogueMenuPlan(string MappingHash, string SourceRevision, string Revision, JsonElement Menu,
-    IReadOnlyList<CatalogueMenuSelection> Items)
+    IReadOnlyList<CatalogueMenuSelection> Items, IReadOnlyList<CatalogueMenuCategory>? Categories = null,
+    JsonElement TaxInfo = default, string TaxProfileRevision = "", decimal? VatRatePercentage = null,
+    bool CategorySelection = false)
 {
-    public bool CanPublish => Items.All(row => row.BlockReason.Length == 0);
+    public bool CanPublish => Items.Count > 0 && Items.All(row => row.BlockReason.Length == 0);
 }
 public sealed record CatalogueMenuSelection(string ItemId, Guid ProductId, Guid? VariationId, string Name,
-    string? VariationName, int? PriceMinor, bool Available, string BlockReason);
+    string? VariationName, int? PriceMinor, bool Available, string BlockReason, string SelectionKey = "",
+    Guid? CategoryId = null, string? CategoryName = null, int? CategoryDisplayOrder = null, int ItemDisplayOrder = 0,
+    string Description = "", string SourceFingerprint = "");
+public sealed record CatalogueMenuCategory(string CategoryId, Guid TenantCategoryId, string Name, int DisplayOrder,
+    int TotalItemCount, int SupportedItemCount, int UnsupportedItemCount, int SelectedItemCount,
+    int SelectedUnsupportedItemCount);
 
 public static class CatalogueMenuPlanner
 {
-    public static string MappingHash(TenantStoreBinding store) => ProviderJson.Hash(ProviderJson.Encode(new
+    public static string MappingHash(TenantStoreBinding store)
     {
-        store.StoreId,
-        store.TenantId,
-        store.BaseUrl,
-        store.Currency,
-        store.CatalogueRevision,
-        Items = store.Items.OrderBy(row => row.ProviderItemId, StringComparer.Ordinal).Select(row => new
-        { row.ProviderItemId, row.ProductId, row.VariationId, row.VariationName })
-    }));
+        if (store.Categories.Count == 0) return ProviderJson.Hash(ProviderJson.Encode(new
+        {
+            store.StoreId,
+            store.TenantId,
+            store.BaseUrl,
+            store.Currency,
+            store.CatalogueRevision,
+            Items = store.Items.OrderBy(row => row.ProviderItemId, StringComparer.Ordinal).Select(row => new
+            { row.ProviderItemId, row.ProductId, row.VariationId, row.VariationName })
+        }));
+        return ProviderJson.Hash(ProviderJson.Encode(new
+        {
+            store.StoreId,
+            store.TenantId,
+            store.BaseUrl,
+            store.Currency,
+            store.CatalogueRevision,
+            Items = store.Items.OrderBy(row => row.ProviderItemId, StringComparer.Ordinal).Select(row => new
+            { row.ProviderItemId, row.ProductId, row.VariationId, row.VariationName }),
+            store.SourceRevision,
+            store.Language,
+            SelectedCategoryIds = store.SelectedCategoryIds.Order(),
+            ItemOverrides = store.ItemOverrides.OrderBy(row => row.CategoryId).ThenBy(row => row.ProductId)
+                .ThenBy(row => row.VariationId).Select(row => new
+                {
+                    row.ProductId,
+                    row.VariationId,
+                    row.CategoryId,
+                    row.Selected,
+                    row.SelectionKey,
+                    row.SourceFingerprint,
+                    row.Supported
+                }),
+            Categories = store.Categories.OrderBy(row => row.DisplayOrder).ThenBy(row => row.CategoryId)
+                .Select(row => new
+                {
+                    row.CategoryId,
+                    row.ProviderCategoryId,
+                    row.Name,
+                    row.DisplayOrder,
+                    row.Active,
+                    row.TotalItemCount,
+                    row.SupportedItemCount,
+                    row.UnsupportedItemCount,
+                    row.SelectedItemCount,
+                    row.SelectedUnsupportedItemCount
+                }),
+            SelectedItems = store.Items.OrderBy(row => row.ProviderItemId, StringComparer.Ordinal)
+                .Select(row => new
+                {
+                    row.SelectionKey,
+                    row.CategoryId,
+                    row.CategoryName,
+                    row.CategoryDisplayOrder,
+                    row.ItemDisplayOrder,
+                    row.SourceFingerprint,
+                    row.ItemName,
+                    row.Description,
+                    row.PriceMinor,
+                    row.Available,
+                    row.Supported,
+                    row.BlockReason
+                })
+        }));
+    }
 
     public static CatalogueMenuPlan Build(JsonElement template, TenantStoreBinding store, TenantCatalogueSnapshot source)
     {
+        if (store.Categories.Count > 0) return CategoryCatalogueMenuPlanner.Build(template, store, source);
         var mappingHash = MappingHash(store);
         var sourceItems = source.Items.ToDictionary(row => (row.ProductId, row.VariationId));
         var items = store.Items.OrderBy(row => row.ProviderItemId, StringComparer.Ordinal).Select(mapping =>

@@ -1,6 +1,7 @@
-using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
@@ -41,8 +42,15 @@ public sealed class OnlinePaymentIntentGuard : IOnlinePaymentIntentGuard
     public async Task ReactivateLatestFailedAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var auditId = _currentUser.GetAuditIdentifier();
-        await using var transaction = await _context.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, orderId, cancellationToken);
+        var sessionId = await _context.Orders.AsNoTracking().Where(value => value.Id == orderId)
+            .Select(value => value.ServiceSessionId).SingleOrDefaultAsync(cancellationToken);
+        if (sessionId is Guid accountId)
+        {
+            await AccountPaymentLedgerGuard.RequireLegacyCollectionAsync(_context, accountId, cancellationToken);
+        }
 
         if (await _context.OrderPayments.AnyAsync(payment => payment.OrderId == orderId
             && payment.PaymentMethod == PaymentMethod.OnlinePayment
@@ -90,6 +98,8 @@ public sealed class OnlinePaymentIntentGuard : IOnlinePaymentIntentGuard
             return;
         }
 
+        accountMutation.RecordAccountChange();
+        await _context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Security.Cryptography;
 using RestaurantSystem.Channels.Api;
 
 namespace RestaurantSystem.Channels.Tests;
@@ -18,8 +19,8 @@ public sealed class TenantCatalogueClientTests
     };
     private static JsonNode Reply()
     {
-        var item = new TenantCatalogueItem(Product, null, "Tenant meal", "Actual description", null, 525, true, "");
-        var revision = ProviderJson.Hash(ProviderJson.Encode(new
+        var item = new ApiCatalogueItem(Product, null, "Tenant meal", "Actual description", null, 525, true, "");
+        var revision = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
         {
             Provider = "uber-eats",
             StoreId = GatewayFixture.StoreId.ToString("D"),
@@ -27,7 +28,7 @@ public sealed class TenantCatalogueClientTests
             IsSandbox = true,
             Language = "en",
             Items = new[] { item }
-        }));
+        })));
         return JsonSerializer.SerializeToNode(new
         {
             provider = "uber-eats",
@@ -41,12 +42,20 @@ public sealed class TenantCatalogueClientTests
         })!;
     }
 
+    private sealed record ApiCatalogueItem(Guid ProductId, Guid? VariationId, string Name, string Description,
+        string? VariationName, int? PriceMinor, bool Available, string BlockReason);
+
     [Fact]
-    public async Task CompleteBoundSnapshotUsesOnlyTheDedicatedReadCredential()
+    public async Task TenantApiRevisionForItsEightFieldSnapshotIsAccepted()
     {
         var store = Store(); var transport = new Transport(Reply());
         var reply = await new TenantCatalogueClient(transport).Read(store, default);
-        var item = Assert.Single(reply.Items); Assert.Equal(525, item.PriceMinor); Assert.Equal("Actual description", item.Description);
+        var item = Assert.Single(reply.Items);
+        Assert.Equal(525, item.PriceMinor);
+        Assert.Equal("Actual description", item.Description);
+        Assert.Empty(item.SelectionKey);
+        Assert.Null(item.CategoryId);
+        Assert.Empty(item.SourceFingerprint);
         Assert.Equal("catalogue-public-fixture", transport.Credential);
         Assert.Equal("/api/delivery-channels/catalogue/snapshot", transport.Path);
         Assert.Equal("order-ingress-public-fixture", store.ApiToken);

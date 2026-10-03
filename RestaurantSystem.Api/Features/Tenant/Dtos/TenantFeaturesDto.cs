@@ -6,4 +6,7 @@ public sealed record TenantFeaturesDto(
     bool EnforceSauceMinimum,
     bool OptionSetMaterializationEnabled,
     bool TableAccountV1 = false,
-    bool OrderAmendmentsV1 = false);
+    bool OrderAmendmentsV1 = false,
+    bool TableGuestVisitsV1 = false,
+    bool TableAccountPaymentsV1 = false,
+    bool TableGuestAccountPaymentsV1 = false);

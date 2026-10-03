@@ -1,0 +1,56 @@
+# Native order amendments and guest table visits
+
+These additive contracts are guarded by `OrderAmendmentsV1` and `TableGuestVisitsV1`, both false by default. They preserve order and preparation-batch IDs under a `TableServiceSession.Id`. Guest online account payments have a separate default-off `TableGuestAccountPaymentsV1` switch; enabling it does not activate the flow unless the existing account and visit switches, online-payments entitlement and configured gateway also allow it.
+
+## Staff amendments
+
+Authenticated Server, Cashier or Admin callers use `POST /api/staff/orders/{orderId}/amendments/quote`, then `POST /api/staff/orders/{orderId}/amendments/commit`. `GET /api/staff/orders/{orderId}/amendments` returns history; `GET /api/staff/amendment-operations/{operationId}` reconciles an uncertain commit. Tenant module, actor, custody, preparation state and quoted versions are enforced by the server.
+
+Quote requests carry the expected order/account versions, additions, one-based unit changes, reason and required acknowledgements. Commit carries the quote ID, client operation UUID, those same versions and review acknowledgement. Reuse the original operation after a lost response. A committed result is immutable and route-bound; changing its request or source order is refused. An expired, confirmed unknown operation can be quoted again.
+
+Menu-root `OrderItemDto` responses have nullable `productId` and `menuID`; clients must handle that identity recursively. Responses and replay snapshots omit contact details, guest status tokens and free preparation text. A client can show reviewed preparation text from its current draft memory. Persist only operation identifiers, expected versions, acknowledgement and expiry for reload recovery.
+
+New or replacement dishes are ordinary supplementary preparation batches. A quote has no reserved daily order number; commit allocates its unique number in the same transaction that inserts the supplement. Typed correction tickets identify the removed source scope and reference a released replacement ticket without instructing the kitchen to prepare it twice. Captured tenders remain unchanged; a pending credit/refund/loyalty resolution is explicit and must not be presented as returned money.
+
+## Guest admission and account reads
+
+`POST /api/table-guest-visits/join` accepts `qrCodeData` plus the staff-issued `admissionCode`. It is intentionally reachable without a login: admission proves access to the current open visit. Staff issue the code with `POST /api/table-guest-visits/{serviceSessionId}/admission-code`; that endpoint requires table-service staff permission and the Server/Cashier module.
+
+The join result returns the visit ID, participant capability and expiry. Hold the capability in per-tab session storage; never put it in a URL or analytics. Only its hash is stored by the server. `GET /api/table-guest-visits/{serviceSessionId}/account` uses `X-Table-Participant` and returns a sanitized item/balance view without other guests' identities or free preparation notes. A close revokes credentials. Account reads use a consistent snapshot followed by a fresh authorization check, so a visit closing during assembly does not expose the former party's bill.
+
+## Guest rounds and basket review
+
+The basket response includes `purchaseFingerprint`, a SHA-256 digest of the canonical translated purchase tree and order type. It binds IDs, quantity, prices, ingredients, nested selections and exact preparation text, while ignoring display translations and line ordering.
+
+`POST /api/table-guest-visits/{serviceSessionId}/rounds` is intentionally reachable without a login and requires `X-Table-Participant`, the existing basket `X-Session-Id`, and body `operationId`, `expectedAccountRevision`, `expectedBasketFingerprint`. Keep the reviewed digest and original operation until the outcome is confirmed. The server checks a committed operation before reading a possibly emptied basket; a new request with a changed basket or stale account is refused. The accepted batch attaches to the same visit and increments its account revision. Old rounds are not dispatched again.
+
+Missing, expired, revoked or wrong-visit capabilities produce a generic unavailable response. Join is limited per IP; account reads and rounds have separate participant-digest rate limits with an IP fallback for malformed credentials and a separate coarse IP budget that also bounds random canonical tokens. Every guest response uses `no-store`. Error reporting strips both participant and basket capability headers; request bodies are excluded. Credential expiry/revocation does not imply record erasure: the cross-repo privacy/retention acceptance remains required before opt-in.
+
+## Guest online account payments
+
+`/api/table-guest-visits/{serviceSessionId}/account-payments` is a separate anonymous controller that accepts only `X-Table-Participant`. It is bound to that exact open visit; there is no staff-user or API-token fallback. `GET` reads the visit payment account. New writes use `POST /quotes`, `POST /equal-share-plans`, and `POST /operations/{operationId}/reserve`; `POST /operations/{operationId}/release` only releases a locally safe, unstarted quote or reservation. `GET /operations/{operationId}` and `GET /equal-share-plans/operations/{operationId}` are actor-scoped recovery lookups. They continue to require the original active participant even if rollout switches are later disabled.
+
+Guest quotes accept `OnlinePayment` only. New quotes, equal-share plans and reservations require `TableGuestVisitsV1`, `TableAccountPaymentsV1`, `TableGuestAccountPaymentsV1`, the tenant's `online-payments` module and a configured Stripe gateway. Account reads require the existing visit and account-payment switches. The guest controller has no manual collection or refund route. Read routes share the participant account-read bucket; writes use the bounded guest-payment bucket, both partitioned by credential digest and backed by the coarse IP budget. `no-store` applies to the entire route.
+
+Equal-share plans record a typed actor ID and kind for replay, lookup and supersede ownership. Legacy rows with no typed owner are not attributed from their audit `CreatedBy` text. Valid participants in the same visit can view and claim currently available plan slots, but a plan operation replay remains bound to the participant that created it.
+
+## Sources of truth
+
+- DTOs: `Features/OrderAmendments/Dtos/`, `Features/TableGuestVisits/Dtos/`, `Features/Basket/Dtos/BasketDto.cs`.
+- Authorization, replay and stale-input tests: amendment, guest round, account-read, rate-limit and fingerprint integration tests.
+- Additive schema: `20261002192333_AddOrderAmendmentsAndGuestVisits` and `20261002194138_AddOrderAmendmentReplaySnapshots`; typed equal-share actor ownership is part of the coordinated P8 migration.
+- Cross-repo delivery and activation gates: workspace `docs/plans/TABLE-ACCOUNT-ORDER-AMENDMENTS-PLAN.md`.
+
+## Guest checkout and private contribution receipts
+
+After an online reservation, `POST /api/table-guest-visits/{serviceSessionId}/account-payments/operations/{operationId}/checkout` takes `{ "expectedVersion": <the reserved version> }`, `X-Table-Participant` and a client-generated canonical 43-character base64url `X-Account-Payment-Receipt` credential. Keep that receipt credential in the originating tab; do not place it in URLs, logs or analytics. The original request, connected account, amount, currency, return URL, provider idempotency key and hashed receipt grant commit before provider I/O. A lost-response retry must use the original version and receipt credential. New flags being disabled does not create a replacement checkout or disable recovery of an existing journal.
+
+`GET` on the checkout route returns the original active participant's checkout status. `POST .../checkout/cancel` takes the current positive version and the participant header. Cancellation keeps debt reserved until canonical provider evidence proves non-payment; a timeout or expired local clock never releases potentially collected funds. Recovery reads the original session/intent/charge and posts the frozen allocations once. Verified funds remain durable and block closure if subsequent allocation posting fails. Recovery runs in bounded tenant-scoped sweeps with expiring leases and fresh database transactions around each write phase.
+
+`GET /api/account-payment-receipts/{attemptId}` requires the original receipt header and returns only that contribution's amount, currency, state, received/refunded amount, completion time and reconciliation flag. Its expiry-bound grant can recover that contribution after visit closure; it does not authorize the full bill, another visit or a new payment. Wrong, missing and expired grants return the same unavailable response. Both HTTP surfaces use `no-store` and bounded rate limits. Redirect parameters identify an attempt; they never prove payment success. Current canonical refund/dispute changes remain reconciliation blockers pending the account refund/credit policy.
+
+### Provider contribution limits
+
+`AccountOnlineContribution:SettlementCurrency` must be configured after connected-account settlement verification. `MinimumAmountMinor` defaults to 50 and `MaximumAmountMinor` to 99,999,999; configure the minimum for the verified provider settlement currency and methods before enabling the guest-payment flag. Startup rejects limits below the provider floor or outside the supported CHF/EUR/USD/GBP/AED rail. A missing settlement currency or a visit in another currency disables new guest online collection. Currency conversion is outside this first contribution flow. [Stripe's documented minima](https://docs.stripe.com/currencies#minimum-and-maximum-charge-amounts) depend on settlement currency, not the locale: CHF/EUR/USD 50 minor units, GBP 30 and AED 200 for same-currency settlement; method-specific and conversion limits can differ. Guest account responses expose `limits.online` only when those new-payment gates and same-currency requirements are met. Quotes and new reservations/checkouts enforce the configured minor-unit range before provider I/O. Existing journal recovery and already-reserved exact replay continue when the configuration or flags change; no rounding, silent amount increase or invented tip is applied.
+
+To enable account-checkout wakeups, configure a Stripe Connect account webhook at `/api/webhooks/stripe/account-checkouts` and set `AccountCheckoutWebhook__SigningSecret` to that endpoint’s signing secret. Subscribe to checkout-session, PaymentIntent, Charge and Refund lifecycle events, including checkout completion/expiry/async results, intent success/failure/cancellation, charge refunds/disputes and refund updates. The endpoint remains 503 until the secret and tenant Stripe account configuration are present, rejects invalid signatures or account/live-mode mismatches, and uses signed identifiers only to wake server-side canonical reconciliation; event amounts/statuses never settle or post a payment. Clean captured contributions use a configurable 24-hour fallback read; unresolved attempts retain bounded prompt recovery. A webhook arriving during an active reconciliation remains scheduled after that pass.

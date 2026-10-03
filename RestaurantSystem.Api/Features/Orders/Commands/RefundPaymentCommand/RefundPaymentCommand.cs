@@ -2,7 +2,9 @@
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -40,6 +42,8 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
 
     public async Task<ApiResponse<OrderPaymentDto>> Handle(RefundPaymentCommand command, CancellationToken cancellationToken)
     {
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, command.OrderId, cancellationToken);
         var order = await _context.Orders
             .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.Id == command.OrderId && !o.IsDeleted, cancellationToken);
@@ -50,6 +54,12 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         }
 
         ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+
+        if (order.ServiceSessionId is Guid serviceSessionId)
+        {
+            await AccountPaymentLedgerGuard.RequireLegacyCollectionAsync(
+                _context, serviceSessionId, cancellationToken);
+        }
 
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
@@ -75,12 +85,16 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
             return validationFailure;
         }
 
+        await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+            _context, order.Id, cancellationToken);
         ApplyRefund(payment, command);
         UpdateOrderPaymentSummary(order);
 
         try
         {
+            accountMutation.RecordAccountChange();
             await _context.SaveChangesAsync(cancellationToken);
+            await accountMutation.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {

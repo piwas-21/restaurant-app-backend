@@ -10,6 +10,9 @@ public sealed class TenantChannelManagementOperations(ITenantChannelSummaryServi
 {
     public Task<JsonElement> Summary(CancellationToken cancellationToken) => summary.Summary(cancellationToken);
     public Task<JsonElement> Catalogue(CancellationToken cancellationToken) => catalogue.Catalogue(cancellationToken);
+    public Task<JsonElement> CatalogueCategories(CancellationToken cancellationToken) => catalogue.CatalogueCategories(cancellationToken);
+    public Task<JsonElement> CheckCategorySelection(TenantManagementCategoryChangesRequest request, CancellationToken cancellationToken)
+        => catalogue.CheckCategorySelection(request, cancellationToken);
     public Task<JsonElement> SaveDraft(TenantManagementDraftRequest request, Guid actorId, CancellationToken cancellationToken)
         => catalogue.SaveDraft(request, actorId, cancellationToken);
     public Task<JsonElement> Preview(TenantManagementPreviewRequest request, Guid actorId, CancellationToken cancellationToken)

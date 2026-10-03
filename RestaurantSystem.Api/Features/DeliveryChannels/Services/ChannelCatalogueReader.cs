@@ -40,7 +40,7 @@ public sealed class ChannelCatalogueReader(ApplicationDbContext context, IOption
         return new(request.Provider, request.StoreId, request.Currency, request.IsSandbox, request.Language, revision, items);
     }
 
-    private static ChannelCatalogueItem Map(ChannelAvailabilitySelection selection, Product? product, string language)
+    internal static ChannelCatalogueItem Map(ChannelAvailabilitySelection selection, Product? product, string language)
     {
         var reason = Eligibility(product);
         if (reason.Length > 0 || product is null) return Block(selection, reason);

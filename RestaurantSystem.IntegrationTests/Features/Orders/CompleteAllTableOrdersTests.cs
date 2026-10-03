@@ -5,6 +5,7 @@ using Moq;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Commands.CompleteAllTableOrdersCommand;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -23,6 +24,29 @@ public sealed class CompleteAllTableOrdersTests : IAsyncLifetime
     public Task InitializeAsync() => _fixture.ResetDatabaseAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task StaleLegacyTargetCannotCancelAnExplicitMemberLoadedAfterThePrecheck()
+    {
+        var visit = await SeedSessionAsync(24, TableServiceSessionStatus.Open);
+        var member = await SeedOrderAsync(visit, 24, OrderStatus.Confirmed);
+        var legacy = await SeedOrderAsync(null, 24, OrderStatus.Ready);
+        var target = new Mock<ITableBillTargetResolver>();
+        target.Setup(value => value.ResolveAsync(24, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TableBillTarget(null, false));
+        await using var context = _fixture.CreateContext();
+        var currentUser = new Mock<ICurrentUserService>();
+        currentUser.Setup(value => value.GetAuditIdentifier()).Returns(nameof(CompleteAllTableOrdersTests));
+        var handler = new CompleteAllTableOrdersCommandHandler(context,
+            currentUser.Object, NullLogger<CompleteAllTableOrdersCommandHandler>.Instance,
+            target.Object);
+        var result = await handler.Handle(new CompleteAllTableOrdersCommand("24"), CancellationToken.None);
+        result.Success.Should().BeTrue();
+        await using var read = _fixture.CreateContext();
+        (await read.Orders.SingleAsync(value => value.Id == member)).Status.Should().Be(OrderStatus.Confirmed);
+        (await read.Orders.SingleAsync(value => value.Id == legacy)).Status.Should().Be(OrderStatus.Completed);
+        (await read.OrderStatusHistories.CountAsync(value => value.OrderId == member)).Should().Be(0);
+    }
 
     [Fact]
     public async Task Active_explicit_visit_refuses_clear_without_mutating_any_visit()

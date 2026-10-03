@@ -4,7 +4,10 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Api.Settings;
@@ -22,21 +25,27 @@ public record CloseTableServiceSessionCommand : ICommand<ApiResponse<TableServic
     public int ExpectedVersion { get; set; }
 }
 
-public sealed class CloseTableServiceSessionCommandHandler
+public sealed partial class CloseTableServiceSessionCommandHandler
     : ICommandHandler<CloseTableServiceSessionCommand, ApiResponse<TableServiceSessionDto>>
 {
     private readonly decimal _paymentTolerance;
     private readonly ApplicationDbContext _context;
     private readonly ITableServiceSessionReader _reader;
     private readonly TimeProvider _timeProvider;
+    private readonly ITableGuestVisitRevoker? _guestVisits;
+    private readonly ITenantFeatures? _features;
 
     public CloseTableServiceSessionCommandHandler(
         ApplicationDbContext context,
         ITableServiceSessionReader reader,
         TimeProvider? timeProvider = null,
-        IOptions<TableServiceSessionSettings>? settings = null)
+        IOptions<TableServiceSessionSettings>? settings = null,
+        ITableGuestVisitRevoker? guestVisits = null,
+        ITenantFeatures? features = null)
     {
         _context = context;
+        _guestVisits = guestVisits;
+        _features = features;
         _reader = reader;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
@@ -81,6 +90,9 @@ public sealed class CloseTableServiceSessionCommandHandler
                     ErrorCodes.TableServicePaymentHandoffPending);
             }
 
+            await AccountPaymentCloseGuard.RequireClosableAsync(
+                _context, session.Id, _features, cancellationToken);
+
             var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
                 _context.Orders, session.TableId, session.TableNumber);
             var legacyOrders = await legacyQuery
@@ -111,19 +123,13 @@ public sealed class CloseTableServiceSessionCommandHandler
                 .ToList();
             if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
             {
-                var errors = new List<string>();
-                if (assessment.Outstanding > _paymentTolerance)
-                {
-                    errors.Add($"The session still has an outstanding balance of {assessment.Outstanding:0.00}.");
-                }
-                if (unresolved.Count > 0)
-                {
-                    errors.Add("The session still has unresolved rounds: " + string.Join(", ", unresolved));
-                }
-                return ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                    errors, ErrorCodes.TableServiceSessionNotClosable);
+                return Unresolved(assessment.Outstanding, unresolved);
             }
 
+            if (_guestVisits is not null)
+            {
+                await _guestVisits.RevokeForSessionAsync(session.Id, now, cancellationToken);
+            }
             session.Status = TableServiceSessionStatus.Closed;
             session.ClosedAt = now;
             session.RecordAccountChange();
@@ -176,25 +182,4 @@ public sealed class CloseTableServiceSessionCommandHandler
         }
     }
 
-    private async Task<ApiResponse<TableServiceSessionDto>> ReadResultAsync(
-        Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _reader.ReadAsync(id, cancellationToken);
-        return result is null
-            ? NotFound()
-            : ApiResponse<TableServiceSessionDto>.SuccessWithData(result, "Table service session closed");
-    }
-
-    private static ApiResponse<TableServiceSessionDto> NotFound() =>
-        ApiResponse<TableServiceSessionDto>.FailureWithCode(
-            "Table service session was not found.", ErrorCodes.TableServiceSessionNotFound);
-
-    private static ApiResponse<TableServiceSessionDto> Stale(int version) =>
-        ApiResponse<TableServiceSessionDto>.FailureWithCode(
-            $"The service session is stale; current version is {version}.",
-            ErrorCodes.TableServiceSessionStale);
-
-    private static ApiResponse<TableServiceSessionDto> Ambiguous() =>
-        ApiResponse<TableServiceSessionDto>.FailureWithCode(
-            TableBillTargetResolver.AmbiguousMessage, ErrorCodes.TableServiceSessionAmbiguous);
 }
