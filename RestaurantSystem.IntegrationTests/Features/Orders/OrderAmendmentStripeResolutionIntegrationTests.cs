@@ -167,7 +167,8 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(Datab
             ProviderLiveMode = false,
             CreateIdempotencyKey = $"checkout:{_attemptId:N}",
             CreatePayloadHash = new string('a', 64),
-            ReturnBaseUrl = "https://tenant.test/table-account",
+            ReturnBaseUrl = Client.BaseAddress?.ToString()
+                ?? throw new InvalidOperationException("The integration test host has no base URL."),
             StartedAt = now,
             ExpiresAt = now.AddHours(1),
             MaximumCreateRetryAt = now.AddHours(1),

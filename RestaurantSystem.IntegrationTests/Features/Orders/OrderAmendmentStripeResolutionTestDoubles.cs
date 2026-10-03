@@ -186,7 +186,7 @@ internal sealed class FixedAdminCurrentUserService(Guid userId) : ICurrentUserSe
 {
     public Guid? UserId => userId;
     public string? UserName => "admin";
-    public string? Email => "admin@example.test";
+    public string? Email => null;
     public UserRole? Role => UserRole.Admin;
     public bool IsAuthenticated => true;
     public bool IsApiToken => false;
