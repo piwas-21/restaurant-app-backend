@@ -14,7 +14,8 @@ internal static class ServerFloorActionProjection
         bool hasLegacyOrders,
         int readyCount,
         bool hasCurrentReservation,
-        UserRole? currentRole)
+        UserRole? currentRole,
+        bool tableVisitReadinessEnabled = false)
     {
         if (!table.IsActive)
         {
@@ -24,6 +25,11 @@ internal static class ServerFloorActionProjection
         if (session is null)
         {
             if (hasLegacyOrders || hasLegacyAmbiguity) return ["ReviewLegacy"];
+            if (tableVisitReadinessEnabled && table.ReadinessState == TableReadinessState.NeedsReset)
+            {
+                return ["MarkTableReady"];
+            }
+
             return hasCurrentReservation ? [] : ["StartTable"];
         }
 

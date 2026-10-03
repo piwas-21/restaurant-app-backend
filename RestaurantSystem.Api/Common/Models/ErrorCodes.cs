@@ -188,6 +188,12 @@ public static class ErrorCodes
     public const string TableServiceSessionAlreadyOpen = "TableServiceSessionAlreadyOpen";
     public const string TableServiceSessionRequired = "TableServiceSessionRequired";
     public const string TableServiceSessionPaymentOperationMismatch = "TableServiceSessionPaymentOperationMismatch";
+    public const string TableReadinessFeatureDisabled = "TableReadinessFeatureDisabled";
+    public const string TableReadinessVersionStale = "TableReadinessVersionStale";
+    public const string TableReadinessOperationMismatch = "TableReadinessOperationMismatch";
+    public const string TableReadinessNotAvailable = "TableReadinessNotAvailable";
+    public const string TableReadinessStaffRequired = "TableReadinessStaffRequired";
+    public const string TableReadinessVisitOpen = "TableReadinessVisitOpen";
     public const string TableServicePaymentHandoffOperationMismatch = "TableServicePaymentHandoffOperationMismatch";
     public const string TableServicePaymentHandoffAlreadyPending = "TableServicePaymentHandoffAlreadyPending";
     public const string TableServicePaymentHandoffNotRequestable = "TableServicePaymentHandoffNotRequestable";

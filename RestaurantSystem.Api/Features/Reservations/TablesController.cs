@@ -13,6 +13,7 @@ using RestaurantSystem.Api.Features.Reservations.Queries.GetTableByIdQuery;
 using RestaurantSystem.Api.Features.Reservations.Queries.GetTablesQuery;
 using RestaurantSystem.Api.Features.Reservations.Queries.ValidateTableQRCodeQuery;
 using RestaurantSystem.Api.Features.Reservations.Commands.ReleaseTableCommand;
+using RestaurantSystem.Api.Features.TableServiceSessions.Commands.MarkTableReadyCommand;
 
 namespace RestaurantSystem.Api.Features.Reservations;
 
@@ -71,6 +72,17 @@ public class TablesController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    /// <summary>Record an explicit staff reset before the next guest visit.</summary>
+    [HttpPost("{id:guid}/ready")]
+    [RequireTableServiceStaff]
+    [RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
+    public async Task<ActionResult<ApiResponse<TableReadinessOperationDto>>> MarkReady(
+        Guid id, [FromBody] MarkTableReadyCommand command)
+    {
+        command.TableId = id;
+        return Ok(await _mediator.SendCommand(command));
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 ﻿using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -29,6 +30,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
     private readonly IOrderFactory _orderFactory;
     private readonly IPreferredLanguageCapture _languages;
     private readonly ITableGuestRoundOperationStore? _guestRounds;
+    private readonly ITenantFeatures? _features;
 
     public CreateOrderCommandHandler(
         ApplicationDbContext context,
@@ -44,7 +46,8 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         IOrderFactory orderFactory,
         IPreferredLanguageCapture languages,
         ILogger<CreateOrderCommandHandler> logger,
-        ITableGuestRoundOperationStore? guestRounds = null)
+        ITableGuestRoundOperationStore? guestRounds = null,
+        ITenantFeatures? features = null)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -60,16 +63,15 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
         _permittedActionsService = permittedActionsService;
         _logger = logger;
         _guestRounds = guestRounds;
+        _features = features;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(CreateOrderCommand command, CancellationToken cancellationToken)
     {
         // Validate guest context before entering the order-number transaction and advisory lock.
         var guestContext = command.GuestRoundContext;
-        if (guestContext is not null)
-        {
-            GuestRoundOrderPolicy.Validate(command);
-        }
+        var validationFailure = GuestRoundOrderPolicy.ValidateSubmission(command, _features?.TableVisitReadinessV1 == true);
+        if (validationFailure is not null) return validationFailure;
 
         var ownerId = guestContext is null ? command.UserId ?? _currentUserService.UserId : null;
         var language = await _languages.ForUserAsync(ownerId, cancellationToken);

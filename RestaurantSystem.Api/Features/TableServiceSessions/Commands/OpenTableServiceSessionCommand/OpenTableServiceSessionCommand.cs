@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Npgsql;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common;
+using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using RestaurantSystem.Api.Settings;
@@ -30,6 +31,7 @@ public sealed class OpenTableServiceSessionCommandHandler
     private readonly ITableIdentityResolver _tables;
     private readonly TimeProvider _timeProvider;
     private readonly decimal _paymentTolerance;
+    private readonly ITenantFeatures? _features;
 
     public OpenTableServiceSessionCommandHandler(
         ApplicationDbContext context,
@@ -37,7 +39,8 @@ public sealed class OpenTableServiceSessionCommandHandler
         ITableServiceSessionReader reader,
         ITableIdentityResolver tables,
         IOptions<TableServiceSessionSettings>? settings = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ITenantFeatures? features = null)
     {
         _context = context;
         _currentUser = currentUser;
@@ -45,6 +48,7 @@ public sealed class OpenTableServiceSessionCommandHandler
         _tables = tables;
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _features = features;
     }
 
     public async Task<ApiResponse<TableServiceSessionDto>> Handle(
@@ -53,34 +57,57 @@ public sealed class OpenTableServiceSessionCommandHandler
         var table = await _tables.ResolveActiveAsync(
             command.TableId, command.TableNumber, cancellationToken);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var existing = await FindOpenSessionAsync(table, cancellationToken);
-        if (existing is not null)
-        {
-            var authoritative = await _reader.ReadAsync(existing.Id, cancellationToken);
-            return authoritative is null
-                ? ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                    "The existing table service session could not be read back.",
-                    ErrorCodes.TableServiceSessionNotFound)
-                : ApiResponse<TableServiceSessionDto>.SuccessWithData(
-                    authoritative, "Table service session already open");
-        }
-
-        var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
-            _context.Orders.AsNoTracking(), table.Id, table.Number);
-        var hasBlockingLegacyRound = await legacyQuery.AnyAsync(order =>
-            !order.IsDeleted
-            && order.Type == Domain.Common.Enums.OrderType.DineIn
-            && order.ServiceSessionId == null
-            && (order.Status != Domain.Common.Enums.OrderStatus.Completed
-                && order.Status != Domain.Common.Enums.OrderStatus.Cancelled
-                || order.Status == Domain.Common.Enums.OrderStatus.Completed
-                && order.RemainingAmount > _paymentTolerance), cancellationToken);
-        if (hasBlockingLegacyRound)
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var lockedTable = await TableServiceSessionRowLock.LoadTableAsync(
+            _context, table.Id, cancellationToken);
+        if (lockedTable is null || !lockedTable.IsActive)
         {
             return ApiResponse<TableServiceSessionDto>.FailureWithCode(
-                TableBillTargetResolver.AmbiguousMessage,
+                "The selected table is no longer active.", ErrorCodes.TableServiceTableInactive);
+        }
+
+        var revalidated = await _tables.ResolveActiveAsync(
+            command.TableId, command.TableNumber, cancellationToken);
+        if (revalidated.Id != lockedTable.Id)
+        {
+            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                "The selected table identity changed; refresh the floor before opening a visit.",
+                ErrorCodes.TableServiceTableMismatch);
+        }
+
+        var existingIds = await TableServiceSessionOpenHelpers.FindOpenSessionIdsAsync(
+            _context, revalidated, cancellationToken);
+        if (existingIds.Count > 1)
+        {
+            return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                "More than one open visit refers to this table. Resolve the legacy identity before continuing.",
                 ErrorCodes.TableServiceSessionAmbiguous);
         }
+
+        if (existingIds.Count == 1)
+        {
+            var existing = await TableServiceSessionRowLock.LoadAsync(
+                _context, existingIds[0], cancellationToken);
+            if (existing?.Status == Domain.Common.Enums.TableServiceSessionStatus.Open)
+            {
+                if (existing.TableId != revalidated.Id
+                    && _features?.TableVisitReadinessV1 == true)
+                {
+                    return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                        "This legacy visit has no stable table identity. Repair it explicitly before using the table.",
+                        ErrorCodes.TableServiceSessionAmbiguous);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return await TableServiceSessionOpenHelpers.ReadExistingSessionAsync(
+                    _reader, existing.Id, cancellationToken);
+            }
+        }
+
+        var readinessFailure = await TableServiceSessionOpenHelpers.ValidateCanCreateAsync(
+            _context, lockedTable, revalidated, _paymentTolerance,
+            _features?.TableVisitReadinessV1 == true, cancellationToken);
+        if (readinessFailure is not null) return readinessFailure;
 
         var tenantCurrency = await _context.RestaurantInfo
             .AsNoTracking()
@@ -90,8 +117,8 @@ public sealed class OpenTableServiceSessionCommandHandler
         var session = new TableServiceSession
         {
             Id = Guid.NewGuid(),
-            TableId = table.Id,
-            TableNumber = table.Number,
+            TableId = revalidated.Id,
+            TableNumber = revalidated.Number,
             Currency = currency,
             Version = 1,
             BillingAllocationVersion = 1,
@@ -104,19 +131,37 @@ public sealed class OpenTableServiceSessionCommandHandler
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (IsOpenSessionConflict(ex))
+        catch (DbUpdateException ex) when (TableServiceSessionOpenHelpers.IsOpenSessionConflict(ex))
         {
+            await transaction.RollbackAsync(cancellationToken);
+            await _context.Database.UseTransactionAsync(null, cancellationToken);
             _context.ChangeTracker.Clear();
-            var authoritative = await FindOpenSessionAsync(table, cancellationToken);
-            if (authoritative is not null)
+            var authoritativeIds = await TableServiceSessionOpenHelpers.FindOpenSessionIdsAsync(
+                _context, revalidated, cancellationToken);
+            if (authoritativeIds.Count > 1)
             {
-                var dto = await _reader.ReadAsync(authoritative.Id, cancellationToken);
-                if (dto is not null)
+                return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                    "More than one open visit refers to this table. Resolve the legacy identity before continuing.",
+                    ErrorCodes.TableServiceSessionAmbiguous);
+            }
+
+            if (authoritativeIds.Count == 1)
+            {
+                if (_features?.TableVisitReadinessV1 == true
+                    && await _context.TableServiceSessions.AsNoTracking()
+                        .Where(session => session.Id == authoritativeIds[0])
+                        .Select(session => session.TableId)
+                        .SingleOrDefaultAsync(cancellationToken) != revalidated.Id)
                 {
-                    return ApiResponse<TableServiceSessionDto>.SuccessWithData(
-                        dto, "Table service session already open");
+                    return ApiResponse<TableServiceSessionDto>.FailureWithCode(
+                        "This legacy visit has no stable table identity. Repair it explicitly before using the table.",
+                        ErrorCodes.TableServiceSessionAmbiguous);
                 }
+
+                return await TableServiceSessionOpenHelpers.ReadExistingSessionAsync(
+                    _reader, authoritativeIds[0], cancellationToken);
             }
 
             return ApiResponse<TableServiceSessionDto>.FailureWithCode(
@@ -132,18 +177,4 @@ public sealed class OpenTableServiceSessionCommandHandler
             : ApiResponse<TableServiceSessionDto>.SuccessWithData(result, "Table service session opened");
     }
 
-    private Task<TableServiceSession?> FindOpenSessionAsync(
-        TableIdentity table, CancellationToken cancellationToken) =>
-        _context.TableServiceSessions
-            .AsNoTracking()
-            .SingleOrDefaultAsync(session => (session.TableId == table.Id
-                || (table.Number.HasValue && session.TableId == null
-                    && session.TableNumber == table.Number))
-                && session.Status == Domain.Common.Enums.TableServiceSessionStatus.Open,
-                cancellationToken);
-
-    private static bool IsOpenSessionConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } postgres
-        && (postgres.ConstraintName?.Contains("table_number", StringComparison.OrdinalIgnoreCase) == true
-            || postgres.ConstraintName?.Contains("table_id", StringComparison.OrdinalIgnoreCase) == true);
 }

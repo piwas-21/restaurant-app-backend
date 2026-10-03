@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Common.Base;
+using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Domain.Entities;
 
@@ -8,6 +9,12 @@ public class Table : Entity
     public int MaxGuests { get; set; }
     public bool IsActive { get; set; } = true;
     public bool IsOutdoor { get; set; }
+
+    /// <summary>Physical guest-turnover readiness, separate from an open service visit.</summary>
+    public TableReadinessState ReadinessState { get; set; } = TableReadinessState.NeedsReset;
+
+    /// <summary>Optimistic-concurrency version for explicit readiness operations.</summary>
+    public int ReadinessVersion { get; set; } = 1;
 
     // Position of the table CENTRE, in metres (origin top-left, x → right,
     // y → down). Reinterpreted from the legacy 600×500 pixel canvas by the
@@ -38,4 +45,5 @@ public class Table : Entity
 
     // Navigation property
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
+    public virtual ICollection<TableReadyOperation> ReadyOperations { get; set; } = new List<TableReadyOperation>();
 }

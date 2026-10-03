@@ -21,13 +21,16 @@ internal sealed class ServerFloorSnapshotProjector
     private readonly ITenantClock _clock;
     private readonly ICurrentUserService _currentUser;
     private readonly decimal _paymentTolerance;
+    private readonly bool _tableVisitReadinessEnabled;
 
     public ServerFloorSnapshotProjector(
-        ITenantClock clock, ICurrentUserService currentUser, decimal paymentTolerance)
+        ITenantClock clock, ICurrentUserService currentUser, decimal paymentTolerance,
+        bool tableVisitReadinessEnabled = false)
     {
         _clock = clock;
         _currentUser = currentUser;
         _paymentTolerance = paymentTolerance;
+        _tableVisitReadinessEnabled = tableVisitReadinessEnabled;
     }
 
     public ServerFloorProjection Project(
@@ -79,6 +82,11 @@ internal sealed class ServerFloorSnapshotProjector
         var state = DetermineTableState(
             table.IsActive, readyCount, summary is not null,
             hasLegacyAmbiguity, reservation?.IsCurrent == true);
+        if ((state is "Available" or "Reserved") && _tableVisitReadinessEnabled
+            && table.ReadinessState == TableReadinessState.NeedsReset)
+        {
+            state = "NeedsReset";
+        }
         var legacyDto = legacyOperational.Count == 0 ? null : new ServerFloorLegacySummaryDto
         {
             OrderCount = legacyOperational.Count,
@@ -104,6 +112,8 @@ internal sealed class ServerFloorSnapshotProjector
             Shape = table.Shape,
             Rotation = table.Rotation,
             State = state,
+            ReadinessState = table.ReadinessState.ToString(),
+            ReadinessVersion = table.ReadinessVersion,
             ActiveRoundCount = summary?.ActiveRoundCount ?? legacyDto?.ActiveOrderCount ?? 0,
             ReadyRoundCount = readyCount,
             Session = summary,
@@ -112,7 +122,7 @@ internal sealed class ServerFloorSnapshotProjector
             Reservation = reservation,
             PermittedActions = ServerFloorActionProjection.Project(
                 table, summary, hasLegacyAmbiguity, legacyDto is not null, readyCount,
-                reservation?.IsCurrent == true, _currentUser.Role)
+                reservation?.IsCurrent == true, _currentUser.Role, _tableVisitReadinessEnabled)
         };
     }
     private ServerFloorSessionSummaryDto SummarizeSession(

@@ -9,4 +9,5 @@ public sealed record TenantFeaturesDto(
     bool OrderAmendmentsV1 = false,
     bool TableGuestVisitsV1 = false,
     bool TableAccountPaymentsV1 = false,
-    bool TableGuestAccountPaymentsV1 = false);
+    bool TableGuestAccountPaymentsV1 = false,
+    bool TableVisitReadinessV1 = false);

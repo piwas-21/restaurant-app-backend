@@ -33,6 +33,7 @@ internal static class ServerFloorSnapshotVersionBuilder
                         + $"{item.HeightMeters}:{item.RotationDegrees}:{item.ZIndex}:{item.Label}:{item.StyleVariant}"))))
             + ';' + string.Join('|', tables.OrderBy(table => table.Id)
                 .Select(table => $"t:{table.Id}:{table.UpdatedAt:O}:{table.TableNumber}:{table.IsActive}:"
+                    + $"{table.ReadinessState}:{table.ReadinessVersion}:"
                     + $"{table.FloorPlanId}:{table.IsOutdoor}:{table.MaxGuests}:{table.PositionX}:{table.PositionY}:"
                     + $"{table.Width}:{table.Height}:{table.Shape}:{table.Rotation}"))
             + ';' + string.Join('|', sessions.OrderBy(session => session.Id)
