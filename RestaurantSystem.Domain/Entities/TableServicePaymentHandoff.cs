@@ -20,6 +20,8 @@ public class TableServicePaymentHandoff : Entity
     public DateTime? ResolvedAt { get; set; }
     /// <summary>Primary key of the committed TableBillPaymentOperation that settled this request.</summary>
     public Guid? ResolvedPaymentOperationId { get; set; }
+    /// <summary>Committed contribution that completed the account's exact outstanding balance.</summary>
+    public Guid? ResolvedAccountPaymentAttemptId { get; set; }
     public string? ResolvedBy { get; set; }
     public Guid? CancellationOperationId { get; set; }
     public int? CancellationExpectedVersion { get; set; }

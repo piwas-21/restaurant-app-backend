@@ -10,7 +10,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <summary>Serializes one native mutation with visit membership before locking its order.</summary>
 public sealed class OrderAccountMutationScope : IAsyncDisposable
 {
-    private readonly IDbContextTransaction? _transaction;
+    private IDbContextTransaction? _transaction;
     private readonly TableServiceSession? _session;
 
     private OrderAccountMutationScope(IDbContextTransaction? transaction, TableServiceSession? session)
@@ -54,7 +54,12 @@ public sealed class OrderAccountMutationScope : IAsyncDisposable
 
     public async Task CommitAsync(CancellationToken cancellationToken)
     {
-        if (_transaction is not null) await _transaction.CommitAsync(cancellationToken);
+        if (_transaction is not null)
+        {
+            await _transaction.CommitAsync(cancellationToken);
+            await _transaction.DisposeAsync();
+            _transaction = null;
+        }
     }
 
     public async ValueTask DisposeAsync()

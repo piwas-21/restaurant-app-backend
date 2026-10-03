@@ -29,7 +29,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// </para>
 /// </summary>
 [Collection("Database Lane 1")]
-public class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
+public partial class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
 {
     private const string ConnectedAccount = "acct_test_connected";
     private const string PaymentIntent = "pi_test_settled";

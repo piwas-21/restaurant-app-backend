@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Payments.Dtos;
@@ -46,6 +47,12 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
         ArgumentNullException.ThrowIfNull(session);
 
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
+        // Serialize table tender settlement with reviewed allocations and visit closure.
+        // Provider-confirmed money is recorded even after a conflicting historical change;
+        // the exact account projection then requires reconciliation rather than losing capture evidence.
+        var account = await AccountPaymentLedgerGuard.LockOrderAccountAsync(
+            _context, session.OrderId, cancellationToken);
 
         // THE CLAIM. A conditional UPDATE, not a read-then-write: `WHERE Status = Created` is
         // evaluated by the database under a row lock, so when the return trip and the reconciler
@@ -108,6 +115,7 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
 
         var confirmed = ConfirmIfDeferred(order);
 
+        account?.RecordAccountChange();
         await _context.SaveChangesAsync(cancellationToken);
 
         // Now that the tender has an id, point the session row at it. A second statement rather
@@ -117,9 +125,13 @@ public class CheckoutSettlementWriter : ICheckoutSettlementWriter
             .Where(s => s.Id == session.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.OrderPaymentId, tender.Id), cancellationToken);
 
-        await AwardPointsAsync(order, cancellationToken);
-
         await transaction.CommitAsync(cancellationToken);
+        await transaction.DisposeAsync();
+        try { await AwardPointsAsync(order, cancellationToken); }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Loyalty award failed after committed checkout {CheckoutId}", session.Id);
+        }
 
         _logger.LogInformation(
             "Settled checkout session {SessionId} for order {OrderNumber}: payment {PaymentStatus}, order {OrderStatus}",

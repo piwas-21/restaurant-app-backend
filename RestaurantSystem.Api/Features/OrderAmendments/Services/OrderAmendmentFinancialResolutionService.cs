@@ -42,17 +42,23 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
                 - Math.Max(0m, supplement.DeliveryFee)));
         var captured = source.Payments.Where(payment => payment.Status.IsCaptured()
             && payment.Amount - (payment.RefundedAmount ?? 0m) > 0m).ToList();
+        var hasUnattributedPaidAmount = captured.Count == 0 && ToMinor(source.TotalPaid) > 0;
+        var hasCapturedOrUnattributedTender = captured.Count > 0 || hasUnattributedPaidAmount;
         var hasCredit = removed > 0;
         var hasLoyalty = hasCredit
             && (source.FidelityPointsEarned > 0 || source.FidelityPointsRedeemed > 0);
         var refundState = OrderAmendmentRefundState.None;
-        if (hasCredit && captured.Count > 0)
+        if (hasCredit && hasCapturedOrUnattributedTender)
+        {
             refundState = captured.Any(TenderCustody.IsHeldByGateway)
                 ? OrderAmendmentRefundState.GatewayRefundRequired
-                : OrderAmendmentRefundState.PendingTillRefund;
+                : captured.Count > 0
+                    ? OrderAmendmentRefundState.PendingTillRefund
+                    : OrderAmendmentRefundState.CustodianReviewRequired;
+        }
         var creditState = OrderAmendmentCreditState.None;
         if (hasCredit)
-            creditState = captured.Count == 0
+            creditState = !hasCapturedOrUnattributedTender
                 ? OrderAmendmentCreditState.BalanceReduction
                 : OrderAmendmentCreditState.PendingAllocationReview;
         var loyaltyState = hasLoyalty
@@ -74,7 +80,12 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        amendment.FinancialResolutionJson = OrderAmendmentJson.Serialize(preview);
+        var committed = preview.CreditState == OrderAmendmentCreditState.BalanceReduction
+            && preview.LoyaltyState == OrderAmendmentLoyaltyState.None
+            && preview.RefundState == OrderAmendmentRefundState.None
+                ? preview with { ResolutionStatus = OrderAmendmentFinancialResolutionStatus.Resolved }
+                : preview;
+        amendment.FinancialResolutionJson = OrderAmendmentJson.Serialize(committed);
         return Task.CompletedTask;
     }
 

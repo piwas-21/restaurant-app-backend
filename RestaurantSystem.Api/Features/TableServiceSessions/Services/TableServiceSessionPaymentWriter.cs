@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Commands.AddTableServiceSessionPaymentCommand;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common;
@@ -36,6 +37,7 @@ public sealed class TableServiceSessionPaymentWriter : ITableServiceSessionPayme
         AddTableServiceSessionPaymentCommand command,
         CancellationToken cancellationToken)
     {
+        await AccountPaymentLedgerGuard.RequireLegacyCollectionAsync(_context, session.Id, cancellationToken);
         var currencyResult = await ResolveCurrencyAsync(session, command, cancellationToken);
         if (!currencyResult.Success)
         {

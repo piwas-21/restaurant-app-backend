@@ -209,6 +209,337 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("asp_net_user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountEqualSharePlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<long>("AccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("account_revision");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTime?>("InvalidatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("invalidated_at");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("ScopeJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scope_json");
+
+                    b.Property<Guid>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<int>("ShareCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("share_count");
+
+                    b.Property<Guid?>("SupersedesPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supersedes_plan_id");
+
+                    b.Property<long>("TotalMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total_minor");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_equal_share_plans");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("ServiceSessionId")
+                        .HasDatabaseName("ix_account_equal_share_plans_service_session_id");
+
+                    b.ToTable("account_equal_share_plans", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_equal_share_plan_shape", "total_minor > 0 AND share_count > 0 AND account_revision > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountPaymentAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<long>("MinorPerUnit")
+                        .HasColumnType("bigint")
+                        .HasColumnName("minor_per_unit");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid?>("OrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_item_id");
+
+                    b.Property<Guid?>("OrderPaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_payment_id");
+
+                    b.Property<int>("StartOrdinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("start_ordinal");
+
+                    b.Property<int>("UnitCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_count");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_payment_allocations");
+
+                    b.HasIndex("AttemptId")
+                        .HasDatabaseName("ix_account_payment_allocations_attempt_id");
+
+                    b.HasIndex("OrderItemId")
+                        .HasDatabaseName("ix_account_payment_allocations_order_item_id");
+
+                    b.HasIndex("OrderPaymentId")
+                        .HasDatabaseName("ix_account_payment_allocations_order_payment_id");
+
+                    b.HasIndex("OrderId", "OrderItemId", "StartOrdinal");
+
+                    b.ToTable("account_payment_allocations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_payment_allocation_range", "start_ordinal > 0 AND unit_count > 0 AND minor_per_unit > 0 AND start_ordinal::bigint + unit_count <= 2147483648 AND (order_item_id IS NOT NULL OR (start_ordinal = 1 AND unit_count = 1)) AND amount_minor = minor_per_unit * unit_count");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<int?>("EqualShareOrdinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("equal_share_ordinal");
+
+                    b.Property<Guid?>("EqualSharePlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("equal_share_plan_id");
+
+                    b.Property<long>("ExpectedAccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_account_revision");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("ProviderAccountId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_account_id");
+
+                    b.Property<string>("ProviderChargeId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_charge_id");
+
+                    b.Property<string>("ProviderSessionId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("provider_session_id");
+
+                    b.Property<DateTime>("QuoteExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("quote_expires_at");
+
+                    b.Property<DateTime?>("ReservationExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reservation_expires_at");
+
+                    b.Property<DateTime?>("ReservedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reserved_at");
+
+                    b.Property<Guid>("ServiceSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_session_id");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_payment_attempts");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("ProviderChargeId")
+                        .IsUnique()
+                        .HasFilter("provider_charge_id IS NOT NULL");
+
+                    b.HasIndex("ProviderSessionId")
+                        .IsUnique()
+                        .HasFilter("provider_session_id IS NOT NULL");
+
+                    b.HasIndex("EqualSharePlanId", "EqualShareOrdinal");
+
+                    b.HasIndex("ServiceSessionId", "State");
+
+                    b.ToTable("account_payment_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_payment_attempt_shape", "amount_minor > 0 AND expected_account_revision > 0 AND version > 0 AND (equal_share_ordinal IS NULL OR equal_share_ordinal > 0) AND ((mode = 'Equal' AND equal_share_plan_id IS NOT NULL AND equal_share_ordinal IS NOT NULL) OR (mode <> 'Equal' AND equal_share_plan_id IS NULL AND equal_share_ordinal IS NULL))");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ApiToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7473,6 +7804,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("requested_currency");
 
+                    b.Property<Guid?>("ResolvedAccountPaymentAttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_account_payment_attempt_id");
+
                     b.Property<DateTime?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
@@ -7512,6 +7847,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OperationId")
                         .IsUnique();
+
+                    b.HasIndex("ResolvedAccountPaymentAttemptId");
 
                     b.HasIndex("ServiceSessionId")
                         .IsUnique()
@@ -8324,6 +8661,75 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_asp_net_user_tokens_aspnetusers_user_id");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountEqualSharePlan", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_equal_share_plans_tableservicesessions_service_sess~");
+
+                    b.Navigation("ServiceSession");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountPaymentAllocation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", "Attempt")
+                        .WithMany("Allocations")
+                        .HasForeignKey("AttemptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_payment_allocations_accountpaymentattempts_attempt_~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_payment_allocations_orders_order_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderItem", "OrderItem")
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_account_payment_allocations_orderitems_order_item_id");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderPayment", "OrderPayment")
+                        .WithMany()
+                        .HasForeignKey("OrderPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_account_payment_allocations_orderpayments_order_payment_id");
+
+                    b.Navigation("Attempt");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("OrderItem");
+
+                    b.Navigation("OrderPayment");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountEqualSharePlan", "EqualSharePlan")
+                        .WithMany()
+                        .HasForeignKey("EqualSharePlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_account_payment_attempts_account_equal_share_plans_equal_sh~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
+                        .WithMany()
+                        .HasForeignKey("ServiceSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_payment_attempts_tableservicesessions_service_sessi~");
+
+                    b.Navigation("EqualSharePlan");
+
+                    b.Navigation("ServiceSession");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.Basket", b =>
@@ -9426,6 +9832,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.TableServicePaymentHandoff", b =>
                 {
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", null)
+                        .WithMany()
+                        .HasForeignKey("ResolvedAccountPaymentAttemptId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("RestaurantSystem.Domain.Entities.TableServiceSession", "ServiceSession")
                         .WithMany()
                         .HasForeignKey("ServiceSessionId")
@@ -9469,6 +9880,11 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_working_hours_shifts_working_hours_working_hours_id");
 
                     b.Navigation("WorkingHours");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ApplicationUser", b =>

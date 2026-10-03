@@ -3,6 +3,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -39,6 +40,8 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
 
     public async Task<ApiResponse<OrderDto>> Handle(RejectDelayCommand command, CancellationToken cancellationToken)
     {
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, command.OrderId, cancellationToken);
         var order = await _context.Orders
             .Include(o => o.Items)
             .Include(o => o.Payments)
@@ -64,6 +67,7 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
             return ApiResponse<OrderDto>.Failure("Order is not pending approval");
         }
 
+        await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
         var previousStatus = order.Status.ToString();
 
         // Add status history
@@ -86,10 +90,12 @@ public class RejectDelayCommandHandler : ICommandHandler<RejectDelayCommand, Api
         order.UpdatedAt = DateTime.UtcNow;
         order.UpdatedBy = "Customer";
         order.CancellationReason = "Customer rejected delay";
+        accountMutation.RecordAccountChange();
 
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
+            await accountMutation.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {

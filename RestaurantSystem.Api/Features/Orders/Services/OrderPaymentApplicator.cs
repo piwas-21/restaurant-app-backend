@@ -96,12 +96,24 @@ public class OrderPaymentApplicator : IOrderPaymentApplicator
             return PaymentApplicationResult.Failed(OrderPaymentApplicationOutcome.OrderNotFound);
         }
 
-        await AwardFidelityPointsIfCompletedAsync(order, cancellationToken);
+        if (!tender.DeferLoyaltyAward)
+            await AwardFidelityPointsIfCompletedAsync(order, cancellationToken);
 
         return PaymentApplicationResult.Applied(order);
     }
 
     /// <summary>Check if we should award fidelity points now that payment is updated.</summary>
+    public async Task AwardAfterCommitAsync(Order order, CancellationToken cancellationToken)
+    {
+        if (_context.Database.CurrentTransaction is not null)
+            throw new RestaurantSystem.Api.Common.Exceptions.ConflictException("Commit the payment before awarding points.");
+        try { await AwardFidelityPointsIfCompletedAsync(order, cancellationToken); }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Loyalty award failed after committed tender for order {OrderId}", order.Id);
+        }
+    }
+
     private async Task AwardFidelityPointsIfCompletedAsync(Order order, CancellationToken cancellationToken)
     {
         if (!order.UserId.HasValue || order.FidelityPointsEarned <= 0 ||

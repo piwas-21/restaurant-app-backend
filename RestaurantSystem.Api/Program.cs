@@ -392,6 +392,11 @@ builder.Services
     .Validate(settings => settings.IsValid(), "Table guest visit settings are invalid")
     .ValidateOnStart();
 builder.Services
+    .AddOptions<AccountPaymentSettings>()
+    .Bind(builder.Configuration.GetSection(AccountPaymentSettings.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services
     .AddOptions<FidelitySettings>()
     .Bind(builder.Configuration.GetSection(FidelitySettings.SectionName))
     .ValidateDataAnnotations()
@@ -804,6 +809,7 @@ builder.Services.AddScoped<IOrderTableReservationService, OrderTableReservationS
 builder.Services.AddOrderPaymentServices();
 builder.Services.AddOrderAmendmentServices();
 builder.Services.AddTableGuestVisitServices();
+builder.Services.AddAccountPaymentServices();
 builder.Services.AddOrderDetailServices();
 builder.Services.AddStaffOrderServices();
 builder.Services.AddServerWorkspaceServices();

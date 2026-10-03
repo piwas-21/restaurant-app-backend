@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -54,6 +55,8 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
 
     public async Task<ApiResponse<OrderDto>> Handle(UpdateOrderStatusCommand command, CancellationToken cancellationToken)
     {
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, command.OrderId, cancellationToken);
         var order = await _context.Orders
             .Include(o => o.Items)
             .Include(o => o.Payments)
@@ -73,6 +76,8 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
             return validationFailure;
         }
 
+        if (command.NewStatus == OrderStatus.Cancelled)
+            await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
         var previousStatus = order.Status.ToString();
         var statusHistory = CreateStatusHistory(order, command);
 
@@ -83,10 +88,12 @@ public partial class UpdateOrderStatusCommandHandler : ICommandHandler<UpdateOrd
         order.UpdatedBy = _currentUserService.GetAuditIdentifier();
 
         var notificationPreparationMinutes = ApplyStatusChange(order, command);
+        accountMutation.RecordAccountChange();
 
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
+            await accountMutation.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {

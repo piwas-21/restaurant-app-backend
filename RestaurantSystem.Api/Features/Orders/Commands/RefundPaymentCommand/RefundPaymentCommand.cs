@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -53,6 +54,12 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         }
 
         ExternalOrderLocalMutationGuard.RequireLocalOrder(order);
+
+        if (order.ServiceSessionId is Guid serviceSessionId)
+        {
+            await AccountPaymentLedgerGuard.RequireLegacyCollectionAsync(
+                _context, serviceSessionId, cancellationToken);
+        }
 
         if (command.ExpectedVersion.HasValue && order.Version != command.ExpectedVersion.Value)
         {
