@@ -21,6 +21,9 @@ public sealed class AccountPaymentReservationService(
     IOptions<AccountPaymentSettings> options,
     TimeProvider timeProvider) : IAccountPaymentReservationService
 {
+    private const string PaymentOperationNotFoundMessage =
+        "The payment operation was not found for this table visit.";
+
     private static readonly AccountPaymentState[] ClaimedEqualShareStates =
     [
         AccountPaymentState.Reserved,
@@ -73,7 +76,7 @@ public sealed class AccountPaymentReservationService(
             var attempt = await LoadLockedAttemptAsync(sessionId, operationId, cancellationToken);
             RequireOwner(attempt, sessionId, actor);
             if (guest && attempt.PaymentMethod != PaymentMethod.OnlinePayment)
-                throw new NotFoundException("The payment operation was not found for this table visit.");
+                throw new NotFoundException(PaymentOperationNotFoundMessage);
             if (IsReservationReplay(attempt, request))
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -211,7 +214,7 @@ public sealed class AccountPaymentReservationService(
             var attempt = await LoadLockedAttemptAsync(sessionId, operationId, cancellationToken);
             RequireOwner(attempt, sessionId, actor);
             if (guest && attempt.PaymentMethod != PaymentMethod.OnlinePayment)
-                throw new NotFoundException("The payment operation was not found for this table visit.");
+                throw new NotFoundException(PaymentOperationNotFoundMessage);
             if (attempt.State == AccountPaymentState.Released
                 && attempt.Version == (long)request.ExpectedVersion + 1L)
             {
@@ -245,7 +248,7 @@ public sealed class AccountPaymentReservationService(
             .FromSqlInterpolated($"SELECT * FROM account_payment_attempts WHERE service_session_id = {sessionId} AND operation_id = {operationId} FOR UPDATE")
             .Include(value => value.Allocations)
             .SingleOrDefaultAsync(cancellationToken)
-        ?? throw new NotFoundException("The payment operation was not found for this table visit.");
+        ?? throw new NotFoundException(PaymentOperationNotFoundMessage);
 
     private static AccountDebtSegment[] ReadSegments(AccountPaymentAttempt attempt)
     {
@@ -266,7 +269,7 @@ public sealed class AccountPaymentReservationService(
     {
         if (attempt.ServiceSessionId != sessionId || attempt.ActorId != actor.ActorId
             || attempt.ActorKind != actor.Kind)
-            throw new NotFoundException("The payment operation was not found for this table visit.");
+            throw new NotFoundException(PaymentOperationNotFoundMessage);
     }
 
     private static void ValidateRouteAndVersion(Guid sessionId, Guid operationId, int expectedVersion)

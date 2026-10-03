@@ -20,7 +20,7 @@ public sealed class AccountCheckoutReconciliationService(IServiceScopeFactory sc
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { throw; }
                 catch (Exception exception)
                 {
-                    logger.LogWarning("Account checkout sweep deferred: {FailureType}", exception.GetType().Name);
+                    AccountCheckoutDiagnostics.Warn(logger, exception, AccountCheckoutFailurePhase.Sweep);
                 }
             }
         }
@@ -47,8 +47,7 @@ public sealed class AccountCheckoutReconciliationService(IServiceScopeFactory sc
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception exception)
             {
-                logger.LogWarning("Account checkout sweep deferred for {AttemptId}: {FailureType}",
-                    attemptId, exception.GetType().Name);
+                AccountCheckoutDiagnostics.Warn(logger, exception, AccountCheckoutFailurePhase.Sweep, attemptId);
             }
         }
     }

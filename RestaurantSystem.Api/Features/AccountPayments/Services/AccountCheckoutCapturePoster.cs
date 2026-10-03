@@ -78,8 +78,7 @@ public sealed class AccountCheckoutCapturePoster(ApplicationDbContext context,
             }
             catch (Exception exception)
             {
-                logger.LogWarning("Post-commit account notification deferred for {AttemptId}: {FailureType}",
-                    attemptId, exception.GetType().Name);
+                AccountCheckoutDiagnostics.Warn(logger, exception, AccountCheckoutFailurePhase.PostCommitNotification, attemptId);
             }
         }
     }

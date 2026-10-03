@@ -33,8 +33,7 @@ public sealed class AccountCheckoutReconciler(IServiceScopeFactory scopes,
         {
             failureCode = "provider_recovery_deferred";
             // Provider messages can contain request detail. Log only the exception type and opaque attempt ID.
-            logger.LogWarning("Account checkout recovery deferred for {AttemptId}: {FailureType}",
-                attemptId, exception.GetType().Name);
+            AccountCheckoutDiagnostics.Warn(logger, exception, AccountCheckoutFailurePhase.ProviderRecovery, attemptId);
         }
         await FinishAsync(attemptId, leaseId, failureCode, cancellationToken);
         return await statuses.ReadAsync(attemptId, failureCode is null ? checkoutUrl : null, cancellationToken);

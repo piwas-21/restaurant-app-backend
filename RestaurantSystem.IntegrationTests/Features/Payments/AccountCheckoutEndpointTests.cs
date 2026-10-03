@@ -26,11 +26,15 @@ public sealed class AccountCheckoutEndpointTests(DatabaseFixture fixture)
     }
 
     [Theory]
-    [InlineData("api/account-payment-receipts/00000000-0000-0000-0000-000000000001")]
-    [InlineData("api/table-guest-visits/00000000-0000-0000-0000-000000000001/account-payments/operations/00000000-0000-0000-0000-000000000002/checkout")]
-    [InlineData("api/table-guest-visits/00000000-0000-0000-0000-000000000001/account-payments/operations/00000000-0000-0000-0000-000000000002")]
-    public async Task Anonymous_lookup_without_its_private_credential_is_unavailable_and_not_cacheable(string route)
+    [InlineData("receipt")]
+    [InlineData("checkout")]
+    [InlineData("operation")]
+    public async Task Anonymous_lookup_without_its_private_credential_is_unavailable_and_not_cacheable(string resource)
     {
+        var route = resource == "receipt"
+            ? "api/account-payment-receipts/00000000-0000-0000-0000-000000000001"
+            : "api/table-guest-visits/00000000-0000-0000-0000-000000000001/account-payments/operations/00000000-0000-0000-0000-000000000002"
+                + (resource == "checkout" ? "/checkout" : string.Empty);
         using var client = fixture.SharedFactory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.AnonymousHeader, "true");
         using var response = await client.GetAsync(new Uri(route, UriKind.Relative));

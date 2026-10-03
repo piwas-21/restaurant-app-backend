@@ -26,7 +26,9 @@ public sealed class AccountCheckoutWebhookController(CustomMediator mediator,
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
     [ProducesResponseType(StatusCodes.Status415UnsupportedMediaType)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> Receive(CancellationToken cancellationToken)
+    public async Task<IActionResult> Receive(
+        [FromHeader(Name = "Stripe-Signature")] string[]? signatureHeaders,
+        CancellationToken cancellationToken)
     {
         Response.Headers.CacheControl = "no-store";
         var settings = options.Value;
@@ -34,8 +36,8 @@ public sealed class AccountCheckoutWebhookController(CustomMediator mediator,
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
 
         if (!Request.HasJsonContentType()) return StatusCode(StatusCodes.Status415UnsupportedMediaType);
-        var signature = Request.Headers["Stripe-Signature"].ToString();
-        if (signature.Length > settings.MaximumSignatureHeaderLength) return BadRequest();
+        var signature = JoinBoundedSignatureHeaders(signatureHeaders, settings.MaximumSignatureHeaderLength);
+        if (signature is null) return BadRequest();
         if (Request.ContentLength > settings.MaximumPayloadBytes)
             return StatusCode(StatusCodes.Status413PayloadTooLarge);
         var payload = await ReadBoundedPayloadAsync(Request.Body, settings.MaximumPayloadBytes, cancellationToken);
@@ -49,6 +51,19 @@ public sealed class AccountCheckoutWebhookController(CustomMediator mediator,
             AccountCheckoutWebhookDisposition.Invalid => BadRequest(),
             _ => Ok()
         };
+    }
+
+    private static string? JoinBoundedSignatureHeaders(string[]? signatureHeaders, int maximumLength)
+    {
+        if (signatureHeaders is null || signatureHeaders.Length == 0) return string.Empty;
+        var combinedLength = signatureHeaders.Length - 1;
+        if (combinedLength > maximumLength) return null;
+        foreach (var header in signatureHeaders)
+        {
+            if (header.Length > maximumLength - combinedLength) return null;
+            combinedLength += header.Length;
+        }
+        return string.Join(',', signatureHeaders);
     }
 
     private static async Task<string?> ReadBoundedPayloadAsync(Stream body, int maximumBytes,

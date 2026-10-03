@@ -14,6 +14,7 @@ public sealed class AccountCheckoutWebhookService(
     IAccountStripeCheckoutClient provider,
     IAccountCheckoutLeaseStore leases) : IAccountCheckoutWebhookService
 {
+    private const string PaymentIntentObjectType = "payment_intent";
 
     public async Task<AccountCheckoutWebhookDisposition> HandleAsync(string payload, string? signature,
         CancellationToken cancellationToken)
@@ -82,20 +83,20 @@ public sealed class AccountCheckoutWebhookService(
         {
             case "checkout.session":
                 sessionId = ReadString(providerObject, "id");
-                intentId = ReadExpandableId(providerObject, "payment_intent");
+                intentId = ReadExpandableId(providerObject, PaymentIntentObjectType);
                 if (metadataAttempt is null && Guid.TryParse(ReadString(providerObject, "client_reference_id"), out var clientRef))
                     metadataAttempt = clientRef;
                 break;
-            case "payment_intent":
+            case PaymentIntentObjectType:
                 intentId = ReadString(providerObject, "id");
                 chargeId = ReadExpandableId(providerObject, "latest_charge");
                 break;
             case "charge":
                 chargeId = ReadString(providerObject, "id");
-                intentId = ReadExpandableId(providerObject, "payment_intent");
+                intentId = ReadExpandableId(providerObject, PaymentIntentObjectType);
                 break;
             case "refund":
-                intentId = ReadExpandableId(providerObject, "payment_intent");
+                intentId = ReadExpandableId(providerObject, PaymentIntentObjectType);
                 chargeId = ReadExpandableId(providerObject, "charge");
                 break;
             case "dispute":
