@@ -136,6 +136,7 @@ public sealed class AccountDebtProjectionTests
     public void Voided_unit_uses_the_original_discounted_line_share_without_redistributing_it()
     {
         var order = DiscountedMultiUnitRound();
+        order.BillingCreditAmount = 10.01m;
         var amendment = Amendment(order.Id, RangeChange(SecondItem, OrderAmendmentChangeKind.Void, 1, 1));
 
         var result = AccountDebtProjection.Project([order], new("CHF"), [], [], [amendment]);
@@ -150,6 +151,7 @@ public sealed class AccountDebtProjectionTests
     public void Replacement_addition_is_counted_once_as_its_supplement_order()
     {
         var source = DiscountedMultiUnitRound();
+        source.BillingCreditAmount = 10.01m;
         var supplementId = Guid.NewGuid();
         var supplementItemId = Guid.NewGuid();
         var supplement = new Order
@@ -216,6 +218,7 @@ public sealed class AccountDebtProjectionTests
             Items = [new OrderItem { Id = FirstItem, OrderId = OrderId,
                 Quantity = 3, ItemTotal = 30.01m, CreatedBy = "test" }]
         };
+        order.BillingCreditAmount = 10m;
         var amendment = Amendment(order.Id, RangeChange(FirstItem, OrderAmendmentChangeKind.Void, 2, 1));
 
         var result = AccountDebtProjection.Project([order], new("CHF"), [], [], [amendment]);
@@ -243,6 +246,7 @@ public sealed class AccountDebtProjectionTests
             Items = [new OrderItem { Id = FirstItem, OrderId = OrderId,
                 Quantity = 3, ItemTotal = 30.01m, CreatedBy = "test" }]
         };
+        order.BillingCreditAmount = 10.01m;
         var amendment = Amendment(order.Id, RangeChange(FirstItem, OrderAmendmentChangeKind.Void, 1, 1));
 
         var result = AccountDebtProjection.Project([order], new("CHF"),

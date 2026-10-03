@@ -32,6 +32,9 @@ public class TableServiceSession : Entity
     /// </summary>
     public long AccountRevision { get; set; } = 1;
 
+    /// <summary>Immutable charge-scope model: 0 preserves legacy allocations; 1 separates tips/fees.</summary>
+    public int BillingAllocationVersion { get; set; } = 1;
+
     /// <summary>Advances both session-write and account-content concurrency markers.</summary>
     public void RecordAccountChange()
     {

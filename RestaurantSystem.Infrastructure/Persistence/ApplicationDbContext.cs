@@ -102,6 +102,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderPayment> OrderPayments { get; set; }
         public DbSet<TableBillPaymentOperation> TableBillPaymentOperations { get; set; }
         public DbSet<OrderAmendment> OrderAmendments { get; set; }
+        public DbSet<OrderBillingCredit> OrderBillingCredits { get; set; }
         public DbSet<TableGuestAdmission> TableGuestAdmissions { get; set; }
         public DbSet<TableGuestParticipant> TableGuestParticipants { get; set; }
         public DbSet<TableGuestRoundOperation> TableGuestRoundOperations { get; set; }
@@ -367,6 +368,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         private void ApplyAuditInformation()
         {
             ChangeTracker.DetectChanges();
+            OrderBillingCreditInvariant.AssertAppendOnly(ChangeTracker);
 
             var now = DateTime.UtcNow;
             var userId = _auditIdentity?.GetAuditIdentifier() ?? "System";

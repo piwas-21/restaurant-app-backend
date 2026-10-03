@@ -84,7 +84,8 @@ internal sealed class ServerFloorSnapshotProjector
             OrderCount = legacyOperational.Count,
             ActiveOrderCount = legacyOperational.Count(IsActiveRound),
             ReadyOrderCount = legacyOperational.Count(IsReady),
-            Outstanding = legacyOperational.Sum(order => Math.Max(0m, order.RemainingAmount))
+            Outstanding = legacyOperational.Sum(order => TableServiceSessionCloseRules.EffectiveOutstanding(
+                order.Total, order.BillingCreditAmount, order.TotalPaid))
         };
 
         return new ServerFloorTableDto
@@ -121,11 +122,12 @@ internal sealed class ServerFloorSnapshotProjector
     {
         var members = session.Bill?.Rounds
             .Select(round => new TableServiceSessionOrderState(
-                ParseStatus(round.Order.Status), round.Order.RemainingAmount,
+                ParseStatus(round.Order.Status), round.Outstanding,
                 round.Order.PaymentStatus == nameof(PaymentStatus.Refunded)))
             .ToList() ?? [];
         var legacyStates = legacy.Select(order =>
-            new TableServiceSessionOrderState(order.Status, order.RemainingAmount));
+            TableServiceSessionCloseRules.FromCharge(
+                order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid));
         var assessment = TableServiceSessionCloseRules.Assess(
             members, legacyStates, _paymentTolerance);
         var bill = session.Bill;
@@ -191,7 +193,8 @@ internal sealed class ServerFloorSnapshotProjector
 
     private bool IsBlockingLegacy(FloorOrderRow order) =>
         TableServiceSessionCloseRules.IsBlockingLegacyOrder(
-            new TableServiceSessionOrderState(order.Status, order.RemainingAmount), _paymentTolerance);
+            TableServiceSessionCloseRules.FromCharge(
+                order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid), _paymentTolerance);
 
     private static OrderStatus ParseStatus(string value) =>
         Enum.TryParse<OrderStatus>(value, ignoreCase: true, out var status)

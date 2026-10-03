@@ -668,8 +668,27 @@ public sealed class AccountDebtSnapshotReaderTests(DatabaseFixture fixture) : In
             OrderAmendmentLoyaltyState.None, OrderAmendmentRefundState.None);
         context.TableServiceSessions.Add(session);
         context.Orders.AddRange(source, supplement);
-        context.Set<OrderAmendment>().Add(NewAmendment(session.Id, source.Id,
-            OrderAmendmentJson.Serialize(new[] { change }), financial, supplement.Id));
+        var amendment = NewAmendment(session.Id, source.Id,
+            OrderAmendmentJson.Serialize(new[] { change }), financial, supplement.Id);
+        amendment.SourceSnapshotJson = OrderAmendmentJson.Serialize(new OrderAmendmentSourceSnapshot(
+            source.Id, source.OrderNumber, source.Type, source.Status, source.IsKitchenReleased,
+            session.Id, source.Version, "CHF", source.Total,
+            [new OrderItemDto { Id = oldItem.Id, Quantity = 3, UnitPrice = oldItem.UnitPrice,
+                ItemTotal = 30.01m }]));
+        source.BillingCreditAmount = 10.01m;
+        source.RemainingAmount = 20m;
+        context.Set<OrderAmendment>().Add(amendment);
+        context.OrderBillingCredits.Add(new OrderBillingCredit
+        {
+            Id = Guid.NewGuid(),
+            SourceOrderId = source.Id,
+            AmendmentId = amendment.Id,
+            AmountMinor = 1001,
+            Currency = "CHF",
+            ActorUserId = amendment.ActorUserId,
+            ActorRole = amendment.ActorRole,
+            CreatedBy = "test"
+        });
         await context.SaveChangesAsync();
         return session.Id;
     }

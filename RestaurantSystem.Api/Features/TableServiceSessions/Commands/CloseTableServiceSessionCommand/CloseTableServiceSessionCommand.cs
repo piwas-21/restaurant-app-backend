@@ -99,27 +99,26 @@ public sealed partial class CloseTableServiceSessionCommandHandler
                 .Where(order => !order.IsDeleted
                     && order.Type == OrderType.DineIn
                     && order.ServiceSessionId == null)
-                .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus })
+                .SelectCloseCharges()
                 .ToListAsync(cancellationToken);
             var memberRows = await _context.Orders
                 .Where(order => !order.IsDeleted && order.ServiceSessionId == session.Id)
-                .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus, order.OrderNumber })
+                .SelectCloseCharges()
                 .ToListAsync(cancellationToken);
+            var memberStates = memberRows.Select(order => order.ToState()).ToList();
+            var legacyStates = legacyOrders.Select(order => order.ToState()).ToList();
             var assessment = TableServiceSessionCloseRules.Assess(
-                memberRows.Select(order =>
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)),
-                legacyOrders.Select(order =>
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)),
+                memberStates,
+                legacyStates,
                 _paymentTolerance);
             if (assessment.LegacyActiveOrderCount > 0)
             {
                 return Ambiguous();
             }
 
-            var unresolved = memberRows
-                .Where(order => TableServiceSessionCloseRules.IsUnresolvedMemberOrder(
-                    new TableServiceSessionOrderState(order.Status, order.RemainingAmount, order.PaymentStatus == PaymentStatus.Refunded)))
-                .Select(order => order.OrderNumber)
+            var unresolved = memberRows.Zip(memberStates)
+                .Where(pair => TableServiceSessionCloseRules.IsUnresolvedMemberOrder(pair.Second))
+                .Select(pair => pair.First.OrderNumber)
                 .ToList();
             if (assessment.Outstanding > _paymentTolerance || unresolved.Count > 0)
             {

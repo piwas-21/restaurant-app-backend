@@ -173,9 +173,9 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         query = TableServiceSessionCloseRules.ForUnassignedSession(
             query, tableId, tableNumber);
         var rows = await query
-            .Select(order => new { order.Status, order.RemainingAmount, order.PaymentStatus })
+            .SelectCloseCharges()
             .ToListAsync(cancellationToken);
-        return rows.Select(row => new TableServiceSessionOrderState(row.Status, row.RemainingAmount, row.PaymentStatus == PaymentStatus.Refunded)).ToList();
+        return rows.Select(row => row.ToState()).ToList();
     }
 
     private async Task<Dictionary<Guid, List<TableServiceSessionOrderState>>> ReadLegacyOrdersBySessionAsync(
@@ -204,14 +204,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
             .Where(order => (order.TableId.HasValue && tableIds.Contains(order.TableId.Value))
                 || (!order.TableId.HasValue && order.TableNumber.HasValue
                     && tableNumbers.Contains(order.TableNumber.Value)))
-            .Select(order => new
-            {
-                order.TableId,
-                order.TableNumber,
-                order.Status,
-                order.PaymentStatus,
-                order.RemainingAmount
-            })
+            .SelectCloseCharges()
             .ToListAsync(cancellationToken);
         var byTableId = rows
             .Where(row => row.TableId.HasValue)
@@ -232,7 +225,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
                 ? numberRows
                 : [];
             return stableRows.Concat(legacyRows)
-                .Select(row => new TableServiceSessionOrderState(row.Status, row.RemainingAmount, row.PaymentStatus == PaymentStatus.Refunded))
+                .Select(row => row.ToState())
                 .ToList();
         });
     }
@@ -245,10 +238,11 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         DateTime now,
         string? currency)
     {
-        var members = bill.Rounds.Select(round =>
-            new TableServiceSessionOrderState(ParseStatus(round.Order.Status), round.Order.RemainingAmount,
-                round.Order.PaymentStatus == nameof(PaymentStatus.Refunded)));
-        var assessment = TableServiceSessionCloseRules.Assess(members, legacy, _paymentTolerance);
+        var memberStates = bill.Rounds.Select(round =>
+            new TableServiceSessionOrderState(ParseStatus(round.Order.Status), round.Outstanding,
+                round.Order.PaymentStatus == nameof(PaymentStatus.Refunded))).ToList();
+        bill.Remaining = memberStates.Sum(TableServiceSessionCloseRules.Outstanding);
+        var assessment = TableServiceSessionCloseRules.Assess(memberStates, legacy, _paymentTolerance);
         var isOpen = session.Status == TableServiceSessionStatus.Open;
         var hasPendingHandoff = handoff?.Status == nameof(TableServicePaymentHandoffStatus.Requested);
         var hasTenderRole = _currentUser is null

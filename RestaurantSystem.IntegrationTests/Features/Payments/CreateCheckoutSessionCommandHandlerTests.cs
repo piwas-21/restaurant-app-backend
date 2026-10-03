@@ -5,6 +5,9 @@ using Microsoft.Extensions.Options;
 using Moq;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
+using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Services;
@@ -386,11 +389,76 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         (await verify.OrderCheckoutSessions.AnyAsync()).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Checkout_charges_effective_total_after_materialized_food_credit()
+    {
+        var orderId = await SeedOrderAsync(total: 42.50m, seedProcessingPayment: false);
+        var actorId = Guid.Parse("8aa8c1ca-0061-49cc-b694-caa2035ba71d");
+        await SeedResolvedCreditAsync(orderId, actorId, materialize: true);
+        await SeedProcessingOnlinePaymentAsync(orderId, amount: 40m);
+        var checkout = FakeCheckout(out var captured);
+
+        await HandleAsync(orderId, checkout);
+
+        captured.Should().ContainSingle();
+        captured[0].AmountMinor.Should().Be(4000,
+            "42.50 original charge less the immutable 2.50 food credit leaves 40.00 payable");
+        captured[0].Currency.Should().Be("chf");
+
+        await using var verify = _fixture.CreateContext();
+        var source = await verify.Orders.IgnoreAutoIncludes().SingleAsync(order => order.Id == orderId);
+        source.Total.Should().Be(42.50m, "the original order charge remains immutable");
+        source.BillingCreditAmount.Should().Be(2.50m);
+        source.PayableTotal.Should().Be(40m);
+
+        var credit = await verify.OrderBillingCredits.SingleAsync(value => value.SourceOrderId == orderId);
+        credit.AmountMinor.Should().Be(250);
+        credit.Currency.Should().Be("CHF");
+        credit.ActorUserId.Should().Be(actorId);
+        credit.ActorRole.Should().Be("Cashier");
+        (await verify.OrderBillingCredits.CountAsync()).Should().Be(1);
+
+        var payment = await verify.OrderPayments.SingleAsync(value => value.OrderId == orderId);
+        payment.PaymentMethod.Should().Be(PaymentMethod.OnlinePayment);
+        payment.Status.Should().Be(PaymentStatus.Processing);
+        payment.Amount.Should().Be(40m);
+
+        var session = await verify.OrderCheckoutSessions.SingleAsync(value => value.OrderId == orderId);
+        session.AmountMinor.Should().Be(4000);
+        session.Currency.Should().Be("chf");
+    }
+
+    [Fact]
+    public async Task Resolved_positive_credit_without_its_ledger_blocks_checkout_before_stripe()
+    {
+        var orderId = await SeedOrderAsync(total: 42.50m, seedProcessingPayment: false);
+        var actorId = Guid.Parse("8aa8c1ca-0061-49cc-b694-caa2035ba71d");
+        await SeedResolvedCreditAsync(orderId, actorId, materialize: false);
+        await SeedProcessingOnlinePaymentAsync(orderId, amount: 42.50m);
+        var checkout = FakeCheckout(out var captured, strict: true);
+
+        var act = () => HandleAsync(orderId, checkout);
+
+        await act.Should().ThrowAsync<ConflictException>();
+        captured.Should().BeEmpty("the billing evidence is inconsistent before any provider request");
+        checkout.Verify(client => client.CreateAsync(
+            It.IsAny<CheckoutSessionRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        checkout.Verify(client => client.GetAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        checkout.Verify(client => client.ExpireAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        await using var verify = _fixture.CreateContext();
+        (await verify.OrderCheckoutSessions.AnyAsync(value => value.OrderId == orderId)).Should().BeFalse();
+        (await verify.OrderBillingCredits.AnyAsync(value => value.SourceOrderId == orderId)).Should().BeFalse();
+    }
+
     private async Task<Guid> SeedOrderAsync(
         decimal total,
         OrderStatus status = OrderStatus.Pending,
         PaymentMethod paymentMethod = PaymentMethod.OnlinePayment,
-        PaymentStatus paymentStatus = PaymentStatus.Processing)
+        PaymentStatus paymentStatus = PaymentStatus.Processing,
+        bool seedProcessingPayment = true)
     {
         await using var seed = _fixture.CreateContext();
         var order = new Order
@@ -406,19 +474,114 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             CreatedAt = DateTime.UtcNow,
             CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
         };
-        order.Payments.Add(new OrderPayment
+        if (seedProcessingPayment)
         {
-            PaymentMethod = paymentMethod,
-            Amount = total,
-            Status = paymentStatus,
-            PaymentDate = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
-        });
+            order.Payments.Add(new OrderPayment
+            {
+                PaymentMethod = paymentMethod,
+                Amount = total,
+                Status = paymentStatus,
+                PaymentDate = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
+            });
+        }
 
         seed.Orders.Add(order);
         await seed.SaveChangesAsync();
         return order.Id;
+    }
+
+    private async Task SeedResolvedCreditAsync(Guid orderId, Guid actorId, bool materialize)
+    {
+        await using var seed = _fixture.CreateContext();
+        var order = await seed.Orders.SingleAsync(value => value.Id == orderId);
+        var now = DateTime.UtcNow;
+        const long creditMinor = 250;
+        var removedItemId = Guid.NewGuid();
+        var retainedItemId = Guid.NewGuid();
+        order.Items =
+        [
+            new OrderItem { Id = removedItemId, OrderId = orderId, Quantity = 1,
+                UnitPrice = 2.50m, ItemTotal = 2.50m, ProductName = "Removed item", CreatedBy = "test" },
+            new OrderItem { Id = retainedItemId, OrderId = orderId, Quantity = 1,
+                UnitPrice = 40m, ItemTotal = 40m, ProductName = "Retained item", CreatedBy = "test" }
+        ];
+        seed.OrderItems.AddRange(order.Items);
+        var snapshotItems = new[]
+        {
+            new OrderItemDto
+                { Id = removedItemId, Quantity = 1, UnitPrice = 2.50m, ItemTotal = 2.50m },
+            new OrderItemDto
+                { Id = retainedItemId, Quantity = 1, UnitPrice = 40m, ItemTotal = 40m }
+        };
+        var amendment = new OrderAmendment
+        {
+            Id = Guid.NewGuid(),
+            SourceOrderId = orderId,
+            ActorUserId = actorId,
+            ActorRole = "Cashier",
+            State = OrderAmendmentState.Committed,
+            PayloadHash = new string('b', 64),
+            ExpectedOrderVersion = order.Version,
+            ExpiresAt = now.AddMinutes(10),
+            CommittedAt = now,
+            RequestJson = "{}",
+            ChangesJson = OrderAmendmentJson.Serialize(new[]
+            {
+                new OrderAmendmentChangeSnapshot(removedItemId, OrderAmendmentChangeKind.Void,
+                    1, 1, false, snapshotItems[0], null)
+            }),
+            SourceSnapshotJson = OrderAmendmentJson.Serialize(new OrderAmendmentSourceSnapshot(
+                orderId, order.OrderNumber, order.Type, order.Status, order.IsKitchenReleased,
+                order.ServiceSessionId, order.Version, "CHF", order.Total, snapshotItems)),
+            FinancialResolutionJson = OrderAmendmentJson.Serialize(new OrderAmendmentFinancialPreviewDto(
+                "CHF", 0, creditMinor, -creditMinor, creditMinor,
+                OrderAmendmentFinancialResolutionStatus.Resolved,
+                OrderAmendmentCreditState.BalanceReduction,
+                OrderAmendmentLoyaltyState.None,
+                OrderAmendmentRefundState.None)),
+            CreatedAt = now,
+            CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests)
+        };
+        seed.OrderAmendments.Add(amendment);
+
+        if (materialize)
+        {
+            order.BillingCreditAmount = creditMinor / 100m;
+            order.RemainingAmount = order.Total - order.BillingCreditAmount;
+            seed.OrderBillingCredits.Add(new OrderBillingCredit
+            {
+                Id = Guid.NewGuid(),
+                SourceOrderId = orderId,
+                AmendmentId = amendment.Id,
+                AmountMinor = creditMinor,
+                Currency = "CHF",
+                ActorUserId = actorId,
+                ActorRole = "Cashier",
+                CreatedAt = now,
+                CreatedBy = actorId.ToString()
+            });
+        }
+
+        await seed.SaveChangesAsync();
+    }
+
+    private async Task SeedProcessingOnlinePaymentAsync(Guid orderId, decimal amount)
+    {
+        await using var seed = _fixture.CreateContext();
+        seed.OrderPayments.Add(new OrderPayment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            PaymentMethod = PaymentMethod.OnlinePayment,
+            Amount = amount,
+            Status = PaymentStatus.Processing,
+            PaymentDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests)
+        });
+        await seed.SaveChangesAsync();
     }
 
     private async Task SeedLiveSessionAsync(Guid orderId)
@@ -446,7 +609,7 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
     /// codebase, not the one Stripe echoes back.
     /// </summary>
     private static Mock<IStripeCheckoutClient> FakeCheckout(
-        out List<CheckoutSessionRequest> captured, bool urlless = false)
+        out List<CheckoutSessionRequest> captured, bool urlless = false, bool strict = false)
     {
         var requests = new List<CheckoutSessionRequest>();
         captured = requests;
@@ -456,7 +619,7 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         // on the unique index and the test fails for a reason the product does not have.
         var instance = Guid.NewGuid().ToString("N")[..6];
 
-        var mock = new Mock<IStripeCheckoutClient>();
+        var mock = new Mock<IStripeCheckoutClient>(strict ? MockBehavior.Strict : MockBehavior.Loose);
         mock.Setup(c => c.CreateAsync(It.IsAny<CheckoutSessionRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((CheckoutSessionRequest request, CancellationToken _) =>
             {

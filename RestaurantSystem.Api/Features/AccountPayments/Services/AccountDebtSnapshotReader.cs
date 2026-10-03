@@ -59,6 +59,7 @@ internal sealed class AccountDebtSnapshotReader(ApplicationDbContext context) : 
             throw new ConflictException("A committed amendment references an unavailable source order.");
         foreach (var amendment in amendments)
             OrderAmendmentFinancialGuard.AssertResolved(amendment.FinancialResolutionJson);
+        await OrderBillingCreditConsistency.AssertAsync(context, orderIds, cancellationToken);
         ValidateCurrency(orders, money.Currency);
         AccountCheckoutEvidenceGuard.Validate(orders, checkouts, attempts, money);
         ValidateAttemptScopes(attempts, money);
@@ -66,7 +67,8 @@ internal sealed class AccountDebtSnapshotReader(ApplicationDbContext context) : 
             .SelectMany(value => value.Allocations).Select(Segment).ToArray();
         var reserved = attempts.Where(value => value.State.HoldsReservation())
             .SelectMany(value => value.Allocations).Select(Segment).ToArray();
-        var debt = AccountDebtProjection.Project(orders, money, captured, reserved, amendments);
+        var debt = AccountDebtProjection.Project(orders, money, captured, reserved, amendments,
+            session.BillingAllocationVersion);
         return new(session, money, debt);
     }
 

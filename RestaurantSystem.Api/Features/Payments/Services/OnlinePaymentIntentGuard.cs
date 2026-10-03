@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Domain.Common.Enums;
@@ -26,6 +27,8 @@ public sealed class OnlinePaymentIntentGuard : IOnlinePaymentIntentGuard
 
     public async Task EnsureProcessingAsync(Guid orderId, CancellationToken cancellationToken)
     {
+        await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+            _context, orderId, cancellationToken);
         var hasProcessingOnlinePayment = await _context.OrderPayments
             .AnyAsync(payment => payment.OrderId == orderId
                 && payment.PaymentMethod == PaymentMethod.OnlinePayment
@@ -44,6 +47,8 @@ public sealed class OnlinePaymentIntentGuard : IOnlinePaymentIntentGuard
         var auditId = _currentUser.GetAuditIdentifier();
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, orderId, cancellationToken);
+        await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
             _context, orderId, cancellationToken);
         var sessionId = await _context.Orders.AsNoTracking().Where(value => value.Id == orderId)
             .Select(value => value.ServiceSessionId).SingleOrDefaultAsync(cancellationToken);

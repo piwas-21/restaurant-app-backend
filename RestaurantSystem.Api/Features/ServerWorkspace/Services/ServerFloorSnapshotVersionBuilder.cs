@@ -41,7 +41,8 @@ internal static class ServerFloorSnapshotVersionBuilder
             + ';' + string.Join('|', orders.Where(order => IsVersionRelevant(order, paymentTolerance))
                 .OrderBy(order => order.Id)
                 .Select(order => $"o:{order.Id}:{order.ServiceSessionId}:{order.TableId}:{order.TableNumber}:"
-                    + $"{order.Status}:{order.Total}:{order.TotalPaid}:{order.RemainingAmount}:{order.CanCollect}"))
+                    + $"{order.Status}:{order.Total}:{order.BillingCreditAmount}:{order.TotalPaid}:"
+                    + $"{order.RemainingAmount}:{order.CanCollect}"))
             + ';' + string.Join('|', reservations.OrderBy(item => item.Key)
                 .Select(item => $"r:{item.Value.ReservationId}:{item.Key}:{item.Value.CustomerName}:"
                     + $"{item.Value.ReservationDate:O}:{item.Value.Status}:{item.Value.StartTime}:"
@@ -54,7 +55,8 @@ internal static class ServerFloorSnapshotVersionBuilder
         order.ServiceSessionId.HasValue
             ? order.Status != OrderStatus.Cancelled
             : IsOccupyingLegacy(order) || TableServiceSessionCloseRules.IsBlockingLegacyOrder(
-                new TableServiceSessionOrderState(order.Status, order.RemainingAmount), paymentTolerance);
+                TableServiceSessionCloseRules.FromCharge(
+                    order.Status, order.Total, order.BillingCreditAmount, order.TotalPaid), paymentTolerance);
 
     private static bool IsOccupyingLegacy(FloorOrderRow order) =>
         order.Status is OrderStatus.Pending or OrderStatus.PendingApproval or OrderStatus.Confirmed

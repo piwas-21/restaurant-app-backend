@@ -21,6 +21,7 @@ internal sealed record FloorOrderRow(
     int? TableNumber,
     OrderStatus Status,
     decimal Total,
+    decimal BillingCreditAmount,
     decimal TotalPaid,
     decimal RemainingAmount,
     bool CanCollect);

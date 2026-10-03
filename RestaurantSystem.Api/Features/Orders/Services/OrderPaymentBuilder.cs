@@ -126,7 +126,7 @@ public class OrderPaymentBuilder : IOrderPaymentBuilder
             - order.Payments.Sum(p => p.RefundedAmount ?? 0);
 
         order.TotalPaid = totalPaid;
-        order.RemainingAmount = order.Total - totalPaid;
+        order.RemainingAmount = order.PayableTotal - totalPaid;
 
         if (order.RemainingAmount <= PaymentTolerance)
         {

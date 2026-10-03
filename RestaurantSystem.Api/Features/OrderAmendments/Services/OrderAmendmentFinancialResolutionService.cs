@@ -1,5 +1,5 @@
-using System.Numerics;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -12,8 +12,14 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
     private const int MinorUnitsPerMajor = 100;
     private readonly IOrderDisplayCurrencyResolver _currencyResolver;
 
-    public OrderAmendmentFinancialResolutionService(IOrderDisplayCurrencyResolver currencyResolver) =>
+    private readonly IOrderBillingAdjustmentWriter _billing;
+
+    public OrderAmendmentFinancialResolutionService(
+        IOrderDisplayCurrencyResolver currencyResolver, IOrderBillingAdjustmentWriter billing)
+    {
         _currencyResolver = currencyResolver;
+        _billing = billing;
+    }
 
     public Task<OrderAmendmentFinancialPreviewDto> PreviewAsync(
         Order source,
@@ -27,7 +33,7 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
 
         var currencyLabel = source.ServiceSession?.Currency ?? _currencyResolver.Resolve(source);
         var currency = CheckoutAmount.From(1m, currencyLabel).Currency.ToUpperInvariant();
-        var removed = CalculateRemovedMinor(source, changes);
+        var removed = CalculateRemovedMinor(source, changes, new AccountMoney(currency));
         var added = supplement is null
             ? 0
             : ToMinor(Math.Max(0m, supplement.Total
@@ -39,8 +45,9 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         var hasCapturedOrUnattributedTender = captured.Count > 0 || hasUnattributedPaidAmount;
         var hasCredit = removed > 0;
         var hasLoyalty = hasCredit
-            && (source.FidelityPointsEarned > 0 || source.FidelityPointsRedeemed > 0);
-        var states = ResolveStates(hasCredit, hasLoyalty, hasCapturedOrUnattributedTender, captured);
+            && (source.FidelityPointsEarned > 0 || source.FidelityPointsRedeemed > 0 || source.FidelityPointsDiscount > 0);
+        var states = ResolveStates(hasCredit, hasLoyalty, hasCapturedOrUnattributedTender,
+            source.Tax != 0, captured);
 
         return Task.FromResult(new OrderAmendmentFinancialPreviewDto(
             currency, added, removed, checked(added - removed), removed,
@@ -62,10 +69,11 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         bool hasCredit,
         bool hasLoyalty,
         bool hasCapturedOrUnattributedTender,
+        bool hasTax,
         IReadOnlyList<OrderPayment> captured)
     {
         var refund = DetermineRefundState(hasCredit, hasCapturedOrUnattributedTender, captured);
-        var credit = DetermineCreditState(hasCredit, hasCapturedOrUnattributedTender);
+        var credit = DetermineCreditState(hasCredit, hasCapturedOrUnattributedTender, hasTax);
         var loyalty = hasLoyalty ? OrderAmendmentLoyaltyState.PendingReview : OrderAmendmentLoyaltyState.None;
         var status = hasCredit
             ? OrderAmendmentFinancialResolutionStatus.Pending
@@ -88,16 +96,16 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
     }
 
     private static OrderAmendmentCreditState DetermineCreditState(
-        bool hasCredit, bool hasCapturedOrUnattributedTender)
+        bool hasCredit, bool hasCapturedOrUnattributedTender, bool hasTax)
     {
         if (!hasCredit)
             return OrderAmendmentCreditState.None;
-        if (!hasCapturedOrUnattributedTender)
+        if (!hasCapturedOrUnattributedTender && !hasTax)
             return OrderAmendmentCreditState.BalanceReduction;
         return OrderAmendmentCreditState.PendingAllocationReview;
     }
 
-    public Task StageAsync(
+    public async Task StageAsync(
         OrderAmendment amendment,
         Order source,
         OrderAmendmentFinancialPreviewDto preview,
@@ -109,84 +117,36 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
             && preview.RefundState == OrderAmendmentRefundState.None
                 ? preview with { ResolutionStatus = OrderAmendmentFinancialResolutionStatus.Resolved }
                 : preview;
+        if (committed.ResolutionStatus == OrderAmendmentFinancialResolutionStatus.Resolved
+            && committed.CreditState == OrderAmendmentCreditState.BalanceReduction)
+            await _billing.StageUnpaidCreditAsync(source, amendment, committed, cancellationToken);
+        // Resolution is published only after the durable credit and effective balance are staged.
         amendment.FinancialResolutionJson = OrderAmendmentJson.Serialize(committed);
-        return Task.CompletedTask;
     }
 
     private static long CalculateRemovedMinor(
-        Order source, IReadOnlyList<OrderAmendmentChangeSnapshot> changes)
+        Order source, IReadOnlyList<OrderAmendmentChangeSnapshot> changes, AccountMoney money)
     {
-        var removals = changes
-            .Where(change => change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
-            .ToList();
-        if (removals.Count == 0)
+        var removals = changes.Where(change => change.Kind is
+            OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace).ToArray();
+        if (removals.Length == 0)
             return 0;
-
-        var lines = source.Items.Where(item => !item.ParentOrderItemId.HasValue).ToList();
-        var weights = lines.Select(item => Math.Max(0, ToMinor(item.ItemTotal))).ToArray();
-        var foodTotal = Math.Max(0, ToMinor(
-            source.Total - Math.Max(0m, source.Tip) - Math.Max(0m, source.DeliveryFee)));
-        var lineShares = Allocate(foodTotal, weights);
-        var lineIndexes = lines.Select((line, index) => (line.Id, index))
-            .ToDictionary(pair => pair.Id, pair => pair.index);
+        var frozen = FrozenOrderChargeMath.Read(source, money);
+        var lines = frozen.FoodLines.ToDictionary(line => line.Item.Id);
         long removed = 0;
-
         foreach (var change in removals)
         {
-            if (!lineIndexes.TryGetValue(change.OrderItemId, out var index))
-                continue;
-            var sourceLine = lines[index];
-            var quantity = change.Quantity;
-            if (quantity >= sourceLine.Quantity)
-            {
-                removed = checked(removed + lineShares[index]);
-                continue;
-            }
-
-            var perUnit = lineShares[index] / sourceLine.Quantity;
-            var remainder = (int)(lineShares[index] % sourceLine.Quantity);
-            var end = (long)change.StartOrdinal + quantity - 1;
-            var highValueUnits = Math.Max(0L,
-                Math.Min(end, remainder) - change.StartOrdinal + 1);
-            removed = checked(removed + (perUnit * quantity) + highValueUnits);
+            if (!lines.TryGetValue(change.OrderItemId, out var line))
+                throw new RestaurantSystem.Api.Common.Exceptions.ConflictException(
+                    "The removed food line is absent from the frozen order.");
+            removed = checked(removed + FrozenOrderChargeMath.RemovedUnits(
+                line, change.StartOrdinal, change.Quantity));
         }
-
         return removed;
-    }
-
-    private static long[] Allocate(long total, long[] weights)
-    {
-        if (weights.Length == 0 || total <= 0)
-            return new long[weights.Length];
-        var denominator = weights.Aggregate(BigInteger.Zero, (sum, weight) => sum + Math.Max(0, weight));
-        if (denominator == BigInteger.Zero)
-            return new long[weights.Length];
-
-        var allocations = new long[weights.Length];
-        var remainders = new BigInteger[weights.Length];
-        long allocated = 0;
-        for (var index = 0; index < weights.Length; index++)
-        {
-            var numerator = new BigInteger(total) * Math.Max(0, weights[index]);
-            allocations[index] = (long)(numerator / denominator);
-            remainders[index] = numerator % denominator;
-            allocated = checked(allocated + allocations[index]);
-        }
-
-        var remaining = total - allocated;
-        foreach (var index in Enumerable.Range(0, weights.Length)
-                     .OrderByDescending(index => remainders[index]).ThenBy(index => index)
-                     .Take((int)Math.Min(remaining, weights.Length)))
-        {
-            allocations[index]++;
-        }
-
-        return allocations;
     }
 
     private static long ToMinor(decimal amount) => checked(decimal.ToInt64(
         decimal.Round(amount, 2, MidpointRounding.AwayFromZero) * MinorUnitsPerMajor));
-
     private sealed record ResolutionStates(
         OrderAmendmentFinancialResolutionStatus Status,
         OrderAmendmentCreditState Credit,

@@ -96,9 +96,9 @@ public class CreateCheckoutSessionCommandHandler
             ?? throw new NotFoundException("Order not found");
         OnlinePaymentEligibility.EnsurePayable(order);
         await _intentGuard.EnsureProcessingAsync(order.Id, cancellationToken);
-        // One call for both numbers: the amount is still the PERSISTED order total and nothing
+        // One call for both numbers: the amount is still the effective persisted charge after amendment credits and nothing
         // else, and the fee is a share of that same amount. See ICheckoutChargeResolver.
-        var (amount, applicationFeeMinor) = _charge.Resolve(order.Total);
+        var (amount, applicationFeeMinor) = _charge.Resolve(order.PayableTotal);
         var existing = await _context.OrderCheckoutSessions
             .Where(s => s.OrderId == order.Id)
             .OrderByDescending(s => s.CreatedAt)

@@ -157,7 +157,7 @@ public sealed class AccountPaymentCaptureWriter(
     {
         var paidMinor = order.Payments.Where(value => value.Status.IsCaptured())
             .DistinctBy(value => value.Id).Sum(value => money.ToMinor(value.Amount));
-        var totalMinor = money.ToMinor(order.Total);
+        var totalMinor = money.ToMinor(order.PayableTotal);
         if (paidMinor > totalMinor)
             throw new ConflictException("Collection exceeds the frozen order charge.");
         order.TotalPaid = money.ToMajor(paidMinor);

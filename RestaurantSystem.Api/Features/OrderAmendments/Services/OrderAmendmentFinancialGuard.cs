@@ -24,6 +24,7 @@ public static class OrderAmendmentFinancialGuard
 
         if (resolutions.Any(IsUnresolved))
             throw PendingResolution();
+        await OrderBillingCreditConsistency.AssertAsync(context, new[] { sourceOrderId }, cancellationToken);
     }
 
     public static async Task AssertNoPendingSessionResolutionAsync(
@@ -40,6 +41,10 @@ public static class OrderAmendmentFinancialGuard
 
         if (resolutions.Any(IsUnresolved))
             throw PendingResolution();
+        var orderIds = await context.Orders.AsNoTracking()
+            .Where(order => order.ServiceSessionId == serviceSessionId)
+            .Select(order => order.Id).ToListAsync(cancellationToken);
+        await OrderBillingCreditConsistency.AssertAsync(context, orderIds, cancellationToken);
     }
 
     internal static bool IsUnresolved(string? json) =>

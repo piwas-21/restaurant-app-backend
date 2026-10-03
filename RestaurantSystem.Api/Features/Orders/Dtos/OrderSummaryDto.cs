@@ -1,6 +1,6 @@
 ﻿namespace RestaurantSystem.Api.Features.Orders.Dtos;
 
-public record OrderSummaryDto
+public partial record OrderSummaryDto
 {
     public Guid Id { get; set; }
     public string OrderNumber { get; set; } = null!;
