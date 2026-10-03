@@ -6,6 +6,7 @@ namespace RestaurantSystem.Channels.Api;
 internal static class CategoryCatalogueMenuPlanner
 {
     private const string UnavailableTax = "ReviewedTaxProfileUnavailable";
+    private const string IncompatibleTemplate = "ReviewedTemplateIncompatible";
 
     public static CatalogueMenuPlan Build(JsonElement template, TenantStoreBinding store, TenantCatalogueSnapshot source)
     {
@@ -25,9 +26,10 @@ internal static class CategoryCatalogueMenuPlanner
                 BlockReason = row.BlockReason.Length == 0
                 ? "CategorySnapshotMismatch" : row.BlockReason
             }).ToArray();
-        if (!TryTaxProfile(template, out var taxInfo, out var taxRevision, out var rate)
-            || !CompatibleTemplates(template))
-            selections = selections.Select(row => row with { BlockReason = row.BlockReason.Length == 0 ? UnavailableTax : row.BlockReason }).ToArray();
+        if (!TryTaxProfile(template, out var taxInfo, out var taxRevision, out var rate))
+            selections = BlockUnmapped(selections, UnavailableTax);
+        else if (!CompatibleTemplates(template))
+            selections = BlockUnmapped(selections, IncompatibleTemplate);
         if (selections.Length == 0)
             return new(mappingHash, source.Revision, string.Empty, default, selections, categories,
                 taxInfo, taxRevision, rate, true);
@@ -109,10 +111,32 @@ internal static class CategoryCatalogueMenuPlanner
         if (!template.TryGetProperty("modifier_groups", out var groups) || groups.ValueKind != JsonValueKind.Array
             || groups.GetArrayLength() != 0 || !template.TryGetProperty("items", out var items)
             || items.ValueKind != JsonValueKind.Array || items.GetArrayLength() == 0
+            || items.EnumerateArray().Any(row => row.TryGetProperty("modifier_group_ids", out _))
             || !template.TryGetProperty("categories", out var categories) || categories.ValueKind != JsonValueKind.Array
             || categories.GetArrayLength() == 0) return false;
-        return SameStatic(items, new HashSet<string>(["id", "title", "description", "price_info", "tax_info", "suspension_info"], StringComparer.Ordinal))
+        return SameItemTemplates(items)
             && SameStatic(categories, new HashSet<string>(["id", "title", "entities"], StringComparer.Ordinal));
+    }
+
+    private static CatalogueMenuSelection[] BlockUnmapped(IReadOnlyList<CatalogueMenuSelection> rows, string reason)
+        => rows.Select(row => row with { BlockReason = row.BlockReason.Length == 0 ? reason : row.BlockReason }).ToArray();
+
+    private static bool SameItemTemplates(JsonElement rows)
+    {
+        var comparable = rows.EnumerateArray().Select(ComparableItemTemplate).ToArray();
+        return comparable.Length > 0 && comparable.All(row => row.HasValue)
+            && comparable.Skip(1).All(row => JsonElement.DeepEquals(comparable[0]!.Value, row!.Value));
+    }
+
+    private static JsonElement? ComparableItemTemplate(JsonElement value)
+    {
+        var node = JsonNode.Parse(value.GetRawText())!.AsObject();
+        foreach (var property in new[] { "id", "title", "description", "tax_info", "suspension_info" }) node.Remove(property);
+        if (node["price_info"] is not JsonObject priceInfo
+            || priceInfo["price"] is not JsonValue price || !price.TryGetValue<decimal>(out var amount) || amount < 0)
+            return null;
+        priceInfo.Remove("price");
+        return JsonSerializer.SerializeToElement(node);
     }
 
     private static bool SameStatic(JsonElement rows, IReadOnlySet<string> dynamicProperties)

@@ -12,8 +12,19 @@ public sealed partial class TenantChannelCatalogueService
         var category = TenantCatalogueCategorySnapshot.Read(draft.Snapshot, draft.MappingRevision);
         var store = FromCategorySnapshot(draft.Snapshot, draft.MappingRevision);
         var latest = await state.Latest(context.Binding(store), cancellationToken);
-        var source = await tenantCatalogue.Read(store, cancellationToken);
-        var preview = await publication.Preview(menu.Preview(), store, cancellationToken);
+        TenantCatalogueSnapshot source;
+        JsonElement preview;
+        try
+        {
+            source = await tenantCatalogue.Read(store, cancellationToken);
+            preview = await publication.Preview(menu.Preview(), store, cancellationToken);
+        }
+        catch (ChannelConsoleException exception) when (IsSourceRevisionChanged(exception))
+        {
+            var staleView = await TryBuildStaleCategoryCatalogueView(draft, category, latest, cancellationToken);
+            if (staleView.HasValue) return staleView.Value;
+            throw;
+        }
         var providerMenu = await ProviderMenu(latest, cancellationToken);
         var planned = PlannedMenu(preview, menu.Preview());
         return ProviderJson.Encode(new
@@ -23,6 +34,8 @@ public sealed partial class TenantChannelCatalogueService
             mappingRevision = draft.MappingRevision,
             draftRevision = draft.Revision,
             sourceRevision = category.SourceRevision,
+            draftSourceRevision = category.SourceRevision,
+            sourceChanged = false,
             canPublish = ProviderJson.Flag(preview, CanPublishProperty),
             items = Rows(store, source, preview, providerMenu.Menu, menu.Preview(), providerMenu.Status),
             serviceAvailability = ServiceHours(planned),
@@ -42,6 +55,48 @@ public sealed partial class TenantChannelCatalogueService
         });
     }
 
+    private async Task<JsonElement?> TryBuildStaleCategoryCatalogueView(CatalogueMappingDraft draft,
+        TenantCatalogueCategoryDraftSnapshot category, CataloguePublication? latest, CancellationToken cancellationToken)
+    {
+        var current = await tenantCatalogue.Categories(context.ConfiguredStore, category.SourceRevision,
+            category.SelectedCategoryIds,
+            category.Items.Select(row => new TenantCatalogueItemReference(row.ProductId, row.VariationId, row.CategoryId)).ToArray(),
+            category.ItemOverrides.Select(row => new TenantCatalogueItemOverride(
+                row.ProductId, row.VariationId, row.CategoryId, row.Selected)).ToArray(), cancellationToken);
+        if (!current.SourceChanged || current.Revision == category.SourceRevision) return null;
+
+        var providerMenu = await ProviderMenu(latest, cancellationToken);
+        return ProviderJson.Encode(new
+        {
+            storeId = context.ConfiguredStore.StoreId,
+            currency = context.ConfiguredStore.Currency,
+            mappingRevision = draft.MappingRevision,
+            draftRevision = draft.Revision,
+            sourceRevision = current.Revision,
+            draftSourceRevision = category.SourceRevision,
+            sourceChanged = true,
+            canPublish = false,
+            items = Array.Empty<object>(),
+            serviceAvailability = ServiceHours(menu.Preview()),
+            serviceHoursEditable = false,
+            serviceHoursStatus = "reviewedTemplate",
+            currentServiceAvailability = ServiceHours(providerMenu.Menu),
+            currentServiceHoursStatus = HasServiceAvailability(providerMenu.Menu) ? providerMenu.Status : "unknown",
+            blockingCodes = new[] { "source_changed" },
+            warningCodes = Array.Empty<string>(),
+            latestPublication = PublicationSummary(latest),
+            selectionMode = CategorySelectionMode,
+            categoryBasis = current.CategoryBasis,
+            categories = current.Categories.Select(row => CategoryDto(row, null)),
+            selectedItems = category.Items.Select(CategoryItemDto),
+            taxProfile = (object?)null,
+            taxProfileRevision = string.Empty
+        });
+    }
+
+    private static bool IsSourceRevisionChanged(ChannelConsoleException exception)
+        => exception.Status == 409 && exception.ErrorCode == "SourceRevisionChanged";
+
     private async Task<JsonElement> EmptyCategoryCatalogueView(CatalogueMappingDraft? draft,
         CancellationToken cancellationToken)
     {
@@ -56,6 +111,8 @@ public sealed partial class TenantChannelCatalogueService
             mappingRevision = draft?.MappingRevision ?? context.ConfiguredStore.CatalogueRevision,
             draftRevision = draft?.Revision ?? string.Empty,
             sourceRevision = source.Revision,
+            draftSourceRevision = (string?)null,
+            sourceChanged = false,
             canPublish = false,
             items = Array.Empty<object>(),
             serviceAvailability = ServiceHours(plannedMenu),
