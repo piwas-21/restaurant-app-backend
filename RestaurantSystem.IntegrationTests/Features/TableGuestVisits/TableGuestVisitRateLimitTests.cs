@@ -69,12 +69,25 @@ public sealed class TableGuestVisitRateLimitPolicyTests
     }
 
     [Fact]
-    public void Guest_payment_controller_is_anonymous_no_store_and_has_no_collection_route()
+    public void Guest_payment_actions_are_anonymous_no_store_and_have_no_collection_route()
     {
         var controller = typeof(GuestAccountPaymentsController);
 
         controller.GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true)
-            .Should().ContainSingle();
+            .Should().BeEmpty("anonymous authority must be granted only to explicit participant routes");
+        var anonymousActions = controller.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(method => method.IsDefined(typeof(Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute), true))
+            .Select(method => method.Name);
+        anonymousActions.Should().BeEquivalentTo(new[]
+        {
+            nameof(GuestAccountPaymentsController.GetAccount),
+            nameof(GuestAccountPaymentsController.CreateQuote),
+            nameof(GuestAccountPaymentsController.CreateEqualSharePlan),
+            nameof(GuestAccountPaymentsController.GetOperation),
+            nameof(GuestAccountPaymentsController.Reserve),
+            nameof(GuestAccountPaymentsController.Release),
+            nameof(GuestAccountPaymentsController.GetEqualSharePlan),
+        });
         controller.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.ResponseCacheAttribute), true)
             .Cast<Microsoft.AspNetCore.Mvc.ResponseCacheAttribute>()
             .Single().NoStore.Should().BeTrue();
