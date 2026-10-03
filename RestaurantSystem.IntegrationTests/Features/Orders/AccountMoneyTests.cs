@@ -28,4 +28,24 @@ public sealed class AccountMoneyTests
         var fractional = () => new AccountMoney("CHF").ToMinor(0.001m);
         fractional.Should().Throw<BadRequestException>();
     }
+
+    [Fact]
+    public void Largest_minor_unit_value_is_exact_and_one_cent_beyond_is_refused()
+    {
+        var money = new AccountMoney("CHF");
+        money.ToMinor(92233720368547758.07m).Should().Be(long.MaxValue);
+        money.ToMajor(long.MaxValue).Should().Be(92233720368547758.07m);
+        var outside = () => money.ToMinor(92233720368547758.08m);
+        outside.Should().Throw<BadRequestException>();
+    }
+
+    [Fact]
+    public void Negative_amount_is_refused_in_both_conversion_directions()
+    {
+        var money = new AccountMoney("CHF");
+        var negativeMajor = () => money.ToMinor(-0.01m);
+        var negativeMinor = () => money.ToMajor(-1);
+        negativeMajor.Should().Throw<BadRequestException>();
+        negativeMinor.Should().Throw<BadRequestException>();
+    }
 }
