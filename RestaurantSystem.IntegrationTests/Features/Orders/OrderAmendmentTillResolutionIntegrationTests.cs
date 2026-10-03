@@ -35,6 +35,8 @@ public sealed partial class OrderAmendmentTillResolutionIntegrationTests(Databas
         services.RemoveAll<ITenantFeatures>();
         services.AddSingleton<ITenantFeatures>(new TenantFeatures(Options.Create(
             new TenantFeatureSettings { OrderAmendmentsV1 = true })));
+        services.RemoveAll<TimeProvider>();
+        services.AddSingleton<TimeProvider>(new FixedTimeProvider(CreateSubMicrosecondUtcNow()));
     }
 
     protected override async Task SeedTestData()
@@ -206,6 +208,26 @@ public sealed partial class OrderAmendmentTillResolutionIntegrationTests(Databas
         payment.RefundedAmount.Should().Be(10m);
         payment.Status.Should().Be(PaymentStatus.PartiallyRefunded);
 
+        await using (var timestampProbe = DatabaseFixture.CreateContext())
+        {
+            var persistedOperation = await timestampProbe.OrderAmendmentResolutionOperations
+                .Include(value => value.Legs)
+                .SingleAsync(value => value.Id == operation.OperationId);
+            var savedResult = OrderAmendmentJson.Deserialize<OrderAmendmentResolutionResultDto>(
+                persistedOperation.ResultJson!);
+            (savedResult.ResolvedAt!.Value.Ticks % 10).Should().Be(7);
+            (persistedOperation.ResolvedAt!.Value.Ticks % 10).Should().Be(0);
+            persistedOperation.ResolvedAt.Should().Be(savedResult.ResolvedAt.Value.AddTicks(-7),
+                "PostgreSQL truncates result timestamps to microsecond precision on reload");
+            savedResult.ResolvedAt.Should().NotBe(persistedOperation.ResolvedAt,
+                "the fixed clock has sub-microsecond ticks that PostgreSQL cannot store in timestamp columns");
+            (savedResult.RefundLegs.Single().ResolvedAt!.Value.Ticks % 10).Should().Be(7);
+            (persistedOperation.Legs.Single().ResolvedAt!.Value.Ticks % 10).Should().Be(0);
+            savedResult.RefundLegs.Single().ResolvedAt.Should().NotBe(
+                persistedOperation.Legs.Single().ResolvedAt,
+                "the durable DTO currently retains finer timestamp precision than its source columns");
+        }
+
         using var eligibility = await Client.GetAsync($"/api/staff/orders/{_orderId}/amendments/eligibility");
         eligibility.StatusCode.Should().Be(HttpStatusCode.OK);
         var eligible = (await eligibility.Content.ReadFromJsonAsync<
@@ -256,4 +278,15 @@ public sealed partial class OrderAmendmentTillResolutionIntegrationTests(Databas
 
     private static string ConfirmPath(Guid operationId) =>
         $"/api/staff/amendment-financial-resolution-operations/{operationId}/confirm-till";
+
+    private static DateTimeOffset CreateSubMicrosecondUtcNow()
+    {
+        var nextMicrosecond = (DateTimeOffset.UtcNow.UtcTicks / 10 + 1) * 10;
+        return new DateTimeOffset(nextMicrosecond + 7, TimeSpan.Zero);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
+    }
 }

@@ -129,13 +129,15 @@ internal static class AccountAmendmentRefundIntegrity
             || result.State != OrderAmendmentResolutionOperationState.Resolved.ToString()
             || result.Currency != operation.Currency || result.CreditMinor != operation.CreditMinor
             || result.RefundMinor != operation.RefundMinor || result.UnpaidWaivedMinor != operation.UnpaidWaivedMinor
-            || result.ResolvedAt != operation.ResolvedAt || resultLegs.Length != operationLegs.Length
+            || !PostgresTimestampPrecision.MatchesColumn(result.ResolvedAt, operation.ResolvedAt)
+            || resultLegs.Length != operationLegs.Length
             || resultLegs.Where((value, index) =>
                 value.PaymentId != operationLegs[index].SourcePaymentId
                 || value.Custody != operationLegs[index].Custody.ToString()
                 || value.State != OrderAmendmentRefundLegState.Succeeded.ToString()
                 || value.AmountMinor != operationLegs[index].AmountMinor
-                || value.ResolvedAt != operationLegs[index].ResolvedAt).Any())
+                || !PostgresTimestampPrecision.MatchesColumn(
+                    value.ResolvedAt, operationLegs[index].ResolvedAt)).Any())
             throw NeedsReconciliation();
     }
 
