@@ -120,6 +120,42 @@ public sealed class DeliveryChannelManagementAuthorizationTests(DatabaseFixture 
         call.Tenant.Should().Be(Tenant);
     }
 
+    [Fact]
+    public async Task CategoryDraftProxyBindsAndForwardsExplicitEmptyItemsArray()
+    {
+        AuthenticateAsAdmin();
+        var categoryId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var productId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var sourceRevision = new string('d', 64);
+
+        var response = await Client.PutAsJsonAsync($"{Route}/catalogue/draft", new
+        {
+            expectedDraftRevision = "reviewed-draft",
+            items = Array.Empty<object>(),
+            expectedSourceRevision = sourceRevision,
+            categoryIds = new[] { categoryId },
+            itemOverrides = new[]
+            {
+                new { productId, variationId = (Guid?)null, categoryId = (Guid?)categoryId, selected = false }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var call = _gateway.Calls.Should().ContainSingle().Subject;
+        call.Method.Should().Be(HttpMethod.Put);
+        call.Uri.Should().Be("https://gateway.example/api/tenant-management/uber/catalogue/draft");
+        using var payload = JsonDocument.Parse(call.Body);
+        var json = payload.RootElement;
+        json.GetProperty("expectedDraftRevision").GetString().Should().Be("reviewed-draft");
+        json.GetProperty("expectedSourceRevision").GetString().Should().Be(sourceRevision);
+        json.GetProperty("items").ValueKind.Should().Be(JsonValueKind.Array);
+        json.GetProperty("items").GetArrayLength().Should().Be(0);
+        json.GetProperty("categoryIds")[0].GetGuid().Should().Be(categoryId);
+        json.GetProperty("itemOverrides")[0].GetProperty("productId").GetGuid().Should().Be(productId);
+        json.GetProperty("itemOverrides")[0].GetProperty("variationId").ValueKind.Should().Be(JsonValueKind.Null);
+        json.GetProperty("itemOverrides")[0].GetProperty("selected").GetBoolean().Should().BeFalse();
+    }
+
     private sealed record Call(HttpMethod Method, string Uri, string Tenant, string Store,
         string Actor, string Authorization, string Body);
 
