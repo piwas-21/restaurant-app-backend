@@ -58,7 +58,7 @@ public sealed class AccountEqualSharePlanService(
             ValidateScope(scope, total, request.ShareCount);
 
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            var plan = CreatePlan(sessionId, request, account.Money.Currency, total, scope, hash, now, actor);
+            var plan = CreatePlan(sessionId, request, account, total, hash, now, actor);
             InvalidateSupersededPlan(superseded, now, actor);
             context.AccountEqualSharePlans.Add(plan);
             await context.SaveChangesAsync(cancellationToken);
@@ -99,9 +99,8 @@ public sealed class AccountEqualSharePlanService(
     private static AccountEqualSharePlan CreatePlan(
         Guid sessionId,
         CreateAccountEqualSharePlanRequest request,
-        string currency,
+        AccountPaymentAccountSnapshot account,
         long total,
-        IReadOnlyList<AccountDebtSegment> scope,
         string hash,
         DateTime now,
         AccountPaymentActor actor) => new()
@@ -112,9 +111,9 @@ public sealed class AccountEqualSharePlanService(
             AccountRevision = request.ExpectedAccountRevision,
             TotalMinor = total,
             ShareCount = request.ShareCount,
-            Currency = currency,
+            Currency = account.Money.Currency,
             PayloadHash = hash,
-            ScopeJson = AccountPaymentSnapshots.Serialize(scope),
+            ScopeJson = AccountPaymentSnapshots.Serialize(account.Debt.Available),
             SupersedesPlanId = request.SupersedesPlanId,
             CreatedAt = now,
             CreatedBy = actor.AuditIdentifier
