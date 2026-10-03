@@ -42,6 +42,8 @@ public record OrderPaymentTender
 
     /// <summary>Optional order version for conditional till writes.</summary>
     public int? ExpectedVersion { get; init; }
+    /// <summary>Trusted caller commits its owned money transaction before requesting the award.</summary>
+    public bool DeferLoyaltyAward { get; init; }
 }
 
 public record PaymentApplicationResult(
@@ -85,4 +87,5 @@ public interface IOrderPaymentApplicator
     /// different payload is refused. Null operation id (bill flow) never replays.
     /// </summary>
     Task<PaymentApplicationResult> ApplyToOrderAsync(Guid orderId, OrderPaymentTender tender, CancellationToken cancellationToken);
+    Task AwardAfterCommitAsync(Order order, CancellationToken cancellationToken);
 }

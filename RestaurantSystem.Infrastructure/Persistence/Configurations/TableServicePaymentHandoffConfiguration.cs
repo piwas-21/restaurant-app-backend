@@ -33,5 +33,8 @@ public sealed class TableServicePaymentHandoffConfiguration : IEntityTypeConfigu
             .WithMany()
             .HasForeignKey(handoff => handoff.ServiceSessionId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<AccountPaymentAttempt>().WithMany()
+            .HasForeignKey(handoff => handoff.ResolvedAccountPaymentAttemptId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

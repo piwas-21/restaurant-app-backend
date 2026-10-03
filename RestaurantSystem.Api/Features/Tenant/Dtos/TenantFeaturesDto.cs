@@ -7,4 +7,5 @@ public sealed record TenantFeaturesDto(
     bool OptionSetMaterializationEnabled,
     bool TableAccountV1 = false,
     bool OrderAmendmentsV1 = false,
-    bool TableGuestVisitsV1 = false);
+    bool TableGuestVisitsV1 = false,
+    bool TableAccountPaymentsV1 = false);

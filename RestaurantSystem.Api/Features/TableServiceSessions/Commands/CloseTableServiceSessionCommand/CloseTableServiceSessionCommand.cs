@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
+using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableGuestVisits.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
@@ -31,16 +33,19 @@ public sealed partial class CloseTableServiceSessionCommandHandler
     private readonly ITableServiceSessionReader _reader;
     private readonly TimeProvider _timeProvider;
     private readonly ITableGuestVisitRevoker? _guestVisits;
+    private readonly ITenantFeatures? _features;
 
     public CloseTableServiceSessionCommandHandler(
         ApplicationDbContext context,
         ITableServiceSessionReader reader,
         TimeProvider? timeProvider = null,
         IOptions<TableServiceSessionSettings>? settings = null,
-        ITableGuestVisitRevoker? guestVisits = null)
+        ITableGuestVisitRevoker? guestVisits = null,
+        ITenantFeatures? features = null)
     {
         _context = context;
         _guestVisits = guestVisits;
+        _features = features;
         _reader = reader;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
@@ -84,6 +89,9 @@ public sealed partial class CloseTableServiceSessionCommandHandler
                     "Resolve the pending cashier collection request before closing the session.",
                     ErrorCodes.TableServicePaymentHandoffPending);
             }
+
+            await AccountPaymentCloseGuard.RequireClosableAsync(
+                _context, session.Id, _features, cancellationToken);
 
             var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
                 _context.Orders, session.TableId, session.TableNumber);

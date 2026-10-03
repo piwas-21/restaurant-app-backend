@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -74,6 +75,10 @@ public class AddTableBillPaymentCommandHandler : ICommandHandler<AddTableBillPay
         {
             return ApiResponse<TableBillDto>.FailureWithCode(
                 "The table service session is no longer open.", ErrorCodes.TableServiceSessionNotFound);
+        }
+        if (session is not null)
+        {
+            await AccountPaymentLedgerGuard.RequireLegacyCollectionAsync(_context, session.Id, cancellationToken);
         }
         var openOrders = await _context.Orders
             .Where(o => !o.IsDeleted

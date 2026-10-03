@@ -6,6 +6,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -15,10 +16,8 @@ namespace RestaurantSystem.Api.Features.Orders.Commands.CancelOrderCommand;
 public record CancelOrderCommand : ICommand<ApiResponse<OrderDto>>
 {
     public Guid OrderId { get; set; }
-
     /// <summary>Optional detail version; old clients may omit it.</summary>
     public int? ExpectedVersion { get; set; }
-
     public string CancellationReason { get; set; } = null!;
 }
 
@@ -92,6 +91,7 @@ public class CancelOrderCommandHandler : ICommandHandler<CancelOrderCommand, Api
 
         await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
             _context, order.Id, cancellationToken);
+        await AccountPaymentLedgerGuard.RequireOrderCorrectionAsync(_context, order.Id, cancellationToken);
 
         // Computed BEFORE the status-history row is built, because the row's Notes carry it: the
         // cancellation and the money still owed on it are one audit entry, not two.

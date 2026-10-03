@@ -24,6 +24,9 @@ public sealed class TenantFeatureSettings
     /// <summary>Opt-in guest visit admission and rounds; disabled until isolation is verified.</summary>
     public bool TableGuestVisitsV1 { get; set; }
 
+    /// <summary>Opt-in exact visit payment collection; defaults off pending reconciliation verification.</summary>
+    public bool TableAccountPaymentsV1 { get; set; }
+
     /// <summary>
     /// Requires configured minimum sauce choices at write time. Defaults off for existing guest,
     /// staff and mobile clients until each tenant's payload compatibility is verified.

@@ -35,7 +35,7 @@ namespace RestaurantSystem.IntegrationTests.Features.Payments;
 /// </para>
 /// </remarks>
 [Collection("Database Lane 1")]
-public class CheckoutExpirySweepTests : IAsyncLifetime
+public partial class CheckoutExpirySweepTests : IAsyncLifetime
 {
     private const string ConnectedAccount = "acct_test_connected";
     private const string PaymentIntent = "pi_test_swept";

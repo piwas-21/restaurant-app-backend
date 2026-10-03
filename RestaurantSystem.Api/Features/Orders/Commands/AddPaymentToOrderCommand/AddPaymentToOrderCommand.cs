@@ -69,6 +69,11 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
                 authorization.Message!, authorization.ErrorCode!);
         }
 
+        if (_context.Database.CurrentTransaction is not null)
+            throw new RestaurantSystem.Api.Common.Exceptions.ConflictException("Order collection must own its money transaction.");
+
+        await using var accountMutation = await OrderAccountMutationScope.BeginAsync(
+            _context, command.OrderId, cancellationToken);
         var belongsToServiceSession = await _context.Orders
             .AsNoTracking()
             .Where(order => order.Id == command.OrderId && !order.IsDeleted)
@@ -93,6 +98,7 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
                 CardType = command.CardType,
                 PaymentNotes = command.PaymentNotes,
                 ExpectedVersion = command.ExpectedVersion,
+                DeferLoyaltyAward = true,
             },
             cancellationToken);
 
@@ -132,6 +138,9 @@ public class AddPaymentToOrderCommandHandler : ICommandHandler<AddPaymentToOrder
             return ApiResponse<OrderDto>.Failure($"Cannot add payment to {result.NotPayableStatus ?? "Completed"} order");
         }
 
+        await accountMutation.CommitAsync(cancellationToken);
+        if (!result.IsIdempotentReplay)
+            await _paymentApplicator.AwardAfterCommitAsync(result.Order, cancellationToken);
         // Return the updated order so frontend gets current payment status. A replay says so,
         // so the UI can tell the cashier "already recorded" from a fresh success without
         // guessing from row counts.

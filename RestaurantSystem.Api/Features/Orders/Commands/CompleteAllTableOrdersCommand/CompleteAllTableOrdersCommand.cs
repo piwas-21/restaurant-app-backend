@@ -72,6 +72,7 @@ public class CompleteAllTableOrdersCommandHandler : ICommandHandler<CompleteAllT
                 .Where(o => !o.IsDeleted
                     && o.Type == OrderType.DineIn
                     && o.TableNumber == tableNumberInt
+                    && o.ServiceSessionId == null
                     && o.Status != OrderStatus.Completed
                     && o.Status != OrderStatus.Cancelled)
                 .ToListAsync(cancellationToken);

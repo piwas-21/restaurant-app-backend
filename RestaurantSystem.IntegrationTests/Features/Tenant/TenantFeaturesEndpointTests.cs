@@ -35,6 +35,7 @@ public sealed class TenantFeaturesEndpointTests : IAsyncLifetime
                 ["TenantFeatures:TableAccountV1"] = "true",
                 ["TenantFeatures:OrderAmendmentsV1"] = "true",
                 ["TenantFeatures:TableGuestVisitsV1"] = "true",
+                ["TenantFeatures:TableAccountPaymentsV1"] = "true",
                 ["TenantFeatures:EnforceSauceMinimum"] = "true",
                 ["TenantFeatures:OptionSetMaterializationEnabled"] = "true"
             });
@@ -66,6 +67,7 @@ public sealed class TenantFeaturesEndpointTests : IAsyncLifetime
         data.GetProperty("tableAccountV1").GetBoolean().Should().BeTrue();
         data.GetProperty("orderAmendmentsV1").GetBoolean().Should().BeTrue();
         data.GetProperty("tableGuestVisitsV1").GetBoolean().Should().BeTrue();
+        data.GetProperty("tableAccountPaymentsV1").GetBoolean().Should().BeTrue();
         data.GetProperty("enforceSauceMinimum").GetBoolean().Should().BeTrue();
         data.GetProperty("optionSetMaterializationEnabled").GetBoolean().Should().BeTrue();
         data.TryGetProperty("ServerWorkspaceV2", out _).Should().BeFalse();

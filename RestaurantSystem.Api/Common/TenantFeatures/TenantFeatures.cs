@@ -15,6 +15,7 @@ public sealed class TenantFeatures : ITenantFeatures
         TableAccountV1 = options.Value.TableAccountV1;
         OrderAmendmentsV1 = options.Value.OrderAmendmentsV1;
         TableGuestVisitsV1 = options.Value.TableGuestVisitsV1;
+        TableAccountPaymentsV1 = options.Value.TableAccountPaymentsV1;
         EnforceSauceMinimum = options.Value.EnforceSauceMinimum;
         OptionSetMaterializationEnabled = options.Value.OptionSetMaterializationEnabled;
     }
@@ -26,6 +27,8 @@ public sealed class TenantFeatures : ITenantFeatures
     public bool OrderAmendmentsV1 { get; }
 
     public bool TableGuestVisitsV1 { get; }
+
+    public bool TableAccountPaymentsV1 { get; }
 
     public bool EnforceSauceMinimum { get; }
 
