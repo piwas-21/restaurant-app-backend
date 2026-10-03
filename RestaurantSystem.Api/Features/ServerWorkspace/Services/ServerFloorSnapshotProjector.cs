@@ -32,15 +32,17 @@ internal sealed class ServerFloorSnapshotProjector
     private readonly ICurrentUserService _currentUser;
     private readonly decimal _paymentTolerance;
     private readonly bool _tableVisitReadinessEnabled;
+    private readonly bool _serverCanCollect;
 
     public ServerFloorSnapshotProjector(
         ITenantClock clock, ICurrentUserService currentUser, decimal paymentTolerance,
-        bool tableVisitReadinessEnabled = false)
+        bool tableVisitReadinessEnabled = false, bool canStartCollection = false)
     {
         _clock = clock;
         _currentUser = currentUser;
         _paymentTolerance = paymentTolerance;
         _tableVisitReadinessEnabled = tableVisitReadinessEnabled;
+        _serverCanCollect = currentUser.Role == UserRole.Server && canStartCollection;
     }
 
     public ServerFloorProjection Project(ServerFloorSnapshotInput input)
@@ -69,7 +71,8 @@ internal sealed class ServerFloorSnapshotProjector
             ServerFloorSnapshotVersionBuilder.Create(
                 input.Plans, input.Tables, input.Sessions, input.Orders, reservationsByTable,
                 new ServerFloorSnapshotVersionContext(
-                    nextStateChangeAt, _paymentTolerance, hasUnidentifiedLegacy)),
+                    nextStateChangeAt, _paymentTolerance, hasUnidentifiedLegacy, _currentUser.Role,
+                    _serverCanCollect)),
             nextStateChangeAt);
     }
 
@@ -155,6 +158,7 @@ internal sealed class ServerFloorSnapshotProjector
         var assessment = TableServiceSessionCloseRules.Assess(
             members, legacyStates, _paymentTolerance);
         var bill = session.Bill;
+        var hasTenderRole = _currentUser.Role is UserRole.Admin or UserRole.Cashier || _serverCanCollect;
         return new ServerFloorSessionSummaryDto
         {
             ServiceSessionId = session.Id,
@@ -167,8 +171,8 @@ internal sealed class ServerFloorSnapshotProjector
             Remaining = assessment.Outstanding,
             ActiveRoundCount = bill?.Rounds.Count(round => IsActiveRound(ParseStatus(round.Order.Status))) ?? 0,
             ReadyRoundCount = bill?.Rounds.Count(round => IsReady(ParseStatus(round.Order.Status))) ?? 0,
-            CanCollect = bill?.EligibleOutstanding > _paymentTolerance,
-            CanRequestPaymentHandoff = _currentUser.Role == UserRole.Server
+            CanCollect = hasTenderRole && bill?.EligibleOutstanding > _paymentTolerance,
+            CanRequestPaymentHandoff = !hasTenderRole && _currentUser.Role == UserRole.Server
                 && bill?.EligibleOutstanding > _paymentTolerance && !session.HasPendingPaymentHandoff,
             HasPendingPaymentHandoff = session.HasPendingPaymentHandoff,
             CanClose = assessment.CanClose && !session.HasPendingPaymentHandoff,

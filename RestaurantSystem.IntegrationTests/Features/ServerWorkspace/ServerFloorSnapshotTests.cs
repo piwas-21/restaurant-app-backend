@@ -66,7 +66,7 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         table.Session!.ServiceSessionId.Should().Be(_sessionId);
         table.Session.Total.Should().Be(25m);
         table.Session.Remaining.Should().Be(25m);
-        table.Session.CanCollect.Should().BeTrue();
+        table.Session.CanCollect.Should().BeFalse();
         table.HasLegacyAmbiguity.Should().BeTrue();
         table.Legacy!.OrderCount.Should().Be(1);
         table.Session.CanClose.Should().BeFalse();
