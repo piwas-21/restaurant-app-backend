@@ -54,7 +54,18 @@ public sealed class TenantCatalogueClient(ITenantChannelTransport transport) : I
             store.Currency,
             IsSandbox = true,
             Language = "en",
-            Items = items.OrderBy(item => item.ProductId).ThenBy(item => item.VariationId).ToArray()
+            Items = items.OrderBy(item => item.ProductId).ThenBy(item => item.VariationId)
+                .Select(item => new
+                {
+                    item.ProductId,
+                    item.VariationId,
+                    item.Name,
+                    item.Description,
+                    item.VariationName,
+                    item.PriceMinor,
+                    item.Available,
+                    item.BlockReason
+                }).ToArray()
         }));
         if (computed != revision) throw Invalid();
         return new(revision, items);
