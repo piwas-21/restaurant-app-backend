@@ -35,6 +35,18 @@ internal static class OrderBillingCreditConsistency
             || orders.Select(value => value.Id).Distinct().Count() != orders.Count
             || amendments.Select(value => value.Id).Distinct().Count() != amendments.Count)
             throw InvalidJournal();
+        var resolved = ReadResolvedOutcomes(amendments);
+        if (resolved.Count != credits.Count)
+            throw InvalidJournal();
+        RequireMatchingCreditEntries(credits, resolved);
+        RequireMatchingOrderTotals(orders, credits);
+        if (credits.Any(value => orders.All(order => order.Id != value.SourceOrderId)))
+            throw InvalidJournal();
+    }
+
+    private static Dictionary<Guid, (BillingCreditAmendment Amendment, OrderAmendmentFinancialPreviewDto Outcome)>
+        ReadResolvedOutcomes(IReadOnlyList<BillingCreditAmendment> amendments)
+    {
         var resolved = new Dictionary<Guid, (BillingCreditAmendment Amendment, OrderAmendmentFinancialPreviewDto Outcome)>();
         foreach (var amendment in amendments)
         {
@@ -48,8 +60,13 @@ internal static class OrderBillingCreditConsistency
                 resolved.Add(amendment.Id, (amendment, outcome));
             }
         }
-        if (resolved.Count != credits.Count)
-            throw InvalidJournal();
+        return resolved;
+    }
+
+    private static void RequireMatchingCreditEntries(
+        IReadOnlyList<OrderBillingCredit> credits,
+        Dictionary<Guid, (BillingCreditAmendment Amendment, OrderAmendmentFinancialPreviewDto Outcome)> resolved)
+    {
         foreach (var credit in credits)
         {
             if (!resolved.TryGetValue(credit.AmendmentId, out var evidence)
@@ -61,6 +78,11 @@ internal static class OrderBillingCreditConsistency
                 || credit.Currency != new AccountMoney(credit.Currency).Currency)
                 throw InvalidJournal();
         }
+    }
+
+    private static void RequireMatchingOrderTotals(
+        IReadOnlyList<BillingCreditOrder> orders, IReadOnlyList<OrderBillingCredit> credits)
+    {
         foreach (var order in orders)
         {
             var entries = credits.Where(value => value.SourceOrderId == order.Id).ToArray();
@@ -74,8 +96,6 @@ internal static class OrderBillingCreditConsistency
                 || money.ToMinor(order.Amount) != entries.Sum(value => value.AmountMinor))
                 throw InvalidJournal();
         }
-        if (credits.Any(value => orders.All(order => order.Id != value.SourceOrderId)))
-            throw InvalidJournal();
     }
 
     private static ConflictException InvalidJournal() => new(
