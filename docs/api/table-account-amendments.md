@@ -12,6 +12,16 @@ Menu-root `OrderItemDto` responses have nullable `productId` and `menuID`; clien
 
 New or replacement dishes are ordinary supplementary preparation batches. A quote has no reserved daily order number; commit allocates its unique number in the same transaction that inserts the supplement. Typed correction tickets identify the removed source scope and reference a released replacement ticket without instructing the kitchen to prepare it twice. Captured tenders remain unchanged; a pending credit/refund/loyalty resolution is explicit and must not be presented as returned money.
 
+## Effective charges and historical credits
+
+`AddOrderBillingCredits` keeps the original `Order.Total` and appends one immutable money credit per amendment. Credited order DTOs add `payableTotal` and `billingCreditAmount`; table bills add `originalTotal` and aggregate `billingCreditAmount`. Native collection, order checkout and account debt use the effective charge. Credit fields are omitted on unchanged orders. Remaining balance and fully-paid status are derived from the effective charge and captured summary, including legacy rows with a stale balance cache; kitchen item structure is unchanged. Guest accounts expose the same original/payable/credit values for every credited batch.
+
+Visit `billingAllocationVersion` freezes old allocation interpretation: existing order/claim/history-bearing visits remain model 0; only unused visits become model 1. New visits separate food units from retained tip and fee charges. The allocation version and credit journal cannot be rewritten or deleted. Rollback refuses financial history; disable new entry instead.
+
+Z-report net sales and order-type totals use effective charges. Product and top-item breakdowns retain the original gross item-price meaning while excluding resolved removed unit scopes; retained zero-price units still count. Original orders and kitchen lines remain available for audit. Reports reject a credit whose immutable journal or removed-unit evidence does not match. Committed amendment sources, their linked supplements and credited orders cannot be deleted.
+
+Historical summary JSON alone cannot grant a credit. Automatic backfill requires a matching source snapshot, one undiscounted root, one void-only amendment, non-overlapping valid unit ranges, exact independently derived unit credit, matching visit currency and no tender, checkout, tax, tip, fee or loyalty history. Ambiguous history remains blocked for reviewed reconciliation. Paid, processing, tax and loyalty credit resolution remains a separate required workflow.
+
 ## Guest admission and account reads
 
 `POST /api/table-guest-visits/join` accepts `qrCodeData` plus the staff-issued `admissionCode`. It is intentionally reachable without a login: admission proves access to the current open visit. Staff issue the code with `POST /api/table-guest-visits/{serviceSessionId}/admission-code`; that endpoint requires table-service staff permission and the Server/Cashier module.

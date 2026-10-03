@@ -9,6 +9,7 @@ public static class OrderAmendmentServiceExtensions
     public static IServiceCollection AddOrderAmendmentServices(this IServiceCollection services)
     {
         services.AddScoped<IOrderAmendmentFinancialResolution, OrderAmendmentFinancialResolutionService>();
+        services.AddScoped<IOrderBillingAdjustmentWriter, OrderBillingAdjustmentWriter>();
         services.AddScoped<IOrderAmendmentQuoteService, OrderAmendmentQuoteService>();
         services.AddScoped<IOrderAmendmentCommitService, OrderAmendmentCommitService>();
         services.AddScoped<IOrderAmendmentQueryService, OrderAmendmentQueryService>();

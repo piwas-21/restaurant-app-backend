@@ -74,6 +74,12 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.Total)
             .HasColumnType("decimal(10,2)");
 
+        builder.Property(o => o.BillingCreditAmount)
+            .HasColumnType("decimal(10,2)").HasDefaultValue(0m);
+        builder.Ignore(o => o.PayableTotal);
+        builder.ToTable("orders", table => table.HasCheckConstraint(
+            "ck_order_billing_credit_bounds", "billing_credit_amount >= 0 AND billing_credit_amount <= total"));
+
         builder.Property(o => o.UserLimitAmount)
             .HasColumnType("decimal(10,2)");
 

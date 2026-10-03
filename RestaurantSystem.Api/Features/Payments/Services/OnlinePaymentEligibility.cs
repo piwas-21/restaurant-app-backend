@@ -34,13 +34,14 @@ public static class OnlinePaymentEligibility
         // already worked.
         //
         // PartiallyPaid is in this list, and that is the deliberate part. Online payment charges
-        // order.Total — the whole order — so letting a part-paid order through would redirect a
+        // the effective order charge — the whole remaining unpaid sale — so letting a part-paid order through would redirect a
         // diner who already handed over CHF 20 at the till to a page for the full CHF 50. Charging
         // the BALANCE instead is not a smaller change than it looks: the balance would have to be
         // frozen for the 30 minutes the Stripe session is live, or a second till payment lands
         // mid-redirect and the diner overpays anyway. Settling a partial online payment is S5/S11
         // territory; refusing here is the honest v1 answer.
-        if (order.PaymentStatus is PaymentStatus.Completed or PaymentStatus.Overpaid
+        if (order.PayableTotal <= 0 || order.TotalPaid > 0
+            || order.PaymentStatus is PaymentStatus.Completed or PaymentStatus.Overpaid
             or PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded
             or PaymentStatus.PartiallyPaid)
         {

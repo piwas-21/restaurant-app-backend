@@ -152,7 +152,7 @@ public class RefundPaymentCommandHandler : ICommandHandler<RefundPaymentCommand,
         order.TotalPaid = order.Payments.Where(p => p.Status.IsCaptured()).Sum(p => p.Amount)
                           - order.Payments.Where(p => p.RefundedAmount.HasValue)
                               .Sum(p => p.RefundedAmount ?? 0);
-        order.RemainingAmount = order.Total - order.TotalPaid;
+        order.RemainingAmount = order.PayableTotal - order.TotalPaid;
 
         const decimal tolerance = 0.01m;
         if (order.Payments.All(p => p.Status == PaymentStatus.Refunded))

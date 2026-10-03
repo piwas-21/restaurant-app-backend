@@ -4395,6 +4395,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("actual_delivery_time");
 
+                    b.Property<decimal>("BillingCreditAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(10,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("billing_credit_amount");
+
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -4655,7 +4661,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "OrderDate");
 
-                    b.ToTable("orders");
+                    b.ToTable("orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_billing_credit_bounds", "billing_credit_amount >= 0 AND billing_credit_amount <= total");
+                        });
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAddress", b =>
@@ -4896,6 +4905,77 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("SourceOrderId", "CreatedAt");
 
                     b.ToTable("order_amendments", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingCredit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("AmendmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("amendment_id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<Guid>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_billing_credits");
+
+                    b.HasIndex("AmendmentId")
+                        .IsUnique();
+
+                    b.HasIndex("AmendmentId", "SourceOrderId");
+
+                    b.HasIndex("SourceOrderId", "CreatedAt");
+
+                    b.ToTable("order_billing_credits", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_billing_credit_money", "amount_minor > 0 AND currency ~ '^[A-Z]{3}$'");
+                        });
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderChange", b =>
@@ -8070,6 +8150,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(1L)
                         .HasColumnName("account_revision");
 
+                    b.Property<int>("BillingAllocationVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("billing_allocation_version");
+
                     b.Property<DateTime?>("ClosedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("closed_at");
@@ -9512,6 +9598,22 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("SupplementOrderId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingCredit", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendment", null)
+                        .WithMany()
+                        .HasForeignKey("AmendmentId", "SourceOrderId")
+                        .HasPrincipalKey("Id", "SourceOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderChange", b =>

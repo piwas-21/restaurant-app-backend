@@ -94,6 +94,7 @@ public sealed class OpenTableServiceSessionCommandHandler
             TableNumber = table.Number,
             Currency = currency,
             Version = 1,
+            BillingAllocationVersion = 1,
             OpenedAt = now,
             CreatedAt = now,
             CreatedBy = _currentUser.GetAuditIdentifier(),

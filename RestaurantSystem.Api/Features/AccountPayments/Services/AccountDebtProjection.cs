@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 
@@ -10,111 +11,109 @@ internal static class AccountDebtProjection
     internal static AccountDebtSnapshot Project(
         IReadOnlyList<Order> orders, AccountMoney money,
         IReadOnlyList<AccountDebtSegment> captured, IReadOnlyList<AccountDebtSegment> reserved,
-        IReadOnlyList<OrderAmendment>? amendments = null)
+        IReadOnlyList<OrderAmendment>? amendments = null, int billingAllocationVersion = 1)
     {
-        RequireUniqueOrders(orders);
-        var dueBeforeLedger = ProjectOrderDebt(orders, money, captured, reserved);
+        if (billingAllocationVersion is not (0 or 1))
+            throw new ConflictException("The account uses an unsupported charge allocation model.");
+        if (orders.Select(order => order.Id).Distinct().Count() != orders.Count)
+            throw new ConflictException("The account contains duplicate order identities.");
+        var dueBeforeLedger = new List<AccountDebtSegment>();
+        foreach (var order in orders.OrderBy(order => order.OrderDate).ThenBy(order => order.Id))
+        {
+            var applied = AccountDebtMath.Total(captured.Where(value => value.OrderId == order.Id));
+            var claimed = AccountDebtMath.Total(reserved.Where(value => value.OrderId == order.Id));
+            var hasRefund = HasRefundEvidence(order);
+            var wholeReversal = order.Status is OrderStatus.Cancelled or OrderStatus.Refunded
+                || order.PaymentStatus == PaymentStatus.Refunded;
+            if (hasRefund && !HasProvenFullRefund(order))
+                throw new ConflictException("Partial or unresolved refunds require account reconciliation.");
+            if (wholeReversal || HasProvenFullRefund(order))
+            {
+                if (applied > 0 || claimed > 0 || NetCaptured(order, money) > 0)
+                    throw new ConflictException("A reversed order still has account allocations. Reconciliation is required.");
+                continue;
+            }
+            if (order.ExternalReference is not null)
+                throw new ConflictException("Marketplace-held payments cannot be collected through a table account.");
+            if (order.Payments.Any(payment => payment.PaymentMethod == PaymentMethod.OnlinePayment
+                    && payment.Status == PaymentStatus.Processing))
+                throw new ConflictException("An existing order checkout must be resolved before account collection.");
+
+            var charge = money.ToMinor(order.Total);
+            var paid = NetCaptured(order, money);
+            if (applied > paid || paid > charge)
+                throw new ConflictException("The order's tender ledger requires reconciliation before account collection.");
+            var roots = order.Items.Where(item => item.ParentOrderItemId is null)
+                .OrderBy(item => item.Id).ToArray();
+            if (roots.Length == 0)
+            {
+                dueBeforeLedger.AddRange(AccountDebtMath.CreateUnitemized(order.Id, charge, 0));
+                continue;
+            }
+            if (billingAllocationVersion == 0)
+            {
+                ProjectLegacyFoodScope(order, money, charge, 0, dueBeforeLedger);
+                continue;
+            }
+            var frozen = FrozenOrderChargeMath.Read(order, money);
+            foreach (var line in frozen.FoodLines)
+            {
+                dueBeforeLedger.AddRange(AccountDebtMath.CreateLine(
+                    order.Id, line.Item.Id, line.Item.Quantity, line.AmountMinor, 0));
+            }
+            dueBeforeLedger.AddRange(AccountDebtMath.CreateUnitemized(
+                order.Id, checked(frozen.TipMinor + frozen.FeeMinor), 0));
+        }
         var amendmentAdjusted = AccountDebtAmendmentProjection.ExcludeVoidedUnits(
-            orders, dueBeforeLedger, amendments ?? []);
-        var outstanding = AccountDebtMath.Subtract(amendmentAdjusted, captured);
+            orders, dueBeforeLedger, amendments ?? [], legacyFullCharge: billingAllocationVersion == 0);
+        var outstanding = ApplyHistoricalContributions(
+            orders, AccountDebtMath.Subtract(amendmentAdjusted, captured), captured, money);
+        AssertEffectiveBalances(orders, outstanding, money);
         var available = AccountDebtMath.Subtract(outstanding, reserved);
         return new(outstanding, available, AccountDebtMath.Total(outstanding), AccountDebtMath.Total(reserved));
     }
 
-    private static void RequireUniqueOrders(IReadOnlyList<Order> orders)
+    private static IReadOnlyList<AccountDebtSegment> ApplyHistoricalContributions(
+        IReadOnlyList<Order> orders, IReadOnlyList<AccountDebtSegment> remaining,
+        IReadOnlyList<AccountDebtSegment> captured, AccountMoney money)
     {
-        if (orders.Select(order => order.Id).Distinct().Count() != orders.Count)
-            throw new ConflictException("The account contains duplicate order identities.");
-    }
-
-    private static List<AccountDebtSegment> ProjectOrderDebt(
-        IReadOnlyList<Order> orders,
-        AccountMoney money,
-        IReadOnlyList<AccountDebtSegment> captured,
-        IReadOnlyList<AccountDebtSegment> reserved)
-    {
-        var due = new List<AccountDebtSegment>();
-        foreach (var order in orders.OrderBy(order => order.OrderDate).ThenBy(order => order.Id))
-            ProjectOrder(order, money, captured, reserved, due);
-        return due;
-    }
-
-    private static void ProjectOrder(
-        Order order,
-        AccountMoney money,
-        IReadOnlyList<AccountDebtSegment> captured,
-        IReadOnlyList<AccountDebtSegment> reserved,
-        List<AccountDebtSegment> due)
-    {
-        var applied = AccountDebtMath.Total(captured.Where(value => value.OrderId == order.Id));
-        var claimed = AccountDebtMath.Total(reserved.Where(value => value.OrderId == order.Id));
-        var hasRefund = HasRefundEvidence(order);
-        var fullyRefunded = HasProvenFullRefund(order);
-        if (hasRefund && !fullyRefunded)
-            throw new ConflictException("Partial or unresolved refunds require account reconciliation.");
-        if (IsWholeOrderReversal(order) || fullyRefunded)
+        var reductions = new List<AccountDebtSegment>();
+        foreach (var order in orders)
         {
-            RequireNoLedgerValueOnReversedOrder(order, money, applied, claimed);
-            return;
+            if (order.Status is OrderStatus.Cancelled or OrderStatus.Refunded || HasProvenFullRefund(order))
+                continue;
+            var historical = NetCaptured(order, money)
+                - AccountDebtMath.Total(captured.Where(value => value.OrderId == order.Id));
+            if (historical == 0)
+                continue;
+            var orderDebt = remaining.Where(segment => segment.OrderId == order.Id).ToArray();
+            if (historical > AccountDebtMath.Total(orderDebt))
+                throw new ConflictException("Historical tenders exceed the retained order charge. Reconciliation is required.");
+            reductions.AddRange(AccountDebtMath.Amount(orderDebt, historical));
         }
-
-        RequireCollectableOrder(order);
-        ProjectUnreconciledDebt(order, money, applied, due);
+        return AccountDebtMath.Subtract(remaining, reductions);
     }
 
-    private static bool IsWholeOrderReversal(Order order) =>
-        order.Status is OrderStatus.Cancelled or OrderStatus.Refunded
-        || order.PaymentStatus == PaymentStatus.Refunded;
-
-    private static void RequireNoLedgerValueOnReversedOrder(
-        Order order, AccountMoney money, long applied, long claimed)
+    private static void AssertEffectiveBalances(
+        IReadOnlyList<Order> orders, IReadOnlyList<AccountDebtSegment> outstanding, AccountMoney money)
     {
-        if (applied > 0 || claimed > 0 || NetCaptured(order, money) > 0)
-            throw new ConflictException("A reversed order still has account allocations. Reconciliation is required.");
+        foreach (var order in orders)
+        {
+            if (order.Status is OrderStatus.Cancelled or OrderStatus.Refunded || HasProvenFullRefund(order))
+                continue;
+            var payable = money.ToMinor(order.PayableTotal);
+            var paid = NetCaptured(order, money);
+            if (paid > payable || AccountDebtMath.Total(outstanding.Where(value => value.OrderId == order.Id)) != payable - paid)
+                throw new ConflictException("The account and effective order charge differ. Reconcile billing credits before collection.");
+        }
     }
 
-    private static void RequireCollectableOrder(Order order)
-    {
-        if (order.ExternalReference is not null)
-            throw new ConflictException("Marketplace-held payments cannot be collected through a table account.");
-        if (order.Payments.Any(payment => payment.PaymentMethod == PaymentMethod.OnlinePayment
-                && payment.Status == PaymentStatus.Processing))
-            throw new ConflictException("An existing order checkout must be resolved before account collection.");
-    }
-
-    private static void ProjectUnreconciledDebt(
-        Order order, AccountMoney money, long applied, List<AccountDebtSegment> due)
-    {
-        var charge = money.ToMinor(order.Total);
-        var paid = NetCaptured(order, money);
-        if (applied > paid || paid > charge)
-            throw new ConflictException("The order's tender ledger requires reconciliation before account collection.");
-        AddUnpaidOrderLines(order, money, charge, paid - applied, due);
-    }
-
-    private static void AddUnpaidOrderLines(
+    private static void ProjectLegacyFoodScope(
         Order order, AccountMoney money, long charge, long historical, List<AccountDebtSegment> due)
     {
-        var roots = order.Items.Where(item => item.ParentOrderItemId is null)
-            .OrderBy(item => item.Id).ToArray();
-        if (roots.Length == 0)
-        {
-            due.AddRange(AccountDebtMath.CreateUnitemized(order.Id, charge, historical));
-            return;
-        }
+        var roots = order.Items.Where(item => item.ParentOrderItemId is null).OrderBy(item => item.Id).ToArray();
         if (roots.Any(item => item.Quantity <= 0 || item.OrderId != order.Id))
             throw new ConflictException("The account contains an invalid frozen order line.");
-        AddLineDebts(order, roots, money, charge, historical, due);
-    }
-
-    private static void AddLineDebts(
-        Order order,
-        OrderItem[] roots,
-        AccountMoney money,
-        long charge,
-        long historical,
-        List<AccountDebtSegment> due)
-    {
         var weights = roots.Select(item => money.ToMinor(item.ItemTotal)).ToArray();
         if (weights.All(weight => weight == 0))
             weights = roots.Select(item => (long)item.Quantity).ToArray();

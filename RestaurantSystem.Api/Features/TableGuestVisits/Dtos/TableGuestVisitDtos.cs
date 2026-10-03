@@ -4,7 +4,7 @@ public sealed record TableGuestAdmissionCodeDto(string AdmissionCode, DateTime E
 
 public sealed record TableGuestJoinDto(Guid ServiceSessionId, string ParticipantToken, DateTime ExpiresAt);
 
-public sealed record TableGuestOrderDto(
+public sealed partial record TableGuestOrderDto(
     Guid OrderId,
     string OrderNumber,
     string Status,
@@ -36,7 +36,7 @@ public sealed record TableGuestAccountLineDto(
     int UnitCount,
     TableGuestItemDto Item);
 
-public sealed record TableGuestAccountDto(
+public sealed partial record TableGuestAccountDto(
     Guid ServiceSessionId,
     string? TableLabel,
     string? Currency,

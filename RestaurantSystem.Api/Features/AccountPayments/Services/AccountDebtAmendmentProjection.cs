@@ -12,7 +12,7 @@ internal static class AccountDebtAmendmentProjection
 {
     internal static IReadOnlyList<AccountDebtSegment> ExcludeVoidedUnits(
         IReadOnlyList<Order> orders, IReadOnlyList<AccountDebtSegment> due,
-        IReadOnlyList<OrderAmendment> amendments)
+        IReadOnlyList<OrderAmendment> amendments, bool legacyFullCharge = false)
     {
         if (amendments.Count == 0)
             return due;
@@ -25,7 +25,7 @@ internal static class AccountDebtAmendmentProjection
             if (!ordersById.TryGetValue(amendment.SourceOrderId, out var source))
                 throw InvalidAmendment();
             foreach (var change in ReadChanges(amendment.ChangesJson))
-                AddChange(source, change, removedRanges, instructionItems);
+                AddChange(source, change, removedRanges, instructionItems, legacyFullCharge);
         }
 
         foreach (var ranges in removedRanges.Values)
@@ -42,7 +42,7 @@ internal static class AccountDebtAmendmentProjection
     private static void AddChange(
         Order source, OrderAmendmentChangeSnapshot change,
         Dictionary<(Guid OrderId, Guid ItemId), List<(int Start, long End)>> removedRanges,
-        HashSet<(Guid OrderId, Guid ItemId)> instructionItems)
+        HashSet<(Guid OrderId, Guid ItemId)> instructionItems, bool legacyFullCharge)
     {
         var key = (source.Id, change.OrderItemId);
         var matchingLines = source.Items.Where(item => item.Id == change.OrderItemId
@@ -90,6 +90,10 @@ internal static class AccountDebtAmendmentProjection
                 && (change.Current is null || change.Current.Id == Guid.Empty))
             || instructionItems.Contains(key))
             throw InvalidAmendment();
+
+        if (legacyFullCharge && (source.Tip > 0 || source.DeliveryFee > 0))
+            throw new ConflictException(
+                "This legacy account needs financial reconciliation before its food units can be removed.");
 
         var end = (long)change.StartOrdinal + change.Quantity;
         if (end > (long)line.Quantity + 1)

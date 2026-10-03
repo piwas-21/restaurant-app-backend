@@ -122,7 +122,7 @@ public sealed class OrderAmendmentPolicyTests
         });
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns("CHF");
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
 
         var firstUnit = await service.PreviewAsync(source,
             [Void(lineId, start: 1, quantity: 1)], null, CancellationToken.None);
@@ -151,7 +151,7 @@ public sealed class OrderAmendmentPolicyTests
         };
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns("CHF");
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
 
         var preview = await service.PreviewAsync(source, [], supplement, CancellationToken.None);
 
@@ -166,7 +166,7 @@ public sealed class OrderAmendmentPolicyTests
         var source = SourceOrder();
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns((string?)null);
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
         var itemId = Guid.NewGuid();
         var item = new OrderItemDto { Id = itemId, ProductName = "Soup", Quantity = 1 };
 
@@ -201,7 +201,7 @@ public sealed class OrderAmendmentPolicyTests
         });
         var resolver = new Mock<IOrderDisplayCurrencyResolver>();
         resolver.Setup(value => value.Resolve(source)).Returns("CHF");
-        var service = new OrderAmendmentFinancialResolutionService(resolver.Object);
+        var service = new OrderAmendmentFinancialResolutionService(resolver.Object, Mock.Of<IOrderBillingAdjustmentWriter>());
 
         var preview = await service.PreviewAsync(source,
             [Void(lineId, start: 1, quantity: 1)], null, CancellationToken.None);

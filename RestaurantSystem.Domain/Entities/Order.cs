@@ -31,7 +31,7 @@ public partial class Order : SoftDeleteEntity
     // Payment Summary (calculated from OrderPayments)
     public decimal TotalPaid { get; set; }
     public decimal RemainingAmount { get; set; }
-    public bool IsFullyPaid => RemainingAmount <= 0;
+    public bool IsFullyPaid => TotalPaid >= PayableTotal;
     // Discount Details
     public string? PromoCode { get; set; }
     public bool HasUserLimitDiscount { get; set; }

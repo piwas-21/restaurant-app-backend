@@ -57,6 +57,12 @@ internal static class OrderAmendmentPolicy
                 throw new ConflictException("The dine-in account is closed or unavailable.");
             if (request.ExpectedAccountRevision != source.ServiceSession.AccountRevision)
                 throw new ConflictException("The table account changed. Refresh the bill and quote again.");
+            if (source.ServiceSession.BillingAllocationVersion == 0
+                && (source.Tip > 0 || source.DeliveryFee > 0)
+                && request.Changes.Any(change => change.Kind is
+                    OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace))
+                throw new ConflictException(
+                    "This legacy account needs financial reconciliation before its food units can be removed.");
         }
         else if (source.ServiceSessionId.HasValue || request.ExpectedAccountRevision.HasValue)
         {

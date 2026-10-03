@@ -7,6 +7,22 @@ namespace RestaurantSystem.Api.Features.TableServiceSessions.Services;
 /// <summary>Shared read/write close predicates for explicit table service sessions.</summary>
 public static class TableServiceSessionCloseRules
 {
+    public static decimal EffectiveOutstanding(decimal total, decimal billingCreditAmount, decimal totalPaid) =>
+        Math.Max(0m, total - billingCreditAmount - totalPaid);
+
+    public static TableServiceSessionOrderState FromCharge(
+        OrderStatus status,
+        decimal total,
+        decimal billingCreditAmount,
+        decimal totalPaid,
+        bool isFullyRefunded = false) =>
+        new(status, EffectiveOutstanding(total, billingCreditAmount, totalPaid), isFullyRefunded);
+
+    internal static IQueryable<TableServiceCloseCharge> SelectCloseCharges(this IQueryable<Order> orders) =>
+        orders.Select(order => new TableServiceCloseCharge(order.Status, order.Total,
+            order.BillingCreditAmount, order.TotalPaid, order.PaymentStatus, order.OrderNumber,
+            order.TableId, order.TableNumber));
+
     public static IQueryable<Order> ForUnassignedSession(
         IQueryable<Order> orders, Guid? tableId, int? tableNumber)
     {
@@ -57,3 +73,11 @@ public sealed record TableServiceSessionCloseAssessment(
     decimal Outstanding,
     int UnresolvedMemberOrderCount,
     bool CanClose);
+
+internal sealed record TableServiceCloseCharge(
+    OrderStatus Status, decimal Total, decimal BillingCreditAmount, decimal TotalPaid,
+    PaymentStatus PaymentStatus, string OrderNumber, Guid? TableId, int? TableNumber)
+{
+    internal TableServiceSessionOrderState ToState() => TableServiceSessionCloseRules.FromCharge(
+        Status, Total, BillingCreditAmount, TotalPaid, PaymentStatus == PaymentStatus.Refunded);
+}

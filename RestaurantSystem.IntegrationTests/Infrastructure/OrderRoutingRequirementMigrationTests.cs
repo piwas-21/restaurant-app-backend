@@ -7,7 +7,7 @@ using RestaurantSystem.IntegrationTests.Common;
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
 [Collection("Database Lane 4")]
-public sealed class OrderRoutingRequirementMigrationTests
+public sealed class OrderRoutingRequirementMigrationTests : IAsyncLifetime
 {
     private const string MigrationBeforeRequirement =
         "20260921194517" + "_AddOrderRoutingStates";
@@ -18,6 +18,11 @@ public sealed class OrderRoutingRequirementMigrationTests
     {
         _fixture = fixture;
     }
+
+    // Historical-schema probes need an empty disposable lane; production Down still
+    // refuses any financial history. No trigger or migration guard is bypassed.
+    public Task InitializeAsync() => _fixture.ResetDatabaseAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Migration_backfills_historical_cashier_routes_as_optional_and_kitchen_as_required()
@@ -35,7 +40,8 @@ public sealed class OrderRoutingRequirementMigrationTests
                 // Revert the real lane database to the schema immediately before the migration.
                 // The order and route rows below therefore exist while is_required is absent.
                 await setup.Database.MigrateAsync(MigrationBeforeRequirement);
-                await TestOrderSeeder.SeedOrderAsync(setup, orderId);
+                await HistoricalOrderSeed.InsertAsync(setup, orderId, $"ROUTE-{orderId:N}"[..16],
+                    DateTime.UtcNow, nameof(OrderRoutingRequirementMigrationTests));
 
                 // The route FK points at a real order entity; every non-nullable historical
                 // routing column is supplied exactly as the pre-migration schema requires.

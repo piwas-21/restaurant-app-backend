@@ -110,7 +110,7 @@ public sealed class TableGuestAccountReader : ITableGuestAccountReader
             cancellationToken);
     }
 
-    private static TableGuestAccountDto Project(TableBillDto bill)
+    internal static TableGuestAccountDto Project(TableBillDto bill)
     {
         if (!bill.AccountRevision.HasValue || !bill.ServiceSessionId.HasValue)
         {
@@ -119,14 +119,22 @@ public sealed class TableGuestAccountReader : ITableGuestAccountReader
 
         var orders = bill.Orders.Select(order => new TableGuestOrderDto(
             order.Id, order.OrderNumber, order.Status, order.PaymentStatus, order.OrderDate,
-            order.Total, order.TotalPaid, order.RemainingAmount)).ToArray();
+            order.Total, order.TotalPaid, order.RemainingAmount)
+        {
+            PayableTotal = order.PayableTotal,
+            BillingCreditAmount = order.BillingCreditAmount
+        }).ToArray();
         var items = bill.AccountItems.Select(line => new TableGuestAccountLineDto(
             line.OrderId, line.OrderNumber, line.UnitCount, ProjectItem(line.ItemSnapshot, 0, []))).ToArray();
 
         return new TableGuestAccountDto(
             bill.ServiceSessionId.Value, bill.TableLabel, bill.Currency, bill.AccountRevision.Value,
             bill.SubTotal, bill.Tax, bill.Discount, bill.Tip, bill.Total, bill.TotalPaid,
-            bill.Remaining, bill.Credit, orders, items);
+            bill.Remaining, bill.Credit, orders, items)
+        {
+            OriginalTotal = bill.OriginalTotal,
+            BillingCreditAmount = bill.BillingCreditAmount
+        };
     }
 
     private static TableGuestItemDto ProjectItem(OrderItemDto item, int depth, HashSet<Guid> path)

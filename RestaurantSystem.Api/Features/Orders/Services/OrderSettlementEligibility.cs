@@ -29,7 +29,7 @@ public static class OrderSettlementEligibility
             payment.RefundedAmount > 0);
 
     private static readonly Expression<Func<Order, bool>> OutstandingBalancePredicate = order =>
-        order.TotalPaid < order.Total - PaymentTolerance;
+        order.TotalPaid < order.Total - order.BillingCreditAmount - PaymentTolerance;
 
     private static readonly Expression<Func<Order, bool>> NoProcessingOnlineTenderPredicate = order =>
         !order.Payments.Any(payment =>
@@ -83,14 +83,14 @@ public static class OrderSettlementEligibility
             ? order.TotalPaid
             : order.Payments.Where(payment => payment.Status.IsCaptured())
                 .Sum(payment => payment.Amount) - RefundedAmount(order);
-        return Math.Max(0m, netPaid - order.Total);
+        return Math.Max(0m, netPaid - order.PayableTotal);
     }
 
     /// <summary>Returns the order's non-negative net balance due, without eligibility filtering.</summary>
     public static decimal Outstanding(Order order)
     {
         ArgumentNullException.ThrowIfNull(order);
-        return Math.Max(0m, order.RemainingAmount);
+        return Math.Max(0m, order.PayableTotal - order.TotalPaid);
     }
 
     /// <summary>

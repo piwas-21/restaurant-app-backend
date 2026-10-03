@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -27,6 +28,9 @@ internal static class OrderPaymentApplicationPersistence
             {
                 transaction = await context.Database.BeginTransactionAsync(cancellationToken);
             }
+
+            await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+                context, order.Id, cancellationToken);
 
             var pendingPlaceholders = order.Payments
                 .Where(payment => payment.Status == PaymentStatus.Pending)
@@ -132,7 +136,7 @@ internal static class OrderPaymentApplicationPersistence
             .Sum(payment => payment.RefundedAmount ?? 0);
 
         order.TotalPaid = capturedPayments - refundedAmounts;
-        order.RemainingAmount = order.Total - order.TotalPaid;
+        order.RemainingAmount = order.PayableTotal - order.TotalPaid;
 
         if (order.RemainingAmount > paymentTolerance)
         {

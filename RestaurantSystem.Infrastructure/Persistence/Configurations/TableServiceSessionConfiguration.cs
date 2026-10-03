@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using RestaurantSystem.Domain.Entities;
 
@@ -21,6 +22,10 @@ public class TableServiceSessionConfiguration : IEntityTypeConfiguration<TableSe
             .IsConcurrencyToken();
 
         builder.Property(session => session.AccountRevision).IsRequired().HasDefaultValue(1L).IsConcurrencyToken();
+        // Older API builds omit this column during a rolling deployment and still use model 0.
+        // Current constructors explicitly persist 1; the database must preserve the old writer.
+        builder.Property(session => session.BillingAllocationVersion).IsRequired().HasDefaultValue(0)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
 
         builder.Property(session => session.OpenedAt).IsRequired();
 

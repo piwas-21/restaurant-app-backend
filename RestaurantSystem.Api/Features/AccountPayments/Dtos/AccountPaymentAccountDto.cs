@@ -48,4 +48,5 @@ public sealed record AccountPaymentAccountDto(
     IReadOnlyList<AccountPaymentAllocationDto> AvailableAllocations,
     AccountPaymentEqualShareSummaryDto? ActiveEqualSharePlan,
     IReadOnlyList<AccountPaymentAttemptSummaryDto> ActiveAttempts,
-    AccountPaymentLimitsDto Limits);
+    AccountPaymentLimitsDto Limits,
+    int BillingAllocationVersion = 0);

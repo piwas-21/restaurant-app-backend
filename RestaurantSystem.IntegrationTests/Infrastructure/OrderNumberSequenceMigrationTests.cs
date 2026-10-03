@@ -9,7 +9,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
 
 [Collection("Database Lane 4")]
-public sealed class OrderNumberSequenceMigrationTests
+public sealed class OrderNumberSequenceMigrationTests : IAsyncLifetime
 {
     private const string MigrationBeforeSequence = "20260927174440" + "_AddOptionSetMaterializationJobs";
     private static readonly DateTimeOffset AllocationInstant = new(2000, 1, 1, 12, 0, 0, TimeSpan.Zero);
@@ -21,6 +21,11 @@ public sealed class OrderNumberSequenceMigrationTests
     {
         _fixture = fixture;
     }
+
+    // Historical-schema probes need an empty disposable lane; production Down still
+    // refuses any financial history. No trigger or migration guard is bypassed.
+    public Task InitializeAsync() => _fixture.ResetDatabaseAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Migration_backfills_deleted_numbers_and_trigger_tracks_legacy_inserts()
@@ -39,9 +44,10 @@ public sealed class OrderNumberSequenceMigrationTests
             await using (var setup = _fixture.CreateContext())
             {
                 await setup.Database.MigrateAsync(MigrationBeforeSequence);
-                setup.Orders.Add(CreateOrder(activeOrderId, $"{prefix}0003", isDeleted: false));
-                setup.Orders.Add(CreateOrder(deletedOrderId, $"{prefix}0008", isDeleted: true));
-                await setup.SaveChangesAsync();
+                await HistoricalOrderSeed.InsertAsync(setup, activeOrderId, $"{prefix}0003",
+                    AllocationInstant.UtcDateTime, nameof(OrderNumberSequenceMigrationTests));
+                await HistoricalOrderSeed.InsertAsync(setup, deletedOrderId, $"{prefix}0008",
+                    AllocationInstant.UtcDateTime, nameof(OrderNumberSequenceMigrationTests), deleted: true);
             }
 
             await using (var migrate = _fixture.CreateContext())

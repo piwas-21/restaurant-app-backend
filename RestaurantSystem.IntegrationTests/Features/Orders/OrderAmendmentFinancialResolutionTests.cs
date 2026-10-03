@@ -12,9 +12,40 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 public sealed class OrderAmendmentFinancialResolutionTests
 {
     [Fact]
+    public async Task Legacy_tax_credit_remains_pending_until_tax_reporting_is_reconciled()
+    {
+        var orderId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var billing = new Mock<IOrderBillingAdjustmentWriter>(MockBehavior.Strict);
+        var source = new Order
+        {
+            Id = orderId,
+            Total = 11m,
+            Tax = 1m,
+            CreatedBy = "test",
+            ServiceSession = new TableServiceSession { Currency = "CHF", CreatedBy = "test" },
+            Items = [new OrderItem { Id = itemId, OrderId = orderId,
+                Quantity = 1, ItemTotal = 11m, CreatedBy = "test" }]
+        };
+        var service = new OrderAmendmentFinancialResolutionService(
+            Mock.Of<IOrderDisplayCurrencyResolver>(), billing.Object);
+        var change = new OrderAmendmentChangeSnapshot(itemId, OrderAmendmentChangeKind.Void,
+            1, 1, false, new OrderItemDto { Id = itemId, Quantity = 1 }, null);
+
+        var preview = await service.PreviewAsync(source, [change], null, CancellationToken.None);
+        await service.StageAsync(new OrderAmendment { CreatedBy = "test" }, source, preview, CancellationToken.None);
+
+        preview.PotentialCreditMinor.Should().Be(1100);
+        preview.CreditState.Should().Be(OrderAmendmentCreditState.PendingAllocationReview);
+        preview.ResolutionStatus.Should().Be(OrderAmendmentFinancialResolutionStatus.Pending);
+        source.BillingCreditAmount.Should().Be(0);
+        billing.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public async Task Unpaid_balance_reduction_is_resolved_when_staged_without_refund_or_loyalty_work()
     {
-        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>());
+        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>(), Mock.Of<IOrderBillingAdjustmentWriter>());
         var amendment = new OrderAmendment { CreatedBy = "test" };
         var preview = new OrderAmendmentFinancialPreviewDto("CHF", 0, 1000, -1000, 1000,
             OrderAmendmentFinancialResolutionStatus.Pending, OrderAmendmentCreditState.BalanceReduction,
@@ -29,7 +60,7 @@ public sealed class OrderAmendmentFinancialResolutionTests
     [Fact]
     public async Task Legacy_paid_summary_without_tender_evidence_remains_pending_for_custodian_review()
     {
-        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>());
+        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>(), Mock.Of<IOrderBillingAdjustmentWriter>());
         var orderId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var source = new Order
@@ -65,7 +96,7 @@ public sealed class OrderAmendmentFinancialResolutionTests
     [Fact]
     public async Task Legacy_paid_summary_with_only_a_non_captured_payment_row_remains_pending()
     {
-        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>());
+        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>(), Mock.Of<IOrderBillingAdjustmentWriter>());
         var orderId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var source = new Order
@@ -101,6 +132,36 @@ public sealed class OrderAmendmentFinancialResolutionTests
     public void Missing_financial_snapshot_fields_fail_closed(string json)
     {
         OrderAmendmentFinancialGuard.IsUnresolved(json).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Loyalty_discount_without_point_counters_still_requires_reconciliation()
+    {
+        var billing = new Mock<IOrderBillingAdjustmentWriter>(MockBehavior.Strict);
+        var service = new OrderAmendmentFinancialResolutionService(Mock.Of<IOrderDisplayCurrencyResolver>(), billing.Object);
+        var orderId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var source = new Order
+        {
+            Id = orderId,
+            Total = 9m,
+            FidelityPointsDiscount = 1m,
+            CreatedBy = "test",
+            ServiceSession = new TableServiceSession { Currency = "CHF", CreatedBy = "test" },
+            Items = [new OrderItem { Id = itemId, OrderId = orderId, Quantity = 1, ItemTotal = 10m, CreatedBy = "test" }]
+        };
+        var changes = new[] { new OrderAmendmentChangeSnapshot(itemId, OrderAmendmentChangeKind.Void, 1, 1,
+            false, new OrderItemDto { Id = itemId, Quantity = 1 }, null) };
+
+        var preview = await service.PreviewAsync(source, changes, null, CancellationToken.None);
+        var amendment = new OrderAmendment { CreatedBy = "test" };
+        await service.StageAsync(amendment, source, preview, CancellationToken.None);
+
+        preview.PotentialCreditMinor.Should().Be(900);
+        preview.LoyaltyState.Should().Be(OrderAmendmentLoyaltyState.PendingReview);
+        OrderAmendmentFinancialGuard.IsUnresolved(amendment.FinancialResolutionJson).Should().BeTrue();
+        source.BillingCreditAmount.Should().Be(0);
+        billing.VerifyNoOtherCalls();
     }
 
     [Fact]
