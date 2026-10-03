@@ -6,6 +6,7 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Interfaces;
 public interface IAccountStripeCheckoutClient
 {
     AccountStripeContext ReadContext();
+    string ReadReturnBaseUrl();
     Task<AccountStripeSession> CreateAsync(AccountStripeCheckoutRequest request, CancellationToken cancellationToken);
     Task<AccountStripeSession?> GetAsync(string sessionId, CancellationToken cancellationToken);
     Task<AccountStripeIntent?> GetIntentAsync(string intentId, CancellationToken cancellationToken);

@@ -24,7 +24,8 @@ public sealed class AccountStripeCheckoutClientTests
         AmountMinor = 334,
         Currency = "CHF",
         ExpiresAt = new DateTime(2026, 10, 3, 12, 0, 0, DateTimeKind.Utc),
-        IdempotencyKey = "account-attempt-create-v1"
+        IdempotencyKey = "account-attempt-create-v1",
+        ReturnBaseUrl = "https://tenant.test/table-account"
     };
 
     private static (AccountStripeCheckoutClient Client, Mock<IStripeClient> Transport) Create(
@@ -55,7 +56,8 @@ public sealed class AccountStripeCheckoutClientTests
     [Fact]
     public async Task Sends_frozen_contribution_once_with_no_order_or_guest_identity()
     {
-        var (client, transport) = Create();
+        var (client, transport) = Create(returnPath: "/updated-return");
+        client.ReadReturnBaseUrl().Should().Be("https://tenant.test/updated-return");
         SessionCreateOptions? sent = null;
         RequestOptions? credentials = null;
         transport.Setup(value => value.RequestAsync<Session>(HttpMethod.Post, "/v1/checkout/sessions",
@@ -120,10 +122,25 @@ public sealed class AccountStripeCheckoutClientTests
     [InlineData("//outside.test/return")]
     [InlineData("/table-account?participant=secret")]
     [InlineData("/table-account#grant")]
-    public async Task Unsafe_return_configuration_fails_before_provider_creation(string path)
+    public void Unsafe_return_configuration_fails_before_provider_creation(string path)
     {
         var (client, transport) = Create(returnPath: path);
-        await FluentActions.Invoking(() => client.CreateAsync(Request(), CancellationToken.None))
+        FluentActions.Invoking(() => client.ReadReturnBaseUrl())
+            .Should().Throw<BadRequestException>();
+        transport.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData("/table-account")]
+    [InlineData("https://tenant.test/table-account?participant=secret")]
+    [InlineData("https://tenant.test/table-account#grant")]
+    [InlineData("https://user:secret@tenant.test/table-account")] // pragma: allowlist secret -- synthetic userinfo rejection fixture
+    [InlineData("https://tenant.test\\table-account")]
+    public async Task Unsafe_frozen_return_payload_has_no_network_calls(string returnBaseUrl)
+    {
+        var (client, transport) = Create();
+        await FluentActions.Invoking(() => client.CreateAsync(
+                Request() with { ReturnBaseUrl = returnBaseUrl }, CancellationToken.None))
             .Should().ThrowAsync<BadRequestException>();
         transport.VerifyNoOtherCalls();
     }

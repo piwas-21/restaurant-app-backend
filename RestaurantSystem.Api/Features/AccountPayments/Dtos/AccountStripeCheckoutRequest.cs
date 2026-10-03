@@ -9,4 +9,5 @@ public sealed record AccountStripeCheckoutRequest
     public required string Currency { get; init; }
     public required DateTime ExpiresAt { get; init; }
     public required string IdempotencyKey { get; init; }
+    public required string ReturnBaseUrl { get; init; }
 }

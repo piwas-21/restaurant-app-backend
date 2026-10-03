@@ -14,6 +14,7 @@ public sealed class TableGuestTelemetryPrivacyTests
         captured.Request.Headers["x-table-participant"] = "participant-secret";
         captured.Request.Headers["X-TABLE-PARTICIPANT"] = "another-participant-secret";
         captured.Request.Headers["x-SeSsIoN-Id"] = "basket-capability";
+        captured.Request.Headers["x-aCcOuNt-PaYmEnT-rEcEiPt"] = "receipt-capability";
         captured.Request.Headers["Accept-Language"] = "fr";
         captured.Request.Headers["Content-Type"] = "application/json";
 
@@ -21,6 +22,7 @@ public sealed class TableGuestTelemetryPrivacyTests
         filtered.Should().BeSameAs(captured);
         var outgoingHeaders = JsonSerializer.Serialize(filtered.Request.Headers);
         outgoingHeaders.Should().NotContain("participant-secret").And.NotContain("basket-capability");
+        outgoingHeaders.Should().NotContain("receipt-capability");
         filtered.Request.Headers["Accept-Language"].Should().Be("fr");
         filtered.Request.Headers["Content-Type"].Should().Be("application/json");
     }

@@ -73,8 +73,8 @@ public sealed class AccountStripeCheckoutClient(
                     }
                 }
             ],
-            SuccessUrl = BuildReturnUrl(attemptId, canceled: false),
-            CancelUrl = BuildReturnUrl(attemptId, canceled: true)
+            SuccessUrl = BuildReturnUrl(request.ReturnBaseUrl, attemptId, canceled: false),
+            CancelUrl = BuildReturnUrl(request.ReturnBaseUrl, attemptId, canceled: true)
         };
         var session = await new SessionService(gateway.Client).CreateAsync(
             options, gateway.BuildRequestOptions(request.IdempotencyKey), cancellationToken);
@@ -166,15 +166,33 @@ public sealed class AccountStripeCheckoutClient(
         Metadata = session.Metadata ?? new Dictionary<string, string>()
     };
 
-    private string BuildReturnUrl(string attemptId, bool canceled)
+    public string ReadReturnBaseUrl()
     {
         var path = checkoutOptions.Value.ReturnPath;
         var origin = emailOptions.Value.FrontendBaseUrl;
         if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("https" or "http")
+            || uri.UserInfo.Length > 0 || uri.Query.Length > 0 || uri.Fragment.Length > 0
+            || uri.AbsolutePath != "/"
             || !path.StartsWith('/') || path.StartsWith("//", StringComparison.Ordinal)
             || path.Contains('?') || path.Contains('#') || path.Contains('\\'))
             throw new BadRequestException("The table payment return path requires configuration.");
-        return $"{origin.TrimEnd('/')}{path}?paymentAttempt={attemptId}&canceled={(canceled ? "1" : "0")}";
+        var result = $"{origin.TrimEnd('/')}{path}";
+        RequireReturnBaseUrl(result);
+        return result;
+    }
+
+    private static string BuildReturnUrl(string returnBaseUrl, string attemptId, bool canceled)
+    {
+        RequireReturnBaseUrl(returnBaseUrl);
+        return $"{returnBaseUrl}?paymentAttempt={attemptId}&canceled={(canceled ? "1" : "0")}";
+    }
+
+    private static void RequireReturnBaseUrl(string returnBaseUrl)
+    {
+        if (!Uri.TryCreate(returnBaseUrl, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("https" or "http") || uri.UserInfo.Length > 0
+            || uri.Query.Length > 0 || uri.Fragment.Length > 0 || returnBaseUrl.Contains('\\'))
+            throw new BadRequestException("The frozen table payment return URL is invalid.");
     }
 }

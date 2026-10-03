@@ -15,5 +15,6 @@ public static class TableGuestTelemetryPrivacy
 
     private static bool IsCapabilityHeader(string key) =>
         string.Equals(key, "X-Table-Participant", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(key, "X-Account-Payment-Receipt", StringComparison.OrdinalIgnoreCase)
         || string.Equals(key, "X-Session-Id", StringComparison.OrdinalIgnoreCase);
 }
