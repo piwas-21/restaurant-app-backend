@@ -10,4 +10,11 @@ public sealed class ConflictException : Exception
     public ConflictException(string message, Exception innerException) : base(message, innerException)
     {
     }
+
+    public ConflictException(string message, string errorCode) : base(message)
+    {
+        ErrorCode = errorCode;
+    }
+
+    public string? ErrorCode { get; }
 }

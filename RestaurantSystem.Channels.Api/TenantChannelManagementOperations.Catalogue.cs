@@ -12,8 +12,13 @@ public sealed partial class TenantChannelCatalogueService(TenantManagementContex
 
     public async Task<JsonElement> Catalogue(CancellationToken cancellationToken)
     {
+        var persisted = await state.ReadDraft(context.Binding(), cancellationToken);
+        if (context.Management.CategorySelectionEnabled)
+            return await CategoryCatalogueView(persisted, cancellationToken);
+        var saved = persisted is not null && TenantCatalogueCategorySnapshot.IsCategorySnapshot(persisted.Snapshot)
+            ? null : persisted;
         var store = await DraftStore(cancellationToken);
-        var draft = await state.ReadDraft(context.Binding(), cancellationToken);
+        var draft = saved;
         var preview = await publication.Preview(menu.Preview(), store, cancellationToken);
         var latest = await state.Latest(context.Binding(store), cancellationToken);
         var source = await tenantCatalogue.Read(store, cancellationToken);
@@ -24,7 +29,8 @@ public sealed partial class TenantChannelCatalogueService(TenantManagementContex
             storeId = store.StoreId,
             currency = store.Currency,
             mappingRevision = store.CatalogueRevision,
-            draftRevision = draft?.Revision ?? string.Empty,
+            draftRevision = persisted?.Revision ?? string.Empty,
+            selectionMode = "fixedItemsV1",
             sourceRevision = ProviderJson.Text(preview, "sourceRevision"),
             canPublish = ProviderJson.Flag(preview, CanPublishProperty),
             items = Rows(store, source, preview, providerMenu.Menu, menu.Preview(), providerMenu.Status),
@@ -42,6 +48,12 @@ public sealed partial class TenantChannelCatalogueService(TenantManagementContex
     public async Task<JsonElement> SaveDraft(TenantManagementDraftRequest request, Guid actorId,
         CancellationToken cancellationToken)
     {
+        if (request is null || request.Items is null || request.CategoryIds is null || request.ItemOverrides is null
+            || request.ExpectedSourceRevision is null)
+            throw new ChannelConsoleException(400, "Refresh the tenant catalogue and review the selected categories and products.");
+        if (context.Management.CategorySelectionEnabled || request.ExpectedSourceRevision.Length > 0
+            || request.CategoryIds.Count > 0 || request.ItemOverrides.Count > 0)
+            return await SaveCategoryDraft(request, actorId, cancellationToken);
         context.RequireEnabled();
         await using var lease = await state.TryLease(context.Binding(), cancellationToken);
         if (lease is null) throw new ChannelConsoleException(409, "A menu or availability operation is in progress. Reload before changing mappings.");
@@ -95,6 +107,11 @@ public sealed partial class TenantChannelCatalogueService(TenantManagementContex
         if (!Guid.TryParseExact(request.DraftRevision, "D", out _)) throw new ChannelConsoleException(400, "Reload the saved draft before previewing.");
         var draft = await state.ReadDraft(context.Binding(), cancellationToken);
         if (draft is null || draft.Revision != request.DraftRevision) throw new ChannelConsoleException(409, "The catalogue draft changed. Reload and review it again.");
+        if (TenantCatalogueCategorySnapshot.IsCategorySnapshot(draft.Snapshot))
+        {
+            RequireCategoryMode();
+            return await PreviewCategoryDraft(draft, actorId, cancellationToken);
+        }
         var store = FromSnapshot(draft.Snapshot, draft.MappingRevision);
         var preview = await publication.Preview(menu.Preview(), store, cancellationToken);
         var source = await tenantCatalogue.Read(store, cancellationToken);
@@ -130,6 +147,11 @@ public sealed partial class TenantChannelCatalogueService(TenantManagementContex
         var draft = await state.ReadDraft(context.Binding(), cancellationToken);
         if (draft is null || draft.Revision != request.DraftRevision)
             throw new ChannelConsoleException(409, "The saved catalogue draft changed after preview. Review a fresh preview before publishing.");
+        if (TenantCatalogueCategorySnapshot.IsCategorySnapshot(draft.Snapshot))
+        {
+            RequireCategoryMode();
+            return await PublishCategoryDraft(request, draft, actorId, cancellationToken);
+        }
         var store = FromSnapshot(draft.Snapshot, draft.MappingRevision);
         var preview = await publication.Preview(menu.Preview(), store, cancellationToken);
         if (!ProviderJson.Flag(preview, CanPublishProperty) || ProviderJson.Text(preview, "revision") != request.PublicationRevision)
@@ -179,13 +201,18 @@ public sealed partial class TenantChannelCatalogueService(TenantManagementContex
     {
         context.RequireEnabled();
         var draft = await state.ReadDraft(context.Binding(), cancellationToken);
-        if (draft is not null) return FromSnapshot(draft.Snapshot, draft.MappingRevision);
+        if (draft is not null && (!TenantCatalogueCategorySnapshot.IsCategorySnapshot(draft.Snapshot)
+            || context.Management.CategorySelectionEnabled))
+            return FromSnapshot(draft.Snapshot, draft.MappingRevision);
+        if (!context.Management.CategorySelectionEnabled) return context.ConfiguredStore;
         try { return await state.Active(cancellationToken); }
         catch (ChannelConsoleException) { return context.ConfiguredStore; }
     }
 
     private TenantStoreBinding FromSnapshot(JsonElement snapshot, string mappingRevision)
     {
+        if (TenantCatalogueCategorySnapshot.IsCategorySnapshot(snapshot))
+            return FromCategorySnapshot(snapshot, mappingRevision);
         if (snapshot.ValueKind != JsonValueKind.Object || !snapshot.TryGetProperty("catalogueRevision", out var revision)
             || revision.GetString() != mappingRevision || !snapshot.TryGetProperty("items", out var rows)
             || rows.ValueKind != JsonValueKind.Array) throw new ChannelConsoleException(409, "Saved catalogue mapping needs operator review.");

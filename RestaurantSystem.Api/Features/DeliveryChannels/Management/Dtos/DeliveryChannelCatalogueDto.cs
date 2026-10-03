@@ -15,7 +15,19 @@ public sealed record DeliveryChannelCatalogueDto(
     DeliveryChannelPublicationSummaryDto? LatestPublication,
     string ServiceHoursStatus,
     IReadOnlyList<DeliveryChannelServiceHoursDayDto> CurrentServiceAvailability,
-    string CurrentServiceHoursStatus);
+    string CurrentServiceHoursStatus)
+{
+    public string SelectionMode { get; init; } = "fixedItemsV1";
+    public IReadOnlyList<DeliveryChannelCategoryDto> Categories { get; init; } = [];
+    public IReadOnlyList<DeliveryChannelCategoryItemDto> SelectedItems { get; init; } = [];
+    public bool SourceChanged { get; init; }
+    public string? DraftSourceRevision { get; init; }
+    public DeliveryChannelTaxProfileDto? TaxProfile { get; init; }
+    public string TaxProfileRevision { get; init; } = string.Empty;
+}
+
+public sealed record DeliveryChannelTaxProfileDto(string Source, string ProfileRevision,
+    decimal VatRatePercentage, bool MerchantVerificationRequired);
 
 public sealed record DeliveryChannelMappingRowDto(
     string ProviderItemId,

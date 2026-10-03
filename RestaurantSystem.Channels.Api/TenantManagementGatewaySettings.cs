@@ -7,6 +7,7 @@ public sealed class TenantManagementGatewaySettings
     public const string ReturnPath = "/admin/delivery-channels/callback";
 
     public bool Enabled { get; set; }
+    public bool CategorySelectionEnabled { get; set; }
     public string CredentialHash { get; set; } = string.Empty;
     public string CallbackUrl { get; set; } = string.Empty;
     public string ReturnUrl { get; set; } = string.Empty;
@@ -14,7 +15,7 @@ public sealed class TenantManagementGatewaySettings
 
     public bool IsValid()
     {
-        if (!Enabled) return true;
+        if (!Enabled) return !CategorySelectionEnabled;
         return CredentialHash.Length == 64 && CredentialHash.All(Uri.IsHexDigit)
             && SecureCallback(CallbackUrl) && SecureReturn(ReturnUrl)
             && AuthorizationMinutes is >= 1 and <= 15;

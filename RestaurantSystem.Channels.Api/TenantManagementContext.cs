@@ -26,7 +26,10 @@ public sealed class TenantManagementContext(IOptions<TenantBridgeSettings> bridg
             throw new ChannelConsoleException(404, "ModuleNotEnabled");
     }
 
-    public TenantStoreBinding Clone(TenantStoreBinding source, string revision, IReadOnlyList<TenantItemMapping> items)
+    public void RequireCategorySelection() => RequireEnabled();
+
+    public TenantStoreBinding Clone(TenantStoreBinding source, string revision, IReadOnlyList<TenantItemMapping> items,
+        TenantCatalogueBindingSelection? selection = null)
         => new()
         {
             StoreId = source.StoreId,
@@ -37,6 +40,35 @@ public sealed class TenantManagementContext(IOptions<TenantBridgeSettings> bridg
             Currency = source.Currency,
             CatalogueRevision = revision,
             PublishedMenuHash = source.PublishedMenuHash,
-            Items = items.ToList()
+            SourceRevision = selection?.SourceRevision ?? source.SourceRevision,
+            Language = selection?.Language ?? source.Language,
+            SelectedCategoryIds = selection?.SelectedCategoryIds.ToList() ?? source.SelectedCategoryIds.ToList(),
+            ItemOverrides = selection?.ItemOverrides.Select(CloneOverride).ToList() ?? source.ItemOverrides.Select(CloneOverride).ToList(),
+            Items = items.ToList(),
+            Categories = (selection?.Categories ?? source.Categories).Select(row => new TenantCategoryMapping
+            {
+                CategoryId = row.CategoryId,
+                ProviderCategoryId = row.ProviderCategoryId,
+                Name = row.Name,
+                DisplayOrder = row.DisplayOrder,
+                Active = row.Active,
+                TotalItemCount = row.TotalItemCount,
+                SupportedItemCount = row.SupportedItemCount,
+                UnsupportedItemCount = row.UnsupportedItemCount,
+                SelectedItemCount = row.SelectedItemCount,
+                SelectedUnsupportedItemCount = row.SelectedUnsupportedItemCount
+            }).ToList()
+        };
+
+    private static TenantItemMappingOverride CloneOverride(TenantItemMappingOverride row)
+        => new()
+        {
+            ProductId = row.ProductId,
+            VariationId = row.VariationId,
+            CategoryId = row.CategoryId,
+            Selected = row.Selected,
+            SelectionKey = row.SelectionKey,
+            SourceFingerprint = row.SourceFingerprint,
+            Supported = row.Supported
         };
 }

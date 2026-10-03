@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Channels.Domain;
 
@@ -40,7 +41,18 @@ public sealed class TenantManagementController(ITenantChannelManagementOperation
     [HttpGet("catalogue")]
     public Task<JsonElement> Catalogue(CancellationToken cancellationToken) => operations.Catalogue(cancellationToken);
 
+    [HttpGet("catalogue/categories")]
+    public Task<JsonElement> CatalogueCategories(CancellationToken cancellationToken)
+        => operations.CatalogueCategories(cancellationToken);
+
+    [HttpPost("catalogue/categories/check")]
+    [RequestSizeLimit(TenantCatalogueLimits.CategoryReferenceRequestBytes)]
+    public Task<JsonElement> CheckCategorySelection(TenantManagementCategoryChangesRequest request,
+        CancellationToken cancellationToken)
+        => operations.CheckCategorySelection(request, cancellationToken);
+
     [HttpPut("catalogue/draft")]
+    [RequestSizeLimit(TenantCatalogueLimits.CategoryReferenceRequestBytes)]
     public Task<JsonElement> SaveDraft(TenantManagementDraftRequest request, CancellationToken cancellationToken)
         => operations.SaveDraft(request, ActorId, cancellationToken);
 
@@ -89,3 +101,8 @@ public sealed class TenantManagementController(ITenantChannelManagementOperation
 }
 
 public sealed record TenantManagementOAuthStartRequest(bool EnableOrderAcceptance = false);
+public sealed record TenantManagementCategoryChangesRequest(
+    [property: JsonRequired] string ExpectedSourceRevision,
+    [property: JsonRequired] IReadOnlyList<Guid> CategoryIds,
+    [property: JsonRequired] IReadOnlyList<TenantCatalogueItemReference> ItemReferences,
+    [property: JsonRequired] IReadOnlyList<TenantManagementItemOverride> ItemOverrides);

@@ -48,16 +48,34 @@ public sealed class DeliveryChannelManagementClient(
     private static Exception Map(HttpStatusCode status, string content)
     {
         var message = SafeMessage(content);
+        var code = SafeErrorCode(content);
         return status switch
         {
-            HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity => new BadRequestException(message),
+            HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity => new BadRequestException(message) { ErrorCode = code },
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => new ForbiddenException(message),
             HttpStatusCode.NotFound => new NotFoundException(message),
-            HttpStatusCode.Conflict => new ConflictException(message),
+            HttpStatusCode.Conflict => code is null ? new ConflictException(message) : new ConflictException(message, code),
             HttpStatusCode.TooManyRequests or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable
                 or HttpStatusCode.GatewayTimeout => Unavailable(),
             _ => Unavailable(),
         };
+    }
+
+    private static string? SafeErrorCode(string content)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(content);
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("errorCode", out var code)
+                || code.ValueKind != JsonValueKind.String) return null;
+            return code.GetString() is "SelectionLimitExceeded" or "SelectionOverrideLimitExceeded"
+                or "CategoryLimitExceeded" or "SelectionRequired" or "SourceRevisionChanged"
+                or "DraftRevisionConflict" or "TaxProfileChanged" or "TaxProfileConfirmationRequired"
+                or "ReviewedTaxProfileUnavailable" or "SelectionBlocked"
+                ? code.GetString() : null;
+        }
+        catch (JsonException) { return null; }
     }
 
     private static string SafeMessage(string content)
