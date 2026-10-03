@@ -18,7 +18,8 @@ internal sealed record AccountPaymentQuoteSnapshot(
     DateTime QuoteExpiresAt,
     Guid? EqualSharePlanId,
     int? EqualShareOrdinal,
-    IReadOnlyList<AccountPaymentAllocationDto> Allocations);
+    IReadOnlyList<AccountPaymentAllocationDto> Allocations,
+    CashSettlementQuote? CashSettlement = null);
 
 internal static class AccountPaymentSnapshots
 {
@@ -57,12 +58,24 @@ internal static class AccountPaymentSnapshots
     internal static AccountPaymentOperationDto ToOperation(AccountPaymentAttempt attempt)
     {
         var snapshot = Deserialize<AccountPaymentQuoteSnapshot>(attempt.SnapshotJson);
+        if (snapshot.CashSettlement is CashSettlementQuote frozen)
+            AccountCashSettlementPolicy.RequireMatches(frozen, attempt.Currency,
+                attempt.PaymentMethod, attempt.AmountMinor);
+        AccountCashCaptureReceiptPolicy.ValidateStored(attempt, snapshot);
+        var receipt = attempt.CashCollectionReceipt;
         return new AccountPaymentOperationDto(
             attempt.ServiceSessionId, attempt.OperationId, attempt.State, attempt.Version,
             snapshot.ExpectedAccountRevision, snapshot.Mode, snapshot.PaymentMethod,
             snapshot.AmountMinor, snapshot.Currency, snapshot.QuoteExpiresAt,
             attempt.ReservedAt, attempt.ReservationExpiresAt, snapshot.EqualSharePlanId,
-            snapshot.EqualShareOrdinal, snapshot.Allocations);
+            snapshot.EqualShareOrdinal, snapshot.Allocations)
+        {
+            CashSettlement = snapshot.CashSettlement,
+            CashReceipt = receipt is null ? null : new CashCollectionReceiptDto(
+                receipt.PolicyVersion, receipt.Currency, receipt.ExactAmountMinor,
+                receipt.AdjustmentMinor, receipt.DueAmountMinor, receipt.ReceivedMinor,
+                receipt.ChangeMinor, receipt.CapturedAt)
+        };
     }
 
     internal static AccountEqualSharePlanDto ToPlan(AccountEqualSharePlan plan) => new(

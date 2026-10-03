@@ -27,15 +27,29 @@ public sealed class AccountPaymentCaptureService(
             var session = await TableServiceSessionRowLock.LoadAsync(context, sessionId, cancellationToken)
                 ?? throw new NotFoundException("Table account was not found.");
             var attempt = await LoadOwnedAttemptAsync(sessionId, operationId, actor, cancellationToken);
+            var snapshot = AccountPaymentSnapshots.Deserialize<AccountPaymentQuoteSnapshot>(attempt.SnapshotJson);
             if (attempt.State == AccountPaymentState.Captured)
             {
+                AccountCashCaptureReceiptPolicy.RequireReplay(attempt, snapshot, actor, request);
                 await transaction.CommitAsync(cancellationToken);
                 return AccountPaymentSnapshots.ToOperation(attempt);
             }
             ValidateReservedAttempt(session.Status, attempt, request.ExpectedVersion);
 
+            var receipt = AccountCashCaptureReceiptPolicy.Create(attempt, snapshot, actor,
+                request, actor.AuditIdentifier, timeProvider.GetUtcNow().UtcDateTime);
+
             // Later rounds do not alter this reviewed scope; the writer revalidates its exact debt.
             await writer.RecordManualAsync(attempt, cancellationToken);
+            if (receipt is not null)
+            {
+                var capturedAt = attempt.CompletedAt
+                    ?? throw new ConflictException("The cash collection timestamp requires reconciliation.");
+                receipt.CapturedAt = capturedAt;
+                receipt.CreatedAt = capturedAt;
+                attempt.CashCollectionReceipt = receipt;
+                context.Set<AccountCashCollectionReceipt>().Add(receipt);
+            }
             session.RecordAccountChange();
             await context.SaveChangesAsync(cancellationToken);
             var paidOrders = await LoadPaidOrdersAsync(attempt, cancellationToken);
@@ -62,7 +76,9 @@ public sealed class AccountPaymentCaptureService(
     {
         var attempt = await context.AccountPaymentAttempts
             .FromSqlInterpolated($"SELECT * FROM account_payment_attempts WHERE operation_id = {operationId} FOR UPDATE")
-            .Include(value => value.Allocations).SingleOrDefaultAsync(cancellationToken)
+            .Include(value => value.Allocations)
+            .Include(value => value.CashCollectionReceipt)
+            .SingleOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("The payment operation was not found for this table visit.");
         if (attempt.ServiceSessionId != sessionId || attempt.ActorId != actor.ActorId || attempt.ActorKind != actor.Kind)
             throw new NotFoundException("The payment operation was not found for this table visit.");

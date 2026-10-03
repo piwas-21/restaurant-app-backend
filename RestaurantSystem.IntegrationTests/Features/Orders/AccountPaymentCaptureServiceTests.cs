@@ -54,7 +54,7 @@ public sealed partial class AccountPaymentCaptureWriterTests
     [Fact]
     public async Task PartialCollectionKeepsTheHandoffOpenForTheRemainingCent()
     {
-        var attemptId = await Seed(2, 1);
+        var attemptId = await Seed(2, 1, PaymentMethod.CreditCard);
         var identity = await ReadyForCollection(attemptId);
         await using (var context = DatabaseFixture.CreateContext())
         {
@@ -126,11 +126,14 @@ public sealed partial class AccountPaymentCaptureWriterTests
         attempt.ReservationExpiresAt = DateTime.UtcNow.AddMinutes(5);
         var segments = attempt.Allocations.Select(value => new AccountDebtSegment(value.OrderId,
             value.OrderItemId, value.StartOrdinal, value.UnitCount, value.MinorPerUnit)).ToArray();
+        var cashSettlement = AccountCashSettlementPolicy.Resolve(
+            attempt.Currency, attempt.PaymentMethod, attempt.AmountMinor);
         attempt.SnapshotJson = AccountPaymentSnapshots.Serialize(new AccountPaymentQuoteSnapshot(
             1, attempt.Mode, attempt.PaymentMethod, attempt.AmountMinor, attempt.Currency, attempt.QuoteExpiresAt,
-            null, null, AccountPaymentSnapshots.ToDtos(segments)));
+            null, null, AccountPaymentSnapshots.ToDtos(segments), cashSettlement));
         await context.SaveChangesAsync();
-        return new(attempt.ServiceSessionId, attempt.OperationId, attempt.ActorId);
+        return new(attempt.ServiceSessionId, attempt.OperationId, attempt.ActorId,
+            attempt.PaymentMethod == PaymentMethod.Cash ? cashSettlement.DueAmountMinor : null);
     }
 
     [Fact]
@@ -153,7 +156,7 @@ public sealed partial class AccountPaymentCaptureWriterTests
         await using var context = DatabaseFixture.CreateContext();
         var actors = new Mock<IAccountPaymentActorResolver>();
         actors.Setup(value => value.ResolveStaffActor()).Returns(new AccountPaymentActor(identity.ActorId,
-            AccountPaymentActorKind.Staff, "test"));
+            AccountPaymentActorKind.Staff, "test", UserRole.Cashier));
         var current = new Mock<ICurrentUserService>();
         current.Setup(value => value.GetAuditIdentifier()).Returns("test");
         if (failUsingSql)
@@ -172,8 +175,9 @@ public sealed partial class AccountPaymentCaptureWriterTests
             fidelity ?? new Mock<IOrderFidelityCoordinator>().Object, TimeProvider.System,
             NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(identity.SessionId, identity.OperationId,
-            new CaptureAccountPaymentRequest { ExpectedVersion = 1 }, CancellationToken.None);
+            new CaptureAccountPaymentRequest { ExpectedVersion = 1, ReceivedMinor = identity.ReceivedMinor },
+            CancellationToken.None);
     }
 
-    private sealed record CollectionIdentity(Guid SessionId, Guid OperationId, Guid ActorId);
+    private sealed record CollectionIdentity(Guid SessionId, Guid OperationId, Guid ActorId, long? ReceivedMinor);
 }

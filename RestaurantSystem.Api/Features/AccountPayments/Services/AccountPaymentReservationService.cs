@@ -251,6 +251,7 @@ public sealed class AccountPaymentReservationService(
         await context.AccountPaymentAttempts
             .FromSqlInterpolated($"SELECT * FROM account_payment_attempts WHERE service_session_id = {sessionId} AND operation_id = {operationId} FOR UPDATE")
             .Include(value => value.Allocations)
+            .Include(value => value.CashCollectionReceipt)
             .SingleOrDefaultAsync(cancellationToken)
         ?? throw new NotFoundException(PaymentOperationNotFoundMessage);
 

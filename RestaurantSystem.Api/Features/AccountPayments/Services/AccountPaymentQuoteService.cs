@@ -62,6 +62,7 @@ public sealed class AccountPaymentQuoteService(
                 : staffActor!;
             await AccountPaymentOperationKeyLock.AcquireAsync(context, request.OperationId, cancellationToken);
             var existing = await context.AccountPaymentAttempts.Include(value => value.Allocations)
+                .Include(value => value.CashCollectionReceipt)
                 .SingleOrDefaultAsync(value => value.OperationId == request.OperationId, cancellationToken);
             if (existing is not null)
             {
@@ -81,6 +82,8 @@ public sealed class AccountPaymentQuoteService(
                 throw new BadRequestException("The payment scope exceeds the configured segment limit.");
             var amount = AccountDebtMath.Total(segments);
             if (guest) guestPolicy.RequireContribution(amount, account.Money.Currency);
+            var cashSettlement = AccountCashSettlementPolicy.Resolve(
+                account.Money.Currency, request.PaymentMethod, amount);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var quoteExpires = now.AddMinutes(settings.QuoteLifetimeMinutes);
             var attempt = new AccountPaymentAttempt
@@ -108,7 +111,7 @@ public sealed class AccountPaymentQuoteService(
             attempt.SnapshotJson = AccountPaymentSnapshots.Serialize(new AccountPaymentQuoteSnapshot(
                 request.ExpectedAccountRevision, request.Mode, request.PaymentMethod, amount,
                 account.Money.Currency, quoteExpires, request.EqualSharePlanId,
-                request.EqualShareOrdinal, AccountPaymentSnapshots.ToDtos(segments)));
+                request.EqualShareOrdinal, AccountPaymentSnapshots.ToDtos(segments), cashSettlement));
             context.AccountPaymentAttempts.Add(attempt);
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

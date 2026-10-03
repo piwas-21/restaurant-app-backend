@@ -6,7 +6,8 @@ using RestaurantSystem.Domain.Common.Enums;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
-public sealed record AccountPaymentActor(Guid ActorId, AccountPaymentActorKind Kind, string AuditIdentifier);
+public sealed record AccountPaymentActor(
+    Guid ActorId, AccountPaymentActorKind Kind, string AuditIdentifier, UserRole? Role = null);
 
 public interface IAccountPaymentActorResolver
 {
@@ -49,6 +50,6 @@ public sealed class AccountPaymentActorResolver(
         }
 
         return new AccountPaymentActor(
-            actorId, AccountPaymentActorKind.Staff, currentUser.GetAuditIdentifier());
+            actorId, AccountPaymentActorKind.Staff, currentUser.GetAuditIdentifier(), currentUser.Role);
     }
 }

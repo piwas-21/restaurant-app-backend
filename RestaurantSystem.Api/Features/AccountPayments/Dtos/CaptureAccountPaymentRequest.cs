@@ -6,4 +6,6 @@ public sealed record CaptureAccountPaymentRequest
 {
     [JsonRequired]
     public int ExpectedVersion { get; init; }
+
+    public long? ReceivedMinor { get; init; }
 }
