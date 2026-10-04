@@ -41,9 +41,7 @@ internal static class AccountCashRefundHistoryReader
             .Where(value => value.AccountPaymentAttemptId.HasValue
                 && cashAttemptIds.Contains(value.AccountPaymentAttemptId.Value))
             .Include(value => value.CashRefundIntent!.ReturnEvidence), cancellationToken);
-        HashSet<Guid> excludedLegIds = excludedOperationId is Guid excludedId
-            ? allLegs.Where(value => value.OperationId == excludedId).Select(value => value.Id).ToHashSet()
-            : [];
+        var excludedLegIds = GetExcludedLegIds(allLegs, excludedOperationId);
         var legs = allLegs.Where(value => !excludedLegIds.Contains(value.Id)).ToArray();
         var legIds = legs.Select(value => value.Id).ToArray();
         if (await context.OrderAmendmentRefundLegs.AsNoTracking()
@@ -96,6 +94,12 @@ internal static class AccountCashRefundHistoryReader
         }
         return result;
     }
+
+    private static HashSet<Guid> GetExcludedLegIds(
+        IReadOnlyCollection<OrderAmendmentRefundLeg> legs, Guid? excludedOperationId) =>
+        excludedOperationId is Guid excludedId
+            ? legs.Where(value => value.OperationId == excludedId).Select(value => value.Id).ToHashSet()
+            : [];
 
     private static AccountCashRefundHistory ReadOne(
         AccountPaymentAttempt attempt, AccountCashCollectionReceipt receipt,
