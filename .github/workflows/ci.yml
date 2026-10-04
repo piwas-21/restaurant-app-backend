@@ -113,11 +113,12 @@ jobs:
   # none runs twice, even if a new test lands in a brand-new namespace — it simply
   # falls into shard 2. The aggregate job below re-verifies this against
   # `dotnet test --list-tests`, so a mistake here fails CI instead of silently
-  # dropping tests. Groups are balanced on the per-namespace test time in the junit
-  # report. DeliveryChannels is moved to shard 1 to rebalance elapsed time:
-  # shard 2 hit the existing 20-minute budget twice while shard 1 completed in
-  # under nine minutes. Moving the whole namespace preserves
-  # every test and coverage floor; both filters remain exact complements.
+  # dropping tests. Groups are balanced on measured namespace fixture/test time.
+  # Orders runs in shard 2: diagnostic run 37175238849 showed
+  # shard 1 completing cases through its 20-minute deadline while shard 2
+  # finished its test run in 10.31 minutes. Orders spreads work across all
+  # four DB lanes; moving DeliveryChannels would overload shard 2's lane 2.
+  # Both filters remain exact complements and coverage floors are unchanged.
   # Rebalance by moving a namespace key between the two filters; the lanes are
   # unaffected. Per-test report time excludes fixture setup, so also compare job
   # elapsed time when assessing this split.
@@ -148,10 +149,10 @@ jobs:
         include:
           - shard: 1
             filter: >-
-              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
     container:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:
@@ -200,6 +201,8 @@ jobs:
           dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj \
             --nologo --verbosity minimal \
             --filter "$TEST_FILTER" \
+            --logger "console;verbosity=normal" \
+            --blame-hang-timeout 3m --blame-hang-dump-type none \
             --logger "junit;LogFileName=test-results.xml" \
             --results-directory test-results \
             -p:CollectCoverage=true \
@@ -211,7 +214,7 @@ jobs:
       # is already built — and comparing the sum against the total is what proves the
       # filters still partition the suite. Counted at discovery, not execution: a [Theory]
       # whose rows are enumerated at run time counts as one test here and as N in the
-      # junit report, so the two numbers are not comparable (1446 vs 1449 today).
+      # junit report, so discovery and execution totals are not directly comparable.
       - name: Record this shard's discovered test count
         env:
           TEST_FILTER: ${{ matrix.filter }}

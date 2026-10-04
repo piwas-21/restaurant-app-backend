@@ -48,7 +48,7 @@ internal static class OrderAmendmentRefundScopePlanner
             var end = Math.Min(allocationEnd, removal.End);
             if (start >= end)
                 continue;
-            EnsureNoDuplicateCoverage(covered, itemId, start, end);
+            EnsureNoDuplicateCoverage(covered, allocation.Id, itemId, start, end);
             foreach (var remaining in SubtractReversed(allocation, reversals, start, end))
                 yield return new OrderAmendmentRefundScope(allocation.Id, allocation.OrderId,
                     allocation.OrderItemId, remaining.Start, remaining.Count,
@@ -95,15 +95,15 @@ internal static class OrderAmendmentRefundScopePlanner
     }
 
     private static void EnsureNoDuplicateCoverage(
-        Dictionary<Guid, List<OrderAmendmentRefundRange>> covered, Guid itemId, int start, long end)
+        Dictionary<Guid, List<OrderAmendmentRefundRange>> covered, Guid allocationId, Guid itemId, int start, long end)
     {
-        if (!covered.TryGetValue(itemId, out var ranges))
+        if (!covered.TryGetValue(allocationId, out var ranges))
         {
             ranges = [];
-            covered.Add(itemId, ranges);
+            covered.Add(allocationId, ranges);
         }
         if (ranges.Any(value => value.Start < end && start < value.End))
-            throw ReconciliationRequired("Captured allocation scopes overlap the same removed food unit.");
+            throw ReconciliationRequired("A captured allocation is counted twice for the same removed food unit.");
         ranges.Add(new OrderAmendmentRefundRange(itemId, start, end));
     }
 

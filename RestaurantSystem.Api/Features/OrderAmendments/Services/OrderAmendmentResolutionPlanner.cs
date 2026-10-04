@@ -89,7 +89,11 @@ internal static class OrderAmendmentResolutionPlanner
     {
         var result = new List<OrderAmendmentRefundLegPlan>();
         var covered = new Dictionary<Guid, List<OrderAmendmentRefundRange>>();
-        foreach (var attempt in attempts.Where(value => value.ServiceSessionId == source.ServiceSessionId))
+        var scopedAttempts = attempts.Where(value => value.ServiceSessionId == source.ServiceSessionId).ToArray();
+        var captures = scopedAttempts.Where(value => value.State == AccountPaymentState.Captured)
+            .SelectMany(value => value.Allocations.Where(allocation => allocation.OrderId == source.Id)).ToArray();
+        OrderAmendmentCapturedPortionGuard.RequireConserved(source, captures, money);
+        foreach (var attempt in scopedAttempts)
         {
             if (attempt.State != AccountPaymentState.Captured && attempt.State.HoldsReservation())
                 RejectHeldAllocation(source.Id, attempt, removals);
