@@ -20,10 +20,12 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
 public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
 {
-    [Fact]
-    public async Task Mixed_provider_and_till_refund_posts_only_after_both_legs_are_proven()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Mixed_provider_and_till_refund_posts_only_after_both_legs_are_proven(bool sameUnit)
     {
-        var mixedTender = await PrepareMixedTenderAsync();
+        var mixedTender = await PrepareMixedTenderAsync(sameUnit);
         var manualPaymentId = mixedTender.PaymentId;
         AuthenticateAsAdmin();
         var basePath = $"/api/staff/orders/{_orderId}/amendments/{_amendmentId}/financial-resolution";
@@ -93,6 +95,12 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
             ApiResponse<OrderAmendmentResolutionResultDto>>(JsonOptions))!.Data!;
         settled.State.Should().Be("Resolved");
         settled.RefundLegs.Should().OnlyContain(value => value.State == "Succeeded");
+        using var settledReplay = await Client.PostAsJsonAsync(basePath, startRequest, JsonOptions);
+        settledReplay.StatusCode.Should().Be(HttpStatusCode.OK);
+        var replayedSettlement = (await settledReplay.Content.ReadFromJsonAsync<
+            ApiResponse<OrderAmendmentResolutionStartOutcomeDto>>(JsonOptions))!.Data!;
+        replayedSettlement.Result!.OperationId.Should().Be(operation.OperationId);
+        replayedSettlement.Result.State.Should().Be("Resolved");
         _refundState.CreateCalls.Should().Be(1);
 
         await using var final = DatabaseFixture.CreateContext();
@@ -101,6 +109,10 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         savedOperation.State.Should().Be(OrderAmendmentResolutionOperationState.Resolved);
         var reversals = await final.AccountPaymentAllocationReversals.ToArrayAsync();
         reversals.Should().HaveCount(2);
+        reversals.Select(value => value.AllocationId).Distinct().Should().HaveCount(2);
+        reversals.Select(value => value.OrderItemId).Distinct().Should().HaveCount(sameUnit ? 1 : 2);
+        if (sameUnit)
+            reversals.Should().OnlyContain(value => value.OrderItemId == _itemId);
         reversals.Should().ContainSingle(value => value.StartOrdinal == 1
             && value.UnitCount == 1 && value.AmountMinor == 600);
         reversals.Should().ContainSingle(value => value.StartOrdinal == 1
@@ -117,17 +129,17 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         order.Payments.Single(value => value.Id == manualPaymentId).RefundedAmount.Should().Be(4m);
     }
 
-    private async Task<(Guid PaymentId, int OrderVersion, long AccountRevision)> PrepareMixedTenderAsync()
+    private async Task<(Guid PaymentId, int OrderVersion, long AccountRevision)> PrepareMixedTenderAsync(bool sameUnit)
     {
         var manualPaymentId = Guid.NewGuid();
-        var manualItemId = Guid.NewGuid();
+        var manualItemId = sameUnit ? _itemId : Guid.NewGuid();
         await using var context = DatabaseFixture.CreateContext();
         var order = await context.Orders.Include(value => value.Items)
             .SingleAsync(value => value.Id == _orderId);
         var providerItem = order.Items.Single(value => value.Id == _itemId);
-        providerItem.UnitPrice = 6m;
-        providerItem.ItemTotal = 12m;
-        var manualItem = new OrderItem
+        providerItem.UnitPrice = sameUnit ? 10m : 6m;
+        providerItem.ItemTotal = sameUnit ? 20m : 12m;
+        var manualItem = sameUnit ? providerItem : new OrderItem
         {
             Id = manualItemId,
             OrderId = _orderId,
@@ -137,8 +149,11 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
             ItemTotal = 8m,
             CreatedBy = nameof(OrderAmendmentStripeResolutionIntegrationTests)
         };
-        manualItem.Order = order;
-        context.OrderItems.Add(manualItem);
+        if (!sameUnit)
+        {
+            manualItem.Order = order;
+            context.OrderItems.Add(manualItem);
+        }
         var amendment = await context.OrderAmendments.SingleAsync(value => value.Id == _amendmentId);
         var changes = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(
             amendment.ChangesJson);
@@ -153,7 +168,8 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
                 ItemTotal = providerItem.ItemTotal
             }
         };
-        changes.Add(new OrderAmendmentChangeSnapshot(manualItemId,
+        if (!sameUnit)
+            changes.Add(new OrderAmendmentChangeSnapshot(manualItemId,
             OrderAmendmentChangeKind.Void, 1, 1, false, new OrderItemDto
             {
                 Id = manualItemId,
