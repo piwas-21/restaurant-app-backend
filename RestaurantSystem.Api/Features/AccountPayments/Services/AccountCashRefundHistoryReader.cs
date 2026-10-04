@@ -226,7 +226,10 @@ internal static class AccountCashRefundHistoryReader
         var matching = result.RefundLegs.Where(value => value.PaymentId == leg.SourcePaymentId).ToArray();
         if (matching.Length != 1
             || matching[0].CashRefund != OrderAmendmentCashRefundMapper.Map(intent)
-            || matching[0].CashReturn != OrderAmendmentCashRefundMapper.Map(returned))
+            || matching[0].CashReturn is not { } cashReturn
+            || !PostgresTimestampPrecision.MatchesColumn(cashReturn.ConfirmedAt, returned.ObservedAt)
+            || cashReturn with { ConfirmedAt = returned.ObservedAt }
+                != OrderAmendmentCashRefundMapper.Map(returned))
             throw ReconciliationRequired();
     }
 

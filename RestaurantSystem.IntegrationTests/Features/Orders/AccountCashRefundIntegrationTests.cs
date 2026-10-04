@@ -19,7 +19,8 @@ namespace RestaurantSystem.IntegrationTests.Features.Orders;
 public sealed partial class AccountCashRefundIntegrationTests(DatabaseFixture fixture)
     : IntegrationTestBase(fixture)
 {
-    private static readonly DateTimeOffset FixedNow = new(2026, 10, 4, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset FixedNow =
+        new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero).AddTicks(1);
     private readonly Guid _sessionId = Guid.NewGuid();
     private readonly Guid _attemptId = Guid.NewGuid();
     private CashRefundCase[] _cases = [];

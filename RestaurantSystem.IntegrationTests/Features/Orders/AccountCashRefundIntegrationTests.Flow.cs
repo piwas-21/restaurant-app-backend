@@ -18,6 +18,7 @@ public sealed partial class AccountCashRefundIntegrationTests
     [Fact]
     public async Task Cash_refund_history_spans_orders_and_requires_the_exact_physical_return_attestation()
     {
+        (FixedNow.UtcTicks % 10).Should().Be(1, "the clock must exercise PostgreSQL timestamp precision");
         AuthenticateAsAdmin();
         var expectedCashRefunds = new long[] { 5, 0, 330 };
         var expectedPriorExact = new long[] { 0, 1, 3 };
@@ -29,7 +30,8 @@ public sealed partial class AccountCashRefundIntegrationTests
             var item = _cases[index];
             var basePath = $"/api/staff/orders/{item.OrderId}/amendments/{item.AmendmentId}/financial-resolution";
             using var contextResponse = await Client.GetAsync($"{basePath}/context");
-            contextResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            contextResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+                "history must remain readable after {0} earlier persisted cash returns", index);
             var context = (await contextResponse.Content.ReadFromJsonAsync<
                 ApiResponse<OrderAmendmentResolutionContextDto>>(JsonOptions))!.Data!;
             context.Currency.Should().Be("CHF");
@@ -105,7 +107,23 @@ public sealed partial class AccountCashRefundIntegrationTests
             resultLeg.CashReturn.Should().Be(new CashReturnEvidenceDto(
                 item.ExactMinor, expectedCashRefunds[index] - item.ExactMinor,
                 expectedCashRefunds[index], resultLeg.CashReturn!.ConfirmedAt));
-            returnedTotal += resultLeg.CashReturn!.CashReturnedMinor;
+            resultLeg.CashReturn!.ConfirmedAt.Should().Be(FixedNow.UtcDateTime.AddTicks(-1),
+                "API results are projected from persisted PostgreSQL evidence");
+            await using (var persistedReturn = DatabaseFixture.CreateContext())
+            {
+                var observedAt = await persistedReturn.AccountCashRefundEvidence.AsNoTracking()
+                    .Where(value => value.Intent!.OperationId == operation.OperationId)
+                    .Select(value => value.ObservedAt).SingleAsync();
+                observedAt.Should().Be(FixedNow.UtcDateTime.AddTicks(-1));
+                var savedJson = await persistedReturn.OrderAmendmentResolutionOperations.AsNoTracking()
+                    .Where(value => value.Id == operation.OperationId)
+                    .Select(value => value.ResultJson).SingleAsync();
+                var saved = RestaurantSystem.Api.Features.OrderAmendments.Services.OrderAmendmentJson
+                    .Deserialize<OrderAmendmentResolutionResultDto>(savedJson!);
+                saved.RefundLegs.Single().CashReturn!.ConfirmedAt.Should().Be(FixedNow.UtcDateTime,
+                    "the durable JSON captures the clock before PostgreSQL truncates column precision");
+            }
+            returnedTotal += resultLeg.CashReturn.CashReturnedMinor;
 
             using var retryResponse = await Client.PostAsJsonAsync(confirmPath, confirmation, JsonOptions);
             retryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -119,6 +137,7 @@ public sealed partial class AccountCashRefundIntegrationTests
         await ResolveLegacyCashRefundWithoutPhysicalReceiptAsync(legacy);
         await AssertPersistedCashHistoryAsync(expectedCashRefunds, expectedPriorExact, expectedPriorCash, legacy);
         await AssertAccountCashReportAsync();
+        await AssertSavedCashReturnIntegrityAsync();
     }
 
     private async Task AssertPersistedCashHistoryAsync(
