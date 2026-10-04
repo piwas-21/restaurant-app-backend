@@ -16,15 +16,41 @@ internal static class ZReportAccountCashMovementReader
     {
         var collections = await context.AccountCashCollectionReceipts.AsNoTracking()
             .Where(value => value.CapturedAt >= startUtc && value.CapturedAt < endUtc)
+            .GroupBy(value => value.Currency)
+            .Select(group => new
+            {
+                Currency = group.Key,
+                Count = group.Count(),
+                ExactAmountMinor = group.Sum(value => value.ExactAmountMinor),
+                ReceivedMinor = group.Sum(value => value.ReceivedMinor),
+                ChangeMinor = group.Sum(value => value.ChangeMinor),
+                DueAmountMinor = group.Sum(value => value.DueAmountMinor)
+            })
             .ToArrayAsync(cancellationToken);
         var returns = await context.AccountCashRefundEvidence.AsNoTracking()
             .Where(value => value.ObservedAt >= startUtc && value.ObservedAt < endUtc)
+            .GroupBy(value => value.Currency)
+            .Select(group => new
+            {
+                Currency = group.Key,
+                Count = group.Count(),
+                ExactRefundAmountMinor = group.Sum(value => value.ExactRefundAmountMinor),
+                CashReturnedMinor = group.Sum(value => value.CashReturnedMinor),
+                RefundAdjustmentMinor = group.Sum(value => value.RefundAdjustmentMinor)
+            })
             .ToArrayAsync(cancellationToken);
         var legacyCaptures = await context.AccountPaymentAttempts.AsNoTracking()
             .Where(value => value.PaymentMethod == PaymentMethod.Cash
                 && value.State == AccountPaymentState.Captured
                 && value.CashCollectionReceipt == null
                 && value.CompletedAt >= startUtc && value.CompletedAt < endUtc)
+            .GroupBy(value => value.Currency)
+            .Select(group => new
+            {
+                Currency = group.Key,
+                Count = group.Count(),
+                ExactAmountMinor = group.Sum(value => value.AmountMinor)
+            })
             .ToArrayAsync(cancellationToken);
         var legacyReturns = await (
             from evidence in context.OrderAmendmentRefundEvidence.AsNoTracking()
@@ -36,7 +62,14 @@ internal static class ZReportAccountCashMovementReader
                 && evidence.State == OrderAmendmentRefundLegState.Succeeded
                 && evidence.ObservedAt >= startUtc && evidence.ObservedAt < endUtc
                 && attempt.PaymentMethod == PaymentMethod.Cash && leg.CashRefundIntent == null
-            select new LegacyCashReturn(evidence.Currency, evidence.AmountMinor))
+            select new { evidence.Currency, ExactRefundMinor = evidence.AmountMinor })
+            .GroupBy(value => value.Currency)
+            .Select(group => new
+            {
+                Currency = group.Key,
+                Count = group.Count(),
+                ExactRefundMinor = group.Sum(value => value.ExactRefundMinor)
+            })
             .ToArrayAsync(cancellationToken);
         var unresolved = await context.AccountCashRefundIntents.AsNoTracking()
             .Where(value => value.Operation!.State != OrderAmendmentResolutionOperationState.Resolved
@@ -57,17 +90,40 @@ internal static class ZReportAccountCashMovementReader
             })
             .ToArrayAsync(cancellationToken);
 
+        var collectionByCurrency = collections.ToDictionary(value => value.Currency, StringComparer.Ordinal);
+        var returnByCurrency = returns.ToDictionary(value => value.Currency, StringComparer.Ordinal);
+        var legacyCaptureByCurrency = legacyCaptures.ToDictionary(value => value.Currency, StringComparer.Ordinal);
+        var legacyReturnByCurrency = legacyReturns.ToDictionary(value => value.Currency, StringComparer.Ordinal);
         var currencies = collections.Select(value => value.Currency)
             .Concat(returns.Select(value => value.Currency))
             .Concat(legacyCaptures.Select(value => value.Currency))
             .Concat(legacyReturns.Select(value => value.Currency))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(value => value, StringComparer.Ordinal)
-            .Select(currency => BuildCurrency(currency,
-                collections.Where(value => value.Currency == currency),
-                returns.Where(value => value.Currency == currency),
-                legacyCaptures.Where(value => value.Currency == currency),
-                legacyReturns.Where(value => value.Currency == currency)))
+            .Select(currency =>
+            {
+                collectionByCurrency.TryGetValue(currency, out var collection);
+                returnByCurrency.TryGetValue(currency, out var cashReturn);
+                legacyCaptureByCurrency.TryGetValue(currency, out var legacyCapture);
+                legacyReturnByCurrency.TryGetValue(currency, out var legacyReturn);
+                return new ZReportAccountCashCurrencyDto(
+                    Currency: currency,
+                    CollectionCount: collection?.Count ?? 0,
+                    CollectedExactMinor: collection?.ExactAmountMinor ?? 0,
+                    CashReceivedMinor: collection?.ReceivedMinor ?? 0,
+                    ChangeReturnedMinor: collection?.ChangeMinor ?? 0,
+                    CashDueMinor: collection?.DueAmountMinor ?? 0,
+                    ReturnCount: cashReturn?.Count ?? 0,
+                    ExactRefundedMinor: cashReturn?.ExactRefundAmountMinor ?? 0,
+                    PhysicalCashReturnedMinor: cashReturn?.CashReturnedMinor ?? 0,
+                    RefundAdjustmentMinor: cashReturn?.RefundAdjustmentMinor ?? 0,
+                    LegacyCaptureWithoutReceiptCount: legacyCapture?.Count ?? 0,
+                    LegacyCaptureExactMinor: legacyCapture?.ExactAmountMinor ?? 0,
+                    LegacyReturnWithoutPhysicalEvidenceCount: legacyReturn?.Count ?? 0,
+                    LegacyExactRefundMinor: legacyReturn?.ExactRefundMinor ?? 0,
+                    UnresolvedReturnCount: 0, UnresolvedExactRefundMinor: 0,
+                    UnconfirmedPhysicalCashMinor: 0);
+            })
             .ToArray();
         var unresolvedByCurrency = unresolved
             .OrderBy(value => value.Currency, StringComparer.Ordinal)
@@ -84,35 +140,4 @@ internal static class ZReportAccountCashMovementReader
         return new ZReportAccountCashMovementDto(snapshotAtUtc, CoverageNote,
             CoversWholeRestaurantTill: false, currencies, unresolvedByCurrency);
     }
-
-    private static ZReportAccountCashCurrencyDto BuildCurrency(
-        string currency, IEnumerable<RestaurantSystem.Domain.Entities.AccountCashCollectionReceipt> collections,
-        IEnumerable<RestaurantSystem.Domain.Entities.AccountCashRefundEvidence> returns,
-        IEnumerable<RestaurantSystem.Domain.Entities.AccountPaymentAttempt> legacyCaptures,
-        IEnumerable<LegacyCashReturn> legacyReturns)
-    {
-        var collectionRows = collections.ToArray();
-        var returnRows = returns.ToArray();
-        var legacyRows = legacyCaptures.ToArray();
-        var legacyReturnRows = legacyReturns.ToArray();
-        return new ZReportAccountCashCurrencyDto(
-            Currency: currency,
-            CollectionCount: collectionRows.Length,
-            CollectedExactMinor: collectionRows.Sum(value => value.ExactAmountMinor),
-            CashReceivedMinor: collectionRows.Sum(value => value.ReceivedMinor),
-            ChangeReturnedMinor: collectionRows.Sum(value => value.ChangeMinor),
-            CashDueMinor: collectionRows.Sum(value => value.DueAmountMinor),
-            ReturnCount: returnRows.Length,
-            ExactRefundedMinor: returnRows.Sum(value => value.ExactRefundAmountMinor),
-            PhysicalCashReturnedMinor: returnRows.Sum(value => value.CashReturnedMinor),
-            RefundAdjustmentMinor: returnRows.Sum(value => value.RefundAdjustmentMinor),
-            LegacyCaptureWithoutReceiptCount: legacyRows.Length,
-            LegacyCaptureExactMinor: legacyRows.Sum(value => value.AmountMinor),
-            LegacyReturnWithoutPhysicalEvidenceCount: legacyReturnRows.Length,
-            LegacyExactRefundMinor: legacyReturnRows.Sum(value => value.ExactRefundMinor),
-            UnresolvedReturnCount: 0, UnresolvedExactRefundMinor: 0,
-            UnconfirmedPhysicalCashMinor: 0);
-    }
-
-    private sealed record LegacyCashReturn(string Currency, long ExactRefundMinor);
 }

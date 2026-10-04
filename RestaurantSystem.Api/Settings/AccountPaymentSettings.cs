@@ -5,6 +5,7 @@ namespace RestaurantSystem.Api.Settings;
 public sealed class AccountPaymentSettings
 {
     public const string SectionName = "AccountPayments";
+    public const int AbsoluteCashRefundHistoryRowLimit = 10_000;
 
     // Versioned receipt terms: changing the increment requires a new policy and decoder.
     public const long SwissCashFiveRappenV1IncrementMinor = 5;
