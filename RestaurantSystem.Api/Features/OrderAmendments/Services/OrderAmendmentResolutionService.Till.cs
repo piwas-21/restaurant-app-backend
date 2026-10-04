@@ -32,10 +32,8 @@ public sealed partial class OrderAmendmentResolutionService
         {
             var operation = await context.OrderAmendmentResolutionOperations
                 .Include(value => value.Legs).ThenInclude(value => value.Attempts)
-                .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent)
-                    .ThenInclude(value => value!.ReturnEvidence)
-                .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent)
-                    .ThenInclude(value => value!.CollectionReceipt)
+                .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent!.ReturnEvidence)
+                .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent!.CollectionReceipt)
                 .SingleOrDefaultAsync(value => value.Id == operationId, cancellationToken)
                 ?? throw Unavailable();
             if (operation.ActorUserId != actorId || operation.SourceOrderId != orderId
@@ -50,27 +48,7 @@ public sealed partial class OrderAmendmentResolutionService
                 throw new ConflictException("The till refund step contains conflicting provider context.");
 
             var cashIntent = leg.CashRefundIntent;
-            IReadOnlyDictionary<Guid, AccountCashRefundHistory> historyByAttempt =
-                new Dictionary<Guid, AccountCashRefundHistory>();
-            if (leg.AccountPaymentAttemptId is Guid attemptId)
-                historyByAttempt = await AccountCashRefundHistoryReader.ReadAsync(
-                    context, [attemptId], cancellationToken, operation.Id);
-            if (cashIntent is null)
-            {
-                if (request.CashReturnedMinor is not null
-                    || leg.AccountPaymentAttemptId is Guid missingIntentAttempt
-                    && historyByAttempt.ContainsKey(missingIntentAttempt))
-                    throw new ConflictException("This refund has no frozen physical cash return amount.");
-            }
-            else
-            {
-                if (!historyByAttempt.TryGetValue(cashIntent.AttemptId, out var history)
-                    || request.CashReturnedMinor != cashIntent.CashRefundAmountMinor
-                    || cashIntent.CollectionReceipt is null)
-                    throw new ConflictException("Confirm the exact physical return shown in the reviewed cash refund quote.");
-                AccountCashRefundIntentValidator.RequireMatchesHistory(cashIntent, leg,
-                    operation, cashIntent.CollectionReceipt, history);
-            }
+            await ValidateCashTillReturnAsync(operation, leg, cashIntent, request, cancellationToken);
 
             var evidence = await context.OrderAmendmentRefundEvidence.AsNoTracking()
                 .Where(value => value.RefundLegId == leg.Id)
@@ -100,22 +78,7 @@ public sealed partial class OrderAmendmentResolutionService
                         reference, null, currentUser.GetAuditIdentifier())));
                 if (cashIntent is not null)
                 {
-                    var returnEvidence = new AccountCashRefundEvidence
-                    {
-                        Id = Guid.NewGuid(),
-                        IntentId = cashIntent.Id,
-                        ExactRefundAmountMinor = cashIntent.ExactRefundAmountMinor,
-                        RefundAdjustmentMinor = cashIntent.RefundAdjustmentMinor,
-                        CashReturnedMinor = request.CashReturnedMinor!.Value,
-                        Currency = cashIntent.Currency,
-                        ActorId = actorId,
-                        ActorRole = UserRole.Admin,
-                        TillReference = reference,
-                        ObservedAt = now,
-                        CreatedBy = currentUser.GetAuditIdentifier()
-                    };
-                    cashIntent.ReturnEvidence = returnEvidence;
-                    context.AccountCashRefundEvidence.Add(returnEvidence);
+                    RecordCashReturnEvidence(cashIntent, actorId, request.CashReturnedMinor!.Value, reference, now);
                 }
                 await RefreshOperationStateAsync(operation, cancellationToken);
                 operation.UpdatedAt = now;
@@ -127,6 +90,56 @@ public sealed partial class OrderAmendmentResolutionService
 
         await finalizer.TryFinalizeAsync(operationId, actorId, cancellationToken);
         return await ReadResultAsync(operationId, cancellationToken);
+    }
+
+    private async Task ValidateCashTillReturnAsync(
+        OrderAmendmentResolutionOperation operation, OrderAmendmentRefundLeg leg,
+        AccountCashRefundIntent? cashIntent, ManualTillConfirmationRequest request,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<Guid, AccountCashRefundHistory> historyByAttempt =
+            new Dictionary<Guid, AccountCashRefundHistory>();
+        if (leg.AccountPaymentAttemptId is Guid attemptId)
+            historyByAttempt = await AccountCashRefundHistoryReader.ReadAsync(
+                context, [attemptId], cancellationToken, operation.Id);
+        if (cashIntent is null)
+        {
+            if (request.CashReturnedMinor is not null
+                || leg.AccountPaymentAttemptId is Guid missingIntentAttempt
+                && historyByAttempt.ContainsKey(missingIntentAttempt))
+                throw new ConflictException("This refund has no frozen physical cash return amount.");
+        }
+        else
+        {
+            if (!historyByAttempt.TryGetValue(cashIntent.AttemptId, out var history)
+                || request.CashReturnedMinor != cashIntent.CashRefundAmountMinor
+                || cashIntent.CollectionReceipt is null)
+                throw new ConflictException("Confirm the exact physical return shown in the reviewed cash refund quote.");
+            AccountCashRefundIntentValidator.RequireMatchesHistory(cashIntent, leg,
+                operation, cashIntent.CollectionReceipt, history);
+        }
+    }
+
+    private void RecordCashReturnEvidence(
+        AccountCashRefundIntent cashIntent, Guid actorId, long cashReturnedMinor,
+        string reference, DateTime now)
+    {
+        var returnEvidence = new AccountCashRefundEvidence
+        {
+            Id = Guid.NewGuid(),
+            IntentId = cashIntent.Id,
+            ExactRefundAmountMinor = cashIntent.ExactRefundAmountMinor,
+            RefundAdjustmentMinor = cashIntent.RefundAdjustmentMinor,
+            CashReturnedMinor = cashReturnedMinor,
+            Currency = cashIntent.Currency,
+            ActorId = actorId,
+            ActorRole = UserRole.Admin,
+            TillReference = reference,
+            ObservedAt = now,
+            CreatedBy = currentUser.GetAuditIdentifier()
+        };
+        cashIntent.ReturnEvidence = returnEvidence;
+        context.AccountCashRefundEvidence.Add(returnEvidence);
     }
 
     private static void EnsureSameTillConfirmation(

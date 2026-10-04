@@ -108,8 +108,8 @@ internal static class OrderAmendmentResolutionPlanner
                 allocation, reversals, removals, covered)).ToArray();
             if (slices.Length == 0)
                 continue;
-            AddAllocatedLeg(source, attempt, allocations, slices, checkoutJournals, money,
-                cashRefundHistoryByAttempt, result);
+            AddAllocatedLeg(attempt, allocations, slices,
+                new AllocatedRefundContext(source, checkoutJournals, money, cashRefundHistoryByAttempt), result);
         }
         return result;
     }
@@ -126,12 +126,11 @@ internal static class OrderAmendmentResolutionPlanner
     }
 
     private static void AddAllocatedLeg(
-        Order source, AccountPaymentAttempt attempt, IReadOnlyList<AccountPaymentAllocation> allocations,
-        IReadOnlyList<OrderAmendmentRefundScope> slices,
-        IReadOnlyList<AccountCheckoutJournal> checkoutJournals, AccountMoney money,
-        IReadOnlyDictionary<Guid, AccountCashRefundHistory>? cashRefundHistoryByAttempt,
+        AccountPaymentAttempt attempt, IReadOnlyList<AccountPaymentAllocation> allocations,
+        IReadOnlyList<OrderAmendmentRefundScope> slices, AllocatedRefundContext context,
         List<OrderAmendmentRefundLegPlan> legs)
     {
+        var (source, checkoutJournals, money, cashRefundHistoryByAttempt) = context;
         var paymentIds = slices.Select(value => allocations.Single(allocation => allocation.Id == value.AllocationId)
             .OrderPaymentId).Distinct().ToArray();
         if (paymentIds.Length != 1 || paymentIds[0] is not Guid paymentId)
@@ -234,5 +233,9 @@ internal static class OrderAmendmentResolutionPlanner
     }
 
     private static ConflictException ReconciliationRequired(string message) => new(message);
+
+    private sealed record AllocatedRefundContext(
+        Order Source, IReadOnlyList<AccountCheckoutJournal> CheckoutJournals, AccountMoney Money,
+        IReadOnlyDictionary<Guid, AccountCashRefundHistory>? CashRefundHistoryByAttempt);
 
 }

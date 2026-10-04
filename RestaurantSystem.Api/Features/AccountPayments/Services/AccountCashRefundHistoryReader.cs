@@ -35,7 +35,7 @@ internal static class AccountCashRefundHistoryReader
             .Where(value => value.AccountPaymentAttemptId.HasValue
                 && cashAttemptIds.Contains(value.AccountPaymentAttemptId.Value))
             .Include(value => value.Attempts)
-            .Include(value => value.CashRefundIntent).ThenInclude(value => value!.ReturnEvidence)
+            .Include(value => value.CashRefundIntent!.ReturnEvidence)
             .ToListAsync(cancellationToken);
         HashSet<Guid> excludedLegIds = excludedOperationId is Guid excludedId
             ? allLegs.Where(value => value.OperationId == excludedId).Select(value => value.Id).ToHashSet()
@@ -79,24 +79,20 @@ internal static class AccountCashRefundHistoryReader
                 attempt.PaymentMethod, attempt.AmountMinor);
             var attemptAllocationIds = attempt.Allocations.Select(value => value.Id).ToHashSet();
 
-            result.Add(attempt.Id, ReadOne(attempt, receipt, original,
+            result.Add(attempt.Id, ReadOne(attempt, receipt, new AccountCashHistoryEvidence(
                 legs.Where(value => value.AccountPaymentAttemptId == attempt.Id).ToArray(),
                 intents.Where(value => value.AttemptId == attempt.Id).ToArray(),
                 reversals.Where(value => attemptAllocationIds.Contains(value.AllocationId)).ToArray(),
-                evidence, operations, cancellationToken));
+                evidence, operations), cancellationToken));
         }
         return result;
     }
 
     private static AccountCashRefundHistory ReadOne(
         AccountPaymentAttempt attempt, AccountCashCollectionReceipt receipt,
-        CashSettlementQuote original, OrderAmendmentRefundLeg[] legs,
-        AccountCashRefundIntent[] intents,
-        AccountPaymentAllocationReversal[] reversals,
-        IReadOnlyList<OrderAmendmentRefundEvidence> evidence,
-        IReadOnlyList<OrderAmendmentResolutionOperation> operations,
-        CancellationToken cancellationToken)
+        AccountCashHistoryEvidence historyEvidence, CancellationToken cancellationToken)
     {
+        var (legs, intents, reversals, evidence, operations) = historyEvidence;
         cancellationToken.ThrowIfCancellationRequested();
         if (legs.Length != intents.Length || legs.Any(value => value.CashRefundIntent is null)
             || intents.Any(value => legs.All(leg => leg.Id != value.RefundLegId)))
@@ -124,8 +120,9 @@ internal static class AccountCashRefundHistoryReader
             var legEvidence = evidence.Where(value => value.RefundLegId == leg.Id).ToArray();
             var legReversals = reversals.Where(value => value.RefundLegId == leg.Id).ToArray();
             var returnEvidence = intent.ReturnEvidence;
-            ValidateRefund(intent, leg, operation, receipt, scopes, legEvidence,
-                legReversals, allocationById, returnEvidence, refundedExact, refundedCash, fingerprint);
+            ValidateRefund(intent, new AccountCashRefundProof(leg, operation, receipt, scopes,
+                legEvidence, legReversals, allocationById), returnEvidence,
+                new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint));
 
             refundedExact = checked(refundedExact + intent.ExactRefundAmountMinor);
             refundedCash = checked(refundedCash + intent.CashRefundAmountMinor);
@@ -151,16 +148,12 @@ internal static class AccountCashRefundHistoryReader
     }
 
     private static void ValidateRefund(
-        AccountCashRefundIntent intent, OrderAmendmentRefundLeg leg,
-        OrderAmendmentResolutionOperation operation, AccountCashCollectionReceipt receipt,
-        List<OrderAmendmentRefundScope> scopes,
-        OrderAmendmentRefundEvidence[] evidence,
-        AccountPaymentAllocationReversal[] reversals,
-        Dictionary<Guid, AccountPaymentAllocation> allocations,
-        AccountCashRefundEvidence? returned, long refundedExact, long refundedCash, string fingerprint)
+        AccountCashRefundIntent intent, AccountCashRefundProof proof,
+        AccountCashRefundEvidence? returned, AccountCashRefundHistory history)
     {
+        var (leg, operation, receipt, scopes, evidence, reversals, allocations) = proof;
         var expected = AccountCashRefundIntentValidator.RequireMatchesHistory(intent, leg,
-            operation, receipt, new AccountCashRefundHistory(refundedExact, refundedCash, fingerprint));
+            operation, receipt, history);
         if (intent.RefundLegId != leg.Id || intent.OperationId != leg.OperationId
             || intent.AttemptId != receipt.AttemptId || intent.CollectionReceiptId != receipt.Id
             || intent.PolicyVersion != expected.PolicyVersion || intent.Currency != expected.Currency
