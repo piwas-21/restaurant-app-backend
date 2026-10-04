@@ -41,9 +41,20 @@ internal static class ZReportAccountCashMovementReader
         var unresolved = await context.AccountCashRefundIntents.AsNoTracking()
             .Where(value => value.Operation!.State != OrderAmendmentResolutionOperationState.Resolved
                 || value.ReturnEvidence == null)
-            .Select(value => new UnresolvedCashRefund(value.Currency,
-                value.ExactRefundAmountMinor,
-                value.ReturnEvidence == null ? value.CashRefundAmountMinor : 0))
+            .Select(value => new
+            {
+                value.Currency,
+                ExactRefundMinor = value.ExactRefundAmountMinor,
+                PhysicalCashMinor = value.ReturnEvidence == null ? value.CashRefundAmountMinor : 0
+            })
+            .GroupBy(value => value.Currency)
+            .Select(group => new
+            {
+                Currency = group.Key,
+                Count = group.Count(),
+                ExactRefundMinor = group.Sum(value => value.ExactRefundMinor),
+                PhysicalCashMinor = group.Sum(value => value.PhysicalCashMinor)
+            })
             .ToArrayAsync(cancellationToken);
 
         var currencies = collections.Select(value => value.Currency)
@@ -58,17 +69,17 @@ internal static class ZReportAccountCashMovementReader
                 legacyCaptures.Where(value => value.Currency == currency),
                 legacyReturns.Where(value => value.Currency == currency)))
             .ToArray();
-        var unresolvedByCurrency = unresolved.GroupBy(value => value.Currency, StringComparer.Ordinal)
-            .OrderBy(value => value.Key, StringComparer.Ordinal)
-            .Select(group => new ZReportAccountCashCurrencyDto(
-                Currency: group.Key, CollectionCount: 0, CollectedExactMinor: 0,
+        var unresolvedByCurrency = unresolved
+            .OrderBy(value => value.Currency, StringComparer.Ordinal)
+            .Select(value => new ZReportAccountCashCurrencyDto(
+                Currency: value.Currency, CollectionCount: 0, CollectedExactMinor: 0,
                 CashReceivedMinor: 0, ChangeReturnedMinor: 0, CashDueMinor: 0,
                 ReturnCount: 0, ExactRefundedMinor: 0, PhysicalCashReturnedMinor: 0,
                 RefundAdjustmentMinor: 0, LegacyCaptureWithoutReceiptCount: 0,
                 LegacyCaptureExactMinor: 0, LegacyReturnWithoutPhysicalEvidenceCount: 0,
-                LegacyExactRefundMinor: 0, UnresolvedReturnCount: group.Count(),
-                UnresolvedExactRefundMinor: group.Sum(value => value.ExactRefundMinor),
-                UnconfirmedPhysicalCashMinor: group.Sum(value => value.PhysicalCashMinor)))
+                LegacyExactRefundMinor: 0, UnresolvedReturnCount: value.Count,
+                UnresolvedExactRefundMinor: value.ExactRefundMinor,
+                UnconfirmedPhysicalCashMinor: value.PhysicalCashMinor))
             .ToArray();
         return new ZReportAccountCashMovementDto(snapshotAtUtc, CoverageNote,
             CoversWholeRestaurantTill: false, currencies, unresolvedByCurrency);
@@ -102,9 +113,6 @@ internal static class ZReportAccountCashMovementReader
             UnresolvedReturnCount: 0, UnresolvedExactRefundMinor: 0,
             UnconfirmedPhysicalCashMinor: 0);
     }
-
-    private sealed record UnresolvedCashRefund(string Currency,
-        long ExactRefundMinor, long PhysicalCashMinor);
 
     private sealed record LegacyCashReturn(string Currency, long ExactRefundMinor);
 }

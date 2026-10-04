@@ -3,11 +3,34 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Settings;
+using System.ComponentModel.DataAnnotations;
 
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
 public sealed class AccountCashSettlementPolicyTests
 {
+    [Fact]
+    public void Configured_cash_terms_are_validated_without_reinterpreting_frozen_receipts()
+    {
+        var settings = new AccountPaymentSettings();
+        var original = AccountCashSettlementPolicy.ResolveConfigured("CHF", PaymentMethod.Cash, 333, settings);
+        original.DueAmountMinor.Should().Be(335);
+        settings.SwissCashIncrementMinor = 10;
+        var validation = new List<ValidationResult>();
+        Validator.TryValidateObject(settings, new ValidationContext(settings), validation, true).Should().BeFalse();
+        validation.Should().Contain(value => value.MemberNames.Contains(nameof(settings.SwissCashIncrementMinor)));
+        var unsupportedIncrement = () => AccountCashSettlementPolicy.ResolveConfigured("CHF", PaymentMethod.Cash, 333, settings);
+        unsupportedIncrement.Should().Throw<ConflictException>();
+        AccountCashSettlementPolicy.RetainedDue(original, 232).Should().Be(230);
+        settings.SwissCashIncrementMinor = 5;
+        settings.SwissCashPolicyVersion = "unknown-v2";
+        var unsupportedVersion = () => AccountCashSettlementPolicy.ResolveConfigured("CHF", PaymentMethod.Cash, 333, settings);
+        unsupportedVersion.Should().Throw<ConflictException>();
+        Validator.TryValidateObject(settings, new ValidationContext(settings), validation, true).Should().BeFalse();
+        validation.Should().Contain(value => value.MemberNames.Contains(nameof(settings.SwissCashPolicyVersion)));
+    }
+
     [Fact]
     public void Swiss_cash_quote_freezes_round_up_terms_in_minor_units()
     {

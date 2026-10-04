@@ -1,6 +1,7 @@
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
+using RestaurantSystem.Api.Settings;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
@@ -9,8 +10,18 @@ internal static class AccountCashSettlementPolicy
 {
     internal const string SwissCashFiveRappenV1 = "chf-cash-5-rappen-v1";
     internal const string ExactV1 = "exact-v1";
-    internal const long SwissCashIncrementMinor = 5;
+    internal const long SwissCashIncrementMinor = AccountPaymentSettings.SwissCashFiveRappenV1IncrementMinor;
 
+    internal static CashSettlementQuote ResolveConfigured(
+        string? currency, PaymentMethod method, long exactAmountMinor, AccountPaymentSettings settings)
+    {
+        if (settings.SwissCashPolicyVersion != SwissCashFiveRappenV1
+            || settings.SwissCashIncrementMinor != SwissCashIncrementMinor)
+            throw new ConflictException("The configured cash settlement policy is unsupported.");
+        return Resolve(currency, method, exactAmountMinor);
+    }
+
+    // Frozen receipts always decode by version, independently of current configuration.
     internal static CashSettlementQuote Resolve(string? currency, PaymentMethod method, long exactAmountMinor)
     {
         if (exactAmountMinor <= 0 || !Enum.IsDefined(method))

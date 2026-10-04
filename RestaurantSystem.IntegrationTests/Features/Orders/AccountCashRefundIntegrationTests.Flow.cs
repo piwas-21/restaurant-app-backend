@@ -73,6 +73,8 @@ public sealed partial class AccountCashRefundIntegrationTests
             operationLeg.CashRefund.Should().Be(legQuote.CashRefund);
             operationLeg.CashReturn.Should().BeNull();
 
+            await AssertUnresolvedCashReportAsync(item.ExactMinor, expectedCashRefunds[index]);
+
             var confirmPath = $"/api/staff/amendment-financial-resolution-operations/{operation.OperationId}/confirm-till";
             var missingAttestation = new ManualTillConfirmationRequest
             {
@@ -153,6 +155,22 @@ public sealed partial class AccountCashRefundIntegrationTests
         var reversals = await context.AccountPaymentAllocationReversals.AsNoTracking().ToArrayAsync();
         reversals.Sum(value => value.AmountMinor).Should().Be(1333);
         reversals.Should().HaveCount(4);
+    }
+
+    private async Task AssertUnresolvedCashReportAsync(long exactMinor, long physicalMinor)
+    {
+        await using var context = DatabaseFixture.CreateContext();
+        var handler = new GetZReportQueryHandler(context, new FixedTenantClock("UTC"),
+            NullLogger<GetZReportQueryHandler>.Instance);
+        // Today's pending return must remain visible even when the requested report date has no movements.
+        var response = await handler.Handle(new GetZReportQuery(_reportDate.AddDays(-1)), CancellationToken.None);
+        var movement = response.Data!.AccountCashMovements!;
+        movement.ByCurrency.Should().BeEmpty();
+        var unresolved = movement.UnresolvedByCurrency.Should().ContainSingle().Subject;
+        unresolved.Currency.Should().Be("CHF");
+        unresolved.UnresolvedReturnCount.Should().Be(1);
+        unresolved.UnresolvedExactRefundMinor.Should().Be(exactMinor);
+        unresolved.UnconfirmedPhysicalCashMinor.Should().Be(physicalMinor);
     }
 
     private async Task AssertAccountCashReportAsync()

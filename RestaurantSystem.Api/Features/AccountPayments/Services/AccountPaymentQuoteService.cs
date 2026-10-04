@@ -82,8 +82,8 @@ public sealed class AccountPaymentQuoteService(
                 throw new BadRequestException("The payment scope exceeds the configured segment limit.");
             var amount = AccountDebtMath.Total(segments);
             if (guest) guestPolicy.RequireContribution(amount, account.Money.Currency);
-            var cashSettlement = AccountCashSettlementPolicy.Resolve(
-                account.Money.Currency, request.PaymentMethod, amount);
+            var cashSettlement = AccountCashSettlementPolicy.ResolveConfigured(
+                account.Money.Currency, request.PaymentMethod, amount, settings);
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var quoteExpires = now.AddMinutes(settings.QuoteLifetimeMinutes);
             var attempt = new AccountPaymentAttempt
