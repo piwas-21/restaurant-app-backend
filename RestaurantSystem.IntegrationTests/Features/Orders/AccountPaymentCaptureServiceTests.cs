@@ -51,6 +51,31 @@ public sealed partial class AccountPaymentCaptureWriterTests
         (await Collect(identity)).Should().BeEquivalentTo(results[0]);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    [InlineData(9)]
+    public async Task SubMicrosecondCaptureReturnsTheExactPersistedReceiptOnFirstResponseAndReplay(int extraTicks)
+    {
+        var now = DateTime.UtcNow;
+        var expected = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
+        var clock = new FixedCaptureTimeProvider(new DateTimeOffset(expected.AddTicks(extraTicks)));
+        var identity = await ReadyForCollection(await Seed(333, 333));
+
+        var captured = await Collect(identity, clock: clock);
+        captured.CashReceipt.Should().NotBeNull();
+        captured.CashReceipt!.CapturedAt.Should().Be(expected);
+        await using (var context = DatabaseFixture.CreateContext())
+        {
+            var receipt = await context.AccountCashCollectionReceipts.SingleAsync();
+            receipt.CapturedAt.Should().Be(expected);
+            receipt.CreatedAt.Should().Be(expected);
+            (await context.AccountPaymentAttempts.SingleAsync()).CompletedAt.Should().Be(expected);
+            (await context.OrderPayments.SingleAsync()).PaymentDate.Should().Be(expected);
+        }
+        (await Collect(identity, clock: clock)).Should().BeEquivalentTo(captured);
+    }
+
     [Fact]
     public async Task PartialCollectionKeepsTheHandoffOpenForTheRemainingCent()
     {
@@ -151,7 +176,8 @@ public sealed partial class AccountPaymentCaptureWriterTests
     }
 
     private async Task<AccountPaymentOperationDto> Collect(CollectionIdentity identity,
-        IOrderFidelityCoordinator? fidelity = null, bool failUsingSql = false, Action<bool>? transactionProbe = null)
+        IOrderFidelityCoordinator? fidelity = null, bool failUsingSql = false, Action<bool>? transactionProbe = null,
+        TimeProvider? clock = null)
     {
         await using var context = DatabaseFixture.CreateContext();
         var actors = new Mock<IAccountPaymentActorResolver>();
@@ -171,12 +197,17 @@ public sealed partial class AccountPaymentCaptureWriterTests
             fidelity = sqlFailure.Object;
         }
         var service = new AccountPaymentCaptureService(context, actors.Object,
-            new AccountPaymentCaptureWriter(context, current.Object, TimeProvider.System),
-            fidelity ?? new Mock<IOrderFidelityCoordinator>().Object, TimeProvider.System,
+            new AccountPaymentCaptureWriter(context, current.Object, clock ?? TimeProvider.System),
+            fidelity ?? new Mock<IOrderFidelityCoordinator>().Object, clock ?? TimeProvider.System,
             NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(identity.SessionId, identity.OperationId,
             new CaptureAccountPaymentRequest { ExpectedVersion = 1, ReceivedMinor = identity.ReceivedMinor },
             CancellationToken.None);
+    }
+
+    private sealed class FixedCaptureTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
     }
 
     private sealed record CollectionIdentity(Guid SessionId, Guid OperationId, Guid ActorId, long? ReceivedMinor);
