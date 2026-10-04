@@ -200,6 +200,8 @@ jobs:
           dotnet test RestaurantSystem.IntegrationTests/RestaurantSystem.IntegrationTests.csproj \
             --nologo --verbosity minimal \
             --filter "$TEST_FILTER" \
+            --logger "console;verbosity=normal" \
+            --blame-hang-timeout 3m --blame-hang-dump-type none \
             --logger "junit;LogFileName=test-results.xml" \
             --results-directory test-results \
             -p:CollectCoverage=true \
