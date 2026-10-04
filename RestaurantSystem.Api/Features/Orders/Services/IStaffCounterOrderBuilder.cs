@@ -11,4 +11,8 @@ public interface IStaffCounterOrderBuilder
 }
 
 public sealed record StaffCounterOrderBuild(
-    Order Order, CreateOrderCommand LegacyCommand, Guid? CustomerUserId);
+    Order Order,
+    CreateOrderCommand LegacyCommand,
+    Guid? CustomerUserId,
+    string? AcceptedCurrency,
+    OrderBillingEarningEvaluation? EarningEvaluation);

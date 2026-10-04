@@ -13,7 +13,7 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal sealed class OrderAmendmentCommitWriter(
     ApplicationDbContext context, ICurrentUserService currentUser,
-    IOrderAmendmentFinancialResolution financial, IOrderFidelityCoordinator fidelity,
+    IOrderAmendmentFinancialResolution financial, IOrderNativeBillingAcceptance fidelity,
     IOrderRoutingService routing, IOrderAmendmentQueryService queries,
     OrderAmendmentKitchenStager kitchenStager)
 {
@@ -22,7 +22,8 @@ internal sealed class OrderAmendmentCommitWriter(
         OrderAmendmentPreparedCommit prepared, string payloadHash, long? accountRevision,
         CancellationToken cancellationToken)
     {
-        var supplement = prepared.Supplement;
+        var supplementBuild = prepared.Supplement;
+        var supplement = supplementBuild?.Order;
         if (supplement is not null)
         {
             amendment.SupplementOrderId = supplement.Id;
@@ -40,9 +41,18 @@ internal sealed class OrderAmendmentCommitWriter(
         await financial.StageAsync(amendment, source, prepared.Financial, cancellationToken);
         await kitchenStager.StageAsync(source, amendment.Id, accountRevision, prepared.Changes, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-        if (supplement is not null && prepared.Request.PointsToRedeem is > 0)
-            await fidelity.RedeemAsync(supplement, prepared.Request.PointsToRedeem, supplement.UserId,
-                cancellationToken, failOnError: true);
+        if (supplementBuild is not null)
+        {
+            var acceptedSupplement = supplementBuild.Order;
+            var redemption = prepared.Request.PointsToRedeem is > 0
+                ? await fidelity.RedeemAsync(acceptedSupplement, prepared.Request.PointsToRedeem,
+                    supplementBuild.CustomerUserId,
+                    cancellationToken, failOnError: true)
+                : null;
+            await fidelity.WriteAcceptedSnapshotAsync(
+                acceptedSupplement, supplementBuild.AcceptedCurrency, supplementBuild.EarningEvaluation,
+                redemption, cancellationToken);
+        }
         var result = await queries.MaterializeCommittedResultAsync(amendment, cancellationToken);
         amendment.CommitResultJson = OrderAmendmentJson.Serialize(result);
         await context.SaveChangesAsync(cancellationToken);

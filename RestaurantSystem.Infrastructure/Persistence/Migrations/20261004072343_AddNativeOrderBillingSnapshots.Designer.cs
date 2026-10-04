@@ -2,19 +2,17 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using RestaurantSystem.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    partial class AddNativeOrderBillingSnapshots
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5845,7 +5843,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("order_amendment_resolution_refusals", null, t =>
                         {
-                            t.HasCheckConstraint("ck_amendment_resolution_refusal_code", "failure_code IN ('quoteExpired','sourceVersionConflict','accountRevisionConflict','quoteChanged','cashHistoryCapacityExceeded')");
+                            t.HasCheckConstraint("ck_amendment_resolution_refusal_code", "failure_code IN ('quoteExpired','sourceVersionConflict','accountRevisionConflict','quoteChanged')");
 
                             t.HasCheckConstraint("ck_amendment_resolution_refusal_hash", "request_hash ~ '^[a-f0-9]{64}$'");
                         });

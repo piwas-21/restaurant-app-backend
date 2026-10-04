@@ -86,7 +86,10 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
 
         var itemsTotal = order.Items.Sum(item => item.ItemTotal);
         await _pricing.ApplyAsync(order, itemsTotal, legacy, customerId, cancellationToken);
-        await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, customerId, cancellationToken);
+        var earning = await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, customerId, cancellationToken);
+        var acceptedCurrency = target is null
+            ? await OrderNativeAcceptedCurrency.ReadTenantCurrencyAsync(_context, cancellationToken)
+            : target.Currency;
         _payments.UpdatePaymentSummary(order);
 
         var initialStatus = order.Status;
@@ -106,7 +109,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             CreatedBy = draft.AuditId
         });
 
-        return new StaffCounterOrderBuild(order, legacy, customerId);
+        return new StaffCounterOrderBuild(order, legacy, customerId, acceptedCurrency, earning);
     }
 
     private async Task<TableOrderTarget?> ResolveTableTargetAsync(
@@ -168,7 +171,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
                 ErrorCodes.TableServiceSessionAmbiguous);
         }
 
-        return new TableOrderTarget(table, session.Id);
+        return new TableOrderTarget(table, session.Id, session.Currency);
     }
 
     private static void AssignTableIdentity(Order order, TableOrderTarget? target)
@@ -236,7 +239,7 @@ public sealed class StaffCounterOrderBuilder : IStaffCounterOrderBuilder
             Payments = [],
         };
 
-    private sealed record TableOrderTarget(TableIdentity Identity, Guid? ServiceSessionId);
+    private sealed record TableOrderTarget(TableIdentity Identity, Guid? ServiceSessionId, string? Currency);
 
     private static void ApplyReleaseState(Order order, bool releaseToKitchen, OrderDraft draft)
     {

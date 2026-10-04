@@ -23,6 +23,8 @@ public sealed class OrderBillingSnapshotConfiguration : IEntityTypeConfiguration
         builder.Property(value => value.EarningEvaluationVersion).HasMaxLength(80);
         builder.Property(value => value.EarningRuleSetFingerprint).HasMaxLength(64);
         builder.Property(value => value.EarningRuleName).HasMaxLength(100);
+        builder.Property(value => value.RedemptionTransactionType).HasConversion<string>().HasMaxLength(30);
+        builder.Property(value => value.RedemptionTransactionOrderTotal).HasColumnType("decimal(18,2)");
         builder.Property(value => value.TaxCategory).HasMaxLength(30).IsRequired();
         builder.Property(value => value.TaxTreatment).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.HasAlternateKey(value => value.OrderId);
@@ -30,12 +32,6 @@ public sealed class OrderBillingSnapshotConfiguration : IEntityTypeConfiguration
             .IsUnique()
             .HasFilter("\"redemption_transaction_id\" IS NOT NULL");
         builder.HasOne<Order>().WithMany().HasForeignKey(value => value.OrderId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<FidelityPointsTransaction>().WithMany().HasForeignKey(value => value.RedemptionTransactionId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(value => value.EarningUserId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(value => value.RedemptionUserId)
             .OnDelete(DeleteBehavior.Restrict);
         MakeImmutable(builder);
     }

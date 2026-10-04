@@ -50,6 +50,44 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
         (await context.OrderRoutingStates.CountAsync()).Should().Be(0);
         (await context.StaffOrderOperations.SingleAsync()).Kind
             .Should().Be(StaffOrderOperationKind.RoundCreate);
+        var snapshot = await context.OrderBillingSnapshots.AsNoTracking().SingleAsync();
+        snapshot.OrderId.Should().Be(firstBody.Data.Id);
+        snapshot.Currency.Should().Be(session.Currency);
+    }
+
+    [Fact]
+    public async Task Round_snapshot_uses_the_currency_frozen_on_its_visit()
+    {
+        AuthenticateAsRole(UserRole.Server);
+        var session = await OpenSessionAsync();
+        string? tenantCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            tenantCurrency = tenant.Currency;
+            tenant.Currency = "EUR";
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            var response = await PostAsJsonAsync("/api/staff/orders/round", Body(
+                session.ServiceSessionId, Guid.NewGuid(), releaseToKitchen: false));
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            await using var verify = DatabaseFixture.CreateContext();
+            var snapshot = await verify.OrderBillingSnapshots.AsNoTracking().SingleAsync();
+            snapshot.Currency.Should().Be(session.Currency);
+            snapshot.Currency.Should().NotBe("EUR",
+                "an existing visit keeps the currency accepted when it opened");
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = tenantCurrency;
+            await restore.SaveChangesAsync();
+        }
     }
 
     [Theory]

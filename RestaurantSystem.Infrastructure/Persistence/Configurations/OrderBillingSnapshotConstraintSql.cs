@@ -3,7 +3,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Configurations;
 internal static class OrderBillingSnapshotConstraintSql
 {
     internal const string Header = """
-        currency ~ '^[A-Z]{3}$' AND tax_minor = 0 AND tax_rate_basis_points = 0
+        created_by = 'OrderBillingSnapshotFactory' AND updated_by IS NULL
+        AND currency ~ '^[A-Z]{3}$' AND tax_minor = 0 AND tax_rate_basis_points = 0
         AND tax_category = 'none' AND tax_treatment = 'NotApplied'
         AND pricing_policy_version = 'native-zero-tax-v1'
         AND component_quantization_policy_version = 'currency-minor-2dp-away-from-zero-v1'
@@ -24,11 +25,11 @@ internal static class OrderBillingSnapshotConstraintSql
         AND food_reconciliation_minor = payable_food_minor - (gross_food_minor - tax_minor
         - order_discount_minor - customer_discount_minor + courtesy_rounding_minor - redemption_discount_minor)
         AND (earned_points_candidate IS NULL OR earned_points_candidate >= 0)
-        AND ((earned_points_candidate IS NULL AND earning_user_id IS NULL
+        AND ((earned_points_candidate IS NULL
         AND earning_evaluation_version IS NULL AND earning_rule_set_fingerprint IS NULL
         AND earning_rule_id IS NULL AND earning_rule_name IS NULL AND earning_rule_minimum_minor IS NULL
         AND earning_rule_maximum_minor IS NULL AND earning_rule_points IS NULL AND earning_rule_priority IS NULL)
-        OR (earned_points_candidate IS NOT NULL AND earning_user_id IS NOT NULL
+        OR (earned_points_candidate IS NOT NULL
         AND earning_evaluation_version IS NOT NULL AND earning_evaluation_version <> ''
         AND earning_rule_set_fingerprint IS NOT NULL
         AND earning_rule_set_fingerprint ~ '^[0-9a-f]{64}$'))
@@ -42,16 +43,33 @@ internal static class OrderBillingSnapshotConstraintSql
         AND earning_rule_points = earned_points_candidate
         AND earning_rule_minimum_minor <= earning_basis_minor
         AND (earning_rule_maximum_minor IS NULL OR earning_rule_maximum_minor >= earning_basis_minor)))
-        AND ((redemption_transaction_id IS NULL AND redemption_user_id IS NULL AND redeemed_points = 0
+        AND ((redemption_transaction_id IS NULL AND redemption_transaction_type IS NULL
+        AND redemption_transaction_points IS NULL AND redemption_transaction_order_total IS NULL
+        AND redemption_transaction_created_at IS NULL AND redeemed_points = 0
         AND redemption_discount_minor = 0) OR (redemption_transaction_id IS NOT NULL
-        AND redemption_user_id IS NOT NULL AND redeemed_points > 0
+        AND redemption_transaction_type IS NOT NULL AND redemption_transaction_type = 'Redeemed'
+        AND redemption_transaction_points IS NOT NULL
+        AND redemption_transaction_points = -redeemed_points
+        AND redemption_transaction_order_total IS NULL AND redemption_transaction_created_at IS NOT NULL
+        AND redeemed_points > 0
         -- Current fidelity value is 100 points per major unit; supported currencies all have two decimals.
         AND redemption_discount_minor = redeemed_points
         AND raw_redemption_discount_amount * 100 = redeemed_points))
         """;
 
+    internal const string OwnerLink = """
+        created_by = 'OrderBillingSnapshotFactory' AND updated_by IS NULL
+        AND slot IN ('Earning', 'Redemption') AND
+        ((disposition = 'Linked' AND user_id IS NOT NULL AND erased_at IS NULL
+        AND erasure_transaction_id IS NULL)
+        OR (disposition = 'Erased' AND user_id IS NULL AND erased_at IS NOT NULL
+        AND erasure_transaction_id IS NOT NULL
+        AND erasure_transaction_id ~ '^[0-9]{1,20}$'))
+        """;
+
     internal const string Unit = """
-        unit_ordinal > 0 AND gross_food_minor >= 0 AND tax_minor = 0 AND tax_rate_basis_points = 0
+        created_by = 'OrderBillingSnapshotFactory' AND updated_by IS NULL
+        AND unit_ordinal > 0 AND gross_food_minor >= 0 AND tax_minor = 0 AND tax_rate_basis_points = 0
         AND tax_category = 'none' AND tax_treatment = 'NotApplied' AND order_discount_minor >= 0
         AND customer_discount_minor >= 0 AND redeemed_points >= 0 AND redemption_discount_minor >= 0
         AND redemption_discount_minor = redeemed_points

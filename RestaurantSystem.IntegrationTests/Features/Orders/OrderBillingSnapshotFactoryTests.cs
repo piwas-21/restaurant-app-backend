@@ -160,6 +160,15 @@ public sealed class OrderBillingSnapshotFactoryTests
         unevaluated.Header.EarnedPointsCandidate.Should().BeNull();
         evaluated.Header.EarnedPointsCandidate.Should().Be(0);
         evaluated.Header.EarningEvaluationVersion.Should().Be("fixed-priority-v1");
+        unevaluated.OwnerLinks.Should().BeEmpty();
+        var earningLink = evaluated.OwnerLinks.Should().ContainSingle().Which;
+        earningLink.OrderId.Should().Be(OrderId);
+        earningLink.Slot.Should().Be(OrderBillingSnapshotOwnerSlot.Earning);
+        earningLink.UserId.Should().Be(UserId);
+        earningLink.Disposition.Should().Be(OrderBillingSnapshotOwnerDisposition.Linked);
+        earningLink.ErasedAt.Should().BeNull();
+        earningLink.CreatedBy.Should().Be(OrderBillingSnapshotFactory.SnapshotAuditIdentifier);
+        evaluated.Header.CreatedBy.Should().Be(OrderBillingSnapshotFactory.SnapshotAuditIdentifier);
     }
 
     [Fact]
@@ -181,13 +190,25 @@ public sealed class OrderBillingSnapshotFactoryTests
         order.UserId = UserId;
         order.FidelityPointsRedeemed = 25;
         order.FidelityPointsDiscount = 0.25m;
+        var transactionCreatedAt = DateTime.UnixEpoch.AddMinutes(4);
         var evidence = new OrderBillingRedemptionEvidence(Guid.NewGuid(), UserId, OrderId,
-            TransactionType.Redeemed, -25, 0.25m, null);
+            TransactionType.Redeemed, -25, 0.25m, null, transactionCreatedAt);
 
         var result = Build(order, redemption: evidence);
 
         result.Header.RedemptionTransactionId.Should().Be(evidence.TransactionId);
-        result.Header.RedemptionUserId.Should().Be(UserId);
+        result.Header.RedemptionTransactionType.Should().Be(evidence.TransactionType);
+        result.Header.RedemptionTransactionPoints.Should().Be(evidence.Points);
+        result.Header.RedemptionTransactionOrderTotal.Should().Be(evidence.OrderTotal);
+        result.Header.RedemptionTransactionCreatedAt.Should().Be(transactionCreatedAt);
+        var redemptionLink = result.OwnerLinks.Should().ContainSingle().Which;
+        redemptionLink.OrderId.Should().Be(OrderId);
+        redemptionLink.Slot.Should().Be(OrderBillingSnapshotOwnerSlot.Redemption);
+        redemptionLink.UserId.Should().Be(UserId);
+        redemptionLink.Disposition.Should().Be(OrderBillingSnapshotOwnerDisposition.Linked);
+        redemptionLink.ErasedAt.Should().BeNull();
+        redemptionLink.CreatedBy.Should().Be(OrderBillingSnapshotFactory.SnapshotAuditIdentifier);
+        result.Header.CreatedBy.Should().Be(OrderBillingSnapshotFactory.SnapshotAuditIdentifier);
         result.Header.RedemptionDiscountMinor.Should().Be(25);
         result.Header.FoodReconciliationMinor.Should().Be(0);
     }
@@ -207,7 +228,7 @@ public sealed class OrderBillingSnapshotFactoryTests
         order.FidelityPointsDiscount = 0.25m;
         var evidence = new OrderBillingRedemptionEvidence(Guid.NewGuid(),
             wrongOwner ? Guid.NewGuid() : UserId,
-            wrongOrder ? Guid.NewGuid() : OrderId, type, points, discountMinor / 100m, null);
+            wrongOrder ? Guid.NewGuid() : OrderId, type, points, discountMinor / 100m, null, DateTime.UnixEpoch);
 
         var act = () => Build(order, redemption: evidence);
 

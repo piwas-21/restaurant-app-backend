@@ -37,7 +37,6 @@ public sealed class OrderBillingSnapshot : Entity
     public decimal RawCourtesyRoundingAmount { get; set; }
     public long EarningBasisMinor { get; set; }
     public int? EarnedPointsCandidate { get; set; }
-    public Guid? EarningUserId { get; set; }
     public string? EarningEvaluationVersion { get; set; }
     public string? EarningRuleSetFingerprint { get; set; }
     public Guid? EarningRuleId { get; set; }
@@ -47,7 +46,10 @@ public sealed class OrderBillingSnapshot : Entity
     public int? EarningRulePoints { get; set; }
     public int? EarningRulePriority { get; set; }
     public Guid? RedemptionTransactionId { get; set; }
-    public Guid? RedemptionUserId { get; set; }
+    public TransactionType? RedemptionTransactionType { get; set; }
+    public int? RedemptionTransactionPoints { get; set; }
+    public decimal? RedemptionTransactionOrderTotal { get; set; }
+    public DateTime? RedemptionTransactionCreatedAt { get; set; }
     public string TaxCategory { get; set; } = "none";
     public int TaxRateBasisPoints { get; set; }
     public OrderBillingTaxTreatment TaxTreatment { get; set; } = OrderBillingTaxTreatment.NotApplied;

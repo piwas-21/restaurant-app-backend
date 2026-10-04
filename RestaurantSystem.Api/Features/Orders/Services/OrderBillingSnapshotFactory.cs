@@ -5,6 +5,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 
 internal static partial class OrderBillingSnapshotFactory
 {
+    internal const string SnapshotAuditIdentifier = "OrderBillingSnapshotFactory";
     internal const string PricingPolicyVersion = "native-zero-tax-v1";
     internal const string ComponentQuantizationPolicyVersion = "currency-minor-2dp-away-from-zero-v1";
     internal const string EarningBasisPolicyVersion = "raw-root-item-total-v1";
@@ -83,8 +84,45 @@ internal static partial class OrderBillingSnapshotFactory
         var units = BuildUnits(new UnitAllocationContext(
             allocation, money, charge, header, redemptionFacts, earningFacts));
         ValidateUnitConservation(units, header);
-        return new(header, units);
+        var ownerLinks = BuildOwnerLinks(order, header, redemptionFacts, earningFacts);
+        return new(header, units, ownerLinks);
     }
+
+    private static List<OrderBillingSnapshotOwnerLink> BuildOwnerLinks(
+        Order order,
+        OrderBillingSnapshot header,
+        RedemptionFacts redemption,
+        EarningFacts earning)
+    {
+        var links = new List<OrderBillingSnapshotOwnerLink>(2);
+        if (earning.CandidatePoints.HasValue)
+        {
+            if (!order.UserId.HasValue)
+                throw Reconciliation("An evaluated earning snapshot requires an owner link.");
+            links.Add(NewOwnerLink(header, OrderBillingSnapshotOwnerSlot.Earning, order.UserId.Value));
+        }
+        if (redemption.TransactionId.HasValue)
+        {
+            if (!redemption.UserId.HasValue)
+                throw Reconciliation("A redemption snapshot requires an owner link.");
+            links.Add(NewOwnerLink(header, OrderBillingSnapshotOwnerSlot.Redemption, redemption.UserId.Value));
+        }
+        return links;
+    }
+
+    private static OrderBillingSnapshotOwnerLink NewOwnerLink(
+        OrderBillingSnapshot header,
+        OrderBillingSnapshotOwnerSlot slot,
+        Guid userId) => new()
+        {
+            Id = Guid.NewGuid(),
+            OrderId = header.OrderId,
+            Slot = slot,
+            UserId = userId,
+            Disposition = OrderBillingSnapshotOwnerDisposition.Linked,
+            CreatedAt = header.CreatedAt,
+            CreatedBy = SnapshotAuditIdentifier
+        };
 
     private static OrderBillingSnapshot BuildHeader(HeaderBuildContext context)
     {
@@ -121,7 +159,6 @@ internal static partial class OrderBillingSnapshotFactory
             RawCourtesyRoundingAmount = raw.CourtesyRoundingAmount,
             EarningBasisMinor = earning.BasisMinor,
             EarnedPointsCandidate = earning.CandidatePoints,
-            EarningUserId = earning.CandidatePoints.HasValue ? context.Order.UserId : null,
             EarningEvaluationVersion = earning.AlgorithmVersion,
             EarningRuleSetFingerprint = earning.RuleSetFingerprint,
             EarningRuleId = rule?.Id,
@@ -131,12 +168,15 @@ internal static partial class OrderBillingSnapshotFactory
             EarningRulePoints = rule?.PointsAwarded,
             EarningRulePriority = rule?.Priority,
             RedemptionTransactionId = redemption.TransactionId,
-            RedemptionUserId = redemption.UserId,
+            RedemptionTransactionType = redemption.TransactionType,
+            RedemptionTransactionPoints = redemption.TransactionPoints,
+            RedemptionTransactionOrderTotal = redemption.TransactionOrderTotal,
+            RedemptionTransactionCreatedAt = redemption.TransactionCreatedAt,
             TaxCategory = "none",
             TaxRateBasisPoints = 0,
             TaxTreatment = OrderBillingTaxTreatment.NotApplied,
             CreatedAt = context.Order.CreatedAt,
-            CreatedBy = context.Order.CreatedBy
+            CreatedBy = SnapshotAuditIdentifier
         };
     }
 
@@ -188,4 +228,5 @@ internal static partial class OrderBillingSnapshotFactory
 
 internal sealed record OrderBillingSnapshotBuildResult(
     OrderBillingSnapshot Header,
-    IReadOnlyList<OrderBillingSnapshotUnit> Units);
+    IReadOnlyList<OrderBillingSnapshotUnit> Units,
+    IReadOnlyList<OrderBillingSnapshotOwnerLink> OwnerLinks);

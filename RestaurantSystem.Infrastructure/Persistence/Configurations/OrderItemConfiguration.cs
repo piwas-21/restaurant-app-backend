@@ -27,8 +27,12 @@ public class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
             .HasMaxLength(500);
 
         // Indexes
-        builder.HasIndex(i => i.OrderId);
+        builder.HasIndex(i => i.OrderId).HasDatabaseName("ix_order_items_order_id");
         builder.HasIndex(i => i.ProductId);
+
+        // Snapshot units reference an item together with its owner order, so a foreign-key
+        // constraint can prove both identifiers belong to the same accepted order.
+        builder.HasAlternateKey(i => new { i.OrderId, i.Id });
 
         // Relationships
         builder.HasOne(i => i.Order)

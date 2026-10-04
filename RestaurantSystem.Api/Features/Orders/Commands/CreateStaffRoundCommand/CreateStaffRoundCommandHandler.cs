@@ -22,7 +22,7 @@ public sealed class CreateStaffRoundCommandHandler
     private readonly IStaffCounterOrderBuilder _builder;
     private readonly IStaffOrderOperationStore _operations;
     private readonly IOrderResponseProjector _responses;
-    private readonly IOrderFidelityCoordinator _fidelity;
+    private readonly IOrderNativeBillingAcceptance _fidelity;
     private readonly IOrderNotificationService _notifications;
     private readonly IOrderTableReservationService _tableReservation;
     private readonly IOrderRoutingService _routing;
@@ -32,7 +32,7 @@ public sealed class CreateStaffRoundCommandHandler
     public CreateStaffRoundCommandHandler(
         ApplicationDbContext context, ICurrentUserService currentUser,
         IStaffCounterOrderBuilder builder, IStaffOrderOperationStore operations,
-        IOrderResponseProjector responses, IOrderFidelityCoordinator fidelity,
+        IOrderResponseProjector responses, IOrderNativeBillingAcceptance fidelity,
         IOrderNotificationService notifications, IOrderTableReservationService tableReservation,
         IOrderRoutingService routing)
     {
@@ -94,6 +94,8 @@ public sealed class CreateStaffRoundCommandHandler
             }
 
             var build = await _builder.BuildAsync(command, command.ReleaseToKitchen, cancellationToken);
+            if (!string.Equals(build.AcceptedCurrency, session.Currency, StringComparison.Ordinal))
+                throw new ConflictException("The accepted visit currency changed while creating the round.");
             _context.Orders.Add(build.Order);
             session.RecordAccountChange();
             if (command.ReleaseToKitchen)
@@ -113,9 +115,11 @@ public sealed class CreateStaffRoundCommandHandler
                 CreatedBy = _currentUser.GetAuditIdentifier()
             });
             await _context.SaveChangesAsync(cancellationToken);
-            await _fidelity.RedeemAsync(
+            var redemption = await _fidelity.RedeemAsync(
                 build.Order, command.PointsToRedeem, build.CustomerUserId, cancellationToken,
                 failOnError: true);
+            await _fidelity.WriteAcceptedSnapshotAsync(
+                build.Order, session.Currency, build.EarningEvaluation, redemption, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             var dto = await _responses.ProjectAsync(build.Order, CancellationToken.None);

@@ -28,6 +28,17 @@ internal sealed class OrderAmendmentSupplementBuilder
     internal async Task<Order?> BuildAsync(
         Order source,
         OrderAmendmentQuoteRequest request,
+        CancellationToken cancellationToken) =>
+        (await BuildForAcceptanceAsync(source, request, cancellationToken))?.Order;
+
+    internal Task<OrderAmendmentSupplementBuild?> BuildForAcceptanceAsync(
+        Order source,
+        OrderAmendmentQuoteRequest request,
+        CancellationToken cancellationToken) => BuildCoreAsync(source, request, cancellationToken);
+
+    private async Task<OrderAmendmentSupplementBuild?> BuildCoreAsync(
+        Order source,
+        OrderAmendmentQuoteRequest request,
         CancellationToken cancellationToken)
     {
         var hasItems = request.Additions.Count > 0 || request.Changes.Any(
@@ -48,6 +59,12 @@ internal sealed class OrderAmendmentSupplementBuilder
         await _fidelity.PreviewRedemptionAsync(
             build.Order, request.PointsToRedeem, build.CustomerUserId, cancellationToken);
         OrderAmendmentJson.EnsureItemIdentity(build.Order);
-        return build.Order;
+        return new(build.Order, build.CustomerUserId, build.AcceptedCurrency, build.EarningEvaluation);
     }
 }
+
+internal sealed record OrderAmendmentSupplementBuild(
+    Order Order,
+    Guid? CustomerUserId,
+    string? AcceptedCurrency,
+    OrderBillingEarningEvaluation? EarningEvaluation);

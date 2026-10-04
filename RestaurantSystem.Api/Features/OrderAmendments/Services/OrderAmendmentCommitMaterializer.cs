@@ -33,13 +33,13 @@ internal sealed class OrderAmendmentCommitMaterializer(
             .ToDictionary(item => item.Id, item => item.Quantity);
         await OrderAmendmentRangeValidator.ValidateAsync(context, source.Id, quoteRequest, quantities, cancellationToken);
         var quotedChanges = DeserializeChanges(amendment.ChangesJson);
-        var supplement = await supplements.BuildAsync(source, quoteRequest, cancellationToken);
-        var supplementDto = ValidateSupplement(supplement, amendment.SupplementSnapshotJson);
+        var supplement = await supplements.BuildForAcceptanceAsync(source, quoteRequest, cancellationToken);
+        var supplementDto = ValidateSupplement(supplement?.Order, amendment.SupplementSnapshotJson);
         var changes = await changeBuilder.BuildAsync(source, sourceDto, quoteRequest, supplementDto, cancellationToken);
         if (!string.Equals(OrderAmendmentJson.ChangeFingerprint(changes),
                 OrderAmendmentJson.ChangeFingerprint(quotedChanges), StringComparison.Ordinal))
             throw new ConflictException("The source-line snapshot changed after the quote. Quote again.");
-        var preview = await financial.PreviewAsync(source, changes, supplement, cancellationToken);
+        var preview = await financial.PreviewAsync(source, changes, supplement?.Order, cancellationToken);
         var quotedFinancial = OrderAmendmentJson.Deserialize<OrderAmendmentFinancialPreviewDto>(amendment.FinancialResolutionJson);
         if (preview != quotedFinancial)
             throw new ConflictException("The financial preview changed after the quote. Quote again.");
@@ -83,5 +83,5 @@ internal sealed class OrderAmendmentCommitMaterializer(
 }
 
 internal sealed record OrderAmendmentPreparedCommit(
-    OrderAmendmentQuoteRequest Request, Order? Supplement,
+    OrderAmendmentQuoteRequest Request, OrderAmendmentSupplementBuild? Supplement,
     List<OrderAmendmentChangeSnapshot> Changes, OrderAmendmentFinancialPreviewDto Financial);

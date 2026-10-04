@@ -16,8 +16,9 @@ public sealed class OrderBillingSnapshotUnitConfiguration : IEntityTypeConfigura
         builder.HasIndex(value => new { value.OrderId, value.OrderItemId, value.UnitOrdinal }).IsUnique();
         builder.HasOne<OrderBillingSnapshot>().WithMany().HasForeignKey(value => value.OrderId)
             .HasPrincipalKey(value => value.OrderId).OnDelete(DeleteBehavior.Restrict);
-        // The same-order composite target is deliberately deferred until its principal key is migrated.
-        builder.HasOne<OrderItem>().WithMany().HasForeignKey(value => value.OrderItemId)
+        builder.HasOne<OrderItem>().WithMany()
+            .HasForeignKey(value => new { value.OrderId, value.OrderItemId })
+            .HasPrincipalKey(value => new { value.OrderId, value.Id })
             .OnDelete(DeleteBehavior.Restrict);
         foreach (var property in builder.Metadata.GetProperties())
             property.SetAfterSaveBehavior(PropertySaveBehavior.Throw);

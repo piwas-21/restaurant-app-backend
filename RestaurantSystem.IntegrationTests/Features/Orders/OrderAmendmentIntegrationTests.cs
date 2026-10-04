@@ -154,6 +154,8 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         await using (var quoted = DatabaseFixture.CreateContext())
         {
             (await quoted.Orders.CountAsync()).Should().Be(1, "quote is a read-only preview");
+            (await quoted.OrderBillingSnapshots.CountAsync()).Should().Be(0,
+                "a quote does not persist the earning evaluation as an accepted snapshot");
             (await quoted.Set<OrderAmendment>().SingleAsync()).State.Should().Be(OrderAmendmentState.Quoted);
             (await quoted.OrderOperationalNotes.CountAsync()).Should().Be(0);
         }
@@ -198,6 +200,9 @@ public sealed class OrderAmendmentIntegrationTests(DatabaseFixture fixture) : In
         var committedAmendment = await verify.Set<OrderAmendment>().SingleAsync();
         committedAmendment.CommitResultJson.Should().NotBeNullOrWhiteSpace();
         (await verify.Orders.CountAsync()).Should().Be(2, "the retry returns the original supplement");
+        var billing = await verify.OrderBillingSnapshots.AsNoTracking()
+            .SingleAsync(snapshot => snapshot.OrderId == first.Data!.SupplementOrderId);
+        billing.Currency.Should().Be("CHF");
         (await verify.OrderOperationalNotes.CountAsync(note => note.OrderId == _sourceOrderId)).Should().Be(1);
         (await verify.Orders.SingleAsync(order => order.Id == _sourceOrderId))
             .Status.Should().Be(OrderStatus.Confirmed, "amendments preserve source lifecycle state");

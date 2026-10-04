@@ -23,7 +23,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 public interface IOrderFidelityCoordinator
 {
     /// <summary>Pre-save calculation (sets <c>Order.FidelityPointsEarned</c>).</summary>
-    Task CalculatePointsToEarnAsync(Order order, decimal itemsTotal, Guid? userId, CancellationToken cancellationToken);
+    Task<OrderBillingEarningEvaluation?> CalculatePointsToEarnAsync(
+        Order order, decimal itemsTotal, Guid? userId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Read-only redemption preview. It updates the transient quote aggregate but never writes a
@@ -35,9 +36,9 @@ public interface IOrderFidelityCoordinator
     /// <summary>
     /// Post-save redemption. Staff creation requests strict failure so the ambient order
     /// transaction rolls back when the balance cannot be redeemed; guest checkout retains the
-    /// historical best-effort behavior.
+    /// historical best-effort behavior for a typed insufficient-balance result with no debit.
     /// </summary>
-    Task RedeemAsync(
+    Task<OrderBillingRedemptionEvidence?> RedeemAsync(
         Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken,
         bool failOnError = false);
 

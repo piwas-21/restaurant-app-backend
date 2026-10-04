@@ -16,8 +16,8 @@ internal static partial class OrderBillingSnapshotFactory
 
     private static void ValidateOrderIdentity(Order order)
     {
-        if (order.Id == Guid.Empty || string.IsNullOrWhiteSpace(order.CreatedBy))
-            throw Reconciliation("A billing snapshot requires a persisted order and creator identity.");
+        if (order.Id == Guid.Empty)
+            throw Reconciliation("A billing snapshot requires a persisted order.");
     }
 
     private static AccountMoney CreateMoney(string? currency)
@@ -101,13 +101,13 @@ internal static partial class OrderBillingSnapshotFactory
         {
             if (evidence is not null || order.FidelityPointsDiscount != 0)
                 throw Reconciliation("A points discount requires a matching persisted redemption row.");
-            return new(0, 0, null, null, 0m);
+            return new(0, 0, null, null, null, null, null, null, 0m);
         }
 
         if (evidence is null || evidence.TransactionId == Guid.Empty || !order.UserId.HasValue
             || evidence.UserId != order.UserId.Value || evidence.OrderId != order.Id
             || evidence.TransactionType != TransactionType.Redeemed || evidence.Points >= 0
-            || evidence.OrderTotal is not null)
+            || evidence.OrderTotal is not null || evidence.CreatedAt == default)
             throw Reconciliation("The redemption row does not prove this order's exact negative debit.");
 
         int redeemedPoints;
@@ -126,7 +126,9 @@ internal static partial class OrderBillingSnapshotFactory
             || discount != order.FidelityPointsDiscount || evidence.DiscountAmount != discount
             || discountMinor == 0)
             throw Reconciliation("The redemption debit, order points and applied discount do not agree.");
-        return new(redeemedPoints, discountMinor, evidence.TransactionId, evidence.UserId, evidence.DiscountAmount);
+        return new(redeemedPoints, discountMinor, evidence.TransactionId, evidence.UserId,
+            evidence.TransactionType, evidence.Points, evidence.OrderTotal, evidence.CreatedAt,
+            evidence.DiscountAmount);
     }
 
     private static EarningFacts ValidateEarning(
@@ -212,7 +214,15 @@ internal static partial class OrderBillingSnapshotFactory
     }
 
     private sealed record RedemptionFacts(
-        int Points, long DiscountMinor, Guid? TransactionId, Guid? UserId, decimal RawDiscountAmount);
+        int Points,
+        long DiscountMinor,
+        Guid? TransactionId,
+        Guid? UserId,
+        TransactionType? TransactionType,
+        int? TransactionPoints,
+        decimal? TransactionOrderTotal,
+        DateTime? TransactionCreatedAt,
+        decimal RawDiscountAmount);
 
     private sealed record EarningFacts(
         long BasisMinor,

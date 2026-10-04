@@ -47,6 +47,10 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            // Scrub retained order rows before deleting loyalty evidence to preserve snapshot capture's
+            // Order → User → FidelityPointsTransaction lock order.
+            await _retainedDataScrubber.ScrubAsync(user.Id, cancellationToken);
+
             // 1. Delete Baskets (Soft Delete or Hard Delete depending on strategy - using Hard as baskets are transient)
             // INCLUDE Soft-deleted baskets to avoid FK errors
             await _context.Baskets
@@ -75,8 +79,6 @@ public class ConfirmAccountDeletionCommandHandler : ICommandHandler<ConfirmAccou
             await _context.GroupMemberships
                 .Where(g => g.UserId == user.Id)
                 .ExecuteDeleteAsync(cancellationToken);
-
-            await _retainedDataScrubber.ScrubAsync(user.Id, cancellationToken);
 
         }
         catch (Exception ex)
