@@ -29,7 +29,8 @@ internal static class OrderAmendmentRefundFinalizationEvidence
     {
         var scopes = OrderAmendmentJson.Deserialize<List<OrderAmendmentRefundScope>>(leg.FrozenScopesJson);
         if ((leg.AccountPaymentAttemptId is null) != (scopes.Count == 0) || leg.Attempts.Count != 0
-            || scopes.Sum(value => value.AmountMinor) != leg.AmountMinor
+            || (leg.AccountPaymentAttemptId is not null
+                && scopes.Sum(value => value.AmountMinor) != leg.AmountMinor)
             || scopes.Select(value => (value.AllocationId, value.StartOrdinal, value.UnitCount))
                 .Distinct().Count() != scopes.Count
             || !AccountAmendmentRefundIntegrity.HasNoProviderContext(leg)
