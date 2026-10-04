@@ -8,7 +8,7 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class PaidAmendmentResolutionMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string BeforePaidResolution = "20261003120021_AddTableVisitReadiness";
-    private const string LatestMigration = "20261003153304_AddOrderAmendmentResolutionRefusals";
+    private const string LatestMigration = "20261004031747_AddAccountCashCollectionReceipts";
     private static readonly string[] PaidTables =
     [
         "order_amendment_resolution_operations",
