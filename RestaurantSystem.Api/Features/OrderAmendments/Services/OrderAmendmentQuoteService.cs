@@ -126,7 +126,20 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         }
 
         _context.ChangeTracker.Clear();
-        await using var persistence = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var persistence = await OrderAccountMutationScope.BeginAsync(
+            _context, orderId, cancellationToken);
+        var current = await _context.Orders.AsNoTracking()
+            .Where(order => order.Id == orderId && !order.IsDeleted)
+            .Select(order => new
+            {
+                order.Version,
+                order.ServiceSessionId,
+                AccountRevision = order.ServiceSession == null ? (long?)null : order.ServiceSession.AccountRevision
+            }).SingleOrDefaultAsync(cancellationToken);
+        if (current is null || current.Version != amendment.ExpectedOrderVersion
+            || current.ServiceSessionId != amendment.ServiceSessionId
+            || current.AccountRevision != amendment.ExpectedAccountRevision)
+            throw new ConflictException("The source order changed while preparing the quote. Refresh and quote again.");
         _context.Set<OrderAmendment>().Add(amendment);
         await _context.SaveChangesAsync(cancellationToken);
         await persistence.CommitAsync(cancellationToken);

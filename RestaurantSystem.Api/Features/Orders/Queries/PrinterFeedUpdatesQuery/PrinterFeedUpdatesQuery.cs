@@ -41,14 +41,16 @@ public class PrinterFeedUpdatesQueryHandler
         PrinterFeedUpdatesQuery query, CancellationToken cancellationToken)
     {
         var updatesQuery = _context.OrderOperationalNotes
+            // soft-delete-bypass: withdrawal tombstones must purge cached jobs for hidden orders.
+            .IgnoreQueryFilters()
             .AsNoTracking()
             // Device/API-key calls have no user role. This explicit audience predicate is the
             // printer boundary: Staff notes can never reach a printer through role inference.
             .Where(note => note.Audience == OrderNoteAudience.Kitchen
-                && !note.Order.IsDeleted
+                && (note.WithdrawnAt.HasValue || !note.Order.IsDeleted)
                 // Ordinary notes follow the existing preparation states. Frozen amendment jobs
                 // survive terminal status: an offline kitchen still needs the cancellation ticket.
-                && (note.KitchenChangesJson != null
+                && (note.WithdrawnAt.HasValue || note.KitchenChangesJson != null
                     || note.Order.Status == OrderStatus.Confirmed
                     || note.Order.Status == OrderStatus.Preparing
                     || note.Order.Status == OrderStatus.Ready));
@@ -58,20 +60,20 @@ public class PrinterFeedUpdatesQueryHandler
         {
             var value = cursor.Value;
             updatesQuery = updatesQuery.Where(note =>
-                note.CreatedAt > value.CreatedAt
-                || (note.CreatedAt == value.CreatedAt && note.Id.CompareTo(value.JobId) > 0));
+                EF.Property<DateTime>(note, "FeedEventAt") > value.CreatedAt
+                || (EF.Property<DateTime>(note, "FeedEventAt") == value.CreatedAt && note.Id.CompareTo(value.JobId) > 0));
         }
         else
         {
             var modifiedSinceUtc = QueryInstant.AsUtc(query.ModifiedSince);
             if (modifiedSinceUtc.HasValue)
             {
-                updatesQuery = updatesQuery.Where(note => note.CreatedAt > modifiedSinceUtc.Value);
+                updatesQuery = updatesQuery.Where(note => EF.Property<DateTime>(note, "FeedEventAt") > modifiedSinceUtc.Value);
             }
         }
 
         var storedUpdates = await updatesQuery
-            .OrderBy(note => note.CreatedAt)
+            .OrderBy(note => EF.Property<DateTime>(note, "FeedEventAt"))
             .ThenBy(note => note.Id)
             // Read one sentinel row so the response can tell the printer-app whether another page
             // exists without making it advance a timestamp cursor past unseen work.
@@ -79,9 +81,9 @@ public class PrinterFeedUpdatesQueryHandler
             .Select(note => new StoredKitchenUpdate(new PrinterFeedUpdateDto
             {
                 JobId = note.Id,
-                // Each immutable note is one update job. A future editable-note contract can
-                // introduce later revisions without changing the current retry identity.
-                Revision = 1,
+                Revision = note.WithdrawnAt.HasValue
+                    ? PrinterUpdateRevisions.Withdrawal : PrinterUpdateRevisions.Original,
+                IsWithdrawn = note.WithdrawnAt.HasValue,
                 JobType = DevicePrintJobType.Update,
                 Target = note.KitchenTarget ?? DevicePrintTarget.General,
                 OrderId = note.OrderId,
@@ -94,12 +96,12 @@ public class PrinterFeedUpdatesQueryHandler
                 AccountRevision = note.AccountRevision,
                 Audience = nameof(OrderNoteAudience.Kitchen),
                 Text = note.Text,
-                CreatedAt = note.CreatedAt,
+                CreatedAt = EF.Property<DateTime>(note, "FeedEventAt"),
             }, note.KitchenChangesJson))
             .ToListAsync(cancellationToken);
         var updates = storedUpdates.Select(stored => stored.Update with
         {
-            Changes = KitchenChangeSnapshot.Deserialize(stored.ChangesJson)
+            Changes = stored.Update.IsWithdrawn ? [] : KitchenChangeSnapshot.Deserialize(stored.ChangesJson)
         }).ToList();
 
         var hasMore = updates.Count > _updatePageSize;

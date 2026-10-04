@@ -19,6 +19,7 @@ public class PrinterDeviceConfiguration : IEntityTypeConfiguration<PrinterDevice
         builder.Property(d => d.ApiBaseUrl).HasMaxLength(300);
         builder.Property(d => d.KitchenPrinter).HasMaxLength(120);
         builder.Property(d => d.CashierPrinter).HasMaxLength(120);
+        builder.Property(d => d.SupportsUpdateAuthorization).HasDefaultValue(false);
         builder.Property(d => d.KitchenRoutingMode)
             .HasConversion<string>()
             .HasMaxLength(30)

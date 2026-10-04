@@ -20,5 +20,8 @@ public class OrderOperationalNote : Entity
     public DevicePrintTarget? KitchenTarget { get; set; }
     public string? KitchenChangesJson { get; set; }
 
+    /// <summary>Withdraws operational text from preparation without deleting the retained job identity.</summary>
+    public DateTime? WithdrawnAt { get; set; }
+
     public virtual Order Order { get; set; } = null!;
 }
