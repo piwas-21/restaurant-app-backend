@@ -64,7 +64,7 @@ internal sealed class AccountDebtSnapshotReader(ApplicationDbContext context) : 
         await OrderBillingCreditConsistency.AssertAsync(context, orderIds, cancellationToken);
         ValidateCurrency(orders, money.Currency);
         AccountCheckoutEvidenceGuard.Validate(orders, checkouts, attempts, money);
-        ValidateAttemptScopes(attempts, money);
+        AccountPaymentAttemptScopeGuard.RequireReconciled(attempts, money);
         var capturedAllocations = attempts.Where(value => value.State == AccountPaymentState.Captured)
             .SelectMany(value => value.Allocations).ToArray();
         var captured = AccountPaymentAllocationReversalMath.Apply(
@@ -82,26 +82,6 @@ internal sealed class AccountDebtSnapshotReader(ApplicationDbContext context) : 
                 || order.Payments.Any(payment => payment.Currency is not null
                     && !string.Equals(payment.Currency.Trim(), currency, StringComparison.OrdinalIgnoreCase))))
             throw new ConflictException("The table account contains incompatible order or payment currencies.");
-    }
-
-    private static void ValidateAttemptScopes(IReadOnlyList<AccountPaymentAttempt> attempts, AccountMoney money)
-    {
-        var active = attempts.Where(value => value.State == AccountPaymentState.Captured
-            || value.State.HoldsReservation()).ToArray();
-        if (active.Any(attempt => attempt.Currency != money.Currency
-                || attempt.Allocations.Sum(allocation => allocation.AmountMinor) != attempt.AmountMinor))
-            throw new ConflictException("The account's captured or reserved totals require reconciliation.");
-        var allocations = active.Where(value => value.State == AccountPaymentState.Captured)
-            .SelectMany(value => value.Allocations).ToArray();
-        foreach (var group in allocations.GroupBy(value => value.OrderPaymentId))
-        {
-            var payment = group.First().OrderPayment;
-            if (payment is null || !payment.Status.IsCaptured()
-                || group.Any(value => value.OrderId != payment.OrderId
-                    || value.AmountMinor != checked(value.MinorPerUnit * value.UnitCount))
-                || group.Sum(value => value.AmountMinor) != money.ToMinor(payment.Amount))
-                throw new ConflictException("A captured account allocation has no matching tender evidence.");
-        }
     }
 
     private static AccountDebtSegment Segment(AccountPaymentAllocation value) =>

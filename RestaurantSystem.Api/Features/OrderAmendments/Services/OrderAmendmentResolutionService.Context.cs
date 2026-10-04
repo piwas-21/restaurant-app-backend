@@ -36,10 +36,10 @@ public sealed partial class OrderAmendmentResolutionService
                 && value.State != OrderAmendmentResolutionOperationState.Resolved, cancellationToken))
             throw new ConflictException("Resolve the earlier paid correction in this table account first.");
 
-        var attempts = await ReadAttemptsAsync(source.ServiceSessionId, source.Id, cancellationToken);
+        var money = new AccountMoney(source.ServiceSession?.Currency ?? resolutionPolicy.ResolveCurrency(source));
+        var attempts = await ReadAttemptsAsync(source.ServiceSessionId, source.Id, money, cancellationToken);
         var loyalty = await context.FidelityPointsTransactions.AsNoTracking()
             .Where(value => value.OrderId == source.Id).ToListAsync(cancellationToken);
-        var money = new AccountMoney(source.ServiceSession?.Currency ?? resolutionPolicy.ResolveCurrency(source));
         var refunds = await AccountAmendmentRefundIntegrity.ReadAsync(context, [source], sourceAmendments,
             attempts, money, cancellationToken);
         var credit = OrderAmendmentResolutionPlanner.ValidateSourceForResolution(
