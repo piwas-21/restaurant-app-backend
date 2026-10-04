@@ -13,7 +13,7 @@ public sealed class AccountCashCollectionReceiptModelTests
     public void Receipt_schema_metadata_maps_bounded_adjustment_and_staff_role_without_opening_a_database()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql("Host=localhost;Database=cash_model;Username=model;Password=model")
+            .UseNpgsql()
             .Options;
         using var context = new ApplicationDbContext(options);
 

@@ -89,7 +89,7 @@ public sealed class OrderAmendmentRefundFinalizationEvidenceTests
     private static ApplicationDbContext CreateOfflineContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql("Host=127.0.0.1;Port=9;Database=offline_finalization_evidence")
+            .UseNpgsql()
             .Options;
         return new ApplicationDbContext(options);
     }
