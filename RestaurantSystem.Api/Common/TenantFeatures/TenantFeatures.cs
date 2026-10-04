@@ -17,6 +17,7 @@ public sealed class TenantFeatures : ITenantFeatures
         TableGuestVisitsV1 = options.Value.TableGuestVisitsV1;
         TableVisitReadinessV1 = options.Value.TableVisitReadinessV1;
         TableAccountPaymentsV1 = options.Value.TableAccountPaymentsV1;
+        ServerAccountCollectionV1 = options.Value.ServerAccountCollectionV1;
         TableGuestAccountPaymentsV1 = options.Value.TableGuestAccountPaymentsV1;
         if (TableVisitReadinessV1 && (!ServerWorkspaceV2 || !TableGuestVisitsV1))
         {
@@ -38,6 +39,8 @@ public sealed class TenantFeatures : ITenantFeatures
     public bool TableVisitReadinessV1 { get; }
 
     public bool TableAccountPaymentsV1 { get; }
+
+    public bool ServerAccountCollectionV1 { get; }
 
     public bool TableGuestAccountPaymentsV1 { get; }
 

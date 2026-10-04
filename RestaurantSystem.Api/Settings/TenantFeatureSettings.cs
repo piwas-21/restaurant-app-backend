@@ -30,6 +30,9 @@ public sealed class TenantFeatureSettings
     /// <summary>Opt-in exact visit payment collection; defaults off pending reconciliation verification.</summary>
     public bool TableAccountPaymentsV1 { get; set; }
 
+    /// <summary>Tenant-wide opt-in for Server-role manual account collection; defaults off.</summary>
+    public bool ServerAccountCollectionV1 { get; set; }
+
     /// <summary>Opt-in participant-initiated online payment for an exact table visit; defaults off.</summary>
     public bool TableGuestAccountPaymentsV1 { get; set; }
 

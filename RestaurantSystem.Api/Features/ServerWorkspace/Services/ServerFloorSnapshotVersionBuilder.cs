@@ -11,7 +11,9 @@ namespace RestaurantSystem.Api.Features.ServerWorkspace.Services;
 internal sealed record ServerFloorSnapshotVersionContext(
     DateTimeOffset? NextStateChangeAt,
     decimal PaymentTolerance,
-    bool HasUnidentifiedLegacy);
+    bool HasUnidentifiedLegacy,
+    UserRole? CurrentRole = null,
+    bool ServerCanCollect = false);
 
 internal static class ServerFloorSnapshotVersionBuilder
 {
@@ -52,7 +54,8 @@ internal static class ServerFloorSnapshotVersionBuilder
                 .Select(item => $"r:{item.Value.ReservationId}:{item.Key}:{item.Value.CustomerName}:"
                     + $"{item.Value.ReservationDate:O}:{item.Value.Status}:{item.Value.StartTime}:"
                     + $"{item.Value.EndTime}:{item.Value.GuestCount}:{item.Value.IsCurrent}"))
-            + $";next:{context.NextStateChangeAt:O};unidentified:{context.HasUnidentifiedLegacy}";
+            + $";next:{context.NextStateChangeAt:O};unidentified:{context.HasUnidentifiedLegacy}"
+            + $";role:{context.CurrentRole};serverCollection:{context.ServerCanCollect}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)))[..16];
     }
 

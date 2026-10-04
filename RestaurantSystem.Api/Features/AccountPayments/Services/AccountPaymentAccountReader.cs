@@ -34,6 +34,7 @@ public sealed class AccountPaymentAccountReader(
         if (sessionId == Guid.Empty)
             throw new BadRequestException("A table visit is required.");
 
+        actors.RequireNewCollection();
         var actor = actors.ResolveStaffActor();
         return await ReadAsync(sessionId, actor, null, cancellationToken);
     }

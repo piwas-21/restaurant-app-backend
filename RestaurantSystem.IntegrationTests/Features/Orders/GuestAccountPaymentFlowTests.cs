@@ -544,6 +544,11 @@ public sealed class GuestAccountPaymentFlowTests(DatabaseFixture fixture) : IAsy
 
     private sealed class TestActorResolver(Guid actorId) : IAccountPaymentActorResolver
     {
+        public bool CanStartCollection => true;
+        public void RequireNewCollection()
+        {
+            // These payment lifecycle fixtures grant staff authority; policy is covered separately.
+        }
         public AccountPaymentActor ResolveStaffActor() =>
             new(actorId, AccountPaymentActorKind.Staff, $"staff:{actorId:N}");
     }

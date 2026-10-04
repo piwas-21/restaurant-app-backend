@@ -17,7 +17,8 @@ internal sealed class MutableAmendmentFeatures : RestaurantSystem.Api.Common.Ten
     public bool TableAccountV1 => false;
     public bool TableGuestVisitsV1 => false;
     public bool TableVisitReadinessV1 => false;
-    public bool TableAccountPaymentsV1 => false;
+    public bool TableAccountPaymentsV1 { get; set; }
+    public bool ServerAccountCollectionV1 { get; set; }
     public bool TableGuestAccountPaymentsV1 => false;
     public bool EnforceSauceMinimum => false;
     public bool OptionSetMaterializationEnabled => false;

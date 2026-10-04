@@ -408,7 +408,7 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests(Datab
         {
             Id = _itemId,
             ProductName = "Two-unit meal",
-            Quantity = 2,
+            Quantity = 1,
             UnitPrice = 10m,
             ItemTotal = 20m
         };
