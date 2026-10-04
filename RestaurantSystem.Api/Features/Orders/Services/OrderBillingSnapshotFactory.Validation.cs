@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Utilities;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
@@ -140,11 +139,7 @@ internal static partial class OrderBillingSnapshotFactory
         var basisMinor = SumMinor(roots.Select(item => ToMinor(money, item.ItemTotal, false)));
         if (evaluation is null || evaluation.CandidatePoints is null)
         {
-            if (evaluation is not null && (evaluation.AlgorithmVersion is not null
-                || evaluation.RuleSetFingerprint is not null || evaluation.MatchedRule is not null))
-                throw Reconciliation("Unevaluated loyalty evidence cannot carry a partial rule result.");
-            if (order.FidelityPointsEarned != 0)
-                throw Reconciliation("The order's loyalty preview has no matching evaluation evidence.");
+            ValidateUnevaluatedEarning(order, evaluation);
             return new(basisMinor, null, null, null, null, null, null);
         }
 
@@ -155,26 +150,51 @@ internal static partial class OrderBillingSnapshotFactory
             throw Reconciliation("An evaluated loyalty candidate requires a version and rule-set fingerprint.");
 
         var rule = evaluation.MatchedRule;
-        if (rule is null && candidatePoints != 0)
-            throw Reconciliation("A positive loyalty candidate requires its matched rule evidence.");
-        if (rule is not null && (rule.Id == Guid.Empty || string.IsNullOrWhiteSpace(rule.Name)
-            || rule.MinimumOrderAmount < 0
-            || (rule.MaximumOrderAmount.HasValue && rule.MaximumOrderAmount.Value < rule.MinimumOrderAmount)
-            || rule.PointsAwarded < 0 || rule.PointsAwarded != candidatePoints))
-            throw Reconciliation("The matched earning rule does not explain the frozen candidate.");
-
-        long? minimumMinor = rule is null ? null : ToMinor(money, rule.MinimumOrderAmount, false);
-        long? maximumMinor = rule is { MaximumOrderAmount: { } maximumOrderAmount }
-            ? ToMinor(money, maximumOrderAmount, false) : null;
-        if (rule is not null && (basisMinor < minimumMinor!.Value
-            || (maximumMinor.HasValue && basisMinor > maximumMinor.Value)))
-            throw Reconciliation("The matched earning rule does not apply to the frozen raw-root basis.");
+        var (minimumMinor, maximumMinor) = ValidateMatchedEarningRule(rule, candidatePoints, basisMinor, money);
         return new(basisMinor, candidatePoints, evaluation.AlgorithmVersion,
             evaluation.RuleSetFingerprint, rule, minimumMinor, maximumMinor);
     }
 
+    private static void ValidateUnevaluatedEarning(Order order, OrderBillingEarningEvaluation? evaluation)
+    {
+        if (evaluation is not null && (evaluation.AlgorithmVersion is not null
+            || evaluation.RuleSetFingerprint is not null || evaluation.MatchedRule is not null))
+            throw Reconciliation("Unevaluated loyalty evidence cannot carry a partial rule result.");
+        if (order.FidelityPointsEarned != 0)
+            throw Reconciliation("The order's loyalty preview has no matching evaluation evidence.");
+    }
+
+    private static (long? MinimumMinor, long? MaximumMinor) ValidateMatchedEarningRule(
+        OrderBillingEarningRuleEvidence? rule, int candidatePoints, long basisMinor, AccountMoney money)
+    {
+        if (rule is null)
+        {
+            if (candidatePoints != 0)
+                throw Reconciliation("A positive loyalty candidate requires its matched rule evidence.");
+            return (null, null);
+        }
+        ValidateMatchedEarningRuleIdentity(rule, candidatePoints);
+
+        var minimumMinor = ToMinor(money, rule.MinimumOrderAmount, false);
+        long? maximumMinor = rule.MaximumOrderAmount is { } maximumOrderAmount
+            ? ToMinor(money, maximumOrderAmount, false) : null;
+        if (basisMinor < minimumMinor
+            || (maximumMinor.HasValue && basisMinor > maximumMinor.Value))
+            throw Reconciliation("The matched earning rule does not apply to the frozen raw-root basis.");
+        return (minimumMinor, maximumMinor);
+    }
+
+    private static void ValidateMatchedEarningRuleIdentity(OrderBillingEarningRuleEvidence rule, int candidatePoints)
+    {
+        if (rule.Id == Guid.Empty || string.IsNullOrWhiteSpace(rule.Name)
+            || rule.MinimumOrderAmount < 0
+            || (rule.MaximumOrderAmount.HasValue && rule.MaximumOrderAmount.Value < rule.MinimumOrderAmount)
+            || rule.PointsAwarded < 0 || rule.PointsAwarded != candidatePoints)
+            throw Reconciliation("The matched earning rule does not explain the frozen candidate.");
+    }
+
     private static bool IsFingerprint(string? value) => value is { Length: 64 }
-        && Regex.IsMatch(value, "^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
+        && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     private static decimal ReadRawCourtesy(Order order)
     {
