@@ -39,8 +39,18 @@ internal static class OrderAmendmentResolutionResultMapper
         if (leg.Custody != OrderAmendmentRefundCustody.ManualTill
             && evidence.Any(value => value.Kind == OrderAmendmentRefundEvidenceKind.ManualTillConfirmation))
             throw new ConflictException("The refund leg contains unrelated till evidence.");
+        var cashRefund = leg.CashRefundIntent;
+        var cashReturn = OrderAmendmentCashRefundMapper.Map(cashRefund?.ReturnEvidence);
+        if (cashRefund is not null
+            && (leg.Custody != OrderAmendmentRefundCustody.ManualTill
+                || cashRefund.RefundLegId != leg.Id || cashRefund.OperationId != operation.Id
+                || cashRefund.ExactRefundAmountMinor != leg.AmountMinor
+                || leg.State == OrderAmendmentRefundLegState.Succeeded && cashReturn is null
+                || leg.State != OrderAmendmentRefundLegState.Succeeded && cashReturn is not null))
+            throw new ConflictException("The cash refund attestation differs from its frozen intent.");
         return new OrderAmendmentRefundLegResultDto(leg.SourcePaymentId, leg.Custody.ToString(),
-            leg.State.ToString(), leg.AmountMinor, leg.ResolvedAt, confirmation);
+            leg.State.ToString(), leg.AmountMinor, leg.ResolvedAt, confirmation,
+            OrderAmendmentCashRefundMapper.Map(cashRefund), cashReturn);
     }
 
     private static ManualTillConfirmationResultDto? MapTillConfirmation(

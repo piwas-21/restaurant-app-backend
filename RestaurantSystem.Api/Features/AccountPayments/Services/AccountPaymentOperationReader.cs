@@ -17,6 +17,7 @@ public sealed class AccountPaymentOperationReader(
     {
         var actor = actors.ResolveStaffActor();
         var attempt = await context.AccountPaymentAttempts.AsNoTracking()
+            .Include(value => value.CashCollectionReceipt)
             .SingleOrDefaultAsync(value => value.ServiceSessionId == sessionId
                 && value.OperationId == operationId, cancellationToken);
         if (attempt is null || attempt.ActorId != actor.ActorId || attempt.ActorKind != actor.Kind)
@@ -30,6 +31,7 @@ public sealed class AccountPaymentOperationReader(
         var actor = await guestAuthorization.AuthorizeActiveAsync(
             sessionId, participantCredential, cancellationToken);
         var attempt = await context.AccountPaymentAttempts.AsNoTracking()
+            .Include(value => value.CashCollectionReceipt)
             .SingleOrDefaultAsync(value => value.ServiceSessionId == sessionId
                 && value.OperationId == operationId, cancellationToken);
         var currentActor = await guestAuthorization.AuthorizeActiveAsync(

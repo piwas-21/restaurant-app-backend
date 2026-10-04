@@ -15,7 +15,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 namespace RestaurantSystem.IntegrationTests.Features.Orders;
 
 [Collection("Database Lane 3")]
-public sealed class AccountPaymentStaffCollectionEndpointTests(DatabaseFixture fixture) : IAsyncLifetime
+public sealed partial class AccountPaymentStaffCollectionEndpointTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {

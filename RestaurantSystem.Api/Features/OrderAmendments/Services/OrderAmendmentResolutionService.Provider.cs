@@ -16,6 +16,7 @@ public sealed partial class OrderAmendmentResolutionService
         var actorId = RequireAdminActor();
         var operation = await context.OrderAmendmentResolutionOperations.AsNoTracking()
             .Include(value => value.Legs).ThenInclude(value => value.Attempts)
+            .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent!.ReturnEvidence)
             .SingleOrDefaultAsync(value => value.Id == operationId, cancellationToken) ?? throw Unavailable();
         if (operation.ActorUserId != actorId)
             throw Unavailable();
@@ -218,6 +219,7 @@ public sealed partial class OrderAmendmentResolutionService
     {
         var operation = await context.OrderAmendmentResolutionOperations.AsNoTracking()
             .Include(value => value.Legs).ThenInclude(value => value.Attempts)
+            .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent!.ReturnEvidence)
             .SingleOrDefaultAsync(value => value.Id == operationId, cancellationToken) ?? throw Unavailable();
         var legs = operation.Legs.ToArray();
         var legIds = legs.Select(value => value.Id).ToArray();

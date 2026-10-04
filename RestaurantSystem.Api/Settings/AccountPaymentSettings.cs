@@ -5,6 +5,16 @@ namespace RestaurantSystem.Api.Settings;
 public sealed class AccountPaymentSettings
 {
     public const string SectionName = "AccountPayments";
+    public const int AbsoluteCashRefundHistoryRowLimit = 10_000;
+
+    // Versioned receipt terms: changing the increment requires a new policy and decoder.
+    public const long SwissCashFiveRappenV1IncrementMinor = 5;
+
+    [Range(SwissCashFiveRappenV1IncrementMinor, SwissCashFiveRappenV1IncrementMinor)]
+    public long SwissCashIncrementMinor { get; set; } = SwissCashFiveRappenV1IncrementMinor;
+
+    [Required, RegularExpression("^chf-cash-5-rappen-v1$")]
+    public string SwissCashPolicyVersion { get; set; } = "chf-cash-5-rappen-v1";
 
     [Range(1, 30)]
     public int QuoteLifetimeMinutes { get; set; } = 5;

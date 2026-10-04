@@ -209,6 +209,327 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("asp_net_user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashCollectionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<long>("AdjustmentMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("adjustment_minor");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<DateTime>("CapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("captured_at");
+
+                    b.Property<long>("ChangeMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("change_minor");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long>("DueAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("due_amount_minor");
+
+                    b.Property<long>("ExactAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("exact_amount_minor");
+
+                    b.Property<long>("ExpectedAccountRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expected_account_revision");
+
+                    b.Property<int>("ExpectedVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_version");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("PolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("policy_version");
+
+                    b.Property<long>("ReceivedMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_minor");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_cash_collection_receipt");
+
+                    b.HasIndex("AttemptId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_account_cash_collection_receipt_attempt_id");
+
+                    b.ToTable("account_cash_collection_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_cash_collection_receipt_shape", "payment_method = 'Cash' AND exact_amount_minor > 0 AND due_amount_minor > 0 AND adjustment_minor = due_amount_minor - exact_amount_minor AND adjustment_minor BETWEEN -2 AND 2 AND received_minor >= due_amount_minor AND change_minor = received_minor - due_amount_minor AND expected_account_revision > 0 AND expected_version > 0 AND currency ~ '^[A-Z]{3}$' AND actor_id <> '00000000-0000-0000-0000-000000000000' AND actor_kind = 'Staff' AND actor_role IN ('Admin','Cashier','Server') AND request_hash ~ '^[a-f0-9]{64}$' AND ((policy_version = 'chf-cash-5-rappen-v1' AND currency = 'CHF' AND due_amount_minor % 5 = 0) OR (policy_version = 'exact-v1' AND currency <> 'CHF' AND due_amount_minor = exact_amount_minor))");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashRefundEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<long>("CashReturnedMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cash_returned_minor");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long>("ExactRefundAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("exact_refund_amount_minor");
+
+                    b.Property<Guid>("IntentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("intent_id");
+
+                    b.Property<DateTime>("ObservedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("observed_at");
+
+                    b.Property<long>("RefundAdjustmentMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refund_adjustment_minor");
+
+                    b.Property<string>("TillReference")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("till_reference");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_cash_refund_evidence");
+
+                    b.HasIndex("IntentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_account_cash_refund_evidence_intent_id");
+
+                    b.ToTable("account_cash_refund_evidence", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_cash_refund_evidence_shape", "exact_refund_amount_minor > 0 AND cash_returned_minor >= 0 AND refund_adjustment_minor = cash_returned_minor - exact_refund_amount_minor AND currency ~ '^[A-Z]{3}$' AND actor_id <> '00000000-0000-0000-0000-000000000000' AND actor_role = 'Admin' AND length(till_reference) BETWEEN 1 AND 80");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashRefundIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<long>("CashRefundAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cash_refund_amount_minor");
+
+                    b.Property<Guid>("CollectionReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("collection_receipt_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long>("ExactRefundAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("exact_refund_amount_minor");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<long>("OriginalAdjustmentMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("original_adjustment_minor");
+
+                    b.Property<long>("OriginalDueAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("original_due_amount_minor");
+
+                    b.Property<long>("OriginalExactAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("original_exact_amount_minor");
+
+                    b.Property<string>("PolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("policy_version");
+
+                    b.Property<long>("PreviouslyRefundedCashMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("previously_refunded_cash_minor");
+
+                    b.Property<long>("PreviouslyRefundedExactMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("previously_refunded_exact_minor");
+
+                    b.Property<string>("PriorHistoryFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("prior_history_fingerprint");
+
+                    b.Property<long>("RefundAdjustmentMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refund_adjustment_minor");
+
+                    b.Property<Guid>("RefundLegId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_leg_id");
+
+                    b.Property<long>("RetainedCashDueMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("retained_cash_due_minor");
+
+                    b.Property<long>("RetainedExactAmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("retained_exact_amount_minor");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_account_cash_refund_intents");
+
+                    b.HasIndex("AttemptId")
+                        .HasDatabaseName("ix_account_cash_refund_intents_attempt_id");
+
+                    b.HasIndex("CollectionReceiptId")
+                        .HasDatabaseName("ix_account_cash_refund_intents_collection_receipt_id");
+
+                    b.HasIndex("OperationId")
+                        .HasDatabaseName("ix_account_cash_refund_intents_operation_id");
+
+                    b.HasIndex("RefundLegId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_account_cash_refund_intents_refund_leg_id");
+
+                    b.ToTable("account_cash_refund_intents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_account_cash_refund_intent_shape", "original_exact_amount_minor > 0 AND original_due_amount_minor > 0 AND original_adjustment_minor = original_due_amount_minor - original_exact_amount_minor AND original_adjustment_minor BETWEEN -2 AND 2 AND previously_refunded_exact_minor >= 0 AND previously_refunded_cash_minor >= 0 AND exact_refund_amount_minor > 0 AND cash_refund_amount_minor >= 0 AND refund_adjustment_minor = cash_refund_amount_minor - exact_refund_amount_minor AND retained_exact_amount_minor >= 0 AND retained_cash_due_minor >= 0 AND original_exact_amount_minor = previously_refunded_exact_minor + exact_refund_amount_minor + retained_exact_amount_minor AND original_due_amount_minor = previously_refunded_cash_minor + cash_refund_amount_minor + retained_cash_due_minor AND currency ~ '^[A-Z]{3}$' AND prior_history_fingerprint ~ '^[a-f0-9]{64}$' AND ((policy_version = 'chf-cash-5-rappen-v1' AND currency = 'CHF') OR (policy_version = 'exact-v1' AND currency <> 'CHF' AND original_due_amount_minor = original_exact_amount_minor))");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCheckoutJournal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5524,7 +5845,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.ToTable("order_amendment_resolution_refusals", null, t =>
                         {
-                            t.HasCheckConstraint("ck_amendment_resolution_refusal_code", "failure_code IN ('quoteExpired','sourceVersionConflict','accountRevisionConflict','quoteChanged')");
+                            t.HasCheckConstraint("ck_amendment_resolution_refusal_code", "failure_code IN ('quoteExpired','sourceVersionConflict','accountRevisionConflict','quoteChanged','cashHistoryCapacityExceeded')");
 
                             t.HasCheckConstraint("ck_amendment_resolution_refusal_hash", "request_hash ~ '^[a-f0-9]{64}$'");
                         });
@@ -9670,6 +9991,69 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_asp_net_user_tokens_aspnetusers_user_id");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashCollectionReceipt", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", "Attempt")
+                        .WithOne("CashCollectionReceipt")
+                        .HasForeignKey("RestaurantSystem.Domain.Entities.AccountCashCollectionReceipt", "AttemptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_cash_collection_receipt_accountpaymentattempts_atte~");
+
+                    b.Navigation("Attempt");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashRefundEvidence", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountCashRefundIntent", "Intent")
+                        .WithOne("ReturnEvidence")
+                        .HasForeignKey("RestaurantSystem.Domain.Entities.AccountCashRefundEvidence", "IntentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_cash_refund_evidence_accountcashrefundintents_inten~");
+
+                    b.Navigation("Intent");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashRefundIntent", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", "Attempt")
+                        .WithMany()
+                        .HasForeignKey("AttemptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_cash_refund_intents_accountpaymentattempts_attempt_~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.AccountCashCollectionReceipt", "CollectionReceipt")
+                        .WithMany()
+                        .HasForeignKey("CollectionReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_cash_refund_intents_account_cash_collection_receipt~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentResolutionOperation", "Operation")
+                        .WithMany()
+                        .HasForeignKey("OperationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_cash_refund_intents_orderamendmentresolutionoperati~");
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentRefundLeg", "RefundLeg")
+                        .WithOne("CashRefundIntent")
+                        .HasForeignKey("RestaurantSystem.Domain.Entities.AccountCashRefundIntent", "RefundLegId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_account_cash_refund_intents_orderamendmentrefundlegs_refund~");
+
+                    b.Navigation("Attempt");
+
+                    b.Navigation("CollectionReceipt");
+
+                    b.Navigation("Operation");
+
+                    b.Navigation("RefundLeg");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCheckoutJournal", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", "Attempt")
@@ -11035,9 +11419,16 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.Navigation("WorkingHours");
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountCashRefundIntent", b =>
+                {
+                    b.Navigation("ReturnEvidence");
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.AccountPaymentAttempt", b =>
                 {
                     b.Navigation("Allocations");
+
+                    b.Navigation("CashCollectionReceipt");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.ApplicationUser", b =>
@@ -11151,6 +11542,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentRefundLeg", b =>
                 {
                     b.Navigation("Attempts");
+
+                    b.Navigation("CashRefundIntent");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentResolutionOperation", b =>

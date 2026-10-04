@@ -49,6 +49,7 @@ public sealed partial class OrderAmendmentResolutionService
         CancellationToken cancellationToken) => context.OrderAmendmentResolutionOperations.AsNoTracking()
         .Where(predicate).OrderBy(value => value.StartedAt).ThenBy(value => value.Id).Take(2)
         .Include(value => value.Legs).ThenInclude(value => value.Attempts)
+        .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent)
         .ToArrayAsync(cancellationToken);
 
     private async Task<OrderAmendmentResolutionRecoveryDto> MapRecoveryAsync(
@@ -174,6 +175,7 @@ public sealed partial class OrderAmendmentResolutionService
         return leg.SourcePaymentId == quote.PaymentId && leg.Custody.ToString() == quote.Custody
             && leg.AmountMinor == quote.AmountMinor
             && (leg.Custody == OrderAmendmentRefundCustody.ManualTill) == quote.RequiresTillConfirmation
-            && scopes.SequenceEqual(quote.Scopes);
+            && scopes.SequenceEqual(quote.Scopes)
+            && OrderAmendmentCashRefundMapper.Map(leg.CashRefundIntent) == quote.CashRefund;
     }
 }

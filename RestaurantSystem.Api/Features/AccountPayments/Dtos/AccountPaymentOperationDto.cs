@@ -17,4 +17,8 @@ public sealed record AccountPaymentOperationDto(
     DateTime? ReservationExpiresAt,
     Guid? EqualSharePlanId,
     int? EqualShareOrdinal,
-    IReadOnlyList<AccountPaymentAllocationDto> Allocations);
+    IReadOnlyList<AccountPaymentAllocationDto> Allocations)
+{
+    public CashSettlementQuote? CashSettlement { get; init; }
+    public CashCollectionReceiptDto? CashReceipt { get; init; }
+}

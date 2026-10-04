@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
@@ -11,7 +12,8 @@ internal static class OrderAmendmentResolutionPlanner
     internal static OrderAmendmentResolutionPlan Build(OrderAmendmentResolutionPlanningInput input)
     {
         var (source, amendment, request, changes, attempts, checkoutJournals, reversals,
-            priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory) = input;
+            priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory,
+            cashRefundHistoryByAttempt) = input;
         var credit = ValidateSourceForResolution(source, amendment,
             priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory);
         if (request.ExpectedOrderVersion != source.Version
@@ -20,7 +22,8 @@ internal static class OrderAmendmentResolutionPlanner
             throw new ConflictException("The order account changed. Review the amendment again.");
         var removals = OrderAmendmentRefundScopePlanner.RemovalRanges(changes);
         OrderAmendmentRefundScopePlanner.EnsureNoPriorRemovalRefund(removals, reversals);
-        var legs = PlanAllocatedRefunds(source, attempts, checkoutJournals, reversals, removals, money);
+        var legs = PlanAllocatedRefunds(source, attempts, checkoutJournals, reversals, removals, money,
+            cashRefundHistoryByAttempt);
         AddManualRefunds(source, request.ManualRefunds, attempts, legs, money);
         var refund = legs.Sum(value => value.AmountMinor);
         if (refund > credit)
@@ -85,7 +88,8 @@ internal static class OrderAmendmentResolutionPlanner
         Order source, IReadOnlyList<AccountPaymentAttempt> attempts,
         IReadOnlyList<AccountCheckoutJournal> checkoutJournals,
         IReadOnlyList<AccountPaymentAllocationReversal> reversals,
-        IReadOnlyList<OrderAmendmentRefundRange> removals, AccountMoney money)
+        IReadOnlyList<OrderAmendmentRefundRange> removals, AccountMoney money,
+        IReadOnlyDictionary<Guid, AccountCashRefundHistory>? cashRefundHistoryByAttempt = null)
     {
         var result = new List<OrderAmendmentRefundLegPlan>();
         var covered = new Dictionary<Guid, List<OrderAmendmentRefundRange>>();
@@ -104,7 +108,8 @@ internal static class OrderAmendmentResolutionPlanner
                 allocation, reversals, removals, covered)).ToArray();
             if (slices.Length == 0)
                 continue;
-            AddAllocatedLeg(source, attempt, allocations, slices, checkoutJournals, money, result);
+            AddAllocatedLeg(attempt, allocations, slices,
+                new AllocatedRefundContext(source, checkoutJournals, money, cashRefundHistoryByAttempt), result);
         }
         return result;
     }
@@ -121,11 +126,11 @@ internal static class OrderAmendmentResolutionPlanner
     }
 
     private static void AddAllocatedLeg(
-        Order source, AccountPaymentAttempt attempt, IReadOnlyList<AccountPaymentAllocation> allocations,
-        IReadOnlyList<OrderAmendmentRefundScope> slices,
-        IReadOnlyList<AccountCheckoutJournal> checkoutJournals, AccountMoney money,
+        AccountPaymentAttempt attempt, IReadOnlyList<AccountPaymentAllocation> allocations,
+        IReadOnlyList<OrderAmendmentRefundScope> slices, AllocatedRefundContext context,
         List<OrderAmendmentRefundLegPlan> legs)
     {
+        var (source, checkoutJournals, money, cashRefundHistoryByAttempt) = context;
         var paymentIds = slices.Select(value => allocations.Single(allocation => allocation.Id == value.AllocationId)
             .OrderPaymentId).Distinct().ToArray();
         if (paymentIds.Length != 1 || paymentIds[0] is not Guid paymentId)
@@ -139,9 +144,27 @@ internal static class OrderAmendmentResolutionPlanner
         var custody = ResolveCustody(payment, attempt, checkoutJournals, money);
         var amount = slices.Sum(value => value.AmountMinor);
         var journal = checkoutJournals.SingleOrDefault(value => value.AttemptId == attempt.Id);
+        var cashRefund = PlanCashRefund(attempt, amount, cashRefundHistoryByAttempt);
         legs.Add(new OrderAmendmentRefundLegPlan(payment, attempt.Id, custody, amount, slices,
             journal?.ProviderAccountId, journal?.ProviderLiveMode,
-            journal?.ProviderChargeId, journal?.ProviderIntentId));
+            journal?.ProviderChargeId, journal?.ProviderIntentId, cashRefund));
+    }
+
+    private static AccountCashRefundPlan? PlanCashRefund(
+        AccountPaymentAttempt attempt, long refundAmount,
+        IReadOnlyDictionary<Guid, AccountCashRefundHistory>? histories)
+    {
+        var receipt = attempt.CashCollectionReceipt;
+        if (attempt.PaymentMethod != PaymentMethod.Cash || receipt is null)
+            return null;
+        if (histories is null || !histories.TryGetValue(attempt.Id, out var history))
+            throw ReconciliationRequired("The original cash receipt or refund history is unavailable.");
+        var original = new CashSettlementQuote(receipt.PolicyVersion, receipt.Currency,
+            receipt.PaymentMethod, receipt.ExactAmountMinor, receipt.AdjustmentMinor,
+            receipt.DueAmountMinor);
+        var refund = AccountCashRefundPolicy.Project(original, history.RefundedExactMinor,
+            history.RefundedCashMinor, refundAmount);
+        return AccountCashRefundPlan.Create(receipt, history, refund);
     }
 
     private static OrderAmendmentRefundCustody ResolveCustody(
@@ -210,5 +233,9 @@ internal static class OrderAmendmentResolutionPlanner
     }
 
     private static ConflictException ReconciliationRequired(string message) => new(message);
+
+    private sealed record AllocatedRefundContext(
+        Order Source, IReadOnlyList<AccountCheckoutJournal> CheckoutJournals, AccountMoney Money,
+        IReadOnlyDictionary<Guid, AccountCashRefundHistory>? CashRefundHistoryByAttempt);
 
 }

@@ -10,7 +10,8 @@ namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 internal sealed record AccountAmendmentRefundSnapshot(
     IReadOnlyList<AccountPaymentAllocationReversal> Reversals,
-    IReadOnlyDictionary<Guid, long> AuthorizedRefundMinorByPayment);
+    IReadOnlyDictionary<Guid, long> AuthorizedRefundMinorByPayment,
+    IReadOnlyDictionary<Guid, AccountCashRefundHistory> CashRefundHistoryByAttempt);
 
 /// <summary>Checks that every table-account refund is backed by one resolved amendment operation.</summary>
 internal static class AccountAmendmentRefundIntegrity
@@ -55,7 +56,9 @@ internal static class AccountAmendmentRefundIntegrity
         ValidateResolvedAmendments(amendments, operations, evidence, reversals, attempts, money);
         var authorized = BuildAuthorizedRefunds(operations, orders, money);
         ValidateRefundedCapturedTenders(orders, operations, attempts, reversals, money);
-        return new AccountAmendmentRefundSnapshot(reversals, authorized);
+        var cashHistory = await AccountCashRefundHistoryReader.ReadAsync(context,
+            attempts.Select(value => value.Id).ToArray(), cancellationToken, excludedOperationId);
+        return new AccountAmendmentRefundSnapshot(reversals, authorized, cashHistory);
     }
 
     private static void ValidateResolvedAmendments(

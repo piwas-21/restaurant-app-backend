@@ -17,7 +17,8 @@ internal static class OrderAmendmentResolutionQuoteFactory
                 value.Custody == OrderAmendmentRefundCustody.ManualTill,
                 value.Scopes.OrderBy(scope => scope.AllocationId).ThenBy(scope => scope.StartOrdinal)
                     .Select(scope => new RefundScopeQuoteDto(scope.AllocationId, scope.OrderItemId,
-                        scope.StartOrdinal, scope.UnitCount, scope.MinorPerUnit, scope.AmountMinor)).ToArray()))
+                        scope.StartOrdinal, scope.UnitCount, scope.MinorPerUnit, scope.AmountMinor)).ToArray(),
+                OrderAmendmentCashRefundMapper.Map(value.CashRefund)))
             .ToArray();
         return new OrderAmendmentResolutionQuoteDto(orderId, amendmentId,
             request.ClientOperationId, hash, expiresAt, plan.Currency, plan.CreditMinor,

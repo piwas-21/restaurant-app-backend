@@ -1,5 +1,6 @@
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
@@ -19,7 +20,8 @@ internal sealed record OrderAmendmentRefundLegPlan(
     string? ProviderAccountId,
     bool? ProviderLiveMode,
     string? ProviderChargeId,
-    string? ProviderIntentId);
+    string? ProviderIntentId,
+    AccountCashRefundPlan? CashRefund = null);
 
 internal sealed record OrderAmendmentRefundScope(
     Guid AllocationId,

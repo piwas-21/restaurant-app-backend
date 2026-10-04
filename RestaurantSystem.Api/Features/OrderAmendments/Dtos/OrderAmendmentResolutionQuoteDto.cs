@@ -18,7 +18,20 @@ public sealed record OrderAmendmentRefundLegQuoteDto(
     string Custody,
     long AmountMinor,
     bool RequiresTillConfirmation,
-    IReadOnlyList<RefundScopeQuoteDto> Scopes);
+    IReadOnlyList<RefundScopeQuoteDto> Scopes,
+    CashRefundQuoteDto? CashRefund = null);
+
+public sealed record CashRefundQuoteDto(
+    string PolicyVersion,
+    long OriginalExactAmountMinor,
+    long OriginalDueAmountMinor,
+    long PreviouslyRefundedExactMinor,
+    long PreviouslyRefundedCashMinor,
+    long ExactRefundAmountMinor,
+    long RefundAdjustmentMinor,
+    long CashRefundAmountMinor,
+    long RetainedExactAmountMinor,
+    long RetainedCashDueMinor);
 
 public sealed record RefundScopeQuoteDto(
     Guid AllocationId,

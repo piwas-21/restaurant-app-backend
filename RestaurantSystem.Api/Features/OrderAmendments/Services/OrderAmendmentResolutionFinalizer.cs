@@ -27,6 +27,8 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
             context, sourceOrderId, cancellationToken);
         var operation = await context.OrderAmendmentResolutionOperations
             .Include(value => value.Legs).ThenInclude(value => value.Attempts)
+            .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent!.ReturnEvidence)
+            .Include(value => value.Legs).ThenInclude(value => value.CashRefundIntent!.CollectionReceipt)
             .SingleOrDefaultAsync(value => value.Id == operationId, cancellationToken)
             ?? throw new NotFoundException("The amendment resolution operation is unavailable.");
         if (operation.State is OrderAmendmentResolutionOperationState.Resolved
@@ -78,6 +80,7 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
         var priorRefunds = await ReadPriorRefundsAsync(source, amendment.Id,
             operation.Id, money,
             cancellationToken: cancellationToken);
+        ValidateCashRefundIntents(operation, legs, priorRefunds.CashRefundHistoryByAttempt);
         OrderAmendmentRefundFinalizationEvidence.ValidateSucceededEvidence(
             context, operation, legs);
 

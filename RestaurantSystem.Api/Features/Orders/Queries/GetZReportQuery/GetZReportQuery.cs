@@ -138,6 +138,9 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
 
         var salesByProductType = BillingAdjustedSalesLines.ByProductType(salesLines);
         var topSellingItems = BillingAdjustedSalesLines.TopItems(salesLines, TopItemsCount);
+        var generatedAt = DateTime.UtcNow;
+        var accountCashMovements = await ZReportAccountCashMovementReader.ReadAsync(
+            _context, startOfDay, startOfNextDay, generatedAt, cancellationToken);
 
         var report = new ZReportDto
         {
@@ -145,7 +148,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
             // renders this as a date, and the tenant-day start (22:00Z the evening before, in
             // Zurich summer) would print as the previous day in any browser at or west of UTC.
             ReportDate = query.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
-            GeneratedAt = DateTime.UtcNow,
+            GeneratedAt = generatedAt,
             TotalTransactions = totalTransactions,
             GrossSales = grossSales,
             NetSales = netSales,
@@ -165,6 +168,7 @@ public class GetZReportQueryHandler : IQueryHandler<GetZReportQuery, ApiResponse
                 RefundCount = refundCount,
                 TotalRefundedAmount = totalRefundedAmount
             },
+            AccountCashMovements = accountCashMovements,
             CancelledOrdersCount = cancelledOrdersCount,
             CancelledOrdersTotal = cancelledOrdersTotal,
             PaymentsByMethod = paymentsByMethod,

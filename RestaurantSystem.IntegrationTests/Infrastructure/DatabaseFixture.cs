@@ -130,7 +130,8 @@ public class DatabaseFixture : IAsyncLifetime
             "TRUNCATE TABLE order_billing_credits, table_ready_operations, order_amendment_resolution_refusals, "
             + "order_amendment_resolution_operations, order_amendment_refund_legs, "
             + "order_amendment_refund_evidence, account_payment_allocation_reversals, "
-            + "order_amendment_refund_attempts", connection))
+            + "order_amendment_refund_attempts, account_cash_refund_evidence, "
+            + "account_cash_refund_intents, account_cash_collection_receipts", connection))
         {
             await clearJournal.ExecuteNonQueryAsync();
         }

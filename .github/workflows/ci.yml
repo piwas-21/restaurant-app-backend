@@ -105,45 +105,44 @@ jobs:
   # parallel. On one 2-core runner that parallelism is capped at two lanes at a time —
   # measured (run 31990710971): 175s of test execution for a summed 142s of per-test
   # time, i.e. the runner, not the schedule, was the limit. This job therefore also
-  # splits the WORK across two runners, each with its own postgres service container
+  # splits the work across three runners, each with its own postgres service container
   # (services are per-job, so cross-shard contamination is impossible by construction).
   #
-  # The split is BY NAMESPACE and the two filters are exact complements: shard 2 is
-  # `!~` of every key shard 1 matches. That is what guarantees no test is skipped and
-  # none runs twice, even if a new test lands in a brand-new namespace — it simply
-  # falls into shard 2. The aggregate job below re-verifies this against
-  # `dotnet test --list-tests`, so a mistake here fails CI instead of silently
-  # dropping tests. Groups are balanced on measured namespace fixture/test time.
-  # Orders runs in shard 2: diagnostic run 37175238849 showed
-  # shard 1 completing cases through its 20-minute deadline while shard 2
-  # finished its test run in 10.31 minutes. Orders spreads work across all
-  # four DB lanes; moving DeliveryChannels would overload shard 2's lane 2.
-  # Both filters remain exact complements and coverage floors are unchanged.
-  # Rebalance by moving a namespace key between the two filters; the lanes are
-  # unaffected. Per-test report time excludes fixture setup, so also compare job
-  # elapsed time when assessing this split.
+  # The split is BY NAMESPACE. Shard 1 owns its six listed prefixes, shard 3 owns
+  # Orders, and shard 2 excludes both sets and catches the remaining namespaces.
+  # Together these filters are a disjoint, exhaustive partition: new tests under a
+  # listed prefix follow that shard, and other namespaces fall into shard 2. The
+  # aggregate job below re-verifies this against `dotnet test --list-tests` and merged
+  # JUnit output.
   #
-  # TWO shards, not four, and that is MEASURED, not assumed. Four shards (~34s/36s/40s/
-  # 33s of test work each, one runner per shard) were tried on this branch and rejected:
-  # critical path 266s, per-shard test step 111s/134s/164s/195s — no better than two
-  # shards (234s/270s/256s over three runs) for twice the runner time. The reason is the
-  # fixed floor a shard cannot avoid: ~35s container init, ~16s NuGet restore, ~62s
-  # restore+compile, plus the suite's own bootstrap (template migration, four lane
-  # databases, four test hosts) — the floor, not the test work, is what sets a shard's
-  # wall clock once the work per shard is down to ~40s.
+  # Current rebalance evidence: run 37203816598 emitted 1,008 passing Orders cases
+  # (530s summed test-method duration) before shard 2's 20-minute job timeout; shard 1
+  # completed in 17m38s. The method durations omit fixture/setup wall time, so the
+  # three-shard timing projection remains provisional until hosted CI completes.
+  # Earlier diagnostic run 37175238849 measured a different split: shard 1 reached
+  # its 20-minute deadline while shard 2 finished its test run in 10.31 minutes.
+  # Rebalance by moving a namespace prefix among the three filters; the four database
+  # lanes are unaffected. Coverage floors are unchanged.
   #
-  # Whole-job measurement, `dotnet test (integration)` critical path:
+  # Historical capacity measurements for the earlier, much shorter suite rejected four
+  # shards: roughly 34s/36s/40s/33s of test work each produced a 266s critical path and
+  # 111s/134s/164s/195s test steps, versus 234s/270s/256s for two shards. Those figures
+  # describe that earlier workload, not this current three-shard allocation. The reason
+  # was the fixed floor then: ~35s container init, ~16s NuGet restore, ~62s restore+compile,
+  # plus suite bootstrap (template migration, four lane databases, four test hosts).
+  #
+  # Historical whole-job measurements, `dotnet test (integration)` critical path:
   #   single job  289s, 296s   (test step 238s, 246s)
   #   two shards  234s, 270s, 256s
   #   four shards 266s
   # Runner-to-runner variance on the same code is ±20%, which is why every number above
   # is a real sample and not an average of one.
   dotnet_test:
-    name: dotnet test (integration) shard ${{ matrix.shard }}/2
+    name: dotnet test (integration) shard ${{ matrix.shard }}/3
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      # Both shards always run: a red shard must not hide the state of the other one.
+      # All shards always run: a red shard must not hide the state of another one.
       fail-fast: false
       matrix:
         include:
@@ -152,7 +151,10 @@ jobs:
               FullyQualifiedName~RestaurantSystem.IntegrationTests.Common.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Products.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Payments.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Menus.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Basket.|FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
           - shard: 2
             filter: >-
-              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.
+              FullyQualifiedName!~RestaurantSystem.IntegrationTests.Common.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Products.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Payments.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Menus.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Basket.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.DeliveryChannels.&FullyQualifiedName!~RestaurantSystem.IntegrationTests.Features.Orders.
+          - shard: 3
+            filter: >-
+              FullyQualifiedName~RestaurantSystem.IntegrationTests.Features.Orders.
     container:
       image: mcr.microsoft.com/dotnet/sdk:10.0
     services:

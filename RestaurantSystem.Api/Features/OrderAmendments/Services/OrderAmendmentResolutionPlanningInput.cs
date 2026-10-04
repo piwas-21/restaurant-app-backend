@@ -14,4 +14,5 @@ internal sealed record OrderAmendmentResolutionPlanningInput(
     IReadOnlyList<AccountPaymentAllocationReversal> Reversals,
     IReadOnlyDictionary<Guid, long> PriorAuthorizedRefundMinorByPayment,
     AccountMoney Money,
-    bool HasLoyaltyLedgerHistory);
+    bool HasLoyaltyLedgerHistory,
+    IReadOnlyDictionary<Guid, AccountCashRefundHistory>? CashRefundHistoryByAttempt = null);
