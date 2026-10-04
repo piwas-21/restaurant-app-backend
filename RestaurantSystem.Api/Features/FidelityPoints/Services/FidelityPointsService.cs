@@ -7,7 +7,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.FidelityPoints.Services;
 
-public class FidelityPointsService : IFidelityPointsService
+public partial class FidelityPointsService : IFidelityPointsService
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
@@ -32,90 +32,6 @@ public class FidelityPointsService : IFidelityPointsService
         return applicableRule?.PointsAwarded ?? 0;
     }
 
-    public async Task<FidelityPointsTransaction> AwardPointsAsync(
-        Guid userId,
-        Guid orderId,
-        int points,
-        decimal orderTotal,
-        CancellationToken cancellationToken = default)
-    {
-        if (points <= 0)
-            throw new ArgumentException("Points must be positive", nameof(points));
-
-        // Check if there's an existing transaction
-        var hasExistingTransaction = _context.Database.CurrentTransaction != null;
-        var transaction = hasExistingTransaction ? null : await _context.Database.BeginTransactionAsync(cancellationToken);
-
-        try
-        {
-            // Create transaction record
-            var pointsTransaction = new FidelityPointsTransaction
-            {
-                UserId = userId,
-                OrderId = orderId,
-                TransactionType = TransactionType.Earned,
-                Points = points,
-                OrderTotal = orderTotal,
-                Description = $"Points earned from order",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId.ToString()
-            };
-
-            _context.FidelityPointsTransactions.Add(pointsTransaction);
-
-            // Update or create user's balance
-            var balance = await _context.FidelityPointBalances
-                .FirstOrDefaultAsync(b => b.UserId == userId, cancellationToken);
-
-            if (balance == null)
-            {
-                balance = new FidelityPointBalance
-                {
-                    UserId = userId,
-                    CurrentPoints = points,
-                    TotalEarnedPoints = points,
-                    TotalRedeemedPoints = 0,
-                    LastUpdated = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = userId.ToString()
-                };
-                _context.FidelityPointBalances.Add(balance);
-            }
-            else
-            {
-                balance.CurrentPoints += points;
-                balance.TotalEarnedPoints += points;
-                balance.LastUpdated = DateTime.UtcNow;
-                balance.UpdatedAt = DateTime.UtcNow;
-                balance.UpdatedBy = _currentUserService.UserId?.ToString() ?? userId.ToString();
-            }
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            if (!hasExistingTransaction && transaction != null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-
-            return pointsTransaction;
-        }
-        catch
-        {
-            if (!hasExistingTransaction && transaction != null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-            throw;
-        }
-        finally
-        {
-            if (!hasExistingTransaction && transaction != null)
-            {
-                await transaction.DisposeAsync();
-            }
-        }
-    }
-
     public async Task<(FidelityPointsTransaction Transaction, decimal DiscountAmount)> RedeemPointsAsync(
         Guid userId,
         Guid orderId,
@@ -131,16 +47,19 @@ public class FidelityPointsService : IFidelityPointsService
 
         try
         {
-            // Get and lock the current balance. Staff order creation owns an ambient transaction,
-            // so this row lock prevents two concurrent redemptions from spending the same points.
-            var balance = await _context.FidelityPointBalances
-                .FromSqlInterpolated($"SELECT * FROM fidelity_point_balances WHERE user_id = {userId} FOR UPDATE")
-                .SingleOrDefaultAsync(cancellationToken);
+            await LockOrderRowForLoyaltyAsync(orderId, userId, cancellationToken);
+            await LockUserRowForLoyaltyAsync(userId, cancellationToken);
+            var balance = await LockBalanceRowForLoyaltyAsync(userId, cancellationToken);
 
             if (balance == null || balance.CurrentPoints < pointsToRedeem)
             {
                 throw new BadRequestException($"Insufficient points. Available: {balance?.CurrentPoints ?? 0}, Requested: {pointsToRedeem}");
             }
+
+            var updatedCurrentPoints = checked(balance.CurrentPoints - pointsToRedeem);
+            var updatedTotalRedeemedPoints = checked(balance.TotalRedeemedPoints + pointsToRedeem);
+            var now = DateTime.UtcNow;
+            var auditIdentifier = _currentUserService.GetAuditIdentifier();
 
             // Calculate discount amount
             var discountAmount = CalculateDiscountFromPoints(pointsToRedeem);
@@ -154,18 +73,18 @@ public class FidelityPointsService : IFidelityPointsService
                 Points = -pointsToRedeem, // Negative for redemption
                 OrderTotal = null,
                 Description = $"Points redeemed for ${discountAmount:F2} discount",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId.ToString()
+                CreatedAt = now,
+                CreatedBy = auditIdentifier
             };
 
             _context.FidelityPointsTransactions.Add(pointsTransaction);
 
             // Update balance
-            balance.CurrentPoints -= pointsToRedeem;
-            balance.TotalRedeemedPoints += pointsToRedeem;
-            balance.LastUpdated = DateTime.UtcNow;
-            balance.UpdatedAt = DateTime.UtcNow;
-            balance.UpdatedBy = _currentUserService.UserId?.ToString() ?? userId.ToString();
+            balance.CurrentPoints = updatedCurrentPoints;
+            balance.TotalRedeemedPoints = updatedTotalRedeemedPoints;
+            balance.LastUpdated = now;
+            balance.UpdatedAt = now;
+            balance.UpdatedBy = auditIdentifier;
 
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -230,6 +149,24 @@ public class FidelityPointsService : IFidelityPointsService
 
         try
         {
+            await LockUserRowForLoyaltyAsync(userId, cancellationToken);
+            var balance = await LockBalanceRowForLoyaltyAsync(userId, cancellationToken);
+
+            var now = DateTime.UtcNow;
+            var currentPoints = balance is null
+                ? Math.Max(0, points)
+                : Math.Max(0, checked(balance.CurrentPoints + points));
+            var totalEarnedPoints = balance?.TotalEarnedPoints ?? (points > 0 ? points : 0);
+            var totalRedeemedPoints = balance?.TotalRedeemedPoints ?? (points < 0 ? Math.Abs(points) : 0);
+            if (balance is not null && points > 0)
+            {
+                totalEarnedPoints = checked(totalEarnedPoints + points);
+            }
+            else if (balance is not null && points < 0)
+            {
+                totalRedeemedPoints = checked(totalRedeemedPoints + Math.Abs(points));
+            }
+
             // Create transaction record
             var pointsTransaction = new FidelityPointsTransaction
             {
@@ -239,40 +176,35 @@ public class FidelityPointsService : IFidelityPointsService
                 Points = points,
                 OrderTotal = null,
                 Description = reason,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = now,
                 CreatedBy = _currentUserService.GetAuditIdentifier()
             };
 
             _context.FidelityPointsTransactions.Add(pointsTransaction);
 
-            // Update or create user's balance
-            var balance = await _context.FidelityPointBalances
-                .FirstOrDefaultAsync(b => b.UserId == userId, cancellationToken);
-
+            // Update or create user's balance under the same user/balance locks as awards and redemptions.
             if (balance == null)
             {
                 balance = new FidelityPointBalance
                 {
                     UserId = userId,
-                    CurrentPoints = Math.Max(0, points), // Ensure non-negative
-                    TotalEarnedPoints = points > 0 ? points : 0,
-                    TotalRedeemedPoints = points < 0 ? Math.Abs(points) : 0,
-                    LastUpdated = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow,
+                    CurrentPoints = currentPoints, // Ensure non-negative
+                    TotalEarnedPoints = totalEarnedPoints,
+                    TotalRedeemedPoints = totalRedeemedPoints,
+                    LastUpdated = now,
+                    CreatedAt = now,
                     CreatedBy = _currentUserService.GetAuditIdentifier()
                 };
                 _context.FidelityPointBalances.Add(balance);
             }
             else
             {
-                balance.CurrentPoints = Math.Max(0, balance.CurrentPoints + points); // Ensure non-negative
-                if (points > 0)
-                    balance.TotalEarnedPoints += points;
-                else
-                    balance.TotalRedeemedPoints += Math.Abs(points);
+                balance.CurrentPoints = currentPoints; // Ensure non-negative
+                balance.TotalEarnedPoints = totalEarnedPoints;
+                balance.TotalRedeemedPoints = totalRedeemedPoints;
 
-                balance.LastUpdated = DateTime.UtcNow;
-                balance.UpdatedAt = DateTime.UtcNow;
+                balance.LastUpdated = now;
+                balance.UpdatedAt = now;
                 balance.UpdatedBy = _currentUserService.GetAuditIdentifier();
             }
 
