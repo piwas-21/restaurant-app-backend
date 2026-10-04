@@ -17,12 +17,14 @@ namespace RestaurantSystem.Api.Features.Payments.Interfaces;
 public interface ICheckoutChargeResolver
 {
     /// <summary>
-    /// Resolves the charge from an order total as PERSISTED. Throws
+    /// Resolves the charge from an order total as PERSISTED. An explicit accepted currency is
+    /// compared with current tenant charge configuration before any provider work; null preserves
+    /// the configured-currency fallback for legacy orders with no retained currency evidence. Throws
     /// <see cref="Common.Exceptions.BadRequestException"/> for anything unchargeable — an
     /// unsupported currency, a non-positive total, an over-TWINT-ceiling amount, or a
     /// misconfigured commission rate — so a caller never has to distinguish those.
     /// </summary>
-    CheckoutCharge Resolve(decimal orderTotal);
+    CheckoutCharge Resolve(decimal orderTotal, string? acceptedCurrency = null);
 }
 
 /// <summary>

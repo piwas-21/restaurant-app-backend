@@ -56,7 +56,7 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Round_snapshot_uses_the_currency_frozen_on_its_visit()
+    public async Task Round_refuses_when_live_catalogue_currency_differs_from_frozen_visit()
     {
         AuthenticateAsRole(UserRole.Server);
         var session = await OpenSessionAsync();
@@ -74,12 +74,12 @@ public sealed class StaffRoundOrderTests : IntegrationTestBase
             var response = await PostAsJsonAsync("/api/staff/orders/round", Body(
                 session.ServiceSessionId, Guid.NewGuid(), releaseToKitchen: false));
 
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict,
+                "live catalogue prices cannot be interpreted in a different frozen visit currency");
             await using var verify = DatabaseFixture.CreateContext();
-            var snapshot = await verify.OrderBillingSnapshots.AsNoTracking().SingleAsync();
-            snapshot.Currency.Should().Be(session.Currency);
-            snapshot.Currency.Should().NotBe("EUR",
-                "an existing visit keeps the currency accepted when it opened");
+            (await verify.Orders.CountAsync()).Should().Be(0);
+            (await verify.StaffOrderOperations.CountAsync()).Should().Be(0);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
         }
         finally
         {

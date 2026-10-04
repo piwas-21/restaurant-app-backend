@@ -7,7 +7,8 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 public interface IStaffCounterOrderBuilder
 {
     Task<StaffCounterOrderBuild> BuildAsync(
-        StaffCounterOrderRequest request, bool releaseToKitchen, CancellationToken cancellationToken);
+        StaffCounterOrderRequest request, bool releaseToKitchen, CancellationToken cancellationToken,
+        string? requiredAcceptedCurrency = null);
 }
 
 public sealed record StaffCounterOrderBuild(

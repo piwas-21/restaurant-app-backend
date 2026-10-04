@@ -8,6 +8,7 @@ using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Payments.Commands.CreateCheckoutSessionCommand;
 using RestaurantSystem.Api.Features.Payments.Interfaces;
 using RestaurantSystem.Api.Features.Payments.Services;
@@ -74,6 +75,46 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         row.PaymentIntentId.Should().BeNull();
         row.AmountReceivedMinor.Should().BeNull();
         row.OrderPaymentId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Accepted_snapshot_currency_must_match_configuration_before_reuse_or_provider_io()
+    {
+        var orderId = await SeedOrderAsync(total: 42.50m);
+        await SeedAcceptedSnapshotAsync(orderId, "CHF");
+        var checkout = FakeCheckout(out var captured, strict: true);
+
+        var act = () => HandleAsync(orderId, checkout, currency: "EUR");
+
+        await act.Should().ThrowAsync<ConflictException>();
+        captured.Should().BeEmpty();
+        checkout.Verify(client => client.CreateAsync(
+            It.IsAny<CheckoutSessionRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        checkout.Verify(client => client.GetAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        checkout.Verify(client => client.ExpireAsync(
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        await using var verify = _fixture.CreateContext();
+        (await verify.OrderCheckoutSessions.AnyAsync(value => value.OrderId == orderId)).Should().BeFalse();
+        (await verify.OrderBillingSnapshots.SingleAsync(value => value.OrderId == orderId))
+            .Currency.Should().Be("CHF");
+    }
+
+    [Fact]
+    public async Task Conflicting_legacy_tender_currency_blocks_checkout_before_provider_io()
+    {
+        var orderId = await SeedOrderAsync(total: 42.50m, paymentCurrency: "EUR");
+        var checkout = FakeCheckout(out var captured, strict: true);
+
+        var act = () => HandleAsync(orderId, checkout);
+
+        await act.Should().ThrowAsync<ConflictException>();
+        captured.Should().BeEmpty();
+        checkout.Verify(client => client.CreateAsync(
+            It.IsAny<CheckoutSessionRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        await using var verify = _fixture.CreateContext();
+        (await verify.OrderCheckoutSessions.AnyAsync(value => value.OrderId == orderId)).Should().BeFalse();
     }
 
     /// <summary>
@@ -458,7 +499,8 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         OrderStatus status = OrderStatus.Pending,
         PaymentMethod paymentMethod = PaymentMethod.OnlinePayment,
         PaymentStatus paymentStatus = PaymentStatus.Processing,
-        bool seedProcessingPayment = true)
+        bool seedProcessingPayment = true,
+        string? paymentCurrency = null)
     {
         await using var seed = _fixture.CreateContext();
         var order = new Order
@@ -481,6 +523,7 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
                 PaymentMethod = paymentMethod,
                 Amount = total,
                 Status = paymentStatus,
+                Currency = paymentCurrency,
                 PaymentDate = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests),
@@ -490,6 +533,34 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         seed.Orders.Add(order);
         await seed.SaveChangesAsync();
         return order.Id;
+    }
+
+    private async Task SeedAcceptedSnapshotAsync(Guid orderId, string currency)
+    {
+        await using var seed = _fixture.CreateContext();
+        var order = await seed.Orders.Include(value => value.Items)
+            .SingleAsync(value => value.Id == orderId);
+        var item = new OrderItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            ProductName = "Snapshot currency test item",
+            Quantity = 1,
+            UnitPrice = order.Total,
+            ItemTotal = order.Total,
+            CreatedBy = nameof(CreateCheckoutSessionCommandHandlerTests)
+        };
+        order.Items.Add(item);
+        seed.OrderItems.Add(item);
+        order.SubTotal = order.Total;
+        await seed.SaveChangesAsync();
+
+        var snapshot = OrderBillingSnapshotFactory.Build(order, currency,
+            earningEvaluation: null, redemption: null, maximumUnitRows: 1_000);
+        seed.OrderBillingSnapshots.Add(snapshot.Header);
+        seed.OrderBillingSnapshotUnits.AddRange(snapshot.Units);
+        seed.OrderBillingSnapshotOwnerLinks.AddRange(snapshot.OwnerLinks);
+        await seed.SaveChangesAsync();
     }
 
     private async Task SeedResolvedCreditAsync(Guid orderId, Guid actorId, bool materialize)
@@ -653,7 +724,8 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
         Guid orderId,
         Mock<IStripeCheckoutClient> checkout,
         Mock<IStripeGateway>? gateway = null,
-        int commissionBps = 0)
+        int commissionBps = 0,
+        string currency = "CHF")
     {
         await using var ctx = _fixture.CreateContext();
 
@@ -684,7 +756,7 @@ public class CreateCheckoutSessionCommandHandlerTests : IAsyncLifetime
             // property these two commission tests exist for. commissionBps defaults to 0, the whole
             // fleet's setting, so every other test here asserts the NO-commission shape for free.
             new CheckoutChargeResolver(
-                Options.Create(new LocalizationSettings { Currency = "CHF" }),
+                Options.Create(new LocalizationSettings { Currency = currency }),
                 Options.Create(new RestaurantSystem.Api.Settings.StripeCommissionSettings { Bps = commissionBps })),
             NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
 

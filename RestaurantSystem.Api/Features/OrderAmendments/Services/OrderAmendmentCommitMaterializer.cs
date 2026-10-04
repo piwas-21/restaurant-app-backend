@@ -33,8 +33,13 @@ internal sealed class OrderAmendmentCommitMaterializer(
             .ToDictionary(item => item.Id, item => item.Quantity);
         await OrderAmendmentRangeValidator.ValidateAsync(context, source.Id, quoteRequest, quantities, cancellationToken);
         var quotedChanges = DeserializeChanges(amendment.ChangesJson);
-        var supplement = await supplements.BuildForAcceptanceAsync(source, quoteRequest, cancellationToken);
-        var supplementDto = ValidateSupplement(supplement?.Order, amendment.SupplementSnapshotJson);
+        var quotedSupplement = amendment.SupplementSnapshotJson is null
+            ? null
+            : OrderAmendmentJson.Deserialize<OrderAmendmentSupplementSnapshot>(
+                amendment.SupplementSnapshotJson);
+        var supplement = await supplements.BuildForAcceptanceAsync(
+            source, quoteRequest, cancellationToken, quotedSupplement?.Currency);
+        var supplementDto = ValidateSupplement(supplement?.Order, quotedSupplement);
         var changes = await changeBuilder.BuildAsync(source, sourceDto, quoteRequest, supplementDto, cancellationToken);
         if (!string.Equals(OrderAmendmentJson.ChangeFingerprint(changes),
                 OrderAmendmentJson.ChangeFingerprint(quotedChanges), StringComparison.Ordinal))
@@ -57,10 +62,9 @@ internal sealed class OrderAmendmentCommitMaterializer(
         return new OrderAmendmentPreparedCommit(quoteRequest, supplement, changes, preview);
     }
 
-    private OrderDto? ValidateSupplement(Order? supplement, string? snapshotJson)
+    private OrderDto? ValidateSupplement(
+        Order? supplement, OrderAmendmentSupplementSnapshot? snapshot)
     {
-        var snapshot = snapshotJson is null ? null
-            : OrderAmendmentJson.Deserialize<OrderAmendmentSupplementSnapshot>(snapshotJson);
         if (supplement is null)
         {
             if (snapshot is not null) throw PriceChanged();

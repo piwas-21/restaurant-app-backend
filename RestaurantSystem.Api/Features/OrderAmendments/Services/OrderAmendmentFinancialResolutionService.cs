@@ -4,6 +4,7 @@ using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Payments.Services;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
@@ -11,17 +12,20 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
 {
     private const int MinorUnitsPerMajor = 100;
     private readonly IOrderDisplayCurrencyResolver _currencyResolver;
-
     private readonly IOrderBillingAdjustmentWriter _billing;
+    private readonly ApplicationDbContext? _context;
 
     public OrderAmendmentFinancialResolutionService(
-        IOrderDisplayCurrencyResolver currencyResolver, IOrderBillingAdjustmentWriter billing)
+        IOrderDisplayCurrencyResolver currencyResolver,
+        IOrderBillingAdjustmentWriter billing,
+        ApplicationDbContext? context = null)
     {
         _currencyResolver = currencyResolver;
         _billing = billing;
+        _context = context;
     }
 
-    public Task<OrderAmendmentFinancialPreviewDto> PreviewAsync(
+    public async Task<OrderAmendmentFinancialPreviewDto> PreviewAsync(
         Order source,
         IReadOnlyList<OrderAmendmentChangeSnapshot> changes,
         Order? supplement,
@@ -29,9 +33,15 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (IsInstructionOnly(changes, supplement))
-            return Task.FromResult(CreateInstructionOnlyPreview());
+            return CreateInstructionOnlyPreview();
 
-        var currencyLabel = source.ServiceSession?.Currency ?? _currencyResolver.Resolve(source);
+        var acceptedCurrency = _context is null
+            ? null
+            : await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(
+                _context, source, cancellationToken);
+        var currencyLabel = acceptedCurrency
+            ?? source.ServiceSession?.Currency
+            ?? _currencyResolver.Resolve(source);
         var currency = CheckoutAmount.From(1m, currencyLabel).Currency.ToUpperInvariant();
         var removed = CalculateRemovedMinor(source, changes, new AccountMoney(currency));
         var added = supplement is null
@@ -49,9 +59,9 @@ public sealed class OrderAmendmentFinancialResolutionService : IOrderAmendmentFi
         var states = ResolveStates(hasCredit, hasLoyalty, hasCapturedOrUnattributedTender,
             source.Tax != 0, captured);
 
-        return Task.FromResult(new OrderAmendmentFinancialPreviewDto(
+        return new OrderAmendmentFinancialPreviewDto(
             currency, added, removed, checked(added - removed), removed,
-            states.Status, states.Credit, states.Loyalty, states.Refund));
+            states.Status, states.Credit, states.Loyalty, states.Refund);
     }
 
     private static bool IsInstructionOnly(

@@ -97,6 +97,9 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
                 command.TableNumber = guestSession.TableNumber;
             }
 
+            var acceptedCurrency = await OrderNativeAcceptedCurrency.ResolveForAcceptanceAsync(
+                _context, guestSession?.Currency, cancellationToken);
+
             var draft = await _orderFactory.CreateAsync(command, ownerId, language, cancellationToken);
 
             if (draft.IsFailed)
@@ -132,9 +135,6 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
             await _pricingService.ApplyAsync(order, itemsTotal, command, userId, cancellationToken);
 
             var earning = await _fidelity.CalculatePointsToEarnAsync(order, itemsTotal, userId, cancellationToken);
-            var acceptedCurrency = guestSession is null
-                ? await OrderNativeAcceptedCurrency.ReadTenantCurrencyAsync(_context, cancellationToken)
-                : guestSession.Currency;
 
             _paymentBuilder.AddPayments(order, command.Payments);
             _paymentBuilder.UpdatePaymentSummary(order);
