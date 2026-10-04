@@ -211,10 +211,13 @@ public partial class FidelityPointsServiceTests : IAsyncLifetime
         // First award points
         await _service.AwardPointsAsync(userId, await SeedOrderAsync(userId), availablePoints, 25m);
 
-        // Act & Assert — service surfaces insufficient-points as BadRequestException
-        await Assert.ThrowsAsync<RestaurantSystem.Api.Common.Exceptions.BadRequestException>(
+        // The dedicated pre-debit refusal is the only failure native guest acceptance may suppress.
+        await Assert.ThrowsAsync<RestaurantSystem.Api.Common.Exceptions.InsufficientPointsException>(
             () => _service.RedeemPointsAsync(userId, orderId, pointsToRedeem)
         );
+        Assert.Equal(availablePoints, (await _service.GetUserBalanceAsync(userId))!.CurrentPoints);
+        Assert.False(await _context.FidelityPointsTransactions.AnyAsync(value =>
+            value.OrderId == orderId && value.TransactionType == TransactionType.Redeemed));
     }
 
     [Fact]

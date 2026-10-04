@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -276,6 +277,10 @@ public class PrinterFeedContractSnapshotTests : IntegrationTestBase
 
         using var scope = Factory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        // This wire-shape fixture intentionally represents a tenant with no declared currency.
+        // Preserve its committed null-currency contract despite the shared native-order CHF fixture.
+        (await context.RestaurantInfo.ExecuteUpdateAsync(setters =>
+            setters.SetProperty(value => value.Currency, (string?)null))).Should().Be(1);
 
         // A FrontKitchen combo containing a FrontKitchen burger (which itself carries a component)
         // and BackKitchen fries: mixed kitchens AND depth > 1, the two properties #237 changed the

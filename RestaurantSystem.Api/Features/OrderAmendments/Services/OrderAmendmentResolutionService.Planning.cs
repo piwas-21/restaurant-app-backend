@@ -5,6 +5,7 @@ using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Features.Orders.Services;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
@@ -38,8 +39,10 @@ public sealed partial class OrderAmendmentResolutionService
                 value.ServiceSessionId == sessionId
                 && value.State != OrderAmendmentResolutionOperationState.Resolved, cancellationToken))
             throw new ConflictException("Resolve the earlier paid correction in this table account first.");
-        var money = new AccountMoney(source.ServiceSessionId.HasValue
-            ? source.ServiceSession?.Currency : request.Currency);
+        var acceptedCurrency = await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(
+            context, source, cancellationToken);
+        var money = new AccountMoney(acceptedCurrency ?? (source.ServiceSessionId.HasValue
+            ? source.ServiceSession?.Currency : request.Currency));
         var attempts = await ReadAttemptsAsync(source.ServiceSessionId, source.Id, money, cancellationToken);
         var loyaltyTransactions = await context.FidelityPointsTransactions.AsNoTracking()
             .Where(value => value.OrderId == source.Id).ToListAsync(cancellationToken);

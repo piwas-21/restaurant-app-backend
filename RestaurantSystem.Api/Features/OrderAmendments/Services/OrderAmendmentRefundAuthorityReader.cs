@@ -20,7 +20,9 @@ internal static class OrderAmendmentRefundAuthorityReader
         IOrderDisplayCurrencyResolver currencyResolver,
         CancellationToken cancellationToken)
     {
-        var currency = source.ServiceSession?.Currency ?? currencyResolver.Resolve(source);
+        var acceptedCurrency = await OrderNativeAcceptedCurrency.ReadOrderCurrencyEvidenceAsync(
+            context, source, cancellationToken);
+        var currency = acceptedCurrency ?? source.ServiceSession?.Currency ?? currencyResolver.Resolve(source);
         AccountMoney money;
         try
         {

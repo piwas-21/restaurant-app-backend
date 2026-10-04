@@ -91,6 +91,15 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
         (await context.FidelityPointsTransactions.CountAsync()).Should().Be(1);
         (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(0);
+        (await context.OrderBillingSnapshots.AsNoTracking().CountAsync()).Should().Be(1,
+            "the strict staff acceptance commits the snapshot with the debit");
+        var snapshot = await context.OrderBillingSnapshots.AsNoTracking().SingleAsync();
+        var debit = await context.FidelityPointsTransactions.AsNoTracking().SingleAsync();
+        snapshot.RedemptionTransactionId.Should().Be(debit.Id);
+        snapshot.RedemptionTransactionPoints.Should().Be(-100);
+        snapshot.Currency.Should().Be("CHF");
+        (await context.OrderBillingSnapshotOwnerLinks.AsNoTracking()
+            .CountAsync(link => link.Slot == OrderBillingSnapshotOwnerSlot.Redemption)).Should().Be(1);
     }
 
     [Fact]
@@ -110,6 +119,45 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.StaffOrderOperations.CountAsync()).Should().Be(0);
         (await context.FidelityPointsTransactions.CountAsync()).Should().Be(0);
         (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(50);
+        (await context.OrderBillingSnapshots.CountAsync()).Should().Be(0,
+            "the strict debit refusal rolls back order and immutable snapshot together");
+    }
+
+    [Fact]
+    public async Task Snapshot_refusal_after_a_successful_debit_rolls_back_the_entire_staff_acceptance()
+    {
+        await SeedPointsAsync(100);
+        string? originalCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            originalCurrency = tenant.Currency;
+            tenant.Currency = "XXX";
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            AuthenticateAsAdmin();
+            var response = await PostAsJsonAsync(
+                "/api/staff/orders", CreateBody(Guid.NewGuid(), false, _customerId, pointsToRedeem: 100));
+
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict,
+                "the accepted currency fails snapshot validation after the strict debit has been staged");
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(0);
+            (await verify.StaffOrderOperations.CountAsync()).Should().Be(0);
+            (await verify.FidelityPointsTransactions.CountAsync()).Should().Be(0);
+            (await verify.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(100);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = originalCurrency;
+            await restore.SaveChangesAsync();
+        }
     }
 
     [Fact]
@@ -157,6 +205,8 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
         (await context.FidelityPointsTransactions.CountAsync()).Should().Be(1);
         (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(0);
+        (await context.OrderBillingSnapshots.AsNoTracking().CountAsync()).Should().Be(1,
+            "only the successful concurrent acceptance persists a snapshot");
     }
 
     [Fact]
@@ -180,6 +230,8 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
         (await context.FidelityPointsTransactions.CountAsync()).Should().Be(1);
         (await context.FidelityPointBalances.SingleAsync()).CurrentPoints.Should().Be(0);
+        (await context.OrderBillingSnapshots.AsNoTracking().CountAsync()).Should().Be(1,
+            "the retry returns the one snapshot committed with the original operation");
     }
 
     [Fact]
@@ -200,6 +252,7 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         (await context.Orders.CountAsync()).Should().Be(1);
         (await context.StaffOrderOperations.CountAsync()).Should().Be(1);
         (await context.Orders.Select(order => order.IsKitchenReleased).SingleAsync()).Should().BeFalse();
+        (await context.OrderBillingSnapshots.AsNoTracking().CountAsync()).Should().Be(1);
     }
 
     [Fact]
@@ -392,6 +445,7 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
             {
                 Id = sessionId,
                 TableNumber = 9,
+                Currency = "CHF",
                 Status = TableServiceSessionStatus.Open,
                 Version = 1,
                 OpenedAt = DateTime.UtcNow,
@@ -413,7 +467,7 @@ public sealed class StaffCounterOrderTests : IntegrationTestBase
         });
         var acceptedBody = (await ReadResponseAsync<ApiResponse<OrderDto>>(accepted))!;
 
-        acceptedBody.Success.Should().BeTrue();
+        acceptedBody.Success.Should().BeTrue(acceptedBody.Message);
         acceptedBody.Data!.ServiceSessionId.Should().Be(sessionId);
 
         var rejected = await PostAsJsonAsync("/api/staff/orders", new

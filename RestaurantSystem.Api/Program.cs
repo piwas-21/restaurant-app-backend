@@ -818,6 +818,16 @@ builder.Services.AddServerWorkspaceServices();
 builder.Services.AddScoped<IOrderFidelityCoordinator, OrderFidelityCoordinator>();
 builder.Services.AddScoped<IPointEarningRuleService, PointEarningRuleService>();
 builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
+builder.Services.AddScoped<IOrderBillingEarningEvaluator, OrderBillingEarningEvaluator>();
+builder.Services.AddScoped<IOrderNativeFidelityOperations, OrderNativeFidelityOperations>();
+builder.Services.AddScoped<IOrderBillingSnapshotWriter, OrderBillingSnapshotWriter>();
+builder.Services.AddScoped<IOrderNativeBillingAcceptance, OrderNativeBillingAcceptance>();
+builder.Services.AddOptions<OrderBillingSnapshotOptions>()
+    .Bind(builder.Configuration.GetSection(OrderBillingSnapshotOptions.SectionName))
+    .Validate(options => options.MaximumUnitRows is >= 1
+        and <= OrderBillingSnapshotLimits.AbsoluteMaximumUnitRows,
+        "OrderBillingSnapshot:MaximumUnitRows must be within the supported range.")
+    .ValidateOnStart();
 builder.Services.AddScoped<ICustomerDiscountService, CustomerDiscountService>();
 builder.Services.AddScoped<ITaxConfigurationService, TaxConfigurationService>();
 // Settings Services

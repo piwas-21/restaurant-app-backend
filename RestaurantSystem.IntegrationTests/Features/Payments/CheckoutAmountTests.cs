@@ -1,6 +1,10 @@
 using FluentAssertions;
+using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.Payments.Services;
+using RestaurantSystem.Api.Settings;
+using RestaurantSystem.Infrastructure.Settings;
 
 namespace RestaurantSystem.IntegrationTests.Features.Payments;
 
@@ -123,5 +127,37 @@ public class CheckoutAmountTests
     public void A_large_order_in_another_currency_is_accepted()
     {
         CheckoutAmount.From(6000m, "EUR").Minor.Should().Be(600000);
+    }
+
+    [Fact]
+    public void An_explicit_accepted_currency_must_match_current_checkout_configuration()
+    {
+        var resolver = new CheckoutChargeResolver(
+            Options.Create(new LocalizationSettings { Currency = "EUR" }),
+            Options.Create(new StripeCommissionSettings { Bps = 0 }));
+
+        var act = () => resolver.Resolve(42.50m, "CHF");
+
+        act.Should().Throw<ConflictException>();
+    }
+
+    [Fact]
+    public void Matching_accepted_currency_is_used_and_missing_legacy_evidence_keeps_configured_fallback()
+    {
+        var resolver = new CheckoutChargeResolver(
+            Options.Create(new LocalizationSettings { Currency = "EUR" }),
+            Options.Create(new StripeCommissionSettings { Bps = 0 }));
+
+        resolver.Resolve(42.50m, "eur").Amount.Currency.Should().Be("eur");
+        resolver.Resolve(42.50m).Amount.Currency.Should().Be("eur");
+    }
+
+    [Fact]
+    public void Conflicting_legacy_currency_evidence_is_not_resolved_by_input_order()
+    {
+        var act = () => OrderNativeAcceptedCurrency.ResolveConsistentEvidence(["CHF", "eur"]);
+
+        act.Should().Throw<ConflictException>();
+        OrderNativeAcceptedCurrency.ResolveConsistentEvidence(["chf", "CHF"]).Should().Be("CHF");
     }
 }

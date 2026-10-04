@@ -21,7 +21,7 @@ public sealed class CreateStaffCounterOrderCommandHandler
     private readonly IStaffCounterOrderBuilder _builder;
     private readonly IStaffOrderOperationStore _operations;
     private readonly IOrderResponseProjector _responses;
-    private readonly IOrderFidelityCoordinator _fidelity;
+    private readonly IOrderNativeBillingAcceptance _fidelity;
     private readonly IOrderNotificationService _notifications;
     private readonly IOrderTableReservationService _tableReservation;
     private readonly IOrderRoutingService _routing;
@@ -31,7 +31,7 @@ public sealed class CreateStaffCounterOrderCommandHandler
     public CreateStaffCounterOrderCommandHandler(
         ApplicationDbContext context, ICurrentUserService currentUser,
         IStaffCounterOrderBuilder builder, IStaffOrderOperationStore operations,
-        IOrderResponseProjector responses, IOrderFidelityCoordinator fidelity,
+        IOrderResponseProjector responses, IOrderNativeBillingAcceptance fidelity,
         IOrderNotificationService notifications, IOrderTableReservationService tableReservation,
         IOrderRoutingService routing)
     {
@@ -76,9 +76,11 @@ public sealed class CreateStaffCounterOrderCommandHandler
                 CreatedBy = _currentUser.GetAuditIdentifier()
             });
             await _context.SaveChangesAsync(cancellationToken);
-            await _fidelity.RedeemAsync(
+            var redemption = await _fidelity.RedeemAsync(
                 build.Order, command.PointsToRedeem, build.CustomerUserId, cancellationToken,
                 failOnError: true);
+            await _fidelity.WriteAcceptedSnapshotAsync(
+                build.Order, build.AcceptedCurrency, build.EarningEvaluation, redemption, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return await PublishAsync(build.Order, "Counter order created", cancellationToken);

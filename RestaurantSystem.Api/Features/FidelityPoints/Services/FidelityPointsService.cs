@@ -53,7 +53,7 @@ public partial class FidelityPointsService : IFidelityPointsService
 
             if (balance == null || balance.CurrentPoints < pointsToRedeem)
             {
-                throw new BadRequestException($"Insufficient points. Available: {balance?.CurrentPoints ?? 0}, Requested: {pointsToRedeem}");
+                throw new InsufficientPointsException(balance?.CurrentPoints ?? 0, pointsToRedeem);
             }
 
             var updatedCurrentPoints = checked(balance.CurrentPoints - pointsToRedeem);

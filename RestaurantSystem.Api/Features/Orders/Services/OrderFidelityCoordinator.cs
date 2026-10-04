@@ -14,7 +14,7 @@ namespace RestaurantSystem.Api.Features.Orders.Services;
 /// <inheritdoc />
 public class OrderFidelityCoordinator : IOrderFidelityCoordinator
 {
-    private readonly IFidelityPointsService _fidelityPointsService;
+    private readonly IOrderNativeFidelityOperations _fidelityPointsService;
     private readonly IOrderPricingService _pricingService;
     private readonly IOrderPaymentBuilder _paymentBuilder;
     private readonly ApplicationDbContext _context;
@@ -23,7 +23,7 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
     private readonly FidelitySettings _settings;
 
     public OrderFidelityCoordinator(
-        IFidelityPointsService fidelityPointsService,
+        IOrderNativeFidelityOperations fidelityPointsService,
         IOrderPricingService pricingService,
         IOrderPaymentBuilder paymentBuilder,
         ApplicationDbContext context,
@@ -40,18 +40,19 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         _settings = settings.Value;
     }
 
-    public async Task CalculatePointsToEarnAsync(
+    public async Task<OrderBillingEarningEvaluation?> CalculatePointsToEarnAsync(
         Order order, decimal itemsTotal, Guid? userId, CancellationToken cancellationToken)
     {
         if (!userId.HasValue || !_modules.IsEnabled(ModuleIds.Loyalty))
         {
-            return;
+            return null;
         }
 
-        var pointsToEarn = await _fidelityPointsService.CalculatePointsForOrderAsync(itemsTotal, cancellationToken);
-        order.FidelityPointsEarned = pointsToEarn;
+        var evaluation = await _fidelityPointsService.EvaluateOrderAsync(itemsTotal, cancellationToken);
+        order.FidelityPointsEarned = evaluation.CandidatePoints ?? 0;
 
-        _logger.LogInformation("Order will earn {Points} fidelity points", pointsToEarn);
+        _logger.LogInformation("Order will earn {Points} fidelity points", order.FidelityPointsEarned);
+        return evaluation;
     }
 
     public async Task PreviewRedemptionAsync(
@@ -76,13 +77,13 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         _paymentBuilder.UpdatePaymentSummary(order);
     }
 
-    public async Task RedeemAsync(
+    public async Task<OrderBillingRedemptionEvidence?> RedeemAsync(
         Order order, int? pointsToRedeem, Guid? userId, CancellationToken cancellationToken,
         bool failOnError = false)
     {
         if (!userId.HasValue || !pointsToRedeem.HasValue || pointsToRedeem.Value <= 0)
         {
-            return;
+            return null;
         }
 
         EnsureLoyaltyEnabled();
@@ -90,7 +91,7 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
         try
         {
             var expectedDiscount = ValidateDiscountFitsOrder(order, pointsToRedeem.Value);
-            var (_, discountAmount) = await _fidelityPointsService.RedeemPointsAsync(
+            var (transaction, discountAmount) = await _fidelityPointsService.RedeemPointsAsync(
                 userId.Value,
                 order.Id, // Order must exist in DB by now (caller saves first to avoid FK violation).
                 pointsToRedeem.Value,
@@ -116,23 +117,20 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
                 pointsToRedeem.Value, discountAmount, order.OrderNumber);
 
             await _context.SaveChangesAsync(cancellationToken);
+            return new OrderBillingRedemptionEvidence(
+                transaction.Id, transaction.UserId, transaction.OrderId, transaction.TransactionType,
+                transaction.Points, discountAmount, transaction.OrderTotal, transaction.CreatedAt);
         }
-        catch (Exception ex)
+        catch (InsufficientPointsException ex) when (!failOnError)
         {
-            // Clear the transient aggregate even for strict callers. Staff creation wraps the
-            // ledger write, order update, and operation record in one transaction, so rethrowing
-            // rolls all three back. Guest checkout remains best-effort; if its separate order save
-            // fails after the ledger transaction commits, support may need to reconcile the debit.
             order.FidelityPointsRedeemed = 0;
             order.FidelityPointsDiscount = 0;
             _pricingService.RecalculateTotal(order);
             _paymentBuilder.UpdatePaymentSummary(order);
 
-            _logger.LogError(ex, "Failed to redeem fidelity points for order {OrderNumber}", order.OrderNumber);
-            if (failOnError)
-            {
-                throw;
-            }
+            _logger.LogWarning(ex, "Insufficient fidelity balance for order {OrderNumber}; no debit was written",
+                order.OrderNumber);
+            return null;
         }
     }
 

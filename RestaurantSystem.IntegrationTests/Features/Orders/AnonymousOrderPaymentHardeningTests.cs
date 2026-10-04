@@ -156,10 +156,83 @@ public class AnonymousOrderPaymentHardeningTests : IntegrationTestBase
 
         var order = await context.Orders.AsNoTracking().SingleAsync();
         var payment = await context.OrderPayments.AsNoTracking().SingleAsync();
+        var snapshot = await context.OrderBillingSnapshots.AsNoTracking().SingleAsync();
 
         payment.Status.Should().Be(PaymentStatus.Pending, "cash is counted at the till, not on the wire");
         order.TotalPaid.Should().Be(0m, "a Pending tender is not captured, so it cannot count as money held");
         order.PaymentStatus.Should().Be(PaymentStatus.Pending);
+        snapshot.OrderId.Should().Be(order.Id);
+        snapshot.Currency.Should().Be("CHF");
+        snapshot.EarnedPointsCandidate.Should().BeNull("anonymous orders have no earning owner slot");
+        (await context.OrderBillingSnapshotOwnerLinks.AsNoTracking().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Insufficient_customer_redemption_keeps_the_order_without_a_debit_snapshot()
+    {
+        var userId = Guid.Parse(TestAuthHandler.UserId);
+        await using (var seed = DatabaseFixture.CreateContext())
+        {
+            seed.FidelityPointBalances.Add(new FidelityPointBalance
+            {
+                UserId = userId,
+                CurrentPoints = 50,
+                TotalEarnedPoints = 50,
+                LastUpdated = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = nameof(AnonymousOrderPaymentHardeningTests)
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        AuthenticateAsUser();
+        var request = NewOrder(PaymentMethod.Cash, 12.99m);
+        request.PointsToRedeem = 100;
+        var response = await PostAsJsonAsync("/api/orders", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "a typed pre-debit balance refusal retains the existing best-effort customer order flow");
+        await using var verify = DatabaseFixture.CreateContext();
+        var order = await verify.Orders.AsNoTracking().SingleAsync();
+        var snapshot = await verify.OrderBillingSnapshots.AsNoTracking().SingleAsync();
+        order.FidelityPointsRedeemed.Should().Be(0);
+        snapshot.RedemptionTransactionId.Should().BeNull();
+        snapshot.RedemptionTransactionPoints.Should().BeNull();
+        (await verify.FidelityPointsTransactions.AsNoTracking().CountAsync()).Should().Be(0);
+        (await verify.FidelityPointBalances.AsNoTracking().SingleAsync()).CurrentPoints.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task Missing_tenant_currency_refuses_native_acceptance_without_a_partial_order()
+    {
+        string? originalCurrency;
+        await using (var configure = DatabaseFixture.CreateContext())
+        {
+            var tenant = await configure.RestaurantInfo.SingleAsync();
+            originalCurrency = tenant.Currency;
+            tenant.Currency = null;
+            await configure.SaveChangesAsync();
+        }
+
+        try
+        {
+            AuthenticateAsAnonymous();
+            var response = await PostAsJsonAsync("/api/orders", NewOrder(PaymentMethod.Cash, 12.99m));
+
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict,
+                "a native snapshot cannot invent a currency when the tenant has not declared one");
+            await using var verify = DatabaseFixture.CreateContext();
+            (await verify.Orders.CountAsync()).Should().Be(0);
+            (await verify.OrderPayments.CountAsync()).Should().Be(0);
+            (await verify.OrderBillingSnapshots.CountAsync()).Should().Be(0);
+        }
+        finally
+        {
+            await using var restore = DatabaseFixture.CreateContext();
+            var tenant = await restore.RestaurantInfo.SingleAsync();
+            tenant.Currency = originalCurrency;
+            await restore.SaveChangesAsync();
+        }
     }
 
     /// <summary>
