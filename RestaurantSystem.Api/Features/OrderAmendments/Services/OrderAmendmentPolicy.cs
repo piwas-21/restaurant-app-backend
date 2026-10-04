@@ -1,3 +1,4 @@
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Common.TenantFeatures;
@@ -47,48 +48,54 @@ internal static class OrderAmendmentPolicy
     internal static void ValidateRefundActivity(
         Order source, OrderAmendmentRefundAuthoritySnapshot refundAuthority)
     {
-        var money = refundAuthority.Money;
         var hasAuthorizedRefund = false;
         foreach (var payment in source.Payments)
-        {
-            long actualRefund;
-            long paymentAmount;
-            try
-            {
-                paymentAmount = money.ToMinor(payment.Amount);
-                actualRefund = money.ToMinor(payment.RefundedAmount
-                    ?? (payment.IsRefunded || payment.Status == PaymentStatus.Refunded ? payment.Amount : 0m));
-            }
-            catch (BadRequestException)
-            {
-                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
-            }
-
-            var authorizedRefund = refundAuthority.AuthorizedRefundMinorByPayment
-                .GetValueOrDefault(payment.Id);
-            if (actualRefund != authorizedRefund || actualRefund > paymentAmount
-                || payment.RefundDate.HasValue != (authorizedRefund > 0))
-                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
-
-            if (authorizedRefund == 0)
-            {
-                if (payment.IsRefunded || payment.Status is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded)
-                    throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
-                continue;
-            }
-
-            hasAuthorizedRefund = true;
-            var isFullyRefunded = authorizedRefund == paymentAmount;
-            if (!payment.Status.IsCaptured()
-                || payment.IsRefunded != isFullyRefunded
-                || isFullyRefunded != (payment.Status == PaymentStatus.Refunded)
-                || !isFullyRefunded && payment.Status != PaymentStatus.PartiallyRefunded)
-                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
-        }
+            hasAuthorizedRefund |= ValidatePaymentRefund(payment, refundAuthority);
 
         if (source.PaymentStatus == PaymentStatus.Refunded
             || source.PaymentStatus == PaymentStatus.PartiallyRefunded && !hasAuthorizedRefund)
             throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+    }
+
+    private static bool ValidatePaymentRefund(
+        OrderPayment payment, OrderAmendmentRefundAuthoritySnapshot refundAuthority)
+    {
+        var (paymentAmount, actualRefund) = ReadRefundAmounts(payment, refundAuthority.Money);
+        var authorizedRefund = refundAuthority.AuthorizedRefundMinorByPayment.GetValueOrDefault(payment.Id);
+        if (actualRefund != authorizedRefund || actualRefund > paymentAmount
+            || payment.RefundDate.HasValue != (authorizedRefund > 0))
+            throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+
+        if (authorizedRefund == 0)
+        {
+            if (payment.IsRefunded || payment.Status is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded)
+                throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+            return false;
+        }
+
+        var isFullyRefunded = authorizedRefund == paymentAmount;
+        if (!payment.Status.IsCaptured()
+            || payment.IsRefunded != isFullyRefunded
+            || isFullyRefunded != (payment.Status == PaymentStatus.Refunded)
+            || !isFullyRefunded && payment.Status != PaymentStatus.PartiallyRefunded)
+            throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+        return true;
+    }
+
+    private static (long PaymentAmount, long ActualRefund) ReadRefundAmounts(
+        OrderPayment payment, AccountMoney money)
+    {
+        try
+        {
+            var paymentAmount = money.ToMinor(payment.Amount);
+            var actualRefund = money.ToMinor(payment.RefundedAmount
+                ?? (payment.IsRefunded || payment.Status == PaymentStatus.Refunded ? payment.Amount : 0m));
+            return (paymentAmount, actualRefund);
+        }
+        catch (BadRequestException)
+        {
+            throw OrderAmendmentRefundAuthorityReader.ReconciliationRequired();
+        }
     }
 
     private static void ValidateAccountContext(Order source, OrderAmendmentQuoteRequest request)

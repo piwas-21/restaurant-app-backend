@@ -44,7 +44,7 @@ internal static class AccountCheckoutAmendmentRefundProof
             stored, evidence.Refunds, new AmendmentRefundProviderContext(
                 journal.ProviderAccountId, journal.ProviderLiveMode), charge.Id,
             journal.ProviderIntentId ?? string.Empty, journal.Currency,
-            operationByLeg, legByAttempt);
+            new RefundProviderCorrelation(operationByLeg, legByAttempt));
         if (charge.RefundedMinor != verifiedRefundedMinor
             || verifiedRefundedMinor > journal.ProviderCapturedMinor
             || journal.ProviderRefundedMinor > verifiedRefundedMinor)

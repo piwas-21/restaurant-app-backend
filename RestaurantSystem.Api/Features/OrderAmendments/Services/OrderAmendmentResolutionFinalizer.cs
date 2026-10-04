@@ -11,7 +11,7 @@ using RestaurantSystem.Infrastructure.Persistence;
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 /// <summary>Posts the frozen refund and credit only after every custody leg has durable proof.</summary>
-public sealed class OrderAmendmentResolutionFinalizer(
+public sealed partial class OrderAmendmentResolutionFinalizer(
     ApplicationDbContext context, ICurrentUserService currentUser, TimeProvider clock)
     : IOrderAmendmentResolutionFinalizer
 {
@@ -45,6 +45,7 @@ public sealed class OrderAmendmentResolutionFinalizer(
             .Include(value => value.Payments)
             .Include(value => value.Items)
             .Include(value => value.ServiceSession)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(value => value.Id == operation.SourceOrderId && !value.IsDeleted,
             cancellationToken)
             ?? throw new NotFoundException("The amendment source order is unavailable.");
@@ -54,18 +55,7 @@ public sealed class OrderAmendmentResolutionFinalizer(
         if (source.ServiceSession is not null
             && source.ServiceSession.Status != TableServiceSessionStatus.Open)
             throw new ConflictException("The table account must remain open until amendment refunds are resolved.");
-        var legIds = legs.Select(value => value.Id).ToArray();
-        var allocationIds = legs.SelectMany(value =>
-                OrderAmendmentJson.Deserialize<List<OrderAmendmentRefundScope>>(value.FrozenScopesJson))
-            .Select(value => value.AllocationId).Distinct().ToArray();
-        await context.OrderAmendmentRefundEvidence.Where(value => legIds.Contains(value.RefundLegId))
-            .LoadAsync(cancellationToken);
-        if (allocationIds.Length > 0)
-            await context.AccountPaymentAllocations.Where(value => allocationIds.Contains(value.Id))
-                .LoadAsync(cancellationToken);
-        if (allocationIds.Length > 0)
-            await context.AccountPaymentAllocationReversals.Where(value => allocationIds.Contains(value.AllocationId))
-                .LoadAsync(cancellationToken);
+        await LoadAllocationEvidenceAsync(legs, cancellationToken);
         var amendment = await context.OrderAmendments.SingleOrDefaultAsync(value =>
                 value.Id == operation.AmendmentId && value.SourceOrderId == source.Id,
             cancellationToken)

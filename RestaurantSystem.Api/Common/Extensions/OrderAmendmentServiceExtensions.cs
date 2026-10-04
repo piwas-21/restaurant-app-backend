@@ -14,7 +14,9 @@ public static class OrderAmendmentServiceExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddScoped<IOrderAmendmentFinancialResolution, OrderAmendmentFinancialResolutionService>();
+        services.AddScoped<IOrderAmendmentResolutionPolicy, OrderAmendmentResolutionPolicy>();
         services.AddScoped<IOrderAmendmentResolutionService, OrderAmendmentResolutionService>();
+        services.AddScoped<IOrderAmendmentQuotePreviewBuilder, OrderAmendmentQuotePreviewBuilder>();
         services.AddScoped<IOrderAmendmentRefundProvider, StripeOrderAmendmentRefundProvider>();
         services.AddScoped<IOrderAmendmentResolutionFinalizer, OrderAmendmentResolutionFinalizer>();
         services.AddScoped<IOrderBillingAdjustmentWriter, OrderBillingAdjustmentWriter>();

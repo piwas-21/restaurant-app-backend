@@ -52,12 +52,12 @@ public sealed partial class OrderAmendmentResolutionService
                 .Where(value => attemptIds.Contains(value.AttemptId)).ToListAsync(cancellationToken);
         var credits = await context.OrderBillingCredits.AsNoTracking()
             .Where(value => value.SourceOrderId == source.Id).ToListAsync(cancellationToken);
-        var plan = OrderAmendmentResolutionPlanner.Build(source, amendment, request, changes,
+        var plan = OrderAmendmentResolutionPlanner.Build(new OrderAmendmentResolutionPlanningInput(source, amendment, request, changes,
             attempts, journals, priorRefunds.Reversals,
-            priorRefunds.AuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory);
-        var sourceFingerprint = OrderAmendmentFinancialSourceFingerprint.Create(
+            priorRefunds.AuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory));
+        var sourceFingerprint = OrderAmendmentFinancialSourceFingerprint.Create(new OrderAmendmentFinancialSourceState(
             source, amendment, sourceAmendments, attempts, journals, priorRefunds.Reversals,
-            priorRefunds.AuthorizedRefundMinorByPayment, credits, loyaltyTransactions, money.Currency);
+            priorRefunds.AuthorizedRefundMinorByPayment, credits, loyaltyTransactions, money.Currency));
         return new OrderAmendmentResolutionPlanningState(
             source, amendment, changes, attempts, journals, priorRefunds.Reversals, plan,
             sourceFingerprint);

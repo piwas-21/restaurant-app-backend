@@ -11,7 +11,7 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 public sealed partial class OrderAmendmentResolutionService
 {
     private async Task<bool> VerifyProviderLegAsync(
-        Guid operationId, Guid legId, Guid actorId, CancellationToken cancellationToken)
+        Guid operationId, Guid legId, CancellationToken cancellationToken)
     {
         var leg = await LoadLegAsync(operationId, legId, cancellationToken);
         var attemptId = leg.Attempts.OrderByDescending(value => value.Sequence).First().Id;
@@ -23,9 +23,10 @@ public sealed partial class OrderAmendmentResolutionService
         var stored = await ReadChargeRefundEvidenceAsync(leg, cancellationToken);
         var scopes = await ReadRefundScopeMapsAsync(stored, leg, cancellationToken);
         var lastAttemptId = leg.Attempts.OrderByDescending(value => value.Sequence).First().Id;
-        var total = OrderAmendmentRefundProviderProof.RequireCanonicalHistory(stored, providerRefunds,
-            providerContext, leg.ProviderChargeId!, leg.ProviderIntentId!, leg.Currency,
+        var correlation = new RefundProviderCorrelation(
             scopes.Operations, scopes.Attempts, operationId, legId, lastAttemptId);
+        var total = OrderAmendmentRefundProviderProof.RequireCanonicalHistory(stored, providerRefunds,
+            providerContext, leg.ProviderChargeId!, leg.ProviderIntentId!, leg.Currency, correlation);
         if (canonical.Charge?.RefundedMinor != total)
         {
             await SetProviderLegStateAsync(operationId, legId, attemptId,

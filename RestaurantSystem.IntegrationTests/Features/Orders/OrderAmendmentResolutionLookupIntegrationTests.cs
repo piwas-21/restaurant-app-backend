@@ -170,10 +170,13 @@ public sealed class OrderAmendmentResolutionLookupIntegrationTests(DatabaseFixtu
     [Fact]
     public async Task Start_persists_and_replays_whitelisted_expiry_refusal_before_feature_gate()
     {
-        using var enabledFactory = EnabledFactory();
+        var utcNow = DateTime.UtcNow;
+        var hostileUtcNow = new DateTime(utcNow.Ticks - utcNow.Ticks % 10 + 7, DateTimeKind.Utc);
+        (hostileUtcNow.Ticks % 10).Should().Be(7);
+        using var enabledFactory = EnabledFactory(new RefusalClock(new DateTimeOffset(hostileUtcNow)));
         using var admin = enabledFactory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-Test-Admin", "true");
-        var request = NewExpiredRequest(Guid.NewGuid(), DateTime.UtcNow);
+        var request = NewExpiredRequest(Guid.NewGuid(), hostileUtcNow);
         var path = StartPath(_pendingOrderId, _pendingAmendmentId);
 
         using var firstResponse = await admin.PostAsJsonAsync(path, request);
@@ -184,6 +187,8 @@ public sealed class OrderAmendmentResolutionLookupIntegrationTests(DatabaseFixtu
         first.Data.Refusal!.FailureCode.Should().Be("quoteExpired");
         first.Data.Refusal.OrderId.Should().Be(_pendingOrderId);
         first.Data.Refusal.OriginalRequest.Quote.ClientOperationId.Should().Be(request.Quote.ClientOperationId);
+        first.Data.Refusal.CreatedAt.Should().Be(hostileUtcNow.AddTicks(-7),
+            "the first response must expose the exact timestamp PostgreSQL persists");
 
         using var disabledFactory = Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
@@ -213,6 +218,9 @@ public sealed class OrderAmendmentResolutionLookupIntegrationTests(DatabaseFixtu
         await using var verify = DatabaseFixture.CreateContext();
         (await verify.OrderAmendmentResolutionRefusals.CountAsync(value =>
             value.ClientOperationId == request.Quote.ClientOperationId)).Should().Be(1);
+        var persisted = await verify.OrderAmendmentResolutionRefusals.AsNoTracking().SingleAsync(value =>
+            value.ClientOperationId == request.Quote.ClientOperationId);
+        persisted.CreatedAt.Should().Be(first.Data.Refusal.CreatedAt);
     }
 
     [Fact]
@@ -264,13 +272,23 @@ public sealed class OrderAmendmentResolutionLookupIntegrationTests(DatabaseFixtu
         };
     }
 
-    private WebApplicationFactory<Program> EnabledFactory() => Factory.WithWebHostBuilder(builder =>
+    private WebApplicationFactory<Program> EnabledFactory(TimeProvider? clock = null) => Factory.WithWebHostBuilder(builder =>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<ITenantFeatures>();
             var settings = new TenantFeatureSettings { OrderAmendmentsV1 = true };
             services.AddSingleton<ITenantFeatures>(new TenantFeatures(Options.Create(settings)));
+            if (clock is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(clock);
+            }
         }));
+
+    private sealed class RefusalClock(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
+    }
 
     private static Order NewOrder(Guid id) => new()
     {

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -44,7 +45,7 @@ internal static class OrderAmendmentResolutionFingerprint
         string? ChargeId, string? IntentId, IReadOnlyList<OrderAmendmentRefundScope> Scopes);
 
     private sealed record RequestFingerprint(Guid ActorId, Guid OrderId, Guid AmendmentId,
-        Guid ClientOperationId, string QuoteHash, DateTime ExpiresAt,
+        Guid ClientOperationId, [property: JsonPropertyName("quoteHash")] string RequestQuoteHash, DateTime ExpiresAt,
         int ExpectedOrderVersion, long? ExpectedAccountRevision, string Currency,
         IReadOnlyList<ManualRefundSelectionRequest> ManualRefunds);
 }

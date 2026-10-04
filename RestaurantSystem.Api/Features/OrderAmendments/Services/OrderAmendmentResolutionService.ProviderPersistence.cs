@@ -52,23 +52,23 @@ public sealed partial class OrderAmendmentResolutionService
                 return;
             }
         }
-        else if (saved is not null && saved.FailureCode != "provider_outcome_unknown")
+        else if (saved is not null && saved.FailureCode != ProviderOutcomeUnknownFailureCode)
         {
             throw new ConflictException("The saved provider observation cannot be advanced safely.");
         }
 
         var sequence = await NextEvidenceSequenceAsync(legId, cancellationToken);
         var state = ProviderState(provider.Status);
-        context.OrderAmendmentRefundEvidence.Add(NewEvidence(leg, currentAttempt,
-            sequence, OrderAmendmentRefundEvidenceKind.ProviderObservation, state,
-            operation, actorId, clock.GetUtcNow().UtcDateTime, null, provider,
-            currentUser.GetAuditIdentifier()));
+        context.OrderAmendmentRefundEvidence.Add(NewEvidence(leg, currentAttempt, sequence,
+            operation, new OrderAmendmentRefundObservation(
+                OrderAmendmentRefundEvidenceKind.ProviderObservation, state, actorId,
+                resolutionPolicy.UtcNow, null, provider, currentUser.GetAuditIdentifier())));
         leg.State = state;
         leg.ResolvedAt = state == OrderAmendmentRefundLegState.Succeeded
-            ? clock.GetUtcNow().UtcDateTime : null;
+            ? resolutionPolicy.UtcNow : null;
         leg.FailureCode = ProviderFailureCode(state);
         await RefreshOperationStateAsync(operation, cancellationToken,
-            recoverFromReconciliation: saved?.FailureCode == "provider_outcome_unknown");
+            recoverFromReconciliation: saved?.FailureCode == ProviderOutcomeUnknownFailureCode);
         await context.SaveChangesAsync(cancellationToken);
         await scope.CommitAsync(cancellationToken);
     }
@@ -112,17 +112,17 @@ public sealed partial class OrderAmendmentResolutionService
         }
         var attempt = leg.Attempts.OrderByDescending(value => value.Sequence).FirstOrDefault();
         var sequence = await NextEvidenceSequenceAsync(legId, cancellationToken);
-        var evidence = NewEvidence(leg, attempt, sequence,
-            OrderAmendmentRefundEvidenceKind.ProviderObservation,
-            OrderAmendmentRefundLegState.ReconciliationRequired, operation, actorId,
-            clock.GetUtcNow().UtcDateTime, null, null, currentUser.GetAuditIdentifier());
-        evidence.FailureCode = "provider_outcome_unknown";
+        var evidence = NewEvidence(leg, attempt, sequence, operation,
+            new OrderAmendmentRefundObservation(OrderAmendmentRefundEvidenceKind.ProviderObservation,
+                OrderAmendmentRefundLegState.ReconciliationRequired, actorId,
+                resolutionPolicy.UtcNow, null, null, currentUser.GetAuditIdentifier()));
+        evidence.FailureCode = ProviderOutcomeUnknownFailureCode;
         context.OrderAmendmentRefundEvidence.Add(evidence);
         leg.State = OrderAmendmentRefundLegState.ReconciliationRequired;
-        leg.FailureCode = "provider_outcome_unknown";
+        leg.FailureCode = ProviderOutcomeUnknownFailureCode;
         leg.ResolvedAt = null;
         operation.State = OrderAmendmentResolutionOperationState.ReconciliationRequired;
-        operation.FailureCode = "provider_outcome_unknown";
+        operation.FailureCode = ProviderOutcomeUnknownFailureCode;
         await context.SaveChangesAsync(cancellationToken);
         await scope.CommitAsync(cancellationToken);
     }
@@ -153,7 +153,7 @@ public sealed partial class OrderAmendmentResolutionService
                 && value.State == OrderAmendmentRefundLegState.Succeeded, cancellationToken))
             throw new ConflictException("Only a canonically failed refund can be retried.");
 
-        var now = clock.GetUtcNow().UtcDateTime;
+        var now = resolutionPolicy.UtcNow;
         var attemptId = Guid.NewGuid();
         var attempt = new OrderAmendmentRefundAttempt
         {
@@ -171,9 +171,10 @@ public sealed partial class OrderAmendmentResolutionService
         leg.ResolvedAt = null;
         var evidenceSequence = await NextEvidenceSequenceAsync(legId, cancellationToken);
         context.OrderAmendmentRefundEvidence.Add(NewEvidence(leg, attempt, evidenceSequence,
-            OrderAmendmentRefundEvidenceKind.ProviderRequest,
-            OrderAmendmentRefundLegState.Processing, operation, currentUser.UserId!.Value,
-            now, null, null, currentUser.GetAuditIdentifier()));
+            operation, new OrderAmendmentRefundObservation(
+                OrderAmendmentRefundEvidenceKind.ProviderRequest,
+                OrderAmendmentRefundLegState.Processing, currentUser.UserId!.Value,
+                now, null, null, currentUser.GetAuditIdentifier())));
         operation.State = OrderAmendmentResolutionOperationState.Processing;
         operation.FailureCode = null;
         await context.SaveChangesAsync(cancellationToken);
@@ -227,7 +228,7 @@ public sealed partial class OrderAmendmentResolutionService
             {
                 operation.State = OrderAmendmentResolutionOperationState.ReconciliationRequired;
                 operation.FailureCode = "provider_refund_requires_reconciliation";
-                operation.UpdatedAt = clock.GetUtcNow().UtcDateTime;
+                operation.UpdatedAt = resolutionPolicy.UtcNow;
                 operation.UpdatedBy = currentUser.GetAuditIdentifier();
                 await context.SaveChangesAsync(cancellationToken);
             }
@@ -236,7 +237,7 @@ public sealed partial class OrderAmendmentResolutionService
             {
                 await RefreshOperationStateAsync(operation, cancellationToken,
                     recoverFromReconciliation: true);
-                operation.UpdatedAt = clock.GetUtcNow().UtcDateTime;
+                operation.UpdatedAt = resolutionPolicy.UtcNow;
                 operation.UpdatedBy = currentUser.GetAuditIdentifier();
                 await context.SaveChangesAsync(cancellationToken);
             }
@@ -245,10 +246,10 @@ public sealed partial class OrderAmendmentResolutionService
         }
         leg.State = state;
         leg.ResolvedAt = state == OrderAmendmentRefundLegState.Succeeded
-            ? clock.GetUtcNow().UtcDateTime : null;
+            ? resolutionPolicy.UtcNow : null;
         leg.FailureCode = ProviderFailureCode(state);
         await RefreshOperationStateAsync(operation, cancellationToken, recoverFromReconciliation);
-        operation.UpdatedAt = clock.GetUtcNow().UtcDateTime;
+        operation.UpdatedAt = resolutionPolicy.UtcNow;
         operation.UpdatedBy = currentUser.GetAuditIdentifier();
         await context.SaveChangesAsync(cancellationToken);
         await scope.CommitAsync(cancellationToken);

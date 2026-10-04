@@ -19,11 +19,8 @@ public sealed partial class OrderAmendmentResolutionService(
     ITenantFeatures features,
     IAccountCheckoutEvidenceReader checkoutEvidence,
     IOrderAmendmentRefundProvider refundProvider,
-    TimeProvider clock,
-    ILogger<OrderAmendmentResolutionService> logger,
-    IOrderAmendmentResolutionFinalizer finalizer,
-    IOptions<OrderAmendmentResolutionSettings> resolutionSettings,
-    IOrderDisplayCurrencyResolver currencyResolver)
+    IOrderAmendmentResolutionPolicy resolutionPolicy,
+    IOrderAmendmentResolutionFinalizer finalizer)
     : IOrderAmendmentResolutionService
 {
     public async Task<OrderAmendmentResolutionQuoteDto> QuoteAsync(
@@ -34,8 +31,7 @@ public sealed partial class OrderAmendmentResolutionService(
         OrderAmendmentPolicy.RequireFeature(features);
         ValidateQuoteRequest(request);
         var state = await ReadPlanningStateAsync(orderId, amendmentId, request, cancellationToken);
-        var lifetime = TimeSpan.FromMinutes(resolutionSettings.Value.FinancialResolutionQuoteLifetimeMinutes);
-        var expiresAt = clock.GetUtcNow().UtcDateTime.Add(lifetime);
+        var expiresAt = resolutionPolicy.UtcNow.Add(resolutionPolicy.QuoteLifetime);
         return OrderAmendmentResolutionQuoteFactory.Create(
             orderId, amendmentId, actorId, request, state.Plan, expiresAt);
     }
@@ -86,9 +82,9 @@ public sealed partial class OrderAmendmentResolutionService(
         Guid operationId, CancellationToken cancellationToken)
     {
         var actorId = RequireAdminActor();
-        var operation = await context.OrderAmendmentResolutionOperations.AsNoTracking()
-            .SingleOrDefaultAsync(value => value.Id == operationId && value.ActorUserId == actorId,
-                cancellationToken) ?? throw Unavailable();
+        if (!await context.OrderAmendmentResolutionOperations.AsNoTracking()
+                .AnyAsync(value => value.Id == operationId && value.ActorUserId == actorId, cancellationToken))
+            throw Unavailable();
         return await ReadResultAsync(operationId, cancellationToken);
     }
 

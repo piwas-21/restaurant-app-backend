@@ -59,16 +59,16 @@ public sealed partial class OrderAmendmentResolutionService
                     || leg.ManualTillReference is not null || leg.ResolvedAt is not null || leg.Attempts.Count != 0)
                     throw new ConflictException("The till refund step already has different or incomplete evidence.");
 
-                var now = clock.GetUtcNow().UtcDateTime;
+                var now = resolutionPolicy.UtcNow;
                 leg.ManualTillReference = reference;
                 leg.State = OrderAmendmentRefundLegState.Succeeded;
                 leg.ResolvedAt = now;
                 leg.FailureCode = null;
                 context.OrderAmendmentRefundEvidence.Add(NewEvidence(leg, null,
                     await NextEvidenceSequenceAsync(leg.Id, cancellationToken),
-                    OrderAmendmentRefundEvidenceKind.ManualTillConfirmation,
-                    OrderAmendmentRefundLegState.Succeeded, operation, actorId, now,
-                    reference, null, currentUser.GetAuditIdentifier()));
+                    operation, new OrderAmendmentRefundObservation(OrderAmendmentRefundEvidenceKind.ManualTillConfirmation,
+                        OrderAmendmentRefundLegState.Succeeded, actorId, now,
+                        reference, null, currentUser.GetAuditIdentifier())));
                 await RefreshOperationStateAsync(operation, cancellationToken);
                 operation.UpdatedAt = now;
                 operation.UpdatedBy = currentUser.GetAuditIdentifier();

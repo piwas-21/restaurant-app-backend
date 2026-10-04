@@ -18,9 +18,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
     private readonly ApplicationDbContext _context;
     private readonly ITenantFeatures _features;
     private readonly ICurrentUserService _currentUser;
-    private readonly OrderAmendmentSupplementBuilder _supplements;
-    private readonly OrderAmendmentChangeBuilder _changes;
-    private readonly IOrderMappingService _mapping;
+    private readonly IOrderAmendmentQuotePreviewBuilder _previewBuilder;
     private readonly IOrderDisplayCurrencyResolver _currencyResolver;
     private readonly IOrderAmendmentFinancialResolution _financial;
     private readonly OrderAmendmentResolutionSettings _resolutionSettings;
@@ -29,9 +27,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         ApplicationDbContext context,
         ITenantFeatures features,
         ICurrentUserService currentUser,
-        OrderAmendmentSupplementBuilder supplements,
-        OrderAmendmentChangeBuilder changes,
-        IOrderMappingService mapping,
+        IOrderAmendmentQuotePreviewBuilder previewBuilder,
         IOrderDisplayCurrencyResolver currencyResolver,
         IOrderAmendmentFinancialResolution financial,
         IOptions<OrderAmendmentResolutionSettings> resolutionSettings)
@@ -39,9 +35,7 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
         _context = context;
         _features = features;
         _currentUser = currentUser;
-        _supplements = supplements;
-        _changes = changes;
-        _mapping = mapping;
+        _previewBuilder = previewBuilder;
         _currencyResolver = currencyResolver;
         _financial = financial;
         _resolutionSettings = resolutionSettings.Value;
@@ -69,19 +63,16 @@ internal sealed class OrderAmendmentQuoteService : IOrderAmendmentQuoteService
                     _context, source, _currencyResolver, cancellationToken);
                 OrderAmendmentPolicy.ValidateOrderContext(source, normalized, refundAuthority);
                 OrderAmendmentPolicy.ValidateChangeAuthority(source, normalized, _currentUser);
-                var sourceDto = await _mapping.MapToOrderDtoAsync(source, cancellationToken);
+                var sourceDto = await _previewBuilder.MapSourceAsync(source, cancellationToken);
                 var sourceLines = source.Items.Where(item => !item.ParentOrderItemId.HasValue).ToList();
                 var sourceQuantities = sourceLines.ToDictionary(item => item.Id, item => item.Quantity);
                 await OrderAmendmentRangeValidator.ValidateAsync(
                     _context, source.Id, normalized, sourceQuantities, cancellationToken);
 
-                var supplement = await _supplements.BuildAsync(source, normalized, cancellationToken);
-                // A rolled-back preview cannot reserve a human-facing daily order number.
-                if (supplement is not null)
-                    supplement.OrderNumber = string.Empty;
-                var supplementDto = supplement is null ? null : OrderAmendmentSnapshots.MapBuiltOrder(_mapping, supplement);
-                var changes = await _changes.BuildAsync(
-                    source, sourceDto, normalized, supplementDto, cancellationToken);
+                var preview = await _previewBuilder.BuildAsync(source, sourceDto, normalized, cancellationToken);
+                var supplement = preview.Supplement;
+                var supplementDto = preview.SupplementDto;
+                var changes = preview.Changes;
                 var financial = await _financial.PreviewAsync(source, changes, supplement, cancellationToken);
 
                 var amendmentId = Guid.NewGuid();

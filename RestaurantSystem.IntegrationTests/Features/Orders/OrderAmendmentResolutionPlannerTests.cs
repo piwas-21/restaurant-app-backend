@@ -152,7 +152,7 @@ public sealed class OrderAmendmentResolutionPlannerTests
         IReadOnlyList<AccountPaymentAllocationReversal> reversals,
         IReadOnlyDictionary<Guid, long> priorRefunds,
         bool hasLoyaltyLedgerHistory = false) =>
-        OrderAmendmentResolutionPlanner.Build(fixture.Source, amendment,
+        OrderAmendmentResolutionPlanner.Build(new OrderAmendmentResolutionPlanningInput(fixture.Source, amendment,
             new OrderAmendmentResolutionQuoteRequest
             {
                 ClientOperationId = Guid.NewGuid(),
@@ -160,7 +160,7 @@ public sealed class OrderAmendmentResolutionPlannerTests
                 ExpectedAccountRevision = fixture.Session.AccountRevision,
                 Currency = "CHF"
             }, changes, fixture.Attempts, [], reversals, priorRefunds,
-            new AccountMoney("CHF"), hasLoyaltyLedgerHistory);
+            new AccountMoney("CHF"), hasLoyaltyLedgerHistory));
 
     private static OrderAmendmentChangeSnapshot Void(Guid itemId) => new(itemId,
         OrderAmendmentChangeKind.Void, 1, 1, false,

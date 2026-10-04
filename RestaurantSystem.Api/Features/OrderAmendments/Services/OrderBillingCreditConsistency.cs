@@ -63,15 +63,7 @@ internal static class OrderBillingCreditConsistency
             }
             if (outcome.PotentialCreditMinor > 0)
             {
-                var appliedBalanceReduction = outcome.CreditState == OrderAmendmentCreditState.BalanceReduction
-                    && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
-                    && outcome.RefundState == OrderAmendmentRefundState.None;
-                var reconciledTenderCredit = outcome.CreditState == OrderAmendmentCreditState.Resolved
-                    && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
-                    && outcome.RefundState == OrderAmendmentRefundState.Resolved;
-                if (outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.Resolved
-                    || !appliedBalanceReduction && !reconciledTenderCredit)
-                    throw InvalidJournal();
+                RequireResolvedCreditOutcome(outcome);
                 resolved.Add(amendment.Id, (amendment, outcome));
             }
             else if (outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.NotRequired
@@ -82,6 +74,19 @@ internal static class OrderBillingCreditConsistency
                 throw InvalidJournal();
         }
         return resolved;
+    }
+
+    private static void RequireResolvedCreditOutcome(OrderAmendmentFinancialPreviewDto outcome)
+    {
+        var appliedBalanceReduction = outcome.CreditState == OrderAmendmentCreditState.BalanceReduction
+            && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
+            && outcome.RefundState == OrderAmendmentRefundState.None;
+        var reconciledTenderCredit = outcome.CreditState == OrderAmendmentCreditState.Resolved
+            && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
+            && outcome.RefundState == OrderAmendmentRefundState.Resolved;
+        if (outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.Resolved
+            || !appliedBalanceReduction && !reconciledTenderCredit)
+            throw InvalidJournal();
     }
 
     private static void RequireMatchingCreditEntries(

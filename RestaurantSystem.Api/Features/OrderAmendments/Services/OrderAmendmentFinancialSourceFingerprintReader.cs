@@ -37,8 +37,8 @@ internal static class OrderAmendmentFinancialSourceFingerprintReader
             .Where(value => value.SourceOrderId == source.Id).ToListAsync(cancellationToken);
         var loyalty = await context.FidelityPointsTransactions.AsNoTracking()
             .Where(value => value.OrderId == source.Id).ToListAsync(cancellationToken);
-        return OrderAmendmentFinancialSourceFingerprint.Create(source, amendment, amendments,
+        return OrderAmendmentFinancialSourceFingerprint.Create(new OrderAmendmentFinancialSourceState(source, amendment, amendments,
             attempts, journals, prior.Reversals, prior.AuthorizedRefundMinorByPayment,
-            credits, loyalty, money.Currency);
+            credits, loyalty, money.Currency));
     }
 }

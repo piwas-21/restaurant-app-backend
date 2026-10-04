@@ -8,16 +8,10 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal static class OrderAmendmentResolutionPlanner
 {
-    internal static OrderAmendmentResolutionPlan Build(
-        Order source, OrderAmendment amendment, OrderAmendmentResolutionQuoteRequest request,
-        IReadOnlyList<OrderAmendmentChangeSnapshot> changes,
-        IReadOnlyList<AccountPaymentAttempt> attempts,
-        IReadOnlyList<AccountCheckoutJournal> checkoutJournals,
-        IReadOnlyList<AccountPaymentAllocationReversal> reversals,
-        IReadOnlyDictionary<Guid, long> priorAuthorizedRefundMinorByPayment,
-        AccountMoney money,
-        bool hasLoyaltyLedgerHistory)
+    internal static OrderAmendmentResolutionPlan Build(OrderAmendmentResolutionPlanningInput input)
     {
+        var (source, amendment, request, changes, attempts, checkoutJournals, reversals,
+            priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory) = input;
         var credit = ValidateSourceForResolution(source, amendment,
             priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory);
         if (request.ExpectedOrderVersion != source.Version
@@ -51,18 +45,7 @@ internal static class OrderAmendmentResolutionPlanner
             || source.PaymentStatus == PaymentStatus.Refunded)
             throw ReconciliationRequired("Existing refund activity requires reconciliation.");
         foreach (var payment in source.Payments)
-        {
-            var actualRefund = money.ToMinor(payment.RefundedAmount
-                ?? (payment.IsRefunded || payment.Status == PaymentStatus.Refunded ? payment.Amount : 0m));
-            var priorAuthorized = priorAuthorizedRefundMinorByPayment.GetValueOrDefault(payment.Id);
-            if (actualRefund != priorAuthorized
-                || actualRefund > 0 && (!payment.Status.IsCaptured()
-                    || actualRefund < money.ToMinor(payment.Amount)
-                        && payment.Status != PaymentStatus.PartiallyRefunded
-                    || actualRefund == money.ToMinor(payment.Amount)
-                        && payment.Status != PaymentStatus.Refunded))
-                throw ReconciliationRequired("Existing refund activity lacks exact resolved amendment evidence.");
-        }
+            RequireAuthorizedSourceRefund(payment, priorAuthorizedRefundMinorByPayment, money);
         if (amendment.State != OrderAmendmentState.Committed
             || amendment.SourceOrderId != source.Id
             || amendment.ServiceSessionId != source.ServiceSessionId)
@@ -71,6 +54,21 @@ internal static class OrderAmendmentResolutionPlanner
             && source.ServiceSession.Status != TableServiceSessionStatus.Open)
             throw new ConflictException("The table account is no longer open for resolution.");
         return ReadCredit(amendment, money.Currency);
+    }
+
+    private static void RequireAuthorizedSourceRefund(OrderPayment payment,
+        IReadOnlyDictionary<Guid, long> priorAuthorizedRefundMinorByPayment, AccountMoney money)
+    {
+        var actualRefund = money.ToMinor(payment.RefundedAmount
+            ?? (payment.IsRefunded || payment.Status == PaymentStatus.Refunded ? payment.Amount : 0m));
+        var priorAuthorized = priorAuthorizedRefundMinorByPayment.GetValueOrDefault(payment.Id);
+        if (actualRefund != priorAuthorized
+            || actualRefund > 0 && (!payment.Status.IsCaptured()
+                || actualRefund < money.ToMinor(payment.Amount)
+                    && payment.Status != PaymentStatus.PartiallyRefunded
+                || actualRefund == money.ToMinor(payment.Amount)
+                    && payment.Status != PaymentStatus.Refunded))
+            throw ReconciliationRequired("Existing refund activity lacks exact resolved amendment evidence.");
     }
 
     private static long ReadCredit(OrderAmendment amendment, string currency)

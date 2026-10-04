@@ -37,8 +37,8 @@ public sealed class OrderAmendmentFinancialSourceFingerprintTests
     }
 
     private static string Fingerprint(Order source, OrderAmendment amendment) =>
-        OrderAmendmentFinancialSourceFingerprint.Create(source, amendment, [amendment], [], [], [],
-            new Dictionary<Guid, long>(), [], [], "CHF");
+        OrderAmendmentFinancialSourceFingerprint.Create(new OrderAmendmentFinancialSourceState(source, amendment, [amendment], [], [], [],
+            new Dictionary<Guid, long>(), [], [], "CHF"));
 
     private static (Order Source, OrderAmendment Amendment) NewSource()
     {

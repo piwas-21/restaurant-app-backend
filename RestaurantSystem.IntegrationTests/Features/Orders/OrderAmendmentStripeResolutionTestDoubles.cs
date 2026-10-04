@@ -36,6 +36,7 @@ internal sealed class FakeAmendmentRefundState
 
     internal int CreateCalls { get; set; }
     internal bool LoseFirstCreateResponse { get; set; } = true;
+    internal HashSet<int> LoseCreateResponseOnCalls { get; } = [];
     internal long? CanonicalRefundedMinorOverride { get; set; }
     internal Queue<string> CreateStatuses { get; } = new();
     internal string DefaultCreateStatus { get; set; } = "succeeded";
@@ -130,6 +131,7 @@ internal sealed class FakeAmendmentRefundProvider(
         AmendmentRefundRequest request, CancellationToken cancellationToken)
     {
         state.CreateCalls++;
+        var createCall = state.CreateCalls;
         state.ProviderIoObservedDatabaseTransaction |= context.Database.CurrentTransaction is not null;
         state.LastRequest = request;
         var operationId = Guid.ParseExact(request.Metadata[StripeOrderAmendmentRefundProvider.OperationKey], "D");
@@ -161,7 +163,8 @@ internal sealed class FakeAmendmentRefundProvider(
             responseGate.Prepare(response);
             await responseGate.WaitForReleaseAsync(cancellationToken);
         }
-        if (state.LoseFirstCreateResponse && state.CreateCalls == 1)
+        if ((state.LoseFirstCreateResponse && createCall == 1)
+            || state.LoseCreateResponseOnCalls.Contains(createCall))
             throw new TimeoutException("Simulated lost response after the provider accepted the refund.");
         return response;
     }

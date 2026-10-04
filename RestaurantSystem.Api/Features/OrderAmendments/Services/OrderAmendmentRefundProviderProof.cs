@@ -5,209 +5,103 @@ using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
-internal static class OrderAmendmentRefundProviderProof
+internal static partial class OrderAmendmentRefundProviderProof
 {
+    private const string SucceededStatus = "succeeded";
+    private const string PendingStatus = "pending";
+    private const string RequiresActionStatus = "requires_action";
+    private const string FailedStatus = "failed";
+    private const string CanceledStatus = "canceled";
+    private const string UnknownOutcomeFailureCode = "provider_outcome_unknown";
+
     internal static long RequireCanonicalHistory(
         IReadOnlyList<OrderAmendmentRefundEvidence> stored,
         IReadOnlyList<AmendmentRefundEvidence> provider,
         AmendmentRefundProviderContext context, string chargeId, string intentId, string currency,
-        IReadOnlyDictionary<Guid, Guid> operationByLeg,
-        IReadOnlyDictionary<Guid, Guid> legByAttempt,
-        Guid? adoptOperationId = null, Guid? adoptLegId = null, Guid? adoptAttemptId = null)
+        RefundProviderCorrelation correlation)
     {
         var latest = LatestStoredObservations(stored, context, chargeId, intentId, currency);
         var byId = latest.ToDictionary(value => value.ProviderRefundId!, StringComparer.Ordinal);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var inventory = new ProviderRefundInventory(byId, new HashSet<string>(StringComparer.Ordinal));
         long refunded = 0;
         foreach (var value in provider)
         {
-            ValidateIdentity(value, context, chargeId, intentId, currency);
-            if (!seen.Add(value.RefundId))
-                throw NeedsReconciliation();
-            var operationId = Guid.ParseExact(value.Metadata[StripeOrderAmendmentRefundProvider.OperationKey], "D");
-            var legId = Guid.ParseExact(value.Metadata[StripeOrderAmendmentRefundProvider.LegKey], "D");
-            var attemptId = Guid.ParseExact(value.Metadata[StripeOrderAmendmentRefundProvider.AttemptKey], "D");
-            if (!operationByLeg.TryGetValue(legId, out var storedOperationId)
-                || storedOperationId != operationId || !legByAttempt.TryGetValue(attemptId, out var storedLegId)
-                || storedLegId != legId)
-            {
-                if (operationId != adoptOperationId || legId != adoptLegId || attemptId != adoptAttemptId)
-                    throw NeedsReconciliation();
-            }
-            if (byId.TryGetValue(value.RefundId, out var saved))
-            {
-                if (saved.AmountMinor != value.AmountMinor
-                    || saved.RefundLegId != legId || saved.RefundAttemptId != attemptId
-                    || !string.Equals(saved.Currency, value.Currency, StringComparison.OrdinalIgnoreCase)
-                    || !CanTransition(saved.ProviderRefundStatus, value.Status))
-                    throw NeedsReconciliation();
-            }
-            else if (!IsCurrentUnrecorded(value, adoptOperationId, adoptLegId, adoptAttemptId))
-            {
-                throw NeedsReconciliation();
-            }
-            if (value.Status == "succeeded")
-                refunded = checked(refunded + value.AmountMinor);
+            refunded = checked(refunded + ValidateProviderRefund(
+                value, context, chargeId, intentId, currency, correlation, inventory));
         }
-        if (byId.Keys.Any(value => !seen.Contains(value)))
+        if (inventory.SavedById.Keys.Any(value => !inventory.Seen.Contains(value)))
             throw NeedsReconciliation();
         return refunded;
     }
 
-    internal static void RequireStoredAttemptHistory(
-        OrderAmendmentRefundLeg leg,
-        OrderAmendmentResolutionOperation operation,
-        IReadOnlyCollection<OrderAmendmentRefundEvidence> evidence,
-        bool requireSuccess)
+    private static long ValidateProviderRefund(
+        AmendmentRefundEvidence value,
+        AmendmentRefundProviderContext context,
+        string chargeId,
+        string intentId,
+        string currency,
+        RefundProviderCorrelation correlation,
+        ProviderRefundInventory inventory)
     {
-        var attempts = leg.Attempts.OrderBy(value => value.Sequence).ToArray();
-        if (leg.Custody != OrderAmendmentRefundCustody.StripeDirect || attempts.Length == 0
-            || attempts.Where((value, index) => value.Sequence != index + 1
-                || value.IdempotencyKey != $"amendment-refund:{value.Id:N}"
-                || value.RequestedAt == default).Any()
-            || leg.ProviderChargeId is null || leg.ProviderIntentId is null
-            || leg.ProviderAccountId is null || leg.ProviderLiveMode is null)
+        ValidateIdentity(value, context, chargeId, intentId, currency);
+        if (!inventory.Seen.Add(value.RefundId))
             throw NeedsReconciliation();
 
-        var rows = evidence.ToArray();
-        if (rows.Any(value => value.Kind is not (OrderAmendmentRefundEvidenceKind.ProviderRequest
-                or OrderAmendmentRefundEvidenceKind.ProviderObservation)))
-            throw NeedsReconciliation();
-        var requests = rows.Where(value => value.Kind == OrderAmendmentRefundEvidenceKind.ProviderRequest).ToArray();
-        if (requests.Length != attempts.Length || attempts.Any(attempt => requests.Count(value =>
-                value.RefundAttemptId == attempt.Id && IsBoundRequest(value, leg, operation)) != 1))
+        var (operationId, legId, attemptId) = ReadProviderIdentity(value);
+        if (!IsStoredOrAdopted(operationId, legId, attemptId, correlation))
             throw NeedsReconciliation();
 
-        var observations = rows.Where(value => value.Kind == OrderAmendmentRefundEvidenceKind.ProviderObservation)
-            .OrderBy(value => value.Sequence).ToArray();
-        var attemptIds = attempts.Select(value => value.Id).ToHashSet();
-        if (observations.Any(value => !value.RefundAttemptId.HasValue
-                || !attemptIds.Contains(value.RefundAttemptId.Value) || !IsBoundObservation(value, leg, operation)))
-            throw NeedsReconciliation();
-
-        var refundsById = observations.Where(value => value.ProviderRefundId is not null)
-            .GroupBy(value => value.ProviderRefundId!, StringComparer.Ordinal).ToArray();
-        if (refundsById.Any(group => group.Select(value => value.RefundAttemptId).Distinct().Count() != 1
-                || group.Select(value => value.AmountMinor).Distinct().Count() != 1
-                || group.Select(value => value.Currency).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 1
-                || group.OrderBy(value => value.Sequence).Zip(group.OrderBy(value => value.Sequence).Skip(1),
-                    (previous, current) => CanTransition(previous.ProviderRefundStatus, current.ProviderRefundStatus))
-                    .Any(value => !value))
-            || refundsById.GroupBy(value => value.First().RefundAttemptId).Any(group => group.Count() > 1))
-            throw NeedsReconciliation();
-
-        var latestStatusByAttempt = new Dictionary<Guid, string>();
-        foreach (var attempt in attempts)
+        if (inventory.SavedById.TryGetValue(value.RefundId, out var saved)
+                ? saved.AmountMinor != value.AmountMinor
+                    || saved.RefundLegId != legId || saved.RefundAttemptId != attemptId
+                    || !string.Equals(saved.Currency, value.Currency, StringComparison.OrdinalIgnoreCase)
+                    || !CanTransition(saved.ProviderRefundStatus, value.Status)
+                : !IsCurrentUnrecorded(value, correlation))
         {
-            var attemptRows = observations.Where(value => value.RefundAttemptId == attempt.Id).ToArray();
-            var refundGroups = refundsById.Where(group => group.Any(value => value.RefundAttemptId == attempt.Id)).ToArray();
-            if (refundGroups.Length > 1)
-                throw NeedsReconciliation();
-            var latest = attemptRows.LastOrDefault();
-            if (refundGroups.Length == 0)
-            {
-                if (attemptRows.Any(value => value.ProviderRefundId is not null || value.FailureCode != "provider_outcome_unknown")
-                    || requireSuccess || attempt.Id != attempts[^1].Id
-                    || latest is not null && latest.State != OrderAmendmentRefundLegState.ReconciliationRequired)
-                    throw NeedsReconciliation();
-                continue;
-            }
-
-            var refundRows = refundGroups[0].OrderBy(value => value.Sequence).ToArray();
-            var final = refundRows[^1];
-            if (latest is null || latest.ProviderRefundId != final.ProviderRefundId
-                || latest.ProviderRefundStatus != final.ProviderRefundStatus)
-                throw NeedsReconciliation();
-            latestStatusByAttempt.Add(attempt.Id, final.ProviderRefundStatus!);
+            throw NeedsReconciliation();
         }
 
-        for (var index = 0; index < attempts.Length - 1; index++)
-        {
-            if (!latestStatusByAttempt.TryGetValue(attempts[index].Id, out var status)
-                || status is not ("failed" or "canceled"))
-                throw NeedsReconciliation();
-        }
-
-        if (requireSuccess && (leg.State != OrderAmendmentRefundLegState.Succeeded
-                || !latestStatusByAttempt.TryGetValue(attempts[^1].Id, out var latestStatus)
-                || latestStatus != "succeeded"))
-            throw NeedsReconciliation();
-
-        var hasCurrentStatus = latestStatusByAttempt.TryGetValue(attempts[^1].Id, out var currentStatus);
-        if (!requireSuccess && !hasCurrentStatus)
-        {
-            if (leg.State is not (OrderAmendmentRefundLegState.Processing
-                    or OrderAmendmentRefundLegState.ReconciliationRequired))
-                throw NeedsReconciliation();
-        }
-        else if (!requireSuccess)
-        {
-            var expected = currentStatus switch
-            {
-                "succeeded" => OrderAmendmentRefundLegState.Succeeded,
-                "pending" or "requires_action" => OrderAmendmentRefundLegState.Pending,
-                "failed" or "canceled" => OrderAmendmentRefundLegState.Failed,
-                _ => (OrderAmendmentRefundLegState?)null
-            };
-            if (expected != leg.State)
-                throw NeedsReconciliation();
-        }
+        return value.Status == SucceededStatus ? value.AmountMinor : 0;
     }
 
-    private static bool IsBoundRequest(OrderAmendmentRefundEvidence value,
-        OrderAmendmentRefundLeg leg, OrderAmendmentResolutionOperation operation) =>
-        value.Sequence > 0 && value.ObservedAt != default
-        && value.State == OrderAmendmentRefundLegState.Processing
-        && value.AmountMinor == leg.AmountMinor && value.Currency == leg.Currency
-        && value.ActorUserId == operation.ActorUserId && value.ActorRole == operation.ActorRole
-        && value.ProviderChargeId == leg.ProviderChargeId && value.ProviderIntentId == leg.ProviderIntentId
-        && value.ProviderAccountId == leg.ProviderAccountId && value.ProviderLiveMode == leg.ProviderLiveMode
-        && value.ProviderRefundId is null && value.ProviderRefundStatus is null
-        && value.FailureCode is null && value.TillReference is null;
+    private static (Guid OperationId, Guid LegId, Guid AttemptId) ReadProviderIdentity(
+        AmendmentRefundEvidence value) => (
+        Guid.ParseExact(value.Metadata[StripeOrderAmendmentRefundProvider.OperationKey], "D"),
+        Guid.ParseExact(value.Metadata[StripeOrderAmendmentRefundProvider.LegKey], "D"),
+        Guid.ParseExact(value.Metadata[StripeOrderAmendmentRefundProvider.AttemptKey], "D"));
 
-    private static bool IsBoundObservation(OrderAmendmentRefundEvidence value,
-        OrderAmendmentRefundLeg leg, OrderAmendmentResolutionOperation operation)
+    private static bool IsStoredOrAdopted(
+        Guid operationId, Guid legId, Guid attemptId, RefundProviderCorrelation correlation)
     {
-        if (value.Sequence <= 0 || value.ObservedAt == default
-            || value.AmountMinor != leg.AmountMinor
-            || !string.Equals(value.Currency, leg.Currency, StringComparison.OrdinalIgnoreCase)
-            || value.ActorUserId != operation.ActorUserId || value.ActorRole != operation.ActorRole
-            || value.ProviderChargeId != leg.ProviderChargeId || value.ProviderIntentId != leg.ProviderIntentId
-            || value.ProviderAccountId != leg.ProviderAccountId || value.ProviderLiveMode != leg.ProviderLiveMode
-            || value.TillReference is not null)
-            return false;
-        if (value.ProviderRefundId is null)
-            return value.ProviderRefundStatus is null && value.FailureCode == "provider_outcome_unknown"
-                && value.State == OrderAmendmentRefundLegState.ReconciliationRequired;
-        var expectedState = value.ProviderRefundStatus switch
-        {
-            "succeeded" => OrderAmendmentRefundLegState.Succeeded,
-            "pending" or "requires_action" => OrderAmendmentRefundLegState.Pending,
-            "failed" or "canceled" => OrderAmendmentRefundLegState.Failed,
-            _ => (OrderAmendmentRefundLegState?)null
-        };
-        var expectedFailure = expectedState switch
-        {
-            OrderAmendmentRefundLegState.Pending => "provider_refund_pending",
-            OrderAmendmentRefundLegState.Failed => "provider_refund_failed",
-            _ => null
-        };
-        return !string.IsNullOrWhiteSpace(value.ProviderRefundId) && expectedState == value.State
-            && value.FailureCode == expectedFailure;
+        var matchesStored = correlation.OperationByLeg.TryGetValue(legId, out var storedOperationId)
+            && storedOperationId == operationId
+            && correlation.LegByAttempt.TryGetValue(attemptId, out var storedLegId)
+            && storedLegId == legId;
+        var matchesAdoption = operationId == correlation.AdoptOperationId
+            && legId == correlation.AdoptLegId
+            && attemptId == correlation.AdoptAttemptId;
+        return matchesStored || matchesAdoption;
     }
 
-    private static bool CanTransition(string? previous, string? current) =>
-        previous == current || (previous is "pending" or "requires_action")
-        && (current is "pending" or "requires_action" or "succeeded" or "failed" or "canceled");
+    private static bool IsCurrentUnrecorded(
+        AmendmentRefundEvidence value, RefundProviderCorrelation correlation)
+    {
+        var metadata = value.Metadata;
+        return correlation.AdoptOperationId is Guid expectedOperation
+            && correlation.AdoptLegId is Guid expectedLeg
+            && correlation.AdoptAttemptId is Guid expectedAttempt
+            && metadata.TryGetValue(StripeOrderAmendmentRefundProvider.OperationKey, out var operation)
+            && string.Equals(operation, expectedOperation.ToString("D"), StringComparison.Ordinal)
+            && metadata.TryGetValue(StripeOrderAmendmentRefundProvider.LegKey, out var leg)
+            && string.Equals(leg, expectedLeg.ToString("D"), StringComparison.Ordinal)
+            && metadata.TryGetValue(StripeOrderAmendmentRefundProvider.AttemptKey, out var attempt)
+            && string.Equals(attempt, expectedAttempt.ToString("D"), StringComparison.Ordinal);
+    }
 
-    private static bool StoredStateMatchesProviderStatus(OrderAmendmentRefundEvidence value) =>
-        value.ProviderRefundStatus switch
-        {
-            "succeeded" => value.State == OrderAmendmentRefundLegState.Succeeded,
-            "pending" or "requires_action" => value.State == OrderAmendmentRefundLegState.Pending,
-            "failed" or "canceled" => value.State == OrderAmendmentRefundLegState.Failed,
-            _ => false
-        };
+    private sealed record ProviderRefundInventory(
+        IReadOnlyDictionary<string, OrderAmendmentRefundEvidence> SavedById,
+        ISet<string> Seen);
+
 
     internal static long SumStoredSuccess(
         IReadOnlyList<OrderAmendmentRefundEvidence> stored,
@@ -220,7 +114,7 @@ internal static class OrderAmendmentRefundProviderProof
         {
             if (!ids.Add(value.ProviderRefundId!))
                 throw NeedsReconciliation();
-            if (value.ProviderRefundStatus == "succeeded")
+            if (value.ProviderRefundStatus == SucceededStatus)
                 total = checked(total + value.AmountMinor);
         }
         return total;
@@ -233,7 +127,8 @@ internal static class OrderAmendmentRefundProviderProof
         if (string.IsNullOrWhiteSpace(value.RefundId) || value.AmountMinor <= 0
             || value.ChargeId != chargeId || value.IntentId != intentId
             || value.Context != context || !string.Equals(value.Currency, currency, StringComparison.OrdinalIgnoreCase)
-            || value.Status is not ("succeeded" or "pending" or "requires_action" or "failed" or "canceled")
+            || value.Status is not (SucceededStatus or PendingStatus or RequiresActionStatus
+                or FailedStatus or CanceledStatus)
             || metadata.Count != 4
             || !metadata.TryGetValue(StripeOrderAmendmentRefundProvider.SchemaKey, out var schema)
             || schema != StripeOrderAmendmentRefundProvider.SchemaVersion
@@ -274,17 +169,6 @@ internal static class OrderAmendmentRefundProviderProof
         }
         return groups.Select(group => group.OrderBy(value => value.Sequence).Last()).ToArray();
     }
-
-    private static bool IsCurrentUnrecorded(AmendmentRefundEvidence value,
-        Guid? operationId, Guid? legId, Guid? attemptId) => operationId is Guid expectedOperation
-        && legId is Guid expectedLeg
-        && attemptId is Guid expectedAttempt
-        && value.Metadata.TryGetValue(StripeOrderAmendmentRefundProvider.OperationKey, out var operation)
-        && operation == expectedOperation.ToString("D")
-        && value.Metadata.TryGetValue(StripeOrderAmendmentRefundProvider.LegKey, out var leg)
-        && leg == expectedLeg.ToString("D")
-        && value.Metadata.TryGetValue(StripeOrderAmendmentRefundProvider.AttemptKey, out var attempt)
-        && attempt == expectedAttempt.ToString("D");
 
     private static ConflictException NeedsReconciliation() =>
         new("The provider refund history is not fully bound to this amendment. Reconciliation is required.");

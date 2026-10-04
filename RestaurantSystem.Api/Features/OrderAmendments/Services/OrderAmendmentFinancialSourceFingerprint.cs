@@ -5,18 +5,10 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal static class OrderAmendmentFinancialSourceFingerprint
 {
-    internal static string Create(
-        Order source,
-        OrderAmendment amendment,
-        IReadOnlyList<OrderAmendment> sourceAmendments,
-        IReadOnlyList<AccountPaymentAttempt> attempts,
-        IReadOnlyList<AccountCheckoutJournal> journals,
-        IReadOnlyList<AccountPaymentAllocationReversal> reversals,
-        IReadOnlyDictionary<Guid, long> authorizedRefundMinorByPayment,
-        IReadOnlyList<OrderBillingCredit> credits,
-        IReadOnlyList<FidelityPointsTransaction> loyaltyTransactions,
-        string currency)
+    internal static string Create(OrderAmendmentFinancialSourceState state)
     {
+        var (source, amendment, sourceAmendments, attempts, journals, reversals,
+            authorizedRefundMinorByPayment, credits, loyaltyTransactions, currency) = state;
         var snapshot = new SourceSnapshot(
             source.Id, source.ServiceSessionId, source.Type, currency,
             source.SubTotal, source.Tax, source.DeliveryFee, source.Discount,

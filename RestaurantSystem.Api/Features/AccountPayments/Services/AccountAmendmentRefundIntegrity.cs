@@ -153,25 +153,7 @@ internal static class AccountAmendmentRefundIntegrity
             throw NeedsReconciliation();
         if (reversals.Length != scopes.Count)
             throw NeedsReconciliation();
-        foreach (var scope in scopes)
-        {
-            if (!allocationById.TryGetValue(scope.AllocationId, out var allocation)
-                || allocation.AttemptId != leg.AccountPaymentAttemptId
-                || allocation.OrderPaymentId != leg.SourcePaymentId
-                || scope.OrderId != allocation.OrderId || scope.OrderItemId != allocation.OrderItemId
-                || scope.MinorPerUnit != allocation.MinorPerUnit || scope.UnitCount <= 0
-                || scope.StartOrdinal < allocation.StartOrdinal
-                || (long)scope.StartOrdinal + scope.UnitCount > (long)allocation.StartOrdinal + allocation.UnitCount
-                || scope.AmountMinor != checked(scope.MinorPerUnit * scope.UnitCount))
-                throw NeedsReconciliation();
-            var reversal = reversals.SingleOrDefault(value => value.AllocationId == scope.AllocationId
-                && value.StartOrdinal == scope.StartOrdinal && value.UnitCount == scope.UnitCount);
-            if (reversal is null || reversal.RefundLegId != leg.Id || reversal.OrderId != scope.OrderId
-                || reversal.OrderItemId != scope.OrderItemId || reversal.MinorPerUnit != scope.MinorPerUnit
-                || reversal.AmountMinor != scope.AmountMinor || reversal.Currency != money.Currency
-                || reversal.ActorUserId != operation.ActorUserId || reversal.ActorRole != operation.ActorRole)
-                throw NeedsReconciliation();
-        }
+        ValidateScopeReversals(operation, leg, scopes, reversals, allocationById, money);
 
         if (leg.Custody == OrderAmendmentRefundCustody.ManualTill)
         {
@@ -194,6 +176,32 @@ internal static class AccountAmendmentRefundIntegrity
             throw NeedsReconciliation();
         OrderAmendmentRefundProviderProof.RequireStoredAttemptHistory(
             leg, operation, evidence, requireSuccess: true);
+    }
+
+    private static void ValidateScopeReversals(
+        OrderAmendmentResolutionOperation operation, OrderAmendmentRefundLeg leg,
+        IReadOnlyList<OrderAmendmentRefundScope> scopes, AccountPaymentAllocationReversal[] reversals,
+        Dictionary<Guid, AccountPaymentAllocation> allocationById, AccountMoney money)
+    {
+        foreach (var scope in scopes)
+        {
+            if (!allocationById.TryGetValue(scope.AllocationId, out var allocation)
+                || allocation.AttemptId != leg.AccountPaymentAttemptId
+                || allocation.OrderPaymentId != leg.SourcePaymentId
+                || scope.OrderId != allocation.OrderId || scope.OrderItemId != allocation.OrderItemId
+                || scope.MinorPerUnit != allocation.MinorPerUnit || scope.UnitCount <= 0
+                || scope.StartOrdinal < allocation.StartOrdinal
+                || (long)scope.StartOrdinal + scope.UnitCount > (long)allocation.StartOrdinal + allocation.UnitCount
+                || scope.AmountMinor != checked(scope.MinorPerUnit * scope.UnitCount))
+                throw NeedsReconciliation();
+            var reversal = reversals.SingleOrDefault(value => value.AllocationId == scope.AllocationId
+                && value.StartOrdinal == scope.StartOrdinal && value.UnitCount == scope.UnitCount);
+            if (reversal is null || reversal.RefundLegId != leg.Id || reversal.OrderId != scope.OrderId
+                || reversal.OrderItemId != scope.OrderItemId || reversal.MinorPerUnit != scope.MinorPerUnit
+                || reversal.AmountMinor != scope.AmountMinor || reversal.Currency != money.Currency
+                || reversal.ActorUserId != operation.ActorUserId || reversal.ActorRole != operation.ActorRole)
+                throw NeedsReconciliation();
+        }
     }
 
     private static Dictionary<Guid, long> BuildAuthorizedRefunds(

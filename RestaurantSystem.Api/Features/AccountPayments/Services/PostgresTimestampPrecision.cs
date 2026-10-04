@@ -17,6 +17,6 @@ internal static class PostgresTimestampPrecision
             && TruncateToMicrosecond(serialized.Value).Ticks == column.Ticks;
     }
 
-    private static DateTime TruncateToMicrosecond(DateTime value) =>
+    internal static DateTime TruncateToMicrosecond(DateTime value) =>
         new(value.Ticks - value.Ticks % TicksPerMicrosecond, value.Kind);
 }

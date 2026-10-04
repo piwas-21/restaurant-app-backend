@@ -12,7 +12,7 @@ public sealed partial class OrderAmendmentResolutionService
     private Guid PersistOperation(OrderAmendmentResolutionPlanningState state,
         OrderAmendmentResolutionStartRequest request, string requestHash, Guid actorId)
     {
-        var now = clock.GetUtcNow().UtcDateTime;
+        var now = resolutionPolicy.UtcNow;
         var reviewedQuote = OrderAmendmentResolutionQuoteFactory.Create(
             state.Source.Id, state.Amendment.Id, actorId, request.Quote, state.Plan, request.ExpiresAt);
         if (reviewedQuote.QuoteHash != request.QuoteHash)
@@ -85,17 +85,18 @@ public sealed partial class OrderAmendmentResolutionService
         };
         leg.Attempts.Add(attempt);
         context.OrderAmendmentRefundEvidence.Add(NewEvidence(leg, attempt, 1,
-            OrderAmendmentRefundEvidenceKind.ProviderRequest,
-            OrderAmendmentRefundLegState.Processing, operation, actorId, now,
-            null, null, currentUser.GetAuditIdentifier()));
+            operation, new OrderAmendmentRefundObservation(OrderAmendmentRefundEvidenceKind.ProviderRequest,
+                OrderAmendmentRefundLegState.Processing, actorId, now,
+                null, null, currentUser.GetAuditIdentifier())));
         return leg;
     }
 
     private static OrderAmendmentRefundEvidence NewEvidence(
         OrderAmendmentRefundLeg leg, OrderAmendmentRefundAttempt? attempt, int sequence,
-        OrderAmendmentRefundEvidenceKind kind, OrderAmendmentRefundLegState state,
-        OrderAmendmentResolutionOperation operation, Guid actorId, DateTime now,
-        string? tillReference, AmendmentRefundEvidence? provider, string auditIdentifier) => new()
+        OrderAmendmentResolutionOperation operation, OrderAmendmentRefundObservation observation)
+    {
+        var (kind, state, actorId, now, tillReference, provider, auditIdentifier) = observation;
+        return new()
         {
             Id = Guid.NewGuid(),
             RefundLegId = leg.Id,
@@ -119,5 +120,6 @@ public sealed partial class OrderAmendmentResolutionService
             EvidenceJson = "{}",
             CreatedBy = auditIdentifier
         };
+    }
 
 }

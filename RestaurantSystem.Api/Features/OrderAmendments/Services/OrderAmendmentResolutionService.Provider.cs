@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
-using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
@@ -9,6 +8,8 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 public sealed partial class OrderAmendmentResolutionService
 {
+    private const string ProviderOutcomeUnknownFailureCode = "provider_outcome_unknown";
+
     private async Task<OrderAmendmentResolutionResultDto> ProcessAndReadAsync(
         Guid operationId, CancellationToken cancellationToken)
     {
@@ -34,9 +35,10 @@ public sealed partial class OrderAmendmentResolutionService
     {
         var observedAttemptId = preloadedLeg.Attempts.OrderByDescending(value => value.Sequence)
             .FirstOrDefault()?.Id ?? Guid.Empty;
+        PreparedProviderRefund? prepared;
         try
         {
-            await ProcessStripeLegAsync(operationId, preloadedLeg, actorId, cancellationToken);
+            prepared = await PrepareProviderRefundAsync(operationId, preloadedLeg, actorId, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -44,24 +46,79 @@ public sealed partial class OrderAmendmentResolutionService
         }
         catch (Exception exception)
         {
-            AccountCheckoutDiagnostics.Warn(logger, exception,
-                AccountCheckoutFailurePhase.ProviderRecovery, preloadedLeg.Id);
+            resolutionPolicy.WarnProviderFailure(exception, preloadedLeg.Id);
             await MarkProviderUnknownAsync(operationId, preloadedLeg.Id, observedAttemptId, actorId, cancellationToken);
+            return;
         }
+
+        if (prepared is not null)
+            await SubmitProviderRefundSafelyAsync(operationId, prepared.Leg, prepared.Attempt,
+                prepared.ProviderContext, actorId, cancellationToken);
     }
 
-    private async Task ProcessStripeLegAsync(
+    private async Task<PreparedProviderRefund?> PrepareProviderRefundAsync(
         Guid operationId, OrderAmendmentRefundLeg leg,
         Guid actorId, CancellationToken cancellationToken)
     {
         // The actor-scoped parent query preloaded this leg and its immutable attempt identities, avoiding
         // a duplicate initial per-leg read. The snapshot cannot authorize retries or writes: those paths
         // reload current state under the source lock, and provider evidence stays fresh per call.
-        if (leg.Custody != OrderAmendmentRefundCustody.StripeDirect
-            || leg.State == OrderAmendmentRefundLegState.Succeeded && await VerifyProviderLegAsync(
-                operationId, leg.Id, actorId, cancellationToken))
-            return;
+        if (leg.Custody != OrderAmendmentRefundCustody.StripeDirect)
+            return null;
+        if (leg.State == OrderAmendmentRefundLegState.Succeeded
+            && await VerifyProviderLegAsync(operationId, leg.Id, cancellationToken))
+            return null;
 
+        var attempt = leg.Attempts.OrderByDescending(value => value.Sequence).FirstOrDefault()
+            ?? throw new ConflictException("The provider refund request identity is unavailable.");
+        var providerSnapshot = await ReadVerifiedProviderRefundsAsync(
+            operationId, leg, attempt.Id, cancellationToken);
+
+        var current = FindCurrentRefund(providerSnapshot.Refunds, operationId, leg.Id, attempt.Id);
+        if (current is not null && await HandleCurrentRefundAsync(
+                operationId, leg.Id, current, actorId, cancellationToken))
+            return null;
+
+        (leg, attempt) = await PrepareProviderAttemptAsync(operationId, leg, attempt, cancellationToken);
+        return new PreparedProviderRefund(leg, attempt, providerSnapshot.Context);
+    }
+
+    private async Task SubmitProviderRefundSafelyAsync(
+        Guid operationId,
+        OrderAmendmentRefundLeg leg,
+        OrderAmendmentRefundAttempt attempt,
+        AmendmentRefundProviderContext providerContext,
+        Guid actorId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var request = BuildProviderRequest(leg, operationId, attempt);
+            var response = await refundProvider.CreateAsync(request, cancellationToken);
+            OrderAmendmentRefundProviderProof.ValidateIdentity(response, providerContext,
+                leg.ProviderChargeId!, leg.ProviderIntentId!, leg.Currency);
+            ValidateCurrentRefund(response, operationId, leg.Id, attempt.Id, leg.AmountMinor);
+            await RecordProviderObservationAsync(operationId, leg.Id, response, actorId, cancellationToken);
+            if (response.Status == "succeeded")
+                await VerifyProviderLegAsync(operationId, leg.Id, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            resolutionPolicy.WarnProviderFailure(exception, leg.Id);
+            await MarkProviderUnknownAsync(operationId, leg.Id, attempt.Id, actorId, cancellationToken);
+        }
+    }
+
+    private async Task<ProviderRefundSnapshot> ReadVerifiedProviderRefundsAsync(
+        Guid operationId,
+        OrderAmendmentRefundLeg leg,
+        Guid attemptId,
+        CancellationToken cancellationToken)
+    {
         var providerContext = refundProvider.ReadContext();
         var journal = await ReadRefundJournalAsync(leg, cancellationToken);
         var canonical = await checkoutEvidence.ReadAsync(journal, false, cancellationToken);
@@ -69,29 +126,43 @@ public sealed partial class OrderAmendmentResolutionService
         var providerRefunds = await refundProvider.ListForChargeAsync(leg.ProviderChargeId!, cancellationToken);
         var stored = await ReadChargeRefundEvidenceAsync(leg, cancellationToken);
         var scopes = await ReadRefundScopeMapsAsync(stored, leg, cancellationToken);
-        var attempt = leg.Attempts.OrderByDescending(value => value.Sequence).FirstOrDefault()
-            ?? throw new ConflictException("The provider refund request identity is unavailable.");
+        var correlation = new RefundProviderCorrelation(
+            scopes.Operations, scopes.Attempts, operationId, leg.Id, attemptId);
         var refunded = OrderAmendmentRefundProviderProof.RequireCanonicalHistory(
             stored, providerRefunds, providerContext, leg.ProviderChargeId!, leg.ProviderIntentId!,
-            leg.Currency, scopes.Operations, scopes.Attempts, operationId, leg.Id, attempt.Id);
+            leg.Currency, correlation);
         if (canonical.Charge?.RefundedMinor != refunded)
             throw new ConflictException("The provider's captured refund total differs from immutable refund evidence.");
+        return new ProviderRefundSnapshot(providerContext, providerRefunds);
+    }
 
-        var current = FindCurrentRefund(providerRefunds, operationId, leg.Id, attempt.Id);
-        if (current is not null)
+    private async Task<bool> HandleCurrentRefundAsync(
+        Guid operationId,
+        Guid legId,
+        AmendmentRefundEvidence current,
+        Guid actorId,
+        CancellationToken cancellationToken)
+    {
+        await RecordProviderObservationAsync(operationId, legId, current, actorId, cancellationToken);
+        if (current.Status == "succeeded")
         {
-            await RecordProviderObservationAsync(operationId, leg.Id, current, actorId, cancellationToken);
-            if (current.Status == "succeeded")
-            {
-                await VerifyProviderLegAsync(operationId, leg.Id, actorId, cancellationToken);
-                return;
-            }
-            if (current.Status is "pending" or "requires_action")
-                return;
-            if (current.Status is not ("failed" or "canceled"))
-                throw new ConflictException("The provider refund status requires reconciliation.");
+            await VerifyProviderLegAsync(operationId, legId, cancellationToken);
+            return true;
         }
+        if (current.Status is "pending" or "requires_action")
+            return true;
+        if (current.Status is not ("failed" or "canceled"))
+            throw new ConflictException("The provider refund status requires reconciliation.");
+        return false;
+    }
 
+    private async Task<(OrderAmendmentRefundLeg Leg, OrderAmendmentRefundAttempt Attempt)>
+        PrepareProviderAttemptAsync(
+        Guid operationId,
+        OrderAmendmentRefundLeg leg,
+        OrderAmendmentRefundAttempt attempt,
+        CancellationToken cancellationToken)
+    {
         var latest = await ReadLatestLegObservationAsync(leg.Id, cancellationToken);
         if (latest is not null && latest.RefundAttemptId == attempt.Id
             && latest.ProviderRefundStatus is ("failed" or "canceled"))
@@ -103,24 +174,18 @@ public sealed partial class OrderAmendmentResolutionService
         {
             throw new ConflictException("The original provider refund request still needs reconciliation.");
         }
-        else if (latest is not null && latest.FailureCode != "provider_outcome_unknown"
+        else if (latest is not null && latest.FailureCode != ProviderOutcomeUnknownFailureCode
                  && latest.RefundAttemptId == attempt.Id)
+        {
             throw new ConflictException("The original provider refund request still needs reconciliation.");
+        }
 
-        var idempotencyWindow = TimeSpan.FromHours(resolutionSettings.Value.ProviderIdempotencySafetyWindowHours);
-        if (clock.GetUtcNow().UtcDateTime - attempt.RequestedAt >= idempotencyWindow)
+        if (!resolutionPolicy.IsProviderRetrySafe(attempt.RequestedAt))
             throw new ConflictException("The provider idempotency window is too old for automatic retry.");
-        var request = BuildProviderRequest(leg, operationId, attempt);
-        var response = await refundProvider.CreateAsync(request, cancellationToken);
-        OrderAmendmentRefundProviderProof.ValidateIdentity(response, providerContext,
-            leg.ProviderChargeId!, leg.ProviderIntentId!, leg.Currency);
-        ValidateCurrentRefund(response, operationId, leg.Id, attempt.Id, leg.AmountMinor);
-        await RecordProviderObservationAsync(operationId, leg.Id, response, actorId, cancellationToken);
-        if (response.Status == "succeeded")
-            await VerifyProviderLegAsync(operationId, leg.Id, actorId, cancellationToken);
+        return (leg, attempt);
     }
 
-    private AmendmentRefundRequest BuildProviderRequest(
+    private static AmendmentRefundRequest BuildProviderRequest(
         OrderAmendmentRefundLeg leg, Guid operationId, OrderAmendmentRefundAttempt attempt) => new(
         leg.ProviderChargeId!, leg.ProviderIntentId!, leg.Currency, leg.AmountMinor,
         attempt.IdempotencyKey, new Dictionary<string, string>(StringComparer.Ordinal)
@@ -130,6 +195,15 @@ public sealed partial class OrderAmendmentResolutionService
             [StripeOrderAmendmentRefundProvider.LegKey] = leg.Id.ToString("D"),
             [StripeOrderAmendmentRefundProvider.AttemptKey] = attempt.Id.ToString("D")
         });
+
+    private sealed record ProviderRefundSnapshot(
+        AmendmentRefundProviderContext Context,
+        IReadOnlyList<AmendmentRefundEvidence> Refunds);
+
+    private sealed record PreparedProviderRefund(
+        OrderAmendmentRefundLeg Leg,
+        OrderAmendmentRefundAttempt Attempt,
+        AmendmentRefundProviderContext ProviderContext);
 
     private async Task<OrderAmendmentRefundLeg> LoadLegAsync(
         Guid operationId, Guid legId, CancellationToken cancellationToken) =>

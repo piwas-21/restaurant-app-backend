@@ -132,14 +132,12 @@ public sealed partial class OrderAmendmentResolutionService
 
     private static long SumRefundLegs(IReadOnlyList<OrderAmendmentRefundLegQuoteDto> legs)
     {
-        long total = 0;
-        foreach (var leg in legs)
+        return legs.Select(leg =>
         {
             if (leg.AmountMinor < 0)
                 throw new ConflictException("A persisted refund leg has an invalid amount.");
-            total = checked(total + leg.AmountMinor);
-        }
-        return total;
+            return leg.AmountMinor;
+        }).Sum();
     }
 
     private static void ValidateQuoteLegs(

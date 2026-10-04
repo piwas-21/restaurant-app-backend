@@ -20,11 +20,14 @@ internal static class OrderAmendmentSourcePaymentSummary
         source.RemainingAmount = money.ToMajor(payable - netPaid);
         var allCapturedRefunded = source.Payments.Where(value => value.Status.IsCaptured())
             .All(value => value.IsRefunded);
-        source.PaymentStatus = payable == 0 && netPaid == 0 && allCapturedRefunded
-            ? PaymentStatus.Refunded
-            : netPaid == payable ? PaymentStatus.Completed
-            : netPaid == 0 ? PaymentStatus.Pending
-            : PaymentStatus.PartiallyPaid;
+        if (payable == 0 && netPaid == 0 && allCapturedRefunded)
+            source.PaymentStatus = PaymentStatus.Refunded;
+        else if (netPaid == payable)
+            source.PaymentStatus = PaymentStatus.Completed;
+        else if (netPaid == 0)
+            source.PaymentStatus = PaymentStatus.Pending;
+        else
+            source.PaymentStatus = PaymentStatus.PartiallyPaid;
         source.UpdatedAt = now;
     }
 }
