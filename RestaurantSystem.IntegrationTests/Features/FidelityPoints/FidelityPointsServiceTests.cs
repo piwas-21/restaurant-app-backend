@@ -11,7 +11,7 @@ using RestaurantSystem.IntegrationTests.Infrastructure;
 namespace RestaurantSystem.IntegrationTests.Features.FidelityPoints;
 
 [Collection("Database Lane 3")]
-public class FidelityPointsServiceTests : IAsyncLifetime
+public partial class FidelityPointsServiceTests : IAsyncLifetime
 {
     private readonly DatabaseFixture _fixture;
     private ApplicationDbContext _context = null!;
@@ -19,6 +19,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
     private Mock<IPointEarningRuleService> _ruleServiceMock = null!;
     private Mock<ICurrentUserService> _currentUserServiceMock = null!;
     private Guid _testUserId;
+    private string _testAuditIdentifier = string.Empty;
 
     public FidelityPointsServiceTests(DatabaseFixture fixture)
     {
@@ -33,10 +34,11 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         _ruleServiceMock = new Mock<IPointEarningRuleService>();
         _currentUserServiceMock = new Mock<ICurrentUserService>();
         _testUserId = Guid.NewGuid();
+        _testAuditIdentifier = Guid.NewGuid().ToString();
 
         _currentUserServiceMock.Setup(x => x.UserId).Returns(_testUserId);
         // Default-interface methods aren't invoked by Moq; stub explicitly.
-        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(_testUserId.ToString());
+        _currentUserServiceMock.Setup(x => x.GetAuditIdentifier()).Returns(_testAuditIdentifier);
 
         _service = new FidelityPointsService(
             _context,
@@ -129,6 +131,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.Equal(orderId, transaction.OrderId);
         Assert.Equal(points, transaction.Points);
         Assert.Equal(TransactionType.Earned, transaction.TransactionType);
+        Assert.Equal(_testAuditIdentifier, transaction.CreatedBy);
 
         // Verify balance was created/updated
         var balance = await _context.FidelityPointBalances
@@ -138,6 +141,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.Equal(points, balance.CurrentPoints);
         Assert.Equal(points, balance.TotalEarnedPoints);
         Assert.Equal(0, balance.TotalRedeemedPoints);
+        Assert.Equal(_testAuditIdentifier, balance.CreatedBy);
     }
 
     [Fact]
@@ -183,6 +187,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.Equal(-pointsToRedeem, result.Transaction.Points);
         Assert.Equal(TransactionType.Redeemed, result.Transaction.TransactionType);
         Assert.Equal(1m, result.DiscountAmount); // 100 points = $1
+        Assert.Equal(_testAuditIdentifier, result.Transaction.CreatedBy);
 
         // Verify balance
         var balance = await _context.FidelityPointBalances
@@ -191,6 +196,7 @@ public class FidelityPointsServiceTests : IAsyncLifetime
         Assert.NotNull(balance);
         Assert.Equal(availablePoints - pointsToRedeem, balance.CurrentPoints);
         Assert.Equal(pointsToRedeem, balance.TotalRedeemedPoints);
+        Assert.Equal(_testAuditIdentifier, balance.UpdatedBy);
     }
 
     [Fact]
