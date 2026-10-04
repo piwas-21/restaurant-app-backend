@@ -28,38 +28,13 @@ public partial class FidelityPointsService
             await LockOrderRowForLoyaltyAsync(orderId, userId, cancellationToken);
             await LockUserRowForLoyaltyAsync(userId, cancellationToken);
 
-            var existingAwards = await _context.FidelityPointsTransactions
-                .AsNoTracking()
-                .Where(value => value.OrderId == orderId
-                    && value.TransactionType == TransactionType.Earned)
-                .OrderBy(value => value.Id)
-                .Take(2)
-                .ToListAsync(cancellationToken);
-
-            if (existingAwards.Count > 1)
+            var original = await FindOriginalAwardAsync(userId, orderId, points, orderTotal, cancellationToken);
+            if (original is not null)
             {
-                throw new ConflictException("Duplicate loyalty awards require reconciliation.");
-            }
-
-            if (existingAwards.Count == 1)
-            {
-                var original = existingAwards[0];
-                if (original.UserId != userId || original.Points != points
-                    || original.OrderTotal != orderTotal)
-                {
-                    throw new ConflictException("The original loyalty award does not match this retry.");
-                }
-
-                if (await LockBalanceRowForLoyaltyAsync(userId, cancellationToken) is null)
-                {
-                    throw new ConflictException("The original loyalty award has no balance record.");
-                }
-
                 if (transaction is not null)
                 {
                     await transaction.CommitAsync(cancellationToken);
                 }
-
                 return original;
             }
 
@@ -129,5 +104,35 @@ public partial class FidelityPointsService
                 await transaction.DisposeAsync();
             }
         }
+    }
+
+
+    private async Task<FidelityPointsTransaction?> FindOriginalAwardAsync(
+        Guid userId, Guid orderId, int points, decimal orderTotal, CancellationToken cancellationToken)
+    {
+        var existingAwards = await _context.FidelityPointsTransactions
+            .AsNoTracking()
+            .Where(value => value.OrderId == orderId && value.TransactionType == TransactionType.Earned)
+            .OrderBy(value => value.Id)
+            .Take(2)
+            .ToListAsync(cancellationToken);
+        if (existingAwards.Count > 1)
+        {
+            throw new ConflictException("Duplicate loyalty awards require reconciliation.");
+        }
+        if (existingAwards.Count == 0)
+        {
+            return null;
+        }
+        var original = existingAwards[0];
+        if (original.UserId != userId || original.Points != points || original.OrderTotal != orderTotal)
+        {
+            throw new ConflictException("The original loyalty award does not match this retry.");
+        }
+        if (await LockBalanceRowForLoyaltyAsync(userId, cancellationToken) is null)
+        {
+            throw new ConflictException("The original loyalty award has no balance record.");
+        }
+        return original;
     }
 }
