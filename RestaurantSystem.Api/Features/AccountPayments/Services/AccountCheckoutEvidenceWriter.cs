@@ -28,12 +28,14 @@ public sealed class AccountCheckoutEvidenceWriter(ApplicationDbContext context,
         var before = (locked.Attempt.State, journal.ProviderCapturedMinor,
             journal.ProviderRefundedMinor, journal.ReconciliationRequired);
         evidence.Validate(journal);
+        var verifiedRefundedMinor = await AccountCheckoutAmendmentRefundProof.ValidateAsync(
+            context, journal, evidence, cancellationToken);
         journal.ProviderSessionId = evidence.Session.Id;
         journal.ProviderIntentId = evidence.Session.IntentId;
         locked.Attempt.ProviderSessionId = evidence.Session.Id;
         locked.Attempt.ProviderAccountId = journal.ProviderAccountId;
         RecordCharge(locked, evidence);
-        RecordState(locked, evidence);
+        RecordState(locked, evidence, verifiedRefundedMinor);
         // Preserve the evidence identity across PostgreSQL timestamp precision.
         journal.LastVerifiedAt = DateTimeOffset.FromUnixTimeMilliseconds(clock.GetUtcNow().ToUnixTimeMilliseconds()).UtcDateTime;
         journal.NextReconcileAt = journal.LastVerifiedAt.Value.AddSeconds(options.Value.ReconciliationIntervalSeconds);
@@ -47,17 +49,18 @@ public sealed class AccountCheckoutEvidenceWriter(ApplicationDbContext context,
         return journal;
     }
 
-    private void RecordState(LockedAccountCheckout locked, AccountCheckoutCanonicalEvidence evidence)
+    private void RecordState(LockedAccountCheckout locked, AccountCheckoutCanonicalEvidence evidence,
+        long verifiedRefundedMinor)
     {
         var attempt = locked.Attempt;
         var journal = locked.Journal;
         if (journal.ProviderCapturedMinor > 0)
         {
-            var hasCapture = evidence.HasUnreversedCapture(journal);
+            var hasCapture = evidence.HasCapturedChargeWithVerifiedRefunds(journal, verifiedRefundedMinor);
             var posted = attempt.State == AccountPaymentState.Captured
                 && attempt.Allocations.Count > 0 && attempt.Allocations.All(value => value.OrderPaymentId.HasValue);
             journal.ReconciliationRequired = !hasCapture || !posted;
-            if (!posted) ChangeState(attempt, hasCapture
+            if (!posted) ChangeState(attempt, hasCapture && verifiedRefundedMinor == 0
                 ? AccountPaymentState.Processing : AccountPaymentState.ReconciliationRequired);
             return;
         }

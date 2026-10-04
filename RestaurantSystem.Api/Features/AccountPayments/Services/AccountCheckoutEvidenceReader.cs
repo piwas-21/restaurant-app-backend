@@ -1,13 +1,16 @@
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Features.AccountPayments.Dtos;
 using RestaurantSystem.Api.Features.AccountPayments.Interfaces;
+using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Domain.Entities;
 using Stripe;
 
 namespace RestaurantSystem.Api.Features.AccountPayments.Services;
 
 /// <summary>Canonical session, intent and charge reads execute with no database transaction.</summary>
-public sealed class AccountCheckoutEvidenceReader(IAccountStripeCheckoutClient provider, TimeProvider clock)
+public sealed class AccountCheckoutEvidenceReader(IAccountStripeCheckoutClient provider,
+    IOrderAmendmentRefundProvider refundProvider, TimeProvider clock)
     : IAccountCheckoutEvidenceReader
 {
     public async Task<AccountCheckoutCanonicalEvidence> ReadAsync(AccountCheckoutJournal journal,
@@ -37,9 +40,26 @@ public sealed class AccountCheckoutEvidenceReader(IAccountStripeCheckoutClient p
             : await provider.GetChargeAsync(chargeId, cancellationToken);
         if (intent?.ChargeId is not null && charge is null)
             throw new ConflictException("The original provider charge is unavailable. Its reservation remains held.");
-        var evidence = new AccountCheckoutCanonicalEvidence(session, intent, charge);
+        var refunds = charge is { CapturedMinor: > 0 }
+            ? await ReadChargeRefundsAsync(charge, journal, cancellationToken)
+            : [];
+        var evidence = new AccountCheckoutCanonicalEvidence(session, intent, charge)
+        {
+            Refunds = refunds
+        };
         evidence.Validate(journal);
         return evidence;
+    }
+
+    private async Task<IReadOnlyList<AmendmentRefundEvidence>> ReadChargeRefundsAsync(
+        AccountStripeCharge charge, AccountCheckoutJournal journal,
+            CancellationToken cancellationToken)
+    {
+        var context = refundProvider.ReadContext();
+        if (context.ConnectedAccountId != journal.ProviderAccountId
+            || context.LiveMode != journal.ProviderLiveMode)
+            throw new ConflictException("Reconcile the original provider account and environment.");
+        return await refundProvider.ListForChargeAsync(charge.Id, cancellationToken);
     }
     private async Task<AccountStripeSession> ExpireAndReadAsync(string sessionId, CancellationToken cancellationToken)
     {

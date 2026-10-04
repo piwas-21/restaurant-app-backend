@@ -7,7 +7,8 @@ public sealed record OrderAmendmentUnitScope(
     Guid OrderItemId,
     int StartOrdinal,
     int Count,
-    bool WholeLine);
+    bool WholeLine,
+    bool AllowCapturedReversal = false);
 
 public interface IOrderAmendmentReservationGuard
 {

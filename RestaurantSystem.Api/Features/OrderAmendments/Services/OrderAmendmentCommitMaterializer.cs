@@ -14,14 +14,17 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 internal sealed class OrderAmendmentCommitMaterializer(
     ApplicationDbContext context, IOrderAmendmentReservationGuard reservationGuard,
     OrderAmendmentSupplementBuilder supplements, OrderAmendmentChangeBuilder changeBuilder,
-    IOrderMappingService mapping, IOrderAmendmentFinancialResolution financial)
+    IOrderMappingService mapping, IOrderDisplayCurrencyResolver currencyResolver,
+    IOrderAmendmentFinancialResolution financial)
 {
     internal async Task<OrderAmendmentPreparedCommit> PrepareAsync(
         Order source, OrderAmendment amendment, OrderAmendmentCommitRequest request,
         ICurrentUserService currentUser, CancellationToken cancellationToken)
     {
         var quoteRequest = OrderAmendmentJson.Deserialize<OrderAmendmentQuoteRequest>(amendment.RequestJson);
-        OrderAmendmentPolicy.ValidateOrderContext(source, quoteRequest);
+        var refundAuthority = await OrderAmendmentRefundAuthorityReader.ReadAsync(
+            context, source, currencyResolver, cancellationToken);
+        OrderAmendmentPolicy.ValidateOrderContext(source, quoteRequest, refundAuthority);
         OrderAmendmentPolicy.ValidateChangeAuthority(source, quoteRequest, currentUser);
         if (source.Version != request.ExpectedOrderVersion || source.Version != amendment.ExpectedOrderVersion)
             throw new ConflictException("The source order changed after the quote. Quote again.");
@@ -30,12 +33,6 @@ internal sealed class OrderAmendmentCommitMaterializer(
             .ToDictionary(item => item.Id, item => item.Quantity);
         await OrderAmendmentRangeValidator.ValidateAsync(context, source.Id, quoteRequest, quantities, cancellationToken);
         var quotedChanges = DeserializeChanges(amendment.ChangesJson);
-        var scopes = quotedChanges.Select(change => change.Kind switch
-        {
-            OrderAmendmentChangeKind.InstructionChange => new OrderAmendmentUnitScope(change.OrderItemId, 0, 0, WholeLine: true),
-            _ => new OrderAmendmentUnitScope(change.OrderItemId, change.StartOrdinal, change.Quantity, WholeLine: false)
-        }).ToList();
-        await reservationGuard.AssertUnitsMutableAsync(source.Id, scopes, cancellationToken);
         var supplement = await supplements.BuildAsync(source, quoteRequest, cancellationToken);
         var supplementDto = ValidateSupplement(supplement, amendment.SupplementSnapshotJson);
         var changes = await changeBuilder.BuildAsync(source, sourceDto, quoteRequest, supplementDto, cancellationToken);
@@ -46,6 +43,17 @@ internal sealed class OrderAmendmentCommitMaterializer(
         var quotedFinancial = OrderAmendmentJson.Deserialize<OrderAmendmentFinancialPreviewDto>(amendment.FinancialResolutionJson);
         if (preview != quotedFinancial)
             throw new ConflictException("The financial preview changed after the quote. Quote again.");
+        var mayResolveCapturedCredit = preview.ResolutionStatus == OrderAmendmentFinancialResolutionStatus.Pending
+            && preview.CreditState == OrderAmendmentCreditState.PendingAllocationReview
+            && preview.PotentialCreditMinor > 0;
+        var scopes = quotedChanges.Select(change => new OrderAmendmentUnitScope(
+            change.OrderItemId,
+            change.Kind == OrderAmendmentChangeKind.InstructionChange ? 0 : change.StartOrdinal,
+            change.Kind == OrderAmendmentChangeKind.InstructionChange ? 0 : change.Quantity,
+            WholeLine: change.Kind == OrderAmendmentChangeKind.InstructionChange,
+            AllowCapturedReversal: mayResolveCapturedCredit
+                && change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)).ToList();
+        await reservationGuard.AssertUnitsMutableAsync(source.Id, scopes, cancellationToken);
         return new OrderAmendmentPreparedCommit(quoteRequest, supplement, changes, preview);
     }
 

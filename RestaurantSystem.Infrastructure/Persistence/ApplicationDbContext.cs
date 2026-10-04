@@ -104,6 +104,12 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<TableBillPaymentOperation> TableBillPaymentOperations { get; set; }
         public DbSet<OrderAmendment> OrderAmendments { get; set; }
         public DbSet<OrderBillingCredit> OrderBillingCredits { get; set; }
+        public DbSet<OrderAmendmentResolutionOperation> OrderAmendmentResolutionOperations { get; set; }
+        public DbSet<OrderAmendmentResolutionRefusal> OrderAmendmentResolutionRefusals { get; set; }
+        public DbSet<OrderAmendmentRefundLeg> OrderAmendmentRefundLegs { get; set; }
+        public DbSet<OrderAmendmentRefundAttempt> OrderAmendmentRefundAttempts { get; set; }
+        public DbSet<OrderAmendmentRefundEvidence> OrderAmendmentRefundEvidence { get; set; }
+        public DbSet<AccountPaymentAllocationReversal> AccountPaymentAllocationReversals { get; set; }
         public DbSet<TableGuestAdmission> TableGuestAdmissions { get; set; }
         public DbSet<TableGuestParticipant> TableGuestParticipants { get; set; }
         public DbSet<TableGuestRoundOperation> TableGuestRoundOperations { get; set; }

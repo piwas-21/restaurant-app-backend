@@ -92,6 +92,8 @@ internal sealed class OrderAmendmentCommitService : IOrderAmendmentCommitService
 
             var source = await OrderAmendmentOrderLoader.LoadSourceAsync(_context, orderId, cancellationToken)
                 ?? throw new NotFoundException("The source order was not found.");
+            await OrderAmendmentFinancialGuard.AssertNoPendingSourceResolutionAsync(
+                _context, source.Id, cancellationToken);
             var prepared = await _materializer.PrepareAsync(source, amendment, request, _currentUser, cancellationToken);
             if (prepared.Request.Additions.Count > 0 || prepared.Changes.Any(change =>
                     change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace))

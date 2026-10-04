@@ -10,6 +10,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class TableReadinessMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string PreviousMigration = "20261003090319_AddOrderBillingCredits";
+    private const string ReadinessMigration = "20261003120021_AddTableVisitReadiness";
+    private const string LatestMigration = "20261003153304_AddOrderAmendmentResolutionRefusals";
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
@@ -51,26 +53,37 @@ public sealed class TableReadinessMigrationTests(DatabaseFixture fixture) : IAsy
     [InlineData(false)]
     public async Task Rollback_refuses_used_readiness_even_when_the_table_needs_reset(bool withOperation)
     {
+        (await LatestAppliedMigrationAsync()).Should().Be(LatestMigration);
         var tableId = await SeedTableAsync();
-        await using (var context = fixture.CreateContext())
+        try
         {
-            if (withOperation)
-                context.TableReadyOperations.Add(NewOperation(tableId, succeeded: false));
-            else
+            await using (var context = fixture.CreateContext())
             {
-                var table = await context.Tables.SingleAsync(value => value.Id == tableId);
-                table.ReadinessVersion = 2;
+                if (withOperation)
+                    context.TableReadyOperations.Add(NewOperation(tableId, succeeded: false));
+                else
+                {
+                    var table = await context.Tables.SingleAsync(value => value.Id == tableId);
+                    table.ReadinessVersion = 2;
+                }
+                await context.SaveChangesAsync();
             }
-            await context.SaveChangesAsync();
+            var rollback = () => MigrateAsync(PreviousMigration);
+            (await rollback.Should().ThrowAsync<PostgresException>())
+                .Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+            (await LatestAppliedMigrationAsync()).Should().Be(ReadinessMigration,
+                "later empty migrations roll back before the readiness guard rejects its own Down");
+            await using var verify = fixture.CreateContext();
+            var retained = await verify.Tables.SingleAsync(value => value.Id == tableId);
+            retained.ReadinessState.Should().Be(TableReadinessState.NeedsReset);
+            retained.ReadinessVersion.Should().Be(withOperation ? 1 : 2);
+            (await verify.TableReadyOperations.CountAsync()).Should().Be(withOperation ? 1 : 0);
         }
-        var rollback = () => MigrateAsync(PreviousMigration);
-        (await rollback.Should().ThrowAsync<PostgresException>())
-            .Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
-        await using var verify = fixture.CreateContext();
-        var retained = await verify.Tables.SingleAsync(value => value.Id == tableId);
-        retained.ReadinessState.Should().Be(TableReadinessState.NeedsReset);
-        retained.ReadinessVersion.Should().Be(withOperation ? 1 : 2);
-        (await verify.TableReadyOperations.CountAsync()).Should().Be(withOperation ? 1 : 0);
+        finally
+        {
+            await MigrateAsync();
+        }
+        (await LatestAppliedMigrationAsync()).Should().Be(LatestMigration);
     }
 
     [Theory]
@@ -169,5 +182,15 @@ public sealed class TableReadinessMigrationTests(DatabaseFixture fixture) : IAsy
     {
         await using var context = fixture.CreateContext();
         await context.Database.MigrateAsync(target);
+    }
+
+    private async Task<string> LatestAppliedMigrationAsync()
+    {
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT \"MigrationId\" FROM \"__EFMigrationsHistory\" ORDER BY \"MigrationId\" DESC LIMIT 1",
+            connection);
+        return (string)(await command.ExecuteScalarAsync())!;
     }
 }

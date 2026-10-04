@@ -11,12 +11,14 @@ internal static class AccountDebtProjection
     internal static AccountDebtSnapshot Project(
         IReadOnlyList<Order> orders, AccountMoney money,
         IReadOnlyList<AccountDebtSegment> captured, IReadOnlyList<AccountDebtSegment> reserved,
-        IReadOnlyList<OrderAmendment>? amendments = null, int billingAllocationVersion = 1)
+        IReadOnlyList<OrderAmendment>? amendments = null, int billingAllocationVersion = 1,
+        IReadOnlyDictionary<Guid, long>? authorizedRefundMinorByPayment = null)
     {
         if (billingAllocationVersion is not (0 or 1))
             throw new ConflictException("The account uses an unsupported charge allocation model.");
         RequireUniqueOrders(orders);
-        var dueBeforeLedger = ProjectOrderCharges(orders, money, captured, reserved, billingAllocationVersion);
+        var dueBeforeLedger = ProjectOrderCharges(orders, money, captured, reserved,
+            billingAllocationVersion, authorizedRefundMinorByPayment ?? new Dictionary<Guid, long>());
         var amendmentAdjusted = AccountDebtAmendmentProjection.ExcludeVoidedUnits(
             orders, dueBeforeLedger, amendments ?? [], legacyFullCharge: billingAllocationVersion == 0);
         var outstanding = ApplyHistoricalContributions(
@@ -35,23 +37,26 @@ internal static class AccountDebtProjection
     private static List<AccountDebtSegment> ProjectOrderCharges(
         IReadOnlyList<Order> orders, AccountMoney money,
         IReadOnlyList<AccountDebtSegment> captured, IReadOnlyList<AccountDebtSegment> reserved,
-        int billingAllocationVersion)
+        int billingAllocationVersion, IReadOnlyDictionary<Guid, long> authorizedRefundMinorByPayment)
     {
         var due = new List<AccountDebtSegment>();
         foreach (var order in orders.OrderBy(order => order.OrderDate).ThenBy(order => order.Id))
-            ProjectOrder(order, money, captured, reserved, billingAllocationVersion, due);
+            ProjectOrder(order, money, captured, reserved, billingAllocationVersion,
+                authorizedRefundMinorByPayment, due);
         return due;
     }
 
     private static void ProjectOrder(
         Order order, AccountMoney money,
         IReadOnlyList<AccountDebtSegment> captured, IReadOnlyList<AccountDebtSegment> reserved,
-        int billingAllocationVersion, List<AccountDebtSegment> due)
+        int billingAllocationVersion, IReadOnlyDictionary<Guid, long> authorizedRefundMinorByPayment,
+        List<AccountDebtSegment> due)
     {
         var applied = AccountDebtMath.Total(captured.Where(value => value.OrderId == order.Id));
         var claimed = AccountDebtMath.Total(reserved.Where(value => value.OrderId == order.Id));
         var fullyRefunded = HasProvenFullRefund(order);
-        if (HasRefundEvidence(order) && !fullyRefunded)
+        if (HasRefundEvidence(order) && !fullyRefunded
+            && !HasAuthorizedPartialRefund(order, money, authorizedRefundMinorByPayment))
             throw new ConflictException("Partial or unresolved refunds require account reconciliation.");
         if (IsWholeOrderReversal(order) || fullyRefunded)
         {
@@ -166,6 +171,19 @@ internal static class AccountDebtProjection
         order.PaymentStatus is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded
         || order.Payments.Any(payment => payment.IsRefunded || payment.RefundedAmount > 0
             || payment.Status is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded);
+
+    private static bool HasAuthorizedPartialRefund(Order order, AccountMoney money,
+        IReadOnlyDictionary<Guid, long> authorizedRefundMinorByPayment)
+    {
+        foreach (var payment in order.Payments)
+        {
+            var actual = money.ToMinor(payment.RefundedAmount
+                ?? (payment.IsRefunded || payment.Status == PaymentStatus.Refunded ? payment.Amount : 0m));
+            if (actual != authorizedRefundMinorByPayment.GetValueOrDefault(payment.Id))
+                return false;
+        }
+        return order.Payments.Any(payment => authorizedRefundMinorByPayment.ContainsKey(payment.Id));
+    }
 
     private static bool HasProvenFullRefund(Order order)
     {
