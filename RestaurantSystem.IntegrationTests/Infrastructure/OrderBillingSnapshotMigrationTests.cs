@@ -10,8 +10,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 [Collection("Database Lane 4")]
 public sealed class OrderBillingSnapshotMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
-    private const string PreviousMigration = "20261004043011_AddAccountCashRefundEvidence";
-    private const string SnapshotMigration = "20261004072343_AddNativeOrderBillingSnapshots"; // pragma: allowlist secret
+    private const string PreviousMigration = "20261004105734_AddCashHistoryCapacityRefusal"; // pragma: allowlist secret
+    private const string SnapshotMigration = "20261004172810_AddNativeOrderBillingSnapshots"; // pragma: allowlist secret
     private static readonly string[] SnapshotTables =
     ["order_billing_snapshots", "order_billing_snapshot_units", "order_billing_snapshot_owner_links"];
 

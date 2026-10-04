@@ -11,7 +11,7 @@ public sealed class TableReadinessMigrationTests(DatabaseFixture fixture) : IAsy
 {
     private const string PreviousMigration = "20261003090319_AddOrderBillingCredits";
     private const string ReadinessMigration = "20261003120021_AddTableVisitReadiness";
-    private const string LatestMigration = "20261004105734_AddCashHistoryCapacityRefusal"; // pragma: allowlist secret
+    private const string LatestMigration = "20261004172810_AddNativeOrderBillingSnapshots"; // pragma: allowlist secret
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;

@@ -10,7 +10,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 public sealed class CashHistoryCapacityRefusalMigrationTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private const string PreviousMigration = "20261004043011_AddAccountCashRefundEvidence"; // pragma: allowlist secret
-    private const string LatestMigration = "20261004105734_AddCashHistoryCapacityRefusal"; // pragma: allowlist secret
+    private const string CashMigration = "20261004105734_AddCashHistoryCapacityRefusal"; // pragma: allowlist secret
+    private const string LatestMigration = "20261004172810_AddNativeOrderBillingSnapshots"; // pragma: allowlist secret
     private static readonly string[] ExistingFailureCodes =
     [
         "quoteExpired",
@@ -65,7 +66,8 @@ public sealed class CashHistoryCapacityRefusalMigrationTests(DatabaseFixture fix
             refusal.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
             refusal.MessageText.Should().Be("Cash history capacity refusal history must be retained");
 
-            (await LatestAppliedMigrationAsync()).Should().Be(LatestMigration);
+            // Empty snapshot history rolls back first; the cash migration then refuses.
+            (await LatestAppliedMigrationAsync()).Should().Be(CashMigration);
             (await RefusalCountAsync()).Should().Be(1);
             await using var verify = fixture.CreateContext();
             (await verify.Orders.CountAsync(value => value.Id == seeded.OrderId)).Should().Be(1);

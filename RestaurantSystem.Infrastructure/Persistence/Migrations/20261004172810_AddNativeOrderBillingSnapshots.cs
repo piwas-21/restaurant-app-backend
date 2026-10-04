@@ -9,7 +9,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261004072343_AddNativeOrderBillingSnapshots")] // pragma: allowlist secret
+    [Migration("20261004172810_AddNativeOrderBillingSnapshots")] // pragma: allowlist secret
     public partial class AddNativeOrderBillingSnapshots : Migration
     {
         /// <inheritdoc />
@@ -61,7 +61,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     redemption_transaction_id = table.Column<Guid>(type: "uuid", nullable: true),
                     redemption_transaction_type = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: true),
                     redemption_transaction_points = table.Column<int>(type: "integer", nullable: true),
-                    redemption_transaction_order_total = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    redemption_transaction_order_total = table.Column<decimal>(type: "numeric(18,2)", nullable: true),
                     redemption_transaction_created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     tax_category = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     tax_rate_basis_points = table.Column<int>(type: "integer", nullable: false),
