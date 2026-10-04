@@ -12,8 +12,6 @@ using RestaurantSystem.Infrastructure.Persistence;
 
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261004043011_AddAccountCashRefundEvidence")]
     partial class AddAccountCashRefundEvidence
     {
         /// <inheritdoc />

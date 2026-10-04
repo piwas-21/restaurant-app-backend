@@ -1,11 +1,14 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 #nullable disable
 
 namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20261004043011_AddAccountCashRefundEvidence")]
     public partial class AddAccountCashRefundEvidence : Migration
     {
         /// <inheritdoc />
