@@ -40,4 +40,6 @@ public sealed record ManualTillConfirmationRequest
 
     [JsonRequired]
     public required string TillReference { get; init; }
+
+    public long? CashReturnedMinor { get; init; }
 }

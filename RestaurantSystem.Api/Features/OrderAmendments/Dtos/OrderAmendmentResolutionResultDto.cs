@@ -20,6 +20,14 @@ public sealed record OrderAmendmentRefundLegResultDto(
     string State,
     long AmountMinor,
     DateTime? ResolvedAt,
-    ManualTillConfirmationResultDto? TillConfirmation = null);
+    ManualTillConfirmationResultDto? TillConfirmation = null,
+    CashRefundQuoteDto? CashRefund = null,
+    CashReturnEvidenceDto? CashReturn = null);
 
 public sealed record ManualTillConfirmationResultDto(string TillReference, DateTime ConfirmedAt);
+
+public sealed record CashReturnEvidenceDto(
+    long ExactRefundAmountMinor,
+    long RefundAdjustmentMinor,
+    long CashReturnedMinor,
+    DateTime ConfirmedAt);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Domain.Common.Enums;
@@ -71,7 +72,15 @@ public sealed partial class OrderAmendmentResolutionService
             CreatedBy = currentUser.GetAuditIdentifier()
         };
         if (plan.Custody == OrderAmendmentRefundCustody.ManualTill)
+        {
+            if (plan.CashRefund is not null)
+            {
+                var cashIntent = CreateCashRefundIntent(operation, leg, plan.CashRefund, now);
+                leg.CashRefundIntent = cashIntent;
+                context.AccountCashRefundIntents.Add(cashIntent);
+            }
             return leg;
+        }
 
         var attemptId = Guid.NewGuid();
         var attempt = new OrderAmendmentRefundAttempt
@@ -90,6 +99,32 @@ public sealed partial class OrderAmendmentResolutionService
                 null, null, currentUser.GetAuditIdentifier())));
         return leg;
     }
+
+    private AccountCashRefundIntent CreateCashRefundIntent(
+        OrderAmendmentResolutionOperation operation, OrderAmendmentRefundLeg leg,
+        AccountCashRefundPlan plan, DateTime now) => new()
+        {
+            Id = Guid.NewGuid(),
+            RefundLegId = leg.Id,
+            OperationId = operation.Id,
+            AttemptId = plan.AttemptId,
+            CollectionReceiptId = plan.ReceiptId,
+            PolicyVersion = plan.PolicyVersion,
+            Currency = plan.Currency,
+            OriginalExactAmountMinor = plan.OriginalExactAmountMinor,
+            OriginalAdjustmentMinor = plan.OriginalAdjustmentMinor,
+            OriginalDueAmountMinor = plan.OriginalDueAmountMinor,
+            PreviouslyRefundedExactMinor = plan.PreviouslyRefundedExactMinor,
+            PreviouslyRefundedCashMinor = plan.PreviouslyRefundedCashMinor,
+            ExactRefundAmountMinor = plan.ExactRefundAmountMinor,
+            RefundAdjustmentMinor = plan.RefundAdjustmentMinor,
+            CashRefundAmountMinor = plan.CashRefundAmountMinor,
+            RetainedExactAmountMinor = plan.RetainedExactAmountMinor,
+            RetainedCashDueMinor = plan.RetainedCashDueMinor,
+            PriorHistoryFingerprint = plan.PriorHistoryFingerprint,
+            CreatedAt = now,
+            CreatedBy = currentUser.GetAuditIdentifier()
+        };
 
     private static OrderAmendmentRefundEvidence NewEvidence(
         OrderAmendmentRefundLeg leg, OrderAmendmentRefundAttempt? attempt, int sequence,

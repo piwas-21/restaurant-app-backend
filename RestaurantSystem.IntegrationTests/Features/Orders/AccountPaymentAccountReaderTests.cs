@@ -259,7 +259,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
             new AccountPaymentCaptureWriter(context, currentUser.Object, TimeProvider.System),
             fidelity.Object, TimeProvider.System, NullLogger<AccountPaymentCaptureService>.Instance);
         return await service.CaptureManualAsync(sessionId, operationId,
-            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion }, CancellationToken.None);
+            new CaptureAccountPaymentRequest { ExpectedVersion = expectedVersion, ReceivedMinor = 335 }, CancellationToken.None);
     }
 
     private static CreateAccountPaymentQuoteRequest EqualQuote(

@@ -28,9 +28,12 @@ public sealed class AccountCashCollectionReceiptConfiguration
         builder.Property(value => value.ActorKind).HasConversion<string>().HasMaxLength(20);
         builder.Property(value => value.ActorRole).HasConversion<string>().HasMaxLength(20);
         builder.Property(value => value.RequestHash).HasMaxLength(64).IsRequired();
-        builder.HasIndex(value => value.AttemptId).IsUnique();
+        builder.HasKey(value => value.Id).HasName("pk_account_cash_collection_receipt");
+        builder.HasIndex(value => value.AttemptId)
+            .HasDatabaseName("ix_account_cash_collection_receipt_attempt_id").IsUnique();
         builder.HasOne(value => value.Attempt).WithOne(value => value.CashCollectionReceipt)
             .HasForeignKey<AccountCashCollectionReceipt>(value => value.AttemptId)
+            .HasConstraintName("fk_account_cash_collection_receipt_accountpaymentattempts_atte~")
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

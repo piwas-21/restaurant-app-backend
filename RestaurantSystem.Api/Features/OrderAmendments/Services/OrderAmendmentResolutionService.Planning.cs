@@ -54,7 +54,8 @@ public sealed partial class OrderAmendmentResolutionService
             .Where(value => value.SourceOrderId == source.Id).ToListAsync(cancellationToken);
         var plan = OrderAmendmentResolutionPlanner.Build(new OrderAmendmentResolutionPlanningInput(source, amendment, request, changes,
             attempts, journals, priorRefunds.Reversals,
-            priorRefunds.AuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory));
+            priorRefunds.AuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory,
+            priorRefunds.CashRefundHistoryByAttempt));
         var sourceFingerprint = OrderAmendmentFinancialSourceFingerprint.Create(new OrderAmendmentFinancialSourceState(
             source, amendment, sourceAmendments, attempts, journals, priorRefunds.Reversals,
             priorRefunds.AuthorizedRefundMinorByPayment, credits, loyaltyTransactions, money.Currency));
@@ -82,6 +83,7 @@ public sealed partial class OrderAmendmentResolutionService
         var attempts = await context.AccountPaymentAttempts.AsNoTracking()
             .Where(value => value.ServiceSessionId == sessionId
                 && value.Allocations.Any(allocation => allocation.OrderId == sourceOrderId))
+            .Include(value => value.CashCollectionReceipt)
             .Include(value => value.Allocations.Where(allocation => allocation.OrderId == sourceOrderId))
             .ToListAsync(cancellationToken);
         var activeIds = attempts.Where(value => value.State == AccountPaymentState.Captured

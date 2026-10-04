@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.OrderAmendments.Dtos;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
@@ -14,7 +15,14 @@ internal static class OrderAmendmentResolutionFingerprint
             expiresAt, request.ManualRefunds.OrderBy(value => value.PaymentId).ToArray(),
             plan.Currency, plan.CreditMinor, plan.RefundMinor, plan.UnpaidWaivedMinor,
             plan.Legs.OrderBy(value => value.Payment.Id).Select(ToLeg).ToArray());
-        return OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(snapshot));
+        var cashRefunds = plan.Legs.Where(value => value.CashRefund is not null)
+            .OrderBy(value => value.Payment.Id)
+            .Select(value => new CashRefundFingerprint(value.Payment.Id, value.CashRefund!))
+            .ToArray();
+        return cashRefunds.Length == 0
+            ? OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(snapshot))
+            : OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(
+                new CashBoundQuoteFingerprint(snapshot, cashRefunds)));
     }
 
     internal static string RequestHash(Guid actorId, Guid orderId, Guid amendmentId,
@@ -48,4 +56,9 @@ internal static class OrderAmendmentResolutionFingerprint
         Guid ClientOperationId, [property: JsonPropertyName("quoteHash")] string RequestQuoteHash, DateTime ExpiresAt,
         int ExpectedOrderVersion, long? ExpectedAccountRevision, string Currency,
         IReadOnlyList<ManualRefundSelectionRequest> ManualRefunds);
+
+    private sealed record CashBoundQuoteFingerprint(
+        QuoteFingerprint Quote, IReadOnlyList<CashRefundFingerprint> CashRefunds);
+
+    private sealed record CashRefundFingerprint(Guid PaymentId, AccountCashRefundPlan Plan);
 }

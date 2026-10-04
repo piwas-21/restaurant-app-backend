@@ -115,6 +115,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<TableGuestRoundOperation> TableGuestRoundOperations { get; set; }
         public DbSet<AccountPaymentAttempt> AccountPaymentAttempts { get; set; }
         public DbSet<AccountPaymentAllocation> AccountPaymentAllocations { get; set; }
+        public DbSet<AccountCashCollectionReceipt> AccountCashCollectionReceipts { get; set; }
+        public DbSet<AccountCashRefundIntent> AccountCashRefundIntents { get; set; }
+        public DbSet<AccountCashRefundEvidence> AccountCashRefundEvidence { get; set; }
         public DbSet<AccountEqualSharePlan> AccountEqualSharePlans { get; set; }
         public DbSet<AccountCheckoutJournal> AccountCheckoutJournals { get; set; }
         public DbSet<TableServicePaymentHandoff> TableServicePaymentHandoffs { get; set; }

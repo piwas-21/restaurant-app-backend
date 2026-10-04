@@ -52,7 +52,7 @@ public sealed partial class OrderAmendmentResolutionService
         var removals = OrderAmendmentRefundScopePlanner.RemovalRanges(changes);
         OrderAmendmentRefundScopePlanner.EnsureNoPriorRemovalRefund(removals, refunds.Reversals);
         _ = OrderAmendmentResolutionPlanner.PlanAllocatedRefunds(source, attempts, journals,
-            refunds.Reversals, removals, money);
+            refunds.Reversals, removals, money, refunds.CashRefundHistoryByAttempt);
         await OrderBillingCreditConsistency.AssertAsync(context, [source.Id], cancellationToken);
 
         var allocatedPaymentIds = attempts.SelectMany(value => value.Allocations)

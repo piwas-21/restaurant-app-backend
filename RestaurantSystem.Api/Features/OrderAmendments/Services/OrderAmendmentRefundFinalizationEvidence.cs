@@ -29,6 +29,9 @@ internal static class OrderAmendmentRefundFinalizationEvidence
     {
         var scopes = OrderAmendmentJson.Deserialize<List<OrderAmendmentRefundScope>>(leg.FrozenScopesJson);
         if ((leg.AccountPaymentAttemptId is null) != (scopes.Count == 0) || leg.Attempts.Count != 0
+            || scopes.Sum(value => value.AmountMinor) != leg.AmountMinor
+            || scopes.Select(value => (value.AllocationId, value.StartOrdinal, value.UnitCount))
+                .Distinct().Count() != scopes.Count
             || !AccountAmendmentRefundIntegrity.HasNoProviderContext(leg)
             || !OrderAmendmentTillReferencePolicy.IsValid(leg.ManualTillReference) || evidence.Length != 1
             || evidence[0].Kind != OrderAmendmentRefundEvidenceKind.ManualTillConfirmation
@@ -39,6 +42,13 @@ internal static class OrderAmendmentRefundFinalizationEvidence
             || evidence[0].ActorUserId != operation.ActorUserId
             || evidence[0].ActorRole != operation.ActorRole)
             throw new ConflictException("The till refund confirmation requires reconciliation.");
+
+        if (leg.CashRefundIntent is AccountCashRefundIntent intent)
+        {
+            var expected = AccountCashRefundPlan.FromIntent(intent).SettlementQuote();
+            AccountCashRefundIntentValidator.RequireReturnEvidence(intent, leg, operation,
+                expected, intent.ReturnEvidence);
+        }
     }
 
     private static void ValidateProviderEvidence(OrderAmendmentResolutionOperation operation,

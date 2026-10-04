@@ -11,6 +11,7 @@ public sealed class AccountCashCollectionReceiptMigrationTests(DatabaseFixture f
 {
     private const string BeforeCashReceipts = "20261003153304_AddOrderAmendmentResolutionRefusals";
     private const string CashMigration = "20261004031747_AddAccountCashCollectionReceipts";
+    private const string RefundMigration = "20261004043011_AddAccountCashRefundEvidence";
     private static readonly DateTime CapturedAt = new(2026, 10, 4, 3, 0, 0, DateTimeKind.Utc);
 
     public Task InitializeAsync() => fixture.ResetDatabaseAsync();
@@ -24,10 +25,20 @@ public sealed class AccountCashCollectionReceiptMigrationTests(DatabaseFixture f
             await MigrateAsync(BeforeCashReceipts);
             (await ScalarAsync("SELECT to_regclass('account_cash_collection_receipts') IS NULL"))
                 .Should().Be(true);
+            (await ScalarAsync("SELECT to_regclass('account_cash_refund_intents') IS NULL"))
+                .Should().Be(true);
+            (await ScalarAsync("SELECT to_regclass('account_cash_refund_evidence') IS NULL"))
+                .Should().Be(true);
             await MigrateAsync();
             (await ScalarAsync("SELECT to_regclass('account_cash_collection_receipts') IS NOT NULL"))
                 .Should().Be(true);
+            (await ScalarAsync("SELECT to_regclass('account_cash_refund_intents') IS NOT NULL"))
+                .Should().Be(true);
+            (await ScalarAsync("SELECT to_regclass('account_cash_refund_evidence') IS NOT NULL"))
+                .Should().Be(true);
             (await ScalarAsync("SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = @value", CashMigration))
+                .Should().Be(1L);
+            (await ScalarAsync("SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = @value", RefundMigration))
                 .Should().Be(1L);
         }
         finally
@@ -63,6 +74,9 @@ public sealed class AccountCashCollectionReceiptMigrationTests(DatabaseFixture f
         (await ScalarAsync("SELECT count(*) FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = @value", CashMigration))
             .Should().Be(1L);
 
+        await MigrateAsync();
+        (await ScalarAsync("SELECT count(*) FROM account_cash_refund_intents")).Should().Be(0L);
+        (await ScalarAsync("SELECT count(*) FROM account_cash_refund_evidence")).Should().Be(0L);
         await fixture.ResetDatabaseAsync();
         (await ScalarAsync("SELECT count(*) FROM account_cash_collection_receipts")).Should().Be(0L,
             "disposable lane cleanup must clear immutable receipts without disabling their production triggers");

@@ -22,4 +22,5 @@ public sealed class OrderAmendmentRefundLeg : Entity
     public string? FailureCode { get; set; }
     public DateTime? ResolvedAt { get; set; }
     public ICollection<OrderAmendmentRefundAttempt> Attempts { get; set; } = [];
+    public AccountCashRefundIntent? CashRefundIntent { get; set; }
 }
