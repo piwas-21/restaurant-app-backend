@@ -23,6 +23,9 @@ public interface ITenantFeatures
     /// <summary>Whether exact visit payment quotes and reservations are enabled.</summary>
     bool TableAccountPaymentsV1 { get; }
 
+    /// <summary>Whether authenticated Server staff may start manual visit contributions.</summary>
+    bool ServerAccountCollectionV1 { get; }
+
     /// <summary>Whether a validated visit participant may start online account payments.</summary>
     bool TableGuestAccountPaymentsV1 { get; }
 

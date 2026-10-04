@@ -2,7 +2,6 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Common.Services.Interfaces;
-using RestaurantSystem.Api.Common.TenantFeatures;
 using RestaurantSystem.Api.Features.FloorPlan.Services;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.ServerWorkspace.Dtos;
@@ -32,6 +31,7 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
     private readonly decimal _paymentTolerance;
     private readonly int _reservationLookAheadDays;
     private readonly bool _tableVisitReadinessEnabled;
+    private readonly IServerFloorSnapshotPolicy? _policy;
 
     public ServerFloorSnapshotReader(
         ApplicationDbContext context,
@@ -40,7 +40,7 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         ITableBillAssembler bills,
         TimeProvider? timeProvider = null,
         IOptions<TableServiceSessionSettings>? settings = null,
-        ITenantFeatures? features = null)
+        IServerFloorSnapshotPolicy? policy = null)
     {
         _context = context;
         _clock = clock;
@@ -50,7 +50,8 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
         var sessionSettings = settings?.Value ?? new TableServiceSessionSettings();
         _paymentTolerance = sessionSettings.PaymentTolerance;
         _reservationLookAheadDays = sessionSettings.FloorReservationLookAheadDays;
-        _tableVisitReadinessEnabled = features?.TableVisitReadinessV1 == true;
+        _tableVisitReadinessEnabled = policy?.TableVisitReadinessEnabled == true;
+        _policy = policy;
     }
 
     public async Task<ServerFloorSnapshotDto> ReadAsync(CancellationToken cancellationToken)
@@ -75,7 +76,8 @@ public sealed class ServerFloorSnapshotReader : IServerFloorSnapshotReader
                 .AnyAsync(TableServiceSessionCloseRules.BlockingLegacyQuery(_paymentTolerance), cancellationToken);
         var reservations = await LoadReservationsAsync(tenantTime, cancellationToken);
         var projection = new ServerFloorSnapshotProjector(
-            _clock, _currentUser, _paymentTolerance, _tableVisitReadinessEnabled).Project(
+            _clock, _currentUser, _paymentTolerance, _tableVisitReadinessEnabled,
+            _policy?.CanStartCollection == true).Project(
                 new ServerFloorSnapshotInput(
                     plans, tables, sessions, orders, reservations, tenantTime, serverTime,
                     hasUnidentifiedLegacyOrders));

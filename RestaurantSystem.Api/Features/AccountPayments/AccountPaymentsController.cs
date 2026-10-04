@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Authorization;
 using RestaurantSystem.Api.Common.Models;
-using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.AccountPayments.Commands.CreateAccountEqualSharePlanCommand;
 using RestaurantSystem.Api.Features.AccountPayments.Commands.CreateAccountPaymentQuoteCommand;
 using RestaurantSystem.Api.Features.AccountPayments.Commands.ReleaseAccountPaymentCommand;
@@ -17,8 +16,7 @@ namespace RestaurantSystem.Api.Features.AccountPayments;
 
 [ApiController]
 [Route("api/table-service-sessions/{serviceSessionId:guid}/account-payments")]
-[RequireAdminOrCashier]
-[RequireModule(ModuleIds.Server, ModuleIds.Cashier)]
+[RequireTableServiceStaff]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class AccountPaymentsController(CustomMediator mediator) : ControllerBase
 {

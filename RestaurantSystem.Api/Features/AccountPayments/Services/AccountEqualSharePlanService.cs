@@ -25,6 +25,7 @@ public sealed class AccountEqualSharePlanService(
         Guid sessionId, CreateAccountEqualSharePlanRequest request, CancellationToken cancellationToken)
     {
         ValidateCreateRequest(sessionId, request);
+        actors.RequireNewCollection();
 
         var actor = actors.ResolveStaffActor();
         return await CreateCoreAsync(sessionId, null, request, actor, guest: false, cancellationToken);

@@ -11,10 +11,10 @@ Restaurant management system backend — REST API, CQRS, EF Core, PostgreSQL.
 - **.NET 10** (Web API)
 - **EF Core 10** + PostgreSQL
 - **Custom CQRS mediator** ([CustomMediator.cs](RestaurantSystem.Api/Common/CustomMediator.cs)) — NOT MediatR. See [ADR-001](docs/adr/ADR-001-custom-cqrs-mediator.md).
-- **JWT Bearer auth** with role-based authorization (Customer / Cashier / Admin). See [ADR-003](docs/adr/ADR-003-jwt-scope-and-claims.md).
+- **JWT Bearer auth** with role-based authorization (Customer / Server / Cashier / Admin). See [ADR-003](docs/adr/ADR-003-jwt-scope-and-claims.md).
 - **Soft-delete** via global query filter. See [ADR-002](docs/adr/ADR-002-soft-delete-strategy.md).
 - **xUnit** integration tests
-- Hosted on GitLab; CI runs gitleaks, GitLab SAST, and Trivy image scan per `.gitlab-ci.yml`.
+- Hosted on GitHub; CI runs build, format, tests, dependency/license checks, secret scans and Trivy filesystem checks through [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Repository layout
 
@@ -30,7 +30,7 @@ RestaurantSystem.Infrastructure/  # EF Core, persistence, migrations
 RestaurantSystem.IntegrationTests/  # xUnit integration tests
 docs/                             # ADRs, API contracts, security audit, dev guidelines
 scripts/                          # Local dev orchestration
-.gitlab/                          # MR templates, CI templates
+.github/                          # Pull-request template and CI/deploy workflows
 ```
 
 ## Quick start (new clone)
@@ -55,26 +55,21 @@ bash scripts/dev-down.sh
 ## Branch strategy
 
 ```
-main          ← production deployment (currently develop; cutover pending)
-└── develop   ← test environment (auto-deployed)
+main          ← production releases only
+└── develop   ← default integration branch; staging deployment
      ├── feature/<x>
      ├── fix/<x>
      ├── chore/<x>
      └── docs/<x>
 ```
 
-Pre-commit hook blocks direct commits to `main` and `develop`. Branch off `develop`, open MR to `develop` using the [default MR template](.gitlab/merge_request_templates/Default.md). After test-env validation, `develop` is promoted to `main` for production.
+Pre-commit hooks block direct commits to `main` and `develop`. Branch off `develop` and open a pull request to `develop` using the [pull-request template](.github/pull_request_template.md). Production releases use a separate `develop` → `main` pull request; merging that release triggers deployment.
 
-### Branch protection (GitLab)
+### Branch protection and merge gates
 
-Configured in **Settings → Repository → Protected Branches**:
+Follow [CLAUDE.md §8](CLAUDE.md#8--git-workflow) for the protected-branch requirements. Direct pushes and protection bypasses are prohibited; pull requests require green checks and resolved review threads.
 
-| Branch | Allowed to push | Allowed to merge | Force push |
-|---|---|---|---|
-| `main` | No one | Maintainers | Disabled |
-| `develop` | No one | Maintainers + Developers | Disabled |
-
-All MRs require the pipeline to pass before merge.
+Merge through the workspace `scripts/pr-merge-gate.sh piwas-21/restaurant-app-backend <pr> --merge`. In addition to CI and review threads, it requires the authenticated Sonar PR quality gate and zero open Sonar issues. A merge to `develop` does not activate default-off tenant features or establish production acceptance.
 
 ## Configuration
 
@@ -141,7 +136,7 @@ stopped being used.
 
 ## Pull requests
 
-Every MR uses [.gitlab/merge_request_templates/Default.md](.gitlab/merge_request_templates/Default.md). It auto-loads when you create an MR via the GitLab UI or `glab mr create`.
+Every pull request uses [.github/pull_request_template.md](.github/pull_request_template.md). Include acceptance coverage, validation and deployment notes before creating it with the GitHub UI or `gh pr create`.
 
 Required sections: summary, sprint-task link, acceptance-criteria coverage, schema/contract verification (for DB/DTO changes), standard checklist, test plan, deploy notes.
 

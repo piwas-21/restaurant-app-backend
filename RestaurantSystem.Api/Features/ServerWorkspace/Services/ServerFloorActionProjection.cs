@@ -48,7 +48,7 @@ internal static class ServerFloorActionProjection
             actions.Add("OpenTasks");
         }
 
-        if (session.CanCollect && context.CurrentRole is UserRole.Admin or UserRole.Cashier)
+        if (session.CanCollect && context.CurrentRole is UserRole.Admin or UserRole.Cashier or UserRole.Server)
         {
             actions.Add("CollectPayment");
         }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Features.AccountPayments.Services;
 using RestaurantSystem.Api.Features.TableServiceSessions.Dtos;
 using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common;
@@ -23,13 +24,15 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
     private readonly decimal _paymentTolerance;
     private readonly int _accountActivityPageSize;
     private readonly ICurrentUserService? _currentUser;
+    private readonly IAccountPaymentActorResolver? _paymentActors;
 
     public TableServiceSessionReader(
         ApplicationDbContext context,
         ITableBillAssembler bills,
         TimeProvider? timeProvider = null,
         IOptions<TableServiceSessionSettings>? settings = null,
-        ICurrentUserService? currentUser = null)
+        ICurrentUserService? currentUser = null,
+        IAccountPaymentActorResolver? paymentActors = null)
     {
         _context = context;
         _bills = bills;
@@ -37,6 +40,7 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         _paymentTolerance = (settings?.Value ?? new TableServiceSessionSettings()).PaymentTolerance;
         _accountActivityPageSize = (settings?.Value ?? new TableServiceSessionSettings()).AccountActivityPageSize;
         _currentUser = currentUser;
+        _paymentActors = paymentActors;
     }
 
     public async Task<TableServiceSessionDto?> ReadAsync(
@@ -247,7 +251,8 @@ public sealed class TableServiceSessionReader : ITableServiceSessionReader
         var hasPendingHandoff = handoff?.Status == nameof(TableServicePaymentHandoffStatus.Requested);
         var hasTenderRole = _currentUser is null
             || _currentUser.IsAdmin
-            || _currentUser.Role == UserRole.Cashier;
+            || _currentUser.Role == UserRole.Cashier
+            || _currentUser.Role == UserRole.Server && _paymentActors?.CanStartCollection == true;
         return new TableServiceSessionDto
         {
             ServiceSessionId = session.Id,

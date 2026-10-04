@@ -118,6 +118,7 @@ public class TenantFeaturesTests
             TableGuestVisitsV1 = enabled,
             TableVisitReadinessV1 = enabled,
             TableAccountPaymentsV1 = enabled,
+            ServerAccountCollectionV1 = enabled,
             TableGuestAccountPaymentsV1 = enabled,
             EnforceSauceMinimum = enabled,
             OptionSetMaterializationEnabled = enabled,
@@ -136,6 +137,7 @@ public class TenantFeaturesTests
         body.Data.TableGuestVisitsV1.Should().Be(enabled);
         body.Data.TableVisitReadinessV1.Should().Be(enabled);
         body.Data.TableAccountPaymentsV1.Should().Be(enabled);
+        body.Data.ServerAccountCollectionV1.Should().Be(enabled);
         body.Data.TableGuestAccountPaymentsV1.Should().Be(enabled);
         body.Data.EnforceSauceMinimum.Should().Be(enabled);
         body.Data.OptionSetMaterializationEnabled.Should().Be(enabled);

@@ -7,6 +7,7 @@ public static class ServerWorkspaceServiceExtensions
     public static IServiceCollection AddServerWorkspaceServices(this IServiceCollection services)
     {
         services.AddScoped<IServerFloorSnapshotReader, ServerFloorSnapshotReader>();
+        services.AddScoped<IServerFloorSnapshotPolicy, ServerFloorSnapshotPolicy>();
         services.AddScoped<IServerTaskProjector, ServerTaskProjector>();
         services.AddScoped<IServerTaskOrderReader, ServerTaskOrderReader>();
         services.AddScoped<IServerTaskReader, ServerTaskReader>();

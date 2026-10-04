@@ -26,6 +26,7 @@ public sealed class AccountPaymentQuoteService(
     {
         if (!features.TableAccountPaymentsV1)
             throw new NotFoundException("Table account payments are not enabled.");
+        actors.RequireNewCollection();
         return await CreateQuoteCoreAsync(sessionId, null, request, guest: false, cancellationToken);
     }
 

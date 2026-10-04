@@ -82,6 +82,12 @@ public sealed class AccountPaymentReservationService(
                 await transaction.CommitAsync(cancellationToken);
                 return AccountPaymentSnapshots.ToOperation(attempt);
             }
+            if (!guest)
+            {
+                if (!features.TableAccountPaymentsV1)
+                    throw new NotFoundException("Table account payments are not enabled.");
+                actors.RequireNewCollection();
+            }
             if (guest)
                 guestPolicy.RequireContribution(attempt.AmountMinor, attempt.Currency);
             ValidateQuotedReservation(session, attempt, request);
@@ -110,8 +116,6 @@ public sealed class AccountPaymentReservationService(
     private void ValidateReservationRequest(
         Guid sessionId, Guid operationId, ReserveAccountPaymentRequest request)
     {
-        if (!features.TableAccountPaymentsV1)
-            throw new NotFoundException("Table account payments are not enabled.");
         ValidateRouteAndVersion(sessionId, operationId, request.ExpectedVersion);
         if (request.ExpectedAccountRevision <= 0)
             throw new BadRequestException("A positive account revision is required.");

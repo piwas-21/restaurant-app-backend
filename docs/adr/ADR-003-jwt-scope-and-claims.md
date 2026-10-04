@@ -15,15 +15,17 @@
 
 ## Context
 
-A single-restaurant deployment authenticates three actor classes:
+A single-restaurant deployment authenticates these user roles:
 
 1. **Customer** — places orders, manages own profile.
 2. **Cashier** — operates the in-store cashier UI; sees today's orders, takes payments.
 3. **Admin** — full restaurant management: menus, settings, staff, financial reports.
+4. **Server** — floor service, table visits and order amendments. Starting manual table-account contributions requires tenant opt-in and the Server module.
+5. **KitchenStaff** — preparation queues and kitchen actions.
 
 Plus internal automation:
 
-4. **Printer-app** — polls the printer-feed endpoint (today: open; future: API-key auth — see follow-up issue #1).
+6. **Printer-app** — authenticates printer endpoints with `X-Api-Key`, checked against `PrinterSettings:ApiKey` by `ApiKeyAuthFilter`.
 
 We need an auth token that:
 - Is **stateless** at the API tier (no per-request DB hit for "who are you?"). Identity provider is the JWT itself.
@@ -43,7 +45,7 @@ Standard JWT (`Bearer`), HS256-signed with `JwtSettings.Secret` (≥32 bytes), i
 |---|---|---|
 | `sub` | `ApplicationUser.Id` (Guid → string) | Subject identifier |
 | `email` | `ApplicationUser.Email` | Display in audit logs; never used for authorization |
-| `role` | `ApplicationUser.Role` (enum → string) | Authorization decisions: `Customer` / `Cashier` / `Admin` |
+| `role` | `ApplicationUser.Role` (enum → string) | Authorization decisions: `Customer` / `Cashier` / `Admin` / `Server` / `KitchenStaff` |
 | `jti` | `Guid.NewGuid()` | Unique token identifier (for future revocation) |
 | `iat` | issue time | Standard |
 | `exp` | issue time + `ExpirationMinutes` | Standard |
@@ -64,8 +66,11 @@ Standard JWT (`Bearer`), HS256-signed with `JwtSettings.Secret` (≥32 bytes), i
 - `[RequireAdmin]`
 - `[RequireAdminOrCashier]`
 - `[RequireCashier]`
+- `[RequireTableServiceStaff]` for shared Admin/Cashier/Server table routes
 
 These wrap `RequireRoleAttribute` for clarity at the callsite.
+
+Table-account collection also checks tenant feature switches, module entitlement and a non-machine staff identity. Server collection is a tenant-wide opt-in for the Server role, not a per-person training claim. New quotes, plans and reservations enforce that opt-in; recovery of an already accepted operation retains its original actor ownership checks after opt-out. Opening the route to Server staff does not grant refund authority or access to another staff member's operation.
 
 ## Consequences
 
