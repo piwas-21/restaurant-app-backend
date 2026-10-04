@@ -70,6 +70,92 @@ public sealed class AccountPaymentStaffCollectionEndpointTests(DatabaseFixture f
     }
 
     [Fact]
+    public async Task Server_can_reserve_and_capture_a_reviewed_equal_share_slot()
+    {
+        var account = await Seed();
+        using var factory = Factory(payments: true, optIn: true);
+        using var client = Client(factory, "Server");
+        var route = Route(account.SessionId);
+        var planRequest = new CreateAccountEqualSharePlanRequest
+        {
+            OperationId = Guid.NewGuid(),
+            ExpectedAccountRevision = 1,
+            ShareCount = 3
+        };
+
+        using var planResponse = await client.PostAsJsonAsync($"{route}/equal-share-plans", planRequest);
+        planResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var plan = (await planResponse.Content.ReadFromJsonAsync<
+            ApiResponse<AccountEqualSharePlanDto>>(JsonOptions))!.Data!;
+        plan.TotalMinor.Should().Be(1000);
+        plan.Scope.Should().ContainSingle(value => value.OrderId == account.OrderId
+            && value.OrderItemId == account.ItemId && value.AmountMinor == 1000);
+
+        var quoteRequest = new CreateAccountPaymentQuoteRequest
+        {
+            OperationId = Guid.NewGuid(),
+            ExpectedAccountRevision = 1,
+            Mode = AccountPaymentMode.Equal,
+            PaymentMethod = PaymentMethod.CreditCard,
+            EqualSharePlanId = plan.PlanId,
+            EqualShareOrdinal = 1
+        };
+        using var quoteResponse = await client.PostAsJsonAsync($"{route}/quotes", quoteRequest);
+        quoteResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var quote = (await quoteResponse.Content.ReadFromJsonAsync<
+            ApiResponse<AccountPaymentOperationDto>>(JsonOptions))!.Data!;
+        quote.State.Should().Be(AccountPaymentState.Quoted);
+        quote.AmountMinor.Should().Be(334);
+        quote.EqualSharePlanId.Should().Be(plan.PlanId);
+        quote.EqualShareOrdinal.Should().Be(1);
+
+        var operationRoute = $"{route}/operations/{quote.OperationId}";
+        using var reserveResponse = await client.PostAsJsonAsync($"{operationRoute}/reserve",
+            new ReserveAccountPaymentRequest { ExpectedVersion = 1, ExpectedAccountRevision = 1 });
+        reserveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var reserved = (await reserveResponse.Content.ReadFromJsonAsync<
+            ApiResponse<AccountPaymentOperationDto>>(JsonOptions))!.Data!;
+        reserved.State.Should().Be(AccountPaymentState.Reserved);
+        reserved.Version.Should().Be(2);
+
+        var reservedAccount = (await client.GetFromJsonAsync<
+            ApiResponse<AccountPaymentAccountDto>>(route, JsonOptions))!.Data!;
+        var reservedPlan = reservedAccount.ActiveEqualSharePlan!;
+        reservedPlan.Slots[0].ClaimState.Should().Be(AccountPaymentState.Reserved);
+        reservedPlan.Slots[0].IsAvailable.Should().BeFalse();
+
+        using var captureResponse = await client.PostAsJsonAsync($"{operationRoute}/collect",
+            new CaptureAccountPaymentRequest { ExpectedVersion = 2 });
+        captureResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var captured = (await captureResponse.Content.ReadFromJsonAsync<
+            ApiResponse<AccountPaymentOperationDto>>(JsonOptions))!.Data!;
+        captured.State.Should().Be(AccountPaymentState.Captured);
+        captured.Version.Should().Be(3);
+
+        var finalAccount = (await client.GetFromJsonAsync<
+            ApiResponse<AccountPaymentAccountDto>>(route, JsonOptions))!.Data!;
+        finalAccount.OutstandingMinor.Should().Be(666);
+        finalAccount.AvailableMinor.Should().Be(666);
+        finalAccount.CapturedAccountPaymentMinor.Should().Be(334);
+        var capturedPlan = finalAccount.ActiveEqualSharePlan!;
+        capturedPlan.Slots.Select(value => value.AmountMinor).Should().Equal(334L, 333L, 333L);
+        capturedPlan.Slots[0].ClaimState.Should().Be(AccountPaymentState.Captured);
+
+        await using var verify = fixture.CreateContext();
+        var attempt = await verify.AccountPaymentAttempts.SingleAsync(value => value.OperationId == quote.OperationId);
+        attempt.State.Should().Be(AccountPaymentState.Captured);
+        attempt.EqualSharePlanId.Should().Be(plan.PlanId);
+        attempt.EqualShareOrdinal.Should().Be(1);
+        var order = await verify.Orders.Include(value => value.Payments)
+            .SingleAsync(value => value.Id == account.OrderId);
+        order.TotalPaid.Should().Be(3.34m);
+        order.RemainingAmount.Should().Be(6.66m);
+        order.Payments.Should().ContainSingle(value => value.Amount == 3.34m
+            && value.PaymentMethod == PaymentMethod.CreditCard
+            && value.Status == PaymentStatus.Completed);
+    }
+
+    [Fact]
     public async Task Server_owner_can_release_after_opt_out_without_leaking_operation_to_other_actor_or_visit()
     {
         var account = await Seed();
