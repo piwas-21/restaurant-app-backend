@@ -11,7 +11,7 @@ public sealed class OrderAmendmentResolutionPolicy(
     TimeProvider clock,
     IOptions<OrderAmendmentResolutionSettings> settings,
     IOrderDisplayCurrencyResolver currencyResolver,
-    ILogger<OrderAmendmentResolutionService> logger) : IOrderAmendmentResolutionPolicy
+    ILogger<OrderAmendmentResolutionPolicy> logger) : IOrderAmendmentResolutionPolicy
 {
     public DateTime UtcNow => clock.GetUtcNow().UtcDateTime;
     public TimeSpan QuoteLifetime => TimeSpan.FromMinutes(settings.Value.FinancialResolutionQuoteLifetimeMinutes);
