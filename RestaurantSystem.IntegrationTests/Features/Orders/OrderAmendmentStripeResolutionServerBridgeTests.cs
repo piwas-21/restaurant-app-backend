@@ -32,7 +32,7 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         var resolutionQuote = new OrderAmendmentResolutionQuoteRequest
         {
             ClientOperationId = _clientOperationId,
-            ExpectedOrderVersion = 1,
+            ExpectedOrderVersion = 2,
             ExpectedAccountRevision = 1,
             Currency = "CHF"
         };
@@ -264,6 +264,8 @@ public sealed partial class OrderAmendmentStripeResolutionIntegrationTests
         context.Tables.Add(table);
         context.Orders.Add(order);
         await context.SaveChangesAsync();
+        refundedOrder.Version.Should().Be(2, "assigning the configured table advances the tracked source order version");
+        session.AccountRevision.Should().Be(1);
         return new ServerBridgeBalance(tableId, orderId, itemId);
     }
 
