@@ -6,4 +6,5 @@ internal static class OrderAmendmentResolutionRefusalCodes
     internal const string SourceVersionConflict = "sourceVersionConflict";
     internal const string AccountRevisionConflict = "accountRevisionConflict";
     internal const string QuoteChanged = "quoteChanged";
+    internal const string CashHistoryCapacityExceeded = "cashHistoryCapacityExceeded";
 }

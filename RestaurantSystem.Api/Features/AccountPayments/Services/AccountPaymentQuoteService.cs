@@ -84,6 +84,10 @@ public sealed class AccountPaymentQuoteService(
             if (guest) guestPolicy.RequireContribution(amount, account.Money.Currency);
             var cashSettlement = AccountCashSettlementPolicy.ResolveConfigured(
                 account.Money.Currency, request.PaymentMethod, amount, settings);
+            var capacity = await AccountCashRefundHistoryCapacityReader.ReadQuoteSizeAsync(
+                context, sessionId, cancellationToken);
+            if (!capacity.CanAdd(AccountCashRefundHistoryCapacityGrowth.ForQuote(segments.Count)))
+                throw new ConflictException("The table account exceeds the supported financial history limit.");
             var now = timeProvider.GetUtcNow().UtcDateTime;
             var quoteExpires = now.AddMinutes(settings.QuoteLifetimeMinutes);
             var attempt = new AccountPaymentAttempt

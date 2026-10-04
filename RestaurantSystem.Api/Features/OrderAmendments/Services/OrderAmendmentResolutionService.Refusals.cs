@@ -31,6 +31,18 @@ public sealed partial class OrderAmendmentResolutionService
             return await PersistRefusalAsync(identity, request,
                 OrderAmendmentResolutionRefusalCodes.AccountRevisionConflict, now, cancellationToken);
 
+        var existingForAmendment = await context.OrderAmendmentResolutionOperations
+            .SingleOrDefaultAsync(value => value.AmendmentId == amendmentId, cancellationToken);
+        AccountCashRefundHistoryCapacitySize? historyCapacity = null;
+        if (existingForAmendment is null && source.ServiceSessionId is Guid serviceSessionId)
+        {
+            historyCapacity = await AccountCashRefundHistoryCapacityReader.ReadResolutionSizeAsync(
+                context, serviceSessionId, cancellationToken);
+            if (!historyCapacity.Value.CanAdd(default))
+                return await PersistRefusalAsync(identity, request,
+                    OrderAmendmentResolutionRefusalCodes.CashHistoryCapacityExceeded, now, cancellationToken);
+        }
+
         var state = await ReadPlanningStateAsync(orderId, amendmentId, request.Quote, cancellationToken);
         var quoteHash = OrderAmendmentResolutionFingerprint.QuoteHash(actorId,
             orderId, amendmentId, request.Quote, request.ExpiresAt, state.Plan);
@@ -38,12 +50,20 @@ public sealed partial class OrderAmendmentResolutionService
             return await PersistRefusalAsync(identity, request,
                 OrderAmendmentResolutionRefusalCodes.QuoteChanged, now, cancellationToken);
 
-        var existingForAmendment = await context.OrderAmendmentResolutionOperations
-            .SingleOrDefaultAsync(value => value.AmendmentId == amendmentId, cancellationToken);
         if (existingForAmendment is not null)
         {
             RequireSameRequest(existingForAmendment, orderId, amendmentId, requestHash);
             return new(existingForAmendment.Id, null);
+        }
+
+        if (historyCapacity is AccountCashRefundHistoryCapacitySize currentCapacity)
+        {
+            var growth = AccountCashRefundHistoryCapacityGrowth.ForResolution(
+                state.Plan.Legs.Where(value => value.CashRefund is not null)
+                    .Select(value => value.Scopes.Count));
+            if (!currentCapacity.CanAdd(growth))
+                return await PersistRefusalAsync(identity, request,
+                    OrderAmendmentResolutionRefusalCodes.CashHistoryCapacityExceeded, now, cancellationToken);
         }
 
         var operationId = PersistOperation(state, request, requestHash, actorId);

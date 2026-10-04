@@ -14,7 +14,7 @@ public sealed class OrderAmendmentResolutionRefusalConfiguration
             table.HasCheckConstraint("ck_amendment_resolution_refusal_hash", "request_hash ~ '^[a-f0-9]{64}$'");
             table.HasCheckConstraint("ck_amendment_resolution_refusal_code",
                 "failure_code IN ('quoteExpired','sourceVersionConflict','accountRevisionConflict',"
-                + "'quoteChanged')");
+                + "'quoteChanged','cashHistoryCapacityExceeded')");
         });
         builder.Property(value => value.RequestHash).HasMaxLength(64).IsRequired();
         builder.Property(value => value.FailureCode).HasMaxLength(40).IsRequired();
