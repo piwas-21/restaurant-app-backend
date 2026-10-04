@@ -497,6 +497,10 @@ public sealed class ServerFloorSnapshotTests : IntegrationTestBase
         using (var scope = Factory.Services.CreateScope())
         {
             var clock = scope.ServiceProvider.GetRequiredService<ITenantClock>();
+            var tenantDate = clock.ToTenantTime(_serverTime.GetUtcNow().UtcDateTime).Date;
+            var localNoon = DateTime.SpecifyKind(tenantDate.AddHours(12), DateTimeKind.Unspecified);
+            _serverTime.Current = new DateTimeOffset(
+                TimeZoneInfo.ConvertTimeToUtc(localNoon, clock.TimeZone));
             current = clock.ToTenantTime(_serverTime.GetUtcNow().UtcDateTime);
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             context.Reservations.Add(new Reservation
