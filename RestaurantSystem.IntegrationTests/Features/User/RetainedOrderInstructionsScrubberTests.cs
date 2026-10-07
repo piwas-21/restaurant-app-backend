@@ -53,7 +53,7 @@ public sealed class RetainedOrderInstructionsScrubberTests(DatabaseFixture fixtu
             WithdrawnAt = previouslyWithdrawn ? DateTime.UtcNow.AddSeconds(-30) : null,
             Audience = OrderNoteAudience.Kitchen,
             ClientOperationId = Guid.NewGuid(),
-            CreatedAt = DateTime.UtcNow.AddMinutes(-1),
+            CreatedAt = new DateTime(2026, 10, 4, 12, 0, 0, DateTimeKind.Utc),
             CreatedBy = "instruction-test"
         };
         var otherNote = new OrderOperationalNote
