@@ -22,8 +22,16 @@ public sealed class PrinterWithdrawalMigrationTests(DatabaseFixture fixture) : I
         try
         {
             await migrator.MigrateAsync(PublishedParent);
+            var legacyDeviceId = Guid.NewGuid();
+            var heartbeatAt = DateTime.UtcNow;
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "PrinterDevices" (id, device_id, created_by, last_heartbeat_at, feed_running)
+                VALUES ({legacyDeviceId}, 'legacy-withdrawal-device', 'migration-test', {heartbeatAt}, false)
+                """);
             await migrator.MigrateAsync();
             Assert.False(context.Database.HasPendingModelChanges());
+            Assert.False((await context.PrinterDevices.AsNoTracking()
+                .SingleAsync(device => device.Id == legacyDeviceId)).SupportsUpdateAuthorization);
             var names = await context.Database.SqlQuery<string>($"""
                 SELECT column_name AS "Value" FROM information_schema.columns
                 WHERE table_name = 'OrderOperationalNotes'

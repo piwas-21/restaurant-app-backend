@@ -24,6 +24,7 @@ public sealed class RetainedCustomerDataScrubber : IRetainedCustomerDataScrubber
         try
         {
             await RetainedLoyaltyEvidenceScrubber.ScrubAsync(_context, userId, cancellationToken);
+            await RetainedOrderInstructionsScrubber.ScrubAsync(_context, userId, cancellationToken);
 
             // Scrub address snapshots before clearing Order.UserId. The correlated subquery stays
             // server-side, so even a long-lived customer cannot make erasure load every order id.

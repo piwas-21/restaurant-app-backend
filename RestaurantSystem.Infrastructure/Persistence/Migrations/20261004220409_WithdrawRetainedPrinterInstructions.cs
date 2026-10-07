@@ -11,6 +11,13 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<bool>(
+                name: "supports_update_authorization",
+                table: "PrinterDevices",
+                type: "boolean",
+                nullable: false,
+                defaultValue: false);
+
             migrationBuilder.AddColumn<DateTime>(
                 name: "withdrawn_at",
                 table: "OrderOperationalNotes",
@@ -29,6 +36,8 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                 name: "IX_OrderOperationalNotes_FeedEventAt_id",
                 table: "OrderOperationalNotes",
                 columns: new[] { "FeedEventAt", "id" });
+
+            migrationBuilder.Sql(RetainedTextErasureUp);
         }
 
         /// <inheritdoc />
@@ -41,6 +50,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     END IF;
                 END $$;
                 """);
+            migrationBuilder.Sql(RetainedTextErasureDown);
+
+            migrationBuilder.DropColumn(
+                name: "supports_update_authorization",
+                table: "PrinterDevices");
+
             migrationBuilder.DropIndex(
                 name: "IX_OrderOperationalNotes_FeedEventAt_id",
                 table: "OrderOperationalNotes");

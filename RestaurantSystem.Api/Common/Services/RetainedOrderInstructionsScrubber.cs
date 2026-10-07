@@ -55,7 +55,7 @@ internal static class RetainedOrderInstructionsScrubber
         {
             note.Text = Erased;
             note.KitchenChangesJson = RetainedOrderPayloadRedactor.Redact(note.KitchenChangesJson);
-            note.WithdrawnAt ??= now;
+            note.WithdrawnAt = now;
             note.UpdatedAt = now;
             note.UpdatedBy = Audit;
         }

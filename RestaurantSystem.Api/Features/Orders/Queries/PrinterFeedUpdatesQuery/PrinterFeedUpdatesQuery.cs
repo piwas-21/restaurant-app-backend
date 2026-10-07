@@ -95,7 +95,7 @@ public class PrinterFeedUpdatesQueryHandler
                 AmendmentId = note.AmendmentId,
                 AccountRevision = note.AccountRevision,
                 Audience = nameof(OrderNoteAudience.Kitchen),
-                Text = note.Text,
+                Text = note.WithdrawnAt.HasValue ? string.Empty : note.Text,
                 CreatedAt = EF.Property<DateTime>(note, "FeedEventAt"),
             }, note.KitchenChangesJson))
             .ToListAsync(cancellationToken);

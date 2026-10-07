@@ -40,6 +40,7 @@ public partial class WithdrawRetainedPrinterInstructions
               NEW.supplement_snapshot_json IS DISTINCT FROM OLD.supplement_snapshot_json OR
               NEW.commit_result_json IS DISTINCT FROM OLD.commit_result_json THEN
               IF NEW.updated_by IS DISTINCT FROM 'RetainedOrderInstructionsScrubber'
+                 OR NEW.financial_resolution_json IS DISTINCT FROM OLD.financial_resolution_json
                  OR NEW.request_json IS DISTINCT FROM erase_order_operational_text(OLD.request_json) OR
                   NEW.changes_json IS DISTINCT FROM erase_order_operational_text(OLD.changes_json) OR
                   NEW.source_snapshot_json IS DISTINCT FROM erase_order_operational_text(OLD.source_snapshot_json) OR

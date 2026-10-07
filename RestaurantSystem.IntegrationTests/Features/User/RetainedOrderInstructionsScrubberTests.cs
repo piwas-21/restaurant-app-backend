@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Services;
+using RestaurantSystem.Api.Features.Orders.Queries.PrinterFeedUpdatesQuery;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.IntegrationTests.Common;
@@ -11,9 +12,11 @@ namespace RestaurantSystem.IntegrationTests.Features.User;
 public sealed class RetainedOrderInstructionsScrubberTests(DatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Erasure_removes_owned_instructions_and_withdraws_jobs_without_losing_financial_identity(bool hidden)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Erasure_removes_owned_instructions_and_withdraws_jobs_without_losing_financial_identity(bool hidden, bool previouslyWithdrawn)
     {
         var userId = Guid.NewGuid();
         var otherUserId = Guid.NewGuid();
@@ -47,6 +50,7 @@ public sealed class RetainedOrderInstructionsScrubberTests(DatabaseFixture fixtu
             Id = Guid.NewGuid(),
             OrderId = owned.Id,
             Text = "Private kitchen note",
+            WithdrawnAt = previouslyWithdrawn ? DateTime.UtcNow.AddSeconds(-30) : null,
             Audience = OrderNoteAudience.Kitchen,
             ClientOperationId = Guid.NewGuid(),
             CreatedAt = DateTime.UtcNow.AddMinutes(-1),
@@ -68,6 +72,11 @@ public sealed class RetainedOrderInstructionsScrubberTests(DatabaseFixture fixtu
         context.ChangeTracker.Clear();
         var originalFinancialJson = await context.OrderAmendments
             .Where(value => value.Id == quote.Id).Select(value => value.FinancialResolutionJson).SingleAsync();
+        var feed = new PrinterFeedUpdatesQueryHandler(context,
+            Microsoft.Extensions.Options.Options.Create(new RestaurantSystem.Api.Settings.PrinterFeedSettings()));
+        var priorFeed = await feed.Handle(new PrinterFeedUpdatesQuery(null), CancellationToken.None);
+        if (previouslyWithdrawn)
+            Assert.True(priorFeed.Items.Single(value => value.JobId == note.Id).IsWithdrawn);
         var before = DateTime.UtcNow;
         await using (var transaction = await context.Database.BeginTransactionAsync())
         {
@@ -87,6 +96,11 @@ public sealed class RetainedOrderInstructionsScrubberTests(DatabaseFixture fixtu
         var withdrawn = await verify.OrderOperationalNotes.SingleAsync(value => value.Id == note.Id);
         Assert.Equal("[erased]", withdrawn.Text);
         Assert.NotNull(withdrawn.WithdrawnAt);
+        Assert.InRange(withdrawn.WithdrawnAt.Value, before, DateTime.UtcNow);
+        var freshFeed = await new PrinterFeedUpdatesQueryHandler(verify,
+            Microsoft.Extensions.Options.Options.Create(new RestaurantSystem.Api.Settings.PrinterFeedSettings()))
+            .Handle(new PrinterFeedUpdatesQuery(null, priorFeed.NextUpdateCursor), CancellationToken.None);
+        Assert.Equal(note.Id, Assert.Single(freshFeed.Items).JobId);
         Assert.Equal(note.ClientOperationId, withdrawn.ClientOperationId);
         Assert.Equal(note.CreatedAt, withdrawn.CreatedAt);
         Assert.Null((await verify.OrderItems.SingleAsync(value => value.OrderId == owned.Id)).SpecialInstructions);

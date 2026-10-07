@@ -7833,6 +7833,12 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("platform");
 
+                    b.Property<bool>("SupportsUpdateAuthorization")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("supports_update_authorization");
+
                     b.Property<string>("TenantSlug")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")

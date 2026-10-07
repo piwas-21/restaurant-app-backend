@@ -75,7 +75,7 @@ public sealed class PrinterUpdateWithdrawalTests(DatabaseFixture fixture) : Inte
         Assert.True(update.IsWithdrawn);
         Assert.Equal(withdrawalTime, update.CreatedAt);
         Assert.Empty(update.Changes);
-        Assert.Equal("[erased]", update.Text);
+        Assert.Empty(update.Text);
         var authority = new GetPrinterUpdateAuthorizationQueryHandler(context);
         foreach (var revision in new[] { 1, 2 })
             Assert.Equal("Withdrawn", (await authority.Handle(
