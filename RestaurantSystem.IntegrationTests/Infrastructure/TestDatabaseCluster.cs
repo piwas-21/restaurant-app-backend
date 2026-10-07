@@ -1,6 +1,7 @@
 using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Infrastructure.Persistence;
+using RestaurantSystem.Infrastructure.Persistence.Migrations;
 using Testcontainers.PostgreSql;
 
 namespace RestaurantSystem.IntegrationTests.Infrastructure;
@@ -31,6 +32,8 @@ namespace RestaurantSystem.IntegrationTests.Infrastructure;
 /// </summary>
 internal static class TestDatabaseCluster
 {
+    internal const string CurrentSchemaMigration = "20261004220409_" + nameof(WithdrawRetainedPrinterInstructions);
+
     /// <summary>
     /// When set, the tests connect to this Postgres instead of starting a Testcontainers
     /// container. Used in CI, where the workflow declares a postgres service container and

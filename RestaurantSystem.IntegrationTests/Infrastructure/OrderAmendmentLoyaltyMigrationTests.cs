@@ -60,10 +60,18 @@ public sealed class OrderAmendmentLoyaltyMigrationTests(DatabaseFixture fixture)
             await context.SaveChangesAsync();
         }
 
-        var failure = await Assert.ThrowsAsync<PostgresException>(() => MigrateAsync(PublishedBillingParent));
-        failure.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
-        failure.MessageText.Should().Be("Native order loyalty history must be retained");
-        await AssertSchemaAsync(present: true);
+        try
+        {
+            var failure = await Assert.ThrowsAsync<PostgresException>(() => MigrateAsync(PublishedBillingParent));
+            failure.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+            failure.MessageText.Should().Be("Native order loyalty history must be retained");
+            // Later migrations can roll back before this journal's guard refuses its own Down.
+            await AssertSchemaAsync(present: true, expectedLatestMigration: LoyaltyMigration);
+        }
+        finally
+        {
+            await MigrateAsync();
+        }
     }
 
     private async Task MigrateAsync(string? target = null)
@@ -72,7 +80,8 @@ public sealed class OrderAmendmentLoyaltyMigrationTests(DatabaseFixture fixture)
         await context.Database.MigrateAsync(target);
     }
 
-    private async Task AssertSchemaAsync(bool present)
+    private async Task AssertSchemaAsync(
+        bool present, string expectedLatestMigration = TestDatabaseCluster.CurrentSchemaMigration)
     {
         await using var connection = new NpgsqlConnection(fixture.ConnectionString);
         await connection.OpenAsync();
@@ -103,7 +112,7 @@ public sealed class OrderAmendmentLoyaltyMigrationTests(DatabaseFixture fixture)
         if (present)
         {
             await using var context = fixture.CreateContext();
-            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(LoyaltyMigration);
+            (await context.Database.GetAppliedMigrationsAsync()).Last().Should().Be(expectedLatestMigration);
         }
     }
 }

@@ -11,7 +11,7 @@ public sealed class CashHistoryCapacityRefusalMigrationTests(DatabaseFixture fix
 {
     private const string PreviousMigration = "20261004043011_AddAccountCashRefundEvidence"; // pragma: allowlist secret
     private const string CashMigration = "20261004105734_AddCashHistoryCapacityRefusal"; // pragma: allowlist secret
-    private const string LatestMigration = "20261004172810_AddNativeOrderBillingSnapshots"; // pragma: allowlist secret
+    private const string LatestMigration = TestDatabaseCluster.CurrentSchemaMigration;
     private static readonly string[] ExistingFailureCodes =
     [
         "quoteExpired",
