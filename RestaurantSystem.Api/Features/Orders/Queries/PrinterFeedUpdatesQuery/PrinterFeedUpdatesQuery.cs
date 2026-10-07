@@ -26,6 +26,7 @@ public record PrinterFeedUpdatesResult(
 public class PrinterFeedUpdatesQueryHandler
     : IQueryHandler<PrinterFeedUpdatesQuery, PrinterFeedUpdatesResult>
 {
+    private const string FeedEventAtProperty = "FeedEventAt";
     private readonly ApplicationDbContext _context;
     private readonly int _updatePageSize;
 
@@ -56,24 +57,10 @@ public class PrinterFeedUpdatesQueryHandler
                     || note.Order.Status == OrderStatus.Ready));
 
         var cursor = DecodeCursor(query.UpdateCursor);
-        if (cursor.HasValue)
-        {
-            var value = cursor.Value;
-            updatesQuery = updatesQuery.Where(note =>
-                EF.Property<DateTime>(note, "FeedEventAt") > value.CreatedAt
-                || (EF.Property<DateTime>(note, "FeedEventAt") == value.CreatedAt && note.Id.CompareTo(value.JobId) > 0));
-        }
-        else
-        {
-            var modifiedSinceUtc = QueryInstant.AsUtc(query.ModifiedSince);
-            if (modifiedSinceUtc.HasValue)
-            {
-                updatesQuery = updatesQuery.Where(note => EF.Property<DateTime>(note, "FeedEventAt") > modifiedSinceUtc.Value);
-            }
-        }
+        updatesQuery = ApplyBoundary(updatesQuery, cursor, query.ModifiedSince);
 
         var storedUpdates = await updatesQuery
-            .OrderBy(note => EF.Property<DateTime>(note, "FeedEventAt"))
+            .OrderBy(note => EF.Property<DateTime>(note, FeedEventAtProperty))
             .ThenBy(note => note.Id)
             // Read one sentinel row so the response can tell the printer-app whether another page
             // exists without making it advance a timestamp cursor past unseen work.
@@ -96,7 +83,7 @@ public class PrinterFeedUpdatesQueryHandler
                 AccountRevision = note.AccountRevision,
                 Audience = nameof(OrderNoteAudience.Kitchen),
                 Text = note.WithdrawnAt.HasValue ? string.Empty : note.Text,
-                CreatedAt = EF.Property<DateTime>(note, "FeedEventAt"),
+                CreatedAt = EF.Property<DateTime>(note, FeedEventAtProperty),
             }, note.KitchenChangesJson))
             .ToListAsync(cancellationToken);
         var updates = storedUpdates.Select(stored => stored.Update with
@@ -114,6 +101,25 @@ public class PrinterFeedUpdatesQueryHandler
         // echoes its valid incoming cursor so clients never fall back to the time-only boundary.
         var nextCursor = GetNextCursor(updates, cursor.HasValue, query.UpdateCursor);
         return new PrinterFeedUpdatesResult(updates, nextCursor, hasMore);
+    }
+
+    private static IQueryable<OrderOperationalNote> ApplyBoundary(
+        IQueryable<OrderOperationalNote> updatesQuery,
+        (DateTime CreatedAt, Guid JobId)? cursor,
+        DateTime? modifiedSince)
+    {
+        if (cursor.HasValue)
+        {
+            var value = cursor.Value;
+            return updatesQuery.Where(note =>
+                EF.Property<DateTime>(note, FeedEventAtProperty) > value.CreatedAt
+                || (EF.Property<DateTime>(note, FeedEventAtProperty) == value.CreatedAt && note.Id.CompareTo(value.JobId) > 0));
+        }
+
+        var modifiedSinceUtc = QueryInstant.AsUtc(modifiedSince);
+        return modifiedSinceUtc.HasValue
+            ? updatesQuery.Where(note => EF.Property<DateTime>(note, FeedEventAtProperty) > modifiedSinceUtc.Value)
+            : updatesQuery;
     }
 
     private static string? GetNextCursor(

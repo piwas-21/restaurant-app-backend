@@ -32,9 +32,8 @@ internal static class RetainedOrderPayloadRedactor
     {
         if (node is JsonArray array)
         {
-            foreach (var child in array)
-                if (child is not null)
-                    Visit(child);
+            foreach (var child in array.OfType<JsonNode>())
+                Visit(child);
             return;
         }
         if (node is not JsonObject item)
