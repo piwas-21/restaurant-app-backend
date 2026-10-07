@@ -11,7 +11,9 @@ public enum TransactionType
     Redeemed,         // Points redeemed for discount
     AdminAdjustment,  // Manual adjustment by admin
     Expired,          // Points expired
-    Refunded          // Points refunded due to order cancellation
+    Refunded,         // Points refunded due to order cancellation
+    EarnedClawback,   // Earned points reversed after an accepted order amendment
+    RedemptionRestored // Previously redeemed points restored after an accepted order amendment
 }
 
 /// <summary>
@@ -19,15 +21,17 @@ public enum TransactionType
 /// </summary>
 public class FidelityPointsTransaction : Entity
 {
-    public Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
     public Guid? OrderId { get; set; } // Nullable for admin adjustments
     public TransactionType TransactionType { get; set; }
     public int Points { get; set; } // Positive for earning, negative for spending
+    /// <summary>Opaque source transaction for a typed compensation movement; never an FK.</summary>
+    public Guid? OriginalTransactionId { get; set; }
     public decimal? OrderTotal { get; set; } // For reference
     public string? Description { get; set; }
     public DateTime? ExpiresAt { get; set; } // For point expiration feature
 
     // Navigation properties
-    public virtual ApplicationUser User { get; set; } = null!;
+    public virtual ApplicationUser? User { get; set; }
     public virtual Order? Order { get; set; }
 }

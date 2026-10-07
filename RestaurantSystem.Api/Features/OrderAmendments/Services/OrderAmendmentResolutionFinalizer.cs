@@ -77,6 +77,13 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
         if (!string.Equals(snapshot.SourceFinancialFingerprint, sourceFingerprint, StringComparison.Ordinal)
             || !string.Equals(snapshot.PlanFingerprint, planFingerprint, StringComparison.Ordinal))
             throw new ConflictException("The source financial evidence changed while the refund was being resolved.");
+        var loyaltyEvidence = await OrderAmendmentLoyaltyEvidenceReader.ReadAsync(
+            context, source.Id, cancellationToken);
+        var changes = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(amendment.ChangesJson);
+        var currentLoyaltyPlan = OrderAmendmentLoyaltyPlanner.Build(
+            source, amendment, changes, money, loyaltyEvidence.WithoutOperation(operation.Id));
+        OrderAmendmentLoyaltyResolutionVerifier.AssertPlanTransition(source.Id, amendment.Id,
+            snapshot.LoyaltyPlan, currentLoyaltyPlan, loyaltyEvidence);
         var priorRefunds = await ReadPriorRefundsAsync(source, amendment.Id,
             operation.Id, money,
             cancellationToken: cancellationToken);
@@ -89,7 +96,8 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
         ApplyRefunds(source, legs, priorRefunds.AuthorizedRefundMinorByPayment, money, now, audit);
         AddAllocationReversals(operation, actorId, audit, now);
         AddBillingCredit(source, amendment, operation, money, now, audit);
-        ApplyFinancialResolution(amendment, operation, money);
+        await OrderAmendmentLoyaltyCompensationPoster.ApplyAsync(context, operation,
+            snapshot.LoyaltyPlan, loyaltyEvidence, now, audit, cancellationToken);
         OrderAmendmentSourcePaymentSummary.Recalculate(source, money, now);
 
         source.Version++;
@@ -100,7 +108,20 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
         operation.ResolvedAt = now;
         operation.UpdatedAt = now;
         operation.UpdatedBy = audit;
-        operation.ResultJson = OrderAmendmentJson.Serialize(CreateResult(operation));
+        var loyaltyHeaders = context.OrderAmendmentLoyaltyCompensations.Local
+            .Where(value => value.OperationId == operation.Id).ToArray();
+        var loyaltyHeaderIds = loyaltyHeaders.Select(value => value.Id).ToHashSet();
+        var loyaltyResult = OrderAmendmentLoyaltyResultFactory.Create(operation,
+            new OrderAmendmentLoyaltyResultEvidence(snapshot.LoyaltyPlan,
+                loyaltyEvidence.AwardWitness, loyaltyEvidence.OwnerLinks, loyaltyHeaders,
+                context.OrderAmendmentLoyaltyReservations.Local
+                    .Where(value => value.OperationId == operation.Id).ToArray(),
+                context.OrderAmendmentLoyaltyCompensationPostings.Local
+                    .Where(value => loyaltyHeaderIds.Contains(value.CompensationId)).ToArray(), null));
+        ApplyFinancialResolution(amendment, operation, money, loyaltyResult);
+        await OrderAmendmentLoyaltyReservationEvidence.ReleaseOwnerHoldsAsync(
+            context, operation, now, cancellationToken);
+        operation.ResultJson = OrderAmendmentJson.Serialize(CreateResult(operation, loyaltyResult));
         scope.RecordAccountChange();
         await context.SaveChangesAsync(cancellationToken);
         await OrderBillingCreditConsistency.AssertAsync(context, [source.Id], cancellationToken);
@@ -257,35 +278,13 @@ public sealed partial class OrderAmendmentResolutionFinalizer(
         });
     }
 
-    private static void ApplyFinancialResolution(OrderAmendment amendment,
-        OrderAmendmentResolutionOperation operation, AccountMoney money)
-    {
-        var preview = OrderAmendmentJson.Deserialize<OrderAmendmentFinancialPreviewDto>(
-            amendment.FinancialResolutionJson);
-        if (preview.Currency != operation.Currency
-            || preview.PotentialCreditMinor != operation.CreditMinor
-            || preview.PotentialCreditMinor <= 0
-            || operation.RefundMinor < 0 || operation.RefundMinor > operation.CreditMinor
-            || operation.UnpaidWaivedMinor != operation.CreditMinor - operation.RefundMinor
-            || money.Currency != operation.Currency
-            || money.ToMinor(money.ToMajor(operation.CreditMinor)) != operation.CreditMinor)
-            throw new ConflictException("The frozen financial resolution does not match its refund operation.");
-        amendment.FinancialResolutionJson = OrderAmendmentJson.Serialize(preview with
-        {
-            ResolutionStatus = OrderAmendmentFinancialResolutionStatus.Resolved,
-            CreditState = OrderAmendmentCreditState.Resolved,
-            LoyaltyState = OrderAmendmentLoyaltyState.None,
-            RefundState = OrderAmendmentRefundState.Resolved
-        });
-    }
-
     private OrderAmendmentResolutionResultDto CreateResult(
-        OrderAmendmentResolutionOperation operation)
+        OrderAmendmentResolutionOperation operation, OrderAmendmentLoyaltyResultDto? loyalty)
     {
         var legs = operation.Legs.ToArray();
         var legIds = legs.Select(value => value.Id).ToHashSet();
         var evidence = context.OrderAmendmentRefundEvidence.Local
             .Where(value => legIds.Contains(value.RefundLegId)).ToArray();
-        return OrderAmendmentResolutionResultMapper.Map(operation, legs, evidence);
+        return OrderAmendmentResolutionResultMapper.Map(operation, legs, evidence, loyalty);
     }
 }

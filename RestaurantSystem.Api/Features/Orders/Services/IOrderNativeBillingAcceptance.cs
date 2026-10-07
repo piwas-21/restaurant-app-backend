@@ -11,4 +11,9 @@ public interface IOrderNativeBillingAcceptance : IOrderFidelityCoordinator
         OrderBillingEarningEvaluation? earning,
         OrderBillingRedemptionEvidence? redemption,
         CancellationToken cancellationToken);
+
+    Task RecordRemovedEarningUnitsAsync(
+        Guid orderId,
+        Guid amendmentId,
+        CancellationToken cancellationToken);
 }

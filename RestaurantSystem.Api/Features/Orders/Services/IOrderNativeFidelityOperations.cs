@@ -1,4 +1,5 @@
 using RestaurantSystem.Domain.Entities;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
 
@@ -14,8 +15,8 @@ public interface IOrderNativeFidelityOperations
     Task<(FidelityPointsTransaction Transaction, decimal DiscountAmount)> RedeemPointsAsync(
         Guid userId, Guid orderId, int pointsToRedeem, CancellationToken cancellationToken);
 
-    Task<FidelityPointsTransaction> AwardPointsAsync(
-        Guid userId, Guid orderId, int points, decimal orderTotal, CancellationToken cancellationToken);
+    Task<FidelityPointsAwardResult> AwardAcceptedOrderAsync(
+        Guid orderId, CancellationToken cancellationToken);
 
     decimal CalculateDiscountFromPoints(int points);
 }

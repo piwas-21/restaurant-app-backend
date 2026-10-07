@@ -22,6 +22,12 @@ internal static class OrderAmendmentResolutionQuoteFactory
             .ToArray();
         return new OrderAmendmentResolutionQuoteDto(orderId, amendmentId,
             request.ClientOperationId, hash, expiresAt, plan.Currency, plan.CreditMinor,
-            plan.RefundMinor, plan.UnpaidWaivedMinor, legs);
+            plan.RefundMinor, plan.UnpaidWaivedMinor, legs, MapLoyalty(plan.Loyalty));
     }
+
+    private static OrderAmendmentLoyaltyQuoteDto? MapLoyalty(OrderAmendmentLoyaltyPlan? plan) =>
+        plan is null || plan.SnapshotId is null ? null : new OrderAmendmentLoyaltyQuoteDto(
+            plan.AwardPending, plan.CandidatePoints, plan.AppliedAwardPoints,
+            plan.SuppressedPoints, plan.EarnedClawbackPoints,
+            plan.RedemptionRestorationPoints, plan.RemovedUnits.Count);
 }

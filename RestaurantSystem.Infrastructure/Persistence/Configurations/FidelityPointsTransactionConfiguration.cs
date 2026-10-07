@@ -11,7 +11,7 @@ public class FidelityPointsTransactionConfiguration : IEntityTypeConfiguration<F
         builder.HasKey(f => f.Id);
 
         builder.Property(f => f.UserId)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(f => f.TransactionType)
             .IsRequired()
@@ -31,12 +31,14 @@ public class FidelityPointsTransactionConfiguration : IEntityTypeConfiguration<F
         builder.HasIndex(f => f.OrderId);
         builder.HasIndex(f => f.CreatedAt);
         builder.HasIndex(f => f.TransactionType);
+        builder.HasIndex(f => f.OriginalTransactionId)
+            .HasDatabaseName("ix_fidelity_points_transactions_original_transaction_id");
 
         // Relationships
         builder.HasOne(f => f.User)
             .WithMany()
             .HasForeignKey(f => f.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(f => f.Order)
             .WithMany(o => o.FidelityPointsTransactions)

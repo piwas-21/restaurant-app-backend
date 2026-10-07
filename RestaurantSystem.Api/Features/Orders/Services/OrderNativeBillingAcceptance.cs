@@ -6,13 +6,16 @@ internal sealed class OrderNativeBillingAcceptance : IOrderNativeBillingAcceptan
 {
     private readonly IOrderFidelityCoordinator _fidelity;
     private readonly IOrderBillingSnapshotWriter _snapshots;
+    private readonly IOrderBillingAwardSuppressionWriter _awardSuppressions;
 
     public OrderNativeBillingAcceptance(
         IOrderFidelityCoordinator fidelity,
-        IOrderBillingSnapshotWriter snapshots)
+        IOrderBillingSnapshotWriter snapshots,
+        IOrderBillingAwardSuppressionWriter awardSuppressions)
     {
         _fidelity = fidelity;
         _snapshots = snapshots;
+        _awardSuppressions = awardSuppressions;
     }
 
     public Task<OrderBillingEarningEvaluation?> CalculatePointsToEarnAsync(
@@ -29,8 +32,8 @@ internal sealed class OrderNativeBillingAcceptance : IOrderNativeBillingAcceptan
         _fidelity.RedeemAsync(order, pointsToRedeem, userId, cancellationToken, failOnError);
 
     public Task AwardEarnedPointsAsync(
-        Order order, Guid? userId, CancellationToken cancellationToken) =>
-        _fidelity.AwardEarnedPointsAsync(order, userId, cancellationToken);
+        Order order, CancellationToken cancellationToken) =>
+        _fidelity.AwardEarnedPointsAsync(order, cancellationToken);
 
     public Task WriteAcceptedSnapshotAsync(
         Order order,
@@ -39,4 +42,10 @@ internal sealed class OrderNativeBillingAcceptance : IOrderNativeBillingAcceptan
         OrderBillingRedemptionEvidence? redemption,
         CancellationToken cancellationToken) =>
         _snapshots.WriteAsync(order, acceptedCurrency, earning, redemption, cancellationToken);
+
+    public Task RecordRemovedEarningUnitsAsync(
+        Guid orderId,
+        Guid amendmentId,
+        CancellationToken cancellationToken) =>
+        _awardSuppressions.RecordRemovedUnitsAsync(orderId, amendmentId, cancellationToken);
 }

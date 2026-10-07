@@ -44,8 +44,9 @@ public sealed partial class OrderAmendmentResolutionService
         var money = new AccountMoney(acceptedCurrency ?? (source.ServiceSessionId.HasValue
             ? source.ServiceSession?.Currency : request.Currency));
         var attempts = await ReadAttemptsAsync(source.ServiceSessionId, source.Id, money, cancellationToken);
-        var loyaltyTransactions = await context.FidelityPointsTransactions.AsNoTracking()
-            .Where(value => value.OrderId == source.Id).ToListAsync(cancellationToken);
+        var loyaltyEvidence = await OrderAmendmentLoyaltyEvidenceReader.ReadAsync(
+            context, source.Id, cancellationToken);
+        var loyaltyTransactions = loyaltyEvidence.Transactions;
         var hasLoyaltyLedgerHistory = loyaltyTransactions.Count > 0;
         var priorRefunds = await AccountAmendmentRefundIntegrity.ReadAsync(
             context, [source], sourceAmendments, attempts, money, cancellationToken);
@@ -58,10 +59,11 @@ public sealed partial class OrderAmendmentResolutionService
         var plan = OrderAmendmentResolutionPlanner.Build(new OrderAmendmentResolutionPlanningInput(source, amendment, request, changes,
             attempts, journals, priorRefunds.Reversals,
             priorRefunds.AuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory,
-            priorRefunds.CashRefundHistoryByAttempt));
+            priorRefunds.CashRefundHistoryByAttempt, loyaltyEvidence));
         var sourceFingerprint = OrderAmendmentFinancialSourceFingerprint.Create(new OrderAmendmentFinancialSourceState(
             source, amendment, sourceAmendments, attempts, journals, priorRefunds.Reversals,
-            priorRefunds.AuthorizedRefundMinorByPayment, credits, loyaltyTransactions, money.Currency));
+            priorRefunds.AuthorizedRefundMinorByPayment, credits, loyaltyTransactions, money.Currency,
+            OrderAmendmentLoyaltyEvidenceFingerprint.Create(loyaltyEvidence)));
         return new OrderAmendmentResolutionPlanningState(
             source, amendment, changes, attempts, journals, priorRefunds.Reversals, plan,
             sourceFingerprint);

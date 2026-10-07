@@ -27,6 +27,13 @@ public sealed partial class OrderAmendmentResolutionService
             .Select(value => (Guid?)value.SourceOrderId)
             .SingleOrDefaultAsync(cancellationToken) ?? throw Unavailable();
 
+        if (!await OrderAmendmentLoyaltyReservationManager.TryActivateHeldAsync(
+                context, operationId, cancellationToken))
+            throw new ConflictException("The exact loyalty clawback is held until the full point obligation is available.");
+        if (!await OrderAmendmentLoyaltyReservationEvidence.AreRequiredOwnersAvailableAsync(
+                context, operationId, cancellationToken))
+            throw new ConflictException("The accepted loyalty owner is no longer available for settlement.");
+
         await using (var scope = await OrderAccountMutationScope.BeginAsync(
                          context, orderId, cancellationToken))
         {
@@ -39,6 +46,9 @@ public sealed partial class OrderAmendmentResolutionService
             if (operation.ActorUserId != actorId || operation.SourceOrderId != orderId
                 || operation.ActorRole != UserRole.Admin.ToString())
                 throw Unavailable();
+            if (!await OrderAmendmentLoyaltyReservationManager.IsReservedUnderOrderLockAsync(
+                    context, operationId, cancellationToken))
+                throw new ConflictException("The exact loyalty clawback reservation is no longer available.");
 
             var leg = operation.Legs.SingleOrDefault(value => value.SourcePaymentId == paymentId)
                 ?? throw Unavailable();

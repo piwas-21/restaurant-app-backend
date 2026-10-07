@@ -8,7 +8,8 @@ internal static class OrderAmendmentFinancialSourceFingerprint
     internal static string Create(OrderAmendmentFinancialSourceState state)
     {
         var (source, amendment, sourceAmendments, attempts, journals, reversals,
-            authorizedRefundMinorByPayment, credits, loyaltyTransactions, currency) = state;
+            authorizedRefundMinorByPayment, credits, loyaltyTransactions, currency,
+            loyaltyEvidenceFingerprint) = state;
         var snapshot = new SourceSnapshot(
             source.Id, source.ServiceSessionId, source.Type, currency,
             source.SubTotal, source.Tax, source.DeliveryFee, source.Discount,
@@ -30,6 +31,7 @@ internal static class OrderAmendmentFinancialSourceFingerprint
                 .Select(value => new AuthorizedRefund(value.Key, value.Value)).ToArray(),
             credits.OrderBy(value => value.Id).Select(Credit).ToArray(),
             loyaltyTransactions.OrderBy(value => value.Id).Select(Loyalty).ToArray(),
+            loyaltyEvidenceFingerprint,
             amendment.Id, amendment.SourceOrderId, amendment.ServiceSessionId,
             amendment.ActorUserId, amendment.ActorRole, amendment.State,
             amendment.SupplementOrderId, amendment.ChangesJson,
@@ -81,7 +83,7 @@ internal static class OrderAmendmentFinancialSourceFingerprint
 
     private static LoyaltySnapshot Loyalty(FidelityPointsTransaction value) => new(
         value.Id, value.UserId, value.OrderId, value.TransactionType,
-        value.Points, value.OrderTotal, value.ExpiresAt);
+        value.Points, value.OriginalTransactionId, value.OrderTotal, value.ExpiresAt, value.CreatedAt);
 
     private sealed record SourceSnapshot(
         Guid OrderId, Guid? ServiceSessionId, OrderType OrderType, string Currency,
@@ -97,6 +99,7 @@ internal static class OrderAmendmentFinancialSourceFingerprint
         IReadOnlyList<AttemptSnapshot> Attempts, IReadOnlyList<JournalSnapshot> Journals,
         IReadOnlyList<ReversalSnapshot> Reversals, IReadOnlyList<AuthorizedRefund> AuthorizedRefunds,
         IReadOnlyList<CreditSnapshot> Credits, IReadOnlyList<LoyaltySnapshot> LoyaltyTransactions,
+        string? LoyaltyEvidenceFingerprint,
         Guid AmendmentId, Guid AmendmentSourceOrderId, Guid? AmendmentServiceSessionId,
         Guid AmendmentActorUserId, string AmendmentActorRole, OrderAmendmentState AmendmentState,
         Guid? SupplementOrderId, string AmendmentChangesJson, string AmendmentFinancialJson,
@@ -147,6 +150,7 @@ internal static class OrderAmendmentFinancialSourceFingerprint
         string Currency, Guid ActorUserId, string ActorRole);
 
     private sealed record LoyaltySnapshot(
-        Guid Id, Guid UserId, Guid? OrderId, TransactionType TransactionType,
-        int Points, decimal? OrderTotal, DateTime? ExpiresAt);
+        Guid Id, Guid? UserId, Guid? OrderId, TransactionType TransactionType,
+        int Points, Guid? OriginalTransactionId, decimal? OrderTotal, DateTime? ExpiresAt,
+        DateTime CreatedAt);
 }

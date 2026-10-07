@@ -11,11 +11,24 @@ internal static class OrderAmendmentResolutionPlanner
 {
     internal static OrderAmendmentResolutionPlan Build(OrderAmendmentResolutionPlanningInput input)
     {
-        var (source, amendment, request, changes, attempts, checkoutJournals, reversals,
-            priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory,
-            cashRefundHistoryByAttempt) = input;
+        var source = input.Source;
+        var amendment = input.Amendment;
+        var request = input.Request;
+        var changes = input.Changes;
+        var attempts = input.Attempts;
+        var checkoutJournals = input.CheckoutJournals;
+        var reversals = input.Reversals;
+        var priorAuthorizedRefundMinorByPayment = input.PriorAuthorizedRefundMinorByPayment;
+        var money = input.Money;
+        var hasLoyaltyLedgerHistory = input.HasLoyaltyLedgerHistory;
+        var cashRefundHistoryByAttempt = input.CashRefundHistoryByAttempt;
+        var loyaltyEvidence = input.LoyaltyEvidence ?? OrderAmendmentLoyaltyEvidence.Empty;
+        var loyaltyPlan = OrderAmendmentLoyaltyPlanner.Build(
+            source, amendment, changes, money, loyaltyEvidence);
         var credit = ValidateSourceForResolution(source, amendment,
-            priorAuthorizedRefundMinorByPayment, money, hasLoyaltyLedgerHistory);
+            priorAuthorizedRefundMinorByPayment, money,
+            hasLoyaltyLedgerHistory || loyaltyEvidence.Transactions.Count > 0,
+            loyaltyPlan.SnapshotId.HasValue);
         if (request.ExpectedOrderVersion != source.Version
             || request.ExpectedAccountRevision != source.ServiceSession?.AccountRevision
             || !string.Equals(request.Currency, money.Currency, StringComparison.Ordinal))
@@ -30,19 +43,19 @@ internal static class OrderAmendmentResolutionPlanner
             throw ReconciliationRequired("Captured refunds exceed the frozen food credit.");
         RequireEnoughRefundForRetainedBalance(source, credit, refund, money);
         return new OrderAmendmentResolutionPlan(money.Currency, credit, refund,
-            checked(credit - refund), legs);
+            checked(credit - refund), legs, loyaltyPlan);
     }
 
     internal static long ValidateSourceForResolution(
         Order source, OrderAmendment amendment,
         IReadOnlyDictionary<Guid, long> priorAuthorizedRefundMinorByPayment,
-        AccountMoney money, bool hasLoyaltyLedgerHistory)
+        AccountMoney money, bool hasLoyaltyLedgerHistory, bool supportedLoyaltySnapshot = false)
     {
         if (source.ExternalReference is not null)
             throw ReconciliationRequired("Marketplace-held orders cannot use local amendment settlement.");
-        if (source.Tax != 0 || source.FidelityPointsEarned != 0
+        if (source.Tax != 0 || !supportedLoyaltySnapshot && (source.FidelityPointsEarned != 0
             || source.FidelityPointsRedeemed != 0 || source.FidelityPointsDiscount != 0
-            || hasLoyaltyLedgerHistory)
+            || hasLoyaltyLedgerHistory))
             throw ReconciliationRequired("Tax or loyalty effects need a frozen compensation review.");
         if (source.Status is OrderStatus.Cancelled or OrderStatus.Refunded
             || source.PaymentStatus == PaymentStatus.Refunded)

@@ -80,14 +80,41 @@ internal static class OrderBillingCreditConsistency
     {
         var appliedBalanceReduction = outcome.CreditState == OrderAmendmentCreditState.BalanceReduction
             && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
+            && IsNoLoyaltyEffect(outcome.Loyalty)
             && outcome.RefundState == OrderAmendmentRefundState.None;
         var reconciledTenderCredit = outcome.CreditState == OrderAmendmentCreditState.Resolved
-            && outcome.LoyaltyState == OrderAmendmentLoyaltyState.None
+            && HasSettledLoyaltyEvidence(outcome)
             && outcome.RefundState == OrderAmendmentRefundState.Resolved;
         if (outcome.ResolutionStatus != OrderAmendmentFinancialResolutionStatus.Resolved
             || !appliedBalanceReduction && !reconciledTenderCredit)
             throw InvalidJournal();
     }
+
+    private static bool HasSettledLoyaltyEvidence(OrderAmendmentFinancialPreviewDto outcome)
+    {
+        if (outcome.LoyaltyState == OrderAmendmentLoyaltyState.None)
+            return IsNoLoyaltyEffect(outcome.Loyalty);
+        var loyalty = outcome.Loyalty;
+        return outcome.LoyaltyState == OrderAmendmentLoyaltyState.Resolved
+            && loyalty is not null
+            && loyalty.State == OrderAmendmentLoyaltyOperationStatus.Resolved
+            && loyalty.CandidatePoints >= 0 && loyalty.AppliedAwardPoints >= 0
+            && loyalty.SuppressedPoints >= 0
+            && (long)loyalty.AppliedAwardPoints + loyalty.SuppressedPoints <= loyalty.CandidatePoints
+            && (loyalty.AwardPending || (long)loyalty.AppliedAwardPoints + loyalty.SuppressedPoints
+                == loyalty.CandidatePoints)
+            && loyalty.EarnedClawbackPoints >= 0 && loyalty.RedemptionRestorationPoints >= 0
+            && loyalty.PostedClawbackPoints == loyalty.EarnedClawbackPoints
+            && loyalty.PostedRestorationPoints == loyalty.RedemptionRestorationPoints
+            && (loyalty.EarnedClawbackPoints > 0 || loyalty.RedemptionRestorationPoints > 0
+                || loyalty.SuppressedPoints > 0);
+    }
+
+    private static bool IsNoLoyaltyEffect(OrderAmendmentLoyaltyResultDto? loyalty) => loyalty is null
+        || loyalty.State == OrderAmendmentLoyaltyOperationStatus.None
+            && loyalty.EarnedClawbackPoints == 0 && loyalty.RedemptionRestorationPoints == 0
+            && loyalty.PostedClawbackPoints == 0 && loyalty.PostedRestorationPoints == 0
+            && loyalty.ClawbackShortfallPoints is null;
 
     private static void RequireMatchingCreditEntries(
         IReadOnlyList<OrderBillingCredit> credits,

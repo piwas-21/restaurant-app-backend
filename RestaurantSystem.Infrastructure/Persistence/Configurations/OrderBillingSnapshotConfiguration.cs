@@ -28,6 +28,7 @@ public sealed class OrderBillingSnapshotConfiguration : IEntityTypeConfiguration
         builder.Property(value => value.TaxCategory).HasMaxLength(30).IsRequired();
         builder.Property(value => value.TaxTreatment).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.HasAlternateKey(value => value.OrderId);
+        builder.HasAlternateKey(value => new { value.OrderId, value.Id });
         builder.HasIndex(value => value.RedemptionTransactionId)
             .IsUnique()
             .HasFilter("\"redemption_transaction_id\" IS NOT NULL");

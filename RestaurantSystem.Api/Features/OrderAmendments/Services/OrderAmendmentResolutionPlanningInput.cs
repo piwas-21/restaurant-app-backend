@@ -15,4 +15,5 @@ internal sealed record OrderAmendmentResolutionPlanningInput(
     IReadOnlyDictionary<Guid, long> PriorAuthorizedRefundMinorByPayment,
     AccountMoney Money,
     bool HasLoyaltyLedgerHistory,
-    IReadOnlyDictionary<Guid, AccountCashRefundHistory>? CashRefundHistoryByAttempt = null);
+    IReadOnlyDictionary<Guid, AccountCashRefundHistory>? CashRefundHistoryByAttempt = null,
+    OrderAmendmentLoyaltyEvidence? LoyaltyEvidence = null);

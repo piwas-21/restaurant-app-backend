@@ -102,6 +102,9 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderBillingSnapshot> OrderBillingSnapshots { get; set; }
         public DbSet<OrderBillingSnapshotUnit> OrderBillingSnapshotUnits { get; set; }
         public DbSet<OrderBillingSnapshotOwnerLink> OrderBillingSnapshotOwnerLinks { get; set; }
+        public DbSet<OrderBillingAwardWitness> OrderBillingAwardWitnesses { get; set; }
+        public DbSet<OrderBillingUnitAwardSuppression> OrderBillingUnitAwardSuppressions { get; set; }
+        public DbSet<OrderBillingAwardUnitCoverage> OrderBillingAwardUnitCoverages { get; set; }
         public DbSet<OrderItemIngredient> OrderItemIngredients { get; set; }
         public DbSet<OrderPayment> OrderPayments { get; set; }
         public DbSet<TableBillPaymentOperation> TableBillPaymentOperations { get; set; }
@@ -109,6 +112,11 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<OrderBillingCredit> OrderBillingCredits { get; set; }
         public DbSet<OrderAmendmentResolutionOperation> OrderAmendmentResolutionOperations { get; set; }
         public DbSet<OrderAmendmentResolutionRefusal> OrderAmendmentResolutionRefusals { get; set; }
+        public DbSet<OrderAmendmentLoyaltyCompensation> OrderAmendmentLoyaltyCompensations { get; set; }
+        public DbSet<OrderAmendmentLoyaltyCompensationUnit> OrderAmendmentLoyaltyCompensationUnits { get; set; }
+        public DbSet<OrderAmendmentLoyaltyCompensationPosting> OrderAmendmentLoyaltyCompensationPostings { get; set; }
+        public DbSet<OrderAmendmentLoyaltyReservation> OrderAmendmentLoyaltyReservations { get; set; }
+        public DbSet<OrderAmendmentLoyaltyOwnerHold> OrderAmendmentLoyaltyOwnerHolds { get; set; }
         public DbSet<OrderAmendmentRefundLeg> OrderAmendmentRefundLegs { get; set; }
         public DbSet<OrderAmendmentRefundAttempt> OrderAmendmentRefundAttempts { get; set; }
         public DbSet<OrderAmendmentRefundEvidence> OrderAmendmentRefundEvidence { get; set; }

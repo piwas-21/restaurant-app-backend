@@ -1,4 +1,5 @@
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 using RestaurantSystem.Domain.Entities;
 
 namespace RestaurantSystem.Api.Features.Orders.Services;
@@ -28,9 +29,9 @@ internal sealed class OrderNativeFidelityOperations : IOrderNativeFidelityOperat
         Guid userId, Guid orderId, int pointsToRedeem, CancellationToken cancellationToken) =>
         _points.RedeemPointsAsync(userId, orderId, pointsToRedeem, cancellationToken);
 
-    public Task<FidelityPointsTransaction> AwardPointsAsync(
-        Guid userId, Guid orderId, int points, decimal orderTotal, CancellationToken cancellationToken) =>
-        _points.AwardPointsAsync(userId, orderId, points, orderTotal, cancellationToken);
+    public Task<FidelityPointsAwardResult> AwardAcceptedOrderAsync(
+        Guid orderId, CancellationToken cancellationToken) =>
+        _points.AwardAcceptedOrderAsync(orderId, cancellationToken);
 
     public decimal CalculateDiscountFromPoints(int points) =>
         _points.CalculateDiscountFromPoints(points);

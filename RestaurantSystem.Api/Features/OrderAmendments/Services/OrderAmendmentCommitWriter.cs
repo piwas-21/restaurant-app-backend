@@ -41,6 +41,11 @@ internal sealed class OrderAmendmentCommitWriter(
         await financial.StageAsync(amendment, source, prepared.Financial, cancellationToken);
         await kitchenStager.StageAsync(source, amendment.Id, accountRevision, prepared.Changes, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
+        if (prepared.Changes.Any(change =>
+                change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace))
+        {
+            await fidelity.RecordRemovedEarningUnitsAsync(source.Id, amendment.Id, cancellationToken);
+        }
         if (supplementBuild is not null)
         {
             var acceptedSupplement = supplementBuild.Order;

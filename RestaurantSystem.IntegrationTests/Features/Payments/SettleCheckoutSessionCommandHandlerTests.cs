@@ -427,25 +427,37 @@ public partial class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The order was paid at the till while the diner was mid-redirect, so the points are already
-    /// awarded. The settle claim stops settlement running twice, but it cannot see a DIFFERENT path
-    /// having awarded — and the award gate admits <c>Overpaid</c>, which is exactly what this
-    /// becomes.
+    /// The order was paid at the till while the diner was mid-redirect, so the exact legacy award
+    /// already exists. Settlement delegates once to the award authority, which owns validating and
+    /// replaying that ledger row without crediting it twice.
     /// </summary>
     [Fact]
-    public async Task Points_already_awarded_at_the_till_are_not_awarded_again()
+    public async Task Points_already_awarded_at_the_till_are_delegated_for_authoritative_replay()
     {
         var seeded = await SeedAsync(total: 42.50m, withUser: true);
+        var userId = seeded.UserId ?? throw new InvalidOperationException("The seeded order must have an owner.");
 
         await using (var till = _fixture.CreateContext())
         {
+            var now = DateTime.UtcNow;
             till.FidelityPointsTransactions.Add(new FidelityPointsTransaction
             {
-                UserId = seeded.UserId!.Value,
+                UserId = userId,
                 OrderId = seeded.OrderId,
                 TransactionType = TransactionType.Earned,
                 Points = 42,
-                CreatedAt = DateTime.UtcNow,
+                OrderTotal = 42.50m,
+                CreatedAt = now,
+                CreatedBy = nameof(SettleCheckoutSessionCommandHandlerTests),
+            });
+            till.FidelityPointBalances.Add(new FidelityPointBalance
+            {
+                UserId = userId,
+                CurrentPoints = 42,
+                TotalEarnedPoints = 42,
+                TotalRedeemedPoints = 0,
+                LastUpdated = now,
+                CreatedAt = now,
                 CreatedBy = nameof(SettleCheckoutSessionCommandHandlerTests),
             });
             await till.SaveChangesAsync();
@@ -456,8 +468,15 @@ public partial class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         await HandleAsync(seeded.SessionId, StripeSays("complete", "paid", 4250), fidelity);
 
         fidelity.Verify(
-            f => f.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+            f => f.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        await using var verify = _fixture.CreateContext();
+        (await verify.FidelityPointsTransactions.AsNoTracking()
+            .CountAsync(value => value.OrderId == seeded.OrderId
+                && value.TransactionType == TransactionType.Earned)).Should().Be(1);
+        (await verify.FidelityPointBalances.AsNoTracking()
+            .SingleAsync(value => value.UserId == userId)).CurrentPoints.Should().Be(42);
     }
 
     /// <summary>
@@ -489,7 +508,7 @@ public partial class SettleCheckoutSessionCommandHandlerTests : IAsyncLifetime
         order.Status.Should().Be(OrderStatus.Cancelled, "settling must not resurrect a cancelled order");
 
         fidelity.Verify(
-            f => f.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            f => f.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

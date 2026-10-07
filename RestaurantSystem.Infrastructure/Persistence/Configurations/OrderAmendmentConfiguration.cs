@@ -20,6 +20,7 @@ public sealed class OrderAmendmentConfiguration : IEntityTypeConfiguration<Order
         builder.Property(amendment => amendment.FinancialResolutionJson).HasColumnType("jsonb").IsRequired();
         builder.Property(amendment => amendment.CommitResultJson).HasColumnType("jsonb");
 
+        builder.HasAlternateKey(amendment => new { amendment.SourceOrderId, amendment.Id });
         builder.HasIndex(amendment => new { amendment.SourceOrderId, amendment.CreatedAt });
         builder.HasIndex(amendment => new { amendment.ServiceSessionId, amendment.State });
         builder.HasIndex(amendment => new { amendment.ActorUserId, amendment.ClientOperationId })

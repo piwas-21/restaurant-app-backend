@@ -253,7 +253,7 @@ public sealed class AccountPaymentAccountReaderTests(DatabaseFixture fixture) : 
         var currentUser = new Mock<ICurrentUserService>();
         currentUser.Setup(value => value.GetAuditIdentifier()).Returns(_actorId.ToString());
         var fidelity = new Mock<IOrderFidelityCoordinator>();
-        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(),
+        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(),
             It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = new AccountPaymentCaptureService(context, ActorResolver(_actorId),
             new AccountPaymentCaptureWriter(context, currentUser.Object, TimeProvider.System),

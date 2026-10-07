@@ -9,7 +9,8 @@ internal sealed record OrderAmendmentResolutionPlan(
     long CreditMinor,
     long RefundMinor,
     long UnpaidWaivedMinor,
-    IReadOnlyList<OrderAmendmentRefundLegPlan> Legs);
+    IReadOnlyList<OrderAmendmentRefundLegPlan> Legs,
+    OrderAmendmentLoyaltyPlan? Loyalty = null);
 
 internal sealed record OrderAmendmentRefundLegPlan(
     OrderPayment Payment,

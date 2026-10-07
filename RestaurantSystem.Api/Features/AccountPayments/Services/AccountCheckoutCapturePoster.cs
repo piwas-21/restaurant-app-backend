@@ -73,7 +73,7 @@ public sealed class AccountCheckoutCapturePoster(ApplicationDbContext context,
             try
             {
                 if (order.PaymentStatus == PaymentStatus.Completed)
-                    await fidelity.AwardEarnedPointsAsync(order, order.UserId, cancellationToken);
+                    await fidelity.AwardEarnedPointsAsync(order, cancellationToken);
                 var dto = await mapping.MapToOrderDtoAsync(order, cancellationToken);
                 await events.NotifyFocusOrderUpdate(dto);
             }

@@ -44,4 +44,7 @@ public sealed record OrderAmendmentFinancialPreviewDto(
     OrderAmendmentFinancialResolutionStatus ResolutionStatus,
     OrderAmendmentCreditState CreditState,
     OrderAmendmentLoyaltyState LoyaltyState,
-    OrderAmendmentRefundState RefundState);
+    OrderAmendmentRefundState RefundState)
+{
+    public OrderAmendmentLoyaltyResultDto? Loyalty { get; init; }
+}

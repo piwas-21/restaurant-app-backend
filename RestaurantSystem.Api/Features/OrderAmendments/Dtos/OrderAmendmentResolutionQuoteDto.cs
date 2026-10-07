@@ -10,7 +10,17 @@ public sealed record OrderAmendmentResolutionQuoteDto(
     long CreditMinor,
     long RefundMinor,
     long UnpaidWaivedMinor,
-    IReadOnlyList<OrderAmendmentRefundLegQuoteDto> RefundLegs);
+    IReadOnlyList<OrderAmendmentRefundLegQuoteDto> RefundLegs,
+    OrderAmendmentLoyaltyQuoteDto? Loyalty = null);
+
+public sealed record OrderAmendmentLoyaltyQuoteDto(
+    bool AwardPending,
+    int CandidatePoints,
+    int AppliedAwardPoints,
+    int SuppressedPoints,
+    int EarnedClawbackPoints,
+    int RedemptionRestorationPoints,
+    int RemovedUnitCount);
 
 public sealed record OrderAmendmentRefundLegQuoteDto(
     Guid PaymentId,

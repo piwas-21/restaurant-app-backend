@@ -18,6 +18,7 @@ public sealed class OrderBillingSnapshotOwnerLinkConfiguration
         builder.HasKey(value => value.Id).HasName("pk_order_billing_snapshot_owner_links");
         builder.HasIndex(value => new { value.OrderId, value.Slot })
             .IsUnique().HasDatabaseName("ix_order_billing_snapshot_owner_links_order_id_slot");
+        builder.HasAlternateKey(value => new { value.OrderId, value.Id });
         builder.HasIndex(value => value.UserId)
             .HasDatabaseName("ix_order_billing_snapshot_owner_links_user_id");
         builder.HasOne<OrderBillingSnapshot>().WithMany()

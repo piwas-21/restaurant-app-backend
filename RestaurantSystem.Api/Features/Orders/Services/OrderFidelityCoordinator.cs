@@ -3,8 +3,8 @@ using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.FidelityPoints.Models;
 using RestaurantSystem.Api.Settings;
-using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 using Microsoft.Extensions.Options;
@@ -118,7 +118,9 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
 
             await _context.SaveChangesAsync(cancellationToken);
             return new OrderBillingRedemptionEvidence(
-                transaction.Id, transaction.UserId, transaction.OrderId, transaction.TransactionType,
+                transaction.Id, transaction.UserId
+                    ?? throw new ConflictException("The new redemption has no authenticated owner."),
+                transaction.OrderId, transaction.TransactionType,
                 transaction.Points, discountAmount, transaction.OrderTotal, transaction.CreatedAt);
         }
         catch (InsufficientPointsException ex) when (!failOnError)
@@ -166,36 +168,21 @@ public class OrderFidelityCoordinator : IOrderFidelityCoordinator
     }
 
     public async Task AwardEarnedPointsAsync(
-        Order order, Guid? userId, CancellationToken cancellationToken)
+        Order order, CancellationToken cancellationToken)
     {
-        if (!userId.HasValue || order.FidelityPointsEarned <= 0)
-        {
-            return;
-        }
-
-        // The gate is the ORDER's PaymentStatus, not its tenders'. Every tender created with an
-        // order is Pending, and since S0b order.Total is computed server-side from the order's own
-        // items — so a caller can no longer declare `basketTotal: 0`, land RemainingAmount at 0,
-        // and have points awarded for an order nobody paid for. Both halves are load-bearing:
-        // do not weaken this gate, and do not let a client-supplied total back into pricing.
-        if (order.PaymentStatus != PaymentStatus.Completed &&
-            order.PaymentStatus != PaymentStatus.Overpaid)
-        {
-            return;
-        }
-
         try
         {
-            await _fidelityPointsService.AwardPointsAsync(
-                userId.Value,
-                order.Id,
-                order.FidelityPointsEarned,
-                order.SubTotal,
-                cancellationToken);
-
-            _logger.LogInformation(
-                "Awarded {Points} fidelity points to user {UserId} for order {OrderNumber}",
-                order.FidelityPointsEarned, userId, order.OrderNumber);
+            var result = await _fidelityPointsService.AwardAcceptedOrderAsync(order.Id, cancellationToken);
+            if (result.Disposition == FidelityPointsAwardDisposition.Awarded)
+                _logger.LogInformation("Awarded {Points} fidelity points for order {OrderNumber}",
+                    result.AppliedPoints, order.OrderNumber);
+        }
+        catch (Exception ex)
+            when (PostgresConcurrencyAborts.IsMatch(ex, out _) && _context.Database.CurrentTransaction is not null)
+        {
+            // Do not swallow a PostgreSQL abort inside the order-creation transaction. The caller
+            // must see the failed transaction rather than report success for rows that rolled back.
+            throw;
         }
         catch (Exception ex)
         {

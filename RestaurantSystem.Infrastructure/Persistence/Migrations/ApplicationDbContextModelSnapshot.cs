@@ -2874,6 +2874,10 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("order_total");
 
+                    b.Property<Guid?>("OriginalTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("original_transaction_id");
+
                     b.Property<int>("Points")
                         .HasColumnType("integer")
                         .HasColumnName("points");
@@ -2891,7 +2895,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("updated_by");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
@@ -2902,6 +2906,9 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId")
                         .HasDatabaseName("ix_fidelity_points_transactions_order_id");
+
+                    b.HasIndex("OriginalTransactionId")
+                        .HasDatabaseName("ix_fidelity_points_transactions_original_transaction_id");
 
                     b.HasIndex("TransactionType");
 
@@ -5325,6 +5332,361 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("order_amendments", (string)null);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AmendmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("amendment_id");
+
+                    b.Property<Guid?>("AwardWitnessId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("award_witness_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("OriginalTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("original_transaction_id");
+
+                    b.Property<int>("OriginalTransactionPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("original_transaction_points");
+
+                    b.Property<Guid>("OwnerLinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_link_id");
+
+                    b.Property<string>("PlanFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("plan_fingerprint");
+
+                    b.Property<int>("RequiredPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_points");
+
+                    b.Property<Guid>("SnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_id");
+
+                    b.Property<Guid>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_amendment_loyalty_compensations");
+
+                    b.HasIndex("SourceOrderId", "AmendmentId");
+
+                    b.HasIndex("SourceOrderId", "AwardWitnessId");
+
+                    b.HasIndex("SourceOrderId", "OperationId");
+
+                    b.HasIndex("SourceOrderId", "OwnerLinkId");
+
+                    b.HasIndex("SourceOrderId", "SnapshotId");
+
+                    b.HasIndex("AmendmentId", "OriginalTransactionId", "Kind")
+                        .IsUnique();
+
+                    b.HasIndex("SourceOrderId", "OriginalTransactionId", "Kind");
+
+                    b.ToTable("order_amendment_loyalty_compensations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_amendment_loyalty_compensation_points", "source_order_id <> '00000000-0000-0000-0000-000000000000'::uuid AND snapshot_id <> '00000000-0000-0000-0000-000000000000'::uuid AND owner_link_id <> '00000000-0000-0000-0000-000000000000'::uuid AND original_transaction_id <> '00000000-0000-0000-0000-000000000000'::uuid AND operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND original_transaction_points <> 0 AND required_points > 0 AND ((kind = 'EarnedClawback' AND original_transaction_points > 0) OR (kind = 'RedemptionRestoration' AND original_transaction_points < 0))");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensationPosting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("CompensationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("compensation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("MovementTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("movement_transaction_id");
+
+                    b.Property<int>("PointsDelta")
+                        .HasColumnType("integer")
+                        .HasColumnName("points_delta");
+
+                    b.Property<DateTime>("PostedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_at");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_amendment_loyalty_compensation_postings");
+
+                    b.HasIndex("CompensationId")
+                        .IsUnique();
+
+                    b.HasIndex("MovementTransactionId")
+                        .IsUnique();
+
+                    b.ToTable("order_amendment_loyalty_compensation_postings", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_amendment_loyalty_compensation_posting_delta", "movement_transaction_id <> '00000000-0000-0000-0000-000000000000'::uuid AND points_delta <> 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensationUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("CompensationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("compensation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("integer")
+                        .HasColumnName("points");
+
+                    b.Property<Guid>("SnapshotUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_unit_id");
+
+                    b.Property<Guid>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_amendment_loyalty_compensation_units");
+
+                    b.HasIndex("CompensationId", "SnapshotUnitId")
+                        .IsUnique();
+
+                    b.HasIndex("SnapshotUnitId", "Kind")
+                        .IsUnique();
+
+                    b.HasIndex("SourceOrderId", "CompensationId");
+
+                    b.HasIndex("SourceOrderId", "SnapshotUnitId")
+                        .HasDatabaseName("IX_order_amendment_loyalty_compensation_units_source_order_id~1");
+
+                    b.ToTable("order_amendment_loyalty_compensation_units", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_amendment_loyalty_compensation_unit_points", "points > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyOwnerHold", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("OwnerLinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_link_id");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<Guid>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_amendment_loyalty_owner_holds");
+
+                    b.HasIndex("OwnerLinkId", "ReleasedAt");
+
+                    b.HasIndex("SourceOrderId", "OwnerLinkId")
+                        .IsUnique()
+                        .HasFilter("released_at IS NULL");
+
+                    b.HasIndex("SourceOrderId", "OperationId", "OwnerLinkId")
+                        .IsUnique();
+
+                    b.ToTable("order_amendment_loyalty_owner_holds", (string)null);
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyReservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("CompensationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("compensation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<Guid>("OwnerLinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_link_id");
+
+                    b.Property<Guid>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_amendment_loyalty_reservations");
+
+                    b.HasIndex("CompensationId")
+                        .IsUnique();
+
+                    b.HasIndex("OperationId");
+
+                    b.HasIndex("OwnerLinkId", "State");
+
+                    b.HasIndex("SourceOrderId", "CompensationId");
+
+                    b.HasIndex("SourceOrderId", "OperationId");
+
+                    b.HasIndex("SourceOrderId", "OwnerLinkId");
+
+                    b.ToTable("order_amendment_loyalty_reservations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_amendment_loyalty_reservation_state", "state IN ('HeldShortfall', 'Reserved', 'Consumed', 'Released')");
+                        });
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentRefundAttempt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5758,8 +6120,6 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasIndex("AmendmentId")
                         .IsUnique();
 
-                    b.HasIndex("SourceOrderId");
-
                     b.HasIndex("ActorUserId", "ClientOperationId")
                         .IsUnique();
 
@@ -5848,6 +6208,143 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_amendment_resolution_refusal_code", "failure_code IN ('quoteExpired','sourceVersionConflict','accountRevisionConflict','quoteChanged','cashHistoryCapacityExceeded')");
 
                             t.HasCheckConstraint("ck_amendment_resolution_refusal_hash", "request_hash ~ '^[a-f0-9]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingAwardUnitCoverage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AwardWitnessId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("award_witness_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("EligibleEarnedPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("eligible_earned_points");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("SnapshotUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_unit_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_billing_award_unit_coverages");
+
+                    b.HasIndex("SnapshotUnitId")
+                        .IsUnique();
+
+                    b.HasIndex("AwardWitnessId", "SnapshotUnitId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "AwardWitnessId");
+
+                    b.HasIndex("OrderId", "SnapshotUnitId");
+
+                    b.ToTable("order_billing_award_unit_coverages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_billing_award_unit_coverage_points", "eligible_earned_points > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingAwardWitness", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("AppliedPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("applied_points");
+
+                    b.Property<int>("CandidatePoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("candidate_points");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("EarnedTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("earned_transaction_id");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("OwnerLinkId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_link_id");
+
+                    b.Property<int>("SuppressedPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("suppressed_points");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_billing_award_witnesses");
+
+                    b.HasIndex("EarnedTransactionId")
+                        .IsUnique()
+                        .HasFilter("\"earned_transaction_id\" IS NOT NULL");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "OwnerLinkId");
+
+                    b.ToTable("order_billing_award_witnesses", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_billing_award_witness_values", "candidate_points >= 0 AND applied_points >= 0 AND suppressed_points >= 0\nAND candidate_points = applied_points + suppressed_points\nAND (\n    (outcome = 'Awarded' AND candidate_points > 0 AND applied_points > 0\n        AND earned_transaction_id IS NOT NULL)\n    OR (outcome = 'EvaluatedZero' AND candidate_points = 0 AND applied_points = 0\n        AND suppressed_points = 0 AND earned_transaction_id IS NULL)\n    OR (outcome = 'FullySuppressed' AND candidate_points > 0 AND applied_points = 0\n        AND suppressed_points = candidate_points AND earned_transaction_id IS NULL)\n)");
                         });
                 });
 
@@ -6322,6 +6819,67 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.ToTable("order_billing_snapshot_units", null, t =>
                         {
                             t.HasCheckConstraint("ck_order_billing_snapshot_unit_values", "created_by = 'OrderBillingSnapshotFactory' AND updated_by IS NULL\nAND unit_ordinal > 0 AND gross_food_minor >= 0 AND tax_minor = 0 AND tax_rate_basis_points = 0\nAND tax_category = 'none' AND tax_treatment = 'NotApplied' AND order_discount_minor >= 0\nAND customer_discount_minor >= 0 AND redeemed_points >= 0 AND redemption_discount_minor >= 0\nAND redemption_discount_minor = redeemed_points\nAND payable_food_minor >= 0 AND earned_points >= 0 AND earning_basis_minor = gross_food_minor\nAND food_reconciliation_minor = payable_food_minor - (gross_food_minor - tax_minor\n- order_discount_minor - customer_discount_minor + courtesy_rounding_minor - redemption_discount_minor)");
+                        });
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingUnitAwardSuppression", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AmendmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("amendment_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("SnapshotUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_unit_id");
+
+                    b.Property<int>("SuppressedEarnedPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("suppressed_earned_points");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_billing_unit_award_suppressions");
+
+                    b.HasIndex("AmendmentId");
+
+                    b.HasIndex("SnapshotUnitId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "AmendmentId");
+
+                    b.HasIndex("OrderId", "SnapshotUnitId");
+
+                    b.ToTable("order_billing_unit_award_suppressions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_billing_unit_award_suppression_points", "suppressed_earned_points > 0");
                         });
                 });
 
@@ -10712,8 +11270,7 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                     b.HasOne("RestaurantSystem.Domain.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_fidelity_points_transactions_asp_net_users_user_id");
 
                     b.Navigation("Order");
@@ -11150,6 +11707,111 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendment", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "AmendmentId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingAwardWitness", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "AwardWitnessId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentResolutionOperation", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "OperationId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotOwnerLink", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "OwnerLinkId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "SnapshotId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_order_amendment_loyalty_compensations_order_billing_snapsh~1");
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensationPosting", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensation", null)
+                        .WithMany()
+                        .HasForeignKey("CompensationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensationUnit", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensation", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "CompensationId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotUnit", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "SnapshotUnitId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyOwnerHold", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentResolutionOperation", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "OperationId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotOwnerLink", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "OwnerLinkId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyReservation", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentLoyaltyCompensation", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "CompensationId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentResolutionOperation", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "OperationId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotOwnerLink", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId", "OwnerLinkId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderAmendmentRefundAttempt", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendmentRefundLeg", null)
@@ -11230,6 +11892,40 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingAwardUnitCoverage", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingAwardWitness", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "AwardWitnessId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotUnit", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "SnapshotUnitId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingAwardWitness", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .HasPrincipalKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotOwnerLink", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "OwnerLinkId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingCredit", b =>
                 {
                     b.HasOne("RestaurantSystem.Domain.Entities.Order", null)
@@ -11287,6 +11983,31 @@ namespace RestaurantSystem.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("OrderId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderBillingUnitAwardSuppression", b =>
+                {
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshot", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .HasPrincipalKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderAmendment", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "AmendmentId")
+                        .HasPrincipalKey("SourceOrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("RestaurantSystem.Domain.Entities.OrderBillingSnapshotUnit", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "SnapshotUnitId")
+                        .HasPrincipalKey("OrderId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_order_billing_unit_award_suppressions_order_billing_snapsh~1");
                 });
 
             modelBuilder.Entity("RestaurantSystem.Domain.Entities.OrderChange", b =>

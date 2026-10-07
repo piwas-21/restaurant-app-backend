@@ -14,7 +14,8 @@ internal static class OrderAmendmentResolutionFingerprint
             request.ExpectedOrderVersion, request.ExpectedAccountRevision, request.Currency,
             expiresAt, request.ManualRefunds.OrderBy(value => value.PaymentId).ToArray(),
             plan.Currency, plan.CreditMinor, plan.RefundMinor, plan.UnpaidWaivedMinor,
-            plan.Legs.OrderBy(value => value.Payment.Id).Select(ToLeg).ToArray());
+            plan.Legs.OrderBy(value => value.Payment.Id).Select(ToLeg).ToArray(),
+            plan.Loyalty is null ? null : OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(plan.Loyalty)));
         var cashRefunds = plan.Legs.Where(value => value.CashRefund is not null)
             .OrderBy(value => value.Payment.Id)
             .Select(value => new CashRefundFingerprint(value.Payment.Id, value.CashRefund!))
@@ -46,7 +47,7 @@ internal static class OrderAmendmentResolutionFingerprint
         Guid ClientOperationId, int ExpectedOrderVersion, long? ExpectedAccountRevision,
         string Currency, DateTime ExpiresAt, IReadOnlyList<ManualRefundSelectionRequest> ManualRefunds,
         string PlanCurrency, long CreditMinor, long RefundMinor, long WaivedMinor,
-        IReadOnlyList<LegFingerprint> Legs);
+        IReadOnlyList<LegFingerprint> Legs, string? LoyaltyFingerprint);
 
     private sealed record LegFingerprint(Guid PaymentId, string PaymentMethod, string Custody,
         long AmountMinor, Guid? AttemptId, string? AccountId, bool? LiveMode,

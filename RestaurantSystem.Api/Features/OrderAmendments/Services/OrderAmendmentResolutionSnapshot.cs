@@ -13,4 +13,6 @@ internal sealed record OrderAmendmentResolutionSnapshot(
     string SourceFinancialFingerprint,
     string PlanFingerprint,
     OrderAmendmentResolutionStartRequest? OriginalRequest = null,
-    OrderAmendmentResolutionQuoteDto? ReviewedQuote = null);
+    OrderAmendmentResolutionQuoteDto? ReviewedQuote = null,
+    OrderAmendmentLoyaltyPlan? LoyaltyPlan = null,
+    string? LoyaltyPlanVersion = null);
