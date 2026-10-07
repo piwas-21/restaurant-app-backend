@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantSystem.Api.Common.Exceptions;
 using RestaurantSystem.Api.Common.Services.Interfaces;
 using RestaurantSystem.Api.Features.FidelityPoints.Interfaces;
+using RestaurantSystem.Api.Features.OrderAmendments.Services;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
 
@@ -51,9 +52,14 @@ public partial class FidelityPointsService : IFidelityPointsService
             await LockUserRowForLoyaltyAsync(userId, cancellationToken);
             var balance = await LockBalanceRowForLoyaltyAsync(userId, cancellationToken);
 
-            if (balance == null || balance.CurrentPoints < pointsToRedeem)
+            if (balance is { CurrentPoints: < 0 })
+                throw new ConflictException("The loyalty balance is negative and requires reconciliation.");
+            var outstanding = await OrderAmendmentLoyaltyReservationEvidence.ReadOutstandingAsync(
+                _context, userId, cancellationToken);
+            var spendable = Math.Max(0L, (long)(balance?.CurrentPoints ?? 0) - outstanding);
+            if (balance == null || spendable < pointsToRedeem)
             {
-                throw new InsufficientPointsException(balance?.CurrentPoints ?? 0, pointsToRedeem);
+                throw new InsufficientPointsException(checked((int)spendable), pointsToRedeem);
             }
 
             var updatedCurrentPoints = checked(balance.CurrentPoints - pointsToRedeem);
@@ -152,10 +158,17 @@ public partial class FidelityPointsService : IFidelityPointsService
             await LockUserRowForLoyaltyAsync(userId, cancellationToken);
             var balance = await LockBalanceRowForLoyaltyAsync(userId, cancellationToken);
 
+            if (balance is { CurrentPoints: < 0 })
+                throw new ConflictException("The loyalty balance is negative and requires reconciliation.");
+            var outstanding = await OrderAmendmentLoyaltyReservationEvidence.ReadOutstandingAsync(
+                _context, userId, cancellationToken);
+
             var now = DateTime.UtcNow;
             var currentPoints = balance is null
                 ? Math.Max(0, points)
                 : Math.Max(0, checked(balance.CurrentPoints + points));
+            if (points < 0 && currentPoints < outstanding)
+                throw new ConflictException("The adjustment would consume points reserved for an exact amendment clawback.");
             var totalEarnedPoints = balance?.TotalEarnedPoints ?? (points > 0 ? points : 0);
             var totalRedeemedPoints = balance?.TotalRedeemedPoints ?? (points < 0 ? Math.Abs(points) : 0);
             if (balance is not null && points > 0)

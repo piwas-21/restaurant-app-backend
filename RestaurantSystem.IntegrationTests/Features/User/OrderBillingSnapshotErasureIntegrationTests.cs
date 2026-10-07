@@ -50,7 +50,7 @@ public sealed class OrderBillingSnapshotErasureIntegrationTests(DatabaseFixture 
     }
 
     [Fact]
-    public async Task Confirmed_customer_deletion_allows_explicit_debit_delete_before_user_delete()
+    public async Task Confirmed_customer_deletion_anonymizes_and_retains_order_linked_loyalty_evidence()
     {
         using var scope = Factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -192,6 +192,24 @@ public sealed class OrderBillingSnapshotErasureIntegrationTests(DatabaseFixture 
         await AssertErasedSnapshotAsync(userId, orderId, transactionId);
     }
 
+    [Fact]
+    public async Task Permanent_customer_delete_includes_soft_deleted_order_loyalty_evidence()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var transactionId = Guid.NewGuid();
+        await using var context = DatabaseFixture.CreateContext();
+        await TestUserSeeder.SeedUserAsync(context, userId);
+        await SaveSnapshotAsync(context, userId, orderId, transactionId, isDeleted: true);
+
+        var handler = new DeleteUserCommandHandler(context, Mock.Of<ICurrentUserService>(),
+            new RetainedCustomerDataScrubber(context), NullLogger<DeleteUserCommandHandler>.Instance);
+        var result = await handler.Handle(new DeleteUserCommand(userId, Permanent: true), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        await AssertErasedSnapshotAsync(userId, orderId, transactionId);
+    }
+
     private static ApplicationUser NewUser()
     {
         var suffix = Guid.NewGuid().ToString("N");
@@ -209,7 +227,7 @@ public sealed class OrderBillingSnapshotErasureIntegrationTests(DatabaseFixture 
     }
 
     private static async Task SaveSnapshotAsync(
-        ApplicationDbContext context, Guid userId, Guid orderId, Guid transactionId)
+        ApplicationDbContext context, Guid userId, Guid orderId, Guid transactionId, bool isDeleted = false)
     {
         var item = new OrderItem
         {
@@ -240,7 +258,8 @@ public sealed class OrderBillingSnapshotErasureIntegrationTests(DatabaseFixture 
             OrderDate = SourceCreatedAt,
             CreatedAt = SourceCreatedAt,
             CreatedBy = "snapshot-erasure-test",
-            Items = [item]
+            Items = [item],
+            IsDeleted = isDeleted
         };
         var transaction = new FidelityPointsTransaction
         {
@@ -271,8 +290,9 @@ public sealed class OrderBillingSnapshotErasureIntegrationTests(DatabaseFixture 
     {
         await using var verify = DatabaseFixture.CreateContext();
         (await verify.Users.IgnoreQueryFilters().AnyAsync(user => user.Id == userId)).Should().BeFalse();
-        (await verify.FidelityPointsTransactions.IgnoreQueryFilters()
-            .AnyAsync(transaction => transaction.Id == transactionId)).Should().BeFalse();
+        (await verify.FidelityPointsTransactions.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(value => value.Id == transactionId)).Should().BeFalse(
+            "the immutable snapshot retains the debit facts while the personal source transaction is erased");
 
         var order = await verify.Orders.IgnoreQueryFilters().SingleAsync(candidate => candidate.Id == orderId);
         order.UserId.Should().BeNull();
@@ -305,6 +325,79 @@ public sealed class OrderBillingSnapshotErasureIntegrationTests(DatabaseFixture 
         unchangedLink.Disposition.Should().Be(OrderBillingSnapshotOwnerDisposition.Erased);
         unchangedLink.ErasureTransactionId.Should().Be(link.ErasureTransactionId);
         unchangedLink.ErasedAt.Should().Be(link.ErasedAt);
+    }
+
+    [Fact]
+    public async Task Active_amendment_loyalty_hold_prevents_customer_erasure()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        await using var context = DatabaseFixture.CreateContext();
+        await TestUserSeeder.SeedUserAsync(context, userId);
+        await SaveSnapshotAsync(context, userId, orderId, Guid.NewGuid());
+        var link = await context.OrderBillingSnapshotOwnerLinks.AsNoTracking()
+            .SingleAsync(value => value.OrderId == orderId);
+        var now = DateTime.UtcNow;
+        var amendment = new OrderAmendment
+        {
+            Id = Guid.NewGuid(),
+            SourceOrderId = orderId,
+            ActorUserId = userId,
+            ActorRole = "Admin",
+            State = OrderAmendmentState.Committed,
+            PayloadHash = new string('a', 64),
+            CommitPayloadHash = new string('b', 64),
+            ExpectedOrderVersion = 1,
+            ExpiresAt = now.AddMinutes(5),
+            CommittedAt = now,
+            RequestJson = "{}",
+            ChangesJson = "[]",
+            SourceSnapshotJson = "{}",
+            FinancialResolutionJson = "{}",
+            CreatedAt = now,
+            CreatedBy = "loyalty-erasure-test"
+        };
+        var operation = new OrderAmendmentResolutionOperation
+        {
+            Id = Guid.NewGuid(),
+            AmendmentId = amendment.Id,
+            SourceOrderId = orderId,
+            ClientOperationId = Guid.NewGuid(),
+            ActorUserId = userId,
+            ActorRole = "Admin",
+            Currency = "CHF",
+            CreditMinor = 1,
+            RefundMinor = 1,
+            UnpaidWaivedMinor = 0,
+            RequestHash = new string('c', 64),
+            SnapshotJson = "{}",
+            State = OrderAmendmentResolutionOperationState.Processing,
+            StartedAt = now,
+            CreatedAt = now,
+            CreatedBy = "loyalty-erasure-test"
+        };
+        context.OrderAmendments.Add(amendment);
+        context.OrderAmendmentResolutionOperations.Add(operation);
+        await context.SaveChangesAsync();
+        context.OrderAmendmentLoyaltyOwnerHolds.Add(new OrderAmendmentLoyaltyOwnerHold
+        {
+            Id = Guid.NewGuid(),
+            SourceOrderId = orderId,
+            OperationId = operation.Id,
+            OwnerLinkId = link.Id,
+            CreatedAt = now,
+            CreatedBy = "loyalty-erasure-test"
+        });
+        await context.SaveChangesAsync();
+
+        var scrubber = new RetainedCustomerDataScrubber(context);
+        var erase = () => scrubber.ScrubAsync(userId, CancellationToken.None);
+
+        await Assert.ThrowsAsync<RestaurantSystem.Api.Common.Exceptions.ConflictException>(erase);
+        (await context.Users.IgnoreQueryFilters().AnyAsync(value => value.Id == userId)).Should().BeTrue();
+        (await context.OrderBillingSnapshotOwnerLinks.AsNoTracking()
+            .AnyAsync(value => value.Id == link.Id && value.UserId == userId
+                && value.Disposition == OrderBillingSnapshotOwnerDisposition.Linked)).Should().BeTrue();
     }
 
     private async Task<bool> WaitForBlockedSessionAsync(int blockingProcessId)

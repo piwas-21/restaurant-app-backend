@@ -12,4 +12,5 @@ internal sealed record OrderAmendmentFinancialSourceState(
     IReadOnlyDictionary<Guid, long> AuthorizedRefundMinorByPayment,
     IReadOnlyList<OrderBillingCredit> Credits,
     IReadOnlyList<FidelityPointsTransaction> LoyaltyTransactions,
-    string Currency);
+    string Currency,
+    string? LoyaltyEvidenceFingerprint = null);

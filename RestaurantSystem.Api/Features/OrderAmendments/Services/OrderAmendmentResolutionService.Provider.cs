@@ -22,6 +22,12 @@ public sealed partial class OrderAmendmentResolutionService
             throw Unavailable();
         if (operation.State != OrderAmendmentResolutionOperationState.Resolved)
         {
+            if (!await OrderAmendmentLoyaltyReservationManager.TryActivateHeldAsync(
+                    context, operationId, cancellationToken))
+                return await ReadResultAsync(operationId, cancellationToken);
+            if (!await OrderAmendmentLoyaltyReservationEvidence.AreRequiredOwnersAvailableAsync(
+                    context, operationId, cancellationToken))
+                return await ReadResultAsync(operationId, cancellationToken);
             foreach (var leg in operation.Legs.Where(value =>
                          value.Custody == OrderAmendmentRefundCustody.StripeDirect))
                 await ProcessStripeLegSafelyAsync(operationId, leg, actorId, cancellationToken);
@@ -226,7 +232,8 @@ public sealed partial class OrderAmendmentResolutionService
         var evidence = legIds.Length == 0 ? []
             : await context.OrderAmendmentRefundEvidence.AsNoTracking()
                 .Where(value => legIds.Contains(value.RefundLegId)).ToListAsync(cancellationToken);
-        return OrderAmendmentResolutionResultMapper.Map(operation, legs, evidence);
+        var loyalty = await ReadLoyaltyResultAsync(operation, cancellationToken);
+        return OrderAmendmentResolutionResultMapper.Map(operation, legs, evidence, loyalty);
     }
 
     private Task<OrderAmendmentResolutionOperation?> FindOperationByClientKeyAsync(

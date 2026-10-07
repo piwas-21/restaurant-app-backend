@@ -11,7 +11,8 @@ internal static class OrderAmendmentResolutionResultMapper
     internal static OrderAmendmentResolutionResultDto Map(
         OrderAmendmentResolutionOperation operation,
         IReadOnlyCollection<OrderAmendmentRefundLeg> legs,
-        IReadOnlyCollection<OrderAmendmentRefundEvidence> evidence)
+        IReadOnlyCollection<OrderAmendmentRefundEvidence> evidence,
+        OrderAmendmentLoyaltyResultDto? loyalty)
     {
         var legResults = legs.OrderBy(value => value.SourcePaymentId)
             .Select(leg => MapLeg(operation, leg,
@@ -20,13 +21,13 @@ internal static class OrderAmendmentResolutionResultMapper
             && operation.ResultJson is not null)
         {
             var saved = OrderAmendmentJson.Deserialize<OrderAmendmentResolutionResultDto>(operation.ResultJson);
-            return saved with { RefundLegs = legResults };
+            return saved with { RefundLegs = legResults, Loyalty = loyalty };
         }
 
         return new OrderAmendmentResolutionResultDto(operation.Id, operation.ClientOperationId,
             operation.AmendmentId, operation.SourceOrderId, operation.State.ToString(),
             operation.Currency, operation.CreditMinor, operation.RefundMinor,
-            operation.UnpaidWaivedMinor, operation.StartedAt, operation.ResolvedAt, legResults);
+            operation.UnpaidWaivedMinor, operation.StartedAt, operation.ResolvedAt, legResults, loyalty);
     }
 
     private static OrderAmendmentRefundLegResultDto MapLeg(

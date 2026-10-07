@@ -110,7 +110,7 @@ public sealed class AccountPaymentCaptureService(
     {
         foreach (var order in orders)
         {
-            try { await fidelity.AwardEarnedPointsAsync(order, order.UserId, cancellationToken); }
+            try { await fidelity.AwardEarnedPointsAsync(order, cancellationToken); }
             catch (Exception exception)
             {
                 logger.LogError(exception, "Loyalty award failed after committed account payment {OperationId}", operationId);

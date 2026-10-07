@@ -20,6 +20,7 @@ public sealed class OrderAmendmentResolutionOperationConfiguration
         builder.Property(value => value.ResultJson).HasColumnType("jsonb");
         builder.Property(value => value.State).HasConversion<string>().HasMaxLength(30);
         builder.Property(value => value.FailureCode).HasMaxLength(80);
+        builder.HasAlternateKey(value => new { value.SourceOrderId, value.Id });
         builder.HasIndex(value => new { value.ActorUserId, value.ClientOperationId }).IsUnique();
         builder.HasIndex(value => value.AmendmentId).IsUnique();
         builder.HasIndex(value => new { value.ServiceSessionId, value.State });

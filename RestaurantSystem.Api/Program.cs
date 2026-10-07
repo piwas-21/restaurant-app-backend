@@ -821,6 +821,7 @@ builder.Services.AddScoped<IFidelityPointsService, FidelityPointsService>();
 builder.Services.AddScoped<IOrderBillingEarningEvaluator, OrderBillingEarningEvaluator>();
 builder.Services.AddScoped<IOrderNativeFidelityOperations, OrderNativeFidelityOperations>();
 builder.Services.AddScoped<IOrderBillingSnapshotWriter, OrderBillingSnapshotWriter>();
+builder.Services.AddScoped<IOrderBillingAwardSuppressionWriter, OrderBillingAwardSuppressionWriter>();
 builder.Services.AddScoped<IOrderNativeBillingAcceptance, OrderNativeBillingAcceptance>();
 builder.Services.AddOptions<OrderBillingSnapshotOptions>()
     .Bind(builder.Configuration.GetSection(OrderBillingSnapshotOptions.SectionName))

@@ -66,10 +66,12 @@ public sealed partial class OrderAmendmentResolutionService
                     OrderAmendmentResolutionRefusalCodes.CashHistoryCapacityExceeded, now, cancellationToken);
         }
 
-        var operationId = PersistOperation(state, request, requestHash, actorId);
+        var operation = PersistOperation(state, request, requestHash, actorId);
+        await OrderAmendmentLoyaltyReservationManager.InitializeAsync(context, operation,
+            state.Plan.Loyalty, now, currentUser.GetAuditIdentifier(), cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
         await scope.CommitAsync(cancellationToken);
-        return new(operationId, null);
+        return new(operation.Id, null);
     }
 
     private async Task<StartDecision> PersistRefusalAsync(

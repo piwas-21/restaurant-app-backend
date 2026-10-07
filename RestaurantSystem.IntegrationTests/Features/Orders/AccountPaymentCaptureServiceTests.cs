@@ -132,7 +132,7 @@ public sealed partial class AccountPaymentCaptureWriterTests
     {
         var identity = await ReadyForCollection(await Seed(100, 100));
         var fidelity = new Mock<IOrderFidelityCoordinator>();
-        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ConflictException("Injected award failure"));
         (await Collect(identity, fidelity.Object)).State.Should().Be(AccountPaymentState.Captured);
         await using var read = DatabaseFixture.CreateContext();
@@ -188,7 +188,7 @@ public sealed partial class AccountPaymentCaptureWriterTests
         if (failUsingSql)
         {
             var sqlFailure = new Mock<IOrderFidelityCoordinator>();
-            sqlFailure.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            sqlFailure.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
                 .Returns(() =>
                 {
                     transactionProbe?.Invoke(context.Database.CurrentTransaction is null);

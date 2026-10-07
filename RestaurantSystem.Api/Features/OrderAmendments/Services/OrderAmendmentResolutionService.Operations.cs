@@ -10,7 +10,7 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 public sealed partial class OrderAmendmentResolutionService
 {
-    private Guid PersistOperation(OrderAmendmentResolutionPlanningState state,
+    private OrderAmendmentResolutionOperation PersistOperation(OrderAmendmentResolutionPlanningState state,
         OrderAmendmentResolutionStartRequest request, string requestHash, Guid actorId)
     {
         var now = resolutionPolicy.UtcNow;
@@ -38,7 +38,9 @@ public sealed partial class OrderAmendmentResolutionService
                 request.QuoteHash, request.ExpiresAt, state.Plan.Currency,
                 state.Plan.CreditMinor, state.Plan.RefundMinor, state.Plan.UnpaidWaivedMinor,
                 requestHash, state.SourceFinancialFingerprint,
-                OrderAmendmentResolutionPlanFingerprint.Create(state.Plan), request, reviewedQuote)),
+                OrderAmendmentResolutionPlanFingerprint.Create(state.Plan), request, reviewedQuote,
+                state.Plan.Loyalty?.SnapshotId.HasValue == true ? state.Plan.Loyalty : null,
+                OrderAmendmentLoyaltyPlanFingerprint.Version)),
             State = OrderAmendmentResolutionOperationState.Processing,
             StartedAt = now,
             CreatedBy = currentUser.GetAuditIdentifier()
@@ -46,7 +48,7 @@ public sealed partial class OrderAmendmentResolutionService
         var legs = state.Plan.Legs.Select(plan => CreateLeg(operation, plan, now, actorId)).ToArray();
         operation.Legs = legs;
         context.OrderAmendmentResolutionOperations.Add(operation);
-        return operation.Id;
+        return operation;
     }
 
     private OrderAmendmentRefundLeg CreateLeg(

@@ -35,6 +35,10 @@ public sealed class OrderBillingAdjustmentWriter(
             throw new ConflictException("This amendment requires financial reconciliation before its credit can be applied.");
 
         var money = new AccountMoney(preview.Currency);
+        var acceptedBilling = await context.OrderBillingSnapshots.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.OrderId == source.Id, cancellationToken);
+        if (acceptedBilling is not null && !acceptedBilling.EarnedPointsCandidate.HasValue)
+            throw new ConflictException("The source order's accepted loyalty evaluation is pending.");
         await OrderBillingCreditConsistency.AssertAsync(context, new[] { source.Id }, cancellationToken);
         await AssertCurrentAggregateAsync(source, money, cancellationToken);
         var existing = context.OrderBillingCredits.Local.SingleOrDefault(value => value.AmendmentId == amendment.Id)

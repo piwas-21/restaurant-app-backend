@@ -29,7 +29,8 @@ public record RecordHeartbeatCommand(
     string? KitchenPrinter,
     string? CashierPrinter,
     List<PrinterTargetCapabilityDto>? TargetCapabilities = null,
-    DeviceKitchenRoutingMode? KitchenRoutingMode = null
+    DeviceKitchenRoutingMode? KitchenRoutingMode = null,
+    bool? SupportsUpdateAuthorization = null
 ) : ICommand<ApiResponse<bool>>;
 
 public class RecordHeartbeatCommandHandler
@@ -67,6 +68,8 @@ public class RecordHeartbeatCommandHandler
         device.Platform = command.Platform;
         device.AppVersion = command.AppVersion;
         device.FeedRunning = command.FeedRunning ?? false;
+        // Every heartbeat is authoritative: a downgraded/legacy client cannot inherit support.
+        device.SupportsUpdateAuthorization = command.SupportsUpdateAuthorization ?? false;
         // The client reports the last completed poll, but the server owns the upper bound. A clock
         // set into the future must never make a device look fresh indefinitely.
         var now = DateTime.UtcNow;

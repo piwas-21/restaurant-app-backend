@@ -27,7 +27,7 @@ public partial class SettleCheckoutSessionCommandHandlerTests
         var fidelity = new Mock<IOrderFidelityCoordinator>();
         var sawSqlError = false;
         var outsideTransaction = false;
-        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+        fidelity.Setup(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 outsideTransaction = context.Database.CurrentTransaction is null;
@@ -54,7 +54,7 @@ public partial class SettleCheckoutSessionCommandHandlerTests
         (await read.Orders.SingleAsync(value => value.Id == seed.OrderId)).TotalPaid.Should().Be(42.50m);
         (await read.TableServiceSessions.SingleAsync()).AccountRevision.Should().Be(2);
         await writer.SettleAsync(checkout, "pi_loyalty_failure", 4250, CancellationToken.None);
-        fidelity.Verify(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(), It.IsAny<Guid?>(),
+        fidelity.Verify(value => value.AwardEarnedPointsAsync(It.IsAny<Order>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

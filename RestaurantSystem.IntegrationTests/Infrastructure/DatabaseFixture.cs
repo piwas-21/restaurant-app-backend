@@ -130,7 +130,12 @@ public class DatabaseFixture : IAsyncLifetime
         // Test lanes are disposable. Truncation clears the append-only journal without
         // disabling its production UPDATE/DELETE triggers during any test execution.
         await using (var clearJournal = new NpgsqlCommand(
-            "TRUNCATE TABLE order_billing_snapshot_owner_links, order_billing_snapshot_units, "
+            "TRUNCATE TABLE order_amendment_loyalty_compensation_postings, "
+            + "order_amendment_loyalty_compensation_units, order_amendment_loyalty_reservations, "
+            + "order_amendment_loyalty_owner_holds, order_amendment_loyalty_compensations, "
+            + "order_billing_award_unit_coverages, order_billing_award_witnesses, "
+            + "order_billing_unit_award_suppressions, "
+            + "order_billing_snapshot_owner_links, order_billing_snapshot_units, "
             + "order_billing_snapshots, order_billing_credits, "
             + "table_ready_operations, order_amendment_resolution_refusals, "
             + "order_amendment_resolution_operations, order_amendment_refund_legs, "

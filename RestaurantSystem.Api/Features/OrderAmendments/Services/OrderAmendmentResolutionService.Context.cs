@@ -43,17 +43,21 @@ public sealed partial class OrderAmendmentResolutionService
             ?? source.ServiceSession?.Currency
             ?? resolutionPolicy.ResolveCurrency(source));
         var attempts = await ReadAttemptsAsync(source.ServiceSessionId, source.Id, money, cancellationToken);
-        var loyalty = await context.FidelityPointsTransactions.AsNoTracking()
-            .Where(value => value.OrderId == source.Id).ToListAsync(cancellationToken);
+        var changes = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(amendment.ChangesJson);
+        var loyaltyEvidence = await OrderAmendmentLoyaltyEvidenceReader.ReadAsync(
+            context, source.Id, cancellationToken);
+        var loyalty = loyaltyEvidence.Transactions;
+        var loyaltyPlan = OrderAmendmentLoyaltyPlanner.Build(
+            source, amendment, changes, money, loyaltyEvidence);
         var refunds = await AccountAmendmentRefundIntegrity.ReadAsync(context, [source], sourceAmendments,
             attempts, money, cancellationToken);
         var credit = OrderAmendmentResolutionPlanner.ValidateSourceForResolution(
-            source, amendment, refunds.AuthorizedRefundMinorByPayment, money, loyalty.Count > 0);
+            source, amendment, refunds.AuthorizedRefundMinorByPayment, money, loyalty.Count > 0,
+            loyaltyPlan.SnapshotId.HasValue);
         var attemptIds = attempts.Select(value => value.Id).ToArray();
         var journals = attemptIds.Length == 0 ? []
             : await context.AccountCheckoutJournals.AsNoTracking()
                 .Where(value => attemptIds.Contains(value.AttemptId)).ToListAsync(cancellationToken);
-        var changes = OrderAmendmentJson.Deserialize<List<OrderAmendmentChangeSnapshot>>(amendment.ChangesJson);
         var removals = OrderAmendmentRefundScopePlanner.RemovalRanges(changes);
         OrderAmendmentRefundScopePlanner.EnsureNoPriorRemovalRefund(removals, refunds.Reversals);
         _ = OrderAmendmentResolutionPlanner.PlanAllocatedRefunds(source, attempts, journals,

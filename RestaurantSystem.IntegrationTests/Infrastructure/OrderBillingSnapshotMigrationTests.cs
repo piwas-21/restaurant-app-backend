@@ -35,45 +35,49 @@ public sealed class OrderBillingSnapshotMigrationTests(DatabaseFixture fixture) 
     [Fact]
     public async Task Snapshot_history_refuses_rollback_and_retains_its_source_and_unit_money()
     {
-        var orderId = Guid.NewGuid();
-        var acceptedAt = new DateTime(2026, 10, 4, 12, 0, 0, DateTimeKind.Utc);
-        var order = new Order
+        try
         {
-            Id = orderId,
-            OrderNumber = $"MIG-SNAP-{Guid.NewGuid():N}"[..20],
-            Type = OrderType.Takeaway,
-            Status = OrderStatus.Completed,
-            SubTotal = 1m,
-            Total = 1m,
-            OrderDate = acceptedAt,
-            CreatedAt = acceptedAt,
-            CreatedBy = "snapshot-migration-test",
-            Items = [new OrderItem
+            var orderId = Guid.NewGuid();
+            var acceptedAt = new DateTime(2026, 10, 4, 12, 0, 0, DateTimeKind.Utc);
+            var order = new Order
             {
-                Id = Guid.NewGuid(), OrderId = orderId, Quantity = 1,
-                ProductName = "Retained accepted unit", UnitPrice = 1m, ItemTotal = 1m,
-                CreatedAt = acceptedAt, CreatedBy = "snapshot-migration-test"
-            }]
-        };
-        await using (var seed = fixture.CreateContext())
-        {
-            seed.Orders.Add(order);
-            await seed.SaveChangesAsync();
-            var snapshot = OrderBillingSnapshotFactory.Build(order, "CHF", null, null, 1_000);
-            seed.OrderBillingSnapshots.Add(snapshot.Header);
-            seed.OrderBillingSnapshotUnits.AddRange(snapshot.Units);
-            await seed.SaveChangesAsync();
-        }
+                Id = orderId,
+                OrderNumber = $"MIG-SNAP-{Guid.NewGuid():N}"[..20],
+                Type = OrderType.Takeaway,
+                Status = OrderStatus.Completed,
+                SubTotal = 1m,
+                Total = 1m,
+                OrderDate = acceptedAt,
+                CreatedAt = acceptedAt,
+                CreatedBy = "snapshot-migration-test",
+                Items = [new OrderItem
+                {
+                    Id = Guid.NewGuid(), OrderId = orderId, Quantity = 1,
+                    ProductName = "Retained accepted unit", UnitPrice = 1m, ItemTotal = 1m,
+                    CreatedAt = acceptedAt, CreatedBy = "snapshot-migration-test"
+                }]
+            };
+            await using (var seed = fixture.CreateContext())
+            {
+                seed.Orders.Add(order);
+                await seed.SaveChangesAsync();
+                var snapshot = OrderBillingSnapshotFactory.Build(order, "CHF", null, null, 1_000);
+                seed.OrderBillingSnapshots.Add(snapshot.Header);
+                seed.OrderBillingSnapshotUnits.AddRange(snapshot.Units);
+                await seed.SaveChangesAsync();
+            }
 
-        var failure = await Assert.ThrowsAsync<PostgresException>(() => MigrateAsync(PreviousMigration));
-        failure.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
-        failure.MessageText.Should().Be("Native order billing snapshot history must be retained");
-        await AssertSchemaAsync(present: true);
-        await using var verify = fixture.CreateContext();
-        (await verify.Database.GetAppliedMigrationsAsync()).Last().Should().Be(SnapshotMigration);
-        (await verify.Orders.AsNoTracking().SingleAsync(value => value.Id == orderId)).Total.Should().Be(1m);
-        (await verify.OrderBillingSnapshots.AsNoTracking().SingleAsync()).TotalMinor.Should().Be(100);
-        (await verify.OrderBillingSnapshotUnits.AsNoTracking().SingleAsync()).PayableFoodMinor.Should().Be(100);
+            var failure = await Assert.ThrowsAsync<PostgresException>(() => MigrateAsync(PreviousMigration));
+            failure.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+            failure.MessageText.Should().Be("Native order billing snapshot history must be retained");
+            await AssertSchemaAsync(present: true);
+            await using var verify = fixture.CreateContext();
+            (await verify.Database.GetAppliedMigrationsAsync()).Last().Should().Be(SnapshotMigration);
+            (await verify.Orders.AsNoTracking().SingleAsync(value => value.Id == orderId)).Total.Should().Be(1m);
+            (await verify.OrderBillingSnapshots.AsNoTracking().SingleAsync()).TotalMinor.Should().Be(100);
+            (await verify.OrderBillingSnapshotUnits.AsNoTracking().SingleAsync()).PayableFoodMinor.Should().Be(100);
+        }
+        finally { await MigrateAsync(); }
     }
 
     private async Task MigrateAsync(string? target = null)

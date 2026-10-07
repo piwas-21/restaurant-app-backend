@@ -15,5 +15,6 @@ public record DeviceSummaryDto(
     string? ApiBaseUrl,
     string? KitchenPrinter,
     string? CashierPrinter,
-    DateTime FirstSeenAt
+    DateTime FirstSeenAt,
+    bool SupportsUpdateAuthorization = false
 );

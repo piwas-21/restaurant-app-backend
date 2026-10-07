@@ -166,7 +166,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand, Api
 
             // Gated on the server-computed order.PaymentStatus: a caller cannot declare itself paid
             // into an award, and an online order is not paid yet — the settle path awards instead.
-            await _fidelity.AwardEarnedPointsAsync(order, userId, cancellationToken);
+            await _fidelity.AwardEarnedPointsAsync(order, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
 

@@ -34,6 +34,9 @@ public class PrinterDevice : Entity
     /// <summary>Whether the order-polling feed was listening at the last heartbeat.</summary>
     public bool FeedRunning { get; set; }
 
+    /// <summary>Whether this installation checks correction authorization immediately before sending.</summary>
+    public bool SupportsUpdateAuthorization { get; set; }
+
     /// <summary>Last time the device successfully polled the order feed (drives stale-feed detection).</summary>
     public DateTime? LastSuccessfulPollAt { get; set; }
 

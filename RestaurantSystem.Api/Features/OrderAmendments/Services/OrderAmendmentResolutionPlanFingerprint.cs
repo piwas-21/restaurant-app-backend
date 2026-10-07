@@ -1,6 +1,8 @@
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Api.Features.AccountPayments.Services;
+using RestaurantSystem.Api.Common.Exceptions;
+using System.Text.Json;
 
 namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
@@ -14,7 +16,8 @@ internal static class OrderAmendmentResolutionPlanFingerprint
             value.AmountMinor, plan.Currency,
             value.Scopes.OrderBy(scope => scope.AllocationId).ThenBy(scope => scope.StartOrdinal)
                 .Select(ScopeSnapshot.From).ToArray(), value.ProviderAccountId,
-            value.ProviderLiveMode, value.ProviderChargeId, value.ProviderIntentId, null)).ToArray());
+            value.ProviderLiveMode, value.ProviderChargeId, value.ProviderIntentId, null)).ToArray(),
+            CreateLoyaltyFingerprint(plan.Loyalty));
         var cashRefunds = plan.Legs.Where(value => value.CashRefund is not null)
             .OrderBy(value => value.Payment.Id)
             .Select(value => new CashRefundFingerprint(value.Payment.Id, value.CashRefund!)).ToArray();
@@ -26,6 +29,10 @@ internal static class OrderAmendmentResolutionPlanFingerprint
     internal static string Create(OrderAmendmentResolutionOperation operation,
         IReadOnlyCollection<OrderAmendmentRefundLeg> legs)
     {
+        OrderAmendmentResolutionSnapshot persisted;
+        try { persisted = OrderAmendmentJson.Deserialize<OrderAmendmentResolutionSnapshot>(operation.SnapshotJson); }
+        catch (JsonException exception)
+        { throw new ConflictException("The frozen loyalty resolution evidence is unavailable.", exception); }
         var snapshot = new PlanSnapshot(operation.Currency, operation.CreditMinor,
             operation.RefundMinor, operation.UnpaidWaivedMinor,
             legs.OrderBy(value => value.SourcePaymentId).Select(value => new LegSnapshot(
@@ -37,27 +44,43 @@ internal static class OrderAmendmentResolutionPlanFingerprint
                     scope.OrderItemId, scope.StartOrdinal, scope.UnitCount,
                     scope.MinorPerUnit, scope.AmountMinor)).ToArray(), value.ProviderAccountId,
             value.ProviderLiveMode, value.ProviderChargeId, value.ProviderIntentId,
-            null)).ToArray());
+            null)).ToArray(), CreateLoyaltyFingerprint(persisted.LoyaltyPlan));
         var cashRefunds = legs.Where(value => value.CashRefundIntent is not null)
             .OrderBy(value => value.SourcePaymentId)
             .Select(value => new CashRefundFingerprint(value.SourcePaymentId,
                 AccountCashRefundPlan.FromIntent(value.CashRefundIntent!))).ToArray();
+        if (persisted.LoyaltyPlanVersion is null)
+        {
+            var legacy = new LegacyPlanSnapshot(operation.Currency, operation.CreditMinor,
+                operation.RefundMinor, operation.UnpaidWaivedMinor, snapshot.Legs);
+            return cashRefunds.Length == 0
+                ? Hash(legacy)
+                : Hash(new LegacyCashBoundPlanFingerprint(legacy, cashRefunds));
+        }
         return cashRefunds.Length == 0
             ? Hash(snapshot)
             : Hash(new CashBoundPlanFingerprint(snapshot, cashRefunds));
     }
 
-    private static string Hash(PlanSnapshot value) => OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(value));
+    private static string Hash<T>(T value) => OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(value));
 
-    private static string Hash(CashBoundPlanFingerprint value) =>
-        OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(value));
+    private static string? CreateLoyaltyFingerprint(OrderAmendmentLoyaltyPlan? value) => value is null
+        || !value.SnapshotId.HasValue
+        ? null : OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(value));
 
     private sealed record PlanSnapshot(
         string Currency, long CreditMinor, long RefundMinor, long UnpaidWaivedMinor,
-        IReadOnlyList<LegSnapshot> Legs);
+        IReadOnlyList<LegSnapshot> Legs, string? LoyaltyFingerprint);
 
     private sealed record CashBoundPlanFingerprint(
         PlanSnapshot Plan, IReadOnlyList<CashRefundFingerprint> CashRefunds);
+
+    private sealed record LegacyPlanSnapshot(
+        string Currency, long CreditMinor, long RefundMinor, long UnpaidWaivedMinor,
+        IReadOnlyList<LegSnapshot> Legs);
+
+    private sealed record LegacyCashBoundPlanFingerprint(
+        LegacyPlanSnapshot Plan, IReadOnlyList<CashRefundFingerprint> CashRefunds);
 
     private sealed record CashRefundFingerprint(Guid PaymentId, AccountCashRefundPlan Plan);
 
