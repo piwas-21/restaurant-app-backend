@@ -124,7 +124,7 @@ public sealed partial class OrderAmendmentResolutionService
             .Where(value => value.RefundLegId == legId)
             .ToArrayAsync(cancellationToken);
 
-    private async Task ConfirmExistingTillEvidenceAsync(
+    private static async Task ConfirmExistingTillEvidenceAsync(
         TillConfirmationContext confirmation, OrderAmendmentRefundEvidence evidence,
         CancellationToken cancellationToken)
     {

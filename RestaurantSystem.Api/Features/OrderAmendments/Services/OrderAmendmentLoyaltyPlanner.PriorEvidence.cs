@@ -6,6 +6,9 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal static partial class OrderAmendmentLoyaltyPlanner
 {
+    private const string PriorCompensationSourceHistoryMessage =
+        "A prior loyalty compensation is not bound to one resolved source history.";
+
     private sealed record PriorEvidenceIndexes(
         IReadOnlyDictionary<Guid, OrderBillingSnapshotUnit> UnitsById,
         IReadOnlyDictionary<Guid, OrderAmendment> Amendments,
@@ -80,13 +83,13 @@ internal static partial class OrderAmendmentLoyaltyPlanner
             || !indexes.Operations.TryGetValue(header.OperationId, out var operation)
             || operation.SourceOrderId != sourceOrderId || operation.AmendmentId != header.AmendmentId
             || operation.State != OrderAmendmentResolutionOperationState.Resolved)
-            throw Held("A prior loyalty compensation is not bound to one resolved source history.");
+            throw Held(PriorCompensationSourceHistoryMessage);
         if (!indexes.OwnerLinks.TryGetValue(header.OwnerLinkId, out var owner)
             || owner.OrderId != sourceOrderId)
-            throw Held("A prior loyalty compensation is not bound to one resolved source history.");
+            throw Held(PriorCompensationSourceHistoryMessage);
         if (!TryReadRetainedOriginal(header, owner, evidence.Snapshot,
                 indexes.OriginalRows, sourceOrderId, out var original))
-            throw Held("A prior loyalty compensation is not bound to one resolved source history.");
+            throw Held(PriorCompensationSourceHistoryMessage);
         return new(owner, original);
     }
 
@@ -96,7 +99,7 @@ internal static partial class OrderAmendmentLoyaltyPlanner
         if (header.SourceOrderId != sourceOrderId || header.SnapshotId != snapshotId
             || header.Id == Guid.Empty || header.AmendmentId == Guid.Empty
             || header.OperationId == Guid.Empty || header.RequiredPoints <= 0)
-            throw Held("A prior loyalty compensation is not bound to one resolved source history.");
+            throw Held(PriorCompensationSourceHistoryMessage);
     }
 
     private static void ValidateOriginalTransaction(
