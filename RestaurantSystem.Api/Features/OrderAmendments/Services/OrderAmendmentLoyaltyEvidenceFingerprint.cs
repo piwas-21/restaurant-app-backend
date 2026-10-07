@@ -19,8 +19,8 @@ internal static class OrderAmendmentLoyaltyEvidenceFingerprint
             evidence.OwnerLinks.OrderBy(value => value.Slot).Select(OwnerSnapshot.From).ToArray(),
             !allowAwardAfterPendingSuppression && evidence.AwardWitness is not null
                 ? AwardSnapshot.From(evidence.AwardWitness) : null,
-            evidence.AwardCoverage.OrderBy(value => value.SnapshotUnitId)
-                .Where(_ => !allowAwardAfterPendingSuppression)
+            evidence.AwardCoverage.Where(_ => !allowAwardAfterPendingSuppression)
+                .OrderBy(value => value.SnapshotUnitId)
                 .Select(CoverageSnapshot.From).ToArray(),
             evidence.Suppressions.Where(value => value.AmendmentId != excludeAmendmentId)
                 .OrderBy(value => value.SnapshotUnitId)

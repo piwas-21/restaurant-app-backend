@@ -17,7 +17,7 @@ internal static class OrderAmendmentResolutionPlanFingerprint
             value.Scopes.OrderBy(scope => scope.AllocationId).ThenBy(scope => scope.StartOrdinal)
                 .Select(ScopeSnapshot.From).ToArray(), value.ProviderAccountId,
             value.ProviderLiveMode, value.ProviderChargeId, value.ProviderIntentId, null)).ToArray(),
-            LoyaltyFingerprint(plan.Loyalty));
+            CreateLoyaltyFingerprint(plan.Loyalty));
         var cashRefunds = plan.Legs.Where(value => value.CashRefund is not null)
             .OrderBy(value => value.Payment.Id)
             .Select(value => new CashRefundFingerprint(value.Payment.Id, value.CashRefund!)).ToArray();
@@ -44,7 +44,7 @@ internal static class OrderAmendmentResolutionPlanFingerprint
                     scope.OrderItemId, scope.StartOrdinal, scope.UnitCount,
                     scope.MinorPerUnit, scope.AmountMinor)).ToArray(), value.ProviderAccountId,
             value.ProviderLiveMode, value.ProviderChargeId, value.ProviderIntentId,
-            null)).ToArray(), LoyaltyFingerprint(persisted.LoyaltyPlan));
+            null)).ToArray(), CreateLoyaltyFingerprint(persisted.LoyaltyPlan));
         var cashRefunds = legs.Where(value => value.CashRefundIntent is not null)
             .OrderBy(value => value.SourcePaymentId)
             .Select(value => new CashRefundFingerprint(value.SourcePaymentId,
@@ -64,7 +64,7 @@ internal static class OrderAmendmentResolutionPlanFingerprint
 
     private static string Hash<T>(T value) => OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(value));
 
-    private static string? LoyaltyFingerprint(OrderAmendmentLoyaltyPlan? value) => value is null
+    private static string? CreateLoyaltyFingerprint(OrderAmendmentLoyaltyPlan? value) => value is null
         || !value.SnapshotId.HasValue
         ? null : OrderAmendmentJson.Hash(OrderAmendmentJson.Serialize(value));
 

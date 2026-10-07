@@ -8,6 +8,8 @@ namespace RestaurantSystem.Api.Features.FidelityPoints.Services;
 
 public partial class FidelityPointsService
 {
+    private sealed record ReplayOwner(Guid UserId);
+
     private async Task<FidelityPointsAwardResult> ReplayLegacyAwardAsync(
         AwardOrderState order,
         List<FidelityPointsTransaction> existingAwards,
@@ -35,14 +37,8 @@ public partial class FidelityPointsService
             .SingleOrDefaultAsync(value => value.OrderId == order.Id, cancellationToken)
             ?? throw new ConflictException("The loyalty award witness has no accepted billing snapshot.");
         var candidate = ValidateSnapshotCandidate(order, snapshot);
-        var ownerLink = await LockEarningOwnerLinkAsync(order.Id, cancellationToken);
-        if (ownerLink is null || ownerLink.Id != witness.OwnerLinkId)
-            throw new ConflictException("The loyalty award witness does not match its earning owner link.");
-        if (!IsLinkedOwner(ownerLink, order.UserId))
-            return Deferred(FidelityPointsAwardDeferralReason.EarningOwnerUnavailable);
-        if (!await TryLockAwardUserAsync(ownerLink.UserId!.Value, cancellationToken))
-            return Deferred(FidelityPointsAwardDeferralReason.EarningOwnerUnavailable);
-        if (!IsLinkedOwner(ownerLink, order.UserId) || ownerLink!.Id != witness.OwnerLinkId)
+        var owner = await LockReplayOwnerAsync(witness, order, cancellationToken);
+        if (owner is null)
             return Deferred(FidelityPointsAwardDeferralReason.EarningOwnerUnavailable);
 
         var units = await ReadSnapshotUnitsAsync(order.Id, cancellationToken);
@@ -54,43 +50,74 @@ public partial class FidelityPointsService
             .Where(value => value.OrderId == order.Id)
             .ToListAsync(cancellationToken);
         ValidateAwardUnitCoverage(witness, units, coverage);
-        if (witness.CandidatePoints != candidate || witness.AppliedPoints < 0 || witness.SuppressedPoints < 0
+        ValidateWitnessTotals(witness, candidate, suppressed);
+        if (witness.Outcome == OrderBillingAwardOutcome.Awarded)
+            return await ReplayAwardedWitnessAsync(witness, order, snapshot, owner, candidate, suppressed,
+                cancellationToken);
+        return await ReplayNoAwardWitnessAsync(witness, order.Id, candidate, suppressed, cancellationToken);
+    }
+
+    private async Task<ReplayOwner?> LockReplayOwnerAsync(
+        OrderBillingAwardWitness witness, AwardOrderState order, CancellationToken cancellationToken)
+    {
+        var link = await LockEarningOwnerLinkAsync(order.Id, cancellationToken);
+        if (link is null || link.Id != witness.OwnerLinkId)
+            throw new ConflictException("The loyalty award witness does not match its earning owner link.");
+        if (!IsLinkedOwner(link, order.UserId) || link.UserId is not Guid userId)
+            return null;
+        if (!await TryLockAwardUserAsync(userId, cancellationToken))
+            return null;
+        if (!IsLinkedOwner(link, order.UserId) || link.Id != witness.OwnerLinkId)
+            return null;
+        return new(userId);
+    }
+
+    private static void ValidateWitnessTotals(
+        OrderBillingAwardWitness witness, int candidate, int suppressed)
+    {
+        if (witness.CandidatePoints != candidate || witness.AppliedPoints < 0
+            || witness.SuppressedPoints < 0
             || (long)witness.AppliedPoints + witness.SuppressedPoints != candidate
             || witness.SuppressedPoints != suppressed)
             throw new ConflictException("The loyalty award witness does not reconcile with its frozen unit history.");
-
-        var expectedOutcome = witness.AppliedPoints > 0
-            ? OrderBillingAwardOutcome.Awarded
-            : candidate == 0 ? OrderBillingAwardOutcome.EvaluatedZero : OrderBillingAwardOutcome.FullySuppressed;
-        if (witness.Outcome != expectedOutcome)
+        if (witness.Outcome != ReadAwardOutcome(witness.AppliedPoints, candidate))
             throw new ConflictException("The loyalty award witness has an invalid outcome.");
-        if (witness.Outcome == OrderBillingAwardOutcome.Awarded)
-        {
-            if (!witness.EarnedTransactionId.HasValue)
-                throw new ConflictException("The awarded loyalty witness has no transaction lineage.");
-            var earned = await _context.FidelityPointsTransactions.AsNoTracking()
-                .SingleOrDefaultAsync(value => value.Id == witness.EarnedTransactionId.Value, cancellationToken)
-                ?? throw new ConflictException("The witnessed loyalty transaction is missing.");
-            var earnedRows = await ReadEarnedRowsAsync(order.Id, cancellationToken);
-            if (earnedRows.Count != 1 || earnedRows[0].Id != earned.Id)
-                throw new ConflictException("The witnessed order has duplicate or mismatched earned ledger history.");
-            if (!MatchesAward(earned, order, ownerLink.UserId!.Value,
-                    witness.AppliedPoints, SnapshotEarningTotal(snapshot)))
-                throw new ConflictException("The witnessed loyalty transaction does not match its frozen award.");
-            if (await LockBalanceRowForLoyaltyAsync(ownerLink.UserId.Value, cancellationToken) is null)
-                throw new ConflictException("The witnessed loyalty award has no balance record.");
-            return Result(FidelityPointsAwardDisposition.AlreadyAwarded,
-                candidate, witness.AppliedPoints, suppressed);
-        }
+    }
 
+    private async Task<FidelityPointsAwardResult> ReplayAwardedWitnessAsync(
+        OrderBillingAwardWitness witness, AwardOrderState order, OrderBillingSnapshot snapshot,
+        ReplayOwner owner, int candidate, int suppressed, CancellationToken cancellationToken)
+    {
+        if (!witness.EarnedTransactionId.HasValue)
+            throw new ConflictException("The awarded loyalty witness has no transaction lineage.");
+        var earned = await _context.FidelityPointsTransactions.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.Id == witness.EarnedTransactionId.Value, cancellationToken)
+            ?? throw new ConflictException("The witnessed loyalty transaction is missing.");
+        var earnedRows = await ReadEarnedRowsAsync(order.Id, cancellationToken);
+        if (earnedRows.Count != 1 || earnedRows[0].Id != earned.Id)
+            throw new ConflictException("The witnessed order has duplicate or mismatched earned ledger history.");
+        if (!MatchesAward(earned, order, owner.UserId,
+                witness.AppliedPoints, SnapshotEarningTotal(snapshot)))
+            throw new ConflictException("The witnessed loyalty transaction does not match its frozen award.");
+        if (await LockBalanceRowForLoyaltyAsync(owner.UserId, cancellationToken) is null)
+            throw new ConflictException("The witnessed loyalty award has no balance record.");
+        return Result(FidelityPointsAwardDisposition.AlreadyAwarded,
+            candidate, witness.AppliedPoints, suppressed);
+    }
+
+    private async Task<FidelityPointsAwardResult> ReplayNoAwardWitnessAsync(
+        OrderBillingAwardWitness witness, Guid orderId, int candidate, int suppressed,
+        CancellationToken cancellationToken)
+    {
         if (witness.EarnedTransactionId.HasValue
             || await _context.FidelityPointsTransactions.AsNoTracking().AnyAsync(
-                value => value.OrderId == order.Id && value.TransactionType == TransactionType.Earned,
+                value => value.OrderId == orderId && value.TransactionType == TransactionType.Earned,
                 cancellationToken))
             throw new ConflictException("A no-award witness conflicts with earned ledger history.");
-        return Result(witness.Outcome == OrderBillingAwardOutcome.EvaluatedZero
+        var disposition = witness.Outcome == OrderBillingAwardOutcome.EvaluatedZero
             ? FidelityPointsAwardDisposition.EvaluatedZero
-            : FidelityPointsAwardDisposition.FullySuppressed, candidate, 0, suppressed);
+            : FidelityPointsAwardDisposition.FullySuppressed;
+        return Result(disposition, candidate, 0, suppressed);
     }
 
     private static FidelityPointsAwardResult Deferred(FidelityPointsAwardDeferralReason reason) =>
@@ -117,6 +144,15 @@ public partial class FidelityPointsService
     private static FidelityPointsAwardResult Result(
         FidelityPointsAwardDisposition disposition, int candidate, int applied, int suppressed) =>
         new(disposition, null, candidate, applied, suppressed);
+
+    private static OrderBillingAwardOutcome ReadAwardOutcome(int appliedPoints, int candidatePoints)
+    {
+        if (appliedPoints > 0)
+            return OrderBillingAwardOutcome.Awarded;
+        return candidatePoints == 0
+            ? OrderBillingAwardOutcome.EvaluatedZero
+            : OrderBillingAwardOutcome.FullySuppressed;
+    }
 
     private static OrderBillingAwardWitness NewWitness(
         Guid orderId, Guid ownerLinkId, int candidate, int applied, int suppressed,

@@ -69,6 +69,7 @@ public sealed class OrderAmendmentLoyaltyRetainedSourceTests
             snapshot, new Dictionary<Guid, FidelityPointsTransaction>(), orderId, out var original);
 
         Assert.True(found);
+        Assert.NotNull(original);
         Assert.Equal(transactionId, original.Id);
         Assert.Equal(orderId, original.OrderId);
         Assert.Null(original.UserId);

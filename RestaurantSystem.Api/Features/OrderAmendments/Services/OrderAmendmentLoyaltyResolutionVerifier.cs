@@ -11,10 +11,27 @@ internal static class OrderAmendmentLoyaltyResolutionVerifier
     {
         if (reviewed is null)
         {
-            if (current.SnapshotId.HasValue)
-                throw Invalid();
+            AssertNoNewSnapshot(current);
             return;
         }
+        AssertReviewedIdentity(reviewed, current);
+        if (!reviewed.AwardPending)
+        {
+            AssertFinalAwardTransition(sourceOrderId, amendmentId, reviewed, current);
+            return;
+        }
+        AssertPendingAwardTransition(sourceOrderId, amendmentId, reviewed, current, evidence);
+    }
+
+    private static void AssertNoNewSnapshot(OrderAmendmentLoyaltyPlan current)
+    {
+        if (current.SnapshotId.HasValue)
+            throw Invalid();
+    }
+
+    private static void AssertReviewedIdentity(
+        OrderAmendmentLoyaltyPlan reviewed, OrderAmendmentLoyaltyPlan current)
+    {
         if (!reviewed.SnapshotId.HasValue || current.SnapshotId != reviewed.SnapshotId
             || current.Currency != reviewed.Currency || current.CandidatePoints != reviewed.CandidatePoints
             || current.EarningOwnerLinkId != reviewed.EarningOwnerLinkId
@@ -22,21 +39,40 @@ internal static class OrderAmendmentLoyaltyResolutionVerifier
             || !reviewed.RemovedUnits.SequenceEqual(current.RemovedUnits)
             || !CompensationsMatch(reviewed.Compensations, current.Compensations))
             throw Invalid();
+    }
 
-        if (!reviewed.AwardPending)
+    private static void AssertFinalAwardTransition(
+        Guid sourceOrderId, Guid amendmentId,
+        OrderAmendmentLoyaltyPlan reviewed, OrderAmendmentLoyaltyPlan current)
+    {
+        if (current.AwardPending || current.AppliedAwardPoints != reviewed.AppliedAwardPoints
+            || current.SuppressedPoints != reviewed.SuppressedPoints
+            || current.EarnedClawbackPoints != reviewed.EarnedClawbackPoints
+            || current.RedemptionRestorationPoints != reviewed.RedemptionRestorationPoints)
+            throw Invalid();
+        var before = OrderAmendmentLoyaltyPlanFingerprint.Create(sourceOrderId, amendmentId, reviewed);
+        var now = OrderAmendmentLoyaltyPlanFingerprint.Create(sourceOrderId, amendmentId, current);
+        if (before != now)
+            throw Invalid();
+    }
+
+    private static void AssertPendingAwardTransition(
+        Guid sourceOrderId, Guid amendmentId, OrderAmendmentLoyaltyPlan reviewed,
+        OrderAmendmentLoyaltyPlan current, OrderAmendmentLoyaltyEvidence evidence)
+    {
+        ValidatePendingSuppressionRows(sourceOrderId, amendmentId, reviewed, current, evidence);
+        if (current.AwardPending)
         {
-            if (current.AwardPending || current.AppliedAwardPoints != reviewed.AppliedAwardPoints
-                || current.SuppressedPoints != reviewed.SuppressedPoints
-                || current.EarnedClawbackPoints != reviewed.EarnedClawbackPoints
-                || current.RedemptionRestorationPoints != reviewed.RedemptionRestorationPoints)
-                throw Invalid();
-            var before = OrderAmendmentLoyaltyPlanFingerprint.Create(sourceOrderId, amendmentId, reviewed);
-            var now = OrderAmendmentLoyaltyPlanFingerprint.Create(sourceOrderId, amendmentId, current);
-            if (before != now)
-                throw Invalid();
+            ValidateStillPending(reviewed, current);
             return;
         }
+        ValidateAwardSettledAfterPending(reviewed, current, evidence, amendmentId);
+    }
 
+    private static void ValidatePendingSuppressionRows(
+        Guid sourceOrderId, Guid amendmentId, OrderAmendmentLoyaltyPlan reviewed,
+        OrderAmendmentLoyaltyPlan current, OrderAmendmentLoyaltyEvidence evidence)
+    {
         var expectedSuppressionIds = reviewed.RemovedUnits.Where(value => value.EarnedPoints > 0)
             .Select(value => value.SnapshotUnitId).Order().ToArray();
         var actualSuppressionIds = evidence.Suppressions.Where(value => value.AmendmentId == amendmentId
@@ -45,15 +81,20 @@ internal static class OrderAmendmentLoyaltyResolutionVerifier
         if (!expectedSuppressionIds.SequenceEqual(actualSuppressionIds)
             || current.PendingAwardSuppressions.Count != 0)
             throw Invalid();
+    }
 
-        if (current.AwardPending)
-        {
-            if (current.AppliedAwardPoints != 0 || current.SuppressedPoints != reviewed.SuppressedPoints
-                || current.EarnedClawbackPoints != 0)
-                throw Invalid();
-            return;
-        }
+    private static void ValidateStillPending(
+        OrderAmendmentLoyaltyPlan reviewed, OrderAmendmentLoyaltyPlan current)
+    {
+        if (current.AppliedAwardPoints != 0 || current.SuppressedPoints != reviewed.SuppressedPoints
+            || current.EarnedClawbackPoints != 0)
+            throw Invalid();
+    }
 
+    private static void ValidateAwardSettledAfterPending(
+        OrderAmendmentLoyaltyPlan reviewed, OrderAmendmentLoyaltyPlan current,
+        OrderAmendmentLoyaltyEvidence evidence, Guid amendmentId)
+    {
         if (current.EarnedClawbackPoints != 0
             || current.SuppressedPoints != reviewed.SuppressedPoints
             || current.RedemptionRestorationPoints != reviewed.RedemptionRestorationPoints

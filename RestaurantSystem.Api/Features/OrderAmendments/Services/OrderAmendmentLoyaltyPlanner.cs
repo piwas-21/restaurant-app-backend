@@ -32,7 +32,7 @@ internal static partial class OrderAmendmentLoyaltyPlanner
             evidence.AwardWitness is null);
         var priorCompensatedUnits = ValidatePriorCompensation(
             source.Id, accepted.Snapshot.Id, accepted.Units, evidence);
-        var award = ValidateAward(source, money, accepted, evidence, removed);
+        var award = ValidateAward(source, money, accepted, evidence);
         ValidatePriorRemovalCoverage(accepted.Units, evidence, suppression.PriorRemovedUnitIds,
             priorCompensatedUnits, award);
         var redemption = ValidateRedemption(source, accepted, evidence);
@@ -41,14 +41,14 @@ internal static partial class OrderAmendmentLoyaltyPlanner
         var earnedUnits = award.Coverage.Where(value => removed.Any(unit => unit.Id == value.SnapshotUnitId))
             .Select(value => new OrderAmendmentLoyaltyCompensationUnitPlan(
                 value.SnapshotUnitId, value.EligibleEarnedPoints)).ToArray();
-        AddPlan(plans, source.Id, amendment.Id, accepted.Snapshot.Id,
+        AddPlan(plans, accepted.Snapshot.Id,
             accepted.EarningOwnerLink, award.Transaction, award.Witness,
             OrderAmendmentLoyaltyCompensationKind.EarnedClawback, earnedUnits);
 
         var redemptionUnits = removed.Where(value => value.RedeemedPoints > 0)
             .Select(value => new OrderAmendmentLoyaltyCompensationUnitPlan(value.Id, value.RedeemedPoints))
             .ToArray();
-        AddPlan(plans, source.Id, amendment.Id, accepted.Snapshot.Id,
+        AddPlan(plans, accepted.Snapshot.Id,
             accepted.RedemptionOwnerLink, redemption.Transaction, null,
             OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration, redemptionUnits);
 
@@ -86,7 +86,7 @@ internal static partial class OrderAmendmentLoyaltyPlanner
     }
 
     private static void AddPlan(List<OrderAmendmentLoyaltyCompensationPlan> plans,
-        Guid orderId, Guid amendmentId, Guid snapshotId,
+        Guid snapshotId,
         OrderBillingSnapshotOwnerLink? owner, FidelityPointsTransaction? original,
         OrderBillingAwardWitness? witness, OrderAmendmentLoyaltyCompensationKind kind,
         OrderAmendmentLoyaltyCompensationUnitPlan[] units)

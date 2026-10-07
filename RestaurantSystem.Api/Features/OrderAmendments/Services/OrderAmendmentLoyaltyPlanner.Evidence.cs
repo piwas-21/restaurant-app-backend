@@ -9,6 +9,14 @@ namespace RestaurantSystem.Api.Features.OrderAmendments.Services;
 
 internal static partial class OrderAmendmentLoyaltyPlanner
 {
+    private sealed record SuppressionScope(
+        Guid SourceOrderId, Guid CurrentAmendmentId,
+        IReadOnlyDictionary<Guid, OrderBillingSnapshotUnit> UnitsById,
+        IReadOnlyDictionary<Guid, OrderAmendment> Amendments,
+        IReadOnlyDictionary<Guid, HashSet<Guid>> RemovedByAmendment,
+        IReadOnlySet<Guid> CurrentRemovedIds,
+        Dictionary<Guid, OrderBillingUnitAwardSuppression> SuppressionByUnit);
+
     private static OrderBillingSnapshotUnit[] SelectRemovedUnits(
         Order source, IReadOnlyList<OrderAmendmentChangeSnapshot> changes,
         IReadOnlyList<OrderBillingSnapshotUnit> units)
@@ -46,58 +54,91 @@ internal static partial class OrderAmendmentLoyaltyPlanner
         var sourceOrderId = source.Id;
         var unitsById = units.ToDictionary(value => value.Id);
         var amendments = evidence.CommittedAmendments.ToDictionary(value => value.Id);
-        var removedByAmendment = new Dictionary<Guid, HashSet<Guid>>();
-        foreach (var amendment in evidence.CommittedAmendments)
-        {
-            if (amendment.SourceOrderId != sourceOrderId || amendment.State != OrderAmendmentState.Committed)
-                throw Held("The committed amendment history has a foreign or invalid source.");
-            var priorChanges = amendment.Id == currentAmendmentId
-                ? null : ReadChanges(amendment.ChangesJson);
-            if (priorChanges is null)
-                continue;
-            removedByAmendment.Add(amendment.Id, SelectRemovedUnits(source, priorChanges, units)
-                .Select(value => value.Id).ToHashSet());
-        }
-
+        var removedByAmendment = ReadPriorRemovalScopes(
+            source, currentAmendmentId, units, evidence.CommittedAmendments);
         var priorRemoved = removedByAmendment.Values.SelectMany(value => value).ToHashSet();
         if (removed.Any(value => priorRemoved.Contains(value.Id)))
             throw Held("A previously amended loyalty unit cannot be compensated twice.");
 
-        var suppressionByUnit = new Dictionary<Guid, OrderBillingUnitAwardSuppression>();
-        foreach (var suppression in evidence.Suppressions)
-        {
-            if (suppression.OrderId != sourceOrderId || suppression.SuppressedEarnedPoints <= 0
-                || !unitsById.TryGetValue(suppression.SnapshotUnitId, out var unit)
-                || unit.EarnedPoints != suppression.SuppressedEarnedPoints
-                || !amendments.ContainsKey(suppression.AmendmentId)
-                || !suppressionByUnit.TryAdd(suppression.SnapshotUnitId, suppression))
-                throw Held("The frozen pre-award suppression history contains invalid or duplicate rows.");
-            var scope = suppression.AmendmentId == currentAmendmentId
-                ? removed.Select(value => value.Id).ToHashSet()
-                : removedByAmendment.GetValueOrDefault(suppression.AmendmentId);
-            if (scope is null || !scope.Contains(unit.Id))
-                throw Held("A pre-award suppression does not match its committed removal.");
-        }
-        if (evidence.Suppressions.Sum(value => (long)value.SuppressedEarnedPoints)
-            > units.Sum(value => (long)value.EarnedPoints))
-            throw Held("The pre-award suppression history exceeds the frozen earning candidate.");
-
-        var pendingSuppressions = new List<OrderAmendmentLoyaltyUnitAllocation>();
-        if (awardMissing)
-        {
-            foreach (var unit in removed.Where(value => value.EarnedPoints > 0))
-            {
-                if (!suppressionByUnit.ContainsKey(unit.Id))
-                    pendingSuppressions.Add(new(unit.Id, unit.OrderItemId, unit.UnitOrdinal,
-                        unit.EarnedPoints, unit.RedeemedPoints));
-            }
-        }
+        var suppressionByUnit = ReadSuppressionRows(sourceOrderId, currentAmendmentId,
+            unitsById, amendments, removedByAmendment, removed, evidence.Suppressions);
+        ValidateSuppressionTotals(units, evidence.Suppressions);
+        var pendingSuppressions = awardMissing
+            ? BuildPendingSuppressions(removed, suppressionByUnit)
+            : [];
         return new(pendingSuppressions, priorRemoved);
     }
 
+    private static Dictionary<Guid, HashSet<Guid>> ReadPriorRemovalScopes(
+        Order source, Guid currentAmendmentId, IReadOnlyList<OrderBillingSnapshotUnit> units,
+        IReadOnlyList<OrderAmendment> committedAmendments)
+    {
+        var removedByAmendment = new Dictionary<Guid, HashSet<Guid>>();
+        foreach (var amendment in committedAmendments)
+        {
+            if (amendment.SourceOrderId != source.Id || amendment.State != OrderAmendmentState.Committed)
+                throw Held("The committed amendment history has a foreign or invalid source.");
+            if (amendment.Id == currentAmendmentId)
+                continue;
+            removedByAmendment.Add(amendment.Id, SelectRemovedUnits(
+                    source, ReadChanges(amendment.ChangesJson), units)
+                .Select(value => value.Id).ToHashSet());
+        }
+        return removedByAmendment;
+    }
+
+    private static Dictionary<Guid, OrderBillingUnitAwardSuppression> ReadSuppressionRows(
+        Guid sourceOrderId, Guid currentAmendmentId,
+        IReadOnlyDictionary<Guid, OrderBillingSnapshotUnit> unitsById,
+        IReadOnlyDictionary<Guid, OrderAmendment> amendments,
+        IReadOnlyDictionary<Guid, HashSet<Guid>> removedByAmendment,
+        IReadOnlyList<OrderBillingSnapshotUnit> removed,
+        IReadOnlyList<OrderBillingUnitAwardSuppression> suppressions)
+    {
+        var suppressionByUnit = new Dictionary<Guid, OrderBillingUnitAwardSuppression>();
+        var scope = new SuppressionScope(sourceOrderId, currentAmendmentId, unitsById,
+            amendments, removedByAmendment, removed.Select(value => value.Id).ToHashSet(), suppressionByUnit);
+        foreach (var suppression in suppressions)
+            AddValidatedSuppression(scope, suppression);
+        return suppressionByUnit;
+    }
+
+    private static void AddValidatedSuppression(
+        SuppressionScope scope,
+        OrderBillingUnitAwardSuppression suppression)
+    {
+        if (suppression.OrderId != scope.SourceOrderId || suppression.SuppressedEarnedPoints <= 0
+            || !scope.UnitsById.TryGetValue(suppression.SnapshotUnitId, out var unit)
+            || unit.EarnedPoints != suppression.SuppressedEarnedPoints
+            || !scope.Amendments.ContainsKey(suppression.AmendmentId)
+            || !scope.SuppressionByUnit.TryAdd(suppression.SnapshotUnitId, suppression))
+            throw Held("The frozen pre-award suppression history contains invalid or duplicate rows.");
+        var removalScope = suppression.AmendmentId == scope.CurrentAmendmentId
+            ? scope.CurrentRemovedIds : scope.RemovedByAmendment.GetValueOrDefault(suppression.AmendmentId);
+        if (removalScope is null || !removalScope.Contains(unit.Id))
+            throw Held("A pre-award suppression does not match its committed removal.");
+    }
+
+    private static void ValidateSuppressionTotals(
+        IReadOnlyList<OrderBillingSnapshotUnit> units,
+        IReadOnlyList<OrderBillingUnitAwardSuppression> suppressions)
+    {
+        if (suppressions.Sum(value => (long)value.SuppressedEarnedPoints)
+            > units.Sum(value => (long)value.EarnedPoints))
+            throw Held("The pre-award suppression history exceeds the frozen earning candidate.");
+    }
+
+    private static List<OrderAmendmentLoyaltyUnitAllocation> BuildPendingSuppressions(
+        IReadOnlyList<OrderBillingSnapshotUnit> removed,
+        Dictionary<Guid, OrderBillingUnitAwardSuppression> suppressionByUnit) =>
+        removed.Where(value => value.EarnedPoints > 0 && !suppressionByUnit.ContainsKey(value.Id))
+            .Select(value => new OrderAmendmentLoyaltyUnitAllocation(
+                value.Id, value.OrderItemId, value.UnitOrdinal,
+                value.EarnedPoints, value.RedeemedPoints)).ToList();
+
     private static AwardValidation ValidateAward(
         Order source, AccountMoney money, AcceptedLoyaltySnapshot accepted,
-        OrderAmendmentLoyaltyEvidence evidence, IReadOnlyList<OrderBillingSnapshotUnit> removed)
+        OrderAmendmentLoyaltyEvidence evidence)
     {
         var candidate = accepted.Snapshot.EarnedPointsCandidate;
         var earnedRows = evidence.Transactions.Where(value => value.TransactionType == TransactionType.Earned).ToArray();
@@ -117,30 +158,46 @@ internal static partial class OrderAmendmentLoyaltyPlanner
         }
 
         var witness = evidence.AwardWitness;
-        if (accepted.EarningOwnerLink is null || witness.OrderId != source.Id
-            || witness.OwnerLinkId != accepted.EarningOwnerLink.Id
-            || witness.CandidatePoints != candidate.Value || witness.AppliedPoints < 0
+        ValidateAwardWitness(source, candidate.Value, accepted.EarningOwnerLink, evidence, witness);
+        if (witness.AppliedPoints == 0)
+            return ValidateZeroAward(witness, evidence, earnedRows);
+        return ValidateAppliedAward(source, money, accepted, evidence, witness, earnedRows);
+    }
+
+    private static void ValidateAwardWitness(
+        Order source, int candidate, OrderBillingSnapshotOwnerLink? earningOwner,
+        OrderAmendmentLoyaltyEvidence evidence, OrderBillingAwardWitness witness)
+    {
+        if (earningOwner is null || witness.OrderId != source.Id
+            || witness.OwnerLinkId != earningOwner.Id
+            || witness.CandidatePoints != candidate || witness.AppliedPoints < 0
             || witness.SuppressedPoints < 0
-            || (long)witness.AppliedPoints + witness.SuppressedPoints != candidate.Value
+            || (long)witness.AppliedPoints + witness.SuppressedPoints != candidate
             || evidence.Suppressions.Sum(value => (long)value.SuppressedEarnedPoints) != witness.SuppressedPoints)
             throw Held("The immutable award witness does not match the accepted unit and suppression history.");
 
-        var expectedOutcome = witness.AppliedPoints > 0
-            ? OrderBillingAwardOutcome.Awarded
-            : candidate == 0 ? OrderBillingAwardOutcome.EvaluatedZero : OrderBillingAwardOutcome.FullySuppressed;
+        var expectedOutcome = ReadAwardOutcome(witness.AppliedPoints, candidate);
         if (witness.Outcome != expectedOutcome)
             throw Held("The loyalty award witness has an invalid evaluated outcome.");
-        if (witness.AppliedPoints == 0)
-        {
-            if (witness.EarnedTransactionId.HasValue || earnedRows.Length > 0
-                || evidence.AwardCoverage.Count > 0)
-                throw Held("A zero-point award witness conflicts with earned ledger history.");
-            return new(0, false, null, witness, []);
-        }
+    }
 
+    private static AwardValidation ValidateZeroAward(
+        OrderBillingAwardWitness witness, OrderAmendmentLoyaltyEvidence evidence,
+        FidelityPointsTransaction[] earnedRows)
+    {
+        if (witness.EarnedTransactionId.HasValue || earnedRows.Length > 0 || evidence.AwardCoverage.Count > 0)
+            throw Held("A zero-point award witness conflicts with earned ledger history.");
+        return new(0, false, null, witness, []);
+    }
+
+    private static AwardValidation ValidateAppliedAward(
+        Order source, AccountMoney money, AcceptedLoyaltySnapshot accepted,
+        OrderAmendmentLoyaltyEvidence evidence, OrderBillingAwardWitness witness,
+        FidelityPointsTransaction[] earnedRows)
+    {
         if (!witness.EarnedTransactionId.HasValue || earnedRows.Length != 1
             || earnedRows[0].Id != witness.EarnedTransactionId.Value
-            || !MatchesEarned(earnedRows[0], source, accepted.EarningOwnerLink.UserId!.Value,
+            || !MatchesEarned(earnedRows[0], source, accepted.EarningOwnerLink!.UserId!.Value,
                 witness.AppliedPoints, money.ToMajor(accepted.Snapshot.EarningBasisMinor)))
             throw Held("The applied award does not match its unique immutable earned transaction.");
 
@@ -155,8 +212,7 @@ internal static partial class OrderAmendmentLoyaltyPlanner
             throw Held("The applied award unit coverage is invalid or incomplete.");
         if (coverage.Count == 0)
             throw Held("A historical award has no exact per-unit compensation basis.");
-        return new(witness.AppliedPoints > 0 ? witness.AppliedPoints : 0,
-            false, earnedRows[0], witness, coverage);
+        return new(witness.AppliedPoints, false, earnedRows[0], witness, coverage);
     }
 
     private static RedemptionValidation ValidateRedemption(
@@ -210,4 +266,13 @@ internal static partial class OrderAmendmentLoyaltyPlanner
     private sealed record SuppressionValidation(
         IReadOnlyList<OrderAmendmentLoyaltyUnitAllocation> PendingAwardSuppressions,
         IReadOnlySet<Guid> PriorRemovedUnitIds);
+
+    private static OrderBillingAwardOutcome ReadAwardOutcome(int appliedPoints, int candidatePoints)
+    {
+        if (appliedPoints > 0)
+            return OrderBillingAwardOutcome.Awarded;
+        return candidatePoints == 0
+            ? OrderBillingAwardOutcome.EvaluatedZero
+            : OrderBillingAwardOutcome.FullySuppressed;
+    }
 }

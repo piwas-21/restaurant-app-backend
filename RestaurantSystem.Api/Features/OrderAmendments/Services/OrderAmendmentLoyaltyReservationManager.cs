@@ -16,10 +16,24 @@ internal static class OrderAmendmentLoyaltyReservationManager
             return;
         var ownerLinks = await OrderAmendmentLoyaltyOwnerLinks.LockForOrderAsync(
             context, operation.SourceOrderId, cancellationToken);
-        var holdOwnerIds = plan.Compensations.Select(value => value.OwnerLinkId)
+        var holdOwnerIds = ReadHoldOwnerIds(plan);
+        await AddOwnerHoldsAsync(context, operation, ownerLinks, holdOwnerIds, now, audit, cancellationToken);
+        AddSuppressionRows(context, operation, plan.PendingAwardSuppressions, now, audit);
+        await AddCompensationRowsAsync(
+            context, operation, ownerLinks, plan.Compensations, now, audit, cancellationToken);
+    }
+
+    private static Guid[] ReadHoldOwnerIds(OrderAmendmentLoyaltyPlan plan) =>
+        plan.Compensations.Select(value => value.OwnerLinkId)
             .Concat(plan.PendingAwardSuppressions.Count > 0 && plan.EarningOwnerLinkId.HasValue
                 ? [plan.EarningOwnerLinkId.Value] : [])
             .Distinct().Order().ToArray();
+
+    private static async Task AddOwnerHoldsAsync(
+        ApplicationDbContext context, OrderAmendmentResolutionOperation operation,
+        IReadOnlyList<OrderBillingSnapshotOwnerLink> ownerLinks, IReadOnlyList<Guid> holdOwnerIds,
+        DateTime now, string audit, CancellationToken cancellationToken)
+    {
         foreach (var ownerLinkId in holdOwnerIds)
         {
             var owner = ownerLinks.SingleOrDefault(value => value.Id == ownerLinkId);
@@ -38,8 +52,13 @@ internal static class OrderAmendmentLoyaltyReservationManager
                 CreatedBy = audit
             });
         }
-        foreach (var suppression in plan.PendingAwardSuppressions)
-        {
+    }
+
+    private static void AddSuppressionRows(
+        ApplicationDbContext context, OrderAmendmentResolutionOperation operation,
+        IReadOnlyList<OrderAmendmentLoyaltyUnitAllocation> suppressions, DateTime now, string audit)
+    {
+        foreach (var suppression in suppressions)
             context.OrderBillingUnitAwardSuppressions.Add(new OrderBillingUnitAwardSuppression
             {
                 Id = Guid.NewGuid(),
@@ -50,66 +69,98 @@ internal static class OrderAmendmentLoyaltyReservationManager
                 CreatedAt = now,
                 CreatedBy = audit
             });
-        }
-
-        foreach (var item in plan.Compensations)
-        {
-            var header = new OrderAmendmentLoyaltyCompensation
-            {
-                Id = Guid.NewGuid(),
-                SourceOrderId = operation.SourceOrderId,
-                AmendmentId = operation.AmendmentId,
-                SnapshotId = item.SnapshotId,
-                OwnerLinkId = item.OwnerLinkId,
-                OriginalTransactionId = item.OriginalTransactionId,
-                AwardWitnessId = item.AwardWitnessId,
-                OperationId = operation.Id,
-                Kind = item.Kind,
-                OriginalTransactionPoints = item.OriginalTransactionPoints,
-                RequiredPoints = item.RequiredPoints,
-                PlanFingerprint = item.PlanFingerprint,
-                CreatedAt = now,
-                CreatedBy = audit
-            };
-            context.OrderAmendmentLoyaltyCompensations.Add(header);
-            context.OrderAmendmentLoyaltyCompensationUnits.AddRange(item.Units.Select(unit =>
-                new OrderAmendmentLoyaltyCompensationUnit
-                {
-                    Id = Guid.NewGuid(),
-                    CompensationId = header.Id,
-                    SourceOrderId = operation.SourceOrderId,
-                    SnapshotUnitId = unit.SnapshotUnitId,
-                    Kind = item.Kind,
-                    Points = unit.Points,
-                    CreatedAt = now,
-                    CreatedBy = audit
-                }));
-
-            if (item.Kind != OrderAmendmentLoyaltyCompensationKind.EarnedClawback)
-                continue;
-            var owner = ownerLinks.SingleOrDefault(value => value.Id == item.OwnerLinkId);
-            if (owner is null || owner.Slot != OrderBillingSnapshotOwnerSlot.Earning
-                || owner.Disposition != OrderBillingSnapshotOwnerDisposition.Linked
-                || !owner.UserId.HasValue || owner.ErasedAt.HasValue
-                || owner.ErasureTransactionId is not null)
-                throw new ConflictException("The original earning owner is unavailable for a protected clawback.");
-            var state = await OrderAmendmentLoyaltyBalanceLocks.CanReserveAsync(context, owner.UserId.Value,
-                item.RequiredPoints, cancellationToken)
-                ? OrderAmendmentLoyaltyReservationState.Reserved
-                : OrderAmendmentLoyaltyReservationState.HeldShortfall;
-            context.OrderAmendmentLoyaltyReservations.Add(new OrderAmendmentLoyaltyReservation
-            {
-                Id = Guid.NewGuid(),
-                SourceOrderId = operation.SourceOrderId,
-                OperationId = operation.Id,
-                CompensationId = header.Id,
-                OwnerLinkId = item.OwnerLinkId,
-                State = state,
-                CreatedAt = now,
-                CreatedBy = audit
-            });
-        }
     }
+
+    private static async Task AddCompensationRowsAsync(
+        ApplicationDbContext context, OrderAmendmentResolutionOperation operation,
+        IReadOnlyList<OrderBillingSnapshotOwnerLink> ownerLinks,
+        IReadOnlyList<OrderAmendmentLoyaltyCompensationPlan> compensations,
+        DateTime now, string audit, CancellationToken cancellationToken)
+    {
+        foreach (var item in compensations)
+            await AddCompensationRowAsync(
+                context, operation, ownerLinks, item, now, audit, cancellationToken);
+    }
+
+    private static async Task AddCompensationRowAsync(
+        ApplicationDbContext context, OrderAmendmentResolutionOperation operation,
+        IReadOnlyList<OrderBillingSnapshotOwnerLink> ownerLinks,
+        OrderAmendmentLoyaltyCompensationPlan item, DateTime now, string audit,
+        CancellationToken cancellationToken)
+    {
+        var header = NewCompensationHeader(operation, item, now, audit);
+        context.OrderAmendmentLoyaltyCompensations.Add(header);
+        context.OrderAmendmentLoyaltyCompensationUnits.AddRange(item.Units.Select(unit =>
+            NewCompensationUnit(operation.SourceOrderId, header.Id, item.Kind, unit, now, audit)));
+        if (item.Kind != OrderAmendmentLoyaltyCompensationKind.EarnedClawback)
+            return;
+        var owner = RequireEarningOwner(ownerLinks, item.OwnerLinkId);
+        var state = await OrderAmendmentLoyaltyBalanceLocks.CanReserveAsync(
+                context, owner.UserId!.Value, item.RequiredPoints, cancellationToken)
+            ? OrderAmendmentLoyaltyReservationState.Reserved
+            : OrderAmendmentLoyaltyReservationState.HeldShortfall;
+        context.OrderAmendmentLoyaltyReservations.Add(NewReservation(operation, header, item, state, now, audit));
+    }
+
+    private static OrderAmendmentLoyaltyCompensation NewCompensationHeader(
+        OrderAmendmentResolutionOperation operation, OrderAmendmentLoyaltyCompensationPlan item,
+        DateTime now, string audit) => new()
+        {
+            Id = Guid.NewGuid(),
+            SourceOrderId = operation.SourceOrderId,
+            AmendmentId = operation.AmendmentId,
+            SnapshotId = item.SnapshotId,
+            OwnerLinkId = item.OwnerLinkId,
+            OriginalTransactionId = item.OriginalTransactionId,
+            AwardWitnessId = item.AwardWitnessId,
+            OperationId = operation.Id,
+            Kind = item.Kind,
+            OriginalTransactionPoints = item.OriginalTransactionPoints,
+            RequiredPoints = item.RequiredPoints,
+            PlanFingerprint = item.PlanFingerprint,
+            CreatedAt = now,
+            CreatedBy = audit
+        };
+
+    private static OrderAmendmentLoyaltyCompensationUnit NewCompensationUnit(
+        Guid sourceOrderId, Guid compensationId, OrderAmendmentLoyaltyCompensationKind kind,
+        OrderAmendmentLoyaltyCompensationUnitPlan unit, DateTime now, string audit) => new()
+        {
+            Id = Guid.NewGuid(),
+            CompensationId = compensationId,
+            SourceOrderId = sourceOrderId,
+            SnapshotUnitId = unit.SnapshotUnitId,
+            Kind = kind,
+            Points = unit.Points,
+            CreatedAt = now,
+            CreatedBy = audit
+        };
+
+    private static OrderBillingSnapshotOwnerLink RequireEarningOwner(
+        IReadOnlyList<OrderBillingSnapshotOwnerLink> ownerLinks, Guid ownerLinkId)
+    {
+        var owner = ownerLinks.SingleOrDefault(value => value.Id == ownerLinkId);
+        if (owner is null || owner.Slot != OrderBillingSnapshotOwnerSlot.Earning
+            || owner.Disposition != OrderBillingSnapshotOwnerDisposition.Linked
+            || !owner.UserId.HasValue || owner.ErasedAt.HasValue || owner.ErasureTransactionId is not null)
+            throw new ConflictException("The original earning owner is unavailable for a protected clawback.");
+        return owner;
+    }
+
+    private static OrderAmendmentLoyaltyReservation NewReservation(
+        OrderAmendmentResolutionOperation operation, OrderAmendmentLoyaltyCompensation header,
+        OrderAmendmentLoyaltyCompensationPlan item, OrderAmendmentLoyaltyReservationState state,
+        DateTime now, string audit) => new()
+        {
+            Id = Guid.NewGuid(),
+            SourceOrderId = operation.SourceOrderId,
+            OperationId = operation.Id,
+            CompensationId = header.Id,
+            OwnerLinkId = item.OwnerLinkId,
+            State = state,
+            CreatedAt = now,
+            CreatedBy = audit
+        };
 
     internal static async Task<bool> TryActivateHeldAsync(ApplicationDbContext context,
         Guid operationId, CancellationToken cancellationToken)

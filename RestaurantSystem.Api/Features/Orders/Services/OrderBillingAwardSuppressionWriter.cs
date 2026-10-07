@@ -16,26 +16,66 @@ internal sealed class OrderBillingAwardSuppressionWriter(ApplicationDbContext co
     public async Task RecordRemovedUnitsAsync(
         Guid orderId, Guid amendmentId, CancellationToken cancellationToken)
     {
+        EnsureAmendmentTransaction();
+        await EnsureSourceOrderLockedAsync(orderId, cancellationToken);
+        var previewPoints = await ReadOrderPreviewPointsAsync(orderId, cancellationToken);
+        var amendment = await ReadCommittedAmendmentAsync(orderId, amendmentId, cancellationToken);
+        var removals = ReadRemovals(amendment);
+        if (removals.Length == 0)
+            return;
+
+        var snapshot = await context.OrderBillingSnapshots.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.OrderId == orderId, cancellationToken);
+        if (!await IsSuppressionRequiredAsync(orderId, previewPoints, snapshot, cancellationToken))
+            return;
+
+        var candidate = snapshot?.EarnedPointsCandidate
+            ?? throw new ConflictException("The frozen loyalty earning candidate is unavailable.");
+        var units = await context.OrderBillingSnapshotUnits.AsNoTracking()
+            .Where(value => value.OrderId == orderId)
+            .OrderBy(value => value.OrderItemId)
+            .ThenBy(value => value.UnitOrdinal)
+            .ToListAsync(cancellationToken);
+        ValidateFrozenAllocation(candidate, units);
+        var affected = SelectAffectedUnits(removals, units);
+        if (affected.Length == 0)
+            return;
+
+        await PersistSuppressionsAsync(orderId, amendmentId, affected, cancellationToken);
+    }
+
+    private void EnsureAmendmentTransaction()
+    {
         if (context.Database.CurrentTransaction is null)
             throw new ConflictException("Loyalty unit suppression requires the accepted amendment transaction.");
+    }
 
+    private async Task EnsureSourceOrderLockedAsync(Guid orderId, CancellationToken cancellationToken)
+    {
         var lockedOrders = await context.Database.SqlQuery<Guid>(
                 $"SELECT id AS \"Value\" FROM orders WHERE id = {orderId} AND is_deleted = FALSE FOR UPDATE")
-            .Take(2)
-            .ToListAsync(cancellationToken);
+            .Take(2).ToListAsync(cancellationToken);
         if (lockedOrders.Count != 1 || lockedOrders[0] != orderId)
             throw new ConflictException("The source order is unavailable for loyalty unit suppression.");
-        var orderPreviewPoints = await context.Orders.AsNoTracking()
-            .Where(value => value.Id == orderId)
-            .Select(value => value.FidelityPointsEarned)
-            .SingleAsync(cancellationToken);
+    }
 
+    private async Task<int> ReadOrderPreviewPointsAsync(Guid orderId, CancellationToken cancellationToken) =>
+        await context.Orders.AsNoTracking().Where(value => value.Id == orderId)
+            .Select(value => value.FidelityPointsEarned).SingleAsync(cancellationToken);
+
+    private async Task<OrderAmendment> ReadCommittedAmendmentAsync(
+        Guid orderId, Guid amendmentId, CancellationToken cancellationToken)
+    {
         var amendment = await context.OrderAmendments.AsNoTracking()
             .SingleOrDefaultAsync(value => value.Id == amendmentId, cancellationToken)
             ?? throw new ConflictException("The accepted loyalty suppression amendment is unavailable.");
         if (amendment.SourceOrderId != orderId || amendment.State != OrderAmendmentState.Committed)
             throw new ConflictException("Loyalty unit suppression requires a committed source-order amendment.");
+        return amendment;
+    }
 
+    private static OrderAmendmentChangeSnapshot[] ReadRemovals(OrderAmendment amendment)
+    {
         List<OrderAmendmentChangeSnapshot> changes;
         try
         {
@@ -47,40 +87,41 @@ internal sealed class OrderBillingAwardSuppressionWriter(ApplicationDbContext co
         }
         if (changes.Any(change => change is null))
             throw new ConflictException("The committed amendment contains an empty removal-scope entry.");
+        return changes.Where(change => change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace)
+            .ToArray();
+    }
 
-        var removals = changes.Where(change =>
-            change.Kind is OrderAmendmentChangeKind.Void or OrderAmendmentChangeKind.Replace).ToArray();
-        if (removals.Length == 0)
-            return;
-
-        var snapshot = await context.OrderBillingSnapshots.AsNoTracking()
-            .SingleOrDefaultAsync(value => value.OrderId == orderId, cancellationToken);
+    private async Task<bool> IsSuppressionRequiredAsync(
+        Guid orderId, int previewPoints, OrderBillingSnapshot? snapshot, CancellationToken cancellationToken)
+    {
         if (snapshot is null)
-            return;
+            return false;
         if (!snapshot.EarnedPointsCandidate.HasValue)
         {
-            if (orderPreviewPoints != 0 || HasPartialEarningEvidence(snapshot))
+            if (previewPoints != 0 || HasPartialEarningEvidence(snapshot))
                 throw new ConflictException("The unevaluated earning snapshot contains partial rule evidence.");
-            return;
+            return false;
         }
-        if (snapshot.EarnedPointsCandidate < 0 || snapshot.EarnedPointsCandidate != orderPreviewPoints)
+        if (snapshot.EarnedPointsCandidate < 0 || snapshot.EarnedPointsCandidate != previewPoints)
             throw new ConflictException("The accepted earning candidate does not match the source-order preview.");
+        return await IsAwardNotYetRecordedAsync(orderId, cancellationToken)
+            && snapshot.EarnedPointsCandidate != 0;
+    }
 
-        if (await context.OrderBillingAwardWitnesses.AsNoTracking()
-                .AnyAsync(value => value.OrderId == orderId, cancellationToken)
-            || await context.FidelityPointsTransactions.AsNoTracking().AnyAsync(value =>
-                value.OrderId == orderId && value.TransactionType == TransactionType.Earned, cancellationToken))
-            return;
-        if (snapshot.EarnedPointsCandidate == 0)
-            return;
+    private async Task<bool> IsAwardNotYetRecordedAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        var hasWitness = await context.OrderBillingAwardWitnesses.AsNoTracking()
+            .AnyAsync(value => value.OrderId == orderId, cancellationToken);
+        if (hasWitness)
+            return false;
+        return !await context.FidelityPointsTransactions.AsNoTracking().AnyAsync(value =>
+            value.OrderId == orderId && value.TransactionType == TransactionType.Earned, cancellationToken);
+    }
 
-        var units = await context.OrderBillingSnapshotUnits.AsNoTracking()
-            .Where(value => value.OrderId == orderId)
-            .OrderBy(value => value.OrderItemId)
-            .ThenBy(value => value.UnitOrdinal)
-            .ToListAsync(cancellationToken);
-        ValidateFrozenAllocation(snapshot.EarnedPointsCandidate.Value, units);
-
+    private static OrderBillingSnapshotUnit[] SelectAffectedUnits(
+        IReadOnlyList<OrderAmendmentChangeSnapshot> removals,
+        IReadOnlyList<OrderBillingSnapshotUnit> units)
+    {
         var selected = new Dictionary<Guid, OrderBillingSnapshotUnit>();
         foreach (var change in removals)
         {
@@ -92,16 +133,17 @@ internal sealed class OrderBillingAwardSuppressionWriter(ApplicationDbContext co
             if (range.Length != change.Quantity || range.Any(unit => !selected.TryAdd(unit.Id, unit)))
                 throw new ConflictException("The amendment removal ranges overlap or do not match frozen earning units.");
         }
+        return selected.Values.Where(value => value.EarnedPoints > 0).ToArray();
+    }
 
-        var affected = selected.Values.Where(value => value.EarnedPoints > 0).ToArray();
-        if (affected.Length == 0)
-            return;
-
+    private async Task PersistSuppressionsAsync(
+        Guid orderId, Guid amendmentId, IReadOnlyList<OrderBillingSnapshotUnit> affected,
+        CancellationToken cancellationToken)
+    {
         var selectedIds = affected.Select(value => value.Id).ToArray();
         if (await context.OrderBillingUnitAwardSuppressions.AsNoTracking()
                 .AnyAsync(value => selectedIds.Contains(value.SnapshotUnitId), cancellationToken))
             throw new ConflictException("An accepted removal unit already has loyalty suppression history.");
-
         var now = DateTime.UtcNow;
         context.OrderBillingUnitAwardSuppressions.AddRange(affected.Select(unit => new OrderBillingUnitAwardSuppression
         {

@@ -189,5 +189,5 @@ public partial class FidelityPointsService
     }
 
     private static bool IsRuleFingerprint(string? value) => value is { Length: 64 }
-        && Regex.IsMatch(value, "^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
+        && Regex.IsMatch(value, "^[0-9a-f]{64}$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 }

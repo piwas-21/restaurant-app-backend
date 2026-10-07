@@ -10,133 +10,26 @@ public partial class FidelityPointsService
 {
     private const string AwardJournalAuditIdentifier = "OrderBillingAwardBoundary";
 
+    private sealed record BackfillAwardInput(
+        AwardOrderState Order, FidelityPointsTransaction Existing, OrderBillingSnapshotOwnerLink OwnerLink,
+        Guid UserId, int Candidate, int Applied, int Suppressed, decimal EarningTotal,
+        IReadOnlyList<OrderBillingSnapshotUnit> Units);
+
+    private sealed record RecordAwardInput(
+        AwardOrderState Order, OrderBillingSnapshotOwnerLink OwnerLink, Guid UserId,
+        int Candidate, int Applied, int Suppressed, decimal EarningTotal,
+        IReadOnlyList<OrderBillingSnapshotUnit> Units,
+        IReadOnlyList<OrderBillingUnitAwardSuppression> Suppressions);
+
     public async Task<FidelityPointsAwardResult> AwardAcceptedOrderAsync(
         Guid orderId, CancellationToken cancellationToken = default)
     {
-        var ownsTransaction = _context.Database.CurrentTransaction is null;
-        var transaction = ownsTransaction
+        var transaction = _context.Database.CurrentTransaction is null
             ? await _context.Database.BeginTransactionAsync(cancellationToken)
             : null;
         try
         {
-            var order = await LockAwardOrderAsync(orderId, cancellationToken);
-            if (order is null)
-                return Deferred(FidelityPointsAwardDeferralReason.OrderUnavailable);
-
-            var witness = await ReadAwardWitnessAsync(orderId, cancellationToken);
-            if (witness is not null)
-            {
-                var replay = await ReplayWitnessAsync(witness, order, cancellationToken);
-                if (transaction is not null)
-                    await transaction.CommitAsync(cancellationToken);
-                return replay;
-            }
-
-            var snapshot = await _context.OrderBillingSnapshots.AsNoTracking()
-                .SingleOrDefaultAsync(value => value.OrderId == orderId, cancellationToken);
-            var existingAwards = await ReadEarnedRowsAsync(orderId, cancellationToken);
-            if (existingAwards.Count > 1)
-                throw new ConflictException("Duplicate loyalty awards require reconciliation.");
-
-            if (snapshot is null)
-            {
-                var legacyReplay = await ReplayLegacyAwardAsync(order, existingAwards, cancellationToken);
-                if (transaction is not null)
-                    await transaction.CommitAsync(cancellationToken);
-                if (legacyReplay.Disposition == FidelityPointsAwardDisposition.Deferred)
-                {
-                    var missingSnapshotReason = ReadIneligibleReason(order);
-                    if (missingSnapshotReason.HasValue)
-                        return Deferred(missingSnapshotReason.Value);
-                    if (await IsProviderManagedAsync(orderId, cancellationToken))
-                        return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
-                }
-                return legacyReplay;
-            }
-
-            if (!snapshot.EarnedPointsCandidate.HasValue)
-            {
-                if (order.FidelityPointsEarned != 0 || HasPartialEarningEvidence(snapshot))
-                    throw new ConflictException("The unevaluated earning snapshot contains partial or inconsistent rule evidence.");
-                return Deferred(FidelityPointsAwardDeferralReason.CandidateUnevaluated);
-            }
-
-            var candidate = ValidateSnapshotCandidate(order, snapshot);
-            var ownerLink = await LockEarningOwnerLinkAsync(orderId, cancellationToken);
-            if (!IsLinkedOwner(ownerLink, order.UserId))
-                return Deferred(FidelityPointsAwardDeferralReason.EarningOwnerUnavailable);
-            if (!await TryLockAwardUserAsync(order.UserId!.Value, cancellationToken))
-                return Deferred(FidelityPointsAwardDeferralReason.EarningOwnerUnavailable);
-            if (existingAwards.Count == 0)
-            {
-                var ineligible = ReadIneligibleReason(order);
-                if (ineligible.HasValue)
-                    return Deferred(ineligible.Value);
-                if (await IsProviderManagedAsync(orderId, cancellationToken))
-                    return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
-            }
-
-            var units = await ReadSnapshotUnitsAsync(orderId, cancellationToken);
-            ValidateUnitAllocation(candidate, units);
-            var suppressions = await ReadUnitSuppressionsAsync(orderId, cancellationToken);
-            var suppressed = await ValidateSuppressionsAsync(orderId, units, suppressions, _context,
-                AwardSuppressionValidationMode.CompletePreAwardCoverage, cancellationToken);
-            if (suppressed > candidate)
-                throw new ConflictException("The loyalty removal history exceeds the frozen earning candidate.");
-            var applied = checked(candidate - suppressed);
-            var earningTotal = SnapshotEarningTotal(snapshot);
-
-            if (existingAwards.Count == 1)
-            {
-                var existing = existingAwards[0];
-                if (suppressed != 0 || applied != candidate
-                    || !MatchesAward(existing, order, ownerLink!.UserId!.Value, candidate, earningTotal))
-                    throw new ConflictException("The original loyalty award does not match the frozen snapshot.");
-                if (await HasCommittedRemovalAmendmentAsync(orderId, cancellationToken))
-                    throw new ConflictException("A legacy award with accepted removals has no provable per-unit award coverage.");
-                if (await LockBalanceRowForLoyaltyAsync(ownerLink.UserId.Value, cancellationToken) is null)
-                    throw new ConflictException("The original loyalty award has no balance record.");
-
-                var backfilled = NewWitness(orderId, ownerLink.Id, candidate, candidate, 0,
-                    OrderBillingAwardOutcome.Awarded, existing.Id);
-                _context.OrderBillingAwardWitnesses.Add(backfilled);
-                AddAwardUnitCoverage(orderId, backfilled.Id, units);
-                await _context.SaveChangesAsync(cancellationToken);
-                if (transaction is not null)
-                    await transaction.CommitAsync(cancellationToken);
-                return Result(FidelityPointsAwardDisposition.AlreadyAwarded, candidate, candidate, 0);
-            }
-
-            if (applied == 0)
-            {
-                var outcome = candidate == 0
-                    ? OrderBillingAwardOutcome.EvaluatedZero
-                    : OrderBillingAwardOutcome.FullySuppressed;
-                _context.OrderBillingAwardWitnesses.Add(NewWitness(
-                    orderId, ownerLink!.Id, candidate, 0, suppressed, outcome, null));
-                await _context.SaveChangesAsync(cancellationToken);
-                if (transaction is not null)
-                    await transaction.CommitAsync(cancellationToken);
-                return Result(candidate == 0
-                    ? FidelityPointsAwardDisposition.EvaluatedZero
-                    : FidelityPointsAwardDisposition.FullySuppressed, candidate, 0, suppressed);
-            }
-
-            var balance = await LockBalanceRowForLoyaltyAsync(ownerLink!.UserId!.Value, cancellationToken);
-            var now = DateTime.UtcNow;
-            var auditIdentifier = _currentUserService.GetAuditIdentifier();
-            ApplyAwardBalance(balance, ownerLink.UserId.Value, applied, now, auditIdentifier);
-            var earned = NewEarnedTransaction(order, ownerLink.UserId.Value, applied, earningTotal, now, auditIdentifier);
-            _context.FidelityPointsTransactions.Add(earned);
-            var newWitness = NewWitness(
-                orderId, ownerLink.Id, candidate, applied, suppressed,
-                OrderBillingAwardOutcome.Awarded, earned.Id);
-            _context.OrderBillingAwardWitnesses.Add(newWitness);
-            AddAwardUnitCoverage(orderId, newWitness.Id, units, suppressions);
-            await _context.SaveChangesAsync(cancellationToken);
-            if (transaction is not null)
-                await transaction.CommitAsync(cancellationToken);
-            return Result(FidelityPointsAwardDisposition.Awarded, candidate, applied, suppressed);
+            return await AwardLockedOrderAsync(orderId, transaction, cancellationToken);
         }
         catch
         {
@@ -150,6 +43,172 @@ public partial class FidelityPointsService
                 await transaction.DisposeAsync();
         }
     }
+
+    private async Task<FidelityPointsAwardResult> AwardLockedOrderAsync(
+        Guid orderId, Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var order = await LockAwardOrderAsync(orderId, cancellationToken);
+        if (order is null)
+            return Deferred(FidelityPointsAwardDeferralReason.OrderUnavailable);
+
+        var witness = await ReadAwardWitnessAsync(orderId, cancellationToken);
+        if (witness is null)
+            return await AwardWithoutWitnessAsync(order, transaction, cancellationToken);
+
+        var replay = await ReplayWitnessAsync(witness, order, cancellationToken);
+        await CommitOwnedTransactionAsync(transaction, cancellationToken);
+        return replay;
+    }
+
+    private async Task<FidelityPointsAwardResult> AwardWithoutWitnessAsync(
+        AwardOrderState order, Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await _context.OrderBillingSnapshots.AsNoTracking()
+            .SingleOrDefaultAsync(value => value.OrderId == order.Id, cancellationToken);
+        var existingAwards = await ReadEarnedRowsAsync(order.Id, cancellationToken);
+        if (existingAwards.Count > 1)
+            throw new ConflictException("Duplicate loyalty awards require reconciliation.");
+        if (snapshot is null)
+            return await ReplayLegacyWithoutSnapshotAsync(order, existingAwards, transaction, cancellationToken);
+        if (!snapshot.EarnedPointsCandidate.HasValue)
+        {
+            if (order.FidelityPointsEarned != 0 || HasPartialEarningEvidence(snapshot))
+                throw new ConflictException("The unevaluated earning snapshot contains partial or inconsistent rule evidence.");
+            return Deferred(FidelityPointsAwardDeferralReason.CandidateUnevaluated);
+        }
+
+        return await AwardFromSnapshotAsync(order, snapshot, existingAwards, transaction, cancellationToken);
+    }
+
+    private async Task<FidelityPointsAwardResult> ReplayLegacyWithoutSnapshotAsync(
+        AwardOrderState order, List<FidelityPointsTransaction> existingAwards,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var result = await ReplayLegacyAwardAsync(order, existingAwards, cancellationToken);
+        await CommitOwnedTransactionAsync(transaction, cancellationToken);
+        if (result.Disposition != FidelityPointsAwardDisposition.Deferred)
+            return result;
+
+        var ineligible = ReadIneligibleReason(order);
+        if (ineligible.HasValue)
+            return Deferred(ineligible.Value);
+        if (await IsProviderManagedAsync(order.Id, cancellationToken))
+            return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
+        return result;
+    }
+
+    private async Task<FidelityPointsAwardResult> AwardFromSnapshotAsync(
+        AwardOrderState order, OrderBillingSnapshot snapshot,
+        List<FidelityPointsTransaction> existingAwards,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var candidate = ValidateSnapshotCandidate(order, snapshot);
+        var ownerLink = await LockEarningOwnerLinkAsync(order.Id, cancellationToken);
+        if (!IsLinkedOwner(ownerLink, order.UserId)
+            || !await TryLockAwardUserAsync(order.UserId!.Value, cancellationToken))
+            return Deferred(FidelityPointsAwardDeferralReason.EarningOwnerUnavailable);
+        var userId = ownerLink!.UserId!.Value;
+        if (existingAwards.Count == 0)
+        {
+            var ineligible = ReadIneligibleReason(order);
+            if (ineligible.HasValue)
+                return Deferred(ineligible.Value);
+            if (await IsProviderManagedAsync(order.Id, cancellationToken))
+                return Deferred(FidelityPointsAwardDeferralReason.ProviderManaged);
+        }
+
+        var units = await ReadSnapshotUnitsAsync(order.Id, cancellationToken);
+        ValidateUnitAllocation(candidate, units);
+        var suppressions = await ReadUnitSuppressionsAsync(order.Id, cancellationToken);
+        var suppressed = await ValidateSuppressionsAsync(order.Id, units, suppressions, _context,
+            AwardSuppressionValidationMode.CompletePreAwardCoverage, cancellationToken);
+        if (suppressed > candidate)
+            throw new ConflictException("The loyalty removal history exceeds the frozen earning candidate.");
+        var applied = checked(candidate - suppressed);
+        var earningTotal = SnapshotEarningTotal(snapshot);
+
+        if (existingAwards.Count == 1)
+            return await BackfillExistingAwardAsync(new(order, existingAwards[0], ownerLink,
+                userId, candidate, applied, suppressed, earningTotal, units), transaction, cancellationToken);
+        if (applied == 0)
+            return await RecordNoAwardAsync(order.Id, ownerLink, candidate, suppressed, transaction, cancellationToken);
+        return await RecordAwardAsync(new(order, ownerLink, userId, candidate, applied,
+            suppressed, earningTotal, units, suppressions), transaction, cancellationToken);
+    }
+
+    private async Task<FidelityPointsAwardResult> BackfillExistingAwardAsync(
+        BackfillAwardInput input,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        if (input.Suppressed != 0 || input.Applied != input.Candidate
+            || !MatchesAward(input.Existing, input.Order, input.UserId,
+                input.Candidate, input.EarningTotal))
+            throw new ConflictException("The original loyalty award does not match the frozen snapshot.");
+        if (await HasCommittedRemovalAmendmentAsync(input.Order.Id, cancellationToken))
+            throw new ConflictException("A legacy award with accepted removals has no provable per-unit award coverage.");
+        if (await LockBalanceRowForLoyaltyAsync(input.UserId, cancellationToken) is null)
+            throw new ConflictException("The original loyalty award has no balance record.");
+
+        var backfilled = NewWitness(input.Order.Id, input.OwnerLink.Id,
+            input.Candidate, input.Candidate, 0, OrderBillingAwardOutcome.Awarded, input.Existing.Id);
+        _context.OrderBillingAwardWitnesses.Add(backfilled);
+        AddAwardUnitCoverage(input.Order.Id, backfilled.Id, input.Units);
+        await _context.SaveChangesAsync(cancellationToken);
+        await CommitOwnedTransactionAsync(transaction, cancellationToken);
+        return Result(FidelityPointsAwardDisposition.AlreadyAwarded,
+            input.Candidate, input.Candidate, 0);
+    }
+
+    private async Task<FidelityPointsAwardResult> RecordNoAwardAsync(
+        Guid orderId, OrderBillingSnapshotOwnerLink ownerLink, int candidate, int suppressed,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var outcome = candidate == 0
+            ? OrderBillingAwardOutcome.EvaluatedZero
+            : OrderBillingAwardOutcome.FullySuppressed;
+        _context.OrderBillingAwardWitnesses.Add(NewWitness(
+            orderId, ownerLink.Id, candidate, 0, suppressed, outcome, null));
+        await _context.SaveChangesAsync(cancellationToken);
+        await CommitOwnedTransactionAsync(transaction, cancellationToken);
+        var disposition = candidate == 0
+            ? FidelityPointsAwardDisposition.EvaluatedZero
+            : FidelityPointsAwardDisposition.FullySuppressed;
+        return Result(disposition, candidate, 0, suppressed);
+    }
+
+    private async Task<FidelityPointsAwardResult> RecordAwardAsync(
+        RecordAwardInput input,
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var balance = await LockBalanceRowForLoyaltyAsync(input.UserId, cancellationToken);
+        var now = DateTime.UtcNow;
+        var auditIdentifier = _currentUserService.GetAuditIdentifier();
+        ApplyAwardBalance(balance, input.UserId, input.Applied, now, auditIdentifier);
+        var earned = NewEarnedTransaction(input.Order, input.UserId, input.Applied,
+            input.EarningTotal, now, auditIdentifier);
+        _context.FidelityPointsTransactions.Add(earned);
+        var witness = NewWitness(input.Order.Id, input.OwnerLink.Id, input.Candidate,
+            input.Applied, input.Suppressed,
+            OrderBillingAwardOutcome.Awarded, earned.Id);
+        _context.OrderBillingAwardWitnesses.Add(witness);
+        AddAwardUnitCoverage(input.Order.Id, witness.Id, input.Units, input.Suppressions);
+        await _context.SaveChangesAsync(cancellationToken);
+        await CommitOwnedTransactionAsync(transaction, cancellationToken);
+        return Result(FidelityPointsAwardDisposition.Awarded,
+            input.Candidate, input.Applied, input.Suppressed);
+    }
+
+    private static Task CommitOwnedTransactionAsync(
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction,
+        CancellationToken cancellationToken) => transaction is null
+        ? Task.CompletedTask : transaction.CommitAsync(cancellationToken);
 
     private async Task<AwardOrderState?> LockAwardOrderAsync(Guid orderId, CancellationToken cancellationToken)
     {

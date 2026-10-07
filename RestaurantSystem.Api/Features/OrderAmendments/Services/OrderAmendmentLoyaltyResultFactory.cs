@@ -16,6 +16,8 @@ internal sealed record OrderAmendmentLoyaltyResultEvidence(
 
 internal static class OrderAmendmentLoyaltyResultFactory
 {
+    private sealed record AwardTotals(bool Pending, int Applied, int Suppressed);
+
     internal static OrderAmendmentLoyaltyResultDto? Create(
         OrderAmendmentResolutionOperation operation, OrderAmendmentLoyaltyResultEvidence evidence)
     {
@@ -34,32 +36,48 @@ internal static class OrderAmendmentLoyaltyResultFactory
             && link.OrderId == operation.SourceOrderId
             && link.Disposition == OrderBillingSnapshotOwnerDisposition.Linked
             && link.UserId.HasValue && !link.ErasedAt.HasValue && link.ErasureTransactionId is null);
-        var awardPending = plan.AwardPending && evidence.AwardWitness is null;
-        var applied = awardPending ? plan.AppliedAwardPoints
-            : plan.AwardPending ? evidence.AwardWitness!.AppliedPoints : plan.AppliedAwardPoints;
-        var suppressed = awardPending ? plan.SuppressedPoints
-            : plan.AwardPending ? evidence.AwardWitness!.SuppressedPoints : plan.SuppressedPoints;
-        if (applied < 0 || suppressed < 0 || (long)applied + suppressed > plan.CandidatePoints
-            || !awardPending && (long)applied + suppressed != plan.CandidatePoints)
+        var award = ReadAwardTotals(plan, evidence.AwardWitness);
+        if (award.Applied < 0 || award.Suppressed < 0
+            || (long)award.Applied + award.Suppressed > plan.CandidatePoints
+            || !award.Pending && (long)award.Applied + award.Suppressed != plan.CandidatePoints)
             throw Invalid("The current award result differs from its accepted loyalty candidate.");
 
         var hasEffect = plan.PendingAwardSuppressions.Count > 0 || plan.Compensations.Count > 0;
-        var status = operation.State == OrderAmendmentResolutionOperationState.Resolved
-            ? hasEffect ? OrderAmendmentLoyaltyOperationStatus.Resolved
-                : OrderAmendmentLoyaltyOperationStatus.None
-            : ReadStatus(plan, reservation, ownerAvailable, awardPending, hasEffect);
+        var status = ReadOperationStatus(operation, plan, reservation, ownerAvailable, award.Pending, hasEffect);
         var activeReservation = reservation?.State is OrderAmendmentLoyaltyReservationState.HeldShortfall
             or OrderAmendmentLoyaltyReservationState.Reserved;
         int? shortfall = activeReservation && evidence.AvailablePointsBeforeClawback is long available
             ? checked((int)Math.Max(0L, plan.EarnedClawbackPoints - available)) : null;
 
-        return new OrderAmendmentLoyaltyResultDto(status, awardPending, plan.CandidatePoints,
-            applied, suppressed, plan.EarnedClawbackPoints, plan.RedemptionRestorationPoints,
+        return new OrderAmendmentLoyaltyResultDto(status, award.Pending, plan.CandidatePoints,
+            award.Applied, award.Suppressed, plan.EarnedClawbackPoints, plan.RedemptionRestorationPoints,
             SumPosted(evidence.Compensations, evidence.Postings,
                 OrderAmendmentLoyaltyCompensationKind.EarnedClawback),
             SumPosted(evidence.Compensations, evidence.Postings,
                 OrderAmendmentLoyaltyCompensationKind.RedemptionRestoration),
             evidence.AvailablePointsBeforeClawback, shortfall);
+    }
+
+    private static AwardTotals ReadAwardTotals(
+        OrderAmendmentLoyaltyPlan plan, OrderBillingAwardWitness? witness)
+    {
+        if (!plan.AwardPending)
+            return new(false, plan.AppliedAwardPoints, plan.SuppressedPoints);
+        return witness is null
+            ? new(true, plan.AppliedAwardPoints, plan.SuppressedPoints)
+            : new(false, witness.AppliedPoints, witness.SuppressedPoints);
+    }
+
+    private static OrderAmendmentLoyaltyOperationStatus ReadOperationStatus(
+        OrderAmendmentResolutionOperation operation, OrderAmendmentLoyaltyPlan plan,
+        OrderAmendmentLoyaltyReservation? reservation, bool ownerAvailable,
+        bool awardPending, bool hasEffect)
+    {
+        if (operation.State == OrderAmendmentResolutionOperationState.Resolved)
+            return hasEffect
+                ? OrderAmendmentLoyaltyOperationStatus.Resolved
+                : OrderAmendmentLoyaltyOperationStatus.None;
+        return ReadStatus(plan, reservation, ownerAvailable, awardPending, hasEffect);
     }
 
     private static OrderAmendmentLoyaltyOperationStatus ReadStatus(
