@@ -6,5 +6,7 @@ namespace RestaurantSystem.Api.Features.KitchenBoard.Services;
 public interface IKitchenBoardWorkReader
 {
     Task<KitchenBoardWorkFeedDto> ReadAsync(
-        GetKitchenBoardWorkQuery query, CancellationToken cancellationToken);
+        GetKitchenBoardWorkQuery query,
+        int pageSize,
+        CancellationToken cancellationToken);
 }

@@ -10,7 +10,7 @@ using RestaurantSystem.Api.Settings;
 namespace RestaurantSystem.Api.Features.KitchenBoard.Queries.GetKitchenBoardWorkQuery;
 
 public sealed record GetKitchenBoardWorkQuery(
-    int PageSize = 100,
+    int? PageSize = null,
     string? OrdersCursor = null,
     string? CorrectionsCursor = null,
     string? CompletionsCursor = null) : IQuery<ApiResponse<KitchenBoardWorkFeedDto>>;
@@ -25,13 +25,15 @@ public sealed class GetKitchenBoardWorkQueryHandler(
         GetKitchenBoardWorkQuery query, CancellationToken cancellationToken)
     {
         KitchenBoardFeaturePolicy.RequireEnabled(features);
-        if (query.PageSize is < 1 || query.PageSize > options.Value.MaxPageSize)
+        var pageSize = query.PageSize
+            ?? Math.Min(options.Value.DefaultPageSize, options.Value.MaxPageSize);
+        if (pageSize is < 1 || pageSize > options.Value.MaxPageSize)
         {
             throw new BadRequestException(
                 $"Kitchen board page size must be between 1 and {options.Value.MaxPageSize}.");
         }
 
         return ApiResponse<KitchenBoardWorkFeedDto>.SuccessWithData(
-            await reader.ReadAsync(query, cancellationToken));
+            await reader.ReadAsync(query, pageSize, cancellationToken));
     }
 }

@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Modules;
@@ -13,6 +14,7 @@ using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
 using RestaurantSystem.Api.Features.ServerWorkspace.Dtos;
+using RestaurantSystem.Api.Settings;
 using RestaurantSystem.Domain.Common.Enums;
 using RestaurantSystem.Domain.Entities;
 using RestaurantSystem.Infrastructure.Persistence;
@@ -36,6 +38,7 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
         services.AddSingleton<ITenantModules>(new KitchenBoardModules());
         services.RemoveAll<ITenantFeatures>();
         services.AddSingleton<ITenantFeatures>(_features);
+        services.PostConfigure<OperationalQueueSyncOptions>(options => options.DefaultPageSize = 1);
     }
 
     [Fact]
@@ -375,6 +378,51 @@ public sealed class KitchenBoardWorkflowTests : IntegrationTestBase
         refusal.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await ReadResponseAsync<ApiResponse<KitchenBoardWorkCompletionDto>>(refusal))!
             .ErrorCode.Should().Be(ErrorCodes.RequiredRoutingUnresolved);
+    }
+
+    [Fact]
+    public async Task Omitted_page_size_cursor_continuation_keeps_the_configured_default()
+    {
+        var firstOrderId = await SeedOrderAsync(OrderStatus.Ready, DevicePrintStatus.NotConfigured);
+        var secondOrderId = await SeedOrderAsync(OrderStatus.Ready, DevicePrintStatus.NotConfigured);
+        AuthenticateAsRole(UserRole.KitchenStaff);
+
+        var firstResponse = await Client.GetAsync("/api/staff/kitchen-board/work");
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var firstPage = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(firstResponse))!.Data!;
+        firstPage.Orders.TotalCount.Should().Be(2);
+        firstPage.Orders.Items.Should().ContainSingle();
+        firstPage.Orders.HasMore.Should().BeTrue();
+
+        var secondResponse = await Client.GetAsync(BuildWorkFeedUrl(firstPage));
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            "the omitted page size must normalize to the same value bound into the cursor");
+        var secondPage = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(secondResponse))!.Data!;
+        secondPage.Orders.Items.Should().ContainSingle();
+        secondPage.Orders.Items.Single().OrderId.Should().NotBe(firstPage.Orders.Items.Single().OrderId);
+        firstPage.Orders.Items.Concat(secondPage.Orders.Items)
+            .Select(item => item.OrderId)
+            .Should().BeEquivalentTo([firstOrderId, secondOrderId]);
+        secondPage.Orders.HasMore.Should().BeFalse();
+
+        var watermarkResponse = await Client.GetAsync(BuildWorkFeedUrl(secondPage));
+        watermarkResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            "terminal cursors remain bound to the effective page size during incremental polling");
+        var watermarkPage = (await ReadResponseAsync<ApiResponse<KitchenBoardWorkFeedDto>>(watermarkResponse))!.Data!;
+        watermarkPage.Orders.Items.Should().BeEmpty();
+        watermarkPage.Orders.HasMore.Should().BeFalse();
+    }
+
+    private static string BuildWorkFeedUrl(KitchenBoardWorkFeedDto feed)
+    {
+        var ordersCursor = Uri.EscapeDataString(feed.Orders.NextCursor
+            ?? throw new InvalidOperationException("The orders page must return its cursor."));
+        var correctionsCursor = Uri.EscapeDataString(feed.Corrections.NextCursor
+            ?? throw new InvalidOperationException("The corrections page must return its cursor."));
+        var completionsCursor = Uri.EscapeDataString(feed.Completions.NextCursor
+            ?? throw new InvalidOperationException("The completions page must return its cursor."));
+        return $"/api/staff/kitchen-board/work?ordersCursor={ordersCursor}"
+            + $"&correctionsCursor={correctionsCursor}&completionsCursor={completionsCursor}";
     }
 
     [Fact]

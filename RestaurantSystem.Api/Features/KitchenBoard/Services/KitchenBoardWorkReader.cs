@@ -14,7 +14,9 @@ public sealed class KitchenBoardWorkReader(
     ILogger<KitchenBoardWorkReader> logger) : IKitchenBoardWorkReader
 {
     public async Task<KitchenBoardWorkFeedDto> ReadAsync(
-        GetKitchenBoardWorkQuery query, CancellationToken cancellationToken)
+        GetKitchenBoardWorkQuery query,
+        int pageSize,
+        CancellationToken cancellationToken)
     {
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         // Writers take the order-feed lock before the board lock. Take the same order here so a
@@ -34,13 +36,13 @@ public sealed class KitchenBoardWorkReader(
         var filter = KitchenBoardCursorPolicy.CreateFilter(currentUser);
 
         var orders = await KitchenBoardOrderStream.ReadAsync(
-            context, cursor, filter, query.OrdersCursor, query.PageSize,
+            context, cursor, filter, query.OrdersCursor, pageSize,
             orderWatermark, logger, cancellationToken);
         var corrections = await KitchenBoardCorrectionStream.ReadAsync(
-            context, cursor, filter, query.CorrectionsCursor, query.PageSize,
+            context, cursor, filter, query.CorrectionsCursor, pageSize,
             correctionWatermark, logger, cancellationToken);
         var completions = await KitchenBoardCompletionStream.ReadAsync(
-            context, cursor, filter, query.CompletionsCursor, query.PageSize,
+            context, cursor, filter, query.CompletionsCursor, pageSize,
             completionWatermark, cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
