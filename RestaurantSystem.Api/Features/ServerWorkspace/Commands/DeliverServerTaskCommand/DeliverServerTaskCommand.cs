@@ -3,6 +3,8 @@ using RestaurantSystem.Api.Abstraction.Messaging;
 using RestaurantSystem.Api.Common;
 using RestaurantSystem.Api.Common.Models;
 using RestaurantSystem.Api.Common.Services.Interfaces;
+using RestaurantSystem.Api.Common.TenantFeatures;
+using RestaurantSystem.Api.Features.KitchenBoard.Services;
 using RestaurantSystem.Api.Features.Orders.Commands.UpdateOrderStatusCommand;
 using RestaurantSystem.Api.Features.Orders.Dtos;
 using RestaurantSystem.Api.Features.Orders.Services;
@@ -23,15 +25,18 @@ public sealed class DeliverServerTaskCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly IOrderPermittedActionsService _actions;
     private readonly CustomMediator _mediator;
+    private readonly ITenantFeatures? _features;
 
     public DeliverServerTaskCommandHandler(
         ApplicationDbContext context,
         IOrderPermittedActionsService actions,
-        CustomMediator mediator)
+        CustomMediator mediator,
+        ITenantFeatures? features = null)
     {
         _context = context;
         _actions = actions;
         _mediator = mediator;
+        _features = features;
     }
 
     public async Task<ApiResponse<OrderDto>> Handle(
@@ -55,7 +60,22 @@ public sealed class DeliverServerTaskCommandHandler
                 ErrorCodes.OrderVersionConflict);
         }
 
-        if (ServerTaskRoutingPolicy.HasRequiredException(order))
+        var boardEnabled = KitchenBoardFeaturePolicy.IsEnabled(_features);
+        if (boardEnabled)
+        {
+            var boardState = (await KitchenBoardHandoverGuard.ReadAsync(
+                _context, [order], true, cancellationToken))[order.Id];
+            var boardBlock = boardState.BlockReason(order);
+            if (boardBlock is not null)
+            {
+                return ApiResponse<OrderDto>.FailureWithCode(
+                    boardBlock == ErrorCodes.KitchenCorrectionUnresolved
+                        ? "A kitchen correction must be acknowledged before handover."
+                        : "Kitchen work must be completed before handover.",
+                    boardBlock);
+            }
+        }
+        else if (ServerTaskRoutingPolicy.HasRequiredException(order))
         {
             return ApiResponse<OrderDto>.FailureWithCode(
                 "Resolve required order routing before delivering it.",
@@ -83,4 +103,5 @@ public sealed class DeliverServerTaskCommandHandler
         order.Status == OrderStatus.Ready && order.Type == OrderType.Delivery
             ? OrderStatus.OutForDelivery
             : OrderStatus.Completed;
+
 }

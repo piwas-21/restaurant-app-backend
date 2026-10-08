@@ -100,6 +100,9 @@ public sealed partial class CloseTableServiceSessionCommandHandler
             await AccountPaymentCloseGuard.RequireClosableAsync(
                 _context, session.Id, _features, cancellationToken);
 
+            var kitchenCorrectionFailure = await CheckKitchenBoardCloseAsync(session, cancellationToken);
+            if (kitchenCorrectionFailure is not null) return kitchenCorrectionFailure;
+
             var legacyQuery = TableServiceSessionCloseRules.ForUnassignedSession(
                 _context.Orders, session.TableId, session.TableNumber);
             var legacyOrders = await legacyQuery

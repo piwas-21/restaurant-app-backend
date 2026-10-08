@@ -214,6 +214,8 @@ public static class ErrorCodes
     public const string OrderVersionConflict = "OrderVersionConflict";
     public const string KitchenReleaseRequired = "KitchenReleaseRequired";
     public const string RequiredRoutingUnresolved = "RequiredRoutingUnresolved";
+    public const string KitchenCorrectionUnresolved = "KitchenCorrectionUnresolved";
+    public const string KitchenWorkUnresolved = "KitchenWorkUnresolved";
     public const string KitchenRoleRequired = "KitchenRoleRequired";
     public const string CashierRequired = "CashierRequired";
 

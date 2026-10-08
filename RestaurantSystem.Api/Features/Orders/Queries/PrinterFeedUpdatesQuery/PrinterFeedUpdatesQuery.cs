@@ -49,6 +49,10 @@ public class PrinterFeedUpdatesQueryHandler
             // printer boundary: Staff notes can never reach a printer through role inference.
             .Where(note => note.Audience == OrderNoteAudience.Kitchen
                 && (note.WithdrawnAt.HasValue || !note.Order.IsDeleted)
+                && (note.WithdrawnAt.HasValue || !_context.KitchenBoardWorkCompletions.Any(work =>
+                    work.OrderId == note.OrderId
+                    && work.WorkItemId == note.Id
+                    && work.Kind == KitchenBoardWorkKind.AmendmentCorrection))
                 // Ordinary notes follow the existing preparation states. Frozen amendment jobs
                 // survive terminal status: an offline kitchen still needs the cancellation ticket.
                 && (note.WithdrawnAt.HasValue || note.KitchenChangesJson != null

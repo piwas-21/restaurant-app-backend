@@ -134,6 +134,7 @@ namespace RestaurantSystem.Infrastructure.Persistence
         public DbSet<AccountCheckoutJournal> AccountCheckoutJournals { get; set; }
         public DbSet<TableServicePaymentHandoff> TableServicePaymentHandoffs { get; set; }
         public DbSet<OrderOperationalNote> OrderOperationalNotes { get; set; }
+        public DbSet<KitchenBoardWorkCompletion> KitchenBoardWorkCompletions { get; set; }
         public DbSet<OrderRoutingState> OrderRoutingStates { get; set; }
         public DbSet<StaffOrderOperation> StaffOrderOperations { get; set; }
         public DbSet<OrderCheckoutSession> OrderCheckoutSessions { get; set; }
